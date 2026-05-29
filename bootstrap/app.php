@@ -16,8 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'role'       => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role'            => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission'      => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'school.admin'    => \App\Http\Middleware\EnsureSchoolAdmin::class,
+            'sahodaya.admin'  => \App\Http\Middleware\EnsureSahodayaAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

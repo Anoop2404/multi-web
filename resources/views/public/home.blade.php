@@ -5,8 +5,9 @@
 @section('content')
     @forelse($sections as $section)
         @include("sections.{$section->section_type}.{$section->variant}", [
-            'config' => $section->config ?? [],
+            'config'  => $section->config ?? [],
             'section' => $section,
+            'tenant'  => $tenant,
         ])
     @empty
         <div class="min-h-screen flex items-center justify-center text-gray-400">

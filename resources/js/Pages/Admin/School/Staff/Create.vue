@@ -1,0 +1,83 @@
+<template>
+    <SchoolAdminLayout title="Add Staff Member" :school="school">
+        <div class="max-w-2xl">
+            <form @submit.prevent="submit" class="space-y-5">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Full Name *</label>
+                            <input v-model="form.name" type="text" required
+                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Designation *</label>
+                            <input v-model="form.designation" type="text" required placeholder="PGT Mathematics"
+                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                        </div>
+                    </div>
+
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Department</label>
+                            <input v-model="form.department" type="text" placeholder="Science, Arts, Admin..."
+                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Qualification</label>
+                            <input v-model="form.qualification" type="text" placeholder="M.Sc., B.Ed."
+                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-2">Staff Type *</label>
+                        <div class="flex gap-3">
+                            <label v-for="type in ['teaching','non-teaching','admin']" :key="type"
+                                   class="flex items-center gap-2 px-4 py-2 rounded-lg border-2 cursor-pointer transition"
+                                   :class="form.type === type ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'">
+                                <input type="radio" v-model="form.type" :value="type" class="sr-only">
+                                <span class="text-sm font-medium capitalize">{{ type }}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Photo</label>
+                        <input type="file" accept="image/*" @change="form.photo = $event.target.files[0]"
+                               class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <button type="submit" :disabled="form.processing"
+                            class="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-700 transition disabled:opacity-50">
+                        Add Staff Member
+                    </button>
+                    <Link :href="`/school-admin/${school.id}/staff`" class="text-sm text-gray-500 hover:text-gray-700">Cancel</Link>
+                </div>
+            </form>
+        </div>
+    </SchoolAdminLayout>
+</template>
+
+<script setup>
+import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { Link, useForm } from '@inertiajs/vue3';
+
+const props = defineProps({ school: Object });
+
+const form = useForm({
+    name:          '',
+    designation:   '',
+    department:    '',
+    qualification: '',
+    type:          'teaching',
+    display_order: 0,
+    is_active:     true,
+    photo:         null,
+});
+
+function submit() {
+    form.post(`/school-admin/${props.school.id}/staff`, { forceFormData: true });
+}
+</script>
