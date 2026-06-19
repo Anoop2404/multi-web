@@ -137,7 +137,7 @@ class StudentController extends SchoolAdminController
         );
 
         $student->update([
-            'photo' => TenantStorage::storeUploadedFile($file, 'students/'.$this->school->id),
+            'photo' => TenantStorage::storeStudentPhoto($file, $this->school->id),
         ]);
 
         app(DataChangeLogger::class)->updated(
@@ -169,7 +169,7 @@ class StudentController extends SchoolAdminController
                 $request->user()->id,
                 ['student_id' => $student->id, 'previous_photo' => $student->photo],
             );
-            $data['photo'] = TenantStorage::storeUploadedFile($file, 'students/'.$this->school->id);
+            $data['photo'] = TenantStorage::storeStudentPhoto($file, $this->school->id);
             $before['photo'] = $student->photo;
         }
 

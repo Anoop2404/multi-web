@@ -98,29 +98,39 @@ class TenantStorage
     {
         $relativePath = ltrim($relativePath, '/');
 
-        $absolute = self::publicFilePath($tenant, $relativePath);
-        if ($absolute) {
-            return response()->file($absolute);
-        }
-
         foreach (self::downloadDisks() as $disk) {
             if (self::disk($disk)->exists($relativePath)) {
                 return self::disk($disk)->response($relativePath);
             }
         }
 
+        $absolute = self::publicFilePath($tenant, $relativePath);
+        if ($absolute) {
+            return response()->file($absolute);
+        }
+
         abort(404, 'File not found.');
     }
 
-    public static function storeUploadedFile($file, string $directory): string
+    public static function storeUploadedFile($file, string $directory, ?string $disk = null): string
     {
-        return $file->store($directory, self::uploadDisk());
+        return $file->store($directory, $disk ?? self::uploadDisk());
+    }
+
+    public static function storeStudentPhoto($file, string $schoolId): string
+    {
+        return self::storeUploadedFile($file, 'students/'.$schoolId, 's3');
+    }
+
+    public static function storeSubmissionImage($file, string $schoolId): string
+    {
+        return self::storeUploadedFile($file, 'submissions/'.$schoolId, 's3');
     }
 
     /** @return list<string> */
     private static function downloadDisks(): array
     {
-        $disks = [self::uploadDisk(), 's3', self::SHARED_DISK];
+        $disks = ['s3', self::uploadDisk(), self::SHARED_DISK];
 
         return array_values(array_unique($disks));
     }

@@ -178,6 +178,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/registration/begin', [AnnualRegistrationController::class, 'begin'])->name('registration.begin');
     Route::get('/registration/students', [AnnualRegistrationController::class, 'students'])->name('registration.students');
     Route::post('/registration/students', [AnnualRegistrationController::class, 'storeStudent'])->name('registration.students.store');
+    Route::get('/registration/students/{student}/image', [AnnualRegistrationController::class, 'showSubmissionStudentImage'])->name('registration.students.image');
     Route::delete('/registration/students/{student}', [AnnualRegistrationController::class, 'destroyStudent'])->name('registration.students.destroy');
     Route::get('/registration/counts', [AnnualRegistrationController::class, 'counts'])->name('registration.counts');
     Route::post('/registration/counts', [AnnualRegistrationController::class, 'saveCounts'])->name('registration.counts.save');
@@ -354,6 +355,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         // Submission review
         Route::get('/membership/submissions', [\App\Http\Controllers\SahodayaAdmin\SubmissionReviewController::class, 'index'])->name('membership.submissions.index');
         Route::get('/membership/submissions/{submission}', [\App\Http\Controllers\SahodayaAdmin\SubmissionReviewController::class, 'show'])->name('membership.submissions.show');
+        Route::get('/membership/submission-students/{student}/image', [\App\Http\Controllers\SahodayaAdmin\SubmissionReviewController::class, 'showSubmissionStudentImage'])->name('membership.submission-students.image');
 
         // Payment verification
         Route::get('/membership/payments', [\App\Http\Controllers\SahodayaAdmin\PaymentVerificationController::class, 'index'])->name('membership.payments.index');

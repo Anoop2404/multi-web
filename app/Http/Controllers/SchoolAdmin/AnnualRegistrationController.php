@@ -102,7 +102,8 @@ class AnnualRegistrationController extends SchoolAdminController
                 ->with('schoolClass.classCategory')
                 ->orderBy('school_class_id')
                 ->orderBy('name')
-                ->get(),
+                ->get()
+                ->map(fn (SubmissionStudent $student) => $this->submissionStudentPayload($student)),
         ]);
     }
 
@@ -130,8 +131,18 @@ class AnnualRegistrationController extends SchoolAdminController
         $data['class'] = $schoolClass->name;
 
         if ($request->hasFile('image')) {
-            $data['image_path'] = $request->file('image')->store("submissions/{$this->school->id}", 'public');
+            $file = $request->file('image');
+            app(UploadBackupService::class)->store(
+                $file,
+                'submission_student_image',
+                $this->school->id,
+                null,
+                $request->user()->id,
+                ['submission_id' => $submission->id],
+            );
+            $data['image_path'] = TenantStorage::storeSubmissionImage($file, $this->school->id);
         }
+        unset($data['image']);
 
         $submission->students()->create($data);
 
@@ -384,6 +395,23 @@ class AnnualRegistrationController extends SchoolAdminController
         abort_unless($payment->payment_proof_path, 404);
 
         return TenantStorage::downloadResponse($this->school, $payment->payment_proof_path);
+    }
+
+    public function showSubmissionStudentImage(string $tenantId, SubmissionStudent $student)
+    {
+        $registration = $this->currentRegistration();
+        abort_if($student->school_year_submission_id !== $registration->submission->id, 403);
+        abort_unless($student->image_path, 404);
+
+        return TenantStorage::downloadResponse($this->school, $student->image_path);
+    }
+
+    private function submissionStudentPayload(SubmissionStudent $student): array
+    {
+        $data = $student->toArray();
+        $data['image_url'] = $student->imageUrl($this->school->id);
+
+        return $data;
     }
 
     private function currentRegistration(): Registration

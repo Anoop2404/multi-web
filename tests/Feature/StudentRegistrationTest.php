@@ -233,10 +233,11 @@ class StudentRegistrationTest extends TestCase
             ->assertOk();
     }
 
-    public function test_student_photo_upload_stores_on_configured_disk(): void
+    public function test_student_photo_upload_stores_on_s3_even_when_upload_disk_is_shared(): void
     {
         Storage::fake('s3');
-        config(['filesystems.upload_disk' => 's3']);
+        Storage::fake('shared');
+        config(['filesystems.upload_disk' => 'shared']);
 
         $this->seed(RolesAndPermissionsSeeder::class);
         ['tenant' => $school, 'class' => $class] = $this->schoolWithClass();

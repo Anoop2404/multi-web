@@ -13,6 +13,8 @@ use App\Services\Membership\RegistrationStatusService;
 use App\Support\AcademicYear;
 use Database\Seeders\SahodayaMasterDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -209,5 +211,48 @@ class MembershipRegistrationTest extends TestCase
         $this->assertSame('Federal Bank', $profile->payment_bank_name);
         $this->assertSame('9876543210', $profile->payment_account_no);
         $this->assertStringContainsString('UPI: knr-sahodaya@upi', $profile->paymentDetailsText());
+    }
+
+    public function test_submission_student_image_upload_stores_on_s3(): void
+    {
+        Storage::fake('s3');
+        Storage::fake('shared');
+        config(['filesystems.upload_disk' => 'shared']);
+
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        ['school' => $school] = $this->cluster();
+
+        SahodayaProfile::where('tenant_id', $school->parent_id)->update([
+            'student_data_mode' => 'full_records',
+        ]);
+
+        app(\App\Services\Students\SchoolClassProvisioner::class)->ensureForSchool($school);
+        $class = \App\Models\SchoolClass::where('tenant_id', $school->id)->firstOrFail();
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        app(RegistrationStatusService::class)->beginAnnualRegistration($school->fresh());
+
+        $file = UploadedFile::fake()->image('submission-student.jpg');
+
+        $this->actingAs($admin)
+            ->post("/school-admin/{$school->id}/registration/students", [
+                'name'            => 'Submission Student',
+                'school_class_id' => $class->id,
+                'image'           => $file,
+            ])
+            ->assertRedirect();
+
+        $student = \App\Models\SubmissionStudent::firstOrFail();
+        $this->assertNotNull($student->image_path);
+        Storage::disk('s3')->assertExists($student->image_path);
+
+        $this->actingAs($admin)
+            ->get("/school-admin/{$school->id}/registration/students/{$student->id}/image")
+            ->assertOk();
     }
 }

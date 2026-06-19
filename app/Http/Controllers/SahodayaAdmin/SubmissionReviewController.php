@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\SchoolYearSubmission;
+use App\Models\SubmissionStudent;
 use App\Support\TenancyDatabase;
+use App\Support\TenantStorage;
 
 class SubmissionReviewController extends SahodayaAdminController
 {
@@ -29,6 +31,15 @@ class SubmissionReviewController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Membership/SubmissionShow', [
             'submission' => $submission,
         ]);
+    }
+
+    public function showSubmissionStudentImage(string $tenantId, SubmissionStudent $student)
+    {
+        $student->loadMissing('submission.school');
+        abort_if($student->submission->school->parent_id !== $this->sahodaya->id, 403);
+        abort_unless($student->image_path, 404);
+
+        return TenantStorage::downloadResponse($student->submission->school, $student->image_path);
     }
 
     private function enrichSubmission(SchoolYearSubmission $submission): SchoolYearSubmission
