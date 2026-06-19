@@ -10,7 +10,10 @@
                 <div class="flex-1">
                     <p class="text-[#fbbf24] text-xs font-bold uppercase tracking-widest mb-1">Sahodaya Complex</p>
                     <h2 class="text-2xl font-extrabold mb-0.5">{{ sahodaya.name }}</h2>
-                    <p class="text-white/70 text-sm">CBSE Sahodaya School Complex — <span class="font-semibold text-white">{{ stats.member_schools ?? 0 }} member schools</span></p>
+                    <p class="text-white/70 text-sm">
+                        CBSE Sahodaya School Complex —
+                        <span class="font-semibold text-white">{{ stats.approved_schools ?? 0 }} approved member{{ (stats.approved_schools ?? 0) === 1 ? '' : 's' }}</span><template v-if="(stats.pending_schools ?? 0) > 0"> · <span class="font-semibold text-[#fbbf24]">{{ stats.pending_schools }} pending</span></template><template v-if="(stats.registered_schools ?? 0) > (stats.approved_schools ?? 0) + (stats.pending_schools ?? 0)"> · {{ stats.registered_schools }} registered</template>
+                    </p>
                 </div>
                 <div class="flex flex-wrap gap-2 shrink-0">
                     <a v-if="websiteEnabled && publicUrl" :href="publicUrl" target="_blank"
@@ -26,16 +29,29 @@
 
             <!-- Stats row -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard :value="stats.member_schools"  label="Member Schools"   color="blue"   icon="🏫" />
-                <StatCard v-if="websiteEnabled" :value="stats.office_bearers"  label="Office Bearers"   color="navy" icon="👥" />
-                <StatCard v-if="websiteEnabled" :value="stats.circulars"        label="Circulars"        color="indigo" icon="📄" />
-                <StatCard v-if="websiteEnabled" :value="stats.kalotsav_events"  label="Kalotsav Events" color="amber"  icon="🏆" />
-                <StatCard v-if="!websiteEnabled" :value="stats.total_students ?? 0" label="Student Counts" color="navy" icon="👨‍🎓" />
-                <StatCard v-if="!websiteEnabled" :value="pendingPaymentsCount" label="Pending Payments" color="green" icon="💳" />
+                <template v-if="!websiteEnabled">
+                    <StatCard :value="stats.approved_schools ?? 0" label="Approved Members" color="blue" icon="🏫" />
+                    <StatCard :value="stats.pending_schools ?? 0" label="Pending Schools" color="amber" icon="⏳" />
+                    <StatCard :value="stats.total_students ?? 0" label="Active Students" color="navy" icon="👨‍🎓"
+                              :hint="'From approved members only'" />
+                    <StatCard :value="pendingPaymentsCount ?? stats.pending_payments ?? 0" label="Pending Payments" color="green" icon="💳" />
+                </template>
+                <template v-else>
+                    <StatCard :value="stats.approved_schools ?? 0" label="Approved Members" color="blue" icon="🏫" />
+                    <StatCard :value="stats.pending_schools ?? 0" label="Pending Schools" color="amber" icon="⏳" />
+                    <StatCard :value="stats.office_bearers"  label="Office Bearers"   color="navy" icon="👥" />
+                    <StatCard :value="stats.circulars"        label="Circulars"        color="indigo" icon="📄" />
+                    <StatCard :value="stats.kalotsav_events"  label="Kalotsav Events" color="amber"  icon="🏆" />
+                </template>
             </div>
 
             <!-- Attention required -->
-            <div v-if="pendingPaymentsCount > 0" class="grid sm:grid-cols-1 gap-4 max-w-md">
+            <div v-if="pendingSchoolsCount > 0 || pendingPaymentsCount > 0" class="grid sm:grid-cols-2 gap-4">
+                <ActionBanner v-if="pendingSchoolsCount > 0"
+                              :href="`/sahodaya-admin/${sahodaya.id}/membership/reports?tab=schools`"
+                              :count="pendingSchoolsCount"
+                              label="schools awaiting membership approval"
+                              color="amber" icon="⏳" />
                 <ActionBanner v-if="pendingPaymentsCount > 0"
                               :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`"
                               :count="pendingPaymentsCount"
@@ -121,7 +137,7 @@
                     <QuickAction v-if="websiteEnabled" :href="`/sahodaya-admin/${sahodaya.id}/office-bearers`"
                                  icon="👥" label="Office Bearers" desc="Update leadership details" />
                     <QuickAction :href="`/sahodaya-admin/${sahodaya.id}/schools`"
-                                 icon="🏫" label="Member Schools" desc="View registered schools" />
+                                 icon="🏫" label="Member Schools" desc="Approved member schools" />
                     <QuickAction :href="`/sahodaya-admin/${sahodaya.id}/membership/submissions`"
                                  icon="👨‍🎓" label="Student Counts" desc="View totals by school" />
                     <QuickAction :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`"
@@ -165,7 +181,7 @@ const colorMap = {
 };
 
 const StatCard = defineComponent({
-    props: { value: [Number, String], label: String, color: String, icon: String },
+    props: { value: [Number, String], label: String, color: String, icon: String, hint: String },
     setup(props) {
         return () => {
             const c = colorMap[props.color] || colorMap.navy;
@@ -174,6 +190,7 @@ const StatCard = defineComponent({
                 h('div', {}, [
                     h('p', { class: `text-2xl font-extrabold ${c.num}` }, props.value ?? '—'),
                     h('p', { class: `text-xs text-gray-500 font-medium mt-0.5` }, props.label),
+                    props.hint ? h('p', { class: 'text-[10px] text-gray-400 mt-0.5' }, props.hint) : null,
                 ]),
             ]);
         };
@@ -183,17 +200,25 @@ const StatCard = defineComponent({
 const ActionBanner = defineComponent({
     props: { href: String, count: Number, label: String, color: String, icon: String },
     setup(props) {
+        const bannerStyles = {
+            amber: 'border-amber-200 bg-amber-50 hover:bg-amber-100',
+            green: 'border-green-200 bg-green-50 hover:bg-green-100',
+            blue:  'border-blue-200 bg-blue-50 hover:bg-blue-100',
+        };
+
         return () => {
             const c = colorMap[props.color] || colorMap.amber;
+            const banner = bannerStyles[props.color] || bannerStyles.amber;
+
             return h(Link, {
                 href: props.href,
-                class: `flex items-center gap-3 p-4 rounded-2xl border-2 border-${props.color}-200 bg-${props.color}-50 hover:bg-${props.color}-100 transition`,
+                class: `flex items-center gap-3 p-4 rounded-2xl border-2 transition ${banner}`,
             }, {
                 default: () => [
-                    h('div', { class: `w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center text-xl shrink-0` }, props.icon),
+                    h('div', { class: 'w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center text-xl shrink-0' }, props.icon),
                     h('div', {}, [
                         h('p', { class: `text-lg font-extrabold ${c.num}` }, String(props.count)),
-                        h('p', { class: `text-xs text-gray-600` }, props.label),
+                        h('p', { class: 'text-xs text-gray-600' }, props.label),
                     ]),
                 ],
             });
