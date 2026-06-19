@@ -35,34 +35,34 @@
                 <StatCard v-else :value="stats.total_students ?? 0" label="Active Students" color="navy" icon="👨‍🎓"
                           :hint="'From approved members only'" />
                 <StatCard v-if="websiteEnabled" :value="stats.circulars"        label="Circulars"        color="indigo" icon="📄" />
-                <StatCard v-else :value="`₹${Number(stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Pending Approval Fees" color="amber" icon="💳"
-                          :hint="`${stats.pending_payments ?? 0} awaiting verification`" />
+                <StatCard v-else :value="`₹${Number(stats.payments_pending_verification_amount || stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Payment Pending" color="amber" icon="💳"
+                          :hint="`${stats.payments_pending_verification ?? stats.pending_payments ?? 0} awaiting verification`" />
                 <StatCard v-if="websiteEnabled" :value="stats.kalotsav_events"  label="Kalotsav Events" color="amber"  icon="🏆" />
                 <StatCard v-else :value="`₹${Number(stats.approved_amount || 0).toLocaleString('en-IN')}`" label="Approved Fees" color="green" icon="✅" />
-                <StatCard :value="`₹${Number(stats.payment_due_amount || 0).toLocaleString('en-IN')}`" label="Payment Not Done" color="navy" icon="🧾"
-                          :hint="`${stats.payment_due ?? 0} schools`" />
+                <StatCard :value="`₹${Number(stats.payment_not_done_amount || stats.payment_due_amount || 0).toLocaleString('en-IN')}`" label="Payment Not Done" color="navy" icon="🧾"
+                          :hint="`${stats.payment_not_done ?? stats.payment_due ?? 0} schools`" />
                 <StatCard v-if="websiteEnabled" :value="stats.total_students ?? 0" label="Active Students" color="navy" icon="👨‍🎓"
                           :hint="'From approved members only'" />
-                <StatCard v-if="websiteEnabled" :value="`₹${Number(stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Pending Approval Fees" color="amber" icon="💳"
-                          :hint="`${stats.pending_payments ?? 0} awaiting verification`" />
+                <StatCard v-if="websiteEnabled" :value="`₹${Number(stats.payments_pending_verification_amount || stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Payment Pending" color="amber" icon="💳"
+                          :hint="`${stats.payments_pending_verification ?? stats.pending_payments ?? 0} awaiting verification`" />
                 <StatCard v-if="websiteEnabled" :value="`₹${Number(stats.approved_amount || 0).toLocaleString('en-IN')}`" label="Approved Fees" color="green" icon="✅" />
             </div>
 
             <!-- Attention required -->
-            <div v-if="pendingSchoolsCount > 0 || pendingPaymentsCount > 0 || (stats.payment_due ?? 0) > 0" class="grid sm:grid-cols-2 gap-4">
+            <div v-if="pendingSchoolsCount > 0 || pendingPaymentsCount > 0 || (stats.payment_not_done ?? stats.payment_due ?? 0) > 0" class="grid sm:grid-cols-2 gap-4">
                 <ActionBanner v-if="pendingSchoolsCount > 0"
                               :href="`/sahodaya-admin/${sahodaya.id}/membership/reports?tab=schools`"
                               :count="pendingSchoolsCount"
                               label="schools awaiting membership approval"
                               color="amber" icon="⏳" />
-                <ActionBanner v-if="(stats.payment_due ?? 0) > 0"
+                <ActionBanner v-if="(stats.payment_not_done ?? stats.payment_due ?? 0) > 0"
                               :href="`/sahodaya-admin/${sahodaya.id}/membership/payments?status=payment-due`"
-                              :count="stats.payment_due"
-                              label="schools registered but payment not done"
-                              color="amber" icon="🧾" />
-                <ActionBanner v-if="pendingPaymentsCount > 0"
+                              :count="stats.payment_not_done ?? stats.payment_due"
+                              label="schools with payment not done"
+                              color="navy" icon="🧾" />
+                <ActionBanner v-if="(stats.payments_pending_verification ?? pendingPaymentsCount ?? 0) > 0"
                               :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`"
-                              :count="pendingPaymentsCount"
+                              :count="stats.payments_pending_verification ?? pendingPaymentsCount"
                               label="payments pending verification"
                               color="green" icon="💳" />
             </div>

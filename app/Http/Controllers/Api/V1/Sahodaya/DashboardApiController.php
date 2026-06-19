@@ -26,9 +26,10 @@ class DashboardApiController extends SahodayaApiController
 
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
         $fees = $this->paymentFeeSummary($this->sahodaya->id, $schoolIds, $year);
+        $paymentSummary = $this->paymentStatusSummary($this->sahodaya->id, $schoolIds, $year);
 
         return $this->ok([
-            'stats' => [
+            'stats' => array_merge([
                 'approved_schools'   => count($approvedSchoolIds),
                 'pending_schools'    => Tenant::query()
                     ->where('parent_id', $this->sahodaya->id)
@@ -42,15 +43,12 @@ class DashboardApiController extends SahodayaApiController
                         ->whereIn('tenant_id', $approvedSchoolIds)
                         ->where('status', 'active')
                         ->count(),
-                'pending_payments'   => MembershipPayment::query()
-                    ->whereIn('school_id', $schoolIds)
-                    ->where('status', 'submitted')
-                    ->count(),
-                'payment_due'        => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds, $year),
+                'pending_payments'   => $paymentSummary['payments_pending_verification'],
+                'payment_due'        => $paymentSummary['payment_not_done'],
                 'pending_amount'     => $fees['pending_amount'],
                 'approved_amount'    => $fees['approved_amount'],
                 'payment_due_amount' => $fees['payment_due_amount'],
-            ],
+            ], $paymentSummary),
         ]);
     }
 }

@@ -48,6 +48,7 @@ class _SchoolShellState extends ConsumerState<SchoolShell> {
     return SaAdminShell(
       roleLabel: 'School',
       tenantName: session.user.tenantName ?? 'School',
+      logoUrl: session.user.logoUrl,
       pageTitle: _index == 3 ? 'Registration Details' : _labels[_index.clamp(0, 2)],
       labels: _labels,
       icons: _icons,

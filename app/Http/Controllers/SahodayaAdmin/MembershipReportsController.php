@@ -77,18 +77,26 @@ class MembershipReportsController extends SahodayaAdminController
 
         $classCounts = $this->classCountsFor($schoolIds);
         $activeStudentCounts = $this->activeStudentCountsFor($schoolIds);
+        $paymentStatuses = $this->schoolPaymentStatusResolver()->forSchools(
+            $this->sahodaya->id,
+            $schoolIds->all(),
+            $year,
+        );
 
-        $rows = $schools->map(function (Tenant $school) use ($submissionsBySchool, $classCounts, $activeStudentCounts) {
+        $rows = $schools->map(function (Tenant $school) use ($submissionsBySchool, $classCounts, $activeStudentCounts, $paymentStatuses) {
             $row = $this->mapSchoolReportRow(
                 $school,
                 $submissionsBySchool->get($school->id),
                 (int) ($classCounts[$school->id] ?? 0),
                 (int) ($activeStudentCounts[$school->id] ?? 0),
+                $paymentStatuses[$school->id] ?? null,
             );
 
             return [
                 $row['name'],
                 $row['membership_status'],
+                $row['payment_status_label'] ?? '—',
+                $row['payment_amount'] ?? '',
                 $row['school_prefix'] ?? '',
                 $row['student_count'],
                 $row['classes_count'],
@@ -97,7 +105,7 @@ class MembershipReportsController extends SahodayaAdminController
         });
 
         return ExcelExport::download('membership-schools', [
-            'School', 'Status', 'Prefix', 'Students', 'Classes', 'Joined',
+            'School', 'Membership Status', 'Payment Status', 'Amount', 'Prefix', 'Students', 'Classes', 'Joined',
         ], $rows);
     }
 
@@ -191,15 +199,16 @@ class MembershipReportsController extends SahodayaAdminController
         $allSchools = Tenant::whereIn('id', $schoolIds)->get(['id', 'membership_status']);
 
         $fees = $this->paymentFeeSummary($this->sahodaya->id, $schoolIds->all(), $year);
+        $paymentSummary = $this->paymentStatusSummary($this->sahodaya->id, $schoolIds->all(), $year);
 
-        return [
+        return array_merge([
             'total_registered'        => $allSchools->count(),
             'total_schools'           => $allSchools->where('membership_status', 'approved')->count(),
             'pending_schools'         => $allSchools->where('membership_status', 'pending')->count(),
             'rejected_schools'        => $allSchools->where('membership_status', 'rejected')->count(),
             'payments_verified'       => MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'verified')->count(),
-            'payments_pending'        => MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'submitted')->count(),
-            'payment_due'             => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds->all(), $year),
+            'payments_pending'        => $paymentSummary['payments_pending_verification'],
+            'payment_due'             => $paymentSummary['payment_not_done'],
             'pending_amount'          => $fees['pending_amount'],
             'approved_amount'         => $fees['approved_amount'],
             'payment_due_amount'      => $fees['payment_due_amount'],
@@ -208,7 +217,7 @@ class MembershipReportsController extends SahodayaAdminController
                 ->where('academic_year', $year)
                 ->where('registration_status', 'completed')
                 ->count(),
-        ];
+        ], $paymentSummary);
     }
 
     private function paginatedSchoolsReport($schoolIds, string $year, string $search, ?string $dateFrom, ?string $dateTo)
@@ -229,12 +238,18 @@ class MembershipReportsController extends SahodayaAdminController
 
         $classCounts = $this->classCountsFor($pageIds);
         $activeStudentCounts = $this->activeStudentCountsFor($pageIds);
+        $paymentStatuses = $this->schoolPaymentStatusResolver()->forSchools(
+            $this->sahodaya->id,
+            $pageIds->all(),
+            $year,
+        );
 
         $schools->getCollection()->transform(fn (Tenant $school) => $this->mapSchoolReportRow(
             $school,
             $submissionsBySchool->get($school->id),
             (int) ($classCounts[$school->id] ?? 0),
             (int) ($activeStudentCounts[$school->id] ?? 0),
+            $paymentStatuses[$school->id] ?? null,
         ));
 
         return $schools;
@@ -312,12 +327,16 @@ class MembershipReportsController extends SahodayaAdminController
         ?SchoolYearSubmission $submission,
         int $classesCount,
         int $activeStudentCount,
+        ?array $paymentStatus = null,
     ): array {
         return [
             'id'                => $school->id,
             'name'              => $school->name,
             'school_prefix'     => $school->school_prefix,
             'membership_status' => $school->membership_status,
+            'payment_status'    => $paymentStatus['status'] ?? 'none',
+            'payment_status_label' => $paymentStatus['label'] ?? '—',
+            'payment_amount'    => $paymentStatus['amount'] ?? null,
             'created_at'        => $school->created_at,
             'student_count'     => $this->resolveStudentCount($submission, $activeStudentCount),
             'classes_count'     => $classesCount,

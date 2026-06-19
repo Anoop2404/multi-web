@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/authenticated_document.dart';
 import '../../core/widgets/sa_widgets.dart';
 import 'sahodaya_api.dart';
 
@@ -48,7 +49,11 @@ class _SahodayaSubmissionDetailScreenState extends ConsumerState<SahodayaSubmiss
     final regStatus = _data?['registration_status']?.toString();
     final students = (_data?['students'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final teachers = (_data?['teachers'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final payments = (_data?['payments'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final studentTotal = _data?['student_total'];
+    final studentsWithImages = students.where((s) => s['has_image'] == true).toList();
+    final paymentsWithProof = payments.where((p) => p['has_proof'] == true).toList();
+    final hasSubmittedFiles = studentsWithImages.isNotEmpty || paymentsWithProof.isNotEmpty;
 
     return SaPageScaffold(
       title: 'Submission review',
@@ -92,6 +97,86 @@ class _SahodayaSubmissionDetailScreenState extends ConsumerState<SahodayaSubmiss
                         ),
                       ],
                       const SizedBox(height: 20),
+                      const SaSectionTitle('Submitted files'),
+                      if (!hasSubmittedFiles)
+                        const SaEmptyView(
+                          title: 'No files uploaded',
+                          subtitle: 'Payment proofs and student photos will appear here once submitted.',
+                          icon: Icons.folder_open_outlined,
+                        )
+                      else ...[
+                        if (paymentsWithProof.isNotEmpty) ...[
+                          ...paymentsWithProof.map((payment) {
+                            final paymentId = payment['id'];
+                            final status = payment['status']?.toString() ?? 'submitted';
+                            final amount = payment['amount']?.toString();
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.receipt_long_outlined, size: 18, color: AppColors.navyPrimary),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          amount != null ? 'Payment proof · ₹$amount' : 'Payment proof',
+                                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark),
+                                        ),
+                                      ),
+                                      SaStatusChip(status),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  AuthenticatedDocument(
+                                    path: '${sahodayaBase(ref)}/payments/$paymentId/proof',
+                                    height: 280,
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                        if (studentsWithImages.isNotEmpty) ...[
+                          Text(
+                            'Student photos (${studentsWithImages.length})',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                          ),
+                          const SizedBox(height: 10),
+                          ...studentsWithImages.map((student) {
+                            final imagePath = student['image_path']?.toString();
+                            final name = student['name']?.toString() ?? 'Student';
+                            final classInfo = [
+                              student['class']?.toString(),
+                              student['section']?.toString(),
+                            ].where((v) => v != null && v.isNotEmpty).join(' · ');
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark),
+                                  ),
+                                  if (classInfo.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2, bottom: 8),
+                                      child: Text(classInfo, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                    )
+                                  else
+                                    const SizedBox(height: 8),
+                                  if (imagePath != null)
+                                    AuthenticatedDocument(path: imagePath, height: 220),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                      ],
+                      const SizedBox(height: 20),
                       const SaSectionTitle('Students'),
                       if (students.isEmpty)
                         const SaEmptyView(
@@ -108,6 +193,7 @@ class _SahodayaSubmissionDetailScreenState extends ConsumerState<SahodayaSubmiss
                               subtitle: [
                                 student['class']?.toString(),
                                 student['section']?.toString(),
+                                if (student['has_image'] == true) 'Photo uploaded',
                               ].where((v) => v != null && v.isNotEmpty).join(' · '),
                               leading: Container(
                                 width: 36,
@@ -117,7 +203,11 @@ class _SahodayaSubmissionDetailScreenState extends ConsumerState<SahodayaSubmiss
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 alignment: Alignment.center,
-                                child: const Icon(Icons.person_outline, size: 18, color: AppColors.navyPrimary),
+                                child: Icon(
+                                  student['has_image'] == true ? Icons.photo_outlined : Icons.person_outline,
+                                  size: 18,
+                                  color: AppColors.navyPrimary,
+                                ),
                               ),
                             ),
                           ),

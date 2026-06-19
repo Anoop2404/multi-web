@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'tenant_logo.dart';
 
 class SaCard extends StatelessWidget {
   const SaCard({super.key, required this.child, this.padding = const EdgeInsets.all(16)});
@@ -149,11 +150,18 @@ class SaPageScaffold extends StatelessWidget {
 }
 
 class SaDrawerHeader extends StatelessWidget {
-  const SaDrawerHeader({super.key, required this.roleLabel, required this.tenantName, this.subtitle});
+  const SaDrawerHeader({
+    super.key,
+    required this.roleLabel,
+    required this.tenantName,
+    this.subtitle,
+    this.logoUrl,
+  });
 
   final String roleLabel;
   final String tenantName;
   final String? subtitle;
+  final String? logoUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -164,19 +172,11 @@ class SaDrawerHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.45), width: 2),
-            ),
-            child: Center(
-              child: Text(
-                tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'S',
-                style: const TextStyle(color: AppColors.accentGold, fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-            ),
+          TenantLogo(
+            logoUrl: logoUrl ?? '',
+            tenantName: tenantName,
+            size: 44,
+            borderColor: AppColors.accentGold.withValues(alpha: 0.45),
           ),
           const SizedBox(height: 12),
           Text(
@@ -250,11 +250,16 @@ class SaStatusChip extends StatelessWidget {
       case 'approved':
       case 'verified':
       case 'completed':
+      case 'payment_verified':
         fg = const Color(0xFF15803D);
         bg = const Color(0xFFDCFCE7);
       case 'rejected':
         fg = const Color(0xFFB91C1C);
         bg = const Color(0xFFFEE2E2);
+      case 'payment_not_done':
+        fg = AppColors.navyPrimary;
+        bg = AppColors.bgSky;
+      case 'payment_pending':
       case 'pending':
       case 'submitted':
       case 'payment_submitted':
@@ -264,6 +269,12 @@ class SaStatusChip extends StatelessWidget {
         fg = const Color(0xFF475569);
         bg = const Color(0xFFF1F5F9);
     }
+    final label = switch (status) {
+      'payment_not_done' => 'payment not done',
+      'payment_pending' => 'payment pending',
+      'payment_verified' => 'payment verified',
+      _ => status.replaceAll('_', ' '),
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -272,7 +283,7 @@ class SaStatusChip extends StatelessWidget {
         border: Border.all(color: fg.withValues(alpha: 0.25)),
       ),
       child: Text(
-        status.replaceAll('_', ' '),
+        label,
         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
       ),
     );

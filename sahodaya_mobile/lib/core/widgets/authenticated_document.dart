@@ -33,10 +33,12 @@ class AuthenticatedDocument extends ConsumerStatefulWidget {
     super.key,
     required this.path,
     this.height = 320,
+    this.fit = BoxFit.contain,
   });
 
   final String path;
   final double height;
+  final BoxFit fit;
 
   @override
   ConsumerState<AuthenticatedDocument> createState() => _AuthenticatedDocumentState();
@@ -147,6 +149,7 @@ class _AuthenticatedDocumentState extends ConsumerState<AuthenticatedDocument> {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Container(
+          height: widget.height,
           decoration: BoxDecoration(
             border: Border.all(color: const Color(0xFFE2E8F0)),
             borderRadius: BorderRadius.circular(12),
@@ -154,7 +157,12 @@ class _AuthenticatedDocumentState extends ConsumerState<AuthenticatedDocument> {
           child: InteractiveViewer(
             minScale: 0.5,
             maxScale: 4,
-            child: Image.memory(_bytes!, fit: BoxFit.contain, width: double.infinity),
+            child: Image.memory(
+              _bytes!,
+              fit: widget.fit,
+              width: double.infinity,
+              height: widget.height,
+            ),
           ),
         ),
       );

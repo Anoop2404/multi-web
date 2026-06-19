@@ -6,6 +6,7 @@ class AuthUser {
     required this.role,
     required this.tenantId,
     this.tenantName,
+    this.logoUrl,
     this.emailVerified = true,
   });
 
@@ -15,6 +16,7 @@ class AuthUser {
   final String role;
   final String tenantId;
   final String? tenantName;
+  final String? logoUrl;
   final bool emailVerified;
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,7 @@ class AuthUser {
       role: (json['role'] ?? user['role']) as String? ?? '',
       tenantId: (json['tenant_id'] ?? user['tenant_id']) as String? ?? '',
       tenantName: (json['tenant_name'] ?? user['tenant_name']) as String?,
+      logoUrl: (json['logo_url'] ?? user['logo_url']) as String?,
       emailVerified: user['email_verified'] as bool? ?? true,
     );
   }

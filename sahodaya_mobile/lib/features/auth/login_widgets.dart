@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/tenant_logo.dart';
 import 'login_branding.dart';
 
 class LoginBackground extends StatelessWidget {
@@ -59,7 +60,11 @@ class LoginBrandPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: wide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
-          LoginLogo(logoUrl: branding.resolvedLogoUrl, tenantName: branding.tenantName, size: wide ? 112 : 88),
+          TenantLogo(
+            logoUrl: branding.resolvedLogoUrl,
+            tenantName: branding.tenantName,
+            size: wide ? 112 : 88,
+          ),
           const SizedBox(height: 12),
           _Badge(label: branding.eyebrow, centered: !wide),
           const SizedBox(height: 10),
@@ -120,29 +125,7 @@ class LoginLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initial = tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'S';
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: const Color(0x59FFFFFF), width: 2),
-        boxShadow: const [BoxShadow(color: Color(0x4D000000), blurRadius: 32, offset: Offset(0, 12))],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Transform.scale(
-        scale: 1.18,
-        child: Image.network(
-          logoUrl,
-          fit: BoxFit.cover,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFBBF24)));
-          },
-          errorBuilder: (_, __, ___) => _AvatarFallback(initial: initial),
-        ),
-      ),
-    );
+    return TenantLogo(logoUrl: logoUrl, tenantName: tenantName, size: size);
   }
 }
 
@@ -181,22 +164,6 @@ class _BlurOrb extends StatelessWidget {
         color: color,
         boxShadow: [BoxShadow(color: color, blurRadius: 80, spreadRadius: 20)],
       ),
-    );
-  }
-}
-
-class _AvatarFallback extends StatelessWidget {
-  const _AvatarFallback({required this.initial});
-
-  final String initial;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [Color(0xFF0F3D7A), Color(0xFF1E5AA8)]),
-      ),
-      child: Center(child: Text(initial, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Color(0xFFFBBF24)))),
     );
   }
 }

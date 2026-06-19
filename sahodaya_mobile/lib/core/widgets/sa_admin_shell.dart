@@ -28,6 +28,7 @@ class SaAdminShell extends ConsumerWidget {
     super.key,
     required this.roleLabel,
     required this.tenantName,
+    this.logoUrl,
     required this.pageTitle,
     required this.pages,
     required this.labels,
@@ -41,6 +42,7 @@ class SaAdminShell extends ConsumerWidget {
 
   final String roleLabel;
   final String tenantName;
+  final String? logoUrl;
   final String pageTitle;
   final List<Widget> pages;
   final List<String> labels;
@@ -102,7 +104,7 @@ class SaAdminShell extends ConsumerWidget {
         drawer: Drawer(
           child: Column(
             children: [
-              SaDrawerHeader(roleLabel: roleLabel, tenantName: tenantName),
+              SaDrawerHeader(roleLabel: roleLabel, tenantName: tenantName, logoUrl: logoUrl),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),

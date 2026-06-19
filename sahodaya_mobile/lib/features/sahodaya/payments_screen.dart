@@ -25,8 +25,8 @@ class _SahodayaPaymentsScreenState extends ConsumerState<SahodayaPaymentsScreen>
   bool _loading = true;
 
   static const _tabs = [
-    ('submitted', 'Pending'),
-    ('payment-due', 'Payment due'),
+    ('submitted', 'Payment pending'),
+    ('payment-due', 'Payment not done'),
     ('verified', 'Verified'),
     ('rejected', 'Rejected'),
     ('all', 'All'),
@@ -131,11 +131,11 @@ class _SahodayaPaymentsScreenState extends ConsumerState<SahodayaPaymentsScreen>
             childAspectRatio: 1.35,
             children: [
               SaStatCard(
-                label: 'Pending approval fees',
-                value: _formatRupee(_summary['pending_amount']),
+                label: 'Payment pending',
+                value: _formatRupee(_summary['payments_pending_verification_amount'] ?? _summary['pending_amount']),
                 icon: '⏳',
                 color: SaStatColor.amber,
-                hint: '${_summary['pending'] ?? _countFor('submitted')} payments',
+                hint: '${_summary['payments_pending_verification'] ?? _summary['pending'] ?? _countFor('submitted')} payments',
               ),
               SaStatCard(
                 label: 'Approved fees',
@@ -146,10 +146,10 @@ class _SahodayaPaymentsScreenState extends ConsumerState<SahodayaPaymentsScreen>
               ),
               SaStatCard(
                 label: 'Payment not done',
-                value: _formatRupee(_summary['payment_due_amount']),
+                value: _formatRupee(_summary['payment_not_done_amount'] ?? _summary['payment_due_amount']),
                 icon: '🧾',
                 color: SaStatColor.navy,
-                hint: '${_summary['payment_due'] ?? _countFor('payment-due')} schools',
+                hint: '${_summary['payment_not_done'] ?? _summary['payment_due'] ?? _countFor('payment-due')} schools',
               ),
               SaStatCard(
                 label: 'Rejected fees',
@@ -163,10 +163,16 @@ class _SahodayaPaymentsScreenState extends ConsumerState<SahodayaPaymentsScreen>
           const SizedBox(height: 16),
           if (_status == 'submitted')
             const SaInfoBanner(
-              title: 'Pending verification',
-              body: 'Tap a school to preview the uploaded payment proof and verify or reject.',
+              title: 'Payment pending',
+              body: 'Proof uploaded — tap a school to preview and verify or reject.',
+            ),
+          if (_status == 'payment-due')
+            const SaInfoBanner(
+              title: 'Payment not done',
+              body: 'These schools have not uploaded membership payment proof yet.',
             ),
           if (_status == 'submitted') const SizedBox(height: 12),
+          if (_status == 'payment-due') const SizedBox(height: 12),
           SaSearchField(controller: _search, hint: 'Search schools...'),
           const SizedBox(height: 12),
           SingleChildScrollView(

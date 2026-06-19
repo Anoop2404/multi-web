@@ -52,12 +52,12 @@ class _SahodayaDashboardScreenState extends ConsumerState<SahodayaDashboardScree
     final session = ref.watch(authControllerProvider).session!;
     final approved = _stats?['approved_schools'] as int? ?? 0;
     final pendingSchools = _stats?['pending_schools'] as int? ?? 0;
-    final pendingPayments = _stats?['pending_payments'] as int? ?? 0;
-    final paymentDue = _stats?['payment_due'] as int? ?? 0;
+    final pendingPayments = _stats?['payments_pending_verification'] as int? ?? _stats?['pending_payments'] as int? ?? 0;
+    final paymentDue = _stats?['payment_not_done'] as int? ?? _stats?['payment_due'] as int? ?? 0;
     final students = _stats?['total_students'] as int? ?? 0;
-    final pendingAmount = _stats?['pending_amount'];
+    final pendingAmount = _stats?['payments_pending_verification_amount'] ?? _stats?['pending_amount'];
     final approvedAmount = _stats?['approved_amount'];
-    final paymentDueAmount = _stats?['payment_due_amount'];
+    final paymentDueAmount = _stats?['payment_not_done_amount'] ?? _stats?['payment_due_amount'];
 
     String formatRupee(dynamic value) {
       final amount = double.tryParse(value?.toString() ?? '') ?? 0;
@@ -88,7 +88,7 @@ class _SahodayaDashboardScreenState extends ConsumerState<SahodayaDashboardScree
               SaStatCard(label: 'Approved Members', value: '$approved', icon: '🏫', color: SaStatColor.blue),
               SaStatCard(label: 'Pending Schools', value: '$pendingSchools', icon: '⏳', color: SaStatColor.amber),
               SaStatCard(label: 'Active Students', value: '$students', icon: '👨‍🎓', color: SaStatColor.navy, hint: 'Approved members only'),
-              SaStatCard(label: 'Pending approval fees', value: formatRupee(pendingAmount), icon: '💳', color: SaStatColor.amber, hint: '$pendingPayments awaiting verify'),
+              SaStatCard(label: 'Payment pending', value: formatRupee(pendingAmount), icon: '💳', color: SaStatColor.amber, hint: '$pendingPayments awaiting verify'),
               SaStatCard(label: 'Approved fees', value: formatRupee(approvedAmount), icon: '✅', color: SaStatColor.green),
               SaStatCard(label: 'Payment not done', value: formatRupee(paymentDueAmount), icon: '🧾', color: SaStatColor.navy, hint: '$paymentDue schools'),
             ],
@@ -108,7 +108,7 @@ class _SahodayaDashboardScreenState extends ConsumerState<SahodayaDashboardScree
             if (paymentDue > 0)
               SaActionBanner(
                 count: paymentDue,
-                label: 'schools registered but payment not done',
+                label: 'schools with payment not done',
                 icon: '🧾',
                 onTap: widget.onGoToPaymentDue,
               ),

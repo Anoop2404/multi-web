@@ -7,15 +7,15 @@
         <div class="space-y-5">
             <!-- Summary -->
             <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <SummaryCard label="Pending Approval Fees"
-                             :value="`₹${Number(summary.pending_amount || 0).toLocaleString('en-IN')}`"
-                             :hint="`${summary.payments_pending} payments awaiting verification`" color="amber" />
+                <SummaryCard label="Payment Pending"
+                             :value="`₹${Number(summary.payments_pending_verification_amount || summary.pending_amount || 0).toLocaleString('en-IN')}`"
+                             :hint="`${summary.payments_pending_verification ?? summary.payments_pending ?? 0} payments awaiting verification`" color="amber" />
                 <SummaryCard label="Approved Fees"
                              :value="`₹${Number(summary.approved_amount || summary.total_collected || 0).toLocaleString('en-IN')}`"
                              :hint="`${summary.payments_verified} verified payments`" color="green" />
                 <SummaryCard label="Payment Not Done"
-                             :value="`₹${Number(summary.payment_due_amount || 0).toLocaleString('en-IN')}`"
-                             :hint="`${summary.payment_due ?? 0} schools not paid`" color="navy" />
+                             :value="`₹${Number(summary.payment_not_done_amount || summary.payment_due_amount || 0).toLocaleString('en-IN')}`"
+                             :hint="`${summary.payment_not_done ?? summary.payment_due ?? 0} schools not paid`" color="navy" />
                 <SummaryCard label="Total Registered" :value="summary.total_registered" color="navy" />
                 <SummaryCard label="Approved Schools" :value="summary.total_schools" color="green" />
                 <SummaryCard label="Pending Schools" :value="summary.pending_schools" color="amber" />
@@ -59,7 +59,8 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="th">School</th>
-                                <th class="th">Status</th>
+                                <th class="th">Membership</th>
+                                <th class="th">Payment</th>
                                 <th class="th">Prefix</th>
                                 <th class="th text-right">Students</th>
                                 <th class="th text-right">Classes</th>
@@ -71,6 +72,9 @@
                             <tr v-for="s in schools.data" :key="s.id" class="hover:bg-gray-50/50">
                                 <td class="td font-medium text-gray-800">{{ s.name }}</td>
                                 <td class="td"><StatusPill :status="s.membership_status" /></td>
+                                <td class="td">
+                                    <PaymentStatusPill :status="s.payment_status" :label="s.payment_status_label" :amount="s.payment_amount" />
+                                </td>
                                 <td class="td font-mono text-xs text-gray-500">{{ s.school_prefix || '—' }}</td>
                                 <td class="td text-right font-semibold text-[#0f3d7a]">{{ s.student_count.toLocaleString('en-IN') }}</td>
                                 <td class="td text-right text-gray-600">{{ s.classes_count }}</td>
@@ -251,6 +255,10 @@ const statusColors = {
     rejected:  'bg-red-100 text-red-700',
     submitted: 'bg-amber-100 text-amber-700',
     verified:  'bg-green-100 text-green-700',
+    payment_not_done: 'bg-[#eff6ff] text-[#0f3d7a]',
+    payment_pending:  'bg-amber-100 text-amber-800',
+    payment_verified: 'bg-green-100 text-green-700',
+    none:      'bg-gray-100 text-gray-500',
 };
 
 const StatusPill = defineComponent({
@@ -260,6 +268,22 @@ const StatusPill = defineComponent({
             class: ['inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize',
                     statusColors[p.status] || 'bg-gray-100 text-gray-600'],
         }, (p.status || '—').replace(/_/g, ' '));
+    },
+});
+
+const PaymentStatusPill = defineComponent({
+    props: { status: String, label: String, amount: [Number, String] },
+    setup(p) {
+        return () => h('div', { class: 'space-y-0.5' }, [
+            h('span', {
+                class: ['inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold',
+                        statusColors[p.status] || 'bg-gray-100 text-gray-600'],
+            }, p.label || '—'),
+            p.amount
+                ? h('p', { class: 'text-[10px] text-gray-500 font-semibold' },
+                    `₹${Number(p.amount).toLocaleString('en-IN')}`)
+                : null,
+        ]);
     },
 });
 

@@ -16,6 +16,8 @@ class MobileAuthPayload
             ? 'sahodaya_admin'
             : ($user->hasRole('school_admin') ? 'school_admin' : null);
 
+        $logoUrl = self::logoUrlFor($tenant);
+
         return [
             'user' => [
                 'id'                => $user->id,
@@ -26,13 +28,25 @@ class MobileAuthPayload
                 'tenant_id'         => $user->tenant_id,
                 'tenant_name'       => $tenant?->name,
                 'tenant_type'       => $tenant?->type,
+                'logo_url'          => $logoUrl,
                 'membership_status' => $tenant?->type === 'school' ? $tenant->membership_status : null,
             ],
             'role'        => $role,
             'tenant_id'   => $user->tenant_id,
             'tenant_name' => $tenant?->name,
             'tenant_type' => $tenant?->type,
+            'logo_url'    => $logoUrl,
         ];
+    }
+
+    private static function logoUrlFor(?Tenant $tenant): ?string
+    {
+        $logoPath = TenantBranding::logoUrl($tenant);
+        if (! $logoPath) {
+            return null;
+        }
+
+        return str_starts_with($logoPath, 'http') ? $logoPath : url($logoPath);
     }
 
     public static function assertCanLogin(User $user): ?string

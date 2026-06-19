@@ -24,15 +24,29 @@ class SchoolsApiController extends SahodayaApiController
     {
         $filters = $this->schoolListFilters($request);
         $status = $request->query('status');
+        $paymentStatus = $request->query('payment_status');
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
 
         $query = $this->allSchoolsQuery($this->sahodaya->id, $filters);
         if (in_array($status, ['approved', 'pending', 'rejected'], true)) {
             $query->where('membership_status', $status);
         }
 
+        if (in_array($paymentStatus, ['payment_not_done', 'payment_pending'], true)) {
+            $allIds = (clone $query)->pluck('id')->all();
+            $matchingIds = $this->schoolPaymentStatusResolver()->schoolIdsMatching(
+                $this->sahodaya->id,
+                $allIds,
+                $year,
+                $paymentStatus,
+            );
+            $query->whereIn('id', $matchingIds === [] ? ['__none__'] : $matchingIds);
+        }
+
         $schools = $query->paginate($request->integer('per_page', 50));
 
         $this->attachSchoolMetrics($schools->getCollection());
+        $this->attachSchoolPaymentStatuses($schools->getCollection(), $this->sahodaya->id, $year);
 
         return SchoolResource::collection($schools);
     }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/sa_widgets.dart';
@@ -7,7 +8,9 @@ import 'sahodaya_api.dart';
 import 'school_detail_screen.dart';
 
 class SahodayaSchoolsScreen extends ConsumerStatefulWidget {
-  const SahodayaSchoolsScreen({super.key});
+  const SahodayaSchoolsScreen({super.key, this.initialPaymentFilter});
+
+  final String? initialPaymentFilter;
 
   @override
   ConsumerState<SahodayaSchoolsScreen> createState() => _SahodayaSchoolsScreenState();
@@ -16,6 +19,7 @@ class SahodayaSchoolsScreen extends ConsumerStatefulWidget {
 class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
   final _search = TextEditingController();
   String? _statusFilter;
+  String? _paymentFilter;
   List<Map<String, dynamic>> _schools = [];
   String? _error;
   bool _loading = true;
@@ -27,9 +31,16 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
     ('rejected', 'Rejected'),
   ];
 
+  static const _paymentFilters = [
+    (null, 'All payments'),
+    ('payment_not_done', 'Payment not done'),
+    ('payment_pending', 'Payment pending'),
+  ];
+
   @override
   void initState() {
     super.initState();
+    _paymentFilter = widget.initialPaymentFilter;
     _load();
     _search.addListener(_onSearchChanged);
   }
@@ -60,6 +71,7 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
       final response = await sahodayaGet(ref, '/schools', query: {
         'per_page': 100,
         if (_statusFilter != null) 'status': _statusFilter!,
+        if (_paymentFilter != null) 'payment_status': _paymentFilter!,
         if (_search.text.trim().isNotEmpty) 'search': _search.text.trim(),
       });
       final data = response['data'];
@@ -99,6 +111,12 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
     _load();
   }
 
+  void _setPaymentFilter(String? status) {
+    if (_paymentFilter == status) return;
+    setState(() => _paymentFilter = status);
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading && _schools.isEmpty && _error == null) return const SaLoadingView();
@@ -114,7 +132,7 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
         children: [
           const SaInfoBanner(
             title: 'Member schools',
-            body: 'Tap any school to view application details, registration status, and payment history.',
+            body: 'Membership status and payment status are shown separately. Payment not done = no proof uploaded yet. Payment pending = proof submitted, awaiting verification.',
           ),
           const SizedBox(height: 12),
           SaSearchField(controller: _search, hint: 'Search schools...'),
@@ -143,6 +161,30 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _paymentFilters.map((filter) {
+                final selected = _paymentFilter == filter.$1;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(filter.$2),
+                    selected: selected,
+                    onSelected: (_) => _setPaymentFilter(filter.$1),
+                    selectedColor: const Color(0xFFFEF3C7),
+                    checkmarkColor: const Color(0xFFB45309),
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? const Color(0xFFB45309) : const Color(0xFF64748B),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
           Text(
             '${schools.length} school${schools.length == 1 ? '' : 's'}',
             style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
@@ -152,13 +194,14 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
             const SaEmptyView(title: 'No schools found', subtitle: 'Try a different search or filter.')
           else
             ...schools.map((school) {
-              final status = school['membership_status']?.toString() ?? 'pending';
+              final membershipStatus = school['membership_status']?.toString() ?? 'pending';
+              final paymentStatus = school['payment_status']?.toString();
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: SaEntityCard(
                   title: school['name']?.toString() ?? 'School',
                   subtitle: '${school['school_prefix'] ?? '-'} · ${school['student_count'] ?? 0} students',
-                  status: status,
+                  status: membershipStatus,
                   leading: Container(
                     width: 40,
                     height: 40,
@@ -177,6 +220,20 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
                     ),
                   ),
                   trailing: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
+                  footer: paymentStatus != null && paymentStatus != 'none'
+                      ? Row(
+                          children: [
+                            SaStatusChip(paymentStatus),
+                            if (school['payment_amount'] != null) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                '₹${NumberFormat.decimalPattern('en_IN').format(double.tryParse(school['payment_amount'].toString()) ?? 0)}',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ],
+                        )
+                      : null,
                   onTap: () => _openSchool(school),
                 ),
               );

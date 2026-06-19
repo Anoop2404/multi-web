@@ -18,6 +18,7 @@ class SahodayaShell extends ConsumerStatefulWidget {
 class _SahodayaShellState extends ConsumerState<SahodayaShell> {
   int _index = 0;
   String? _paymentsInitialStatus;
+  String? _schoolsPaymentFilter;
 
   static const _labels = ['Dashboard', 'Schools', 'Payments', 'Submissions'];
   static const _icons = [
@@ -34,6 +35,7 @@ class _SahodayaShellState extends ConsumerState<SahodayaShell> {
     return SaAdminShell(
       roleLabel: 'Sahodaya',
       tenantName: session.user.tenantName ?? 'Sahodaya',
+      logoUrl: session.user.logoUrl,
       pageTitle: _labels[_index],
       labels: _labels,
       icons: _icons,
@@ -47,11 +49,14 @@ class _SahodayaShellState extends ConsumerState<SahodayaShell> {
             _index = 2;
           }),
           onGoToPaymentDue: () => setState(() {
-            _paymentsInitialStatus = 'payment-due';
-            _index = 2;
+            _schoolsPaymentFilter = 'payment_not_done';
+            _index = 1;
           }),
         ),
-        const SahodayaSchoolsScreen(),
+        SahodayaSchoolsScreen(
+          key: ValueKey(_schoolsPaymentFilter ?? 'all'),
+          initialPaymentFilter: _schoolsPaymentFilter,
+        ),
         SahodayaPaymentsScreen(key: ValueKey(_paymentsInitialStatus ?? 'submitted'), initialStatus: _paymentsInitialStatus ?? 'submitted'),
         const SahodayaSubmissionsScreen(),
       ],

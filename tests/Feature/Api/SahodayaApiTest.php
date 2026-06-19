@@ -121,6 +121,38 @@ class SahodayaApiTest extends TestCase
             ->assertJsonPath('data.0.school.name', 'Govt HS');
     }
 
+    public function test_schools_can_be_filtered_by_payment_status(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'registration' => $registration, 'token' => $token] = $this->sahodayaContext();
+
+        SahodayaProfile::where('tenant_id', $sahodaya->id)->update([
+            'membership_fee_type'         => 'fixed',
+            'fixed_membership_fee_amount' => 4000,
+        ]);
+
+        $pendingSchool = Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'Unpaid School',
+            'parent_id'         => $sahodaya->id,
+            'school_prefix'     => 'UNS',
+            'membership_status' => 'pending',
+            'is_active'         => false,
+        ]);
+
+        $this->auth($token)
+            ->getJson("/api/v1/sahodaya/{$sahodaya->id}/schools?payment_status=payment_not_done")
+            ->assertOk()
+            ->assertJsonPath('data.0.payment_status', 'payment_not_done')
+            ->assertJsonPath('data.0.name', 'Unpaid School');
+
+        $this->auth($token)
+            ->getJson("/api/v1/sahodaya/{$sahodaya->id}/schools?payment_status=payment_pending")
+            ->assertOk()
+            ->assertJsonPath('data.0.payment_status', 'payment_pending')
+            ->assertJsonPath('data.0.name', 'Govt HS');
+    }
+
     public function test_pending_membership_schools_without_payment_show_as_payment_due(): void
     {
         ['sahodaya' => $sahodaya, 'token' => $token] = $this->sahodayaContext();

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
 use App\Models\Circular;
 use App\Models\KalotsavEvent;
-use App\Models\MembershipPayment;
 use App\Models\OfficeBearers;
 use App\Models\Student;
 use App\Models\Tenant;
@@ -21,6 +20,7 @@ class DashboardController extends SahodayaAdminController
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
         $fees = $this->paymentFeeSummary($this->sahodaya->id, $schoolIds, $year);
+        $paymentSummary = $this->paymentStatusSummary($this->sahodaya->id, $schoolIds, $year);
 
         $approvedSchoolIds = Tenant::query()
             ->where('parent_id', $this->sahodaya->id)
@@ -43,14 +43,15 @@ class DashboardController extends SahodayaAdminController
                     ->whereIn('tenant_id', $approvedSchoolIds)
                     ->where('status', 'active')
                     ->count(),
-            'pending_payments'   => MembershipPayment::query()
-                ->whereIn('school_id', $schoolIds)
-                ->where('status', 'submitted')
-                ->count(),
-            'payment_due'        => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds, $year),
+            'pending_payments'   => $paymentSummary['payments_pending_verification'],
+            'payment_due'        => $paymentSummary['payment_not_done'],
             'pending_amount'   => $fees['pending_amount'],
             'approved_amount'  => $fees['approved_amount'],
             'payment_due_amount' => $fees['payment_due_amount'],
+            'payment_not_done' => $paymentSummary['payment_not_done'],
+            'payment_not_done_amount' => $paymentSummary['payment_not_done_amount'],
+            'payments_pending_verification' => $paymentSummary['payments_pending_verification'],
+            'payments_pending_verification_amount' => $paymentSummary['payments_pending_verification_amount'],
             'office_bearers'     => OfficeBearers::where('tenant_id', $this->sahodaya->id)->count(),
             'circulars'          => Circular::where('tenant_id', $this->sahodaya->id)->count(),
             'kalotsav_events'    => KalotsavEvent::where('tenant_id', $this->sahodaya->id)->count(),

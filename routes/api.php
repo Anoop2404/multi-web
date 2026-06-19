@@ -76,6 +76,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('payments/{payment}/proof', [PaymentsApiController::class, 'proof']);
 
                 Route::get('submissions', [SubmissionsApiController::class, 'index']);
+                Route::get('submissions/submission-students/{student}/image', [SubmissionsApiController::class, 'studentImage']);
                 Route::get('submissions/{submission}', [SubmissionsApiController::class, 'show']);
 
                 Route::get('reports/summary', [ReportsApiController::class, 'summary']);

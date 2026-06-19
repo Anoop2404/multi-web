@@ -6,6 +6,7 @@ use App\Models\MembershipPayment;
 use App\Models\Registration;
 use App\Models\Tenant;
 use App\Services\Membership\PaymentDueResolver;
+use App\Services\Membership\SchoolPaymentStatusResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -98,6 +99,40 @@ trait BuildsMembershipExports
         return app(PaymentDueResolver::class);
     }
 
+    protected function schoolPaymentStatusResolver(): SchoolPaymentStatusResolver
+    {
+        return app(SchoolPaymentStatusResolver::class);
+    }
+
+    /** @return array{payment_not_done: int, payment_not_done_amount: float, payments_pending_verification: int, payments_pending_verification_amount: float} */
+    protected function paymentStatusSummary(string $sahodayaId, array $schoolIds, string $academicYear): array
+    {
+        $fees = $this->paymentFeeSummary($sahodayaId, $schoolIds, $academicYear);
+        $pendingCount = MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'submitted')->count();
+
+        return [
+            'payment_not_done'                      => $this->unpaidRegistrationsCount($sahodayaId, $schoolIds, $academicYear),
+            'payment_not_done_amount'               => $fees['payment_due_amount'],
+            'payments_pending_verification'         => $pendingCount,
+            'payments_pending_verification_amount'  => $fees['pending_amount'],
+        ];
+    }
+
+    protected function attachSchoolPaymentStatuses($schools, string $sahodayaId, string $academicYear): void
+    {
+        $ids = $schools->pluck('id')->all();
+        $statuses = $this->schoolPaymentStatusResolver()->forSchools($sahodayaId, $ids, $academicYear);
+
+        $schools->transform(function ($school) use ($statuses) {
+            $entry = $statuses[$school->id] ?? ['status' => 'none', 'label' => '—', 'amount' => null];
+            $school->setAttribute('payment_status', $entry['status']);
+            $school->setAttribute('payment_status_label', $entry['label']);
+            $school->setAttribute('payment_amount', $entry['amount']);
+
+            return $school;
+        });
+    }
+
     protected function unpaidRegistrationsCount(string $sahodayaId, array $schoolIds, string $academicYear): int
     {
         return $this->paymentDueResolver()->count($sahodayaId, $schoolIds, $academicYear);
@@ -134,7 +169,7 @@ trait BuildsMembershipExports
             'rejected'    => (clone $base)->where('status', 'rejected')->count(),
             'total'       => (clone $base)->count(),
             'collected'   => $fees['approved_amount'],
-        ]);
+        ], $this->paymentStatusSummary($sahodayaId, $schoolIds, $academicYear));
     }
 
     private function applySchoolSearchAndDates(Builder $query, array $filters): void

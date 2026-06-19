@@ -12,26 +12,26 @@
 
             <!-- Fee totals -->
             <div class="grid sm:grid-cols-3 gap-3">
-                <SummaryCard label="Pending Approval Fees"
-                             :value="`₹${Number(summary.pending_amount || 0).toLocaleString('en-IN')}`"
-                             :hint="`${summary.pending ?? 0} payment${(summary.pending ?? 0) === 1 ? '' : 's'} awaiting verification`"
+                <SummaryCard label="Payment Pending"
+                             :value="`₹${Number(summary.payments_pending_verification_amount || summary.pending_amount || 0).toLocaleString('en-IN')}`"
+                             :hint="`${summary.payments_pending_verification ?? summary.pending ?? 0} payment${(summary.payments_pending_verification ?? summary.pending ?? 0) === 1 ? '' : 's'} awaiting verification`"
                              color="amber" />
                 <SummaryCard label="Approved Fees"
                              :value="`₹${Number(summary.approved_amount || summary.collected || 0).toLocaleString('en-IN')}`"
                              :hint="`${summary.verified ?? 0} verified payment${(summary.verified ?? 0) === 1 ? '' : 's'}`"
                              color="green" />
                 <SummaryCard label="Payment Not Done"
-                             :value="`₹${Number(summary.payment_due_amount || 0).toLocaleString('en-IN')}`"
-                             :hint="`${summary.payment_due ?? 0} school${(summary.payment_due ?? 0) === 1 ? '' : 's'} not paid yet`"
+                             :value="`₹${Number(summary.payment_not_done_amount || summary.payment_due_amount || 0).toLocaleString('en-IN')}`"
+                             :hint="`${summary.payment_not_done ?? summary.payment_due ?? 0} school${(summary.payment_not_done ?? summary.payment_due ?? 0) === 1 ? '' : 's'} not paid yet`"
                              color="navy" />
             </div>
 
             <!-- Counts -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Pending" :value="summary.pending" color="amber" />
+                <SummaryCard label="Payment Pending" :value="summary.payments_pending_verification ?? summary.pending" color="amber" />
                 <SummaryCard label="Verified" :value="summary.verified" color="green" />
                 <SummaryCard label="Rejected" :value="summary.rejected" color="red" />
-                <SummaryCard label="Payment Due" :value="summary.payment_due ?? 0" color="navy" />
+                <SummaryCard label="Payment Not Done" :value="summary.payment_not_done ?? summary.payment_due ?? 0" color="navy" />
             </div>
 
             <!-- Status tabs -->
@@ -218,8 +218,8 @@ const filterForm = reactive({
 });
 
 const statusTabs = [
-    { key: 'payment-due', label: 'Payment Due' },
-    { key: 'submitted', label: 'Pending' },
+    { key: 'payment-due', label: 'Payment Not Done' },
+    { key: 'submitted', label: 'Payment Pending' },
     { key: 'verified',  label: 'Verified' },
     { key: 'rejected',  label: 'Rejected' },
     { key: 'all',       label: 'All' },
