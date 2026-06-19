@@ -127,4 +127,53 @@ class PaymentVerificationTest extends TestCase
 
         @unlink($absolute);
     }
+
+    public function test_web_dashboard_shows_pending_schools_as_payment_due(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['sahodaya' => $sahodaya] = $this->cluster();
+
+        SahodayaProfile::where('tenant_id', $sahodaya->id)->update([
+            'membership_fee_type'         => 'fixed',
+            'fixed_membership_fee_amount' => 4000,
+        ]);
+
+        Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'Pending School A',
+            'parent_id'         => $sahodaya->id,
+            'school_prefix'     => 'PSA',
+            'membership_status' => 'pending',
+            'is_active'         => false,
+        ]);
+
+        Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'Pending School B',
+            'parent_id'         => $sahodaya->id,
+            'school_prefix'     => 'PSB',
+            'membership_status' => 'pending',
+            'is_active'         => false,
+        ]);
+
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $sahodaya->id]);
+        $admin->assignRole('sahodaya_admin');
+
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('stats.payment_due', 2)
+                ->where('stats.payment_due_amount', 8000));
+
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/membership/payments?status=payment-due")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('summary.payment_due', 2)
+                ->where('summary.payment_due_amount', 8000)
+                ->has('paymentDue.data', 2));
+    }
 }

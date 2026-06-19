@@ -79,11 +79,11 @@
                 <p v-if="$page.props.auth?.user?.name" class="px-3 pb-2 text-[11px] text-white/50 truncate">
                     {{ $page.props.auth.user.name }}
                 </p>
-                <Link href="/logout" method="post" as="button"
-                      class="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-white/80 hover:text-white hover:bg-white/10 transition font-medium">
+                <SignOutButton
+                    class="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-white/80 hover:text-white hover:bg-white/10 transition font-medium">
                     <SvgIcon name="log-out" class="w-4 h-4" />
                     <span>Sign out</span>
-                </Link>
+                </SignOutButton>
             </div>
         </aside>
 
@@ -124,11 +124,11 @@
                         <span v-if="$page.props.auth?.user?.name" class="text-xs text-gray-500 hidden sm:inline max-w-[8rem] truncate">
                             {{ $page.props.auth.user.name }}
                         </span>
-                        <Link href="/logout" method="post" as="button"
-                              class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:text-red-600 hover:bg-red-50 transition">
+                        <SignOutButton
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:text-red-600 hover:bg-red-50 transition">
                             <SvgIcon name="log-out" class="w-3.5 h-3.5" />
                             Sign out
-                        </Link>
+                        </SignOutButton>
                     </div>
                 </div>
             </header>
@@ -142,6 +142,7 @@
 
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
+import SignOutButton from '@/Components/SignOutButton.vue';
 import { computed, defineComponent, h, ref, watch } from 'vue';
 
 defineProps({

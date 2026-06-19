@@ -5,8 +5,10 @@ namespace App\Http\Controllers\SahodayaAdmin\Concerns;
 use App\Models\MembershipPayment;
 use App\Models\Registration;
 use App\Models\Tenant;
+use App\Services\Membership\PaymentDueResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 trait BuildsMembershipExports
 {
@@ -91,64 +93,42 @@ trait BuildsMembershipExports
         return $query;
     }
 
-    protected function unpaidRegistrationsQuery(array $schoolIds, array $filters, string $academicYear): Builder
+    protected function paymentDueResolver(): PaymentDueResolver
     {
-        $query = Registration::whereIn('school_id', $schoolIds)
-            ->where('academic_year', $academicYear)
-            ->whereIn('registration_status', ['payment_pending', 'payment_rejected'])
-            ->with('school:id,name,school_prefix,membership_status,parent_id')
-            ->orderByDesc('updated_at');
-
-        if ($filters['search'] !== '') {
-            $search = $filters['search'];
-            $query->whereHas('school', fn ($q) => $q
-                ->where('name', 'like', "%{$search}%")
-                ->orWhere('school_prefix', 'like', "%{$search}%"));
-        }
-
-        if ($filters['date_from']) {
-            $query->whereDate('updated_at', '>=', $filters['date_from']);
-        }
-
-        if ($filters['date_to']) {
-            $query->whereDate('updated_at', '<=', $filters['date_to']);
-        }
-
-        return $query;
+        return app(PaymentDueResolver::class);
     }
 
-    protected function unpaidRegistrationsCount(array $schoolIds, string $academicYear): int
+    protected function unpaidRegistrationsCount(string $sahodayaId, array $schoolIds, string $academicYear): int
     {
-        return $this->unpaidRegistrationsQuery($schoolIds, [
-            'search'    => '',
-            'date_from' => null,
-            'date_to'   => null,
-        ], $academicYear)->count();
+        return $this->paymentDueResolver()->count($sahodayaId, $schoolIds, $academicYear);
+    }
+
+    protected function paginatedPaymentDue(string $sahodayaId, array $schoolIds, string $academicYear, array $filters, int $perPage = 15): LengthAwarePaginator
+    {
+        return $this->paymentDueResolver()->paginate($sahodayaId, $schoolIds, $academicYear, $filters, $perPage);
     }
 
     /** @return array{pending_amount: float, approved_amount: float, rejected_amount: float, payment_due_amount: float} */
-    protected function paymentFeeSummary(array $schoolIds, string $academicYear): array
+    protected function paymentFeeSummary(string $sahodayaId, array $schoolIds, string $academicYear): array
     {
         $base = MembershipPayment::whereIn('school_id', $schoolIds);
+        $resolver = $this->paymentDueResolver();
 
         return [
             'pending_amount'     => (float) (clone $base)->where('status', 'submitted')->sum('amount'),
             'approved_amount'    => (float) (clone $base)->where('status', 'verified')->sum('amount'),
             'rejected_amount'    => (float) (clone $base)->where('status', 'rejected')->sum('amount'),
-            'payment_due_amount' => (float) Registration::whereIn('school_id', $schoolIds)
-                ->where('academic_year', $academicYear)
-                ->whereIn('registration_status', ['payment_pending', 'payment_rejected'])
-                ->sum('membership_fee_amount'),
+            'payment_due_amount' => $resolver->totalAmount($sahodayaId, $schoolIds, $academicYear),
         ];
     }
 
-    protected function buildPaymentPageSummary(array $schoolIds, string $academicYear): array
+    protected function buildPaymentPageSummary(string $sahodayaId, array $schoolIds, string $academicYear): array
     {
         $base = MembershipPayment::whereIn('school_id', $schoolIds);
-        $fees = $this->paymentFeeSummary($schoolIds, $academicYear);
+        $fees = $this->paymentFeeSummary($sahodayaId, $schoolIds, $academicYear);
 
         return array_merge($fees, [
-            'payment_due' => $this->unpaidRegistrationsCount($schoolIds, $academicYear),
+            'payment_due' => $this->unpaidRegistrationsCount($sahodayaId, $schoolIds, $academicYear),
             'pending'     => (clone $base)->where('status', 'submitted')->count(),
             'verified'    => (clone $base)->where('status', 'verified')->count(),
             'rejected'    => (clone $base)->where('status', 'rejected')->count(),

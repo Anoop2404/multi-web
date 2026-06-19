@@ -139,16 +139,16 @@ class MembershipReportsController extends SahodayaAdminController
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
         $filters = $this->paymentListFilters($request);
         $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id');
-        $registrations = $this->unpaidRegistrationsQuery($schoolIds->all(), $filters, $year)->get();
+        $items = $this->paymentDueResolver()->items($this->sahodaya->id, $schoolIds->all(), $year, $filters);
 
-        $rows = $registrations->map(fn (Registration $registration) => [
-            $registration->school?->name ?? '',
-            $registration->school?->school_prefix ?? '',
-            $registration->academic_year,
-            $registration->reg_no ?? '',
-            $registration->registration_status,
-            $registration->membership_fee_amount,
-            $registration->updated_at?->format('Y-m-d H:i') ?? '',
+        $rows = $items->map(fn (array $item) => [
+            $item['school']['name'] ?? '',
+            $item['school']['school_prefix'] ?? '',
+            $item['academic_year'],
+            $item['reg_no'] ?? '',
+            $item['registration_status'],
+            $item['membership_fee_amount'],
+            isset($item['updated_at']) ? date('Y-m-d H:i', strtotime($item['updated_at'])) : '',
         ]);
 
         return ExcelExport::download('membership-payment-due-'.$year, [
@@ -190,7 +190,7 @@ class MembershipReportsController extends SahodayaAdminController
     {
         $allSchools = Tenant::whereIn('id', $schoolIds)->get(['id', 'membership_status']);
 
-        $fees = $this->paymentFeeSummary($schoolIds->all(), $year);
+        $fees = $this->paymentFeeSummary($this->sahodaya->id, $schoolIds->all(), $year);
 
         return [
             'total_registered'        => $allSchools->count(),
@@ -199,10 +199,7 @@ class MembershipReportsController extends SahodayaAdminController
             'rejected_schools'        => $allSchools->where('membership_status', 'rejected')->count(),
             'payments_verified'       => MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'verified')->count(),
             'payments_pending'        => MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'submitted')->count(),
-            'payment_due'             => Registration::whereIn('school_id', $schoolIds)
-                ->where('academic_year', $year)
-                ->whereIn('registration_status', ['payment_pending', 'payment_rejected'])
-                ->count(),
+            'payment_due'             => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds->all(), $year),
             'pending_amount'          => $fees['pending_amount'],
             'approved_amount'         => $fees['approved_amount'],
             'payment_due_amount'      => $fees['payment_due_amount'],
@@ -251,8 +248,7 @@ class MembershipReportsController extends SahodayaAdminController
             'date_to'   => $dateTo,
         ];
 
-        return $this->unpaidRegistrationsQuery($schoolIds->all(), $filters, $year)
-            ->paginate(20)
+        return $this->paginatedPaymentDue($this->sahodaya->id, $schoolIds->all(), $year, $filters, 20)
             ->withQueryString();
     }
 

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\V1\Sahodaya;
 
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
 use App\Http\Resources\MembershipPaymentResource;
-use App\Http\Resources\RegistrationResource;
+use App\Http\Resources\PaymentDueItemResource;
 use App\Models\MembershipPayment;
 use App\Support\AcademicYear;
 use App\Services\Audit\DataChangeLogger;
@@ -26,19 +26,24 @@ class PaymentsApiController extends SahodayaApiController
 
         $base = MembershipPayment::whereIn('school_id', $schoolIds);
         $statusCounts = [
-            'payment-due' => $this->unpaidRegistrationsCount($schoolIds, $year),
+            'payment-due' => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds, $year),
             'submitted'   => (clone $base)->where('status', 'submitted')->count(),
             'verified'    => (clone $base)->where('status', 'verified')->count(),
             'rejected'    => (clone $base)->where('status', 'rejected')->count(),
             'all'         => (clone $base)->count(),
         ];
-        $summary = $this->buildPaymentPageSummary($schoolIds, $year);
+        $summary = $this->buildPaymentPageSummary($this->sahodaya->id, $schoolIds, $year);
 
         if ($filters['status'] === 'payment-due') {
-            $registrations = $this->unpaidRegistrationsQuery($schoolIds, $filters, $year)
-                ->paginate($request->integer('per_page', 15));
+            $paymentDue = $this->paginatedPaymentDue(
+                $this->sahodaya->id,
+                $schoolIds,
+                $year,
+                $filters,
+                $request->integer('per_page', 15),
+            );
 
-            return RegistrationResource::collection($registrations)->additional([
+            return PaymentDueItemResource::collection($paymentDue)->additional([
                 'meta' => [
                     'active_status' => $filters['status'],
                     'status_counts' => $statusCounts,

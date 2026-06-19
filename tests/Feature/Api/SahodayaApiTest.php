@@ -104,8 +104,9 @@ class SahodayaApiTest extends TestCase
 
     public function test_sahodaya_admin_can_list_payment_due_registrations(): void
     {
-        ['sahodaya' => $sahodaya, 'school' => $school, 'registration' => $registration, 'token' => $token] = $this->sahodayaContext();
+        ['sahodaya' => $sahodaya, 'school' => $school, 'registration' => $registration, 'payment' => $payment, 'token' => $token] = $this->sahodayaContext();
 
+        $payment->delete();
         $registration->update([
             'registration_status'   => 'payment_pending',
             'membership_fee_amount' => 4500,
@@ -118,6 +119,50 @@ class SahodayaApiTest extends TestCase
             ->assertJsonPath('meta.status_counts.payment-due', 1)
             ->assertJsonPath('data.0.registration_status', 'payment_pending')
             ->assertJsonPath('data.0.school.name', 'Govt HS');
+    }
+
+    public function test_pending_membership_schools_without_payment_show_as_payment_due(): void
+    {
+        ['sahodaya' => $sahodaya, 'token' => $token] = $this->sahodayaContext();
+
+        SahodayaProfile::where('tenant_id', $sahodaya->id)->update([
+            'membership_fee_type'          => 'fixed',
+            'fixed_membership_fee_amount'  => 4000,
+        ]);
+
+        Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'Pending School A',
+            'parent_id'         => $sahodaya->id,
+            'school_prefix'     => 'PSA',
+            'membership_status' => 'pending',
+            'is_active'         => false,
+        ]);
+
+        Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'Pending School B',
+            'parent_id'         => $sahodaya->id,
+            'school_prefix'     => 'PSB',
+            'membership_status' => 'pending',
+            'is_active'         => false,
+        ]);
+
+        $this->auth($token)
+            ->getJson("/api/v1/sahodaya/{$sahodaya->id}/dashboard")
+            ->assertOk()
+            ->assertJsonPath('data.stats.payment_due', 2)
+            ->assertJsonPath('data.stats.payment_due_amount', 8000);
+
+        $this->auth($token)
+            ->getJson("/api/v1/sahodaya/{$sahodaya->id}/payments?status=payment-due")
+            ->assertOk()
+            ->assertJsonPath('meta.status_counts.payment-due', 2)
+            ->assertJsonPath('meta.summary.payment_due_amount', 8000)
+            ->assertJsonPath('data.0.source', 'pending_membership')
+            ->assertJsonPath('data.0.membership_fee_amount', 4000);
     }
 
     public function test_sahodaya_admin_can_list_payments(): void

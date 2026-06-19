@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\V1\Sahodaya;
 
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
 use App\Models\MembershipPayment;
-use App\Models\Registration;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Support\AcademicYear;
@@ -26,7 +25,7 @@ class DashboardApiController extends SahodayaApiController
             ->all();
 
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
-        $fees = $this->paymentFeeSummary($schoolIds, $year);
+        $fees = $this->paymentFeeSummary($this->sahodaya->id, $schoolIds, $year);
 
         return $this->ok([
             'stats' => [
@@ -47,11 +46,7 @@ class DashboardApiController extends SahodayaApiController
                     ->whereIn('school_id', $schoolIds)
                     ->where('status', 'submitted')
                     ->count(),
-                'payment_due'        => Registration::query()
-                    ->whereIn('school_id', $schoolIds)
-                    ->where('academic_year', $year)
-                    ->whereIn('registration_status', ['payment_pending', 'payment_rejected'])
-                    ->count(),
+                'payment_due'        => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds, $year),
                 'pending_amount'     => $fees['pending_amount'],
                 'approved_amount'    => $fees['approved_amount'],
                 'payment_due_amount' => $fees['payment_due_amount'],

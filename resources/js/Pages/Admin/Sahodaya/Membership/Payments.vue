@@ -81,7 +81,7 @@
 
             <!-- Payments list -->
             <div v-if="activeStatus === 'payment-due' && paymentDue?.data?.length" class="space-y-4">
-                <div v-for="r in paymentDue.data" :key="r.id"
+                <div v-for="r in paymentDue.data" :key="r.id ?? r.school_id"
                      class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                     <div class="px-6 py-4 flex items-start justify-between gap-4">
                         <div class="flex items-center gap-4 min-w-0">
@@ -107,7 +107,12 @@
                         </div>
                     </div>
                     <div class="px-6 py-3 bg-amber-50/60 border-t border-amber-100 text-xs text-amber-800">
-                        Registered for {{ r.academic_year }} — awaiting payment upload from school.
+                        <template v-if="r.source === 'pending_membership'">
+                            New school application — membership fee not paid yet.
+                        </template>
+                        <template v-else>
+                            Registered for {{ r.academic_year }} — awaiting payment upload from school.
+                        </template>
                     </div>
                 </div>
             </div>

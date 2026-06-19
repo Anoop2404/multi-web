@@ -5,6 +5,24 @@ import '../auth/auth_providers.dart';
 import '../theme/app_theme.dart';
 import 'sa_widgets.dart';
 
+Future<void> confirmSignOut(BuildContext context, WidgetRef ref) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Sign out?'),
+      content: const Text('Are you sure you want to sign out?'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sign out')),
+      ],
+    ),
+  );
+
+  if (confirmed == true && context.mounted) {
+    await ref.read(authControllerProvider.notifier).logout();
+  }
+}
+
 class SaAdminShell extends ConsumerWidget {
   const SaAdminShell({
     super.key,
@@ -77,7 +95,7 @@ class SaAdminShell extends ConsumerWidget {
             IconButton(
               tooltip: 'Sign out',
               icon: const Icon(Icons.logout_rounded, size: 20),
-              onPressed: () => ref.read(authControllerProvider.notifier).logout(),
+              onPressed: () => confirmSignOut(context, ref),
             ),
           ],
         ),
@@ -103,6 +121,19 @@ class SaAdminShell extends ConsumerWidget {
                   ],
                 ),
               ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.logout_rounded, color: Color(0xFFFCA5A5), size: 20),
+                title: const Text(
+                  'Sign out',
+                  style: TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  confirmSignOut(context, ref);
+                },
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         ),

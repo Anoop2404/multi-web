@@ -29,24 +29,23 @@
 
             <!-- Stats row -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <template v-if="!websiteEnabled">
-                    <StatCard :value="stats.approved_schools ?? 0" label="Approved Members" color="blue" icon="🏫" />
-                    <StatCard :value="stats.pending_schools ?? 0" label="Pending Schools" color="amber" icon="⏳" />
-                    <StatCard :value="stats.total_students ?? 0" label="Active Students" color="navy" icon="👨‍🎓"
-                              :hint="'From approved members only'" />
-                    <StatCard :value="`₹${Number(stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Pending Approval Fees" color="amber" icon="💳"
-                              :hint="`${stats.pending_payments ?? 0} awaiting verification`" />
-                    <StatCard :value="`₹${Number(stats.approved_amount || 0).toLocaleString('en-IN')}`" label="Approved Fees" color="green" icon="✅" />
-                    <StatCard :value="`₹${Number(stats.payment_due_amount || 0).toLocaleString('en-IN')}`" label="Payment Not Done" color="navy" icon="🧾"
-                              :hint="`${stats.payment_due ?? 0} schools`" />
-                </template>
-                <template v-else>
-                    <StatCard :value="stats.approved_schools ?? 0" label="Approved Members" color="blue" icon="🏫" />
-                    <StatCard :value="stats.pending_schools ?? 0" label="Pending Schools" color="amber" icon="⏳" />
-                    <StatCard :value="stats.office_bearers"  label="Office Bearers"   color="navy" icon="👥" />
-                    <StatCard :value="stats.circulars"        label="Circulars"        color="indigo" icon="📄" />
-                    <StatCard :value="stats.kalotsav_events"  label="Kalotsav Events" color="amber"  icon="🏆" />
-                </template>
+                <StatCard :value="stats.approved_schools ?? 0" label="Approved Members" color="blue" icon="🏫" />
+                <StatCard :value="stats.pending_schools ?? 0" label="Pending Schools" color="amber" icon="⏳" />
+                <StatCard v-if="websiteEnabled" :value="stats.office_bearers"  label="Office Bearers"   color="navy" icon="👥" />
+                <StatCard v-else :value="stats.total_students ?? 0" label="Active Students" color="navy" icon="👨‍🎓"
+                          :hint="'From approved members only'" />
+                <StatCard v-if="websiteEnabled" :value="stats.circulars"        label="Circulars"        color="indigo" icon="📄" />
+                <StatCard v-else :value="`₹${Number(stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Pending Approval Fees" color="amber" icon="💳"
+                          :hint="`${stats.pending_payments ?? 0} awaiting verification`" />
+                <StatCard v-if="websiteEnabled" :value="stats.kalotsav_events"  label="Kalotsav Events" color="amber"  icon="🏆" />
+                <StatCard v-else :value="`₹${Number(stats.approved_amount || 0).toLocaleString('en-IN')}`" label="Approved Fees" color="green" icon="✅" />
+                <StatCard :value="`₹${Number(stats.payment_due_amount || 0).toLocaleString('en-IN')}`" label="Payment Not Done" color="navy" icon="🧾"
+                          :hint="`${stats.payment_due ?? 0} schools`" />
+                <StatCard v-if="websiteEnabled" :value="stats.total_students ?? 0" label="Active Students" color="navy" icon="👨‍🎓"
+                          :hint="'From approved members only'" />
+                <StatCard v-if="websiteEnabled" :value="`₹${Number(stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Pending Approval Fees" color="amber" icon="💳"
+                          :hint="`${stats.pending_payments ?? 0} awaiting verification`" />
+                <StatCard v-if="websiteEnabled" :value="`₹${Number(stats.approved_amount || 0).toLocaleString('en-IN')}`" label="Approved Fees" color="green" icon="✅" />
             </div>
 
             <!-- Attention required -->

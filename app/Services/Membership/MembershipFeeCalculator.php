@@ -50,4 +50,19 @@ class MembershipFeeCalculator
 
         return $slab ? (float) $slab->amount : 0.0;
     }
+
+    public function estimateFeeForSchool(Tenant $school, string $academicYear): float
+    {
+        $profile = SahodayaProfile::where('tenant_id', $school->parent_id)->first();
+
+        if (! $profile) {
+            return 0.0;
+        }
+
+        return match ($profile->membership_fee_type) {
+            'fixed' => (float) ($profile->fixed_membership_fee_amount ?? 0),
+            'variable_by_student_count' => $this->fromSlabs($school->parent_id, $academicYear, 0),
+            default => 0.0,
+        };
+    }
 }

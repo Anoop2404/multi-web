@@ -38,10 +38,9 @@
             <div class="p-4 border-t border-gray-700 text-xs space-y-1">
                 <p class="text-gray-400 truncate">{{ $page.props.auth?.user?.name }}</p>
                 <p class="text-gray-500 truncate">{{ $page.props.auth?.user?.email }}</p>
-                <Link href="/logout" method="post" as="button"
-                      class="text-red-400 hover:text-red-300 transition mt-1 block">
+                <SignOutButton class="text-red-400 hover:text-red-300 transition mt-1 block text-left w-full">
                     Sign out
-                </Link>
+                </SignOutButton>
             </div>
         </aside>
 
@@ -75,6 +74,7 @@
 
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
+import SignOutButton from '@/Components/SignOutButton.vue';
 import { computed, ref, watch } from 'vue';
 
 defineProps({

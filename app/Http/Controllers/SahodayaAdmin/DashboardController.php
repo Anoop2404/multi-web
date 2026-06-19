@@ -7,7 +7,6 @@ use App\Models\Circular;
 use App\Models\KalotsavEvent;
 use App\Models\MembershipPayment;
 use App\Models\OfficeBearers;
-use App\Models\Registration;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Support\AcademicYear;
@@ -21,7 +20,7 @@ class DashboardController extends SahodayaAdminController
     {
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
-        $fees = $this->paymentFeeSummary($schoolIds, $year);
+        $fees = $this->paymentFeeSummary($this->sahodaya->id, $schoolIds, $year);
 
         $approvedSchoolIds = Tenant::query()
             ->where('parent_id', $this->sahodaya->id)
@@ -48,11 +47,7 @@ class DashboardController extends SahodayaAdminController
                 ->whereIn('school_id', $schoolIds)
                 ->where('status', 'submitted')
                 ->count(),
-            'payment_due'        => Registration::query()
-                ->whereIn('school_id', $schoolIds)
-                ->where('academic_year', AcademicYear::forSahodaya($this->sahodaya->id))
-                ->whereIn('registration_status', ['payment_pending', 'payment_rejected'])
-                ->count(),
+            'payment_due'        => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds, $year),
             'pending_amount'   => $fees['pending_amount'],
             'approved_amount'  => $fees['approved_amount'],
             'payment_due_amount' => $fees['payment_due_amount'],

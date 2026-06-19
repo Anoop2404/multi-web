@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
-use App\Http\Resources\RegistrationResource;
 use App\Models\MembershipPayment;
-use App\Models\Registration;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\RegistrationStatusService;
@@ -28,17 +26,16 @@ class PaymentVerificationController extends SahodayaAdminController
 
         $base = MembershipPayment::whereIn('school_id', $schoolIds);
         $statusCounts = [
-            'payment-due' => $this->unpaidRegistrationsCount($schoolIds, $year),
+            'payment-due' => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds, $year),
             'submitted'   => (clone $base)->where('status', 'submitted')->count(),
             'verified'    => (clone $base)->where('status', 'verified')->count(),
             'rejected'    => (clone $base)->where('status', 'rejected')->count(),
             'all'         => (clone $base)->count(),
         ];
-        $summary = $this->buildPaymentPageSummary($schoolIds, $year);
+        $summary = $this->buildPaymentPageSummary($this->sahodaya->id, $schoolIds, $year);
 
         if ($filters['status'] === 'payment-due') {
-            $paymentDue = $this->unpaidRegistrationsQuery($schoolIds, $filters, $year)
-                ->paginate(15)
+            $paymentDue = $this->paginatedPaymentDue($this->sahodaya->id, $schoolIds, $year, $filters)
                 ->withQueryString();
 
             return $this->inertia('Sahodaya/Membership/Payments', [
@@ -81,16 +78,16 @@ class PaymentVerificationController extends SahodayaAdminController
 
         if ($filters['status'] === 'payment-due') {
             $year = AcademicYear::forSahodaya($this->sahodaya->id);
-            $registrations = $this->unpaidRegistrationsQuery($schoolIds, $filters, $year)->get();
+            $items = $this->paymentDueResolver()->items($this->sahodaya->id, $schoolIds, $year, $filters);
 
-            $rows = $registrations->map(fn (Registration $registration) => [
-                $registration->school?->name ?? '',
-                $registration->school?->school_prefix ?? '',
-                $registration->academic_year,
-                $registration->reg_no ?? '',
-                $registration->registration_status,
-                $registration->membership_fee_amount,
-                $registration->updated_at?->format('Y-m-d H:i') ?? '',
+            $rows = $items->map(fn (array $item) => [
+                $item['school']['name'] ?? '',
+                $item['school']['school_prefix'] ?? '',
+                $item['academic_year'],
+                $item['reg_no'] ?? '',
+                $item['registration_status'],
+                $item['membership_fee_amount'],
+                isset($item['updated_at']) ? date('Y-m-d H:i', strtotime($item['updated_at'])) : '',
             ]);
 
             return ExcelExport::download('payment-due-'.$year, [

@@ -92,7 +92,7 @@
                 <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
                     <div>
                         <h3 class="font-bold text-gray-900">Payment Not Done</h3>
-                        <p class="text-xs text-gray-400 mt-0.5">Schools registered for {{ academicYear }} but have not uploaded payment proof yet.</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Schools that have not uploaded membership payment proof yet — including new applicants awaiting approval.</p>
                     </div>
                     <Link :href="`/sahodaya-admin/${sahodaya.id}/membership/payments?status=payment-due`"
                           class="text-xs font-semibold text-[#0f3d7a] hover:underline shrink-0">
@@ -112,7 +112,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
-                            <tr v-for="r in paymentDue.data" :key="r.id" class="hover:bg-gray-50/50">
+                            <tr v-for="r in paymentDue.data" :key="r.id ?? r.school_id" class="hover:bg-gray-50/50">
                                 <td class="td font-medium text-gray-800">{{ r.school?.name ?? '—' }}</td>
                                 <td class="td font-mono text-xs text-gray-500">{{ r.school?.school_prefix || '—' }}</td>
                                 <td class="td font-mono text-xs text-gray-600">{{ r.reg_no || '—' }}</td>
