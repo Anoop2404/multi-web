@@ -208,9 +208,10 @@ class DemoTenantsSeeder extends Seeder
         $sahodayaAdmin = User::firstOrCreate(
             ['email' => 'sahodaya@malappuram.test'],
             [
-                'name'      => 'Malappuram Sahodaya Admin',
-                'tenant_id' => $sahodaya->id,
-                'password'  => bcrypt('password'),
+                'name'           => 'Malappuram Sahodaya Admin',
+                'tenant_id'      => $sahodaya->id,
+                'password'       => bcrypt('password'),
+                'plain_password' => 'password',
             ]
         );
         $sahodayaAdmin->assignRole('sahodaya_admin');
@@ -227,6 +228,7 @@ class DemoTenantsSeeder extends Seeder
                     'name'              => 'AMU School Admin',
                     'tenant_id'         => $amuSchool->id,
                     'password'          => bcrypt('password'),
+                    'plain_password'    => 'password',
                     'email_verified_at' => now(),
                 ]
             );

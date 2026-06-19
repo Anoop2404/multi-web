@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SiteSection;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
+use App\Models\User;
 use App\Services\Tenancy\SahodayaDatabaseProvisioner;
 use App\Support\SahodayaSiteTemplate;
 use App\Support\TenancyDatabase;
@@ -110,6 +111,9 @@ class TenantController extends Controller
                 : route('admin.schools.index'),
             'database'         => $database,
             'tenantOverview'   => $tenantOverview,
+            'sahodayaAdmins'   => $tenant->type === 'sahodaya' ? $this->portalAdmins($tenant, 'sahodaya_admin') : [],
+            'schoolAdmins'     => $tenant->type === 'school' ? $this->portalAdmins($tenant, 'school_admin') : [],
+            'loginUrl'         => $this->portalLoginUrl($tenant),
         ]);
     }
 
@@ -183,6 +187,73 @@ class TenantController extends Controller
         }
 
         return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Sahodaya database migrations completed.');
+    }
+
+    public function saveSahodayaAdmin(Request $request, Tenant $tenant)
+    {
+        abort_if($tenant->type !== 'sahodaya', 404);
+
+        return $this->savePortalAdmin($request, $tenant, 'sahodaya_admin');
+    }
+
+    public function saveSchoolAdmin(Request $request, Tenant $tenant)
+    {
+        abort_if($tenant->type !== 'school', 404);
+
+        return $this->savePortalAdmin($request, $tenant, 'school_admin');
+    }
+
+    public function destroySahodayaAdmin(Tenant $tenant, User $user)
+    {
+        return $this->destroyPortalAdmin($tenant, $user, 'sahodaya', 'sahodaya_admin');
+    }
+
+    public function destroySchoolAdmin(Tenant $tenant, User $user)
+    {
+        return $this->destroyPortalAdmin($tenant, $user, 'school', 'school_admin');
+    }
+
+    private function savePortalAdmin(Request $request, Tenant $tenant, string $role): \Illuminate\Http\RedirectResponse
+    {
+        $existingId = $request->input('user_id');
+        $label = $role === 'sahodaya_admin' ? 'Sahodaya admin' : 'School admin';
+
+        $data = $request->validate([
+            'user_id'  => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', $tenant->id)],
+            'name'     => ['required', 'string', 'max:255'],
+            'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($existingId)],
+            'password' => ['required', 'string', 'min:8'],
+        ]);
+
+        $user = $existingId
+            ? User::query()->where('tenant_id', $tenant->id)->findOrFail($existingId)
+            : new User(['tenant_id' => $tenant->id]);
+
+        $user->fill([
+            'name'              => $data['name'],
+            'email'             => $data['email'],
+            'password'          => $data['password'],
+            'plain_password'    => $data['password'],
+            'email_verified_at' => now(),
+        ]);
+        $user->save();
+        $user->syncRoles([$role]);
+
+        $message = $existingId ? "{$label} login updated." : "{$label} account created.";
+
+        return redirect()->route('admin.tenants.show', $tenant)->with('success', $message);
+    }
+
+    private function destroyPortalAdmin(Tenant $tenant, User $user, string $tenantType, string $role): \Illuminate\Http\RedirectResponse
+    {
+        abort_if($tenant->type !== $tenantType, 404);
+        abort_if($user->tenant_id !== $tenant->id || ! $user->hasRole($role), 404);
+
+        $user->delete();
+
+        $label = $role === 'sahodaya_admin' ? 'Sahodaya admin' : 'School admin';
+
+        return redirect()->route('admin.tenants.show', $tenant)->with('success', "{$label} removed.");
     }
 
     /** @return array<string, mixed> */
@@ -282,5 +353,36 @@ class TenantController extends Controller
         } catch (\Throwable) {
             return ['sections' => [], 'settings' => []];
         }
+    }
+
+    /** @return list<array{id: int, name: string, email: string, plain_password: ?string, created_at: ?string}> */
+    private function portalAdmins(Tenant $tenant, string $role): array
+    {
+        return User::role($role)
+            ->where('tenant_id', $tenant->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'plain_password', 'created_at'])
+            ->map(fn (User $user) => [
+                'id'             => $user->id,
+                'name'           => $user->name,
+                'email'          => $user->email,
+                'plain_password' => $user->plain_password,
+                'created_at'     => $user->created_at?->toIso8601String(),
+            ])
+            ->all();
+    }
+
+    private function portalLoginUrl(Tenant $tenant): ?string
+    {
+        $portalTenant = $tenant;
+
+        if ($tenant->type === 'school' && $tenant->parent_id) {
+            $portalTenant = Tenant::query()->find($tenant->parent_id) ?? $tenant;
+        }
+
+        $base = TenantDomainSync::publicUrl($portalTenant)
+            ?? ($portalTenant->subdomain ? 'https://'.TenantDomainSync::subdomainFqdn($portalTenant->subdomain) : null);
+
+        return $base ? rtrim($base, '/').'/login' : null;
     }
 }

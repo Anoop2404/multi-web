@@ -84,10 +84,11 @@ class SchoolApplicationController extends Controller
         $plainPassword = Str::password(12);
 
         $user = User::create([
-            'tenant_id' => $school->id,
-            'name'      => $data['school_name'],
-            'email'     => $email,
-            'password'  => Hash::make($plainPassword),
+            'tenant_id'      => $school->id,
+            'name'           => $data['school_name'],
+            'email'          => $email,
+            'password'       => Hash::make($plainPassword),
+            'plain_password' => $plainPassword,
         ]);
         $user->assignRole('school_admin');
 

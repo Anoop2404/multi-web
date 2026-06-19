@@ -345,10 +345,13 @@
         }
         .portal-alert-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
         .portal-alert-error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
-        .field-grid { display: grid; gap: 1rem; }
+        .field-grid { display: grid; gap: 1rem; align-items: start; }
         @media (min-width: 480px) { .field-grid-2 { grid-template-columns: 1fr 1fr; } }
         .field-span-2 { grid-column: 1 / -1; }
         .field-hidden { display: none; }
+        .portal-hint {
+            font-size: .6875rem; color: #94a3b8; margin-top: .35rem; line-height: 1.4;
+        }
         .portal-select {
             appearance: none;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2364748b' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");

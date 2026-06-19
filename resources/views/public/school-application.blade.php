@@ -84,7 +84,7 @@
                             </div>
 
                             @if($fields['school_email']['enabled'] ?? false)
-                            <div>
+                            <div class="field-span-2">
                                 <label class="portal-label" for="school_email">{{ $fields['school_email']['label'] }}
                                     <span class="portal-required">*</span>
                                 </label>
@@ -101,7 +101,7 @@
                             @endif
 
                             @if($fields['school_prefix']['enabled'] ?? false)
-                            <div>
+                            <div class="field-span-2">
                                 <label class="portal-label" for="school_prefix">{{ $fields['school_prefix']['label'] }}
                                     <span class="portal-required">*</span>
                                 </label>

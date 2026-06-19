@@ -126,6 +126,85 @@
                 </p>
             </div>
 
+            <!-- Portal admin login (Sahodaya or school) -->
+            <div v-if="tenant.type === 'sahodaya' || tenant.type === 'school'" class="bg-white rounded-xl shadow-sm border p-6"
+                 :class="tenant.type === 'sahodaya' ? 'border-purple-100' : 'border-blue-100'">
+                <h3 class="font-bold text-gray-900 mb-1">{{ portalAdminTitle }}</h3>
+                <p class="text-sm text-gray-500 mb-4">{{ portalAdminHint }}</p>
+
+                <p v-if="loginUrl" class="text-sm mb-4">
+                    <span class="text-gray-500">Login URL:</span>
+                    <a :href="loginUrl" target="_blank" rel="noopener" class="ml-1 font-mono text-indigo-600 hover:underline">{{ loginUrl }}</a>
+                </p>
+                <p v-else class="text-sm text-amber-600 mb-4">Set a custom domain or subdomain on the parent Sahodaya first.</p>
+
+                <div v-if="portalAdmins.length" class="mb-5 overflow-hidden rounded-lg border border-gray-100">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                            <tr>
+                                <th class="px-4 py-2.5 font-semibold">Name</th>
+                                <th class="px-4 py-2.5 font-semibold">Email</th>
+                                <th class="px-4 py-2.5 font-semibold">Password</th>
+                                <th class="px-4 py-2.5 font-semibold text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            <tr v-for="admin in portalAdmins" :key="admin.id">
+                                <td class="px-4 py-3 font-medium text-gray-800">{{ admin.name }}</td>
+                                <td class="px-4 py-3 font-mono text-gray-600 text-xs">{{ admin.email }}</td>
+                                <td class="px-4 py-3 font-mono text-gray-800 text-xs">{{ admin.plain_password || '—' }}</td>
+                                <td class="px-4 py-3 text-right space-x-2">
+                                    <button type="button" @click="editAdmin(admin)"
+                                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                                        Edit
+                                    </button>
+                                    <button type="button" @click="removeAdmin(admin)"
+                                            class="text-xs font-semibold text-red-600 hover:text-red-800">
+                                        Remove
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <form @submit.prevent="saveAdmin" class="space-y-4 max-w-lg">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        {{ adminForm.user_id ? 'Update login' : 'Create login' }}
+                    </p>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Full name</label>
+                        <input v-model="adminForm.name" type="text" required
+                               class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <p v-if="adminForm.errors.name" class="text-xs text-red-500 mt-1">{{ adminForm.errors.name }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Email (username)</label>
+                        <input v-model="adminForm.email" type="email" required autocomplete="off"
+                               class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <p v-if="adminForm.errors.email" class="text-xs text-red-500 mt-1">{{ adminForm.errors.email }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Password</label>
+                        <input v-model="adminForm.password" type="text" required autocomplete="off"
+                               class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <p class="text-xs text-gray-400 mt-1">Stored in plain text for superadmin reference only.</p>
+                        <p v-if="adminForm.errors.password" class="text-xs text-red-500 mt-1">{{ adminForm.errors.password }}</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="submit" :disabled="adminForm.processing"
+                                class="px-4 py-2.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50"
+                                :class="tenant.type === 'sahodaya' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'">
+                            {{ adminForm.user_id ? 'Save changes' : 'Create login' }}
+                        </button>
+                        <button v-if="adminForm.user_id" type="button" @click="resetAdminForm"
+                                class="px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                            Cancel edit
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <!-- Sahodaya control center -->
             <div v-if="tenant.type === 'sahodaya'" class="bg-white rounded-xl shadow-sm border border-purple-100 p-6">
                 <h3 class="font-bold text-gray-900 mb-1">Sahodaya control</h3>
@@ -192,7 +271,7 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -207,13 +286,46 @@ const props = defineProps({
         type: Object,
         default: () => ({ sections: [], settings: [] }),
     },
+    sahodayaAdmins: {
+        type: Array,
+        default: () => [],
+    },
+    schoolAdmins: {
+        type: Array,
+        default: () => [],
+    },
+    loginUrl: { type: String, default: null },
 });
+
+const portalAdmins = computed(() =>
+    props.tenant.type === 'school' ? props.schoolAdmins : props.sahodayaAdmins
+);
+
+const portalAdminTitle = computed(() =>
+    props.tenant.type === 'school' ? 'School admin login' : 'Sahodaya admin login'
+);
+
+const portalAdminHint = computed(() =>
+    props.tenant.type === 'school'
+        ? 'School admins sign in on the parent Sahodaya portal website.'
+        : 'Sahodaya admins sign in on this cluster\'s portal website, not the superadmin site.'
+);
+
+const portalAdminEndpoint = computed(() =>
+    props.tenant.type === 'school' ? 'school-admin' : 'sahodaya-admin'
+);
 
 const logoForm = useForm({ logo: null });
 const databaseForm = useForm({
     database_name: props.database?.name ?? props.database?.suggested_name ?? '',
 });
 const migrateForm = useForm({ seed: true });
+const adminForm = useForm({
+    user_id: null,
+    name: '',
+    email: '',
+    password: '',
+});
 
 function onLogoSelected(e) {
     logoForm.logo = e.target.files[0] ?? null;
@@ -232,6 +344,40 @@ function saveDatabase() {
 
 function runMigrations() {
     migrateForm.post(`/admin/tenants/${props.tenant.id}/migrate`);
+}
+
+function editAdmin(admin) {
+    adminForm.user_id = admin.id;
+    adminForm.name = admin.name;
+    adminForm.email = admin.email;
+    adminForm.password = admin.plain_password || '';
+    adminForm.clearErrors();
+}
+
+function resetAdminForm() {
+    adminForm.reset();
+    adminForm.clearErrors();
+}
+
+function saveAdmin() {
+    adminForm.post(`/admin/tenants/${props.tenant.id}/${portalAdminEndpoint.value}`, {
+        onSuccess: () => resetAdminForm(),
+    });
+}
+
+function removeAdmin(admin) {
+    const label = props.tenant.type === 'school' ? 'school admin' : 'Sahodaya admin';
+    if (! confirm(`Remove ${label} ${admin.email}?`)) {
+        return;
+    }
+
+    router.delete(`/admin/tenants/${props.tenant.id}/${portalAdminEndpoint.value}/${admin.id}`, {
+        onSuccess: () => {
+            if (adminForm.user_id === admin.id) {
+                resetAdminForm();
+            }
+        },
+    });
 }
 
 const sahodayaLinks = computed(() => {
