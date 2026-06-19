@@ -72,6 +72,57 @@ MSG);
     }
 
     /**
+     * Run a callback in tenant DB context when the Sahodaya database is migrated.
+     * Returns $default when dedicated DB mode is off or the database is not ready yet.
+     */
+    public static function whenDatabaseReady(Tenant $tenant, callable $callback, mixed $default = null): mixed
+    {
+        if (! self::enabled()) {
+            return $callback();
+        }
+
+        if (tenancy()->initialized) {
+            return $callback();
+        }
+
+        try {
+            $owner = self::owner($tenant);
+            $status = app(SahodayaDatabaseProvisioner::class)->status($owner);
+
+            if (! $status['ready']) {
+                return $default;
+            }
+
+            return $tenant->run($callback);
+        } catch (\Throwable) {
+            return $default;
+        }
+    }
+
+    /**
+     * @throws \RuntimeException
+     */
+    public static function runWhenDatabaseReady(Tenant $tenant, callable $callback): mixed
+    {
+        if (! self::enabled()) {
+            return $callback();
+        }
+
+        if (tenancy()->initialized) {
+            return $callback();
+        }
+
+        $owner = self::owner($tenant);
+        $status = app(SahodayaDatabaseProvisioner::class)->status($owner);
+
+        if (! $status['ready']) {
+            throw new \RuntimeException('Sahodaya database is not ready. Create the database and run migrations first.');
+        }
+
+        return $tenant->run($callback);
+    }
+
+    /**
      * School tenant IDs for a Sahodaya cluster (central tenants table).
      *
      * @return list<string>

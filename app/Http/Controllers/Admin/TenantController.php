@@ -135,7 +135,11 @@ class TenantController extends Controller
     {
         $request->validate(['logo' => 'required|image|max:2048']);
 
-        TenantBranding::storeUpload($tenant, $request->file('logo'));
+        try {
+            TenantBranding::storeUpload($tenant, $request->file('logo'));
+        } catch (\RuntimeException $e) {
+            return redirect()->route('admin.tenants.show', $tenant)->with('error', $e->getMessage());
+        }
 
         return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Logo updated.');
     }
