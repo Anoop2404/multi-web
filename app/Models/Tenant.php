@@ -101,4 +101,24 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function scopeActive($q)    { return $q->where('is_active', true); }
     public function scopeSchools($q)   { return $q->where('type', 'school'); }
     public function scopeSahodayas($q) { return $q->where('type', 'sahodaya'); }
+
+    /**
+     * Tenant-scoped models (settings, sections, students, …) live in the Sahodaya
+     * database when database_per_sahodaya is enabled. Without this override, Eloquent
+     * inherits the central connection from this model and queries the wrong database.
+     */
+    protected function newRelatedInstance($class)
+    {
+        return tap(new $class, function ($instance) {
+            if ($instance->getConnectionName()) {
+                return;
+            }
+
+            if (config('tenancy.database_per_sahodaya', true) && tenancy()->initialized) {
+                $instance->setConnection(config('database.default'));
+            } else {
+                $instance->setConnection($this->getConnectionName());
+            }
+        });
+    }
 }
