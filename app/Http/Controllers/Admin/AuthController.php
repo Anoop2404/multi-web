@@ -50,6 +50,8 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
+        $credentials['email'] = strtolower(trim($credentials['email']));
+
         if (!Auth::attempt($credentials, $request->boolean('remember'))) {
             return back()->withErrors(['email' => 'Invalid credentials.']);
         }

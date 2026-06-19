@@ -8,7 +8,7 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Laravel\Sanctum\PersonalAccessToken;
+use App\Models\PersonalAccessToken;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
@@ -49,6 +49,34 @@ class AuthTest extends TestCase
         $user->assignRole('school_admin');
 
         return compact('sahodaya', 'school', 'user');
+    }
+
+    public function test_sahodaya_admin_can_login_and_receive_token(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'KNR Sahodaya',
+            'is_active' => true,
+        ]);
+
+        $user = User::factory()->create([
+            'tenant_id'         => $sahodaya->id,
+            'email_verified_at' => now(),
+        ]);
+        $user->assignRole('sahodaya_admin');
+
+        $this->postJson('/api/v1/auth/login', [
+            'email'       => $user->email,
+            'password'    => 'password',
+            'device_name' => 'PHPUnit',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.role', 'sahodaya_admin')
+            ->assertJsonPath('data.tenant_id', $sahodaya->id)
+            ->assertJsonStructure(['data' => ['token', 'user']]);
     }
 
     public function test_school_admin_can_login_and_receive_token(): void

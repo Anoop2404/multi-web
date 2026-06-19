@@ -3,14 +3,44 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Models\PersonalAccessToken;
 use App\Support\MobileAuthPayload;
+use App\Support\SahodayaHomepageContent;
+use App\Support\TenantBranding;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
-use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends ApiController
 {
+    public function loginBranding(Request $request)
+    {
+        $tenant = TenantBranding::resolveTenant($request);
+        $branding = ($tenant && $tenant->type === 'sahodaya')
+            ? SahodayaHomepageContent::get($tenant)
+            : [];
+
+        $logoPath = TenantBranding::logoUrl($tenant);
+        $logoUrl = $logoPath
+            ? (str_starts_with($logoPath, 'http') ? $logoPath : url($logoPath))
+            : null;
+
+        return $this->ok([
+            'logo_url'      => $logoUrl,
+            'tenant_name'   => $tenant?->name ?? 'Admin Portal',
+            'eyebrow'       => $branding['eyebrow'] ?? 'CBSE Sahodaya School Complex',
+            'tagline'       => $branding['tagline'] ?? null,
+            'motto'         => $branding['motto'] ?? null,
+            'phone'         => $branding['phone'] ?? null,
+            'email'         => $branding['email'] ?? null,
+            'portal_url'    => $request->getSchemeAndHttpHost(),
+            'register_url'  => $tenant && $tenant->type === 'sahodaya'
+                ? url('/school-register')
+                : null,
+            'show_register' => $tenant && $tenant->type === 'sahodaya',
+        ]);
+    }
+
     public function login(Request $request)
     {
         $data = $request->validate([
@@ -19,7 +49,9 @@ class AuthController extends ApiController
             'device_name' => 'required|string|max:255',
         ]);
 
-        if (! Auth::attempt(['email' => $data['email'], 'password' => $data['password']])) {
+        $email = strtolower(trim($data['email']));
+
+        if (! Auth::attempt(['email' => $email, 'password' => $data['password']])) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials.'],
             ]);

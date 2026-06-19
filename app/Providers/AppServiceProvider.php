@@ -3,8 +3,10 @@
 namespace App\Providers;
 
 use App\Models\Tenant;
+use App\Models\PersonalAccessToken;
 use App\Observers\TenantObserver;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Sanctum;
 use Stancl\Tenancy\DatabaseConfig;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,6 +24,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
         Tenant::observe(TenantObserver::class);
 
         if ($this->app->environment('testing') && ! config('tenancy.database_per_sahodaya', true)) {

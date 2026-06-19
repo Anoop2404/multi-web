@@ -132,6 +132,51 @@ class RegistrationApiController extends SchoolApiController
         return $this->ok($student, 201);
     }
 
+    public function submissionStudents(EffectiveMasterDataResolver $resolver)
+    {
+        $registration = $this->currentRegistration();
+        $submission = $registration->submission;
+
+        return $this->ok([
+            'registration' => RegistrationResource::make($registration),
+            'submission'   => $submission,
+            'categories'   => $resolver->classCategories($this->school->parent_id)->values(),
+            'classes'      => SchoolClass::where('tenant_id', $this->school->id)->active()->orderBy('display_order')->get(),
+            'students'     => $submission->students()
+                ->with('schoolClass.classCategory')
+                ->orderBy('school_class_id')
+                ->orderBy('name')
+                ->get(),
+        ]);
+    }
+
+    public function destroySubmissionStudent(string $tenantId, string $studentId)
+    {
+        $registration = $this->currentRegistration();
+        $student = SubmissionStudent::where('school_year_submission_id', $registration->submission->id)
+            ->findOrFail($studentId);
+        abort_unless(in_array($registration->submission->full_records_status, ['pending', 'rejected']), 403);
+
+        $student->delete();
+
+        return $this->message('Student removed.');
+    }
+
+    public function counts(EffectiveMasterDataResolver $resolver)
+    {
+        $registration = $this->currentRegistration();
+        $submission = $registration->submission;
+        $categories = $resolver->classCategories($this->school->parent_id);
+        $existing = $submission->counts()->get()->keyBy('class_category_id');
+
+        return $this->ok([
+            'registration' => RegistrationResource::make($registration),
+            'submission'   => $submission,
+            'categories'   => $categories->values(),
+            'counts'       => $existing,
+        ]);
+    }
+
     public function saveCounts(Request $request)
     {
         $registration = $this->currentRegistration();
@@ -171,6 +216,29 @@ class RegistrationApiController extends SchoolApiController
         $teacher = $submission->teachers()->create($data);
 
         return $this->ok($teacher, 201);
+    }
+
+    public function teachers(EffectiveMasterDataResolver $resolver)
+    {
+        $registration = $this->currentRegistration();
+        $submission = $registration->submission;
+
+        return $this->ok([
+            'registration'  => RegistrationResource::make($registration),
+            'submission'    => $submission,
+            'teachers'      => $submission->teachers()->with('teachingType')->get(),
+            'teaching_types'=> $resolver->teachingTypes($this->school->parent_id),
+        ]);
+    }
+
+    public function destroyTeacher(string $tenantId, string $teacherId)
+    {
+        $registration = $this->currentRegistration();
+        $teacher = SubmissionTeacher::where('school_year_submission_id', $registration->submission->id)
+            ->findOrFail($teacherId);
+        $teacher->delete();
+
+        return $this->message('Teacher removed.');
     }
 
     public function submitTrack(Request $request, RegistrationStatusService $service)
