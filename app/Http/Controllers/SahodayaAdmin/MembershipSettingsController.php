@@ -20,6 +20,8 @@ use App\Services\Audit\DataChangeLogger;
 use App\Services\Mail\SahodayaMailer;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\Mailer\Exception\TransportException;
 
 class MembershipSettingsController extends SahodayaAdminController
 {
@@ -199,13 +201,28 @@ class MembershipSettingsController extends SahodayaAdminController
             'mail_port'         => 'nullable|integer|min:1|max:65535',
             'mail_encryption'   => 'nullable|string|in:tls,ssl',
             'mail_username'     => 'nullable|string|max:255',
-            'mail_password'     => 'nullable|string|max:255',
+            'mail_password'     => 'nullable|string|max:512',
             'mail_from_address' => 'nullable|email|max:255',
             'mail_from_name'    => 'nullable|string|max:255',
         ]);
 
+        foreach (['mail_host', 'mail_username', 'mail_password', 'mail_from_address', 'mail_from_name'] as $field) {
+            if (isset($data[$field]) && is_string($data[$field])) {
+                $data[$field] = trim($data[$field]);
+            }
+        }
+
         if (empty($data['mail_password'])) {
             unset($data['mail_password']);
+        }
+
+        $username = strtolower($data['mail_username'] ?? $profile->mail_username ?? '');
+        $host = strtolower($data['mail_host'] ?? $profile->mail_host ?? '');
+
+        if ($username === 'emailapikey' && $host !== '' && ! str_contains($host, 'zeptomail')) {
+            throw ValidationException::withMessages([
+                'mail_host' => 'ZeptoMail requires smtp.zeptomail.in (India) or smtp.zeptomail.com — not smtp.zoho.in.',
+            ]);
         }
 
         $profile->update($data);
@@ -227,13 +244,33 @@ class MembershipSettingsController extends SahodayaAdminController
 
         $to = $data['test_email'] ?? $profile->contact_email ?? $request->user()->email;
 
-        SahodayaMailer::for($this->sahodaya->id)->sendRaw(
-            $to,
-            'Test email — '.$this->sahodaya->name,
-            "This is a test email from {$this->sahodaya->name} membership portal.\n\nIf you received this, Zoho SMTP is configured correctly.",
-        );
+        try {
+            SahodayaMailer::for($this->sahodaya->id)->sendRaw(
+                $to,
+                'Test email — '.$this->sahodaya->name,
+                "This is a test email from {$this->sahodaya->name} membership portal.\n\nIf you received this, SMTP is configured correctly.",
+            );
+        } catch (TransportException $e) {
+            return back()->with('error', $this->smtpAuthErrorMessage($profile));
+        }
 
         return back()->with('success', "Test email sent to {$to}.");
+    }
+
+    private function smtpAuthErrorMessage(SahodayaProfile $profile): string
+    {
+        $host = strtolower((string) $profile->mail_host);
+        $username = strtolower((string) $profile->mail_username);
+
+        if ($username === 'emailapikey' && ! str_contains($host, 'zeptomail')) {
+            return 'SMTP authentication failed: host is set to '.$profile->mail_host.' but ZeptoMail requires smtp.zeptomail.in. Update the host, re-paste the Send Mail token, and save again.';
+        }
+
+        if ($username === 'emailapikey') {
+            return 'SMTP authentication failed: re-copy the Send Mail token from ZeptoMail (SMTP/API tab). Use username emailapikey exactly, port 587 with TLS, and regenerate the token if needed.';
+        }
+
+        return 'SMTP authentication failed: check username, app password, host, and port. For Zoho Mail use smtp.zoho.in with your full email and an app-specific password.';
     }
 
     public function uploadLogo(Request $request)

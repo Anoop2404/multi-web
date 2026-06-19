@@ -88,10 +88,13 @@ class SahodayaMailer
 
         $mailerName = 'sahodaya_'.$this->sahodayaId;
         $profile = $this->profile();
+        $defaultHost = strtolower((string) $profile->mail_username) === 'emailapikey'
+            ? 'smtp.zeptomail.in'
+            : config('mail.mailers.smtp.host', 'smtp.zoho.in');
 
         Config::set('mail.mailers.'.$mailerName, [
             'transport'    => 'smtp',
-            'host'         => $profile->mail_host ?: config('mail.mailers.smtp.host', 'smtp.zoho.in'),
+            'host'         => $profile->mail_host ?: $defaultHost,
             'port'         => (int) ($profile->mail_port ?: config('mail.mailers.smtp.port', 587)),
             'encryption'   => $profile->mail_encryption ?: 'tls',
             'username'     => $profile->mail_username,
