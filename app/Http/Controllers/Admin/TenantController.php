@@ -43,13 +43,22 @@ class TenantController extends Controller
         return $this->createForm('school', route('admin.schools.index'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, SahodayaDatabaseProvisioner $databaseProvisioner)
     {
-        $validated = $request->validate($this->rules());
+        $validated = $request->validate(array_merge($this->rules(), [
+            'database_name' => $this->databaseNameRules($request->input('type') === 'sahodaya'),
+        ]));
+
+        $databaseName = $validated['database_name'] ?? null;
+        unset($validated['database_name']);
 
         $tenant = Tenant::create(array_merge($validated, ['id' => \Str::uuid()]));
 
-        if ($tenant->type === 'sahodaya' && ! config('tenancy.database_per_sahodaya', true)) {
+        if ($tenant->type === 'sahodaya' && config('tenancy.database_per_sahodaya', true)) {
+            if (filled($databaseName)) {
+                $databaseProvisioner->configure($tenant, $databaseName);
+            }
+        } elseif ($tenant->type === 'sahodaya' && ! config('tenancy.database_per_sahodaya', true)) {
             \App\Models\SahodayaProfile::create([
                 'tenant_id'           => $tenant->id,
                 'student_data_mode'   => 'not_required',
@@ -149,7 +158,7 @@ class TenantController extends Controller
         abort_if($tenant->type !== 'sahodaya', 404);
 
         $data = $request->validate([
-            'database_name' => ['required', 'string', 'max:63', 'regex:/^[a-z][a-z0-9_]*$/'],
+            'database_name' => $this->databaseNameRules(),
         ]);
 
         $databaseProvisioner->configure($tenant, $data['database_name']);
@@ -168,6 +177,16 @@ class TenantController extends Controller
         }
 
         return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Sahodaya database migrations completed.');
+    }
+
+    /** @return array<string, mixed> */
+    private function databaseNameRules(bool $required = true): array
+    {
+        $rules = ['string', 'max:63', 'regex:/^[a-z][a-z0-9_]*$/'];
+
+        return $required
+            ? array_merge(['required'], $rules)
+            : array_merge(['nullable'], $rules);
     }
 
     /** @return array<string, mixed> */

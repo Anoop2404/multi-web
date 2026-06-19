@@ -54,6 +54,21 @@
                         </div>
                     </div>
 
+                    <div v-if="defaultType === 'sahodaya'" class="rounded-lg border border-emerald-100 bg-emerald-50/50 p-4 space-y-3">
+                        <p class="text-xs font-semibold text-emerald-800 uppercase tracking-wide">PostgreSQL database</p>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Database name</label>
+                            <input v-model="form.database_name" type="text"
+                                   :placeholder="databaseNamePlaceholder"
+                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 font-mono bg-white">
+                            <p class="text-xs text-gray-500 mt-1">
+                                Lowercase letters, numbers, underscores only. Must start with a letter.
+                                Leave blank to use the auto-generated name on the next screen.
+                            </p>
+                            <p v-if="form.errors.database_name" class="text-xs text-red-500 mt-1">{{ form.errors.database_name }}</p>
+                        </div>
+                    </div>
+
                     <div v-if="defaultType === 'school'">
                         <label class="block text-xs font-semibold text-gray-600 mb-1.5">Parent Sahodaya *</label>
                         <select v-model="form.parent_id" required
@@ -91,6 +106,7 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Link, useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 const props = defineProps({
     sahodayas: { type: Array, default: () => [] },
@@ -106,6 +122,17 @@ const form = useForm({
     subdomain: '',
     parent_id: '',
     plan: 'free',
+    database_name: '',
+});
+
+const databaseNamePlaceholder = computed(() => {
+    const slug = (form.subdomain || form.name || 'cluster')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 40);
+
+    return slug ? `sahodaya_${slug}` : 'sahodaya_malappuram';
 });
 
 function submit() {
