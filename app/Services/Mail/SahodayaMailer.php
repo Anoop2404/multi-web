@@ -62,21 +62,41 @@ class SahodayaMailer
 
     public function sendVerification(User $user): void
     {
-        if (! $this->isConfigured()) {
+        $this->withSahodayaMailer(function () use ($user) {
             $user->sendEmailVerificationNotification();
+        });
+    }
+
+    /**
+     * Run a mail callback using this Sahodaya's SMTP + From address (required for ZeptoMail).
+     */
+    public function withSahodayaMailer(callable $callback): void
+    {
+        if (! $this->isConfigured()) {
+            $callback();
 
             return;
         }
 
         $mailer = $this->resolveMailerName();
+        [$fromAddress, $fromName] = $this->fromAddress();
         $previousDefault = config('mail.default');
+        $previousFrom = config('mail.from');
 
         Config::set('mail.default', $mailer);
 
+        if ($fromAddress) {
+            Config::set('mail.from', [
+                'address' => $fromAddress,
+                'name'    => $fromName ?: ($previousFrom['name'] ?? config('app.name')),
+            ]);
+        }
+
         try {
-            $user->sendEmailVerificationNotification();
+            $callback();
         } finally {
             Config::set('mail.default', $previousDefault);
+            Config::set('mail.from', $previousFrom);
         }
     }
 

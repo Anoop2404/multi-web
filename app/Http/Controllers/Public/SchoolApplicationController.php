@@ -92,9 +92,35 @@ class SchoolApplicationController extends Controller
         ]);
         $user->assignRole('school_admin');
 
-        SahodayaMailer::for($sahodaya->id)->sendVerification($user);
-        $notifier->schoolCredentialsIssued($user, $plainPassword, $school);
-        $notifier->schoolApplicationSubmitted($school);
+        $mailer = SahodayaMailer::for($sahodaya->id);
+        $mailFailed = false;
+
+        try {
+            $mailer->sendVerification($user);
+        } catch (\Throwable $e) {
+            report($e);
+            $mailFailed = true;
+        }
+
+        try {
+            $notifier->schoolCredentialsIssued($user, $plainPassword, $school);
+        } catch (\Throwable $e) {
+            report($e);
+            $mailFailed = true;
+        }
+
+        try {
+            $notifier->schoolApplicationSubmitted($school);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        if ($mailFailed) {
+            return back()->with(
+                'success',
+                'Application submitted and your account was created, but we could not send email. Contact the Sahodaya office for your login password, or try again after mail settings are fixed.',
+            );
+        }
 
         return back()->with('success', 'Application submitted. Check your Gmail for a verification link and login password. Your application is pending Sahodaya approval.');
     }

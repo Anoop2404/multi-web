@@ -225,6 +225,13 @@ class MembershipSettingsController extends SahodayaAdminController
             ]);
         }
 
+        $fromAddress = strtolower($data['mail_from_address'] ?? $profile->mail_from_address ?? '');
+        if ($username === 'emailapikey' && $fromAddress === '') {
+            throw ValidationException::withMessages([
+                'mail_from_address' => 'From Address is required for ZeptoMail (e.g. noreply@yourdomain.com). It must match your verified domain.',
+            ]);
+        }
+
         $profile->update($data);
 
         return back()->with('success', 'Zoho mail settings saved.');
