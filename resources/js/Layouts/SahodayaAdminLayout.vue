@@ -1,7 +1,17 @@
 <template>
     <div class="sa-layout min-h-screen flex">
+        <div v-if="mobileNavOpen"
+             class="fixed inset-0 z-40 bg-black/50 lg:hidden"
+             @click="mobileNavOpen = false" />
+
         <!-- Sidebar -->
-        <aside class="sa-sidebar w-60 h-screen sticky top-0 text-white flex flex-col shrink-0 shadow-xl overflow-hidden">
+        <aside
+            class="sa-sidebar w-72 lg:w-60 h-screen text-white flex flex-col shrink-0 shadow-xl overflow-hidden
+                   fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0
+                   transition-transform duration-200 ease-out
+                   -translate-x-full lg:translate-x-0"
+            :class="mobileNavOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+        >
             <!-- Logo / Brand -->
             <div class="sa-sidebar-head px-5 pt-5 pb-4 border-b border-white/10 shrink-0">
                 <div class="flex items-center gap-3">
@@ -78,13 +88,21 @@
         </aside>
 
         <!-- Main -->
-        <div class="flex-1 flex flex-col min-w-0 min-h-screen">
-            <header class="sa-header bg-white border-b border-[#dbeafe] px-6 py-3.5 flex items-center justify-between shrink-0 shadow-sm">
-                <div class="flex items-center gap-2 min-w-0">
-                    <h1 class="text-base font-bold text-[#041525]">{{ title }}</h1>
+        <div class="flex-1 flex flex-col min-w-0 min-h-screen w-full lg:w-auto">
+            <header class="sa-header bg-white border-b border-[#dbeafe] px-4 lg:px-6 py-3 flex items-center justify-between gap-3 shrink-0 shadow-sm">
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <button type="button"
+                            class="lg:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 shrink-0"
+                            aria-label="Open menu"
+                            @click="mobileNavOpen = true">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
+                    <h1 class="text-base font-bold text-[#041525] truncate">{{ title }}</h1>
                     <slot name="header-suffix" />
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 sm:gap-3 shrink-0">
                     <transition name="fade">
                         <span v-if="$page.props.flash?.success"
                               class="text-xs font-medium bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
@@ -98,11 +116,11 @@
                         </span>
                     </transition>
                     <a v-if="websiteEnabled && publicUrl" :href="publicUrl" target="_blank" rel="noopener"
-                       class="sa-preview-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-xs font-semibold transition shadow-sm">
+                       class="sa-preview-btn inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-white text-xs font-semibold transition shadow-sm">
                         <SvgIcon name="external-link" class="w-3.5 h-3.5" />
-                        Preview Site
+                        <span class="hidden sm:inline">Preview Site</span>
                     </a>
-                    <div class="flex items-center gap-2 pl-2 border-l border-gray-200">
+                    <div class="hidden sm:flex items-center gap-2 pl-2 border-l border-gray-200">
                         <span v-if="$page.props.auth?.user?.name" class="text-xs text-gray-500 hidden sm:inline max-w-[8rem] truncate">
                             {{ $page.props.auth.user.name }}
                         </span>
@@ -115,7 +133,7 @@
                 </div>
             </header>
 
-            <main class="sa-main flex-1 p-6 overflow-auto">
+            <main class="sa-main flex-1 p-4 lg:p-6 overflow-auto">
                 <slot />
             </main>
         </div>
@@ -124,7 +142,7 @@
 
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
-import { computed, defineComponent, h } from 'vue';
+import { computed, defineComponent, h, ref, watch } from 'vue';
 
 defineProps({
     title:                  { type: String, default: '' },
@@ -137,7 +155,12 @@ defineProps({
 });
 
 const page = usePage();
+const mobileNavOpen = ref(false);
 const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
+
+watch(() => page.url, () => {
+    mobileNavOpen.value = false;
+});
 
 function isActive(href)  { return page.url.startsWith(href); }
 function isExact(href)   { return page.url === href || page.url === href + '/'; }
