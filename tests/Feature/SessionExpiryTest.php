@@ -34,6 +34,25 @@ class SessionExpiryTest extends TestCase
         $response->assertHeader('X-Inertia-Location', route('login').'?session=expired');
     }
 
+    public function test_inertia_login_redirects_to_dashboard_with_inertia_redirect(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $superadmin = User::factory()->create(['email_verified_at' => now()]);
+        $superadmin->assignRole('superadmin');
+
+        $response = $this->withHeaders([
+            'X-Inertia' => 'true',
+            'X-Inertia-Version' => '1',
+        ])->post('http://superadmin.test/login', [
+            'email' => $superadmin->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertStatus(409);
+        $response->assertHeader('X-Inertia-Redirect', '/admin/dashboard');
+    }
+
     public function test_login_page_shows_session_expired_flag(): void
     {
         $response = $this->get('/login?session=expired');

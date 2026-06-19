@@ -75,9 +75,7 @@ class AuthController extends Controller
             return \App\Support\InertiaAuth::redirectTo($request, route('verification.notice'));
         }
 
-        $target = redirect()->intended(self::homeFor($user));
-
-        return \App\Support\InertiaAuth::redirectTo($request, $target->getTargetUrl());
+        return \App\Support\InertiaAuth::intended($request, self::homeFor($user));
     }
 
     public function logout(Request $request)
@@ -104,7 +102,7 @@ class AuthController extends Controller
             Auth::login($user);
             $request->session()->regenerate();
 
-            return \App\Support\InertiaAuth::redirectTo($request, redirect()->intended(self::homeFor($user))->getTargetUrl());
+            return \App\Support\InertiaAuth::intended($request, self::homeFor($user));
         }
 
         $tenant = TenantBranding::resolveTenant($request);
@@ -134,7 +132,7 @@ class AuthController extends Controller
         if ($user->hasVerifiedEmail()) {
             Auth::login($user);
 
-            return \App\Support\InertiaAuth::redirectTo($request, redirect()->intended(self::homeFor($user))->getTargetUrl());
+            return \App\Support\InertiaAuth::intended($request, self::homeFor($user));
         }
 
         $this->sendVerificationFor($user);
