@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
+use App\Http\Resources\RegistrationResource;
 use App\Models\MembershipPayment;
+use App\Models\Registration;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\RegistrationStatusService;
+use App\Support\AcademicYear;
 use App\Support\ExcelExport;
 use App\Support\TenantStorage;
 use App\Support\TenancyDatabase;
@@ -21,35 +24,53 @@ class PaymentVerificationController extends SahodayaAdminController
     {
         $filters = $this->paymentListFilters($request);
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
+
+        $base = MembershipPayment::whereIn('school_id', $schoolIds);
+        $statusCounts = [
+            'payment-due' => $this->unpaidRegistrationsCount($schoolIds, $year),
+            'submitted'   => (clone $base)->where('status', 'submitted')->count(),
+            'verified'    => (clone $base)->where('status', 'verified')->count(),
+            'rejected'    => (clone $base)->where('status', 'rejected')->count(),
+            'all'         => (clone $base)->count(),
+        ];
+        $summary = $this->buildPaymentPageSummary($schoolIds, $year);
+
+        if ($filters['status'] === 'payment-due') {
+            $paymentDue = $this->unpaidRegistrationsQuery($schoolIds, $filters, $year)
+                ->paginate(15)
+                ->withQueryString();
+
+            return $this->inertia('Sahodaya/Membership/Payments', [
+                'payments'     => ['data' => []],
+                'paymentDue'   => $paymentDue,
+                'activeStatus' => $filters['status'],
+                'filters'      => [
+                    'search'    => $filters['search'],
+                    'date_from' => $filters['date_from'],
+                    'date_to'   => $filters['date_to'],
+                ],
+                'statusCounts' => $statusCounts,
+                'summary'      => $summary,
+            ]);
+        }
 
         $payments = $this->paymentsQuery($schoolIds, $filters)
             ->with('registration')
             ->paginate(15)
             ->withQueryString();
 
-        $base = MembershipPayment::whereIn('school_id', $schoolIds);
-
         return $this->inertia('Sahodaya/Membership/Payments', [
             'payments'     => $payments,
+            'paymentDue'   => null,
             'activeStatus' => $filters['status'],
             'filters'      => [
                 'search'    => $filters['search'],
                 'date_from' => $filters['date_from'],
                 'date_to'   => $filters['date_to'],
             ],
-            'statusCounts' => [
-                'submitted' => (clone $base)->where('status', 'submitted')->count(),
-                'verified'  => (clone $base)->where('status', 'verified')->count(),
-                'rejected'  => (clone $base)->where('status', 'rejected')->count(),
-                'all'       => (clone $base)->count(),
-            ],
-            'summary' => [
-                'pending'  => (clone $base)->where('status', 'submitted')->count(),
-                'verified' => (clone $base)->where('status', 'verified')->count(),
-                'rejected' => (clone $base)->where('status', 'rejected')->count(),
-                'total'    => (clone $base)->count(),
-                'collected'=> (clone $base)->where('status', 'verified')->sum('amount'),
-            ],
+            'statusCounts' => $statusCounts,
+            'summary'      => $summary,
         ]);
     }
 
@@ -57,6 +78,26 @@ class PaymentVerificationController extends SahodayaAdminController
     {
         $filters = $this->paymentListFilters($request);
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
+
+        if ($filters['status'] === 'payment-due') {
+            $year = AcademicYear::forSahodaya($this->sahodaya->id);
+            $registrations = $this->unpaidRegistrationsQuery($schoolIds, $filters, $year)->get();
+
+            $rows = $registrations->map(fn (Registration $registration) => [
+                $registration->school?->name ?? '',
+                $registration->school?->school_prefix ?? '',
+                $registration->academic_year,
+                $registration->reg_no ?? '',
+                $registration->registration_status,
+                $registration->membership_fee_amount,
+                $registration->updated_at?->format('Y-m-d H:i') ?? '',
+            ]);
+
+            return ExcelExport::download('payment-due-'.$year, [
+                'School', 'Code', 'Year', 'Reg No', 'Status', 'Fee Due', 'Updated',
+            ], $rows);
+        }
+
         $payments = $this->paymentsQuery($schoolIds, $filters)->get();
 
         $rows = $payments->map(fn (MembershipPayment $p) => [

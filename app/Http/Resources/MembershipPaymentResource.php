@@ -18,6 +18,7 @@ class MembershipPaymentResource extends JsonResource
             'payment_method'     => $this->payment_method,
             'transaction_ref'    => $this->transaction_ref,
             'rejection_reason'   => $this->rejection_reason,
+            'has_proof'          => (bool) $this->payment_proof_path,
             'proof_url'          => $this->proof_url,
             'school'             => $this->whenLoaded('school', fn () => [
                 'id'            => $this->school->id,

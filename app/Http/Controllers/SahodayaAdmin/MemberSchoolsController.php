@@ -12,7 +12,7 @@ use App\Models\User;
 use App\Services\Membership\MembershipNotifier;
 use App\Support\AcademicYear;
 use App\Support\ExcelExport;
-use App\Support\SchoolApplicationForm;
+use App\Support\SchoolDetailFields;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -79,7 +79,7 @@ class MemberSchoolsController extends SahodayaAdminController
 
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
         $payload = $school->application_payload ?? [];
-        $fields  = $this->detailFields($payload);
+        $fields  = SchoolDetailFields::fromPayload($payload);
 
         $registration = Registration::where('school_id', $school->id)
             ->where('academic_year', $year)
@@ -172,43 +172,5 @@ class MemberSchoolsController extends SahodayaAdminController
             ->selectRaw('tenant_id, count(*) as total')
             ->groupBy('tenant_id')
             ->pluck('total', 'tenant_id');
-    }
-
-    /** @return list<array{label: string, value: string}> */
-    private function detailFields(array $payload): array
-    {
-        $labels = collect(SchoolApplicationForm::definitions())
-            ->mapWithKeys(fn ($def, $key) => [$key => $def['label']]);
-
-        $extraLabels = [
-            'contact_email'       => 'Contact Email',
-            'contact_phone'       => 'Contact Phone',
-            'affiliation_number'  => 'Affiliation No.',
-            'submitted_at'        => 'Application Submitted',
-            'rejection_reason'    => 'Rejection Reason',
-            'principal_name'      => 'Principal Name',
-            'principal_email'     => 'Principal Email',
-            'principal_phone'     => 'Principal Phone',
-        ];
-
-        $skip = ['school_name', 'password', 'password_confirmation'];
-        $fields = [];
-
-        foreach ($payload as $key => $value) {
-            if (in_array($key, $skip, true) || $value === null || $value === '') {
-                continue;
-            }
-
-            $display = is_string($value) && str_contains($value, 'T') && strlen($value) > 18
-                ? date('d M Y, H:i', strtotime($value))
-                : (string) $value;
-
-            $fields[] = [
-                'label' => $labels[$key] ?? $extraLabels[$key] ?? ucwords(str_replace('_', ' ', $key)),
-                'value' => $display,
-            ];
-        }
-
-        return $fields;
     }
 }

@@ -85,7 +85,7 @@ class _SchoolRegistrationSubmissionStudentsScreenState extends ConsumerState<Sch
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const SaPageScaffold(title: 'Submission Students', body: Center(child: CircularProgressIndicator()));
+      return const SaPageScaffold(title: 'Submission Students', body: SaLoadingView());
     }
 
     final classes = (_data?['classes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -124,22 +124,24 @@ class _SchoolRegistrationSubmissionStudentsScreenState extends ConsumerState<Sch
               ),
             ),
           const SizedBox(height: 16),
-          SaCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (final student in students)
-                  ListTile(
-                    title: Text(student['name']?.toString() ?? ''),
-                    subtitle: Text('${student['school_class']?['name'] ?? student['class']} · ${student['section'] ?? '—'}'),
-                    trailing: canEdit
-                        ? IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _remove(student['id'] as int))
-                        : null,
-                  ),
-                if (students.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No students added yet'))),
-              ],
+          if (students.isEmpty)
+            const SaEmptyView(title: 'No students added yet', subtitle: 'Add students above, then submit for review.', icon: Icons.people_outline)
+          else
+            ...students.map(
+              (student) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SaEntityCard(
+                  title: student['name']?.toString() ?? 'Student',
+                  subtitle: '${student['school_class']?['name'] ?? student['class']} · ${student['section'] ?? '—'}',
+                  trailing: canEdit
+                      ? IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Color(0xFFDC2626)),
+                          onPressed: () => _remove(student['id'] as int),
+                        )
+                      : null,
+                ),
+              ),
             ),
-          ),
           if (canEdit) ...[
             const SizedBox(height: 16),
             SaNavyButton(label: 'Submit for review', onPressed: _submit),

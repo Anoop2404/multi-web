@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/sa_widgets.dart';
 import 'registration_counts_screen.dart';
 import 'registration_submission_students_screen.dart';
@@ -76,8 +77,8 @@ class _SchoolRegistrationScreenState extends ConsumerState<SchoolRegistrationScr
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) return Center(child: Text(_error!));
+    if (_loading) return const SaLoadingView();
+    if (_error != null) return SaErrorView(message: _error!, onRetry: _load);
 
     final registration = _data?['registration'] as Map<String, dynamic>?;
     final profile = _data?['profile'] as Map<String, dynamic>?;
@@ -86,10 +87,19 @@ class _SchoolRegistrationScreenState extends ConsumerState<SchoolRegistrationScr
     final submission = registration?['submission'] as Map<String, dynamic>?;
 
     return RefreshIndicator(
+      color: AppColors.navyPrimary,
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          SaHeroBanner(
+            eyebrow: 'Annual registration',
+            title: 'Academic year ${_data?['academic_year'] ?? ''}',
+            subtitle: canBegin
+                ? 'Set your school code and begin when ready.'
+                : 'Complete each step below to submit for Sahodaya review.',
+          ),
+          const SizedBox(height: 16),
           SaCard(
             child: Row(
               children: [
@@ -97,9 +107,9 @@ class _SchoolRegistrationScreenState extends ConsumerState<SchoolRegistrationScr
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Academic year ${_data?['academic_year'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      const Text('Registration status', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
-                      Text('Status: $status', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                      Text(status.replaceAll('_', ' '), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                     ],
                   ),
                 ),
@@ -123,18 +133,21 @@ class _SchoolRegistrationScreenState extends ConsumerState<SchoolRegistrationScr
               _TrackCard(
                 title: 'Student counts',
                 status: submission?['counts_status']?.toString() ?? 'pending',
+                icon: Icons.numbers_outlined,
                 onOpen: () => _openWizard(const SchoolRegistrationCountsScreen()),
               )
             else
               _TrackCard(
                 title: 'Student records',
                 status: submission?['full_records_status']?.toString() ?? 'pending',
+                icon: Icons.people_outline,
                 onOpen: () => _openWizard(const SchoolRegistrationSubmissionStudentsScreen()),
               ),
             if (profile['teacher_registration_enabled'] == true)
               _TrackCard(
                 title: 'Teachers',
                 status: submission?['teacher_status']?.toString() ?? 'pending',
+                icon: Icons.co_present_outlined,
                 onOpen: () => _openWizard(const SchoolRegistrationTeachersScreen()),
               ),
             if (status == 'payment_pending' || status == 'payment_rejected') ...[
@@ -165,32 +178,39 @@ class _SchoolRegistrationScreenState extends ConsumerState<SchoolRegistrationScr
 }
 
 class _TrackCard extends StatelessWidget {
-  const _TrackCard({required this.title, required this.status, required this.onOpen});
+  const _TrackCard({required this.title, required this.status, required this.onOpen, required this.icon});
 
   final String title;
   final String status;
   final VoidCallback onOpen;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     final canEdit = status == 'pending' || status == 'rejected';
+    final done = status == 'approved' || status == 'submitted';
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: SaCard(
-        child: ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: Row(
-            children: [
-              const Text('Status: '),
-              SaStatusChip(status),
-            ],
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SaEntityCard(
+        title: title,
+        subtitle: canEdit ? 'Tap to complete this step' : 'Submitted for review',
+        status: status,
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: done ? const Color(0xFFF0FDF4) : const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: done ? const Color(0xFFBBF7D0) : const Color(0xFFDBEAFE)),
           ),
-          trailing: canEdit
-              ? TextButton(onPressed: onOpen, child: const Text('Open'))
-              : const Icon(Icons.check_circle, color: Colors.green),
-          onTap: canEdit ? onOpen : null,
+          alignment: Alignment.center,
+          child: Icon(icon, size: 20, color: done ? const Color(0xFF15803D) : const Color(0xFF1D4ED8)),
         ),
+        trailing: canEdit
+            ? const Icon(Icons.chevron_right, color: Color(0xFF94A3B8))
+            : const Icon(Icons.check_circle, color: Color(0xFF15803D)),
+        onTap: canEdit ? onOpen : null,
       ),
     );
   }

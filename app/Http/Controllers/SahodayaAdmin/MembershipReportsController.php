@@ -33,9 +33,12 @@ class MembershipReportsController extends SahodayaAdminController
         $schools = null;
         $paymentsPending = null;
         $paymentsDone = null;
+        $paymentDue = null;
 
         if ($tab === 'schools') {
             $schools = $this->paginatedSchoolsReport($schoolIds, $year, $search, $dateFrom, $dateTo);
+        } elseif ($tab === 'payment-due') {
+            $paymentDue = $this->paginatedUnpaidRegistrations($schoolIds, $year, $search, $dateFrom, $dateTo);
         } elseif ($tab === 'payments-pending') {
             $paymentsPending = $this->paginatedPayments($schoolIds, 'submitted', $search, $dateFrom, $dateTo);
         } elseif ($tab === 'payments-done') {
@@ -50,6 +53,7 @@ class MembershipReportsController extends SahodayaAdminController
             'dateTo'          => $dateTo,
             'summary'         => $summary,
             'schools'         => $schools,
+            'paymentDue'      => $paymentDue,
             'paymentsPending' => $paymentsPending,
             'paymentsDone'    => $paymentsDone,
             'classMaster'     => $resolver->classCategories($this->sahodaya->id)->values(),
@@ -130,6 +134,28 @@ class MembershipReportsController extends SahodayaAdminController
         ], $rows);
     }
 
+    public function exportPaymentDue(Request $request): StreamedResponse
+    {
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
+        $filters = $this->paymentListFilters($request);
+        $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id');
+        $registrations = $this->unpaidRegistrationsQuery($schoolIds->all(), $filters, $year)->get();
+
+        $rows = $registrations->map(fn (Registration $registration) => [
+            $registration->school?->name ?? '',
+            $registration->school?->school_prefix ?? '',
+            $registration->academic_year,
+            $registration->reg_no ?? '',
+            $registration->registration_status,
+            $registration->membership_fee_amount,
+            $registration->updated_at?->format('Y-m-d H:i') ?? '',
+        ]);
+
+        return ExcelExport::download('membership-payment-due-'.$year, [
+            'School', 'Code', 'Year', 'Reg No', 'Status', 'Fee Due', 'Updated',
+        ], $rows);
+    }
+
     public function exportPayments(Request $request, ?string $forcedStatus = null, ?string $filename = null): StreamedResponse
     {
         $filters = $this->paymentListFilters($request);
@@ -164,6 +190,8 @@ class MembershipReportsController extends SahodayaAdminController
     {
         $allSchools = Tenant::whereIn('id', $schoolIds)->get(['id', 'membership_status']);
 
+        $fees = $this->paymentFeeSummary($schoolIds->all(), $year);
+
         return [
             'total_registered'        => $allSchools->count(),
             'total_schools'           => $allSchools->where('membership_status', 'approved')->count(),
@@ -171,7 +199,14 @@ class MembershipReportsController extends SahodayaAdminController
             'rejected_schools'        => $allSchools->where('membership_status', 'rejected')->count(),
             'payments_verified'       => MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'verified')->count(),
             'payments_pending'        => MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'submitted')->count(),
-            'total_collected'         => MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'verified')->sum('amount'),
+            'payment_due'             => Registration::whereIn('school_id', $schoolIds)
+                ->where('academic_year', $year)
+                ->whereIn('registration_status', ['payment_pending', 'payment_rejected'])
+                ->count(),
+            'pending_amount'          => $fees['pending_amount'],
+            'approved_amount'         => $fees['approved_amount'],
+            'payment_due_amount'      => $fees['payment_due_amount'],
+            'total_collected'         => $fees['approved_amount'],
             'registrations_completed' => Registration::whereIn('school_id', $schoolIds)
                 ->where('academic_year', $year)
                 ->where('registration_status', 'completed')
@@ -206,6 +241,19 @@ class MembershipReportsController extends SahodayaAdminController
         ));
 
         return $schools;
+    }
+
+    private function paginatedUnpaidRegistrations($schoolIds, string $year, string $search, ?string $dateFrom, ?string $dateTo)
+    {
+        $filters = [
+            'search'    => $search,
+            'date_from' => $dateFrom,
+            'date_to'   => $dateTo,
+        ];
+
+        return $this->unpaidRegistrationsQuery($schoolIds->all(), $filters, $year)
+            ->paginate(20)
+            ->withQueryString();
     }
 
     private function paginatedPayments($schoolIds, string $status, string $search, ?string $dateFrom, ?string $dateTo)

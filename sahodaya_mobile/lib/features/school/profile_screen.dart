@@ -103,27 +103,22 @@ class _SchoolProfileScreenState extends ConsumerState<SchoolProfileScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Update the details you submitted when joining this Sahodaya.',
-            style: TextStyle(fontSize: 13, color: Colors.grey),
+          const SaHeroBanner(
+            eyebrow: 'School profile',
+            title: 'Your registration details',
+            subtitle: 'Update the information you submitted when joining this Sahodaya.',
           ),
           const SizedBox(height: 16),
           SaCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SaSectionTitle('School Identity'),
+                const SaSectionTitle('School identity'),
                 ...readOnly.map(
-                  (field) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(field['label'].toString().toUpperCase(), style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 4),
-                        Text(field['value']?.toString() ?? '—', style: const TextStyle(fontWeight: FontWeight.w600)),
-                      ],
-                    ),
+                  (field) => SaDetailTile(
+                    label: field['label'].toString(),
+                    value: field['value']?.toString() ?? '—',
+                    icon: Icons.badge_outlined,
                   ),
                 ),
               ],
@@ -161,10 +156,36 @@ class _SchoolProfileScreenState extends ConsumerState<SchoolProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SaSectionTitle('Login Account'),
-                Text(
-                  account['email_verified'] == true ? 'Email verified' : 'Email not verified — check your inbox',
-                  style: TextStyle(fontSize: 12, color: account['email_verified'] == true ? Colors.green : Colors.amber.shade800),
+                const SaSectionTitle('Login account'),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: account['email_verified'] == true ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: account['email_verified'] == true ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        account['email_verified'] == true ? Icons.verified_outlined : Icons.mark_email_unread_outlined,
+                        size: 16,
+                        color: account['email_verified'] == true ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          account['email_verified'] == true ? 'Email verified' : 'Email not verified — check your inbox',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: account['email_verified'] == true ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Name')),

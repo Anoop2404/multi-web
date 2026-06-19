@@ -10,8 +10,10 @@ use App\Models\Registration;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\Membership\MembershipNotifier;
 use App\Support\AcademicYear;
+use App\Support\SchoolDetailFields;
 use Illuminate\Http\Request;
 
 class SchoolsApiController extends SahodayaApiController
@@ -21,9 +23,14 @@ class SchoolsApiController extends SahodayaApiController
     public function index(Request $request)
     {
         $filters = $this->schoolListFilters($request);
+        $status = $request->query('status');
 
-        $schools = $this->verifiedSchoolsQuery($this->sahodaya->id, $filters)
-            ->paginate($request->integer('per_page', 20));
+        $query = $this->allSchoolsQuery($this->sahodaya->id, $filters);
+        if (in_array($status, ['approved', 'pending', 'rejected'], true)) {
+            $query->where('membership_status', $status);
+        }
+
+        $schools = $query->paginate($request->integer('per_page', 50));
 
         $this->attachSchoolMetrics($schools->getCollection());
 
@@ -37,6 +44,8 @@ class SchoolsApiController extends SahodayaApiController
             ->findOrFail($schoolId);
 
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
+        $payload = $school->application_payload ?? [];
+
         $registration = Registration::where('school_id', $school->id)
             ->where('academic_year', $year)
             ->with('submission')
@@ -52,11 +61,13 @@ class SchoolsApiController extends SahodayaApiController
             'school' => array_merge(SchoolResource::make($school)->resolve(), [
                 'student_count' => Student::where('tenant_id', $school->id)->where('status', 'active')->count(),
                 'classes_count' => SchoolClass::where('tenant_id', $school->id)->where('is_active', true)->count(),
-                'application_payload' => $school->application_payload,
+                'has_login'     => User::where('tenant_id', $school->id)->exists(),
+                'login_email'   => User::where('tenant_id', $school->id)->value('email'),
             ]),
-            'registration' => $registration,
+            'detail_fields'   => SchoolDetailFields::fromPayload($payload),
+            'registration'    => $registration,
             'recent_payments' => MembershipPaymentResource::collection($payments),
-            'academic_year' => $year,
+            'academic_year'   => $year,
         ]);
     }
 
@@ -68,7 +79,13 @@ class SchoolsApiController extends SahodayaApiController
 
         $data = $request->validate(['reason' => 'required|string|max:1000']);
 
-        $school->update(['membership_status' => 'rejected', 'is_active' => false]);
+        $school->update([
+            'membership_status'   => 'rejected',
+            'is_active'           => false,
+            'application_payload' => array_merge($school->application_payload ?? [], [
+                'rejection_reason' => $data['reason'],
+            ]),
+        ]);
         $notifier->schoolRejected($school, $data['reason']);
 
         return $this->message('School membership rejected.');

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\V1\Sahodaya;
 
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
 use App\Http\Resources\MembershipPaymentResource;
+use App\Http\Resources\RegistrationResource;
 use App\Models\MembershipPayment;
+use App\Support\AcademicYear;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\RegistrationStatusService;
@@ -20,28 +22,40 @@ class PaymentsApiController extends SahodayaApiController
     {
         $filters = $this->paymentListFilters($request);
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
+
+        $base = MembershipPayment::whereIn('school_id', $schoolIds);
+        $statusCounts = [
+            'payment-due' => $this->unpaidRegistrationsCount($schoolIds, $year),
+            'submitted'   => (clone $base)->where('status', 'submitted')->count(),
+            'verified'    => (clone $base)->where('status', 'verified')->count(),
+            'rejected'    => (clone $base)->where('status', 'rejected')->count(),
+            'all'         => (clone $base)->count(),
+        ];
+        $summary = $this->buildPaymentPageSummary($schoolIds, $year);
+
+        if ($filters['status'] === 'payment-due') {
+            $registrations = $this->unpaidRegistrationsQuery($schoolIds, $filters, $year)
+                ->paginate($request->integer('per_page', 15));
+
+            return RegistrationResource::collection($registrations)->additional([
+                'meta' => [
+                    'active_status' => $filters['status'],
+                    'status_counts' => $statusCounts,
+                    'summary'       => $summary,
+                ],
+            ]);
+        }
 
         $payments = $this->paymentsQuery($schoolIds, $filters)
             ->with('registration')
             ->paginate($request->integer('per_page', 15));
 
-        $base = MembershipPayment::whereIn('school_id', $schoolIds);
-
         return MembershipPaymentResource::collection($payments)->additional([
             'meta' => [
                 'active_status' => $filters['status'],
-                'status_counts' => [
-                    'submitted' => (clone $base)->where('status', 'submitted')->count(),
-                    'verified'  => (clone $base)->where('status', 'verified')->count(),
-                    'rejected'  => (clone $base)->where('status', 'rejected')->count(),
-                    'all'       => (clone $base)->count(),
-                ],
-                'summary' => [
-                    'pending'   => (clone $base)->where('status', 'submitted')->count(),
-                    'verified'  => (clone $base)->where('status', 'verified')->count(),
-                    'rejected'  => (clone $base)->where('status', 'rejected')->count(),
-                    'collected' => (clone $base)->where('status', 'verified')->sum('amount'),
-                ],
+                'status_counts' => $statusCounts,
+                'summary'       => $summary,
             ],
         ]);
     }

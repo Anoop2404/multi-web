@@ -74,6 +74,52 @@ class SahodayaApiTest extends TestCase
         return $this->withHeader('Authorization', 'Bearer '.$token);
     }
 
+    public function test_sahodaya_admin_can_view_school_details(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'token' => $token] = $this->sahodayaContext();
+
+        $school->update([
+            'application_payload' => [
+                'school_email' => 'school@gmail.com',
+                'phone' => '9876543210',
+                'cbse_affiliation' => '930319',
+            ],
+        ]);
+
+        $this->auth($token)
+            ->getJson("/api/v1/sahodaya/{$sahodaya->id}/schools/{$school->id}")
+            ->assertOk()
+            ->assertJsonPath('data.school.name', 'Govt HS')
+            ->assertJsonPath('data.school.has_login', false)
+            ->assertJsonStructure([
+                'data' => [
+                    'school',
+                    'detail_fields',
+                    'registration',
+                    'recent_payments',
+                    'academic_year',
+                ],
+            ]);
+    }
+
+    public function test_sahodaya_admin_can_list_payment_due_registrations(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'registration' => $registration, 'token' => $token] = $this->sahodayaContext();
+
+        $registration->update([
+            'registration_status'   => 'payment_pending',
+            'membership_fee_amount' => 4500,
+        ]);
+
+        $this->auth($token)
+            ->getJson("/api/v1/sahodaya/{$sahodaya->id}/payments?status=payment-due")
+            ->assertOk()
+            ->assertJsonPath('meta.active_status', 'payment-due')
+            ->assertJsonPath('meta.status_counts.payment-due', 1)
+            ->assertJsonPath('data.0.registration_status', 'payment_pending')
+            ->assertJsonPath('data.0.school.name', 'Govt HS');
+    }
+
     public function test_sahodaya_admin_can_list_payments(): void
     {
         ['sahodaya' => $sahodaya, 'token' => $token] = $this->sahodayaContext();

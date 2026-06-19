@@ -22,6 +22,7 @@ class RegistrationResource extends JsonResource
                 'counts_status'       => $this->submission->counts_status,
                 'teacher_status'      => $this->submission->teacher_status,
             ]),
+            'school'              => $this->whenLoaded('school', fn () => SchoolResource::make($this->school)),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

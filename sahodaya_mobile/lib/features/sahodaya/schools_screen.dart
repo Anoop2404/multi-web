@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_theme.dart';
+import '../../core/widgets/sa_widgets.dart';
 import 'sahodaya_api.dart';
 import 'school_detail_screen.dart';
 
@@ -12,15 +14,42 @@ class SahodayaSchoolsScreen extends ConsumerStatefulWidget {
 }
 
 class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
+  final _search = TextEditingController();
+  String? _statusFilter;
   List<Map<String, dynamic>> _schools = [];
   String? _error;
   bool _loading = true;
+
+  static const _filters = [
+    (null, 'All'),
+    ('approved', 'Approved'),
+    ('pending', 'Pending'),
+    ('rejected', 'Rejected'),
+  ];
 
   @override
   void initState() {
     super.initState();
     _load();
+    _search.addListener(_onSearchChanged);
   }
+
+  @override
+  void dispose() {
+    _search.removeListener(_onSearchChanged);
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    Future.delayed(const Duration(milliseconds: 350), () {
+      if (!mounted || _search.text == _lastSearch) return;
+      _lastSearch = _search.text;
+      _load();
+    });
+  }
+
+  String _lastSearch = '';
 
   Future<void> _load() async {
     setState(() {
@@ -28,7 +57,11 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
       _error = null;
     });
     try {
-      final response = await sahodayaGet(ref, '/schools');
+      final response = await sahodayaGet(ref, '/schools', query: {
+        'per_page': 100,
+        if (_statusFilter != null) 'status': _statusFilter!,
+        if (_search.text.trim().isNotEmpty) 'search': _search.text.trim(),
+      });
       final data = response['data'];
       _schools = data is List ? data.cast<Map<String, dynamic>>() : [];
     } catch (error) {
@@ -38,33 +71,117 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
     }
   }
 
+  List<Map<String, dynamic>> get _filtered {
+    final q = _search.text.trim().toLowerCase();
+    if (q.isEmpty) return _schools;
+    return _schools.where((school) {
+      final name = school['name']?.toString().toLowerCase() ?? '';
+      final prefix = school['school_prefix']?.toString().toLowerCase() ?? '';
+      return name.contains(q) || prefix.contains(q);
+    }).toList();
+  }
+
+  Future<void> _openSchool(Map<String, dynamic> school) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => SahodayaSchoolDetailScreen(
+          schoolId: school['id'].toString(),
+          preview: school,
+        ),
+      ),
+    );
+    if (changed == true) await _load();
+  }
+
+  void _setFilter(String? status) {
+    if (_statusFilter == status) return;
+    setState(() => _statusFilter = status);
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) return Center(child: Text(_error!));
+    if (_loading && _schools.isEmpty && _error == null) return const SaLoadingView();
+    if (_error != null && _schools.isEmpty) return SaErrorView(message: _error!, onRetry: _load);
+
+    final schools = _filtered;
 
     return RefreshIndicator(
+      color: AppColors.navyPrimary,
       onRefresh: _load,
-      child: ListView.separated(
-        itemCount: _schools.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final school = _schools[index];
-          return ListTile(
-            title: Text(school['name']?.toString() ?? ''),
-            subtitle: Text(
-              '${school['school_prefix'] ?? '-'} · ${school['membership_status'] ?? ''} · ${school['student_count'] ?? 0} students',
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const SaInfoBanner(
+            title: 'Member schools',
+            body: 'Tap any school to view application details, registration status, and payment history.',
+          ),
+          const SizedBox(height: 12),
+          SaSearchField(controller: _search, hint: 'Search schools...'),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _filters.map((filter) {
+                final selected = _statusFilter == filter.$1;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(filter.$2),
+                    selected: selected,
+                    onSelected: (_) => _setFilter(filter.$1),
+                    selectedColor: AppColors.navyPrimary.withValues(alpha: 0.15),
+                    checkmarkColor: AppColors.navyPrimary,
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? AppColors.navyPrimary : const Color(0xFF64748B),
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
-            onTap: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => SahodayaSchoolDetailScreen(schoolId: school['id'].toString()),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${schools.length} school${schools.length == 1 ? '' : 's'}',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          if (schools.isEmpty)
+            const SaEmptyView(title: 'No schools found', subtitle: 'Try a different search or filter.')
+          else
+            ...schools.map((school) {
+              final status = school['membership_status']?.toString() ?? 'pending';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: SaEntityCard(
+                  title: school['name']?.toString() ?? 'School',
+                  subtitle: '${school['school_prefix'] ?? '-'} · ${school['student_count'] ?? 0} students',
+                  status: status,
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.bgSky,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.borderBlue),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      (school['school_prefix']?.toString().isNotEmpty == true
+                              ? school['school_prefix'].toString()[0]
+                              : 'S')
+                          .toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navyPrimary),
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
+                  onTap: () => _openSchool(school),
                 ),
               );
-              await _load();
-            },
-          );
-        },
+            }),
+        ],
       ),
     );
   }

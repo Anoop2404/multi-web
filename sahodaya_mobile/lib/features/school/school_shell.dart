@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_theme.dart';
-import '../../core/widgets/sa_widgets.dart';
 import '../../core/auth/auth_providers.dart';
+import '../../core/widgets/sa_admin_shell.dart';
+import '../../core/widgets/sa_widgets.dart';
 import 'dashboard_screen.dart';
 import 'profile_screen.dart';
 import 'registration_screen.dart';
@@ -21,6 +21,9 @@ class SchoolShell extends ConsumerStatefulWidget {
 class _SchoolShellState extends ConsumerState<SchoolShell> {
   int _index = 0;
   bool? _hasSchoolCode;
+
+  static const _labels = ['Dashboard', 'Students', 'Registration'];
+  static const _icons = [Icons.dashboard_outlined, Icons.people_outline, Icons.assignment_outlined];
 
   @override
   void initState() {
@@ -41,105 +44,51 @@ class _SchoolShellState extends ConsumerState<SchoolShell> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(authControllerProvider).session!;
-    final pages = [
-      const SchoolDashboardScreen(),
-      const SchoolStudentsScreen(),
-      const SchoolRegistrationScreen(),
-      const SchoolProfileScreen(),
-    ];
-    final titles = ['Dashboard', 'Students', 'Annual Registration', 'Registration Details'];
 
-    return Container(
-      decoration: BoxDecoration(gradient: AppTheme.mainBackground),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(session.user.tenantName ?? titles[_index]),
-          bottom: const PreferredSize(
-            preferredSize: Size.fromHeight(1),
-            child: Divider(height: 1, color: AppColors.borderBlue),
+    return SaAdminShell(
+      roleLabel: 'School',
+      tenantName: session.user.tenantName ?? 'School',
+      pageTitle: _index == 3 ? 'Registration Details' : _labels[_index.clamp(0, 2)],
+      labels: _labels,
+      icons: _icons,
+      selectedIndex: _index,
+      navSelectedIndex: _index > 2 ? 2 : _index,
+      onIndexChanged: (value) => setState(() => _index = value),
+      navCount: 3,
+      drawerExtras: [
+        if (_hasSchoolCode == false)
+          SaDrawerTile(
+            icon: Icons.tag,
+            label: 'School Code',
+            selected: false,
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const SchoolSetupCodeScreen()));
+            },
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-            ),
-          ],
-        ),
-        drawer: Drawer(
-          child: Column(
-            children: [
-              SaDrawerHeader(
-                roleLabel: 'School',
-                tenantName: session.user.tenantName ?? 'School',
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  children: [
-                    SaDrawerTile(
-                      icon: Icons.dashboard_outlined,
-                      label: 'Dashboard',
-                      selected: _index == 0,
-                      onTap: () => _select(0),
-                    ),
-                    if (_hasSchoolCode == false)
-                      SaDrawerTile(
-                        icon: Icons.tag,
-                        label: 'School Code',
-                        selected: false,
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const SchoolSetupCodeScreen()));
-                        },
-                      ),
-                    SaDrawerTile(
-                      icon: Icons.people_outline,
-                      label: 'Students',
-                      selected: _index == 1,
-                      onTap: () => _select(1),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(12, 16, 12, 4),
-                      child: Text(
-                        'MEMBERSHIP',
-                        style: TextStyle(color: Color(0xBFFBBF24), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.2),
-                      ),
-                    ),
-                    SaDrawerTile(
-                      icon: Icons.person_outline,
-                      label: 'Registration Details',
-                      selected: _index == 3,
-                      onTap: () => _select(3),
-                    ),
-                    SaDrawerTile(
-                      icon: Icons.assignment_outlined,
-                      label: 'Annual Registration',
-                      selected: _index == 2,
-                      onTap: () => _select(2),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        const Padding(
+          padding: EdgeInsets.fromLTRB(12, 16, 12, 4),
+          child: Text(
+            'MEMBERSHIP',
+            style: TextStyle(color: Color(0xBFFBBF24), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.2),
           ),
         ),
-        body: pages[_index],
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _index > 2 ? 2 : _index,
-          onDestinationSelected: (value) => setState(() => _index = value),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Dashboard'),
-            NavigationDestination(icon: Icon(Icons.people_outline), label: 'Students'),
-            NavigationDestination(icon: Icon(Icons.assignment_outlined), label: 'Registration'),
-          ],
+        SaDrawerTile(
+          icon: Icons.person_outline,
+          label: 'Registration Details',
+          selected: _index == 3,
+          onTap: () {
+            Navigator.pop(context);
+            setState(() => _index = 3);
+          },
         ),
-      ),
+      ],
+      pages: const [
+        SchoolDashboardScreen(),
+        SchoolStudentsScreen(),
+        SchoolRegistrationScreen(),
+        SchoolProfileScreen(),
+      ],
     );
-  }
-
-  void _select(int index) {
-    Navigator.pop(context);
-    setState(() => _index = index);
   }
 }

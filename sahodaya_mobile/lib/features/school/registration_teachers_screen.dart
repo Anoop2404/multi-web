@@ -78,7 +78,7 @@ class _SchoolRegistrationTeachersScreenState extends ConsumerState<SchoolRegistr
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const SaPageScaffold(title: 'Submission Teachers', body: Center(child: CircularProgressIndicator()));
+    if (_loading) return const SaPageScaffold(title: 'Submission Teachers', body: SaLoadingView());
 
     final teachers = (_data?['teachers'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final types = (_data?['teaching_types'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -115,22 +115,24 @@ class _SchoolRegistrationTeachersScreenState extends ConsumerState<SchoolRegistr
               ),
             ),
           const SizedBox(height: 16),
-          SaCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (final teacher in teachers)
-                  ListTile(
-                    title: Text(teacher['name']?.toString() ?? ''),
-                    subtitle: Text('${teacher['subject'] ?? '—'} · ${teacher['teaching_type']?['label'] ?? '—'}'),
-                    trailing: canEdit
-                        ? IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _remove(teacher['id'] as int))
-                        : null,
-                  ),
-                if (teachers.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No teachers added yet'))),
-              ],
+          if (teachers.isEmpty)
+            const SaEmptyView(title: 'No teachers added yet', subtitle: 'Add teachers above, then submit for review.', icon: Icons.co_present_outlined)
+          else
+            ...teachers.map(
+              (teacher) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SaEntityCard(
+                  title: teacher['name']?.toString() ?? 'Teacher',
+                  subtitle: '${teacher['subject'] ?? '—'} · ${teacher['teaching_type']?['label'] ?? '—'}',
+                  trailing: canEdit
+                      ? IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Color(0xFFDC2626)),
+                          onPressed: () => _remove(teacher['id'] as int),
+                        )
+                      : null,
+                ),
+              ),
             ),
-          ),
           if (canEdit) ...[
             const SizedBox(height: 16),
             SaSubmitButton(label: 'Submit teachers & continue', onPressed: _submit),

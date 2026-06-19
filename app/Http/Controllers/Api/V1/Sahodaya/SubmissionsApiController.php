@@ -23,7 +23,7 @@ class SubmissionsApiController extends SahodayaApiController
     public function show(string $tenantId, string $submissionId)
     {
         $submission = SchoolYearSubmission::whereIn('school_id', TenancyDatabase::schoolIdsFor($this->sahodaya->id))
-            ->with(['school', 'counts.classCategory', 'students', 'teachers', 'registration'])
+            ->with(['school', 'counts.classCategory', 'students.schoolClass', 'teachers.teachingType', 'registration'])
             ->findOrFail($submissionId);
 
         return $this->ok(SubmissionResource::make($this->enrich($submission)));

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/authenticated_image.dart';
+import '../../core/widgets/sa_widgets.dart';
 import 'school_api.dart';
 import 'student_form_screen.dart';
 
@@ -16,6 +18,7 @@ class SchoolStudentsScreen extends ConsumerStatefulWidget {
 }
 
 class _SchoolStudentsScreenState extends ConsumerState<SchoolStudentsScreen> {
+  final _search = TextEditingController();
   List<Map<String, dynamic>> _students = [];
   List<Map<String, dynamic>> _classes = [];
   String? _error;
@@ -25,6 +28,13 @@ class _SchoolStudentsScreenState extends ConsumerState<SchoolStudentsScreen> {
   void initState() {
     super.initState();
     _load();
+    _search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -42,6 +52,17 @@ class _SchoolStudentsScreenState extends ConsumerState<SchoolStudentsScreen> {
     } finally {
       setState(() => _loading = false);
     }
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    final q = _search.text.trim().toLowerCase();
+    if (q.isEmpty) return _students;
+    return _students.where((student) {
+      final name = student['name']?.toString().toLowerCase() ?? '';
+      final admission = student['admission_number']?.toString().toLowerCase() ?? '';
+      final className = student['school_class']?['name']?.toString().toLowerCase() ?? '';
+      return name.contains(q) || admission.contains(q) || className.contains(q);
+    }).toList();
   }
 
   Future<void> _importCsv() async {
@@ -102,44 +123,64 @@ class _SchoolStudentsScreenState extends ConsumerState<SchoolStudentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) return Center(child: Text(_error!));
+    if (_loading) return const SaLoadingView();
+    if (_error != null) return SaErrorView(message: _error!, onRetry: _load);
+
+    final students = _filtered;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           FloatingActionButton.small(
             heroTag: 'import',
+            backgroundColor: Colors.white,
+            foregroundColor: AppColors.navyPrimary,
             onPressed: _importCsv,
             child: const Icon(Icons.upload_file),
           ),
           const SizedBox(height: 8),
           FloatingActionButton(
             heroTag: 'add',
+            backgroundColor: AppColors.navyPrimary,
             onPressed: () => _openForm(),
             child: const Icon(Icons.add),
           ),
         ],
       ),
       body: RefreshIndicator(
+        color: AppColors.navyPrimary,
         onRefresh: _load,
-        child: _students.isEmpty
-            ? ListView(
-                children: const [
-                  SizedBox(height: 120),
-                  Center(child: Text('No students yet')),
-                ],
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            SaSearchField(controller: _search, hint: 'Search students...'),
+            const SizedBox(height: 8),
+            Text(
+              '${_students.length} student${_students.length == 1 ? '' : 's'}',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            if (students.isEmpty)
+              const SaEmptyView(
+                title: 'No students yet',
+                subtitle: 'Tap + to add a student or use the upload button to import a CSV.',
+                icon: Icons.school_outlined,
               )
-            : ListView.separated(
-                itemCount: _students.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final student = _students[index];
-                  final id = student['id'] as int;
-                  final className = student['school_class']?['name']?.toString() ?? '';
-                  return ListTile(
+            else
+              ...students.map((student) {
+                final id = student['id'] as int;
+                final className = student['school_class']?['name']?.toString() ?? '';
+                final admission = student['admission_number']?.toString() ?? '';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: SaEntityCard(
+                    title: student['name']?.toString() ?? 'Student',
+                    subtitle: [if (admission.isNotEmpty) admission, if (className.isNotEmpty) className].join(' · '),
                     leading: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppColors.bgSky,
                       child: ClipOval(
                         child: AuthenticatedImage(
                           url: schoolPhotoUrl(ref, id),
@@ -148,16 +189,16 @@ class _SchoolStudentsScreenState extends ConsumerState<SchoolStudentsScreen> {
                         ),
                       ),
                     ),
-                    title: Text(student['name']?.toString() ?? ''),
-                    subtitle: Text('${student['admission_number'] ?? ''} · $className'),
-                    onTap: () => _openForm(student: student),
                     trailing: IconButton(
-                      icon: const Icon(Icons.photo_camera_outlined),
+                      icon: const Icon(Icons.photo_camera_outlined, size: 20, color: AppColors.navyLight),
                       onPressed: () => _uploadPhoto(id),
                     ),
-                  );
-                },
-              ),
+                    onTap: () => _openForm(student: student),
+                  ),
+                );
+              }),
+          ],
+        ),
       ),
     );
   }

@@ -34,7 +34,11 @@
                     <StatCard :value="stats.pending_schools ?? 0" label="Pending Schools" color="amber" icon="⏳" />
                     <StatCard :value="stats.total_students ?? 0" label="Active Students" color="navy" icon="👨‍🎓"
                               :hint="'From approved members only'" />
-                    <StatCard :value="pendingPaymentsCount ?? stats.pending_payments ?? 0" label="Pending Payments" color="green" icon="💳" />
+                    <StatCard :value="`₹${Number(stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Pending Approval Fees" color="amber" icon="💳"
+                              :hint="`${stats.pending_payments ?? 0} awaiting verification`" />
+                    <StatCard :value="`₹${Number(stats.approved_amount || 0).toLocaleString('en-IN')}`" label="Approved Fees" color="green" icon="✅" />
+                    <StatCard :value="`₹${Number(stats.payment_due_amount || 0).toLocaleString('en-IN')}`" label="Payment Not Done" color="navy" icon="🧾"
+                              :hint="`${stats.payment_due ?? 0} schools`" />
                 </template>
                 <template v-else>
                     <StatCard :value="stats.approved_schools ?? 0" label="Approved Members" color="blue" icon="🏫" />
@@ -46,12 +50,17 @@
             </div>
 
             <!-- Attention required -->
-            <div v-if="pendingSchoolsCount > 0 || pendingPaymentsCount > 0" class="grid sm:grid-cols-2 gap-4">
+            <div v-if="pendingSchoolsCount > 0 || pendingPaymentsCount > 0 || (stats.payment_due ?? 0) > 0" class="grid sm:grid-cols-2 gap-4">
                 <ActionBanner v-if="pendingSchoolsCount > 0"
                               :href="`/sahodaya-admin/${sahodaya.id}/membership/reports?tab=schools`"
                               :count="pendingSchoolsCount"
                               label="schools awaiting membership approval"
                               color="amber" icon="⏳" />
+                <ActionBanner v-if="(stats.payment_due ?? 0) > 0"
+                              :href="`/sahodaya-admin/${sahodaya.id}/membership/payments?status=payment-due`"
+                              :count="stats.payment_due"
+                              label="schools registered but payment not done"
+                              color="amber" icon="🧾" />
                 <ActionBanner v-if="pendingPaymentsCount > 0"
                               :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`"
                               :count="pendingPaymentsCount"

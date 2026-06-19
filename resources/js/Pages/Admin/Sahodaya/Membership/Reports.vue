@@ -7,11 +7,18 @@
         <div class="space-y-5">
             <!-- Summary -->
             <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <SummaryCard label="Pending Approval Fees"
+                             :value="`₹${Number(summary.pending_amount || 0).toLocaleString('en-IN')}`"
+                             :hint="`${summary.payments_pending} payments awaiting verification`" color="amber" />
+                <SummaryCard label="Approved Fees"
+                             :value="`₹${Number(summary.approved_amount || summary.total_collected || 0).toLocaleString('en-IN')}`"
+                             :hint="`${summary.payments_verified} verified payments`" color="green" />
+                <SummaryCard label="Payment Not Done"
+                             :value="`₹${Number(summary.payment_due_amount || 0).toLocaleString('en-IN')}`"
+                             :hint="`${summary.payment_due ?? 0} schools not paid`" color="navy" />
                 <SummaryCard label="Total Registered" :value="summary.total_registered" color="navy" />
-                <SummaryCard label="Approved" :value="summary.total_schools" color="green" />
-                <SummaryCard label="Pending" :value="summary.pending_schools" color="amber" />
-                <SummaryCard label="Collected (Verified)" :value="`₹${Number(summary.total_collected).toLocaleString('en-IN')}`"
-                             :hint="`${summary.payments_verified} verified · ${summary.payments_pending} pending`" color="green" />
+                <SummaryCard label="Approved Schools" :value="summary.total_schools" color="green" />
+                <SummaryCard label="Pending Schools" :value="summary.pending_schools" color="amber" />
             </div>
 
             <!-- Report tabs -->
@@ -80,6 +87,48 @@
                 <PaginationLinks v-if="schools" :links="schools.links" />
             </div>
 
+            <!-- Payment not done -->
+            <div v-else-if="tab === 'payment-due'" class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
+                    <div>
+                        <h3 class="font-bold text-gray-900">Payment Not Done</h3>
+                        <p class="text-xs text-gray-400 mt-0.5">Schools registered for {{ academicYear }} but have not uploaded payment proof yet.</p>
+                    </div>
+                    <Link :href="`/sahodaya-admin/${sahodaya.id}/membership/payments?status=payment-due`"
+                          class="text-xs font-semibold text-[#0f3d7a] hover:underline shrink-0">
+                        Open in Payments →
+                    </Link>
+                </div>
+                <div v-if="paymentDue?.data?.length" class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="th">School</th>
+                                <th class="th">Code</th>
+                                <th class="th">Reg No</th>
+                                <th class="th text-right">Fee Due</th>
+                                <th class="th">Status</th>
+                                <th class="th">Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            <tr v-for="r in paymentDue.data" :key="r.id" class="hover:bg-gray-50/50">
+                                <td class="td font-medium text-gray-800">{{ r.school?.name ?? '—' }}</td>
+                                <td class="td font-mono text-xs text-gray-500">{{ r.school?.school_prefix || '—' }}</td>
+                                <td class="td font-mono text-xs text-gray-600">{{ r.reg_no || '—' }}</td>
+                                <td class="td text-right font-bold text-gray-800">
+                                    {{ r.membership_fee_amount ? `₹${Number(r.membership_fee_amount).toLocaleString('en-IN')}` : '—' }}
+                                </td>
+                                <td class="td"><StatusPill :status="r.registration_status" /></td>
+                                <td class="td text-xs text-gray-500">{{ formatDate(r.updated_at) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p v-else class="text-sm text-gray-400 text-center py-10">No schools awaiting payment.</p>
+                <PaginationLinks v-if="paymentDue" :links="paymentDue.links" />
+            </div>
+
             <!-- Payments pending -->
             <div v-else-if="tab === 'payments-pending'" class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
@@ -121,6 +170,7 @@ const props = defineProps({
     academicYear: String, tab: String, search: String,
     dateFrom: String, dateTo: String,
     summary: Object, schools: Object,
+    paymentDue: Object,
     paymentsPending: Object, paymentsDone: Object,
 });
 
@@ -132,12 +182,14 @@ const searchForm = reactive({
 
 const reportTabs = [
     { key: 'schools',           label: 'Schools List' },
+    { key: 'payment-due',       label: 'Payment Not Done' },
     { key: 'payments-pending',  label: 'Payments Pending' },
     { key: 'payments-done',     label: 'Payments Done' },
 ];
 
 const searchPlaceholder = computed(() => ({
     schools:           'Search schools…',
+    'payment-due':     'Search by school name…',
     'payments-pending': 'Search by school name…',
     'payments-done':    'Search by school name…',
 }[props.tab] ?? 'Search…'));
@@ -169,6 +221,7 @@ function applySearch() {
 function exportUrl() {
     const type = {
         schools:           'schools',
+        'payment-due':     'payment-due',
         'payments-pending': 'payments-pending',
         'payments-done':    'payments-done',
     }[props.tab] ?? 'schools';

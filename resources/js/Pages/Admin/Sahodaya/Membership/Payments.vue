@@ -10,12 +10,28 @@
                 <strong>approves membership</strong> automatically.
             </p>
 
-            <!-- Summary -->
+            <!-- Fee totals -->
+            <div class="grid sm:grid-cols-3 gap-3">
+                <SummaryCard label="Pending Approval Fees"
+                             :value="`₹${Number(summary.pending_amount || 0).toLocaleString('en-IN')}`"
+                             :hint="`${summary.pending ?? 0} payment${(summary.pending ?? 0) === 1 ? '' : 's'} awaiting verification`"
+                             color="amber" />
+                <SummaryCard label="Approved Fees"
+                             :value="`₹${Number(summary.approved_amount || summary.collected || 0).toLocaleString('en-IN')}`"
+                             :hint="`${summary.verified ?? 0} verified payment${(summary.verified ?? 0) === 1 ? '' : 's'}`"
+                             color="green" />
+                <SummaryCard label="Payment Not Done"
+                             :value="`₹${Number(summary.payment_due_amount || 0).toLocaleString('en-IN')}`"
+                             :hint="`${summary.payment_due ?? 0} school${(summary.payment_due ?? 0) === 1 ? '' : 's'} not paid yet`"
+                             color="navy" />
+            </div>
+
+            <!-- Counts -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <SummaryCard label="Pending" :value="summary.pending" color="amber" />
                 <SummaryCard label="Verified" :value="summary.verified" color="green" />
                 <SummaryCard label="Rejected" :value="summary.rejected" color="red" />
-                <SummaryCard label="Collected" :value="`₹${Number(summary.collected || 0).toLocaleString('en-IN')}`" color="navy" />
+                <SummaryCard label="Payment Due" :value="summary.payment_due ?? 0" color="navy" />
             </div>
 
             <!-- Status tabs -->
@@ -64,7 +80,39 @@
             </div>
 
             <!-- Payments list -->
-            <div v-if="payments.data?.length" class="space-y-4">
+            <div v-if="activeStatus === 'payment-due' && paymentDue?.data?.length" class="space-y-4">
+                <div v-for="r in paymentDue.data" :key="r.id"
+                     class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 flex items-start justify-between gap-4">
+                        <div class="flex items-center gap-4 min-w-0">
+                            <div class="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center text-xl font-bold text-amber-700 shrink-0">
+                                {{ r.school?.name?.charAt(0) }}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="font-bold text-gray-900">{{ r.school?.name }}</p>
+                                <div class="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500">
+                                    <span>{{ r.academic_year }}</span>
+                                    <span v-if="r.reg_no" class="text-gray-300">·</span>
+                                    <span v-if="r.reg_no" class="font-mono">{{ r.reg_no }}</span>
+                                    <span v-if="r.school?.school_prefix" class="text-gray-300">·</span>
+                                    <span v-if="r.school?.school_prefix">{{ r.school.school_prefix }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <p v-if="r.membership_fee_amount" class="text-xl font-extrabold text-gray-900">
+                                ₹{{ Number(r.membership_fee_amount).toLocaleString('en-IN') }}
+                            </p>
+                            <StatusBadge :status="r.registration_status" />
+                        </div>
+                    </div>
+                    <div class="px-6 py-3 bg-amber-50/60 border-t border-amber-100 text-xs text-amber-800">
+                        Registered for {{ r.academic_year }} — awaiting payment upload from school.
+                    </div>
+                </div>
+            </div>
+
+            <div v-else-if="payments.data?.length" class="space-y-4">
                 <div v-for="p in payments.data" :key="p.id"
                      class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                     <div class="px-6 py-4 flex items-start justify-between gap-4 border-b border-gray-100">
@@ -123,8 +171,15 @@
                 <p class="text-gray-600 font-semibold">{{ emptyMessage }}</p>
             </div>
 
-            <div v-if="payments.links?.length > 3" class="flex justify-center gap-1">
+            <div v-if="payments.links?.length > 3 && activeStatus !== 'payment-due'" class="flex justify-center gap-1">
                 <Link v-for="link in payments.links" :key="link.label"
+                      :href="link.url || '#'"
+                      class="px-3 py-1 rounded-lg text-sm"
+                      :class="link.active ? 'bg-[#0f3d7a] text-white' : 'text-gray-600 hover:bg-gray-100'"
+                      v-html="link.label" />
+            </div>
+            <div v-if="paymentDue?.links?.length > 3 && activeStatus === 'payment-due'" class="flex justify-center gap-1">
+                <Link v-for="link in paymentDue.links" :key="link.label"
                       :href="link.url || '#'"
                       class="px-3 py-1 rounded-lg text-sm"
                       :class="link.active ? 'bg-[#0f3d7a] text-white' : 'text-gray-600 hover:bg-gray-100'"
@@ -144,6 +199,7 @@ const props = defineProps({
     approvedSchoolsCount: Number, pendingSchoolsCount: Number,
     pendingSubmissionsCount: Number, pendingPaymentsCount: Number,
     payments: { type: Object, default: () => ({ data: [] }) },
+    paymentDue: { type: Object, default: null },
     activeStatus: { type: String, default: 'submitted' },
     statusCounts: { type: Object, default: () => ({}) },
     filters: { type: Object, default: () => ({}) },
@@ -157,6 +213,7 @@ const filterForm = reactive({
 });
 
 const statusTabs = [
+    { key: 'payment-due', label: 'Payment Due' },
     { key: 'submitted', label: 'Pending' },
     { key: 'verified',  label: 'Verified' },
     { key: 'rejected',  label: 'Rejected' },
@@ -164,6 +221,7 @@ const statusTabs = [
 ];
 
 const emptyMessage = computed(() => ({
+    'payment-due': 'No schools awaiting payment. All registered schools have submitted payment or completed registration.',
     submitted: 'No payments awaiting verification.',
     verified:  'No verified payments yet.',
     rejected:  'No rejected payments.',
@@ -240,6 +298,8 @@ function rejectPayment(payment) {
 }
 
 const statusColors = {
+    payment_pending: 'bg-amber-100 text-amber-700',
+    payment_rejected: 'bg-red-100 text-red-700',
     submitted: 'bg-amber-100 text-amber-700',
     verified:  'bg-green-100 text-green-700',
     rejected:  'bg-red-100 text-red-700',
@@ -251,7 +311,7 @@ const StatusBadge = defineComponent({
         return () => h('span', {
             class: ['inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold capitalize',
                     statusColors[p.status] || 'bg-gray-100 text-gray-600'],
-        }, p.status);
+        }, p.status?.replace(/_/g, ' ') ?? p.status);
     },
 });
 

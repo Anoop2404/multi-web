@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/widgets/sa_widgets.dart';
 import 'school_api.dart';
 
 class SchoolStudentFormScreen extends ConsumerStatefulWidget {
@@ -72,6 +73,19 @@ class _SchoolStudentFormScreenState extends ConsumerState<SchoolStudentFormScree
 
   Future<void> _delete() async {
     if (!_editing) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete student?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
     setState(() => _saving = true);
     try {
       await schoolDelete(ref, '/students/${widget.student!['id']}');
@@ -89,65 +103,70 @@ class _SchoolStudentFormScreenState extends ConsumerState<SchoolStudentFormScree
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_editing ? 'Edit student' : 'Add student'),
-        actions: [
-          if (_editing)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: _saving ? null : _delete,
-            ),
-        ],
-      ),
+    return SaPageScaffold(
+      title: _editing ? 'Edit student' : 'Add student',
+      actions: [
+        if (_editing)
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            onPressed: _saving ? null : _delete,
+          ),
+      ],
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: ListView(
             children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+              SaCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SaSectionTitle('Student details'),
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(labelText: 'Name *'),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<int>(
+                      value: _classId,
+                      decoration: const InputDecoration(labelText: 'Class *'),
+                      items: widget.classes
+                          .map(
+                            (item) => DropdownMenuItem<int>(
+                              value: item['id'] as int,
+                              child: Text(item['name']?.toString() ?? ''),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() => _classId = value),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _gender,
+                      decoration: const InputDecoration(labelText: 'Gender'),
+                      items: const [
+                        DropdownMenuItem(value: 'male', child: Text('Male')),
+                        DropdownMenuItem(value: 'female', child: Text('Female')),
+                        DropdownMenuItem(value: 'other', child: Text('Other')),
+                      ],
+                      onChanged: (value) => setState(() => _gender = value ?? 'male'),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: const InputDecoration(labelText: 'Parent email (optional)'),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<int>(
-                value: _classId,
-                decoration: const InputDecoration(labelText: 'Class', border: OutlineInputBorder()),
-                items: widget.classes
-                    .map(
-                      (item) => DropdownMenuItem<int>(
-                        value: item['id'] as int,
-                        child: Text(item['name']?.toString() ?? ''),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() => _classId = value),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _gender,
-                decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
-                items: const [
-                  DropdownMenuItem(value: 'male', child: Text('Male')),
-                  DropdownMenuItem(value: 'female', child: Text('Female')),
-                  DropdownMenuItem(value: 'other', child: Text('Other')),
-                ],
-                onChanged: (value) => setState(() => _gender = value ?? 'male'),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Parent email', border: OutlineInputBorder()),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _saving ? null : _save,
-                child: _saving
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(_editing ? 'Save changes' : 'Add student'),
+              const SizedBox(height: 20),
+              SaPrimaryButton(
+                label: _editing ? 'Save changes' : 'Add student',
+                onPressed: _save,
+                loading: _saving,
               ),
             ],
           ),

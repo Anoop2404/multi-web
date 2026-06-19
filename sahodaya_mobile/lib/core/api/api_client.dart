@@ -1,4 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
+
+class DownloadResult {
+  const DownloadResult({required this.bytes, this.contentType});
+
+  final Uint8List bytes;
+  final String? contentType;
+}
 
 class ApiClient {
   ApiClient({
@@ -73,10 +82,18 @@ class ApiClient {
   }
 
   Future<List<int>> downloadBytes(String path) async {
+    final result = await download(path);
+    return result.bytes;
+  }
+
+  Future<DownloadResult> download(String path) async {
     final response = await _dio.get<List<int>>(
       path,
       options: Options(responseType: ResponseType.bytes),
     );
-    return response.data ?? [];
+    return DownloadResult(
+      bytes: Uint8List.fromList(response.data ?? []),
+      contentType: response.headers.value('content-type'),
+    );
   }
 }

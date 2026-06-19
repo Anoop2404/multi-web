@@ -19,6 +19,20 @@ class SubmissionResource extends JsonResource
             'student_total'       => $this->when(isset($this->student_total), $this->student_total),
             'registration_status' => $this->when(isset($this->registration_status), $this->registration_status),
             'school'              => $this->whenLoaded('school', fn () => SchoolResource::make($this->school)),
+            'students'            => $this->whenLoaded('students', fn () => $this->students->map(fn ($student) => [
+                'id'      => $student->id,
+                'name'    => $student->name,
+                'class'   => $student->schoolClass?->name ?? $student->class,
+                'section' => $student->section,
+            ])->values()),
+            'teachers'            => $this->whenLoaded('teachers', fn () => $this->teachers->map(fn ($teacher) => [
+                'id'            => $teacher->id,
+                'name'          => $teacher->name,
+                'subject'       => $teacher->subject,
+                'teaching_type' => $teacher->relationLoaded('teachingType') && $teacher->teachingType
+                    ? ['label' => $teacher->teachingType->label]
+                    : null,
+            ])->values()),
             'created_at'          => $this->created_at?->toIso8601String(),
         ];
     }
