@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\SiteSection;
 use App\Models\Tenant;
+use App\Models\TenantSetting;
 use App\Services\Tenancy\SahodayaDatabaseProvisioner;
 use App\Support\SahodayaSiteTemplate;
 use App\Support\TenancyDatabase;
@@ -77,6 +79,8 @@ class TenantController extends Controller
         $tenant->load('children', 'domains');
 
         $database = null;
+        $tenantOverview = ['sections' => [], 'settings' => []];
+
         if ($tenant->type === 'sahodaya' && config('tenancy.database_per_sahodaya', true)) {
             $database = array_merge(
                 $databaseProvisioner->status($tenant),
@@ -84,12 +88,12 @@ class TenantController extends Controller
             );
 
             if ($database['ready']) {
-                $this->loadTenantScopedRelations($tenant);
+                $tenantOverview = $this->tenantOverview($tenant);
             }
         } elseif ($tenant->type === 'school' && $tenant->parent_id && config('tenancy.database_per_sahodaya', true)) {
             $parent = Tenant::query()->find($tenant->parent_id);
             if ($parent && $databaseProvisioner->status($parent)['ready']) {
-                $this->loadTenantScopedRelations($tenant);
+                $tenantOverview = $this->tenantOverview($tenant);
             }
         }
 
@@ -105,6 +109,7 @@ class TenantController extends Controller
                 ? route('admin.sahodayas.index')
                 : route('admin.schools.index'),
             'database'         => $database,
+            'tenantOverview'   => $tenantOverview,
         ]);
     }
 
@@ -256,17 +261,26 @@ class TenantController extends Controller
         ]);
     }
 
-    private function loadTenantScopedRelations(Tenant $tenant): void
+    /** @return array{sections: array<int, array<string, mixed>>, settings: array<int, array<string, mixed>>} */
+    private function tenantOverview(Tenant $tenant): array
     {
         try {
-            TenancyDatabase::runWhenDatabaseReady($tenant, function () use ($tenant) {
-                $tenant->load(['settings', 'sections']);
-            });
+            return TenancyDatabase::whenDatabaseReady($tenant, function () use ($tenant) {
+                return [
+                    'sections' => SiteSection::query()
+                        ->where('tenant_id', $tenant->id)
+                        ->orderBy('display_order')
+                        ->get(['id', 'section_type', 'variant', 'is_active'])
+                        ->all(),
+                    'settings' => TenantSetting::query()
+                        ->where('tenant_id', $tenant->id)
+                        ->orderBy('key')
+                        ->get(['id', 'key'])
+                        ->all(),
+                ];
+            }, ['sections' => [], 'settings' => []]) ?? ['sections' => [], 'settings' => []];
         } catch (\Throwable) {
-            if (tenancy()->initialized) {
-                tenancy()->end();
-            }
-            // Database not ready yet — overview cards stay empty on superadmin show page.
+            return ['sections' => [], 'settings' => []];
         }
     }
 }

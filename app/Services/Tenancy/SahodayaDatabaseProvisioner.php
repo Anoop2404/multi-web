@@ -5,6 +5,7 @@ namespace App\Services\Tenancy;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Support\SahodayaSiteTemplate;
+use App\Support\TenancyDatabase;
 use InvalidArgumentException;
 use RuntimeException;
 use Stancl\Tenancy\Jobs\MigrateDatabase;
@@ -88,9 +89,8 @@ class SahodayaDatabaseProvisioner
         $ready = false;
 
         if ($name) {
-            $sahodaya->database()->makeCredentials();
             $exists = $sahodaya->database()->manager()->databaseExists($name);
-            $ready = $exists && $this->schemaIsReady($sahodaya);
+            $ready = $exists && $this->schemaIsReady($sahodaya, $name);
         }
 
         return [
@@ -143,15 +143,14 @@ class SahodayaDatabaseProvisioner
         return $count;
     }
 
-    private function schemaIsReady(Tenant $sahodaya): bool
+    private function schemaIsReady(Tenant $sahodaya, string $databaseName): bool
     {
         try {
-            return $sahodaya->run(fn () => \Illuminate\Support\Facades\Schema::hasTable('sahodaya_profiles'));
+            return TenancyDatabase::usingDatabase(
+                $databaseName,
+                fn () => \Illuminate\Support\Facades\Schema::hasTable('sahodaya_profiles')
+            );
         } catch (\Throwable) {
-            if (tenancy()->initialized) {
-                tenancy()->end();
-            }
-
             return false;
         }
     }

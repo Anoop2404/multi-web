@@ -114,11 +114,13 @@ class Tenant extends BaseTenant implements TenantWithDatabase
                 return;
             }
 
-            // In dedicated-DB mode, leave connection unset while tenancy is active so
-            // queries follow the bootstrapped default. Pinning "tenant" breaks after
-            // tenancy()->end() purges that connection config.
-            if (config('tenancy.database_per_sahodaya', true) && tenancy()->initialized) {
-                return;
+            // In dedicated-DB mode, leave connection unset when the default connection
+            // already points at a tenant database (Stancl "tenant" or superadmin runtime).
+            if (config('tenancy.database_per_sahodaya', true)) {
+                $central = config('tenancy.database.central_connection');
+                if (tenancy()->initialized || config('database.default') !== $central) {
+                    return;
+                }
             }
 
             $instance->setConnection($this->getConnectionName());

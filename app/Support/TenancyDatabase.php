@@ -4,15 +4,73 @@ namespace App\Support;
 
 use App\Models\Tenant;
 use App\Services\Tenancy\SahodayaDatabaseProvisioner;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Stancl\Tenancy\Exceptions\TenantDatabaseDoesNotExistException;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
 class TenancyDatabase
 {
+    private const RUNTIME_CONNECTION = 'tenant_runtime';
+
     public static function enabled(): bool
     {
         return (bool) config('tenancy.database_per_sahodaya', true);
+    }
+
+    /**
+     * Run a callback against a Sahodaya PostgreSQL database without Stancl's
+     * initialize/end cycle (safe for superadmin pages on the central domain).
+     */
+    public static function usingDatabase(string $databaseName, callable $callback): mixed
+    {
+        $connectionName = self::RUNTIME_CONNECTION;
+        $central = (string) config('tenancy.database.central_connection', 'central');
+        $previousDefault = config('database.default');
+        $template = config("database.connections.{$central}");
+
+        config([
+            "database.connections.{$connectionName}" => array_merge($template, ['database' => $databaseName]),
+            'database.default' => $connectionName,
+        ]);
+
+        DB::purge($connectionName);
+        DB::setDefaultConnection($connectionName);
+
+        try {
+            return $callback($connectionName);
+        } finally {
+            DB::purge($connectionName);
+            config([
+                'database.default' => $previousDefault,
+                "database.connections.{$connectionName}" => null,
+            ]);
+            DB::setDefaultConnection($previousDefault);
+        }
+    }
+
+    /**
+     * Execute a callback in the tenant database when ready.
+     * Uses Stancl tenancy on tenant routes; a direct connection on the central domain.
+     */
+    public static function withTenantDatabase(Tenant $tenant, callable $callback): mixed
+    {
+        if (! self::enabled()) {
+            return $callback();
+        }
+
+        if (tenancy()->initialized) {
+            return $callback();
+        }
+
+        $owner = self::owner($tenant);
+        $dbName = $owner->getInternal('db_name');
+
+        if (! $dbName) {
+            throw new InvalidArgumentException('Sahodaya database name is not configured.');
+        }
+
+        return self::usingDatabase($dbName, fn () => $callback());
     }
 
     /**
@@ -89,7 +147,7 @@ MSG);
                 return $default;
             }
 
-            return $tenant->run($callback);
+            return self::withTenantDatabase($tenant, $callback);
         } catch (\Throwable) {
             return $default;
         }
@@ -111,7 +169,7 @@ MSG);
             throw new \RuntimeException('Sahodaya database is not ready. Create the database and run migrations first.');
         }
 
-        return $tenant->run($callback);
+        return self::withTenantDatabase($tenant, $callback);
     }
 
     /**

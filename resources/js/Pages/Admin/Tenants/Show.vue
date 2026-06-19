@@ -145,9 +145,9 @@
             <div class="grid lg:grid-cols-2 gap-6">
                 <!-- Sections overview -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="font-bold text-gray-900 mb-4">Sections ({{ tenant.sections?.length ?? 0 }})</h3>
-                    <div v-if="tenant.sections?.length" class="space-y-2">
-                        <div v-for="section in tenant.sections" :key="section.id"
+                    <h3 class="font-bold text-gray-900 mb-4">Sections ({{ tenantOverview.sections?.length ?? 0 }})</h3>
+                    <div v-if="tenantOverview.sections?.length" class="space-y-2">
+                        <div v-for="section in tenantOverview.sections" :key="section.id"
                              class="flex items-center justify-between text-sm py-2 border-b border-gray-50 last:border-0">
                             <span class="font-mono text-gray-600 text-xs">{{ section.section_type }}/{{ section.variant }}</span>
                             <span :class="section.is_active ? 'text-green-600' : 'text-gray-300'" class="text-xs font-medium">
@@ -160,9 +160,9 @@
 
                 <!-- Settings overview -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                    <h3 class="font-bold text-gray-900 mb-4">Settings ({{ tenant.settings?.length ?? 0 }} keys)</h3>
-                    <div v-if="tenant.settings?.length" class="space-y-1.5">
-                        <div v-for="setting in tenant.settings" :key="setting.key"
+                    <h3 class="font-bold text-gray-900 mb-4">Settings ({{ tenantOverview.settings?.length ?? 0 }} keys)</h3>
+                    <div v-if="tenantOverview.settings?.length" class="space-y-1.5">
+                        <div v-for="setting in tenantOverview.settings" :key="setting.key"
                              class="flex items-center justify-between text-sm">
                             <span class="font-mono text-gray-500 text-xs">{{ setting.key }}</span>
                             <span class="text-xs text-gray-400">configured</span>
@@ -203,6 +203,10 @@ const props = defineProps({
     logoUrl: { type: String, default: null },
     listUrl: { type: String, default: '/admin/sahodayas' },
     database: { type: Object, default: null },
+    tenantOverview: {
+        type: Object,
+        default: () => ({ sections: [], settings: [] }),
+    },
 });
 
 const logoForm = useForm({ logo: null });
