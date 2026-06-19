@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\MembershipPayment;
+use App\Models\ClassCategory;
 use App\Models\Registration;
 use App\Models\SahodayaProfile;
 use App\Models\SahodayaRegistrationWindow;
@@ -184,7 +185,7 @@ class AnnualRegistrationController extends SchoolAdminController
 
         $data = $request->validate([
             'counts' => 'required|array',
-            'counts.*.class_category_id' => 'required|exists:class_categories,id',
+            'counts.*.class_category_id' => ['required', Rule::exists(ClassCategory::class, 'id')],
             'counts.*.male_count'        => 'required|integer|min:0',
             'counts.*.female_count'      => 'required|integer|min:0',
             'counts.*.total_count'       => 'required|integer|min:0',

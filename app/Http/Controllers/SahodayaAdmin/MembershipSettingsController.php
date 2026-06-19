@@ -19,6 +19,7 @@ use App\Support\TenantBranding;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Mail\SahodayaMailer;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class MembershipSettingsController extends SahodayaAdminController
 {
@@ -332,7 +333,7 @@ class MembershipSettingsController extends SahodayaAdminController
     {
         $data = $request->validate([
             'name'              => 'required|string|max:50',
-            'class_category_id' => 'required|exists:class_categories,id',
+            'class_category_id' => ['required', Rule::exists(ClassCategory::class, 'id')],
             'display_order'     => 'nullable|integer|min:0',
         ]);
 
@@ -358,7 +359,7 @@ class MembershipSettingsController extends SahodayaAdminController
 
         $data = $request->validate([
             'name'              => 'required|string|max:50',
-            'class_category_id' => 'required|exists:class_categories,id',
+            'class_category_id' => ['required', Rule::exists(ClassCategory::class, 'id')],
             'display_order'     => 'nullable|integer|min:0',
         ]);
 
@@ -394,7 +395,7 @@ class MembershipSettingsController extends SahodayaAdminController
     public function toggleCategoryOverride(Request $request)
     {
         $data = $request->validate([
-            'class_category_id' => 'required|exists:class_categories,id',
+            'class_category_id' => ['required', Rule::exists(ClassCategory::class, 'id')],
             'is_hidden'         => 'required|boolean',
         ]);
 
@@ -441,7 +442,7 @@ class MembershipSettingsController extends SahodayaAdminController
     public function toggleTypeOverride(Request $request)
     {
         $data = $request->validate([
-            'teaching_type_id' => 'required|exists:teaching_types,id',
+            'teaching_type_id' => ['required', Rule::exists(TeachingType::class, 'id')],
             'is_hidden'        => 'required|boolean',
         ]);
 
