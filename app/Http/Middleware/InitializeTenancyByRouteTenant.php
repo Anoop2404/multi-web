@@ -19,6 +19,11 @@ class InitializeTenancyByRouteTenant
             return $next($request);
         }
 
+        // Superadmin tenant CRUD uses the central database (incl. DB setup before migrate).
+        if ($request->is('admin/tenants', 'admin/tenants/*')) {
+            return $next($request);
+        }
+
         $tenant = $this->resolveTenant($request);
 
         if ($tenant) {

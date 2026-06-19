@@ -64,7 +64,7 @@ class TenantController extends Controller
 
     public function show(Tenant $tenant, SahodayaDatabaseProvisioner $databaseProvisioner)
     {
-        $tenant->load('children', 'settings', 'sections', 'domains');
+        $tenant->load('children', 'domains');
 
         $database = null;
         if ($tenant->type === 'sahodaya' && config('tenancy.database_per_sahodaya', true)) {
@@ -72,6 +72,15 @@ class TenantController extends Controller
                 $databaseProvisioner->status($tenant),
                 ['suggested_name' => $databaseProvisioner->suggestedName($tenant)]
             );
+
+            if ($database['ready']) {
+                $this->loadTenantScopedRelations($tenant);
+            }
+        } elseif ($tenant->type === 'school' && $tenant->parent_id && config('tenancy.database_per_sahodaya', true)) {
+            $parent = Tenant::query()->find($tenant->parent_id);
+            if ($parent && $databaseProvisioner->status($parent)['ready']) {
+                $this->loadTenantScopedRelations($tenant);
+            }
         }
 
         return inertia('Tenants/Show', [
@@ -221,5 +230,16 @@ class TenantController extends Controller
             'defaultType'      => $type,
             'cancelUrl'        => $cancelUrl,
         ]);
+    }
+
+    private function loadTenantScopedRelations(Tenant $tenant): void
+    {
+        try {
+            $tenant->run(function () use ($tenant) {
+                $tenant->load(['settings', 'sections']);
+            });
+        } catch (\Throwable) {
+            // Database not ready yet — overview cards stay empty on superadmin show page.
+        }
     }
 }
