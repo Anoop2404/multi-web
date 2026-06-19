@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Support\Header;
@@ -26,18 +27,18 @@ class InertiaAuth
         return redirect()->guest($url);
     }
 
-    public static function intended(Request $request, string $default): Response
+    public static function intended(Request $request, string $default): RedirectResponse
     {
-        $target = redirect()->intended($default)->getTargetUrl();
+        $intended = $request->session()->get('url.intended');
 
-        if (self::isLoginUrl($target)) {
-            $target = $default;
+        if (is_string($intended) && self::isLoginUrl($intended)) {
+            $request->session()->forget('url.intended');
         }
 
-        return self::redirectTo($request, $target);
+        return redirect()->intended($default);
     }
 
-    public static function redirectTo(Request $request, string $url): Response
+    public static function redirectTo(Request $request, string $url): Response|RedirectResponse
     {
         if ($request->header('X-Inertia')) {
             if (self::isSameOrigin($request, $url)) {

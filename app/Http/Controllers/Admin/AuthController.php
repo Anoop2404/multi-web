@@ -69,10 +69,10 @@ class AuthController extends Controller
         if ($user->hasRole('school_admin') && ! $user->hasVerifiedEmail()) {
             $intended = $request->session()->pull('url.intended');
             if (is_string($intended) && str_contains($intended, '/email/verify/')) {
-                return \App\Support\InertiaAuth::redirectTo($request, $intended);
+                return redirect()->to($intended);
             }
 
-            return \App\Support\InertiaAuth::redirectTo($request, route('verification.notice'));
+            return redirect()->route('verification.notice');
         }
 
         return \App\Support\InertiaAuth::intended($request, self::homeFor($user));

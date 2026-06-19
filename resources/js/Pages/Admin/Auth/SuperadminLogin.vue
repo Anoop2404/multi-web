@@ -135,7 +135,7 @@ defineProps({
 const form = useForm({ email: '', password: '' });
 
 function submit() {
-    form.post('/login');
+    form.post('/login', { preserveState: false });
 }
 </script>
 

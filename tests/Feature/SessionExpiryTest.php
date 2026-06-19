@@ -34,7 +34,7 @@ class SessionExpiryTest extends TestCase
         $response->assertHeader('X-Inertia-Location', route('login').'?session=expired');
     }
 
-    public function test_inertia_login_redirects_to_dashboard_with_inertia_redirect(): void
+    public function test_inertia_login_redirects_to_dashboard(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
 
@@ -49,8 +49,7 @@ class SessionExpiryTest extends TestCase
             'password' => 'password',
         ]);
 
-        $response->assertStatus(409);
-        $response->assertHeader('X-Inertia-Redirect', '/admin/dashboard');
+        $response->assertRedirect('/admin/dashboard');
     }
 
     public function test_login_page_shows_session_expired_flag(): void
