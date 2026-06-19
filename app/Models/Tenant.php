@@ -114,11 +114,14 @@ class Tenant extends BaseTenant implements TenantWithDatabase
                 return;
             }
 
+            // In dedicated-DB mode, leave connection unset while tenancy is active so
+            // queries follow the bootstrapped default. Pinning "tenant" breaks after
+            // tenancy()->end() purges that connection config.
             if (config('tenancy.database_per_sahodaya', true) && tenancy()->initialized) {
-                $instance->setConnection(config('database.default'));
-            } else {
-                $instance->setConnection($this->getConnectionName());
+                return;
             }
+
+            $instance->setConnection($this->getConnectionName());
         });
     }
 }

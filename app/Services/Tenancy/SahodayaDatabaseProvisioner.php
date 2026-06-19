@@ -148,6 +148,10 @@ class SahodayaDatabaseProvisioner
         try {
             return $sahodaya->run(fn () => \Illuminate\Support\Facades\Schema::hasTable('sahodaya_profiles'));
         } catch (\Throwable) {
+            if (tenancy()->initialized) {
+                tenancy()->end();
+            }
+
             return false;
         }
     }

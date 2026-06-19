@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use App\Services\Tenancy\SahodayaDatabaseProvisioner;
 use App\Support\SahodayaSiteTemplate;
+use App\Support\TenancyDatabase;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
 use Illuminate\Http\Request;
@@ -258,10 +259,13 @@ class TenantController extends Controller
     private function loadTenantScopedRelations(Tenant $tenant): void
     {
         try {
-            $tenant->run(function () use ($tenant) {
+            TenancyDatabase::runWhenDatabaseReady($tenant, function () use ($tenant) {
                 $tenant->load(['settings', 'sections']);
             });
         } catch (\Throwable) {
+            if (tenancy()->initialized) {
+                tenancy()->end();
+            }
             // Database not ready yet — overview cards stay empty on superadmin show page.
         }
     }

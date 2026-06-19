@@ -81,10 +81,6 @@ MSG);
             return $callback();
         }
 
-        if (tenancy()->initialized) {
-            return $callback();
-        }
-
         try {
             $owner = self::owner($tenant);
             $status = app(SahodayaDatabaseProvisioner::class)->status($owner);
@@ -105,10 +101,6 @@ MSG);
     public static function runWhenDatabaseReady(Tenant $tenant, callable $callback): mixed
     {
         if (! self::enabled()) {
-            return $callback();
-        }
-
-        if (tenancy()->initialized) {
             return $callback();
         }
 
