@@ -12,6 +12,7 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -31,11 +32,17 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
 
+        $middleware->api(prepend: [
+            \App\Http\Middleware\InitializeTenancyByRouteTenant::class,
+        ]);
+
         $middleware->alias([
-            'role'            => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission'      => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'school.admin'    => \App\Http\Middleware\EnsureSchoolAdmin::class,
-            'sahodaya.admin'  => \App\Http\Middleware\EnsureSahodayaAdmin::class,
+            'role'              => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission'        => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'school.admin'      => \App\Http\Middleware\EnsureSchoolAdmin::class,
+            'sahodaya.admin'    => \App\Http\Middleware\EnsureSahodayaAdmin::class,
+            'school.admin.api'  => \App\Http\Middleware\EnsureSchoolAdminApi::class,
+            'sahodaya.admin.api'=> \App\Http\Middleware\EnsureSahodayaAdminApi::class,
             'public.cache'    => \App\Http\Middleware\SetPublicCacheHeaders::class,
             'website.enabled' => \App\Http\Middleware\EnsureWebsiteEnabled::class,
         ]);
@@ -46,7 +53,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $sessionExpiredMessage = 'Your session has expired. Please sign in again.';
 
         $inertiaSessionExpired = function (Request $request) use ($sessionExpiredMessage) {
-            if ($request->header('X-Inertia') || $request->expectsJson()) {
+            if ($request->header('X-Inertia')) {
                 return InertiaAuth::redirectToLogin($request, $sessionExpiredMessage);
             }
 

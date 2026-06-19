@@ -7,12 +7,13 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use CentralConnection, HasFactory, Notifiable, HasRoles;
+    use CentralConnection, HasApiTokens, HasFactory, Notifiable, HasRoles;
 
     protected $fillable = [
         'tenant_id',
