@@ -3,11 +3,43 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Tenant;
+use App\Models\User;
+use App\Services\Mail\SahodayaMailer;
+use App\Support\SahodayaHomepageContent;
+use App\Support\TenantBranding;
+use App\Support\TenantDomainSync;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Response;
 
 class AuthController extends Controller
 {
+    public function showLogin(): Response
+    {
+        if (TenantDomainSync::isCentralHost(request()->getHost())) {
+            return inertia('Auth/SuperadminLogin', [
+                'appName' => config('app.name'),
+            ]);
+        }
+
+        $tenant = TenantBranding::resolveTenant();
+        $branding = ($tenant && $tenant->type === 'sahodaya')
+            ? SahodayaHomepageContent::get($tenant)
+            : [];
+
+        return inertia('Auth/Login', [
+            'logoUrl'    => TenantBranding::logoUrl($tenant),
+            'tenantName' => $tenant?->name,
+            'eyebrow'    => $branding['eyebrow'] ?? 'CBSE Sahodaya School Complex',
+            'tagline'    => $branding['tagline'] ?? null,
+            'motto'      => $branding['motto'] ?? null,
+            'phone'      => $branding['phone'] ?? null,
+            'email'      => $branding['email'] ?? null,
+        ]);
+    }
+
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -19,9 +51,23 @@ class AuthController extends Controller
             return back()->withErrors(['email' => 'Invalid credentials.']);
         }
 
+        $user = $request->user();
+
+        if ($message = self::portalMismatchMessage($user, $request)) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors(['email' => $message]);
+        }
+
+        if ($user->hasRole('school_admin') && ! $user->hasVerifiedEmail()) {
+            return redirect()->route('verification.notice');
+        }
+
         $request->session()->regenerate();
 
-        return redirect()->intended(route('admin.dashboard'));
+        return redirect()->intended(self::homeFor($request->user()));
     }
 
     public function logout(Request $request)
@@ -31,5 +77,104 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    public function verifyNotice(): Response
+    {
+        return inertia('Auth/VerifyEmail');
+    }
+
+    public function resendVerification(Request $request)
+    {
+        if ($request->user()->hasVerifiedEmail()) {
+            return redirect()->intended(self::homeFor($request->user()));
+        }
+
+        $this->sendVerificationFor($request->user());
+
+        return back()->with('success', 'Verification link sent to your Gmail.');
+    }
+
+    public function verify(EmailVerificationRequest $request)
+    {
+        $request->fulfill();
+
+        return redirect()->intended(self::homeFor($request->user()))
+            ->with('success', 'Gmail verified successfully. Welcome!');
+    }
+
+    public static function homeFor(User $user): string
+    {
+        if ($user->isSuperAdmin()) {
+            return route('admin.dashboard');
+        }
+
+        if ($user->hasRole('sahodaya_admin') && $user->tenant_id) {
+            return "/sahodaya-admin/{$user->tenant_id}";
+        }
+
+        if ($user->hasRole('school_admin') && $user->tenant_id) {
+            return "/school-admin/{$user->tenant_id}";
+        }
+
+        return route('admin.dashboard');
+    }
+
+    private static function sendVerificationFor(User $user): void
+    {
+        if ($user->hasRole('school_admin') && $user->tenant_id) {
+            $school = \App\Models\Tenant::find($user->tenant_id);
+            if ($school?->parent_id) {
+                SahodayaMailer::for($school->parent_id)->sendVerification($user);
+
+                return;
+            }
+        }
+
+        $user->sendEmailVerificationNotification();
+    }
+
+    private static function portalMismatchMessage(User $user, Request $request): ?string
+    {
+        $host = strtolower($request->getHost());
+
+        if (TenantDomainSync::isCentralHost($host)) {
+            return $user->isSuperAdmin() ? null : 'School and Sahodaya admins must sign in on their portal website, not the superadmin site.';
+        }
+
+        $hostTenant = TenantBranding::resolveTenant($request);
+        if (! $hostTenant) {
+            return null;
+        }
+
+        if ($hostTenant->type === 'sahodaya') {
+            if ($user->hasRole('sahodaya_admin')) {
+                return $user->tenant_id === $hostTenant->id
+                    ? null
+                    : 'This Sahodaya admin account belongs to another cluster. Use your own Sahodaya portal URL.';
+            }
+
+            if ($user->hasRole('school_admin')) {
+                $school = Tenant::find($user->tenant_id);
+
+                return $school?->parent_id === $hostTenant->id
+                    ? null
+                    : 'This school account belongs to another Sahodaya. Sign in on your Sahodaya portal (link in your registration email).';
+            }
+        }
+
+        if ($hostTenant->type === 'school') {
+            if ($user->hasRole('school_admin')) {
+                return $user->tenant_id === $hostTenant->id
+                    ? null
+                    : 'This login is for a different school. Use your school\'s Sahodaya portal to sign in.';
+            }
+
+            if ($user->hasRole('sahodaya_admin')) {
+                return $user->tenant_id === $hostTenant->parent_id ? null : 'Invalid credentials.';
+            }
+        }
+
+        return null;
     }
 }

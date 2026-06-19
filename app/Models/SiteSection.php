@@ -13,13 +13,34 @@ class SiteSection extends Model
         'display_order',
         'is_active',
         'config',
+        'archived_configs',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
-        'config' => 'array',
-        'display_order' => 'integer',
+        'is_active'       => 'boolean',
+        'config'          => 'array',
+        'archived_configs'=> 'array',
+        'display_order'   => 'integer',
     ];
+
+    /**
+     * Archive the current config before switching to a new variant.
+     */
+    public function archiveCurrentConfig(): void
+    {
+        if (empty($this->config)) {
+            return;
+        }
+
+        $history = $this->archived_configs ?? [];
+        $history[] = [
+            'variant'     => $this->variant,
+            'config'      => $this->config,
+            'archived_at' => now()->toIso8601String(),
+        ];
+
+        $this->archived_configs = $history;
+    }
 
     public function tenant()
     {

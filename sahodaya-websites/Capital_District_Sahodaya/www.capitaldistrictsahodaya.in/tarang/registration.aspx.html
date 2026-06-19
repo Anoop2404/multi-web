@@ -1,0 +1,236 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><meta name="viewport" content="width=device-width" /><title>
+	Tarang
+</title>
+     <!--[if lt IE 9]>
+  <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+<![endif]-->
+    <link rel="Stylesheet" href="css/template.css" /><link href="http://fonts.googleapis.com/css?family=Open+Sans:400,300,600" rel="stylesheet" type="text/css" />
+    <script type="text/javascript" src="js/jquery-1.11.3.min.js"></script> 
+    <script type="text/javascript" src="js/jquery.waypoints.min.js"></script>
+        <link rel="stylesheet" type="text/css" href="css/animate.css" />
+         <!-- Font Awesome Style -->
+      <link href="css/font-awesome.min.css" rel="stylesheet" />
+    <!--  Scroll top -->
+<script>
+$(document).ready(function(){
+	// hide #back-top first
+	$("#scrl-top").hide();
+	// fade in #back-top
+	$(function () {
+		$(window).scroll(function () {
+			if ($(this).scrollTop() > 100) {
+				$('#scrl-top').fadeIn();
+			} else {
+				$('#scrl-top').fadeOut();
+			}
+		});
+		// scroll body to 0px on click
+		$('#scrl-top a').click(function () {
+			$('body,html').animate({
+				scrollTop: 0
+			}, 800);
+			return false;
+		});
+	});
+});
+</script>
+<!--  Scroll top -->
+        <style type="text/css">
+        .os-animation{
+            opacity: 0;
+        }  
+        .os-animation.animated{
+            opacity: 1;
+        }   
+    </style>
+    <script type="text/javascript">
+        $(function(){
+            function onScrollInit( items, trigger ) {
+                items.each( function() {
+                var osElement = $(this),
+                    osAnimationClass = osElement.attr('data-os-animation'),
+                    osAnimationDelay = osElement.attr('data-os-animation-delay');
+                    osElement.css({
+                        '-webkit-animation-delay':  osAnimationDelay,
+                        '-moz-animation-delay':     osAnimationDelay,
+                        'animation-delay':          osAnimationDelay
+                    });
+                    var osTrigger = ( trigger ) ? trigger : osElement;
+                    osTrigger.waypoint(function() {
+                        osElement.addClass('animated').addClass(osAnimationClass);
+                        },{
+                            triggerOnce: true,
+                            offset: '90%'
+                    });
+                });
+            }
+            onScrollInit( $('.os-animation') );
+            onScrollInit( $('.staggered-animation'), $('.staggered-animation-container') );
+});
+    </script>
+</head>
+<body>
+<div id="wrapper">
+<div class="container os-animation bg-abt"  data-os-animation="fadeIn" data-os-animation-delay="0s">
+    <div class="row">
+        <div class="col3">   
+            <div class="menu">
+            <ul>
+             <li><a href="index.html">Home</a></li>
+            <li><a href="rules.html">General Rules</a></li>
+            <li><a href="items.html">Competitions</a></li> 
+           <!-- <li><a href="album.aspx">PhotoGallery</a></li> -->
+            <li><a href="schedule.html">Programme schedule</a></li>  
+             <li><a href="topics.html">Topics</a></li> 
+             <li><a href="registration.aspx.html">Registration</a></li>    
+             <li><a href="Results.aspx.html">Results</a></li>   
+           <!--  <li><a href="#">Contact us</a></li>-->
+            </ul>
+            </div>
+            <div style="display:inline-block; vertical-align:bottom"><img src="images/logo-200.png" alt="logo"/></div>
+            <div style="display:inline-block;" class="logoimg"><img src="images/kalotsav.png" alt="logo"/></div>
+        </div>
+    </div>
+ </div>
+        <div class="container os-animation " data-os-animation="fadeIn" data-os-animation-delay="0s">
+          <div class="row os-animation"  data-os-animation="slideInLeft" data-os-animation-delay="1s">
+          <div class="col3">
+        <form name="form1" method="post" action="registration.aspx.html" onsubmit="javascript:return WebForm_OnSubmit();" id="form1">
+<div>
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwUKLTI3MzEwMzk5OA9kFgICAw9kFgICDQ8PFgIeB1Zpc2libGVoZGRkWkuXLz/eRg52l239fnusiz3t2+o=" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['form1'];
+if (!theForm) {
+    theForm = document.form1;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="../WebResource.axd%3Fd=prd9Qcy0q1t2iHmhEHt1cXZNMO8FwnKBFaRIdfntf6CbRDWR6ggqYDlDQK7ROqfuZh3X-tggFpv_JWum2aSyeMsBJuQ1&amp;t=637727926725507761" type="text/javascript"></script>
+
+
+<script src="../WebResource.axd%3Fd=H0_Inl7lbhspS5BPa3O-5KkVQiZI7PA9laaD8W39wed12OHhBwJn5J8SQnUG3Rf8pEYnHbdmJSwPZgtQP2HQciLN4tQ1&amp;t=637727926725507761" type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+function WebForm_OnSubmit() {
+if (typeof(ValidatorOnSubmit) == "function" && ValidatorOnSubmit() == false) return false;
+return true;
+}
+//]]>
+</script>
+
+<div>
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="DC538BA2" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="/wEWBQKMm/DWAgLF1bSzCQLVqbaRCwLCi9r7CgKtkuXnBwH/1UEMVc/0ssq0EzTytjFBlATF" />
+</div>
+          <h1 class="txt-center">User Login</h1>
+<table class="tbl-login">
+         <tr>
+         <td> <span id="Label2">USERNAME</span>  </td>
+         <td>
+             <input name="TxtUserName" type="text" id="TxtUserName" />
+             <span id="RequiredFieldValidator2" style="color:Red;visibility:hidden;">*</span>         
+             </td>
+         </tr>
+        <tr>
+         <td> 
+             <span id="Label3">PASSWORD</span></td>
+         <td>
+             <input name="TxtPassword" type="password" id="TxtPassword" />
+             <span id="RequiredFieldValidator3" style="color:Red;visibility:hidden;">*</span>
+        </td>
+         </tr>       
+         <tr>
+         <td colspan="2"> 
+             
+          </td>
+         </tr>
+         <tr>
+         <td colspan="2" style="padding-left:110px"> 
+             <input type="submit" name="btnsubmit" value="Submit" onclick="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;btnsubmit&quot;, &quot;&quot;, true, &quot;log&quot;, &quot;&quot;, false, false))" id="btnsubmit" />
+&nbsp;&nbsp;
+             <input type="submit" name="btnclear" value="Reset" id="btnclear" />
+             <br />
+             </td>
+         </tr>
+         </table>
+      
+<script type="text/javascript">
+//<![CDATA[
+var Page_Validators =  new Array(document.getElementById("RequiredFieldValidator2"), document.getElementById("RequiredFieldValidator3"));
+//]]>
+</script>
+
+<script type="text/javascript">
+//<![CDATA[
+var RequiredFieldValidator2 = document.all ? document.all["RequiredFieldValidator2"] : document.getElementById("RequiredFieldValidator2");
+RequiredFieldValidator2.controltovalidate = "TxtUserName";
+RequiredFieldValidator2.errormessage = "*";
+RequiredFieldValidator2.validationGroup = "log";
+RequiredFieldValidator2.evaluationfunction = "RequiredFieldValidatorEvaluateIsValid";
+RequiredFieldValidator2.initialvalue = "";
+var RequiredFieldValidator3 = document.all ? document.all["RequiredFieldValidator3"] : document.getElementById("RequiredFieldValidator3");
+RequiredFieldValidator3.controltovalidate = "TxtPassword";
+RequiredFieldValidator3.errormessage = "*";
+RequiredFieldValidator3.validationGroup = "log";
+RequiredFieldValidator3.evaluationfunction = "RequiredFieldValidatorEvaluateIsValid";
+RequiredFieldValidator3.initialvalue = "";
+//]]>
+</script>
+
+
+<script type="text/javascript">
+//<![CDATA[
+
+var Page_ValidationActive = false;
+if (typeof(ValidatorOnLoad) == "function") {
+    ValidatorOnLoad();
+}
+
+function ValidatorOnSubmit() {
+    if (Page_ValidationActive) {
+        return ValidatorCommonOnSubmit();
+    }
+    else {
+        return true;
+    }
+}
+        //]]>
+</script>
+</form>
+          </div>
+          </div>
+    </div>
+    <div id="scrl-top">
+		<a href="registration.aspx.html#top"><span></span></a>
+	</div>
+<footer>
+<div class="block">
+<div style="display:inline-block;text-align: center;">
+
+<p>&copy; 2025 <a href="http://www.bstsoftwarelabs.com" target="_blank">BST Software Pvt. Ltd</a></p>
+
+</div>
+</div>
+</footer>
+</div>
+  
+</body>
+</html>

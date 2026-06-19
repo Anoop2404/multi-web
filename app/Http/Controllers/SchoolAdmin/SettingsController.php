@@ -29,6 +29,7 @@ class SettingsController extends SchoolAdminController
             'seo_description' => 'nullable|string|max:160',
             'seo_keywords'    => 'nullable|string|max:500',
             'seo_tagline'     => 'nullable|string|max:200',
+            'locale'          => 'nullable|string|in:en,ml',
         ]);
 
         // Handle logo upload
@@ -74,6 +75,10 @@ class SettingsController extends SchoolAdminController
         if ($seo) {
             $existing = $this->school->settings()->where('key', 'seo')->first()?->value ?? [];
             $this->school->setSetting('seo', array_merge($existing, $seo));
+        }
+
+        if (! empty($data['locale'])) {
+            $this->school->setSetting('locale', $data['locale']);
         }
 
         Cache::forget("site:{$this->school->id}:home");

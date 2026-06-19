@@ -1,9 +1,10 @@
 <?php
 
 use App\Http\Controllers\Admin\BuilderApiController;
+use App\Http\Controllers\Admin\MasterDataController;
 use App\Http\Controllers\Admin\TenantController;
 use App\Http\Controllers\Admin\AuthController;
-use App\Http\Controllers\SchoolAdmin\AchievementController;
+use App\Http\Controllers\SchoolAdmin\AnnualRegistrationController;
 use App\Http\Controllers\SchoolAdmin\AlumniController;
 use App\Http\Controllers\SchoolAdmin\BoardResultController;
 use App\Http\Controllers\SchoolAdmin\DashboardController;
@@ -13,15 +14,16 @@ use App\Http\Controllers\SchoolAdmin\EventController;
 use App\Http\Controllers\SchoolAdmin\GalleryController;
 use App\Http\Controllers\SchoolAdmin\JobVacancyController;
 use App\Http\Controllers\SchoolAdmin\NewsController;
+use App\Http\Controllers\SchoolAdmin\SchoolClassController;
+use App\Http\Controllers\SchoolAdmin\RegistrationProfileController;
+use App\Http\Controllers\SchoolAdmin\SchoolSetupController;
 use App\Http\Controllers\SchoolAdmin\SettingsController;
 use App\Http\Controllers\SchoolAdmin\StaffController;
+use App\Http\Controllers\SchoolAdmin\StudentController;
 use App\Http\Controllers\SchoolAdmin\TcRequestController as SchoolTcRequestController;
 use App\Models\SkinPreset;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Route;
-
-// Root redirect
-Route::get('/', fn() => redirect()->route('admin.dashboard'));
 
 Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(function () {
 
@@ -36,8 +38,15 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(funct
         return inertia('Dashboard', compact('stats'));
     })->name('dashboard');
 
-    // ── Tenant CRUD ──────────────────────────────────────────────────────────
-    Route::resource('tenants', TenantController::class)->names([
+    // ── Sahodaya clusters & member schools (separate lists) ───────────────────
+    Route::get('/sahodayas', [TenantController::class, 'indexSahodayas'])->name('sahodayas.index');
+    Route::get('/sahodayas/create', [TenantController::class, 'createSahodaya'])->name('sahodayas.create');
+    Route::get('/schools', [TenantController::class, 'indexSchools'])->name('schools.index');
+    Route::get('/schools/create', [TenantController::class, 'createSchool'])->name('schools.create');
+
+    Route::resource('tenants', TenantController::class)->only([
+        'index', 'create', 'store', 'show', 'edit', 'update', 'destroy',
+    ])->names([
         'index'   => 'tenants.index',
         'create'  => 'tenants.create',
         'store'   => 'tenants.store',
@@ -46,9 +55,12 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(funct
         'update'  => 'tenants.update',
         'destroy' => 'tenants.destroy',
     ]);
+    Route::post('tenants/{tenant}/logo', [TenantController::class, 'uploadLogo'])->name('tenants.logo');
+    Route::post('tenants/{tenant}/database', [TenantController::class, 'saveDatabase'])->name('tenants.database');
+    Route::post('tenants/{tenant}/migrate', [TenantController::class, 'migrateDatabase'])->name('tenants.migrate');
 
-    // ── Builder Inertia pages (superadmin only) ───────────────────────────────
-    Route::middleware('role:superadmin')->prefix('builder')->name('builder.')->group(function () {
+    // ── Builder Inertia pages (superadmin only, website phase) ────────────────
+    Route::middleware(['role:superadmin', 'website.enabled'])->prefix('builder')->name('builder.')->group(function () {
         Route::get('/sections', function () {
             return inertia('Builder/Sections', [
                 'tenants' => Tenant::active()->orderBy('name')->get(['id', 'name', 'type']),
@@ -82,7 +94,9 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(funct
     });
 
     // ── Builder REST API (JSON, no Inertia) ───────────────────────────────────
-    Route::middleware('role:superadmin')->prefix('api/tenants/{tenantId}')->name('api.builder.')->group(function () {
+    Route::middleware(['role:superadmin', 'website.enabled'])->get('/api/section-definitions', [BuilderApiController::class, 'sectionDefinitions'])->name('api.section-definitions');
+
+    Route::middleware(['role:superadmin', 'website.enabled', \App\Http\Middleware\InitializeTenancyByRouteTenant::class])->prefix('api/tenants/{tenantId}')->name('api.builder.')->group(function () {
         // Sections
         Route::get('/sections',                      [BuilderApiController::class, 'sections'])->name('sections.index');
         Route::post('/sections',                     [BuilderApiController::class, 'storeSection'])->name('sections.store');
@@ -112,8 +126,18 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(funct
         Route::post('/widgets',        [BuilderApiController::class, 'saveWidgets'])->name('widgets.save');
     });
 
-    // ── Skin presets management ────────────────────────────────────────────────
-    Route::middleware('role:superadmin')->prefix('skin-presets')->name('skin-presets.')->group(function () {
+    // ── Global master data (superadmin) ───────────────────────────────────────
+    Route::middleware('role:superadmin')->prefix('master-data')->name('master-data.')->group(function () {
+        Route::get('/class-categories', [MasterDataController::class, 'classCategories'])->name('class-categories');
+        Route::post('/class-categories', [MasterDataController::class, 'storeClassCategory'])->name('class-categories.store');
+        Route::put('/class-categories/{classCategory}', [MasterDataController::class, 'updateClassCategory'])->name('class-categories.update');
+        Route::get('/teaching-types', [MasterDataController::class, 'teachingTypes'])->name('teaching-types');
+        Route::post('/teaching-types', [MasterDataController::class, 'storeTeachingType'])->name('teaching-types.store');
+        Route::put('/teaching-types/{teachingType}', [MasterDataController::class, 'updateTeachingType'])->name('teaching-types.update');
+    });
+
+    // ── Skin presets management (website phase) ──────────────────────────────
+    Route::middleware(['role:superadmin', 'website.enabled'])->prefix('skin-presets')->name('skin-presets.')->group(function () {
         Route::get('/', fn() => inertia('SkinPresets/Index', [
             'presets' => SkinPreset::orderBy('display_order')->get(),
         ]))->name('index');
@@ -123,11 +147,50 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(funct
 // ── School Admin Panel ────────────────────────────────────────────────────────
 Route::prefix('school-admin/{tenantId}')
     ->name('school.')
-    ->middleware(['web', 'auth', 'school.admin'])
+    ->middleware(['web', 'auth', 'school.admin', \App\Http\Middleware\InitializeTenancyByRouteTenant::class])
     ->group(function () {
 
     Route::get('/',          [DashboardController::class, 'index'])->name('dashboard');
 
+    Route::get('/setup/code',  [SchoolSetupController::class, 'code'])->name('setup.code');
+    Route::post('/setup/code', [SchoolSetupController::class, 'saveCode'])->name('setup.code.save');
+
+    // Students & annual registration (always available)
+    Route::get('/students/setup', [SchoolClassController::class, 'index'])->name('students.setup');
+
+    Route::get('/students',                    [StudentController::class, 'index'])->name('students.index');
+    Route::get('/students/import',             [StudentController::class, 'importForm'])->name('students.import');
+    Route::get('/students/import/template',    [StudentController::class, 'importTemplate'])->name('students.import.template');
+    Route::post('/students/import',            [StudentController::class, 'importStore'])->name('students.import.store');
+    Route::get('/students/create',                             [StudentController::class, 'create'])->name('students.create');
+    Route::post('/students',                                   [StudentController::class, 'store'])->name('students.store');
+    Route::get('/students/{student}/edit',                     [StudentController::class, 'edit'])->name('students.edit');
+    Route::put('/students/{student}',                          [StudentController::class, 'update'])->name('students.update');
+    Route::get('/students/{student}/photo',                   [StudentController::class, 'showPhoto'])->name('students.photo');
+    Route::post('/students/{student}/photo',                   [StudentController::class, 'updatePhoto'])->name('students.photo.upload');
+    Route::delete('/students/{student}',                       [StudentController::class, 'destroy'])->name('students.destroy');
+
+    Route::get('/registration/profile', [RegistrationProfileController::class, 'show'])->name('registration.profile');
+    Route::put('/registration/profile', [RegistrationProfileController::class, 'updateProfile'])->name('registration.profile.update');
+    Route::put('/registration/account', [RegistrationProfileController::class, 'updateAccount'])->name('registration.account.update');
+
+    Route::get('/registration', [AnnualRegistrationController::class, 'index'])->name('registration.index');
+    Route::post('/registration/begin', [AnnualRegistrationController::class, 'begin'])->name('registration.begin');
+    Route::get('/registration/students', [AnnualRegistrationController::class, 'students'])->name('registration.students');
+    Route::post('/registration/students', [AnnualRegistrationController::class, 'storeStudent'])->name('registration.students.store');
+    Route::delete('/registration/students/{student}', [AnnualRegistrationController::class, 'destroyStudent'])->name('registration.students.destroy');
+    Route::get('/registration/counts', [AnnualRegistrationController::class, 'counts'])->name('registration.counts');
+    Route::post('/registration/counts', [AnnualRegistrationController::class, 'saveCounts'])->name('registration.counts.save');
+    Route::get('/registration/teachers', [AnnualRegistrationController::class, 'teachers'])->name('registration.teachers');
+    Route::post('/registration/teachers', [AnnualRegistrationController::class, 'storeTeacher'])->name('registration.teachers.store');
+    Route::delete('/registration/teachers/{teacher}', [AnnualRegistrationController::class, 'destroyTeacher'])->name('registration.teachers.destroy');
+    Route::post('/registration/submit-track', [AnnualRegistrationController::class, 'submitTrack'])->name('registration.submit-track');
+    Route::get('/registration/payment', [AnnualRegistrationController::class, 'payment'])->name('registration.payment');
+    Route::post('/registration/payment', [AnnualRegistrationController::class, 'uploadPayment'])->name('registration.payment.upload');
+    Route::get('/registration/payments/{payment}/proof', [AnnualRegistrationController::class, 'paymentProof'])->name('registration.payment.proof');
+
+    // Website & CMS (disabled until WEBSITE_ENABLED=true)
+    Route::middleware('website.enabled')->group(function () {
     // News
     Route::get('/news',                  [NewsController::class, 'index'])->name('news.index');
     Route::get('/news/create',           [NewsController::class, 'create'])->name('news.create');
@@ -217,50 +280,110 @@ Route::prefix('school-admin/{tenantId}')
         ]);
     })->name('contact.index');
     Route::post('/contact',                                  [SettingsController::class, 'update'])->name('contact.update');
+    }); // website.enabled
 });
 
 // ── Sahodaya Admin Panel ─────────────────────────────────────────────────────
 Route::prefix('sahodaya-admin/{tenantId}')
     ->name('sahodaya.')
-    ->middleware(['web', 'auth', 'sahodaya.admin'])
+    ->middleware(['web', 'auth', 'sahodaya.admin', \App\Http\Middleware\InitializeTenancyByRouteTenant::class])
     ->group(function () {
 
         // Dashboard
         Route::get('/', [\App\Http\Controllers\SahodayaAdmin\DashboardController::class, 'index'])->name('dashboard');
 
-        // Office Bearers
+        // Website & CMS (disabled until WEBSITE_ENABLED=true)
+        Route::middleware('website.enabled')->group(function () {
+        Route::get('/site-builder', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderController::class, 'index'])->name('site-builder');
+        Route::get('/site-builder/section-types', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderController::class, 'sectionTypes'])->name('site-builder.section-types');
+
         Route::get('/office-bearers',              [\App\Http\Controllers\SahodayaAdmin\OfficeBearersController::class, 'index'])->name('office-bearers.index');
         Route::post('/office-bearers',             [\App\Http\Controllers\SahodayaAdmin\OfficeBearersController::class, 'store'])->name('office-bearers.store');
         Route::put('/office-bearers/{bearer}',     [\App\Http\Controllers\SahodayaAdmin\OfficeBearersController::class, 'update'])->name('office-bearers.update');
         Route::delete('/office-bearers/{bearer}',  [\App\Http\Controllers\SahodayaAdmin\OfficeBearersController::class, 'destroy'])->name('office-bearers.destroy');
 
-        // Circulars
         Route::get('/circulars',              [\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'index'])->name('circulars.index');
         Route::post('/circulars',             [\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'store'])->name('circulars.store');
         Route::delete('/circulars/{circular}',[\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'destroy'])->name('circulars.destroy');
 
-        // Kalotsav Events
         Route::get('/kalotsav',          [\App\Http\Controllers\SahodayaAdmin\KalotsavController::class, 'index'])->name('kalotsav.index');
         Route::post('/kalotsav',         [\App\Http\Controllers\SahodayaAdmin\KalotsavController::class, 'store'])->name('kalotsav.store');
         Route::get('/kalotsav/{event}',  [\App\Http\Controllers\SahodayaAdmin\KalotsavController::class, 'show'])->name('kalotsav.show');
         Route::put('/kalotsav/{event}',  [\App\Http\Controllers\SahodayaAdmin\KalotsavController::class, 'update'])->name('kalotsav.update');
         Route::delete('/kalotsav/{event}', [\App\Http\Controllers\SahodayaAdmin\KalotsavController::class, 'destroy'])->name('kalotsav.destroy');
 
-        // Kalotsav Categories (nested under event)
         Route::post('/kalotsav/{event}/categories',               [\App\Http\Controllers\SahodayaAdmin\KalotsavController::class, 'storeCategory'])->name('kalotsav.categories.store');
         Route::delete('/kalotsav/{event}/categories/{category}',  [\App\Http\Controllers\SahodayaAdmin\KalotsavController::class, 'destroyCategory'])->name('kalotsav.categories.destroy');
 
-        // Kalotsav Results
         Route::post('/kalotsav/{event}/results',          [\App\Http\Controllers\SahodayaAdmin\KalotsavController::class, 'storeResult'])->name('kalotsav.results.store');
         Route::delete('/kalotsav/{event}/results/{result}',[\App\Http\Controllers\SahodayaAdmin\KalotsavController::class, 'destroyResult'])->name('kalotsav.results.destroy');
+        }); // website.enabled
 
-        // Member Schools (read-only overview)
+        // Portal & website content (portal always available; full website tabs when enabled)
+        Route::get('/public-content',  [\App\Http\Controllers\SahodayaAdmin\PublicContentController::class, 'index'])->name('public-content.index');
+        Route::put('/public-content',  [\App\Http\Controllers\SahodayaAdmin\PublicContentController::class, 'update'])->name('public-content.update');
+
+        // Membership & registration (always available)
         Route::get('/schools', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'index'])->name('schools.index');
+        Route::get('/schools/export', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'export'])->name('schools.export');
+        Route::get('/schools/{school}/students', [\App\Http\Controllers\SahodayaAdmin\SchoolStudentsController::class, 'show'])->name('schools.students');
+        Route::get('/schools/{school}', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'show'])->name('schools.show');
+        Route::post('/schools/{school}/reject', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'reject'])->name('schools.reject');
+
+        // Membership settings
+        Route::get('/membership/settings', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'index'])->name('membership.settings');
+        Route::put('/membership/settings', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateProfile'])->name('membership.settings.update');
+        Route::put('/membership/fees', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateMembershipFees'])->name('membership.fees.update');
+        Route::put('/membership/payment-details', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updatePaymentDetails'])->name('membership.payment-details.update');
+        Route::put('/membership/mail-settings', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateMailSettings'])->name('membership.mail-settings.update');
+        Route::post('/membership/mail-settings/test', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'testMailSettings'])->name('membership.mail-settings.test');
+        Route::post('/membership/fee-slabs', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'storeFeeSlab'])->name('membership.fee-slabs.store');
+        Route::delete('/membership/fee-slabs/{feeSlab}', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'destroyFeeSlab'])->name('membership.fee-slabs.destroy');
+        Route::put('/membership/registration-window', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateRegistrationWindow'])->name('membership.window.update');
+        Route::post('/membership/custom-categories', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'storeCustomCategory'])->name('membership.custom-categories.store');
+        Route::put('/membership/custom-categories/{classCategory}', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateCustomCategory'])->name('membership.custom-categories.update');
+        Route::delete('/membership/custom-categories/{classCategory}', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'destroyCustomCategory'])->name('membership.custom-categories.destroy');
+        Route::post('/membership/classes', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'storeMasterClass'])->name('membership.classes.store');
+        Route::put('/membership/classes/{masterClass}', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateMasterClass'])->name('membership.classes.update');
+        Route::delete('/membership/classes/{masterClass}', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'destroyMasterClass'])->name('membership.classes.destroy');
+        Route::post('/membership/category-overrides', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'toggleCategoryOverride'])->name('membership.category-overrides.toggle');
+        Route::put('/membership/global-categories/{classCategory}/sort', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateGlobalCategorySort'])->name('membership.global-categories.sort');
+        Route::post('/membership/custom-teaching-types', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'storeCustomTeachingType'])->name('membership.custom-types.store');
+        Route::post('/membership/type-overrides', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'toggleTypeOverride'])->name('membership.type-overrides.toggle');
+
+        // Submission review
+        Route::get('/membership/submissions', [\App\Http\Controllers\SahodayaAdmin\SubmissionReviewController::class, 'index'])->name('membership.submissions.index');
+        Route::get('/membership/submissions/{submission}', [\App\Http\Controllers\SahodayaAdmin\SubmissionReviewController::class, 'show'])->name('membership.submissions.show');
+
+        // Payment verification
+        Route::get('/membership/payments', [\App\Http\Controllers\SahodayaAdmin\PaymentVerificationController::class, 'index'])->name('membership.payments.index');
+        Route::get('/membership/payments/export', [\App\Http\Controllers\SahodayaAdmin\PaymentVerificationController::class, 'export'])->name('membership.payments.export');
+        Route::get('/membership/payments/{payment}/proof', [\App\Http\Controllers\SahodayaAdmin\PaymentVerificationController::class, 'proof'])->name('membership.payments.proof');
+        Route::post('/membership/payments/{payment}/verify', [\App\Http\Controllers\SahodayaAdmin\PaymentVerificationController::class, 'verify'])->name('membership.payments.verify');
+
+        Route::get('/membership/reports', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'index'])->name('membership.reports');
+        Route::get('/membership/reports/export/schools', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportSchools'])->name('membership.reports.export.schools');
+        Route::get('/membership/reports/export/payments-pending', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPaymentsPending'])->name('membership.reports.export.payments-pending');
+        Route::get('/membership/reports/export/payments-done', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPaymentsDone'])->name('membership.reports.export.payments-done');
+        Route::get('/membership/reports/export/submissions', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportSubmissions'])->name('membership.reports.export.submissions');
+        Route::get('/membership/reports/export/payments', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPayments'])->name('membership.reports.export.payments');
+
+        Route::post('/membership/logo', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'uploadLogo'])->name('membership.logo');
+        Route::put('/membership/application-form', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateApplicationForm'])->name('membership.application-form.update');
     });
 
 // Auth routes
 Route::middleware('web')->group(function () {
-    Route::get('/login', fn() => inertia('Auth/Login'))->name('login');
+    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->name('login.post');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    Route::middleware('auth')->group(function () {
+        Route::get('/email/verify', [AuthController::class, 'verifyNotice'])->name('verification.notice');
+        Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verify'])
+            ->middleware('signed')
+            ->name('verification.verify');
+        Route::post('/email/verification-notification', [AuthController::class, 'resendVerification'])
+            ->name('verification.send');
+    });
 });

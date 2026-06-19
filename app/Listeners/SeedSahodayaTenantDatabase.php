@@ -1,0 +1,33 @@
+<?php
+
+namespace App\Listeners;
+
+use App\Models\SahodayaProfile;
+use App\Support\SahodayaSiteTemplate;
+use Stancl\Tenancy\Events\DatabaseMigrated;
+
+class SeedSahodayaTenantDatabase
+{
+    public function handle(DatabaseMigrated $event): void
+    {
+        $tenant = $event->tenant;
+
+        if ($tenant->type !== 'sahodaya') {
+            return;
+        }
+
+        $tenant->run(function () use ($tenant) {
+            SahodayaProfile::firstOrCreate(
+                ['tenant_id' => $tenant->id],
+                [
+                    'student_data_mode'   => 'not_required',
+                    'membership_fee_type' => 'fixed',
+                ]
+            );
+
+            if ($tenant->sections()->count() === 0) {
+                SahodayaSiteTemplate::apply($tenant);
+            }
+        });
+    }
+}

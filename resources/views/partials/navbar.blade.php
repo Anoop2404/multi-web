@@ -1,3 +1,9 @@
 {{-- Navbar rendered from nav_config for this tenant --}}
-@php $navConfig = $navConfig ?? []; @endphp
-@include("partials.navbars." . ($navConfig['layout_variant'] ?? 'logo-left'), ['items' => $navConfig['items'] ?? []])
+@php
+    use App\Support\SectionVariantResolver;
+
+    $navConfig = $navConfig ?? [];
+    $navVariant = SectionVariantResolver::resolveNavVariant($navConfig);
+    $logo = $logo ?? ($tenant->getSetting('logo') ?? null);
+@endphp
+@include("partials.navbars.{$navVariant}", ['items' => $navConfig['items'] ?? [], 'logo' => $logo])

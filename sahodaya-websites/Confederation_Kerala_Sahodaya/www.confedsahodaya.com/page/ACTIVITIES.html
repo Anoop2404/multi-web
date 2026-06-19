@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://confedsahodaya.com/web/css/navbar.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://confedsahodaya.com/web/js/navbar.js"></script>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <div class="hamburger" onclick="toggleMenu()">
+                <div class="hamburger-line"></div>
+                <div class="hamburger-line"></div>
+                <div class="hamburger-line"></div>
+            </div>
+
+            <div class="nav-menu" id="navMenu">
+                                                                                <a href="../index.html" class="nav-item">HOME</a>
+                                                                                <a href="../about.html" class="nav-item">ABOUT US</a>
+                                                                                <div class="nav-item-with-submenu" id="GOVERNANCEItem">
+                    <span class="nav-item">
+                        GOVERNANCE
+                        <span class="submenu-indicator">▼</span>
+                    </span>
+                    <div class="submenu">
+                                                                        <a href="STRUCTURE.html" class="submenu-item">STRUCTURE</a>
+                                                                        <a href="RULES%20AND%20BYE-LAWS.html" class="submenu-item">RULES AND BYE-LAWS</a>
+                                                                        <a href="ELECTION%20OF%20MEMBERS.html" class="submenu-item">ELECTION OF MEMBERS</a>
+                                                                        <a href="AUTHORITY.html" class="submenu-item">AUTHORITY</a>
+                                                                        <a href="EXECUTIVE%20COMMITTEE-POWERS.html" class="submenu-item">SAHODAYA HEADS</a>
+                                                                        <a href="ACTIVITIES.html" class="submenu-item">ACTIVITIES</a>
+                                                                        <a href="MEETINGS.html" class="submenu-item">MEETINGS</a>
+                                                                        <a href="../sahodaya-list.html" class="submenu-item">SAHODAYA HEADS</a>
+                                                                        <a href="../confed-executive.html" class="submenu-item">CONFED EXECUTIVE MEMBERS</a>
+                                            </div>
+                </div>
+                                                                                <div class="nav-item-with-submenu" id="GALLERYItem">
+                    <span class="nav-item">
+                        GALLERY
+                        <span class="submenu-indicator">▼</span>
+                    </span>
+                    <div class="submenu">
+                                                                        <a href="https://www.confedsahodaya.com/gallery/function" class="submenu-item">FUNCTION</a>
+                                                                        <a href="https://www.confedsahodaya.com/gallery/programme" class="submenu-item">PROGRAMME</a>
+                                                                        <a href="../gallery/sahodya.html" class="submenu-item">SAHODAYA</a>
+                                            </div>
+                </div>
+                                                                                <a href="../download.html" class="nav-item">DOWNLOADS</a>
+                                                                                <a href="../contactus.html" class="nav-item">CONTACT US</a>
+                                                                                <a href="http://www.cksart.com/training_app/" class="nav-item">ART UNIT</a>
+                                                                                <a href="https://keralastatecbsekalotsav.webschoolgj.in/" class="nav-item">KALOTSAV</a>
+                                                                                <a href="https://site.fotoowl.ai/123weddingstudio40/gallery/172007?pass_key=3656" class="nav-item">CONFERENCE</a>
+                                                            </div>
+
+        </div>
+    </nav>
+
+
+</body>
+
+</html><link href="https://confedsahodaya.com/web/css/style.css" rel="stylesheet">
+<script src="https://confedsahodaya.com/web/js/main.js"></script>
+<style>
+    /* Header Section */
+    .header-section {
+        padding: clamp(80px, 10vw, 150px) clamp(20px, 4vw, 64px) clamp(40px, 6vw, 80px);
+        background: #D9AF4B;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: clamp(30px, 5vw, 60px);
+    }
+
+    .header-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: clamp(20px, 3vw, 39px);
+        max-width: 1200px;
+        text-align: center;
+    }
+
+    .header-logo {
+        width: clamp(100px, 15vw, 140px);
+        height: clamp(100px, 15vw, 140px);
+        background: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .header-logo-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .header-title {
+        color: #15224D;
+        font-size: clamp(24px, 4vw, 32px);
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .header-subtitle {
+        color: #15224D;
+        font-size: clamp(32px, 5vw, 56px);
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    /* Content Section */
+    .content-section {
+        padding: clamp(50px, 8vw, 80px) clamp(20px, 4vw, 64px);
+        background: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: clamp(40px, 6vw, 60px);
+    }
+
+    .content-container {
+        width: 100%;
+        max-width: 1200px;
+    }
+
+    .content-text {
+        color: black;
+        font-size: clamp(16px, 2vw, 18px);
+        font-weight: 400;
+        line-height: 1.7;
+    }
+
+    .content-text strong {
+        font-weight: 700;
+    }
+
+    .content-text ul {
+        margin-left: 20px;
+        margin-bottom: 20px;
+    }
+
+    .content-text li {
+        margin-bottom: 10px;
+    }
+</style>
+
+<div class="main-container">
+    <div class="content-wrapper">
+        <!-- Header Section -->
+        <div class="section header-section">
+            <div class="header-content">
+                <div class="header-logo">
+                    <img class="header-logo-img" src="https://confedsahodaya.com/web/logo/sahodya.png" alt="Logo" />
+                </div>
+                <div class="header-title">CONFEDERATION OF<br />KERALA SAHODAYA COMPLEXES</div>
+                <div class="header-subtitle">ACTIVITIES</div>
+            </div>
+        </div>
+
+        <!-- Content Section -->
+        <div class="section content-section">
+            <div class="content-container">
+                <div class="content-text">
+                    <p><strong>Confederation of Sahodayas</strong> has its strong footing on mutual co-operation and sharing . Hence it shall undertake all the activities beneficial to all the member Sahodayas and for the development of education in the State.&nbsp;</p><p>A Few important activities can be:&nbsp;</p><p>a. Conduct of annual teachers workshops.&nbsp;</p><p>b. Principals’ in -service programmes.&nbsp;</p><p>c. Supply of academic information.&nbsp;</p><p>d. Orientation Programmes.&nbsp;</p><p>e. Publication of Annual Magazine highlighting the activities of various Sahodayas in Kerala.&nbsp;</p><p>f. Academic sharing – sharing of resource persons for seminar, workshop etc in schools.&nbsp;</p><p>g. Organizing common examination at regional/state level.&nbsp;</p><p>h. Promoting edu-friendly atmosphere among member schools.&nbsp;</p><p>i. Conduct of inter Sahodaya/School competitions.&nbsp;</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer Section -->
+<!-- Footer Section -->
+<link href="https://confedsahodaya.com/web/css/footer.css" rel="stylesheet">
+<!-- <script src="https://confedsahodaya.com/web/js/main.js"></script> -->
+<div class="section footer-section">
+    <div class="footer-content">
+        <div class="footer-logo-wrapper">
+            <div class="footer-logo-img">
+                <img src="https://confedsahodaya.com/web/logo/sahodya.png " alt="Logo" />
+            </div>
+            <div class="footer-logo-text">CONFEDERATION OF<br />KERALA SAHODAYA COMPLEXES</div>
+        </div>
+        <div class="footer-links-wrapper">
+            <div class="footer-column">
+                <div class="footer-info">
+                    <div class="footer-label">Address</div>
+                    <div class="footer-text">Sree Sarada Vidyalaya, Kalady, Ernakulam</div>
+                </div>
+                <div class="footer-info">
+                    <div class="footer-label">Contact</div>
+                    <div class="footer-text">+91 9447154684</div>
+                    <div class="footer-text">confederationkerala@gmail.com</div>
+                </div>
+                <div class="social-icons">
+                    <div class="social-icon">f</div>
+                    <div class="social-icon">t</div>
+                    <div class="social-icon">i</div>
+                    <div class="social-icon">in</div>
+                    <div class="social-icon">y</div>
+                </div>
+            </div>
+            <div class="footer-column">
+                <div class="section-title-text">Quick Links</div>
+                <a href="../index.html" class="link-item">Home</a>
+                <a href="../about.html" class="link-item">About Us</a>
+                <!--<a href="/executive" class="link-item">Executive Committie</a>-->
+                <!-- <a href="#" class="link-item">Updates</a> -->
+                <a href="../contactus.html" class="link-item">Contact us</a>
+            </div>
+            <div class="footer-column">
+                <div class="section-title-text">Programmes</div>
+                <a href="ACTIVITIES.html#" class="link-item">Athletic Meet</a>
+                <a href="ACTIVITIES.html#" class="link-item">Kalotsav</a>
+                <a href="ACTIVITIES.html#" class="link-item">Writings</a>
+                <a href="ACTIVITIES.html#" class="link-item">Language Fest</a>
+                <a href="ACTIVITIES.html#" class="link-item">Teacher Fest</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <div class="footer-divider"></div>
+            <div class="footer-copyright-wrapper">
+                <div class="copyright-text">© 2024 CKSC. All rights reserved.</div>
+                <div class="legal-links">
+                    <a href="ACTIVITIES.html#" class="legal-link">Privacy policy</a>
+                    <a href="ACTIVITIES.html#" class="legal-link">Terms of service</a>
+                    <a href="ACTIVITIES.html#" class="legal-link">Cookies settings</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

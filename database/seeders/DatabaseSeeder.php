@@ -11,6 +11,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesAndPermissionsSeeder::class,
             SkinPresetsSeeder::class,
+            SahodayaMasterDataSeeder::class,
+            DemoTenantsSeeder::class,
         ]);
     }
 }

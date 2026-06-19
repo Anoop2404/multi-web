@@ -18,7 +18,7 @@
                     @foreach($config['videos'] as $video)
                     <a href="https://www.youtube.com/watch?v={{ $video['youtube_id'] }}" target="_blank" class="flex gap-3 p-3 rounded-lg bg-white shadow-sm hover:shadow transition">
                         <div class="w-20 h-14 rounded overflow-hidden shrink-0 bg-gray-100">
-                            <img loading="lazy" src="https://img.youtube.com/vi/{{ $video['youtube_id'] }}/mqdefault.jpg" alt="" class="w-full h-full object-cover">
+                            <img loading="lazy" src="https://img.youtube.com/vi/{{ $video['youtube_id'] }}/mqdefault.jpg" alt="{{ $video['title'] ?? 'Video thumbnail' }}" class="w-full h-full object-cover">
                         </div>
                         <div>
                             <p class="text-sm font-medium text-gray-800">{{ $video['title'] ?? '' }}</p>

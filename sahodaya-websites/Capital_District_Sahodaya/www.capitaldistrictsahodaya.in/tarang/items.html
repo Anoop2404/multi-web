@@ -1,0 +1,300 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width">
+        <title>Tarang</title>
+     <!--[if lt IE 9]>
+  <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+<![endif]-->
+    <link rel=Stylesheet href="css/template.css" />
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,300,600' rel='stylesheet' type='text/css'>
+    <script type="text/javascript" src="js/jquery-1.11.3.min.js"></script> 
+    <script type="text/javascript" src="js/jquery.waypoints.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/animate.css">
+         <!-- Font Awesome Style -->
+      <link href="css/font-awesome.min.css" rel="stylesheet">
+    <!--  Scroll top -->
+<script>
+$(document).ready(function(){
+	// hide #back-top first
+	$("#scrl-top").hide();
+	// fade in #back-top
+	$(function () {
+		$(window).scroll(function () {
+			if ($(this).scrollTop() > 100) {
+				$('#scrl-top').fadeIn();
+			} else {
+				$('#scrl-top').fadeOut();
+			}
+		});
+		// scroll body to 0px on click
+		$('#scrl-top a').click(function () {
+			$('body,html').animate({
+				scrollTop: 0
+			}, 800);
+			return false;
+		});
+	});
+});
+</script>
+<!--  Scroll top -->
+        <style type="text/css">
+        .os-animation{
+            opacity: 0;
+        }  
+        .os-animation.animated{
+            opacity: 1;
+        }   
+    </style>
+    <script type="text/javascript">
+        $(function(){
+            function onScrollInit( items, trigger ) {
+                items.each( function() {
+                var osElement = $(this),
+                    osAnimationClass = osElement.attr('data-os-animation'),
+                    osAnimationDelay = osElement.attr('data-os-animation-delay');
+                    osElement.css({
+                        '-webkit-animation-delay':  osAnimationDelay,
+                        '-moz-animation-delay':     osAnimationDelay,
+                        'animation-delay':          osAnimationDelay
+                    });
+                    var osTrigger = ( trigger ) ? trigger : osElement;
+                    osTrigger.waypoint(function() {
+                        osElement.addClass('animated').addClass(osAnimationClass);
+                        },{
+                            triggerOnce: true,
+                            offset: '90%'
+                    });
+                });
+            }
+            onScrollInit( $('.os-animation') );
+            onScrollInit( $('.staggered-animation'), $('.staggered-animation-container') );
+});
+    </script>
+</head>
+<body>
+<div id="wrapper">
+<div class="container os-animation bg-abt"  data-os-animation="fadeIn" data-os-animation-delay="0s">
+    <div class="row">
+        <div class="col3">   
+            <div class="menu">
+            <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="rules.html">General Rules</a></li>
+            <li><a href="items.html">Competitions</a></li> 
+           <!-- <li><a href="album.aspx">PhotoGallery</a></li> -->
+            <li><a href="schedule.html">Programme schedule</a></li>  
+             <li><a href="topics.html">Topics</a></li> 
+                <li><a href="registration.aspx.html">Registration</a></li>    
+             <li><a href="results.aspx.html">Results</a></li>   
+           <!--  <li><a href="#">Contact us</a></li>-->
+            </ul>
+            </div>
+            <div style="display:inline-block; vertical-align:bottom"><img src="images/logo-200.png" alt="logo"/></div>
+            <div style="display:inline-block;" class="logoimg"><img src="images/kalotsav.png" alt="logo"/></div>
+        </div>
+    </div>
+ </div>
+        <div class="container">
+          <div class="row os-animation"  data-os-animation="slideInLeft" data-os-animation-delay=".5s">
+          <div class="col3">
+         <h2>Category l (Classes lll & lV) : Common for Boys and Girls</h2>
+              <table class="table">
+<tr><th>Item Code</th><th>Item Name</th><th>Duration</th><th>Stage</th><th>Remarks</th></tr>
+<tr><td>101</td><td>Pencil Drawing </td><td>60 mts.</td><td>off stage</td><td>&nbsp;</td></tr>
+ <tr><td>102</td><td>Painting Crayon </td><td>60 mts.</td><td>off stage</td><td>&nbsp;</td></tr>
+<tr><td>103</td><td>Recitation-Malayalam </td><td>5 mts.</td><td>on stage</td><td>&nbsp;</td></tr>
+ <tr><td>104</td><td>Recitation-English</td><td>5 mts.</td><td>on stage</td><td>&nbsp;</td></tr>
+ <tr><td>105</td><td>Recitation-Hindi </td><td>5 mts.</td><td>on stage</td><td>&nbsp;</td></tr>
+ <tr><td>106</td><td>Light Music-Malayalam </td><td>5 ms</td><td>on stage</td><td>&nbsp;</td></tr>
+ <tr><td>107</td><td>Folkdance </td><td>5 mts.</td><td>on stage</td><td>&nbsp;</td></tr>
+ <tr><td>108</td><td>Elocution-English </td><td>5 mts.</td><td>on stage</td><td>&nbsp;</td></tr>
+ <tr><td>109</td><td>Elocution-Malayalam </td><td>5 mts.</td><td>on stage</td><td>&nbsp;</td></tr>
+ <tr><td>110</td><td>Digital Painting</td><td>30 mts.</td><td>off stage</td><td>&nbsp;</td></tr>
+ <tr><td>111</td><td>Painting water colour</td><td>60 mts. </td><td>off stage</td><td></td></tr>
+                  </table>
+              </div>
+              </div>
+            </div>
+          <div class="container os-animation bg2" data-os-animation="fadeIn" data-os-animation-delay="0s">
+          <div class="row os-animation"  data-os-animation="slideInDown" data-os-animation-delay=".5s">
+          <div class="col3">
+              <h2>Category ll (classes V, Vl & Vll)</h2>
+              <table class="table">
+<tr><th>Item Code</th><th>Item Name</th><th>Duration</th><th>Stage</th><th>Remarks</th></tr>
+ <tr><td>201</td><td>Pencil Drawing</td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>202</td><td>Painting (water colour) </td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>203</td><td>Cartoon </td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>204</td><td>Elocution-English </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>205</td><td>Elocution-Hindi </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>206</td><td>Elocution-Malayalam </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>207</td><td>Recitation-Malayalam </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>208</td><td>Recitation-Hindi </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>209</td><td>Recitation- (English) </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>210</td><td>Recitation- (Sanskrit) </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>211</td><td>Recitation- (Arabic) </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>212</td><td>Essay writing (English) </td><td>1 hr</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>213</td><td>Essay writing (Malayalam)</td><td>1 hr</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>214</td><td>Light Music (Boys) </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>215</td><td>Light Music (Girls) </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>216</td><td>Classical Music (Karnatic) </td><td>10 mts</td><td>ON STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>217</td><td>Folk Dance (Girls) </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>218</td><td>Folk Dance (Boys)</td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>219</td><td>Group Dance (Girls) </td><td>10 mts. </td><td>GROUP</td><td>7 Participants</td></tr>
+ <tr><td>220</td><td>Bharata Natyam (Boys) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>221</td><td>Bharata Natyam (Girls) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>222</td><td>Mohiniyattom (Girls) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>223</td><td>Mono Act </td><td>5 mts.</td><td>ON STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>224</td><td>Digital Painting</td><td>30 mts  </td><td>OFF STAGE</td><td>Common for boys and girls</td></tr>
+</table>
+                </div>
+              </div>
+            </div>
+        <div class="container">
+          <div class="row os-animation"  data-os-animation="slideInLeft" data-os-animation-delay="0s">
+          <div class="col3">
+<h2>Category lll (Classes Vlll to X)</h2>
+ <table class="table">
+     <tr><th>Item Code</th><th>Item Name</th><th>Duration</th><th>Stage</th><th>Remarks</th></tr>
+ <tr><td>301</td><td>Pencil Drawing </td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>302</td><td>Painting (Oil Colour) </td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>303</td><td>Painting (Water Colour) </td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>304</td><td>Cartoon </td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>305</td><td>Essay writing (English) </td><td>1 hr</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>306</td><td>Essay writing (Malayalam) </td><td>1 hr</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>307</td><td>Essay writing (Hindi) </td><td>1 hr.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>308</td><td>Story writing Malayalam </td><td>1 hr</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>309</td><td>Story writing Hindi </td><td>1 hr.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>310</td><td>Story writing English </td><td>1 hr.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>311</td><td>Versification English </td><td>1 hr.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>312</td><td>Versification Hindi </td><td>1 hr.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>313</td><td>Versification Malayalam </td><td>1 hr</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>314</td><td>Extempore Malayalam </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>315</td><td>Extempore English </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>316</td><td>Extempore Hindi </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>317</td><td>Recitation Malayalam </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>318</td><td>Recitation Hindi </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>319</td><td>Recitation English </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>320</td><td>Recitation Sanskrit </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>321</td><td>Recitation Arabic </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>322</td><td>Light Music (Malayalam) Boys </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>323</td><td>Light Music (Malayalam) Girls</td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>324</td><td>Classical Music (Carnatic) Boys</td><td>10 mts</td><td>ON STAGE</td><td>Sruti allowed</td></tr>
+ <tr><td>325</td><td>Classical Music (Carnatic) Girls </td><td>10 mts</td><td>ON STAGE</td><td>Sruti allowed</td></tr>
+ <tr><td>326</td><td>Mappilapattu (Boys) </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>327</td><td>Mappilapattu (Girls) </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>328</td><td>Mono Act </td><td>5 mts.</td><td>ON STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>329</td><td>Bharata Natyam (Girls) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>330</td><td>Bharata Natyam (Boys) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>331</td><td>Kuchippudi (Girls) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>332</td><td>Kuchippudi (Boys) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>333</td><td>Mohiniyattom (Girls) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>334</td><td>Folk Dance Girls </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>335</td><td>Folk Dance Boys </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+<tr><td>336</td><td>Ottanthullal </td><td>10 mts</td><td>ON STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>337</td><td>Mimicry </td><td>5 mts.</td><td>ON STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>338</td><td>Group Dance (Girls) </td><td>10 mts.  </td><td>GROUP</td><td>7 Participants</td></tr>
+ <tr><td>339</td><td>Mridungam (Eastern) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>340</td><td>Tabala (Eastern) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>341</td><td>Guitar Western </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>342</td><td>Flute </td><td>10 mts</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>343</td><td>Violin Eastern </td><td>10 mts</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>344</td><td>Anchoring (Single)</td><td>7 mts</td><td>ON STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>345</td><td>Power Point Presentation</td><td>1 hr + 10 mts</td><td>OFF STAGE</td><td>2 Participant</td></tr>
+ <tr><td>346</td><td>Poster Designing</td><td>2 hrs.</td><td>OFF STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>347</td><td>Collage</td><td>2 hrs.</td><td>OFF STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>348</td><td>Digital Painting</td><td>30 mts</td><td>OFF STAGE</td><td>Common for boys and girls</td></tr>
+</table>
+              </div>
+              </div>
+            </div>
+        <div class="container os-animation bg " data-os-animation="fadeIn" data-os-animation-delay="0s">
+          <div class="row os-animation "  data-os-animation="fadeInDown" data-os-animation-delay=".5s">
+          <div class="col3">
+<h2>Category lV (Classes Xl & Xll)</h2>            
+<table class="table">
+ <tr><th>Item Code</th><th>Item Name</th><th>Duration</th><th>Stage</th><th>Remarks</th></tr>
+<tr><td>401</td><td>Pencil Drawing </td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>402</td><td>Painting (Water Colour) </td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>403</td><td>Painting (Oil Colour) </td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>404</td><td>Cartoon </td><td>2 hrs.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>405</td><td>Essay Writing (Malayalam) </td><td>1 hr.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>406</td><td>Essay Writing (English) </td><td>1 hr.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>407</td><td>Essay Writing (Hindi) </td><td>1 hr.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>408</td><td>Story writing (English) </td><td>1 hr.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>409</td><td>Story writing (Malayalam) </td><td>1 hr.</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>410</td><td>Story writing (Hindi) </td><td>1 hr</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>411</td><td>Versification Malayalam </td><td>1 hr</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>412</td><td>Versification Hindi </td><td>1 hr</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>413</td><td>Versification English </td><td>1 hr</td><td>OFF STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>414</td><td>Extempore Malayalam </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>415</td><td>Extempore English </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>416</td><td>Extempore Hindi </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>417</td><td>Recitation Malayalam </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>418</td><td>Recitation English </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>419</td><td>Recitation Hindi </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>420</td><td>Recitation Sanskrit </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>421</td><td>Recitation Arabic </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>422</td><td>Classical Music (Carnatic) Boys  </td><td>10 mts.</td><td>ON STAGE</td><td>Sruti Allowed</td></tr>
+ <tr><td>423</td><td>Classical Music (Carnatic) Girls  </td><td>10 mts.</td><td>ON STAGE</td><td>Sruti Allowed</td></tr>
+ <tr><td>424</td><td>Light Music (Malayalam) Boys </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>425</td><td>Light Music (Malayalam) Girls  </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>426</td><td>Mappilapattu (Boys) </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>427</td><td>Mappilapattu (Girls) </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>428</td><td>Bharata Natyam (girls) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>429</td><td>Bharata Natyam (Boys) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>430</td><td>Mohiniyattom (Girls) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>431</td><td>Folk dance Boys </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>432</td><td>Folk dance Girls </td><td>5 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>433</td><td>Mono Act </td><td>5 mts.</td><td>ON STAGE</td><td>Common for Boys & Girls</td></tr>
+ <tr><td>434</td><td>Mimicry </td><td>5 mts.</td><td>ON STAGE</td><td>Common for Boys & Girls</td></tr>
+ <tr><td>435</td><td>Flute (Eastern) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>436</td><td>Mridungam (Eastern) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>437</td><td>Tabala (Eastern) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>438</td><td>Violin (Eastern) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>439</td><td>Guitar (Western) </td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>440</td><td>Kuchi pudi [boys]</td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>441</td><td>Kuchi pudi [girls]</td><td>10 mts.</td><td>ON STAGE</td><td>&nbsp;</td></tr>
+ <tr><td>442</td><td>Anchoring  (Single) </td><td>7 mts</td><td>ON STAGE</td><td>2 Participant</td></tr>
+ <tr><td>443</td><td>Power Point Presentation</td><td>1 hr + 10 mts</td><td>OFF STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>444</td><td>Poster Designing</td><td>2 hrs.</td><td>OFF STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>445</td><td>Collage</td><td>2 hrs.</td><td>OFF STAGE</td><td>Common for boys and girls</td></tr>
+ <tr><td>446</td><td>Digital painting</td><td>30 mts</td><td>OFF STAGE</td><td>Common for boys and girls</td></tr>
+</table>
+                </div>
+              </div>
+            </div>
+        <div class="container" >
+          <div class="row os-animation"  data-os-animation="slideInLeft" data-os-animation-delay="0s">
+          <div class="col3">
+<h2>GROUP ITEMS (Common for Boys & Girls and category)</h2>            
+<table class="table">
+ <tr><th>Item Code</th><th>Item Name</th><th>Duration</th><th>Stage</th><th>Remarks</th></tr>
+ <tr><td>501</td><td>Group Song</td><td>10 mts.</td><td>ON STAGE</td><td>7 participants , Sruti allowed.</td></tr>
+ <tr><td>502</td><td>Patriotic Song</td><td>10 mts.</td><td>ON STAGE</td><td>7 participants , Sruti allowed.</td></tr>
+ <tr><td>503</td><td>Mime</td><td>5 mts.</td><td>ON STAGE</td><td>7 participants</td></tr>
+ <tr><td>504</td><td>One Act play (English Skit)</td><td>15 mts.</td><td>ON STAGE</td><td>Max. Charactors 10+3 for stage arrangements</td></tr>
+ <tr><td>505</td><td>Western Music Concert</td><td>15 mts.</td><td>ON STAGE</td><td>8 Participants</td></tr>
+ <tr><td>506</td><td>Band Display</td><td>20 mts.</td><td>OFF STAGE</td><td>Maximum participant 25</td></tr>
+  <tr><td>507</td><td>	Thiruvathirakali (Girls)</td><td>	10 mts.	</td><td>GROUP</td><td>10 participants</td></tr>
+ <tr><td>508</td><td>	Oppana (Girls)	</td><td>10 mts.	</td><td>GROUP</td><td>	10 participants</td></tr>
+ <tr><td>509</td><td>	Margam Kali (Girls)	</td><td>10 mts.	</td><td>GROUP</td><td>	7 participants</td></tr>
+ <tr><td>510</td><td>	Kol Kali (Boys)	</td><td>10 mts.	</td><td>GROUP</td><td>	12 participants</td></tr>
+ <tr><td>511</td><td>	Dufmutt (Boys)	</td><td>10 mts.	</td><td>GROUP</td><td>	10 participants</td></tr>
+    </table>
+              <p class="msg-warning">Group items can be registered with two standbys to substitute the performers in case of emergency. However substitution while performing on the stage will not be allowed. Certificates and prizes will be given only to those students who perform on the stage. Students registered as standby need not pay any registration fee. They will not be issued any participation Certificate.</p>
+          </div>
+          </div>
+    </div>
+    <div id="scrl-top">
+		<a href="items.html#top"><span></span></a>
+	</div>
+<footer>
+<div class="block">
+<p>&copy; 2025 <a href="http://www.bstsoftwarelabs.com" target="_blank">BST Software Pvt. Ltd</a></p>
+</div>
+</footer>
+</div>
+</body>
+</html>

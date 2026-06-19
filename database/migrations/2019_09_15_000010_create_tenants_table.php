@@ -23,12 +23,15 @@ class CreateTenantsTable extends Migration
             $table->string('domain')->nullable()->unique();
             $table->string('subdomain')->nullable()->unique();
             $table->string('parent_id')->nullable();
-            $table->foreign('parent_id')->references('id')->on('tenants')->nullOnDelete();
             $table->string('plan')->default('standard');
             $table->boolean('is_active')->default(true);
 
             $table->timestamps();
             $table->json('data')->nullable();
+        });
+
+        Schema::table('tenants', function (Blueprint $table) {
+            $table->foreign('parent_id')->references('id')->on('tenants')->nullOnDelete();
         });
     }
 

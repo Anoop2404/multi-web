@@ -18,6 +18,23 @@
             </div>
             @endforeach
         </div>
+        @else
+        @php $dbEvents = \App\Support\SahodayaPublicData::upcomingEvents($tenant->id); @endphp
+        @if($dbEvents->isNotEmpty())
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            @foreach($dbEvents as $event)
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition">
+                <div class="p-5">
+                    <p class="text-xs font-semibold" style="color: var(--color-primary)">
+                        {{ $event->event_date ? $event->event_date->format('M j, Y') : 'TBA' }}
+                    </p>
+                    <h3 class="font-bold font-heading text-gray-800 mt-1">{{ $event->name }}</h3>
+                    @if($event->venue)<p class="text-xs text-gray-500 mt-1">📍 {{ $event->venue }}</p>@endif
+                </div>
+            </div>
+            @endforeach
+        </div>
+        @endif
         @endif
     </div>
 </section>

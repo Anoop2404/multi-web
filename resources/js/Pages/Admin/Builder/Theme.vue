@@ -143,14 +143,18 @@ const themeFields = [
         { value: 'full', label: 'Pill (full)' },
     ]},
     { key: 'navbar_style', label: 'Navbar Style', type: 'select', options: [
-        { value: 'logo-left',   label: 'Logo Left' },
-        { value: 'logo-center', label: 'Logo Center' },
-        { value: 'dark',        label: 'Dark Navbar' },
+        { value: 'logo-left',          label: 'Logo Left' },
+        { value: 'logo-center',        label: 'Logo Center' },
+        { value: 'centered-below',     label: 'Centered Below' },
+        { value: 'sticky-transparent', label: 'Sticky Transparent' },
+        { value: 'dark',               label: 'Dark Navbar' },
     ]},
     { key: 'footer_style', label: 'Footer Style', type: 'select', options: [
-        { value: 'three-column', label: '3 Column' },
-        { value: 'four-column',  label: '4 Column' },
-        { value: 'minimal',      label: 'Minimal' },
+        { value: 'two-column-logo',    label: 'Two Column + Logo' },
+        { value: 'three-column',       label: 'Three Column' },
+        { value: 'four-column',        label: 'Four Column' },
+        { value: 'minimal',            label: 'Minimal' },
+        { value: 'minimal-single-row', label: 'Minimal Single Row' },
     ]},
 ];
 

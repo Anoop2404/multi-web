@@ -110,7 +110,7 @@ const selectedTenantId = ref('');
 const saved = ref(false);
 
 const footerConfig = reactive({
-    style: 'two-column-logo',
+    style: 'three-column',
     tagline: '',
     copyright: '',
     address: '',
@@ -122,10 +122,11 @@ const footerConfig = reactive({
 });
 
 const footerStyles = [
-    { value: 'two-column-logo',   label: 'Two Column + Logo' },
+    { value: 'two-column-logo',    label: 'Two Column + Logo' },
+    { value: 'three-column',       label: 'Three Column' },
+    { value: 'four-column',        label: 'Four Column' },
+    { value: 'minimal',            label: 'Minimal' },
     { value: 'minimal-single-row', label: 'Minimal Single Row' },
-    { value: 'dark',              label: 'Dark Footer' },
-    { value: 'light',             label: 'Light Footer' },
 ];
 
 async function loadFooter() {
@@ -135,7 +136,7 @@ async function loadFooter() {
     });
     const data = await res.json();
     Object.assign(footerConfig, {
-        style: data.style ?? 'two-column-logo',
+        style: data.layout_variant ?? data.style ?? 'three-column',
         tagline: data.tagline ?? '',
         copyright: data.copyright ?? '',
         address: data.address ?? '',

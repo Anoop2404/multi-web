@@ -32,7 +32,7 @@
                     @foreach($config['articles'] as $article)
                     <div class="flex gap-3 pb-4 border-b border-gray-100 last:border-0">
                         @if(!empty($article['image']))
-                        <img loading="lazy" src="{{ $article['image'] }}" alt="" class="w-12 h-12 rounded object-cover shrink-0">
+                        <img loading="lazy" src="{{ $article['image'] }}" alt="{{ $article['title'] ?? 'Article thumbnail' }}" class="w-12 h-12 rounded object-cover shrink-0">
                         @endif
                         <div>
                             @if(!empty($article['date']))

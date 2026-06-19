@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Alappuzha Sahodaya</title>
+	<atom:link href="http://alappuzhasahodaya.org/?feed=rss2" rel="self" type="application/rss+xml" />
+	<link>http://alappuzhasahodaya.org</link>
+	<description>Association CBSE Schools in Costal Kerala</description>
+	<lastBuildDate>Thu, 29 Aug 2013 07:51:33 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>
+	hourly	</sy:updatePeriod>
+	<sy:updateFrequency>
+	1	</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=5.7.15</generator>
+	<item>
+		<title>Hello world!</title>
+		<link>http://alappuzhasahodaya.org/?p=1</link>
+					<comments>http://alappuzhasahodaya.org/?p=1#respond</comments>
+		
+		<dc:creator><![CDATA[admin]]></dc:creator>
+		<pubDate>Thu, 29 Aug 2013 07:51:33 +0000</pubDate>
+				<category><![CDATA[Uncategorized]]></category>
+		<guid isPermaLink="false">http://alappuzhasahodaya.org/?p=1</guid>
+
+					<description><![CDATA[Welcome to WordPress. This is your first post. Edit or delete it, then start blogging!]]></description>
+										<content:encoded><![CDATA[<p>Welcome to WordPress. This is your first post. Edit or delete it, then start blogging!</p>
+]]></content:encoded>
+					
+					<wfw:commentRss>http://alappuzhasahodaya.org/?feed=rss2&#038;p=1</wfw:commentRss>
+			<slash:comments>0</slash:comments>
+		
+		
+			</item>
+	</channel>
+</rss>

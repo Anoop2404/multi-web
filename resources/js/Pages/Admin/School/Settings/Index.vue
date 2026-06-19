@@ -103,6 +103,20 @@
                     </div>
                 </div>
 
+                <!-- Language -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+                    <h3 class="font-bold text-gray-800">Site Language</h3>
+                    <p class="text-xs text-gray-400 -mt-1">Sets the HTML lang attribute for accessibility and search engines.</p>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Public site language</label>
+                        <select v-model="form.locale"
+                                class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                            <option value="en">English</option>
+                            <option value="ml">Malayalam</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="flex items-center gap-4">
                     <button type="submit" :disabled="form.processing"
                             class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition disabled:opacity-50">
@@ -141,6 +155,7 @@ const form = useForm({
     seo_description: seo.description ?? '',
     seo_tagline:     seo.tagline ?? '',
     seo_keywords:    seo.keywords ?? '',
+    locale:          props.settings.locale ?? 'en',
 });
 
 function submit() {

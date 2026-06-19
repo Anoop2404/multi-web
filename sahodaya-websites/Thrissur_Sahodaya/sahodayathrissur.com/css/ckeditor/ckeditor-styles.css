@@ -1,0 +1,668 @@
+/* General Container Styling */
+.container {
+
+    /* font-family: sans-serif;
+    padding: 20px; */
+}
+
+/* Panel Styling */
+.panel {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    background-color: #ffffff;
+    box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
+}
+
+/* Panel Heading */
+.panel-heading {
+    background-color: #337ab7;
+    color: white;
+    font-size: 1.5rem;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+/* Panel Body */
+.panel-body {
+    padding: 20px;
+}
+
+/* Form Styling */
+.form-horizontal .form-group {
+    margin-bottom: 5px;
+}
+
+.control-label {
+    width: 100%;
+    color: #333;
+}
+
+.form-control {
+    width: 100%;
+    /* padding: 10px; */
+    margin-top: 5px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+.form-control:focus {
+    border-color: #5bc0de;
+    box-shadow: 0 0 5px rgba(91, 192, 222, 0.5);
+}
+
+/* Submit Buttons Styling */
+.btn {
+
+    font-size: 16px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-info {
+    background-color: #17195d;
+    color: white;
+}
+
+.btn-success {
+    background-color: #5cb85c;
+    color: white;
+}
+
+.btn-default {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.btn-danger {
+    background-color: #d9534f;
+    color: white;
+}
+
+.btn:hover {
+    opacity: 0.8;
+}
+
+/* Alert Box */
+.alert {
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    background-color: #f2dede;
+    color: #a94442;
+}
+
+/* File Input Styling */
+input[type="file"] {
+    padding: 5px;
+}
+
+input[type="file"]:focus {
+    outline: none;
+}
+
+/* Tooltip Button */
+.tooltip {
+    display: inline-block;
+    position: relative;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    background-color: #555;
+    color: #fff;
+    text-align: center;
+    border-radius: 5px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    /* Position above */
+    left: 50%;
+    margin-left: -60px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Form Fields for Category and Other Inputs */
+select.form-control {
+    height: 40px;
+    padding: 5px;
+}
+
+/* Table and Input Fields */
+.table {
+    width: 100%;
+
+}
+
+.table.borderless td,
+.table.borderless th {
+    border: none;
+}
+
+textarea.form-control {
+    resize: vertical;
+}
+
+input[type="number"].form-control {
+    width: 70px;
+}
+
+/* Responsive Design for smaller screens */
+@media (max-width: 767px) {
+    .form-horizontal .control-label {
+        text-align: left;
+    }
+
+    .form-group {
+        margin-bottom: 10px;
+    }
+
+    .col-sm-2,
+    .col-sm-3,
+    .col-sm-5,
+    .col-sm-12 {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    .panel-body {
+        padding: 10px;
+    }
+
+    .btn {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    .tooltip .tooltiptext {
+        font-size: 12px;
+    }
+}
+
+/* Customizing File Input */
+input[type="file"] {
+    font-size: 14px;
+    /* padding: 6px 12px; */
+    cursor: pointer;
+}
+
+.ck-editor__editable {
+    min-height: 200px !important;
+}
+
+.tooltip {
+    position: relative;
+    display: inline-block;
+    opacity: 1 !important;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 140px;
+    background-color: #555;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 150%;
+    left: 50%;
+    margin-left: -75px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.tooltip .tooltiptext::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #555 transparent transparent transparent;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Custom link color */
+.text-primary {
+    color: #4CAF50 !important;
+}
+
+/* Article content styles */
+.post-content {
+    line-height: 1.8;
+    font-size: 1.1rem;
+}
+
+/* Custom class handling */
+.post-content .flex-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #42275A;
+    box-shadow: 0px 0px 5px 0px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0px 5px 15px;
+}
+
+.post-content .activities-img-container img {
+    width: 100%;
+    height: auto;
+}
+
+.post-content .activities-details-container h5 {
+    font-size: 18px;
+    line-height: 28px;
+    color: #42275A;
+    font-weight: bold;
+    padding: 0;
+    margin: 0;
+}
+
+.post-content .activities-details-container p {
+    text-align: justify;
+    font-size: 16px;
+    line-height: 26px;
+    margin: 0;
+}
+
+/* CKEditor image styles */
+.post-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+/* Left alignment with text wrap */
+.image-style-align-left {
+    float: left;
+    margin-right: 20px;
+    margin-bottom: 20px;
+    max-width: 50%;
+}
+
+/* Right alignment with text wrap */
+.image-style-align-right {
+    float: right;
+    margin-left: 20px;
+    margin-bottom: 20px;
+    max-width: 50%;
+}
+
+/* Center alignment */
+.image-style-align-center {
+    margin: 0 auto;
+    display: block;
+}
+
+/* Block image (full width) */
+.image-style-block {
+    display: block;
+    width: 100%;
+    margin: 20px 0;
+}
+
+/* Side image (medium size) */
+.image-style-side {
+    float: right;
+    width: 50%;
+    margin-left: 20px;
+    margin-bottom: 20px;
+}
+
+/* Clear floats */
+.post-content::after {
+    content: "";
+    clear: both;
+    display: table;
+}
+
+/* Updated Table styles */
+/* .post-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            background-color: #fff;
+            table-layout: fixed;
+        }
+
+        .post-content table td,
+        .post-content table th {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            display: table-cell !important;
+            word-wrap: break-word;
+        }
+
+        .post-content table th {
+            background-color: #f8f9fa;
+        } */
+
+/* Remove text-align inherit override */
+/* .post-content [style*="text-align"] {
+            all: revert !important;
+        } */
+
+/* Specific table cell alignment preservation */
+/* .post-content table th[style*="text-align"],
+        .post-content table td[style*="text-align"] {
+            display: table-cell !important;
+        } */
+
+/* Table alignment utilities */
+/* .post-content table .text-center,
+        .post-content table [style*="text-align: center"] {
+            text-align: center !important;
+        } */
+
+/* .post-content table .text-right,
+        .post-content table [style*="text-align: right"] {
+            text-align: right !important;
+        } */
+
+/* .post-content table .text-left,
+        .post-content table [style*="text-align: left"] {
+            text-align: left !important;
+        } */
+
+/* Ensure colspan is respected */
+/* .post-content table th[colspan],
+        .post-content table td[colspan] {
+            display: table-cell !important;
+        } */
+
+.image {
+    display: table;
+    clear: both;
+    text-align: center;
+    margin: 1em auto;
+}        
+.image img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    min-width: 50px;
+}
+
+.image.image_resized > figcaption {
+    display: block;
+}
+.image > figcaption {
+    display: table-caption;
+    caption-side: bottom;
+    word-break: break-word;
+    color: hsl(0, 0%, 20%);
+    background-color: hsl(0, 0%, 97%);
+    padding: 0.6em;
+    font-size: .75em;
+    outline-offset: -1px;
+    line-height: 1.5;
+    font-family: 'poppins';
+}
+/* ckeditor5-image/theme/imageresize.css */
+.image.image_resized {
+    max-width: 100%;
+    display: block;
+    box-sizing: border-box;
+}
+
+/* ckeditor5-image/theme/imageresize.css */
+.image.image_resized img {
+    width: 100%;
+}
+
+/* ckeditor5-image/theme/imageresize.css */
+.image.image_resized>figcaption {
+    display: block;
+}
+
+/* Figure and caption styles */
+.post-content figure {
+    margin: 0;
+    display: table;
+}
+
+.post-content figure.image-style-align-left {
+    float: left;
+    margin-right: 20px;
+}
+
+.post-content figure.image-style-align-right {
+    float: right;
+    margin-left: 20px;
+}
+
+.post-content figcaption {
+    caption-side: bottom;
+    display: table-caption;
+    font-size: 0.9em;
+    color: #6c757d;
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* Custom button styles */
+.btn-primary {
+    background-color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+.btn-primary:hover {
+    background-color: #45a049;
+    border-color: #45a049;
+}
+
+.btn-outline-primary {
+    color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+.btn-outline-primary:hover {
+    background-color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+/* CKEditor Highlight Styles */
+.marker-yellow {
+    background-color: #fff3a3 !important;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+.marker-pink {
+    background-color: #ffd7e8 !important;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+.marker-green {
+    background-color: #c2f0c2 !important;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+.marker-blue {
+    background-color: #c2e5f4 !important;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+.pen-red {
+    color: #e91313 !important;
+    background-color: transparent !important;
+}
+
+.pen-green {
+    color: #118311 !important;
+    background-color: transparent !important;
+}
+
+/* Additional highlight styles */
+.highlight-yellow {
+    background-color: rgba(255, 243, 163, 0.7) !important;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+.highlight-blue {
+    background-color: rgba(194, 229, 244, 0.7) !important;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+.highlight-green {
+    background-color: rgba(194, 240, 194, 0.7) !important;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+.highlight-pink {
+    background-color: rgba(255, 215, 232, 0.7) !important;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+.highlight-red {
+    background-color: rgba(255, 200, 200, 0.7) !important;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+/* Style for mark tag */
+mark {
+    background-color: #fff3a3;
+    padding: 0 3px;
+    border-radius: 2px;
+}
+
+/* Post content wrapper for scoped styles */
+.post-content-wrapper {
+    position: relative;
+}
+
+/* Style preservation for CKEditor content */
+.post-content [style] {
+    display: inherit !important;
+}
+
+/* Preserve custom styles from CKEditor */
+.post-content *[class^="activities-"],
+.post-content *[class^="flex-"] {
+    display: block !important;
+}
+
+/* Enhanced style handling */
+.post-content [style*="background-color"],
+.post-content [style*="color"],
+.post-content [style*="font-size"],
+.post-content [style*="font-weight"] {
+    all: revert;
+    display: inherit !important;
+}
+
+/* Table override */
+.table {
+    --bs-table-bg: transparent !important;
+}
+
+/* Iframe styles */
+.post-content iframe {
+    width: 100%;
+    min-height: 600px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: #f8f9fa;
+    margin: 1rem 0;
+    max-width: 100%;
+    aspect-ratio: 16/9;
+}
+
+.button {
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 10px 25px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 2px 2px;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background-color: #337ab7;
+    border: none;
+    color: white;
+    padding: 6px 10px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 2px 2px;
+    cursor: pointer;
+}
+
+.table.borderless td,
+table.borderless th {
+    border: none !important;
+}
+
+@media (max-width: 768px) {
+    .post-content iframe {
+        min-height: 400px;
+    }
+}
+
+/* Print styles */
+@media print {
+
+    .marker-yellow,
+    .marker-pink,
+    .marker-green,
+    .marker-blue,
+    .highlight-yellow,
+    .highlight-blue,
+    .highlight-green,
+    .highlight-pink,
+    .highlight-red {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+/* Ensure paragraph and block level elements respect text alignment */
+.post-content p[style*="text-align"],
+.post-content div[style*="text-align"],
+.post-content span[style*="text-align"] {
+    display: block !important;
+}
+
+/* Fix for table cell spacing and alignment */
+/* .post-content table th,
+        .post-content table td {
+            vertical-align: middle;
+        } */
+
+/* Ensure proper table cell wrapping */
+/* .post-content table th *,
+        .post-content table td * {
+            word-break: normal;
+            word-wrap: break-word;
+        } */

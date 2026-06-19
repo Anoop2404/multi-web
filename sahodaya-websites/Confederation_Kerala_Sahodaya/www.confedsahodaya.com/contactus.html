@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://confedsahodaya.com/web/css/navbar.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://confedsahodaya.com/web/js/navbar.js"></script>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <div class="hamburger" onclick="toggleMenu()">
+                <div class="hamburger-line"></div>
+                <div class="hamburger-line"></div>
+                <div class="hamburger-line"></div>
+            </div>
+
+            <div class="nav-menu" id="navMenu">
+                                                                                <a href="index.html" class="nav-item">HOME</a>
+                                                                                <a href="about.html" class="nav-item">ABOUT US</a>
+                                                                                <div class="nav-item-with-submenu" id="GOVERNANCEItem">
+                    <span class="nav-item">
+                        GOVERNANCE
+                        <span class="submenu-indicator">▼</span>
+                    </span>
+                    <div class="submenu">
+                                                                        <a href="page/STRUCTURE.html" class="submenu-item">STRUCTURE</a>
+                                                                        <a href="page/RULES%20AND%20BYE-LAWS.html" class="submenu-item">RULES AND BYE-LAWS</a>
+                                                                        <a href="page/ELECTION%20OF%20MEMBERS.html" class="submenu-item">ELECTION OF MEMBERS</a>
+                                                                        <a href="page/AUTHORITY.html" class="submenu-item">AUTHORITY</a>
+                                                                        <a href="page/EXECUTIVE%20COMMITTEE-POWERS.html" class="submenu-item">SAHODAYA HEADS</a>
+                                                                        <a href="page/ACTIVITIES.html" class="submenu-item">ACTIVITIES</a>
+                                                                        <a href="page/MEETINGS.html" class="submenu-item">MEETINGS</a>
+                                                                        <a href="sahodaya-list.html" class="submenu-item">SAHODAYA HEADS</a>
+                                                                        <a href="confed-executive.html" class="submenu-item">CONFED EXECUTIVE MEMBERS</a>
+                                            </div>
+                </div>
+                                                                                <div class="nav-item-with-submenu" id="GALLERYItem">
+                    <span class="nav-item">
+                        GALLERY
+                        <span class="submenu-indicator">▼</span>
+                    </span>
+                    <div class="submenu">
+                                                                        <a href="https://www.confedsahodaya.com/gallery/function" class="submenu-item">FUNCTION</a>
+                                                                        <a href="https://www.confedsahodaya.com/gallery/programme" class="submenu-item">PROGRAMME</a>
+                                                                        <a href="gallery/sahodya.html" class="submenu-item">SAHODAYA</a>
+                                            </div>
+                </div>
+                                                                                <a href="download.html" class="nav-item">DOWNLOADS</a>
+                                                                                <a href="contactus.html" class="nav-item">CONTACT US</a>
+                                                                                <a href="http://www.cksart.com/training_app/" class="nav-item">ART UNIT</a>
+                                                                                <a href="https://keralastatecbsekalotsav.webschoolgj.in/" class="nav-item">KALOTSAV</a>
+                                                                                <a href="https://site.fotoowl.ai/123weddingstudio40/gallery/172007?pass_key=3656" class="nav-item">CONFERENCE</a>
+                                                            </div>
+
+        </div>
+    </nav>
+
+
+</body>
+
+</html><style>
+    .content-wrapper {
+        width: 100%;
+        margin-top: clamp(90px, 12vw, 110px);
+    }
+
+    .header-section {
+        padding: clamp(80px, 10vw, 150px) clamp(20px, 4vw, 64px) clamp(40px, 6vw, 80px);
+        background: #D9AF4B;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: clamp(30px, 5vw, 60px);
+    }
+
+    .header-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: clamp(20px, 3vw, 39px);
+        max-width: 1200px;
+        text-align: center;
+    }
+
+    .header-logo {
+        width: clamp(100px, 15vw, 140px);
+        height: clamp(100px, 15vw, 140px);
+        background: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .header-logo-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .header-title {
+        color: #15224D;
+        font-size: clamp(24px, 4vw, 32px);
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .header-subtitle {
+        color: #15224D;
+        font-size: clamp(32px, 5vw, 56px);
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .contact-container {
+        width: 100%;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    .contact-header {
+        text-align: center;
+        margin-bottom: 60px;
+    }
+
+    .contact-header h1 {
+        color: #15224D;
+        font-size: clamp(32px, 5vw, 56px);
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 20px;
+    }
+
+    .contact-header p {
+        color: #15224D;
+        font-size: clamp(16px, 2.5vw, 32px);
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    .contact-content {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 48px;
+        justify-content: center;
+        align-items: flex-start;
+        margin-bottom: 60px;
+    }
+
+    .contact-form-section {
+        flex: 1;
+        min-width: 300px;
+        max-width: 500px;
+    }
+
+    .contact-form-section h2 {
+        color: black;
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 16px;
+    }
+
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .form-input {
+        width: 100%;
+        height: 80px;
+        padding: 16px;
+        background: #CCCCCC;
+        opacity: 0.6;
+        border-radius: 10px;
+        border: none;
+        font-size: 16px;
+        font-family: Roboto;
+        color: black;
+    }
+
+    .form-input::placeholder {
+        color: black;
+    }
+
+    .form-input.message {
+        height: 319px;
+        resize: vertical;
+    }
+
+    .contact-info-section {
+        flex: 1;
+        min-width: 300px;
+        max-width: 500px;
+    }
+
+    .working-hours {
+        margin-bottom: 33px;
+    }
+
+    .working-hours h2 {
+        color: black;
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 16px;
+    }
+
+    .hours-item {
+        width: 100%;
+        padding: 16px;
+        opacity: 0.6;
+        border-radius: 10px;
+        border: 1px solid black;
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .hours-day {
+        color: black;
+        font-size: 16px;
+        font-weight: 400;
+    }
+
+    .hours-time {
+        color: black;
+        font-size: 16px;
+        font-weight: 400;
+        text-align: right;
+    }
+
+    .find-us h2 {
+        color: black;
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 26px;
+    }
+
+    .location-info {
+        opacity: 0.6;
+        border-radius: 10px;
+        border: 1px solid black;
+        padding: 0;
+    }
+
+    .info-item {
+        padding: 16px 23px;
+        display: flex;
+        align-items: center;
+        gap: 33px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .info-item:last-child {
+        border-bottom: none;
+    }
+
+    .info-icon {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .icon-placeholder {
+        width: 16px;
+        height: 20px;
+        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='black' viewBox='0 0 24 24'><path d='M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5c-1.4 0-2.5-1.1-2.5-2.5S10.6 6.5 12 6.5s2.5 1.1 2.5 2.5S13.4 11.5 12 11.5z'/></svg>") no-repeat center;
+        background-size: contain;
+        border: none;
+    }
+
+    .icon-email {
+        width: 20px;
+        height: 16px;
+        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='black' viewBox='0 0 24 24'><path d='M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 2v.01L12 13 4 6.01V6h16zM4 18V8l8 5 8-5v10H4z'/></svg>") no-repeat center;
+        background-size: contain;
+        border: none;
+    }
+
+    .icon-phone {
+        width: 18px;
+        height: 18px;
+        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='black' viewBox='0 0 24 24'><path d='M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.8-.4 1.2-.2 1.3.5 2.7.8 4.2.8.7 0 1.2.5 1.2 1.2V21c0 .7-.5 1.2-1.2 1.2C10.8 22.2 1.8 13.2 1.8 2.4 1.8 1.7 2.3 1.2 3 1.2h3.6c.7 0 1.2.5 1.2 1.2 0 1.5.3 2.9.8 4.2.1.4 0 .9-.2 1.2l-2.2 2.2z'/></svg>") no-repeat center;
+        background-size: contain;
+        border: none;
+    }
+
+
+    .info-text {
+        flex: 1;
+        color: black;
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 27px;
+    }
+
+    /* Google Maps Section */
+    .map-section {
+        width: 100%;
+        margin-top: 40px;
+    }
+
+    .map-section h2 {
+        color: #15224D;
+        font-size: 32px;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .map-container {
+        width: 100%;
+        height: 500px;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .map-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .contact-container {
+            padding: 20px 15px;
+        }
+
+        .contact-header {
+            margin-bottom: 40px;
+        }
+
+        .contact-content {
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .form-input {
+            height: 60px;
+        }
+
+        .form-input.message {
+            height: 200px;
+        }
+
+        .info-item {
+            padding: 12px 15px;
+            gap: 20px;
+        }
+
+        .info-text {
+            font-size: 16px;
+            line-height: 24px;
+        }
+
+        .map-container {
+            height: 400px;
+        }
+
+        .map-section h2 {
+            font-size: 28px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .contact-header h1 {
+            font-size: 28px;
+        }
+
+        .contact-header p {
+            font-size: 18px;
+        }
+
+        .hours-item {
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .hours-time {
+            text-align: left;
+        }
+
+        .info-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .info-icon {
+            align-self: flex-start;
+        }
+
+        .map-container {
+            height: 300px;
+        }
+
+        .map-section h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 16px;
+        background: #15224D;
+        color: white;
+        font-size: 16px;
+        font-weight: 700;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+    .submit-btn:hover {
+        background: #D9AF4B;
+    }
+
+    .alert {
+        margin-bottom: 20px;
+        padding: 15px;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 400;
+        text-align: center;
+    }
+
+    .alert-success {
+        background: #15224D;
+        color: white;
+    }
+
+    .alert-error {
+        background: #ff4d4d;
+        color: white;
+    }
+</style>
+</head>
+
+<body>
+    <div class="main-container">
+        <div class="content-wrapper">
+            <div class="section header-section">
+                <div class="header-content">
+                    <div class="header-logo">
+                        <img class="header-logo-img" src="https://confedsahodaya.com/web/logo/sahodya.png " alt="Logo" />
+                    </div>
+                    <div class="header-title">CONFEDERATION OF<br />KERALA SAHODAYA COMPLEXES</div>
+                    <div class="header-subtitle">Contact Us</div>
+                </div>
+            </div>
+            <div class="contact-container">
+                                <div class="contact-header">
+                    <h1>Get in touch with us!</h1>
+                    <p>The Confederation of Kerala Sahodaya Complexes shall be an association of the Sahodaya Schools Complexes in the state of Kerala</p>
+                </div>
+
+                <div class="contact-content">
+                    <div class="contact-form-section">
+                        <h2>Connect with us!</h2>
+                        <form id="contact-form" action="https://www.confedsahodaya.com/contact/submit" method="POST">
+                            <input type="hidden" name="_token" value="IDxQxq17bLRzXTS1BIgXrwH0FmovQXJdspd9gE6B" autocomplete="off">                            <div class="form-group">
+                                <input type="text" name="name" class="form-input" placeholder="Your Name" required>
+                            </div>
+                            <div class="form-group">
+                                <input type="email" name="email" class="form-input" placeholder="Your Email-ID" required>
+                            </div>
+                            <div class="form-group">
+                                <textarea name="message" class="form-input message" placeholder="Your Message" required></textarea>
+                            </div>
+                            <button type="submit" class="submit-btn">Submit</button>
+                            <div class="form-message" id="form-message"></div>
+                        </form>
+                    </div>
+
+                    <div class="contact-info-section">
+                        <div class="working-hours">
+                            <h2>Working Hours</h2>
+                            <div class="hours-item">
+                                <span class="hours-day">Monday-Friday</span>
+                                <span class="hours-time">09:30 AM - 03:30 PM</span>
+                            </div>
+                            <div class="hours-item">
+                                <span class="hours-day">Saturday</span>
+                                <span class="hours-time">10:00 AM - 12:00 PM</span>
+                            </div>
+                            <div class="hours-item">
+                                <span class="hours-day">Sunday</span>
+                                <span class="hours-time">Closed.</span>
+                            </div>
+                        </div>
+
+                        <div class="find-us">
+                            <h2>Find us!</h2>
+                            <div class="location-info">
+                                                                <div class="info-item">
+                                    <div class="info-icon">
+                                        <div class="icon-placeholder"></div>
+                                    </div>
+                                    <div class="info-text">Sree Sarada Vidyalaya, Kalady , Ernakulam</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-icon">
+                                        <div class="icon-email"></div>
+                                    </div>
+                                    <div class="info-text">confederationkerala@gmail.com</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-icon">
+                                        <div class="icon-phone"></div>
+                                    </div>
+                                    <div class="info-text">+91 9447154684</div>
+                                </div>
+                                                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Google Maps Section -->
+                <div class="map-section">
+                    <h2>Find Our Location</h2>
+                    <div class="map-container">
+                        <iframe
+                            class="map-iframe"
+                            src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d7835.717700428085!2d75.91387!3d10.89833!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ba7b1c2ee1e1df1%3A0x8dfb519e9598a0a0!2sBenchMark%20International%20School!5e0!3m2!1sen!2sin!4v1760278500993!5m2!1sen!2sin">
+                        </iframe>
+                    </div>
+                </div>
+            </div>
+            <!-- Footer Section -->
+<link href="https://confedsahodaya.com/web/css/footer.css" rel="stylesheet">
+<!-- <script src="https://confedsahodaya.com/web/js/main.js"></script> -->
+<div class="section footer-section">
+    <div class="footer-content">
+        <div class="footer-logo-wrapper">
+            <div class="footer-logo-img">
+                <img src="https://confedsahodaya.com/web/logo/sahodya.png " alt="Logo" />
+            </div>
+            <div class="footer-logo-text">CONFEDERATION OF<br />KERALA SAHODAYA COMPLEXES</div>
+        </div>
+        <div class="footer-links-wrapper">
+            <div class="footer-column">
+                <div class="footer-info">
+                    <div class="footer-label">Address</div>
+                    <div class="footer-text">Sree Sarada Vidyalaya, Kalady, Ernakulam</div>
+                </div>
+                <div class="footer-info">
+                    <div class="footer-label">Contact</div>
+                    <div class="footer-text">+91 9447154684</div>
+                    <div class="footer-text">confederationkerala@gmail.com</div>
+                </div>
+                <div class="social-icons">
+                    <div class="social-icon">f</div>
+                    <div class="social-icon">t</div>
+                    <div class="social-icon">i</div>
+                    <div class="social-icon">in</div>
+                    <div class="social-icon">y</div>
+                </div>
+            </div>
+            <div class="footer-column">
+                <div class="section-title-text">Quick Links</div>
+                <a href="index.html" class="link-item">Home</a>
+                <a href="about.html" class="link-item">About Us</a>
+                <!--<a href="/executive" class="link-item">Executive Committie</a>-->
+                <!-- <a href="#" class="link-item">Updates</a> -->
+                <a href="contactus.html" class="link-item">Contact us</a>
+            </div>
+            <div class="footer-column">
+                <div class="section-title-text">Programmes</div>
+                <a href="contactus.html#" class="link-item">Athletic Meet</a>
+                <a href="contactus.html#" class="link-item">Kalotsav</a>
+                <a href="contactus.html#" class="link-item">Writings</a>
+                <a href="contactus.html#" class="link-item">Language Fest</a>
+                <a href="contactus.html#" class="link-item">Teacher Fest</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <div class="footer-divider"></div>
+            <div class="footer-copyright-wrapper">
+                <div class="copyright-text">© 2024 CKSC. All rights reserved.</div>
+                <div class="legal-links">
+                    <a href="contactus.html#" class="legal-link">Privacy policy</a>
+                    <a href="contactus.html#" class="legal-link">Terms of service</a>
+                    <a href="contactus.html#" class="legal-link">Cookies settings</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

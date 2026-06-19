@@ -11,24 +11,54 @@ return [
 
     'domain_model' => Stancl\Tenancy\Database\Models\Domain::class,
 
-    'central_domains' => [
+    /*
+    |--------------------------------------------------------------------------
+    | Central & tenant base domains
+    |--------------------------------------------------------------------------
+    |
+    | central_domains — hosts for the superadmin panel only (not Sahodaya portals).
+    |   Production: CENTRAL_DOMAIN=superadmin.com → https://superadmin.com/admin
+    |
+    | tenant_base_domain — optional platform domain for subdomain tenants
+    |   e.g. amu-school.sahodaya.in when TENANT_BASE_DOMAIN=sahodaya.in
+    |
+    | Sahodaya clusters can also use a full custom domain on the tenant record
+    |   e.g. malappuramsahodaya.com (set in Superadmin → Tenants → Custom Domain)
+    |
+    */
+    'tenant_base_domain' => env('TENANT_BASE_DOMAIN', 'sahodaya.test'),
+
+    'central_domains' => array_values(array_unique(array_filter([
         '127.0.0.1',
         'localhost',
-        'sahodaya.test',
+        env('CENTRAL_DOMAIN', 'sahodaya.test'),
+    ]))),
+
+    'reserved_subdomains' => [
+        'www', 'admin', 'api', 'app', 'mail', 'ftp', 'cdn', 'static',
     ],
 
-    // Single-DB mode: only cache, filesystem, and queue bootstrappers — no DB switching
-    'bootstrappers' => [
+    // Dedicated PostgreSQL database per Sahodaya cluster (member schools share the parent DB).
+    // Set TENANCY_DATABASE_PER_SAHODAYA=false for local/tests to keep a single database.
+    'database_per_sahodaya' => env('TENANCY_DATABASE_PER_SAHODAYA', true),
+
+    // Local dev: auto-create and migrate missing Sahodaya databases on first request.
+    'auto_create_sahodaya_database' => env('TENANCY_AUTO_CREATE_DATABASE', env('APP_ENV') === 'local'),
+
+    'bootstrappers' => array_values(array_filter([
+        env('TENANCY_DATABASE_PER_SAHODAYA', true)
+            ? Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper::class
+            : null,
         Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper::class,
-    ],
+    ])),
 
     /**
      * Database tenancy config. Used by DatabaseTenancyBootstrapper.
      */
     'database' => [
-        'central_connection' => env('DB_CONNECTION', 'central'),
+        'central_connection' => env('DB_CENTRAL_CONNECTION', 'central'),
 
         /**
          * Connection used as a "template" for the dynamically created tenant database connection.
@@ -40,7 +70,7 @@ return [
          * Tenant database names are created like this:
          * prefix + tenant_id + suffix.
          */
-        'prefix' => 'tenant',
+        'prefix' => 'sahodaya_',
         'suffix' => '',
 
         /**

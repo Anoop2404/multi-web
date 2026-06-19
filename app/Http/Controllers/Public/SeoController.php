@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
-use App\Models\NewsArticle;
 use App\Models\Event;
+use App\Models\GalleryAlbum;
+use App\Models\NewsArticle;
 use Illuminate\Support\Facades\Cache;
 
 class SeoController extends Controller
@@ -20,6 +21,8 @@ class SeoController extends Controller
             $base = 'https://' . $tenant->domain;
             $urls = [
                 ['loc' => $base, 'priority' => '1.0', 'changefreq' => 'weekly'],
+                ['loc' => $base.'/news', 'priority' => '0.8', 'changefreq' => 'weekly'],
+                ['loc' => $base.'/events', 'priority' => '0.8', 'changefreq' => 'weekly'],
             ];
 
             // News articles
@@ -52,6 +55,19 @@ class SeoController extends Controller
                             'changefreq' => 'monthly',
                         ];
                     }
+                });
+
+            GalleryAlbum::where('tenant_id', $tenant->id)
+                ->select('slug', 'updated_at')
+                ->orderByDesc('updated_at')
+                ->limit(50)
+                ->each(function ($album) use ($base, &$urls) {
+                    $urls[] = [
+                        'loc'        => $base.'/gallery/'.$album->slug,
+                        'lastmod'    => $album->updated_at->toAtomString(),
+                        'priority'   => '0.5',
+                        'changefreq' => 'monthly',
+                    ];
                 });
 
             return $urls;

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Listeners\SeedSahodayaTenantDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use Stancl\JobPipeline\JobPipeline;
 use Stancl\Tenancy\Events;
 use Stancl\Tenancy\Listeners;
 use Stancl\Tenancy\Middleware;
@@ -20,13 +20,13 @@ class TenancyServiceProvider extends ServiceProvider
     {
         return [
             Events\CreatingTenant::class => [],
-            Events\TenantCreated::class => [],  // Single-DB: no DB creation jobs
+            Events\TenantCreated::class => [],
             Events\SavingTenant::class => [],
             Events\TenantSaved::class => [],
             Events\UpdatingTenant::class => [],
             Events\TenantUpdated::class => [],
             Events\DeletingTenant::class => [],
-            Events\TenantDeleted::class => [],  // Single-DB: no DB deletion jobs
+            Events\TenantDeleted::class => [],
 
             Events\CreatingDomain::class => [],
             Events\DomainCreated::class => [],
@@ -36,6 +36,14 @@ class TenancyServiceProvider extends ServiceProvider
             Events\DomainUpdated::class => [],
             Events\DeletingDomain::class => [],
             Events\DomainDeleted::class => [],
+
+            Events\DatabaseCreated::class => [],
+            Events\DatabaseMigrated::class => [
+                SeedSahodayaTenantDatabase::class,
+            ],
+            Events\DatabaseSeeded::class => [],
+            Events\DatabaseRolledBack::class => [],
+            Events\DatabaseDeleted::class => [],
 
             Events\InitializingTenancy::class => [],
             Events\TenancyInitialized::class => [
@@ -67,9 +75,6 @@ class TenancyServiceProvider extends ServiceProvider
     {
         foreach ($this->events() as $event => $listeners) {
             foreach ($listeners as $listener) {
-                if ($listener instanceof JobPipeline) {
-                    $listener = $listener->toListener();
-                }
                 Event::listen($event, $listener);
             }
         }

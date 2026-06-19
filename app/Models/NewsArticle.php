@@ -16,5 +16,14 @@ class NewsArticle extends Model
     public static function boot() {
         parent::boot();
         static::creating(fn($m) => $m->slug = $m->slug ?? Str::slug($m->title));
+        static::saved(fn (self $model) => $model->invalidateTenantCache());
+        static::deleted(fn (self $model) => $model->invalidateTenantCache());
+    }
+
+    public function invalidateTenantCache(): void
+    {
+        if ($tenant = Tenant::find($this->tenant_id)) {
+            $tenant->invalidateCache();
+        }
     }
 }

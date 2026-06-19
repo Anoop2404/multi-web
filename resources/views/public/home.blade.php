@@ -1,14 +1,19 @@
 @extends('layouts.public')
 
-@section('title', $tenant->name)
-
 @section('content')
+    @php use App\Support\SectionVariantResolver; @endphp
     @forelse($sections as $section)
-        @include("sections.{$section->section_type}.{$section->variant}", [
+        @php
+            [$sectionType, $variant] = SectionVariantResolver::path($section->section_type, $section->variant);
+            $anchor = str_replace('_', '-', $section->section_type);
+        @endphp
+        <div id="{{ $anchor }}" class="scroll-mt-24">
+        @includeIf("sections.{$sectionType}.{$variant}", [
             'config'  => $section->config ?? [],
             'section' => $section,
             'tenant'  => $tenant,
         ])
+        </div>
     @empty
         <div class="min-h-screen flex items-center justify-center text-gray-400">
             <p>This site is being set up. Please check back soon.</p>

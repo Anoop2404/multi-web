@@ -100,7 +100,7 @@ const saved = ref(false);
             headers: { 'Accept': 'application/json' },
         });
         const data = await res.json();
-        navConfig.style = data.style ?? 'logo-left';
+        navConfig.style = data.layout_variant ?? data.style ?? 'logo-left';
         navConfig.items = data.items ?? [];
     }
 

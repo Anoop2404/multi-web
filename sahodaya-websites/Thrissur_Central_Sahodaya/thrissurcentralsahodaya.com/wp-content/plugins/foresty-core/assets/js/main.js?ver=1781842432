@@ -1,0 +1,602 @@
+;(function ($) {
+    "use strict";
+    /*---------------------------------------------------
+      * Initialize all widget js in elementor init hook
+      ---------------------------------------------------*/
+    $(window).on('elementor/frontend/init', function () {
+
+        // Brand Slider
+        elementorFrontend.hooks.addAction('frontend/element_ready/foresty-brand-carousel-one-widget.default', function ($scope) {
+            activeBrandSlider($scope);
+        });
+        /* Counter Up */
+        elementorFrontend.hooks.addAction('frontend/element_ready/foresty-counterup-one-widget.default', function ($scope) {
+            counterupInit($scope.find('.count-num'));
+        });
+
+    });
+
+
+    $(window).on('elementor/frontend/init', function () {
+
+        elementorFrontend.hooks.addAction('frontend/element_ready/global', function ($scope, $) {
+            progressBarInit();
+        });
+
+    });
+    // JS for rtl
+    var rtlEnable = $('html').attr('dir');
+    var SlickRtlValue = !(typeof rtlEnable === 'undefined' || rtlEnable === 'ltr');
+
+    /*------------------------------
+    *    Progressbar init
+    * ------------------------------*/
+    function progressBarInit() {
+        var neatProgressInit = $('.neaterller-progress-init');
+        if (neatProgressInit.length > 0) {
+            neatProgressInit.each(function (value) {
+                var eel = $(this);
+                eel.rProgressbar({
+                    percentage: eel.data('percent'),
+                    fillBackgroundColor: eel.data('fillbgcolor')
+                });
+            });
+        }
+    }
+
+    /*-----------------------------
+    *   Header Slider
+    * ----------------------------*/
+    // Banner two slider area start here ***
+    var sliderActive1 = ".banner-slider";
+    var sliderInit1 = new Swiper(sliderActive1, {
+        loop: true,
+        slidesPerView: 1,
+        speed: 2000,
+        effect: "fade",
+        autoplay: {
+            delay: 5000,
+            disableOnInteraction: false,
+        },
+        pagination: {
+            el: ".banner-two__dot",
+            clickable: true,
+        },
+    });
+
+
+    // Here this is use for animate ***
+    function animated_swiper(selector, init) {
+        var animated = function animated() {
+            $(selector + " [data-animation]").each(function () {
+                var anim = $(this).data("animation");
+                var delay = $(this).data("delay");
+                var duration = $(this).data("duration");
+                $(this)
+                    .removeClass("anim" + anim)
+                    .addClass(anim + " animated")
+                    .css({
+                        webkitAnimationDelay: delay,
+                        animationDelay: delay,
+                        webkitAnimationDuration: duration,
+                        animationDuration: duration,
+                    })
+                    .one("animationend", function () {
+                        $(this).removeClass(anim + " animated");
+                    });
+            });
+        };
+        animated();
+        init.on("slideChange", function () {
+            $(sliderActive1 + " [data-animation]").removeClass("animated");
+        });
+        init.on("slideChange", animated);
+    }
+    animated_swiper(sliderActive1, sliderInit1);
+
+    // Here this is use for animate ***
+    var swiper = new Swiper(".banner-two__slider", {
+        loop: "true",
+        effect: "fade",
+        speed: 2000,
+        autoplay: {
+            delay: 5000,
+            disableOnInteraction: false,
+        },
+        pagination: {
+            el: ".banner-two__dot",
+            clickable: true,
+        },
+    });
+    // Banner two slider area end here ***
+
+	// Banner three slider area end here ***
+	var sliderActive2 = ".banner-three__slider";
+	var sliderInit2 = new Swiper(sliderActive2, {
+		loop: true,
+		slidesPerView: 1,
+		effect: "fade",
+		speed: 3000,
+		autoplay: {
+			delay: 7000,
+			disableOnInteraction: false,
+		},
+		navigation: {
+			nextEl: ".banner-three__arry-next",
+			prevEl: ".banner-three__arry-prev",
+		},
+	});
+	// Here this is use for animate ***
+	function animated_swiper(selector, init) {
+		var animated = function animated() {
+			$(selector + " [data-animation]").each(function () {
+				var anim = $(this).data("animation");
+				var delay = $(this).data("delay");
+				var duration = $(this).data("duration");
+				$(this)
+					.removeClass("anim" + anim)
+					.addClass(anim + " animated")
+					.css({
+						webkitAnimationDelay: delay,
+						animationDelay: delay,
+						webkitAnimationDuration: duration,
+						animationDuration: duration,
+					})
+					.one("animationend", function () {
+						$(this).removeClass(anim + " animated");
+					});
+			});
+		};
+		animated();
+		init.on("slideChange", function () {
+			$(sliderActive2 + " [data-animation]").removeClass("animated");
+		});
+		init.on("slideChange", animated);
+	}
+	animated_swiper(sliderActive2, sliderInit2);
+	// Banner three slider area end here ***
+
+	// Banner five slider area end here ***
+	var sliderActive3 = ".banner-five__slider";
+	var sliderInit3 = new Swiper(sliderActive3, {
+		loop: true,
+		slidesPerView: 1,
+		effect: "fade",
+		speed: 3000,
+		autoplay: {
+			delay: 7000,
+			disableOnInteraction: false,
+		},
+		navigation: {
+			nextEl: ".banner-five__arry-next",
+			prevEl: ".banner-five__arry-prev",
+		},
+	});
+	// Here this is use for animate ***
+	function animated_swiper(selector, init) {
+		var animated = function animated() {
+			$(selector + " [data-animation]").each(function () {
+				var anim = $(this).data("animation");
+				var delay = $(this).data("delay");
+				var duration = $(this).data("duration");
+				$(this)
+					.removeClass("anim" + anim)
+					.addClass(anim + " animated")
+					.css({
+						webkitAnimationDelay: delay,
+						animationDelay: delay,
+						webkitAnimationDuration: duration,
+						animationDuration: duration,
+					})
+					.one("animationend", function () {
+						$(this).removeClass(anim + " animated");
+					});
+			});
+		};
+		animated();
+		init.on("slideChange", function () {
+			$(sliderActive3 + " [data-animation]").removeClass("animated");
+		});
+		init.on("slideChange", animated);
+	}
+	animated_swiper(sliderActive3, sliderInit3);
+	// Banner five slider area end here ***
+	
+    // Project slider area start here ***
+    var swiper = new Swiper(".project-slider", {
+        spaceBetween: 30,
+        speed: 500,
+        loop: "true",
+        autoplay: {
+            delay: 5000,
+            disableOnInteraction: false,
+        },
+        pagination: {
+            el: ".pegi-number",
+            type: "fraction",
+        },
+        navigation: {
+            nextEl: ".project-arry-next",
+            prevEl: ".project-arry-prev",
+        },
+    });
+    var swiper = new Swiper(".project-slider2", {
+        spaceBetween: 20,
+        speed: 500,
+        simulateTouch: false,
+        autoplay: {
+            delay: 5000,
+            disableOnInteraction: false,
+        },
+        loop: "true",
+        pagination: {
+            el: ".pegi-number",
+            type: "fraction",
+        },
+        navigation: {
+            nextEl: ".project-arry-next",
+            prevEl: ".project-arry-prev",
+        },
+    });
+    // Project slider area end here ***
+
+    // Donation slider area start here ***
+    var swiper = new Swiper(".donation__slider", {
+        loop: "true",
+        spaceBetween: 30,
+        speed: 500,
+        centeredSlides: true,
+        autoplay: {
+            delay: 3000,
+            disableOnInteraction: false,
+        },
+        navigation: {
+            nextEl: ".donation__arry-next",
+            prevEl: ".donation__arry-prev",
+        },
+        breakpoints: {
+            991: {
+                slidesPerView: 3,
+            },
+            575: {
+                slidesPerView: 1,
+            },
+        },
+    });
+    // Donation slider area end here ***
+
+    // Service three slider area start here ***
+    var swiper = new Swiper(".service-three__slider", {
+        loop: "true",
+        spaceBetween: 30,
+        speed: 1000,
+        centeredSlides: true,
+        autoplay: {
+            delay: 4000,
+            disableOnInteraction: false,
+        },
+        breakpoints: {
+            991: {
+                slidesPerView: 2,
+            },
+            575: {
+                slidesPerView: 1,
+            },
+        },
+        pagination: {
+            el: ".service-three__dot",
+            clickable: true,
+        },
+    });
+    // Service three slider area end here ***
+
+    // Blog two slider area start here ***
+    var swiper = new Swiper(".blog-two__slider", {
+        loop: "true",
+        spaceBetween: 30,
+        speed: 500,
+        centeredSlides: true,
+        autoplay: {
+            delay: 3000,
+            disableOnInteraction: false,
+        },
+        navigation: {
+            nextEl: ".donation__arry-next",
+            prevEl: ".donation__arry-prev",
+        },
+        breakpoints: {
+            1200: {
+                slidesPerView: 4,
+            },
+            768: {
+                slidesPerView: 2,
+            },
+        },
+    });
+    // Blog two slider area end here ***
+
+    // Testimonial slider area start here ***
+    var swiper = new Swiper(".testimonial__slider", {
+        loop: "true",
+        spaceBetween: 30,
+        speed: 500,
+        grabCursor: true,
+        autoplay: {
+            delay: 3000,
+            disableOnInteraction: false,
+        },
+        pagination: {
+            el: ".testimonial__dot",
+            clickable: true,
+        },
+
+        breakpoints: {
+            991: {
+                slidesPerView: 2,
+            },
+            575: {
+                slidesPerView: 1,
+            },
+        },
+    });
+    // Testimonial slider area end here ***
+
+    // Animal gallery slider area start here ***
+    var swiper = new Swiper(".animal-gallery__slider", {
+        loop: "true",
+        spaceBetween: 30,
+        speed: 1000,
+        centeredSlides: true,
+        autoplay: {
+            delay: 3000,
+            disableOnInteraction: false,
+        },
+        breakpoints: {
+            991: {
+                slidesPerView: 3,
+            },
+            768: {
+                slidesPerView: 2,
+            },
+        },
+        navigation: {
+            nextEl: ".animal__arry-next",
+            prevEl: ".animal__arry-prev",
+        },
+    });
+
+    // Testimonial two slider area start here ***
+    var swiper = new Swiper(".testimonial-two__slider", {
+        loop: "true",
+        spaceBetween: 20,
+        speed: 500,
+        autoplay: {
+            delay: 4000,
+            disableOnInteraction: false,
+        },
+        pagination: {
+            el: ".testimonial-two__dot",
+            clickable: true,
+        },
+    });
+    // Testimonial two slider area end here ***
+
+    // Blog slider area start here ***
+    var swiper = new Swiper(".blog__slider", {
+        loop: "true",
+        spaceBetween: 30,
+        speed: 500,
+        autoplay: {
+            delay: 5000,
+            disableOnInteraction: false,
+        },
+        pagination: {
+            el: ".blog__dot",
+            clickable: true,
+        },
+    });
+    // Blog slider area end here ***
+
+    // Preloader area start here ***
+    var windowOn = $(window);
+    windowOn.on("load", function () {
+        $("#loading").fadeOut(500);
+    });
+    // Preloader area end here ***
+
+
+    // Image src and class add js area start here ***
+    $(document).on("mouseenter", ".changeImage2", function () {
+        var newImage = $(this).data("image");
+        var fadeDuration = 200;
+
+        $("#myImage2").fadeOut(fadeDuration, function () {
+            $("#myImage2").attr("src", newImage);
+            $("#myImage2").fadeIn(fadeDuration);
+        });
+
+        $(this).addClass("clicked");
+        $(".changeImage2").not(this).removeClass("clicked");
+    });
+    // Image src and class add js area end here ***
+
+    // Shop single swiper slider area end here ***
+
+    // Shop count js area start here ***
+    jQuery(document).ready(($) => {
+        $(".quantity").on("click", ".plus", function (e) {
+            let $input = $(this).prev("input.qty");
+            let val = parseInt($input.val());
+            $input.val(val + 1).change();
+        });
+
+        $(".quantity").on("click", ".minus", function (e) {
+            let $input = $(this).next("input.qty");
+            var val = parseInt($input.val());
+            if (val > 0) {
+                $input.val(val - 1).change();
+            }
+        });
+    });
+    // Shop count js area end here ***
+
+    // Image src js area start here ***
+    $(document).ready(function () {
+        $(document).on("click", ".changeImage", function () {
+            // Get the image URL from the "data-image" attribute of the clicked button
+            var newImage = $(this).data("image");
+
+            // Define the fade duration in milliseconds (e.g., 1000ms for 1 second)
+            var fadeDuration = 50; // Change this value to your desired duration
+
+            // Fade out the current image with the specified duration
+            $("#myImage").fadeOut(fadeDuration, function () {
+                // Change the src attribute of the image
+                $("#myImage").attr("src", newImage);
+
+                // Fade in the new image with the specified duration
+                $("#myImage").fadeIn(fadeDuration);
+            });
+        });
+    });
+
+    // Image src js area end here ***
+
+    // Hide & show by toggle js area start here ***
+    $(document).ready(function () {
+        $(document).on("click", ".share-btn", function () {
+            var target = $(this).data("target");
+            $("#" + target).toggle();
+        });
+    });
+    // Hide & show by toggle js area end here ***
+
+    // Hide & show by click js area start here ***
+    $(document).ready(function () {
+        $(document).on("click", "#openButton", function () {
+            $("#targetElement").removeClass("side_bar_hidden");
+        });
+        $(document).on("click", "#closeButton", function () {
+            $("#targetElement").addClass("side_bar_hidden");
+        });
+    });
+    // Hide & show by click js area end here ***
+
+    // Hide & show by click and outer js area start here ***
+    $(document).ready(function () {
+        // Function to close the div
+        function closeDiv() {
+            $("#targetElement").addClass("side_bar_hidden");
+        }
+
+        // Click event on the open button
+        $(document).on("click", "#openButton", function () {
+            $("#targetElement").removeClass("side_bar_hidden");
+        });
+
+        // Click event on the close button
+        $(document).on("click", "#closeButton", function (e) {
+            e.stopPropagation(); // Prevent the click event from propagating
+            closeDiv();
+        });
+
+        // Click event outside the div to close it
+        $(document).on("click", function (e) {
+            if (
+                !$("#targetElement").hasClass("side_bar_hidden") &&
+                !$(e.target).closest("#targetElement").length
+            ) {
+                closeDiv();
+            }
+        });
+    });
+
+    // Hide & show by click and outer js area end here ***
+
+    // Isotope area start here ***
+    var $grid = $(".portfolio-items").isotope({});
+    // click here
+    $(".portfolio-list").on("click", "li", function () {
+        var filterValue = $(this).attr("data-filter");
+        $grid.isotope({ filter: filterValue });
+    });
+    // change is-checked class on buttons
+    $(".portfolio-list").each(function (i, buttonGroup) {
+        var $buttonGroup = $(buttonGroup);
+        $buttonGroup.on("click", "li", function () {
+            $buttonGroup.find(".active").removeClass("active");
+            $(this).addClass("active");
+        });
+    });
+    // Isotope area end here ***
+
+    // Background image date area start here ***
+    $("[data-background").each(function () {
+        $(this).css(
+            "background-image",
+            "url( " + $(this).attr("data-background") + "  )"
+        );
+    });
+    // Background image date area end here ***
+    
+    // Map popup area start here ***
+	$(".map-popup").magnificPopup({
+		disableOn: 700,
+		type: "iframe",
+		mainClass: "mfp-fade",
+		removalDelay: 160,
+		preloader: false,
+		fixedContentPos: false,
+	});
+
+
+    /*------------------------------
+            counter section activation
+          -------------------------------*/
+    function counterupInit($scope) {
+        $scope.counterUp({
+            delay: 20,
+            time: 3000
+        });
+    }
+
+    $(document).ready(function () {
+        /*--------------------
+          wow js init
+      ---------------------*/
+        new WOW().init();
+
+        /*---------------------------------
+        * Magnific Popup
+        * --------------------------------*/
+        $('.video-play-btn,.video-play-btn-02,.play-video-btn,.button-video').magnificPopup({
+            type: 'video'
+        });
+
+            //Call Widget
+            $('.call-widget-btn').on('click', function () {
+                $('.call-widget-wrapper').toggleClass('open');
+            });
+        // book + - start here
+        $(function () {
+            $(".qtybutton").on("click", function () {
+                var $button = $(this);
+                var oldValue = $button.parent().find("input").val();
+                if ($button.text() === "+") {
+                    var newVal = parseFloat(oldValue) + 1;
+                } else {
+                    // Don't allow decrementing below zero
+                    if (oldValue > 1) {
+                        var newVal = parseFloat(oldValue) - 1;
+                    } else {
+                        newVal = 1;
+                    }
+                }
+                $button.parent().find("input").val(newVal);
+            });
+        });
+
+    });
+
+})(jQuery);
+

@@ -104,6 +104,36 @@ return [
                 ['key' => 'secondary_cta_url',   'type' => 'url',  'label' => 'Secondary CTA URL'],
             ],
         ],
+        'gradient-split' => [
+            'label' => 'Gradient Split Hero',
+            'description' => 'Premium gradient bg — text left, image or abstract right',
+            'fields' => [
+                ['key' => 'eyebrow',             'type' => 'text',  'label' => 'Eyebrow Label'],
+                ['key' => 'heading',             'type' => 'text',  'label' => 'Heading', 'required' => true],
+                ['key' => 'tagline',             'type' => 'text',  'label' => 'Tagline'],
+                ['key' => 'motto',               'type' => 'text',  'label' => 'Motto (italicised quote)'],
+                ['key' => 'years_active',        'type' => 'number','label' => 'Years Active (stat chip)'],
+                ['key' => 'cta_label',           'type' => 'text',  'label' => 'Primary Button Label'],
+                ['key' => 'cta_url',             'type' => 'url',   'label' => 'Primary Button URL'],
+                ['key' => 'secondary_cta_label', 'type' => 'text',  'label' => 'Secondary Button Label'],
+                ['key' => 'secondary_cta_url',   'type' => 'url',   'label' => 'Secondary Button URL'],
+                ['key' => 'image',               'type' => 'media', 'label' => 'Right-side Image (optional)'],
+            ],
+        ],
+        'full-bleed' => [
+            'label' => 'Full-Bleed Hero',
+            'description' => 'Immersive full-viewport hero — dark overlay over photo',
+            'fields' => [
+                ['key' => 'eyebrow',             'type' => 'text',  'label' => 'Eyebrow Label'],
+                ['key' => 'heading',             'type' => 'text',  'label' => 'Heading', 'required' => true],
+                ['key' => 'tagline',             'type' => 'text',  'label' => 'Tagline'],
+                ['key' => 'bg_image',            'type' => 'media', 'label' => 'Background Image'],
+                ['key' => 'cta_label',           'type' => 'text',  'label' => 'Primary Button Label'],
+                ['key' => 'cta_url',             'type' => 'url',   'label' => 'Primary Button URL'],
+                ['key' => 'secondary_cta_label', 'type' => 'text',  'label' => 'Secondary Button Label'],
+                ['key' => 'secondary_cta_url',   'type' => 'url',   'label' => 'Secondary Button URL'],
+            ],
+        ],
     ],
 
     'about' => [
@@ -170,6 +200,48 @@ return [
                  'fields' => [
                      ['key' => 'value', 'type' => 'text', 'label' => 'Value'],
                      ['key' => 'label', 'type' => 'text', 'label' => 'Label'],
+                 ]],
+            ],
+        ],
+        'motto-hero' => [
+            'label' => 'Motto Hero',
+            'description' => 'About text + Caring and Sharing motto block',
+            'fields' => [
+                ['key' => 'heading',     'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'eyebrow',     'type' => 'text', 'label' => 'Eyebrow'],
+                ['key' => 'motto',       'type' => 'text', 'label' => 'Motto'],
+                ['key' => 'motto_label', 'type' => 'text', 'label' => 'Motto Label'],
+                ['key' => 'about_text',  'type' => 'textarea', 'label' => 'About Text'],
+            ],
+        ],
+        'vision-mission' => [
+            'label' => 'Vision & Mission',
+            'description' => 'Two-column — Vision card + Mission card + optional motto',
+            'fields' => [
+                ['key' => 'eyebrow',         'type' => 'text',     'label' => 'Eyebrow Label'],
+                ['key' => 'heading',         'type' => 'text',     'label' => 'Section Heading'],
+                ['key' => 'vision_heading',  'type' => 'text',     'label' => 'Vision Card Heading'],
+                ['key' => 'vision',          'type' => 'textarea', 'label' => 'Vision Text'],
+                ['key' => 'mission_heading', 'type' => 'text',     'label' => 'Mission Card Heading'],
+                ['key' => 'mission',         'type' => 'textarea', 'label' => 'Mission Text'],
+                ['key' => 'values',          'type' => 'repeater', 'label' => 'Core Values',
+                 'fields' => [['key' => 'text', 'type' => 'text', 'label' => 'Value']]],
+                ['key' => 'motto',           'type' => 'text',     'label' => 'Motto Quote'],
+                ['key' => 'motto_source',    'type' => 'text',     'label' => 'Motto Source'],
+            ],
+        ],
+        'with-timeline' => [
+            'label' => 'History Timeline',
+            'description' => 'Alternating milestone timeline — founding year, events, growth',
+            'fields' => [
+                ['key' => 'eyebrow',    'type' => 'text',     'label' => 'Eyebrow Label'],
+                ['key' => 'heading',    'type' => 'text',     'label' => 'Section Heading'],
+                ['key' => 'subtext',    'type' => 'textarea', 'label' => 'Introduction Text'],
+                ['key' => 'milestones', 'type' => 'repeater', 'label' => 'Milestones',
+                 'fields' => [
+                     ['key' => 'year',        'type' => 'text', 'label' => 'Year'],
+                     ['key' => 'title',       'type' => 'text', 'label' => 'Title'],
+                     ['key' => 'description', 'type' => 'text', 'label' => 'Description'],
                  ]],
             ],
         ],
@@ -280,6 +352,20 @@ return [
                 ['key' => 'achievements', 'type' => 'repeater', 'label' => 'Achievements',
                  'fields' => [
                      ['key' => 'text', 'type' => 'text', 'label' => 'Achievement'],
+                 ]],
+            ],
+        ],
+        'counter-strip' => [
+            'label' => 'Counter Strip',
+            'description' => 'Animated count-up numbers on gradient bg — schools, years, events',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Section Heading'],
+                ['key' => 'stats',   'type' => 'repeater', 'label' => 'Statistics',
+                 'fields' => [
+                     ['key' => 'value',  'type' => 'text', 'label' => 'Value (e.g. 117)'],
+                     ['key' => 'label',  'type' => 'text', 'label' => 'Label (e.g. Member Schools)'],
+                     ['key' => 'suffix', 'type' => 'text', 'label' => 'Suffix (e.g. +)'],
+                     ['key' => 'icon',   'type' => 'text', 'label' => 'Emoji Icon'],
                  ]],
             ],
         ],
@@ -853,6 +939,13 @@ return [
     // ── Sahodaya-specific sections ─────────────────────────────────────────────
 
     'office_bearers' => [
+        'modern-grid' => [
+            'label' => 'Modern Grid (from Admin)',
+            'description' => 'Loads office bearers from Sahodaya admin — modern card layout',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+            ],
+        ],
         'photo-cards' => [
             'label' => 'Photo Cards',
             'description' => 'Photo + name + role + term',
@@ -870,6 +963,13 @@ return [
     ],
 
     'member_schools' => [
+        'modern-grid' => [
+            'label' => 'Modern Grid',
+            'description' => 'Member schools from cluster — modern cards',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+            ],
+        ],
         'card-grid' => [
             'label' => 'Card Grid',
             'description' => 'Logo + school name + location + type + link',
@@ -895,6 +995,20 @@ return [
     ],
 
     'news_circulars' => [
+        'modern-feed' => [
+            'label' => 'Modern Feed',
+            'description' => 'Latest circulars + announcements from admin',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'announcements', 'type' => 'repeater', 'label' => 'Manual Announcements',
+                 'fields' => [
+                     ['key' => 'title', 'type' => 'text', 'label' => 'Title'],
+                     ['key' => 'url',   'type' => 'url',  'label' => 'URL'],
+                     ['key' => 'date',  'type' => 'text', 'label' => 'Date'],
+                     ['key' => 'badge', 'type' => 'text', 'label' => 'Badge'],
+                 ]],
+            ],
+        ],
         'grid' => [
             'label' => 'Grid',
             'description' => 'Card grid (news + circulars combined)',
@@ -914,9 +1028,17 @@ return [
     'events_programs' => [
         'cards' => [
             'label' => 'Cards',
-            'description' => 'Upcoming events grid',
+            'description' => 'Upcoming events grid (manual config or Kalotsav DB)',
             'fields' => [
                 ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+            ],
+        ],
+        'upcoming-cards' => [
+            'label' => 'Upcoming Cards (DB)',
+            'description' => 'Kalotsav events from admin — Travancore style',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'eyebrow',  'type' => 'text', 'label' => 'Eyebrow'],
             ],
         ],
         'timeline' => [
@@ -1019,6 +1141,175 @@ return [
             'description' => 'Current vacancies with apply link/email',
             'fields' => [
                 ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+            ],
+        ],
+    ],
+
+    'sahodaya_home' => [
+        'dashboard' => [
+            'label' => 'Modern Dashboard (All-in-one)',
+            'description' => 'Multi-reference homepage: motto, programmes, bearers, academic links, events, schools, contact',
+            'fields' => [
+                ['key' => 'heading',            'type' => 'text', 'label' => 'Hero Heading'],
+                ['key' => 'tagline',            'type' => 'text', 'label' => 'Tagline'],
+                ['key' => 'eyebrow',            'type' => 'text', 'label' => 'Eyebrow'],
+                ['key' => 'motto',              'type' => 'text', 'label' => 'Motto'],
+                ['key' => 'about_text',         'type' => 'textarea', 'label' => 'About Text'],
+                ['key' => 'about_heading',      'type' => 'text', 'label' => 'About Heading'],
+                ['key' => 'programmes_heading', 'type' => 'text', 'label' => 'Programmes Heading'],
+                ['key' => 'bearers_heading',    'type' => 'text', 'label' => 'Bearers Heading'],
+                ['key' => 'academic_heading',   'type' => 'text', 'label' => 'Academic Heading'],
+                ['key' => 'events_heading',     'type' => 'text', 'label' => 'Events Heading'],
+                ['key' => 'schools_heading',    'type' => 'text', 'label' => 'Schools Heading'],
+                ['key' => 'links_heading',      'type' => 'text', 'label' => 'Useful Links Heading'],
+                ['key' => 'portal_heading',     'type' => 'text', 'label' => 'Portal Strip Heading'],
+                ['key' => 'portal_text',        'type' => 'textarea', 'label' => 'Portal Strip Text'],
+                ['key' => 'contact_heading',    'type' => 'text', 'label' => 'Contact Heading'],
+                ['key' => 'contact_text',       'type' => 'textarea', 'label' => 'Contact Text'],
+                ['key' => 'phone',              'type' => 'tel', 'label' => 'Contact Phone'],
+                ['key' => 'email',              'type' => 'email', 'label' => 'Contact Email'],
+                ['key' => 'announcements', 'type' => 'repeater', 'label' => 'Manual Announcements',
+                 'fields' => [
+                     ['key' => 'title', 'type' => 'text', 'label' => 'Title'],
+                     ['key' => 'url',   'type' => 'url',  'label' => 'URL'],
+                     ['key' => 'date',  'type' => 'text', 'label' => 'Date'],
+                     ['key' => 'badge', 'type' => 'text', 'label' => 'Badge'],
+                 ]],
+                ['key' => 'programmes', 'type' => 'repeater', 'label' => 'Programmes',
+                 'fields' => [
+                     ['key' => 'label',       'type' => 'text', 'label' => 'Label'],
+                     ['key' => 'description', 'type' => 'text', 'label' => 'Description'],
+                     ['key' => 'url',         'type' => 'url',  'label' => 'URL'],
+                     ['key' => 'icon',        'type' => 'text', 'label' => 'Icon (emoji)'],
+                 ]],
+                ['key' => 'years', 'type' => 'academic_years', 'label' => 'Academic Year Links'],
+                ['key' => 'links', 'type' => 'repeater', 'label' => 'Useful Links',
+                 'fields' => [
+                     ['key' => 'label', 'type' => 'text', 'label' => 'Label'],
+                     ['key' => 'url',   'type' => 'url',  'label' => 'URL'],
+                     ['key' => 'icon',  'type' => 'text', 'label' => 'Icon (emoji)'],
+                 ]],
+            ],
+        ],
+    ],
+
+    'programmes' => [
+        'service-grid' => [
+            'label' => 'Service Grid',
+            'description' => 'Kalotsav, MSAT, Kids Fest, membership — Central Kerala / Confederation style',
+            'fields' => [
+                ['key' => 'heading',    'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'eyebrow',    'type' => 'text', 'label' => 'Eyebrow'],
+                ['key' => 'subheading', 'type' => 'text', 'label' => 'Subheading'],
+                ['key' => 'programmes', 'type' => 'repeater', 'label' => 'Programmes',
+                 'fields' => [
+                     ['key' => 'label',       'type' => 'text', 'label' => 'Label'],
+                     ['key' => 'description', 'type' => 'text', 'label' => 'Description'],
+                     ['key' => 'url',         'type' => 'url',  'label' => 'URL'],
+                     ['key' => 'icon',        'type' => 'text', 'label' => 'Icon (emoji)'],
+                 ]],
+            ],
+        ],
+    ],
+
+    'academic_quicklinks' => [
+        'year-tabs' => [
+            'label' => 'Year Tabs',
+            'description' => 'Academic year tabbed quick links',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'years', 'type' => 'academic_years', 'label' => 'Academic Year Links'],
+            ],
+        ],
+    ],
+
+    'useful_links' => [
+        'icon-grid' => [
+            'label' => 'Icon Grid',
+            'description' => 'External resource links (CBSE, DIKSHA, etc.)',
+            'fields' => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'links', 'type' => 'repeater', 'label' => 'Links',
+                 'fields' => [
+                     ['key' => 'label', 'type' => 'text', 'label' => 'Label'],
+                     ['key' => 'url',   'type' => 'url',  'label' => 'URL'],
+                     ['key' => 'icon',  'type' => 'text', 'label' => 'Icon (emoji)'],
+                 ]],
+            ],
+        ],
+    ],
+
+    // ── Sahodaya-specific (from real Sahodaya complex website analysis) ──────
+
+    'sports_meet' => [
+        'results-highlight' => [
+            'label'       => 'Results Highlight',
+            'description' => 'Leaderboard podium + standings table for sports meets',
+            'fields'      => [
+                ['key' => 'eyebrow',  'type' => 'text',  'label' => 'Eyebrow Label'],
+                ['key' => 'heading',  'type' => 'text',  'label' => 'Event Name'],
+                ['key' => 'year',     'type' => 'text',  'label' => 'Academic Year'],
+                ['key' => 'results',  'type' => 'repeater', 'label' => 'Results (by rank)',
+                 'fields' => [
+                     ['key' => 'school',      'type' => 'text',  'label' => 'School Name'],
+                     ['key' => 'points',      'type' => 'text',  'label' => 'Points'],
+                     ['key' => 'school_logo', 'type' => 'media', 'label' => 'School Logo'],
+                 ]],
+            ],
+        ],
+        'schedule-cards' => [
+            'label'       => 'Schedule Cards',
+            'description' => 'Upcoming sports events with schedule and venue info',
+            'fields'      => [
+                ['key' => 'eyebrow',          'type' => 'text', 'label' => 'Eyebrow Label'],
+                ['key' => 'heading',          'type' => 'text', 'label' => 'Heading'],
+                ['key' => 'date_range',       'type' => 'text', 'label' => 'Date Range'],
+                ['key' => 'venue',            'type' => 'text', 'label' => 'Venue'],
+                ['key' => 'registration_url', 'type' => 'url',  'label' => 'Registration URL'],
+                ['key' => 'registration_label','type' => 'text','label' => 'Registration Button Label'],
+                ['key' => 'events', 'type' => 'repeater', 'label' => 'Events',
+                 'fields' => [
+                     ['key' => 'name',      'type' => 'text', 'label' => 'Event Name'],
+                     ['key' => 'icon',      'type' => 'text', 'label' => 'Emoji Icon'],
+                     ['key' => 'category',  'type' => 'text', 'label' => 'Category (e.g. Athletics)'],
+                     ['key' => 'time',      'type' => 'text', 'label' => 'Time'],
+                     ['key' => 'venue',     'type' => 'text', 'label' => 'Venue'],
+                     ['key' => 'age_group', 'type' => 'text', 'label' => 'Age Group'],
+                 ]],
+            ],
+        ],
+    ],
+
+    'testimonials_sahodaya' => [
+        'principal-quotes' => [
+            'label'       => 'Principal Quotes',
+            'description' => 'Testimonials from member school principals',
+            'fields'      => [
+                ['key' => 'heading', 'type' => 'text', 'label' => 'Section Heading'],
+                ['key' => 'quotes', 'type' => 'repeater', 'label' => 'Testimonials',
+                 'fields' => [
+                     ['key' => 'quote',       'type' => 'textarea', 'label' => 'Quote'],
+                     ['key' => 'name',        'type' => 'text',     'label' => 'Name'],
+                     ['key' => 'designation', 'type' => 'text',     'label' => 'Designation'],
+                     ['key' => 'school',      'type' => 'text',     'label' => 'School Name'],
+                     ['key' => 'photo',       'type' => 'media',    'label' => 'Photo'],
+                 ]],
+            ],
+        ],
+    ],
+
+    'newsletter' => [
+        'subscribe-form' => [
+            'label'       => 'Subscribe Form',
+            'description' => 'Email newsletter subscription — gradient bg, single field',
+            'fields'      => [
+                ['key' => 'icon',          'type' => 'text',  'label' => 'Top Icon (emoji)'],
+                ['key' => 'heading',       'type' => 'text',  'label' => 'Heading', 'default' => 'Stay Updated'],
+                ['key' => 'subtext',       'type' => 'textarea','label' => 'Description'],
+                ['key' => 'placeholder',   'type' => 'text',  'label' => 'Email Placeholder'],
+                ['key' => 'button_label',  'type' => 'text',  'label' => 'Button Label', 'default' => 'Subscribe'],
+                ['key' => 'form_action',   'type' => 'url',   'label' => 'Form Action URL'],
+                ['key' => 'privacy_note',  'type' => 'text',  'label' => 'Privacy Note (below form)'],
             ],
         ],
     ],

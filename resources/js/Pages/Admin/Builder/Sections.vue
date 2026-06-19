@@ -103,8 +103,22 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Config (JSON)</label>
-                        <textarea v-model="modal.configRaw" rows="10"
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Config</label>
+                        <div class="flex gap-2 mb-2">
+                            <button type="button" @click="modal.editMode = 'form'"
+                                    :class="modal.editMode === 'form' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'"
+                                    class="text-xs px-3 py-1 rounded-lg font-medium transition">Form</button>
+                            <button type="button" @click="modal.editMode = 'json'"
+                                    :class="modal.editMode === 'json' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'"
+                                    class="text-xs px-3 py-1 rounded-lg font-medium transition">JSON</button>
+                        </div>
+                        <SectionConfigForm v-if="modal.editMode === 'form' && modal.fieldDefs.length"
+                                           :fields="modal.fieldDefs"
+                                           :config="modal.configObj"
+                                           @update:config="onConfigFormUpdate" />
+                        <p v-else-if="modal.editMode === 'form' && !modal.fieldDefs.length"
+                           class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 mb-2">No form fields for this section type — use JSON.</p>
+                        <textarea v-if="modal.editMode === 'json'" v-model="modal.configRaw" rows="10"
                                   class="w-full font-mono text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 resize-none">
                         </textarea>
                         <p v-if="modal.jsonError" class="text-xs text-red-500 mt-1">{{ modal.jsonError }}</p>
@@ -132,9 +146,10 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SectionConfigForm from '@/Components/SectionConfigForm.vue';
 
 const props = defineProps({
     tenants: { type: Array, default: () => [] },
@@ -143,11 +158,17 @@ const props = defineProps({
 const selectedTenantId = ref('');
 const sections = ref([]);
 const loading = ref(false);
+const sectionDefinitions = ref({});
+
+fetch('/admin/api/section-definitions', { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(r => r.json())
+    .then(data => { sectionDefinitions.value = data; })
+    .catch(() => {});
 
 const sectionTypeMap = {
     hero:                 ['centered', 'split-image', 'video-bg', 'minimal', 'with-quicklinks', 'sahodaya-centered', 'event-promo'],
     about:               ['text-left', 'text-right', 'two-column', 'with-motto'],
-    about_sahodaya:      ['single-column', 'with-stats'],
+    about_sahodaya:      ['single-column', 'with-stats', 'motto-hero'],
     principal_message:   ['card-style', 'full-width', 'with-management'],
     management:          ['photo-cards', 'table-list'],
     statistics:          ['counter-cards', 'horizontal-strip', 'with-achievements'],
@@ -176,7 +197,7 @@ const sectionTypeMap = {
     office_bearers:      ['photo-cards', 'table-list'],
     member_schools:      ['card-grid', 'table-list', 'map-view'],
     news_circulars:      ['grid', 'list'],
-    events_programs:     ['cards', 'timeline'],
+    events_programs:     ['cards', 'upcoming-cards', 'timeline'],
     kalotsav:            ['scoreboard', 'results-tabs', 'registration-cta'],
     circulars:           ['category-filter', 'accordion'],
     downloads_sahodaya:  ['sahodaya-grid'],
@@ -184,6 +205,10 @@ const sectionTypeMap = {
     timeline:            ['milestone'],
     testimonials_sahodaya:['principal-quotes'],
     job_vacancies:       ['listing'],
+    sahodaya_home:       ['dashboard'],
+    academic_quicklinks: ['year-tabs'],
+    useful_links:        ['icon-grid'],
+    programmes:          ['service-grid'],
 };
 
 const sectionTypes = Object.keys(sectionTypeMap).map(k => ({
@@ -218,13 +243,35 @@ const modal = reactive({
     editing: null,
     form: { section_type: 'hero', variant: 'centered', is_active: true },
     configRaw: '{}',
+    configObj: {},
+    fieldDefs: [],
+    editMode: 'form',
     jsonError: '',
+});
+
+function fieldsFor(type, variant) {
+    return sectionDefinitions.value?.[type]?.[variant]?.fields ?? [];
+}
+
+function onConfigFormUpdate(config) {
+    modal.configObj = config;
+    modal.configRaw = JSON.stringify(config, null, 2);
+}
+
+watch(() => [modal.form.section_type, modal.form.variant], () => {
+    modal.fieldDefs = fieldsFor(modal.form.section_type, modal.form.variant);
+    if (modal.fieldDefs.length) {
+        modal.editMode = 'form';
+    }
 });
 
 function addSection() {
     modal.editing = null;
     modal.form = { section_type: 'hero', variant: 'centered', is_active: true };
+    modal.configObj = { heading: '', tagline: '' };
     modal.configRaw = '{\n  "heading": "",\n  "tagline": ""\n}';
+    modal.fieldDefs = fieldsFor(modal.form.section_type, modal.form.variant);
+    modal.editMode = modal.fieldDefs.length ? 'form' : 'json';
     modal.jsonError = '';
     modal.open = true;
 }
@@ -232,19 +279,26 @@ function addSection() {
 function editSection(section) {
     modal.editing = section;
     modal.form = { section_type: section.section_type, variant: section.variant, is_active: section.is_active };
+    modal.configObj = { ...(section.config ?? {}) };
     modal.configRaw = JSON.stringify(section.config ?? {}, null, 2);
+    modal.fieldDefs = fieldsFor(section.section_type, section.variant);
+    modal.editMode = modal.fieldDefs.length ? 'form' : 'json';
     modal.jsonError = '';
     modal.open = true;
 }
 
 async function saveSection() {
     let config;
-    try {
-        config = JSON.parse(modal.configRaw);
-        modal.jsonError = '';
-    } catch (e) {
-        modal.jsonError = 'Invalid JSON: ' + e.message;
-        return;
+    if (modal.editMode === 'form' && modal.fieldDefs.length) {
+        config = modal.configObj;
+    } else {
+        try {
+            config = JSON.parse(modal.configRaw);
+            modal.jsonError = '';
+        } catch (e) {
+            modal.jsonError = 'Invalid JSON: ' + e.message;
+            return;
+        }
     }
 
     const payload = { ...modal.form, config };

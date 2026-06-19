@@ -16,7 +16,7 @@
         <div class="grid lg:grid-cols-5 gap-6">
             {{-- Featured article --}}
             @if($featured)
-            <div class="lg:col-span-3 bg-white rounded-2xl overflow-hidden shadow-sm group">
+            <a href="/news/{{ $featured->slug }}" class="lg:col-span-3 bg-white rounded-2xl overflow-hidden shadow-sm group block hover:shadow-md transition">
                 @if($featured->image)
                 <div class="aspect-video overflow-hidden">
                     <img loading="lazy" src="{{ $featured->image }}" alt="{{ $featured->title }}"
@@ -32,13 +32,13 @@
                     <p class="text-gray-500 text-sm mb-3">{{ Str::limit(strip_tags($featured->body), 180) }}</p>
                     <span class="text-xs text-gray-400">{{ $featured->published_at->format('d M Y') }}</span>
                 </div>
-            </div>
+            </a>
             @endif
 
             {{-- Recent list --}}
             <div class="lg:col-span-2 flex flex-col gap-4">
                 @foreach($recents->take(4) as $article)
-                <div class="bg-white rounded-xl p-4 shadow-sm flex gap-4 hover:shadow-md transition group">
+                <a href="/news/{{ $article->slug }}" class="bg-white rounded-xl p-4 shadow-sm flex gap-4 hover:shadow-md transition group">
                     @if($article->image)
                     <div class="w-20 h-16 rounded-lg overflow-hidden shrink-0">
                         <img loading="lazy" src="{{ $article->image }}" alt="{{ $article->title }}"
@@ -49,7 +49,7 @@
                         <h4 class="font-semibold text-gray-900 text-sm line-clamp-2 mb-1">{{ $article->title }}</h4>
                         <span class="text-xs text-gray-400">{{ $article->published_at->format('d M Y') }}</span>
                     </div>
-                </div>
+                </a>
                 @endforeach
             </div>
         </div>

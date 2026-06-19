@@ -126,6 +126,34 @@
                     </div>
                 </div>
 
+                <!-- Visitor Counter -->
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-gray-900">Visitor Counter</h3>
+                            <p class="text-xs text-gray-400 mt-0.5">Shows total page views at the bottom of the site.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" v-model="widgets.visitor_counter.active" class="sr-only peer">
+                            <div class="w-10 h-6 bg-gray-200 peer-checked:bg-indigo-500 rounded-full transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Social Media Strip -->
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-gray-900">Social Media Strip</h3>
+                            <p class="text-xs text-gray-400 mt-0.5">Icon row above the footer (uses social links from top bar settings).</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" v-model="widgets.social_strip.show" class="sr-only peer">
+                            <div class="w-10 h-6 bg-gray-200 peer-checked:bg-indigo-500 rounded-full transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></div>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="flex items-center gap-3">
                     <button @click="saveWidgets"
                             class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition">
@@ -158,6 +186,8 @@ const widgets = reactive({
     news_ticker: { show: false },
     cbse_badge_show: false,
     cbse_affiliation_number: '',
+    visitor_counter: { active: false },
+    social_strip: { show: false },
 });
 
 async function loadWidgets() {
@@ -171,6 +201,8 @@ async function loadWidgets() {
     if (!widgets.social_links) widgets.social_links = {};
     if (!widgets.admission_banner) widgets.admission_banner = { show: false, message: '', link_text: '', link_url: '' };
     if (!widgets.news_ticker) widgets.news_ticker = { show: false };
+    if (!widgets.visitor_counter) widgets.visitor_counter = { active: false };
+    if (!widgets.social_strip) widgets.social_strip = { show: false };
 }
 
 async function saveWidgets() {

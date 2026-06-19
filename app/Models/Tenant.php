@@ -2,28 +2,35 @@
 
 namespace App\Models;
 
-use Illuminate\Support\Facades\Cache;
-use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
+use App\Support\TenantCache;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
+use Stancl\Tenancy\Database\Concerns\HasDatabase;
+use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
-    use HasDomains;
+    use HasDatabase, HasDomains;
 
     protected $fillable = [
         'id', 'type', 'name', 'domain', 'subdomain',
         'parent_id', 'plan', 'is_active',
+        'school_prefix', 'membership_status', 'application_payload', 'prefixes_locked',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
-        'data'      => 'array',
+        'is_active'           => 'boolean',
+        'data'                => 'array',
+        'application_payload' => 'array',
+        'prefixes_locked'     => 'boolean',
     ];
 
     public static function getCustomColumns(): array
     {
-        return ['id', 'type', 'name', 'domain', 'subdomain', 'parent_id', 'plan', 'is_active'];
+        return [
+            'id', 'type', 'name', 'domain', 'subdomain', 'parent_id', 'plan', 'is_active',
+            'school_prefix', 'membership_status', 'application_payload', 'prefixes_locked',
+        ];
     }
 
     // ── Relationships ────────────────────────────────────────────────────────
@@ -44,18 +51,27 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function boardResults() { return $this->hasMany(BoardResult::class, 'tenant_id'); }
     public function admissionEnquiries() { return $this->hasMany(AdmissionEnquiry::class, 'tenant_id'); }
     public function tcRequests()   { return $this->hasMany(TcRequest::class, 'tenant_id'); }
+    public function schoolClasses(){ return $this->hasMany(SchoolClass::class, 'tenant_id'); }
+    public function students()     { return $this->hasMany(Student::class, 'tenant_id'); }
     // Sahodaya-specific
     public function officeBearers() { return $this->hasMany(OfficeBearers::class, 'tenant_id'); }
     public function circulars()     { return $this->hasMany(Circular::class, 'tenant_id'); }
     public function kalotsavEvents() { return $this->hasMany(KalotsavEvent::class, 'tenant_id'); }
+    public function sahodayaProfile() { return $this->hasOne(SahodayaProfile::class, 'tenant_id'); }
+    public function registrations()   { return $this->hasMany(Registration::class, 'school_id'); }
+    public function submissions()     { return $this->hasMany(SchoolYearSubmission::class, 'school_id'); }
+
+    public function isMembershipApproved(): bool
+    {
+        return $this->type !== 'school' || $this->membership_status === 'approved';
+    }
 
     // ── Settings helpers ─────────────────────────────────────────────────────
 
     public function getSetting(string $key, mixed $default = null): mixed
     {
-        return Cache::tags(["tenant:{$this->id}"])->remember("setting:{$key}", 3600, function () use ($key, $default) {
-            $setting = $this->settings()->where('key', $key)->first();
-            return $setting ? $setting->value : $default;
+        return TenantCache::remember($this->id, "setting:{$key}", 3600, function () use ($key, $default) {
+            return $this->settings()->where('key', $key)->first()?->value ?? $default;
         });
     }
 
@@ -77,7 +93,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
 
     public function invalidateCache(): void
     {
-        Cache::tags(["tenant:{$this->id}"])->flush();
+        TenantCache::flushTenant($this->id);
     }
 
     // ── Scopes ───────────────────────────────────────────────────────────────

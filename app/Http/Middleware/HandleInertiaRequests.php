@@ -28,9 +28,13 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user()?->only('id', 'name', 'email'),
             ],
+            'features' => [
+                'website_enabled' => \App\Support\FeatureFlags::websiteEnabled(),
+            ],
             'flash' => [
-                'success' => fn() => $request->session()->get('success'),
-                'error'   => fn() => $request->session()->get('error'),
+                'success'      => fn () => $request->session()->get('success'),
+                'error'        => fn () => $request->session()->get('error'),
+                'importResult' => fn () => $request->session()->get('importResult'),
             ],
         ];
     }

@@ -32,6 +32,18 @@ class EnsureSchoolAdmin
             abort(403);
         }
 
+        if ($user->hasRole('school_admin') && ! $user->hasVerifiedEmail()) {
+            return redirect()->route('verification.notice');
+        }
+
+        $tenantId = $request->route('tenantId');
+        if ($tenantId && $user->hasRole('school_admin')) {
+            $school = \App\Models\Tenant::find($tenantId);
+            if ($school?->membership_status === 'rejected') {
+                abort(403, 'Your school application was rejected.');
+            }
+        }
+
         return $next($request);
     }
 }

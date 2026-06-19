@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width">
+        <title>Tarang</title>
+     <!--[if lt IE 9]>
+  <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+<![endif]-->
+    <link rel=Stylesheet href="css/template.css" />
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,300,600' rel='stylesheet' type='text/css'>
+    <script type="text/javascript" src="js/jquery-1.11.3.min.js"></script> 
+    <script type="text/javascript" src="js/jquery.waypoints.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/animate.css">
+         <!-- Font Awesome Style -->
+      <link href="css/font-awesome.min.css" rel="stylesheet">
+    <!--  Scroll top -->
+<script>
+$(document).ready(function(){
+    // hide #back-top first
+	$("#scrl-top").hide();
+	// fade in #back-top
+	$(function () {
+		$(window).scroll(function () {
+			if ($(this).scrollTop() > 100) {
+				$('#scrl-top').fadeIn();
+			} else {
+				$('#scrl-top').fadeOut();
+			}
+		});
+		// scroll body to 0px on click
+		$('#scrl-top a').click(function () {
+			$('body,html').animate({
+				scrollTop: 0
+			}, 800);
+			return false;
+		});
+	});
+});
+</script>
+<!--  Scroll top -->
+        <style type="text/css">
+        .os-animation{
+            opacity: 0;
+        }  
+        .os-animation.animated{
+            opacity: 1;
+        }   
+    </style>
+    <script type="text/javascript">
+        $(function(){
+            function onScrollInit( items, trigger ) {
+                items.each( function() {
+                var osElement = $(this),
+                    osAnimationClass = osElement.attr('data-os-animation'),
+                    osAnimationDelay = osElement.attr('data-os-animation-delay');
+                    osElement.css({
+                        '-webkit-animation-delay':  osAnimationDelay,
+                        '-moz-animation-delay':     osAnimationDelay,
+                        'animation-delay':          osAnimationDelay
+                    });
+                    var osTrigger = ( trigger ) ? trigger : osElement;
+                    osTrigger.waypoint(function() {
+                        osElement.addClass('animated').addClass(osAnimationClass);
+                        },{
+                            triggerOnce: true,
+                            offset: '90%'
+                    });
+                });
+            }
+            onScrollInit( $('.os-animation') );
+            onScrollInit( $('.staggered-animation'), $('.staggered-animation-container') );
+});
+    </script>
+</head>
+<body>
+<div id="wrapper">
+<div class="container os-animation bg-abt"  data-os-animation="fadeIn" data-os-animation-delay="0s">
+    <div class="row">
+        <div class="col3" style="text-align: center;">   
+           <div class="menu" style="border-bottom: solid 1px papayawhip;">
+            <ul>
+             <li><a href="index.html">Home</a></li>
+            <li><a href="rules.html">General Rules</a></li>
+            <li><a href="items.html">Competitions</a></li> 
+            <li><a href="schedule.html">Programme schedule</a></li>  
+             <li><a href="topics.html">Topics</a></li> 
+                <li><a href="registration.aspx.html">Registration</a></li>    
+             <li><a href="Results.aspx.html">Results</a></li>  
+            </ul>
+            </div>
+            <div style="display:inline-block; vertical-align:bottom;"><img src="images/logo-200.png" alt="logo"/></div>
+            <div class="logoimg"><img src="images/kalotsav.png" alt="logo"/></div>
+            <div class="prgm">
+                <h2>Off Stage Programme Schedule</h2>
+                <p>Date <span>October 23<sup>rd</sup></span>Venue <span>Saraswathi Vidyalaya, Vattiyoorkavu, Trivandrum</span></p>
+                <h2>On Stage Programme Schedule</h2>
+                 <p>Date <span>October 24<sup>th</sup> & 25<sup>th</sup></span>  Venue  <span>Saraswathi Vidyalaya, Vattiyoorkavu, Trivandrum</span></p>
+                   <h2>Last Date of Registration</h2>
+                 <p>Date <span>5pm, 15<sup>th</sup> October 2025</span> </p>
+            </div>
+        </div>
+    </div>
+ </div>       
+    <div id="scrl-top">
+		<a href="index.html#top"><span></span></a>
+	</div>
+    <div class="lnkbtn" style="padding: 15px;">
+    <a target="_blank" href="https://capitaldistrictsahodaya.in/tarangmanual.pdf">Download Manual</a>
+    </div>
+<footer>
+<div class="block">
+<p>&copy; 2025 <a href="http://www.bstsoftwarelabs.com" target="_blank">BST Software Pvt. Ltd</a></p>
+</div>
+</footer>
+</div>
+</body>
+</html>

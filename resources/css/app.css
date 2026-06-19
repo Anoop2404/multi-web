@@ -16,3 +16,7 @@
         100% { transform: translateX(-50%); }
     }
 }
+
+[x-cloak] {
+    display: none !important;
+}

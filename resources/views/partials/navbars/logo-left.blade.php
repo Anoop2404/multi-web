@@ -1,8 +1,8 @@
 <nav class="bg-white shadow-sm sticky top-0 z-50" x-data="{ open: false }">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
         <a href="/" class="flex items-center gap-3">
-            @if(isset($tenant) && $tenant->getFirstMediaUrl('logo'))
-                <img loading="lazy" src="{{ $tenant->getFirstMediaUrl('logo') }}" class="h-10" alt="{{ $tenant->name }}">
+            @if(!empty($logo))
+                <img loading="lazy" src="{{ $logo }}" class="h-10" alt="{{ $tenant->name }}">
             @else
                 <span class="text-xl font-bold text-primary font-heading">{{ $tenant->name ?? 'School' }}</span>
             @endif

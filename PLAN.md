@@ -414,28 +414,29 @@ These are injected by the layout, not sections. Configured via `tenant_settings`
 **Goal:** Production-ready. Fast, found on Google, mobile-perfect.
 
 ### 7A — SEO per tenant
-- [ ] Each page: `<title>`, `<meta description>`, Open Graph tags
-- [ ] SEO settings in tenant_settings (title, description, keywords, tagline)
-- [ ] School admin Settings page has SEO section
+- [x] Each page: `<title>`, `<meta description>`, Open Graph tags
+- [x] SEO settings in tenant_settings (title, description, keywords, tagline)
+- [x] School admin Settings page has SEO section
+- [x] Per-page SEO on news and event detail pages
 
 ### 7B — Sitemap per tenant
-- [ ] Generate `/sitemap.xml` for each tenant domain
+- [x] Generate `/sitemap.xml` for each tenant domain
 
 ### 7C — Mobile responsive QA
-- [ ] Test every section variant
-- [ ] Hamburger nav on all variants
-- [ ] Touch-friendly gallery lightbox
+- [x] Hamburger nav on all variants
+- [x] Touch-friendly gallery lightbox (44px tap targets, keyboard nav)
+- [ ] Test every section variant (manual QA pass before launch)
 
 ### 7D — Performance
-- [ ] Cloudflare domain mapping + wildcard SSL
-- [ ] Edge cache headers
-- [ ] Image lazy loading
-- [ ] Font preload
+- [ ] Cloudflare domain mapping + wildcard SSL (deployment/infrastructure)
+- [x] Edge cache headers (`SetPublicCacheHeaders` middleware on tenant routes)
+- [x] Image lazy loading (all content images; hero/carousel first slide eager)
+- [x] Font preload (Google Fonts via `partials/font-preload.blade.php`)
 
 ### 7E — Accessibility
-- [ ] `lang` attribute support
-- [ ] Color contrast
-- [ ] Alt attributes on all images
+- [x] `lang` attribute support (tenant_settings `locale`, school admin picker)
+- [ ] Color contrast (audit theme presets before launch)
+- [x] Alt attributes on all images
 
 ---
 
@@ -464,7 +465,7 @@ Phase 3  ✅ Complete    — Superadmin builder Vue SPA (section manager, theme,
 Phase 4  ✅ Complete    — School admin panel (all content CRUD pages)
 Phase 5  ✅ Complete    — Sahodaya admin panel (cluster content + Kalotsav)
 Phase 6  ✅ Complete    — Advanced modules (Mandatory Disclosure, Board Results, Admissions, E-TC, Downloads, Alumni, Jobs, Kalotsav Scoreboard)
-Phase 7  🔲 Next        — SEO, sitemaps, performance, mobile QA
+Phase 7  🟡 Nearly done  — SEO, sitemaps, performance, mobile QA (manual section pass + Cloudflare deploy remain)
 Phase 8  🔲 Post-launch — Analytics, Flutter, onboarding automation
 ```
 

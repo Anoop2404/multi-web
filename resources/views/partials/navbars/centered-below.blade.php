@@ -2,8 +2,8 @@
     <div class="max-w-7xl mx-auto px-4">
         <div class="flex items-center justify-center py-4">
             <a href="/" class="flex items-center gap-3">
-                @if(isset($tenant) && $tenant->getFirstMediaUrl('logo'))
-                <img loading="lazy" src="{{ $tenant->getFirstMediaUrl('logo') }}" class="h-12" alt="{{ $tenant->name }}">
+                @if(!empty($logo))
+                <img loading="lazy" src="{{ $logo }}" class="h-12" alt="{{ $tenant->name }}">
                 @else
                 <span class="text-2xl font-bold font-heading" style="color: var(--color-primary)">{{ $tenant->name ?? 'School' }}</span>
                 @endif

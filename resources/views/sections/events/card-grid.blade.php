@@ -23,7 +23,7 @@
 
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($events as $event)
-            <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group">
+            <a href="/events/{{ $event->slug }}" class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group block">
                 @if($event->image)
                 <div class="aspect-video overflow-hidden relative">
                     <img loading="lazy" src="{{ $event->image }}" alt="{{ $event->title }}"
@@ -64,7 +64,7 @@
                     </p>
                     @endif
                 </div>
-            </div>
+            </a>
             @endforeach
         </div>
     </div>

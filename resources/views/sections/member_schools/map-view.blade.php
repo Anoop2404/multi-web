@@ -11,7 +11,7 @@
             @foreach($config['schools'] as $school)
             <div class="flex items-center gap-3 p-3 rounded-lg bg-white shadow-sm border border-gray-100">
                 @if(!empty($school['logo']))
-                <img loading="lazy" src="{{ $school['logo'] }}" alt="" class="w-10 h-10 rounded object-contain">
+                <img loading="lazy" src="{{ $school['logo'] }}" alt="{{ $school['name'] ?? 'School logo' }}" class="w-10 h-10 rounded object-contain">
                 @endif
                 <div>
                     <p class="font-medium text-sm text-gray-800">{{ $school['name'] }}</p>

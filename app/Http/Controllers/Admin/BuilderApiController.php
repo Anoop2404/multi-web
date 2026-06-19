@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\SiteSection;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
+use App\Support\SectionFieldRegistry;
+use App\Support\SectionVariantResolver;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 
 class BuilderApiController extends Controller
 {
@@ -51,6 +53,17 @@ class BuilderApiController extends Controller
             'config'       => 'nullable|array',
             'is_active'    => 'boolean',
         ]);
+
+        // Archive current config when variant changes
+        $newVariant = $data['variant'] ?? $section->variant;
+        if ($newVariant !== $section->variant) {
+            $section->archiveCurrentConfig();
+            $data['archived_configs'] = $section->archived_configs;
+            // Reset config for the new variant so editors start fresh
+            if (!isset($data['config']) || empty($data['config'])) {
+                $data['config'] = [];
+            }
+        }
 
         $section->update($data);
         $this->bustCache($tenantId);
@@ -127,11 +140,16 @@ class BuilderApiController extends Controller
     {
         $data = $request->validate([
             'style' => 'nullable|string|max:50',
+            'layout_variant' => 'nullable|string|max:50',
             'items' => 'nullable|array',
             'items.*.label' => 'required|string|max:100',
             'items.*.url'   => 'required|string|max:500',
             'items.*.children' => 'nullable|array',
         ]);
+
+        $variant = $data['layout_variant'] ?? $data['style'] ?? 'logo-left';
+        $data['style'] = $variant;
+        $data['layout_variant'] = $variant;
 
         $tenant = Tenant::findOrFail($tenantId);
         $tenant->setSetting('nav_config', $data);
@@ -150,18 +168,23 @@ class BuilderApiController extends Controller
     public function saveFooter(Request $request, string $tenantId): JsonResponse
     {
         $data = $request->validate([
-            'style'       => 'nullable|string|max:50',
-            'tagline'     => 'nullable|string|max:500',
-            'copyright'   => 'nullable|string|max:500',
-            'address'     => 'nullable|string|max:500',
-            'phone'       => 'nullable|string|max:50',
-            'email'       => 'nullable|email|max:255',
-            'quick_links' => 'nullable|array',
+            'style'            => 'nullable|string|max:50',
+            'layout_variant'   => 'nullable|string|max:50',
+            'tagline'          => 'nullable|string|max:500',
+            'copyright'        => 'nullable|string|max:500',
+            'address'          => 'nullable|string|max:500',
+            'phone'            => 'nullable|string|max:50',
+            'email'            => 'nullable|email|max:255',
+            'quick_links'      => 'nullable|array',
             'quick_links.*.label' => 'required|string|max:100',
             'quick_links.*.url'   => 'required|string|max:500',
-            'social_links' => 'nullable|array',
-            'sahodaya_link' => 'nullable|array',
+            'social_links'     => 'nullable|array',
+            'sahodaya_link'    => 'nullable|array',
         ]);
+
+        $variant = SectionVariantResolver::resolveFooterVariant($data);
+        $data['style'] = $variant;
+        $data['layout_variant'] = $variant;
 
         $tenant = Tenant::findOrFail($tenantId);
         $tenant->setSetting('footer_config', $data);
@@ -207,25 +230,40 @@ class BuilderApiController extends Controller
     public function saveWidgets(Request $request, string $tenantId): JsonResponse
     {
         $data = $request->validate([
-            'whatsapp_number' => 'nullable|string|max:50',
-            'topbar'          => 'nullable|array',
-            'admission_banner'=> 'nullable|array',
-            'ticker'          => 'nullable|array',
-            'social_links'    => 'nullable|array',
-            'visitor_counter' => 'nullable|array',
-            'cbse_affiliation_no' => 'nullable|string|max:100',
+            'whatsapp_enabled'        => 'nullable|boolean',
+            'whatsapp_number'         => 'nullable|string|max:50',
+            'topbar'                  => 'nullable|array',
+            'admission_banner'        => 'nullable|array',
+            'news_ticker'             => 'nullable|array',
+            'ticker'                  => 'nullable|array',
+            'social_links'            => 'nullable|array',
+            'visitor_counter'         => 'nullable|array',
+            'social_strip'            => 'nullable|array',
+            'cbse_badge_show'         => 'nullable|boolean',
+            'cbse_affiliation_number' => 'nullable|string|max:100',
+            'cbse_affiliation_no'     => 'nullable|string|max:100',
         ]);
 
         $tenant = Tenant::findOrFail($tenantId);
-        $tenant->setSetting('widgets', $data);
+        $existing = $tenant->getSetting('widgets', []) ?? [];
+        $tenant->setSetting('widgets', array_merge($existing, $data));
 
         return response()->json(['saved' => true]);
+    }
+
+    // ── Section field definitions ─────────────────────────────────────────────
+
+    public function sectionDefinitions(): JsonResponse
+    {
+        return response()->json(SectionFieldRegistry::all());
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function bustCache(string $tenantId): void
     {
-        Cache::tags(["tenant:{$tenantId}"])->flush();
+        if (Cache::supportsTags()) {
+            Cache::tags(["tenant:{$tenantId}"])->flush();
+        }
     }
 }

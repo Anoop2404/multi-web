@@ -4,8 +4,8 @@
      :class="scrolled ? 'bg-white shadow-sm' : 'bg-transparent'">
     <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
         <a href="/" class="flex items-center gap-3">
-            @if(isset($tenant) && $tenant->getFirstMediaUrl('logo'))
-            <img loading="lazy" src="{{ $tenant->getFirstMediaUrl('logo') }}" class="h-10" alt="{{ $tenant->name }}"
+            @if(!empty($logo))
+            <img loading="lazy" src="{{ $logo }}" class="h-10" alt="{{ $tenant->name }}"
                  :class="scrolled ? '' : 'brightness-0 invert'">
             @else
             <span class="text-xl font-bold font-heading transition-colors"

@@ -55,6 +55,7 @@
 
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 defineProps({
     title: { type: String, default: 'Dashboard' },
@@ -62,36 +63,62 @@ defineProps({
 
 const page = usePage();
 
-const navGroups = [
-    {
-        label: 'Overview',
-        items: [
-            { href: '/admin/dashboard', icon: '📊', label: 'Dashboard' },
-        ],
-    },
-    {
-        label: 'Tenants',
-        items: [
-            { href: '/admin/tenants',  icon: '🏫', label: 'All Tenants' },
-            { href: '/admin/tenants/create', icon: '➕', label: 'Add Tenant' },
-        ],
-    },
-    {
-        label: 'Site Builder',
-        items: [
-            { href: '/admin/builder/sections',  icon: '📐', label: 'Sections' },
-            { href: '/admin/builder/theme',     icon: '🎨', label: 'Theme & Skin' },
-            { href: '/admin/builder/nav',       icon: '🧭', label: 'Navigation' },
-            { href: '/admin/builder/widgets',   icon: '🔧', label: 'Widgets' },
-        ],
-    },
-    {
-        label: 'Content',
-        items: [
-            { href: '/admin/skin-presets', icon: '🖌️', label: 'Skin Presets' },
-        ],
-    },
-];
+const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
+
+const navGroups = computed(() => {
+    const groups = [
+        {
+            label: 'Overview',
+            items: [
+                { href: '/admin/dashboard', icon: '📊', label: 'Dashboard' },
+            ],
+        },
+        {
+            label: 'Sahodaya Clusters',
+            items: [
+                { href: '/admin/sahodayas',        icon: '🏛️', label: 'All Sahodayas' },
+                { href: '/admin/sahodayas/create', icon: '➕', label: 'Add Sahodaya' },
+            ],
+        },
+        {
+            label: 'Member Schools',
+            items: [
+                { href: '/admin/schools',        icon: '🏫', label: 'All Schools' },
+                { href: '/admin/schools/create', icon: '➕', label: 'Add School' },
+            ],
+        },
+        {
+            label: 'Platform Rules',
+            items: [
+                { href: '/admin/master-data/class-categories', icon: '📚', label: 'Class Categories' },
+                { href: '/admin/master-data/teaching-types',   icon: '👩‍🏫', label: 'Teaching Types' },
+            ],
+        },
+    ];
+
+    if (websiteEnabled.value) {
+        groups.push(
+            {
+                label: 'Site Builder',
+                items: [
+                    { href: '/admin/builder/sections',  icon: '📐', label: 'Sections' },
+                    { href: '/admin/builder/theme',     icon: '🎨', label: 'Theme & Skin' },
+                    { href: '/admin/builder/nav',       icon: '🧭', label: 'Navigation' },
+                    { href: '/admin/builder/footer',    icon: '🦶', label: 'Footer' },
+                    { href: '/admin/builder/widgets',   icon: '🔧', label: 'Widgets' },
+                ],
+            },
+            {
+                label: 'Content',
+                items: [
+                    { href: '/admin/skin-presets', icon: '🖌️', label: 'Skin Presets' },
+                ],
+            },
+        );
+    }
+
+    return groups;
+});
 
 function isActive(href) {
     return page.url === href || page.url.startsWith(href + '/');

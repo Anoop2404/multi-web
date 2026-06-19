@@ -1,3 +1,9 @@
 {{-- Footer rendered from footer_config for this tenant --}}
-@php $footerConfig = $footerConfig ?? []; @endphp
-@include("partials.footers." . ($footerConfig['layout_variant'] ?? 'three-column'), ['content' => $footerConfig['content'] ?? []])
+@php
+    use App\Support\SectionVariantResolver;
+
+    $footerConfig = $footerConfig ?? [];
+    $footerVariant = SectionVariantResolver::resolveFooterVariant($footerConfig);
+    $content = $footerConfig['content'] ?? array_diff_key($footerConfig, array_flip(['style', 'layout_variant']));
+@endphp
+@include("partials.footers.{$footerVariant}", ['content' => $content])
