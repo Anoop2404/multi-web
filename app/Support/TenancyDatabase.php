@@ -27,7 +27,12 @@ class TenancyDatabase
         $connectionName = self::RUNTIME_CONNECTION;
         $central = (string) config('tenancy.database.central_connection', 'central');
         $previousDefault = config('database.default');
-        $template = config("database.connections.{$central}");
+        $template = config("database.connections.{$central}")
+            ?? config('database.connections.'.($previousDefault ?: 'pgsql'));
+
+        if (! is_array($template)) {
+            throw new InvalidArgumentException("No database connection template found for tenant runtime.");
+        }
 
         config([
             "database.connections.{$connectionName}" => array_merge($template, ['database' => $databaseName]),
