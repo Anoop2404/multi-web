@@ -30,7 +30,7 @@ abstract class SchoolAdminController extends Controller
     {
         return inertia($component, array_merge([
             'school' => array_merge(
-                $this->school->only('id', 'name', 'type', 'school_prefix', 'prefixes_locked'),
+                $this->school->only('id', 'name', 'type', 'school_prefix', 'prefixes_locked', 'membership_status'),
                 ['logo_url' => TenantBranding::logoUrl($this->school)],
             ),
             'publicUrl' => TenantDomainSync::publicUrl($this->school),

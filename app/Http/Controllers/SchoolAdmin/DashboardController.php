@@ -25,6 +25,7 @@ class DashboardController extends SchoolAdminController
                 ['label' => 'Pending TC Requests', 'value' => TcRequest::where('tenant_id', $tid)->where('status', 'pending')->count()],
             ],
             'setup' => $this->setupStatus(),
+            'membershipComplete' => $this->membershipComplete(),
         ]);
     }
 
@@ -60,6 +61,23 @@ class DashboardController extends SchoolAdminController
             'studentCount'    => $studentCount,
             'hasRegistration' => (bool) $registration,
             'registrationStatus' => $registration?->registration_status,
+        ];
+    }
+
+    private function membershipComplete(): ?array
+    {
+        $academicYear = AcademicYear::forSchool($this->school);
+        $registration = Registration::where('school_id', $this->school->id)
+            ->where('academic_year', $academicYear)
+            ->first();
+
+        if ($registration?->registration_status !== 'completed') {
+            return null;
+        }
+
+        return [
+            'academicYear' => $academicYear,
+            'regNo'        => $registration->reg_no,
         ];
     }
 }

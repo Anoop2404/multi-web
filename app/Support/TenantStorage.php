@@ -119,12 +119,24 @@ class TenantStorage
 
     public static function storeStudentPhoto($file, string $schoolId): string
     {
-        return self::storeUploadedFile($file, 'students/'.$schoolId, 's3');
+        return self::storeUploadedFile($file, 'students/'.$schoolId, self::photosDisk());
     }
 
     public static function storeSubmissionImage($file, string $schoolId): string
     {
-        return self::storeUploadedFile($file, 'submissions/'.$schoolId, 's3');
+        return self::storeUploadedFile($file, 'submissions/'.$schoolId, self::photosDisk());
+    }
+
+    public static function isS3Configured(): bool
+    {
+        return filled(config('filesystems.disks.s3.key'))
+            && filled(config('filesystems.disks.s3.secret'))
+            && filled(config('filesystems.disks.s3.bucket'));
+    }
+
+    private static function photosDisk(): string
+    {
+        return self::isS3Configured() ? 's3' : self::uploadDisk();
     }
 
     /** @return list<string> */

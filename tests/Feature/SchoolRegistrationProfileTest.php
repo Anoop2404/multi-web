@@ -9,7 +9,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Auth\Notifications\VerifyEmail;
+use App\Notifications\PortalVerifyEmail;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -127,7 +127,7 @@ class SchoolRegistrationProfileTest extends TestCase
         $this->assertNull($admin->fresh()->email_verified_at);
         $this->assertSame('new.demo.school@gmail.com', $school->fresh()->application_payload['school_email']);
 
-        Notification::assertSentTo($admin->fresh(), VerifyEmail::class);
+        Notification::assertSentTo($admin->fresh(), PortalVerifyEmail::class);
     }
 
     public function test_non_gmail_login_email_rejected(): void

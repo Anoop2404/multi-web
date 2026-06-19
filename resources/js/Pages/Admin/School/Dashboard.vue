@@ -1,6 +1,16 @@
 <template>
     <SchoolAdminLayout title="Dashboard" :school="school">
         <div class="space-y-6 max-w-4xl">
+            <div v-if="membershipComplete"
+                 class="bg-green-50 border border-green-200 rounded-xl p-5 space-y-2">
+                <p class="font-semibold text-green-900">
+                    {{ membershipComplete.academicYear }} membership complete
+                </p>
+                <p class="text-sm text-green-800">
+                    Membership No: <span class="font-mono font-bold">{{ membershipComplete.regNo }}</span>
+                </p>
+            </div>
+
             <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-3">
                 <h2 class="text-lg font-bold text-gray-900">Welcome to your school portal</h2>
                 <p class="text-sm text-gray-600 leading-relaxed">
@@ -89,5 +99,6 @@ defineProps({
     school: Object,
     stats:  { type: Array, default: () => [] },
     setup:  { type: Object, required: true },
+    membershipComplete: { type: Object, default: null },
 });
 </script>

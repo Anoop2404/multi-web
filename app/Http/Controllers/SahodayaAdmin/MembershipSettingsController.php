@@ -252,10 +252,15 @@ class MembershipSettingsController extends SahodayaAdminController
         $to = $data['test_email'] ?? $profile->contact_email ?? $request->user()->email;
 
         try {
-            SahodayaMailer::for($this->sahodaya->id)->sendRaw(
+            SahodayaMailer::for($this->sahodaya->id)->sendView(
                 $to,
                 'Test email — '.$this->sahodaya->name,
-                "This is a test email from {$this->sahodaya->name} membership portal.\n\nIf you received this, SMTP is configured correctly.",
+                'emails.test-mail',
+                [
+                    'headerTitle'    => 'SMTP Test',
+                    'headerSubtitle' => $this->sahodaya->name,
+                    'headerEyebrow'  => 'Mail Settings',
+                ],
             );
         } catch (TransportException $e) {
             return back()->with('error', $this->smtpAuthErrorMessage($profile));

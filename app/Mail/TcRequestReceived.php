@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\TcRequest;
 use App\Models\Tenant;
+use App\Support\Mail\EmailBranding;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -28,8 +29,21 @@ class TcRequestReceived extends Mailable
 
     public function content(): Content
     {
+        $sahodaya = $this->school->parent_id
+            ? Tenant::query()->find($this->school->parent_id)
+            : null;
+
         return new Content(
             view: 'emails.tc-request',
+            with: array_merge(
+                EmailBranding::forTenant($sahodaya ?? $this->school),
+                [
+                    'headerTitle'    => 'Transfer Certificate Request',
+                    'headerSubtitle' => $this->school->name,
+                    'headerEyebrow'  => 'TC Portal',
+                    'footerNote'     => 'Submitted via '.$this->school->name.' TC Portal',
+                ],
+            ),
         );
     }
 }

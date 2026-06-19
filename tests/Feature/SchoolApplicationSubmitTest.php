@@ -9,7 +9,7 @@ use App\Support\SchoolApplicationForm;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Auth\Notifications\VerifyEmail;
+use App\Notifications\PortalVerifyEmail;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -56,7 +56,7 @@ class SchoolApplicationSubmitTest extends TestCase
         $this->assertNull($user->email_verified_at);
         $this->assertTrue($user->hasRole('school_admin'));
 
-        Notification::assertSentTo($user, VerifyEmail::class);
+        Notification::assertSentTo($user, PortalVerifyEmail::class);
     }
 
     public function test_non_gmail_rejected(): void

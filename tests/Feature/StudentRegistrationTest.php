@@ -225,8 +225,8 @@ class StudentRegistrationTest extends TestCase
         $student->update(['photo' => $path]);
 
         $photoUrl = $student->fresh()->photoUrl();
-        $this->assertStringContainsString("/school-admin/{$school->id}/students/{$student->id}/photo", $photoUrl);
-        $this->assertStringNotContainsString('amazonaws.com', $photoUrl);
+        $this->assertNotNull($photoUrl);
+        $this->assertStringContainsString('students/'.$school->id.'/avatar.jpg', $photoUrl);
 
         $this->actingAs($admin)
             ->get("/school-admin/{$school->id}/students/{$student->id}/photo")

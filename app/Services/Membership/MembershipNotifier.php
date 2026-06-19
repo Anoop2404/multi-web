@@ -5,88 +5,170 @@ namespace App\Services\Membership;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Mail\SahodayaMailer;
-use App\Support\TenantDomainSync;
+use App\Support\Mail\EmailBranding;
 
 class MembershipNotifier
 {
     public function schoolApplicationSubmitted(Tenant $school): void
     {
-        $this->notifySahodayaAdmins($school->parent_id, 'School Registration Submitted', [
-            'school' => $school->name,
-            'message' => "A new school \"{$school->name}\" has submitted a membership application.",
-        ]);
+        $sahodaya = $this->sahodayaFor($school);
+        $payload = $school->application_payload ?? [];
+
+        $this->notifySahodayaRecipients(
+            $school->parent_id,
+            'New school application — '.$school->name,
+            'emails.membership.school-application-submitted',
+            [
+                'headerTitle'    => 'New School Application',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => 'Membership',
+                'school'         => $school,
+                'reviewUrl'      => EmailBranding::sahodayaAdminUrl($sahodaya, 'schools?status=pending'),
+                'applicationDetails' => array_filter([
+                    'School name'        => $school->name,
+                    'School code'        => $school->school_prefix,
+                    'CBSE affiliation'   => $payload['cbse_affiliation'] ?? $payload['affiliation_number'] ?? null,
+                    'Contact email'      => $payload['school_email'] ?? $payload['contact_email'] ?? null,
+                    'Phone'              => $payload['phone'] ?? $payload['contact_phone'] ?? null,
+                    'Highest class'      => $payload['highest_class'] ?? null,
+                ]),
+            ],
+        );
     }
 
     public function schoolCredentialsIssued(User $user, string $plainPassword, Tenant $school): void
     {
-        $sahodaya = $school->parent_id ? Tenant::find($school->parent_id) : null;
-        $portal = $sahodaya ? TenantDomainSync::publicUrl($sahodaya) : null;
-        $loginUrl = $portal ? rtrim($portal, '/').'/login' : url('/login');
-        $body = <<<TEXT
-Your school "{$school->name}" has been registered with {$school->parent?->name}.
+        $sahodaya = $this->sahodayaFor($school);
+        $loginUrl = EmailBranding::schoolLoginUrl($sahodaya);
 
-Login email (Gmail): {$user->email}
-Temporary password: {$plainPassword}
-
-1. Open {$loginUrl}
-2. Verify your Gmail address using the link we sent separately
-3. Sign in with the credentials above
-
-You may change your password after logging in. Keep this email safe.
-TEXT;
-
-        $this->mailerFor($school->parent_id)->sendRaw(
+        $this->mailerFor($school->parent_id)->sendView(
             $user->email,
             'School Portal Login — Verify Gmail & Sign In',
-            $body,
+            'emails.membership.school-credentials',
+            [
+                'headerTitle'    => 'School Portal Access',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => 'Welcome',
+                'school'         => $school,
+                'user'           => $user,
+                'plainPassword'  => $plainPassword,
+                'loginUrl'       => $loginUrl,
+            ],
         );
     }
 
     public function schoolApproved(Tenant $school): void
     {
-        $email = $school->application_payload['school_email']
-            ?? $school->application_payload['contact_email']
-            ?? null;
-        if ($email) {
-            $this->mailerFor($school->parent_id)->sendRaw(
-                $email,
-                'School Registration Approved',
-                "Your school \"{$school->name}\" has been approved. You may now log in.",
-            );
+        $email = $this->schoolContactEmail($school);
+        if (! $email) {
+            return;
         }
+
+        $sahodaya = $this->sahodayaFor($school);
+        $loginUrl = EmailBranding::schoolLoginUrl($sahodaya);
+
+        $this->mailerFor($school->parent_id)->sendView(
+            $email,
+            'School Membership Approved — '.$school->name,
+            'emails.membership.school-approved',
+            [
+                'headerTitle'    => 'Membership Approved',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => 'Welcome',
+                'school'         => $school,
+                'loginUrl'       => $loginUrl,
+            ],
+        );
     }
 
     public function schoolRejected(Tenant $school, string $reason): void
     {
-        $email = $school->application_payload['school_email']
-            ?? $school->application_payload['contact_email']
-            ?? null;
-        if ($email) {
-            $this->mailerFor($school->parent_id)->sendRaw(
-                $email,
-                'School Registration Rejected',
-                "Your school application was rejected. Reason: {$reason}",
-            );
+        $email = $this->schoolContactEmail($school);
+        if (! $email) {
+            return;
         }
+
+        $this->mailerFor($school->parent_id)->sendView(
+            $email,
+            'School Application Rejected — '.$school->name,
+            'emails.membership.school-rejected',
+            [
+                'headerTitle'    => 'Application Not Approved',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => 'Membership',
+                'school'         => $school,
+                'reason'         => $reason,
+            ],
+        );
     }
 
     public function dataSubmitted(Tenant $school, string $academicYear): void
     {
-        $this->notifySahodayaAdmins($school->parent_id, 'Student/Teacher Data Submitted', [
-            'school' => $school->name,
-            'year'   => $academicYear,
-            'message' => "{$school->name} submitted annual data for {$academicYear}.",
-        ]);
+        $sahodaya = $this->sahodayaFor($school);
+
+        $this->notifySahodayaRecipients(
+            $school->parent_id,
+            "Annual data submitted — {$school->name}",
+            'emails.membership.generic-admin',
+            [
+                'headerTitle'    => 'Annual Data Submitted',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => $academicYear,
+                'title'          => 'Review annual submission',
+                'body'           => "{$school->name} submitted student and/or teacher data for {$academicYear}. Please review the submission in the Sahodaya admin panel.",
+                'details'        => [
+                    'School'        => $school->name,
+                    'Academic year' => $academicYear,
+                ],
+                'actionUrl'      => EmailBranding::sahodayaAdminUrl($sahodaya, 'membership/submissions'),
+                'actionLabel'    => 'Review submission',
+            ],
+        );
     }
 
     public function dataApproved(Tenant $school, string $academicYear): void
     {
-        $this->notifySchoolAdmins($school, "Annual data for {$academicYear} has been approved.");
+        $sahodaya = $this->sahodayaFor($school);
+
+        $this->notifySchoolAdmins(
+            $school,
+            "Annual data approved — {$academicYear}",
+            'emails.membership.generic-school',
+            [
+                'headerTitle'    => 'Annual Data Approved',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => $academicYear,
+                'title'          => 'Submission approved',
+                'body'           => "Your annual data submission for {$academicYear} has been approved by {$sahodaya?->name}. You can continue with membership payment.",
+                'actionUrl'      => EmailBranding::schoolAdminUrl($sahodaya, $school, 'registration'),
+                'actionLabel'    => 'Continue registration',
+                'actionVariant'  => 'success',
+            ],
+        );
     }
 
     public function dataRejected(Tenant $school, string $academicYear, string $reason): void
     {
-        $this->notifySchoolAdmins($school, "Annual data for {$academicYear} was rejected. Reason: {$reason}");
+        $sahodaya = $this->sahodayaFor($school);
+
+        $this->notifySchoolAdmins(
+            $school,
+            "Annual data rejected — {$academicYear}",
+            'emails.membership.generic-school',
+            [
+                'headerTitle'    => 'Annual Data Rejected',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => $academicYear,
+                'title'          => 'Submission needs correction',
+                'body'           => "Your annual data submission for {$academicYear} was rejected. Please review the reason below, make corrections, and resubmit.",
+                'reason'         => $reason,
+                'reasonTitle'    => 'Rejection reason',
+                'alertVariant'   => 'danger',
+                'actionUrl'      => EmailBranding::schoolAdminUrl($sahodaya, $school, 'registration'),
+                'actionLabel'    => 'Fix and resubmit',
+                'actionVariant'  => 'danger',
+            ],
+        );
     }
 
     public function paymentSubmitted(
@@ -96,55 +178,109 @@ TEXT;
         ?string $transactionRef = null,
         ?string $paymentMethod = null,
     ): void {
-        $sahodayaId = $school->parent_id;
-        $paymentsUrl = url("/sahodaya-admin/{$sahodayaId}/membership/payments");
-
-        $lines = [
-            "{$school->name} uploaded membership payment proof for {$academicYear}.",
-            '',
-            'Please review and verify the payment:',
-            $paymentsUrl,
-        ];
-
-        if ($amount !== null) {
-            $lines[] = '';
-            $lines[] = 'Amount: ₹'.number_format($amount, 2);
-        }
-        if ($paymentMethod) {
-            $lines[] = "Method: {$paymentMethod}";
-        }
-        if ($transactionRef) {
-            $lines[] = "Reference: {$transactionRef}";
-        }
+        $sahodaya = $this->sahodayaFor($school);
 
         $this->notifySahodayaRecipients(
-            $sahodayaId,
+            $school->parent_id,
             "Payment proof submitted — {$school->name}",
-            implode("\n", $lines),
+            'emails.membership.payment-submitted',
+            [
+                'headerTitle'    => 'Payment Proof Received',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => $academicYear,
+                'school'         => $school,
+                'academicYear'   => $academicYear,
+                'amount'         => $amount,
+                'transactionRef' => $transactionRef,
+                'paymentMethod'  => $paymentMethod,
+                'paymentsUrl'    => EmailBranding::sahodayaAdminUrl($sahodaya, 'membership/payments'),
+            ],
         );
     }
 
     public function paymentVerified(Tenant $school, string $academicYear, string $membershipNo): void
     {
-        $this->notifySchoolAdmins($school, "Payment verified. Membership {$membershipNo} for {$academicYear} is complete.");
+        $sahodaya = $this->sahodayaFor($school);
+
+        $this->notifySchoolAdmins(
+            $school,
+            "Payment verified — Membership {$membershipNo}",
+            'emails.membership.generic-school',
+            [
+                'headerTitle'    => 'Payment Verified',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => $academicYear,
+                'title'          => 'Membership payment approved',
+                'body'           => "Your membership payment for {$academicYear} has been verified by {$sahodaya?->name}. Your membership number is shown below.",
+                'details'        => [
+                    'Academic year'  => $academicYear,
+                    'Membership No.' => $membershipNo,
+                    'Status'         => 'Payment verified',
+                ],
+                'actionUrl'      => EmailBranding::schoolAdminUrl($sahodaya, $school, 'registration'),
+                'actionLabel'    => 'View registration',
+                'actionVariant'  => 'success',
+            ],
+        );
     }
 
     public function paymentRejected(Tenant $school, string $academicYear, string $reason): void
     {
-        $this->notifySchoolAdmins($school, "Payment for {$academicYear} was rejected. Reason: {$reason}");
+        $sahodaya = $this->sahodayaFor($school);
+
+        $this->notifySchoolAdmins(
+            $school,
+            "Payment rejected — {$academicYear}",
+            'emails.membership.generic-school',
+            [
+                'headerTitle'    => 'Payment Rejected',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => $academicYear,
+                'title'          => 'Payment proof not accepted',
+                'body'           => "Your payment proof for {$academicYear} was rejected by {$sahodaya?->name}. Please upload a valid proof again.",
+                'reason'         => $reason,
+                'reasonTitle'    => 'Rejection reason',
+                'alertVariant'   => 'danger',
+                'actionUrl'      => EmailBranding::schoolAdminUrl($sahodaya, $school, 'registration'),
+                'actionLabel'    => 'Upload new proof',
+                'actionVariant'  => 'danger',
+            ],
+        );
     }
 
-    public function registrationCompleted(Tenant $school, string $academicYear, string $membershipNo): void
-    {
-        $this->notifySchoolAdmins($school, "Annual membership for {$academicYear} is complete. Membership No: {$membershipNo}");
+    public function registrationCompleted(
+        Tenant $school,
+        string $academicYear,
+        string $membershipNo,
+        bool $firstMembershipApproval = false,
+    ): void {
+        $sahodaya = $this->sahodayaFor($school);
+
+        $body = $firstMembershipApproval
+            ? "Welcome! Your school's membership with {$sahodaya?->name} has been approved and your {$academicYear} annual registration is complete."
+            : "Your {$academicYear} annual Sahodaya membership registration is complete. Payment has been verified and your membership is now active.";
+
+        $this->notifySchoolAdmins(
+            $school,
+            "Membership complete — {$membershipNo}",
+            'emails.membership.registration-complete',
+            [
+                'headerTitle'    => 'Membership Complete',
+                'headerSubtitle' => $school->name,
+                'headerEyebrow'  => $academicYear,
+                'title'          => $firstMembershipApproval ? 'Welcome to the Sahodaya network' : 'Annual membership active',
+                'body'           => $body,
+                'academicYear'   => $academicYear,
+                'membershipNo'   => $membershipNo,
+                'firstApproval'  => $firstMembershipApproval,
+                'loginUrl'       => EmailBranding::schoolLoginUrl($sahodaya),
+                'dashboardUrl'   => EmailBranding::schoolAdminUrl($sahodaya, $school),
+            ],
+        );
     }
 
-    private function notifySahodayaAdmins(string $sahodayaId, string $subject, array $context): void
-    {
-        $this->notifySahodayaRecipients($sahodayaId, $subject, $context['message'] ?? $subject);
-    }
-
-    private function notifySahodayaRecipients(string $sahodayaId, string $subject, string $message): void
+    /** @param  array<string, mixed>  $viewData */
+    private function notifySahodayaRecipients(string $sahodayaId, string $subject, string $view, array $viewData): void
     {
         $mailer = $this->mailerFor($sahodayaId);
         $emails = User::where('tenant_id', $sahodayaId)->pluck('email');
@@ -154,30 +290,45 @@ TEXT;
             $emails->push($profileEmail);
         }
 
-        $mailer->sendRawToMany(
+        $mailer->sendViewToMany(
             $emails->unique()->filter()->all(),
             $subject,
-            $message,
+            $view,
+            $viewData,
         );
     }
 
-    private function notifySchoolAdmins(Tenant $school, string $message): void
+    /** @param  array<string, mixed>  $viewData */
+    private function notifySchoolAdmins(Tenant $school, string $subject, string $view, array $viewData): void
     {
         $admins = User::where('tenant_id', $school->id)->get();
         $recipients = $admins->pluck('email')->all();
 
-        $email = $school->application_payload['school_email']
-            ?? $school->application_payload['contact_email']
-            ?? null;
+        $email = $this->schoolContactEmail($school);
         if ($email && ! in_array($email, $recipients, true)) {
             $recipients[] = $email;
         }
 
-        $this->mailerFor($school->parent_id)->sendRawToMany(
+        $this->mailerFor($school->parent_id)->sendViewToMany(
             $recipients,
-            'Membership Registration Update',
-            $message,
+            $subject,
+            $view,
+            $viewData,
         );
+    }
+
+    private function sahodayaFor(Tenant $school): ?Tenant
+    {
+        return $school->parent_id
+            ? Tenant::query()->find($school->parent_id)
+            : null;
+    }
+
+    private function schoolContactEmail(Tenant $school): ?string
+    {
+        return $school->application_payload['school_email']
+            ?? $school->application_payload['contact_email']
+            ?? null;
     }
 
     private function mailerFor(?string $sahodayaId): SahodayaMailer

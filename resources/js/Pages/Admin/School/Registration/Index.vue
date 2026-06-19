@@ -147,11 +147,30 @@
 
                 <!-- Completed -->
                 <div v-if="registration.registration_status === 'completed'"
-                     class="bg-green-50 border border-green-200 rounded-xl p-6">
-                    <p class="font-semibold text-green-900">Membership registration complete</p>
-                    <p class="text-sm text-green-800 mt-1">
-                        {{ academicYear }} membership is active. Membership No: {{ registration.reg_no }}
-                    </p>
+                     class="bg-green-50 border border-green-200 rounded-xl p-6 space-y-4">
+                    <div>
+                        <p class="font-semibold text-green-900">Membership registration complete</p>
+                        <p class="text-sm text-green-800 mt-1">
+                            {{ academicYear }} membership is active. Membership No: {{ registration.reg_no }}
+                        </p>
+                        <p v-if="school.membership_status === 'approved'" class="text-sm text-green-700 mt-2">
+                            Your school is approved by Sahodaya. You can now manage students and use the portal.
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap gap-3 pt-2 border-t border-green-200/80">
+                        <Link :href="`/school-admin/${school.id}`"
+                              class="inline-flex items-center px-4 py-2 rounded-lg bg-white border border-green-200 text-sm font-semibold text-green-900 hover:bg-green-100/50">
+                            Go to Dashboard
+                        </Link>
+                        <Link :href="`/school-admin/${school.id}/students`"
+                              class="inline-flex items-center px-4 py-2 rounded-lg bg-green-700 text-sm font-semibold text-white hover:bg-green-800">
+                            Manage Students
+                        </Link>
+                        <Link :href="`/school-admin/${school.id}/registration/profile`"
+                              class="inline-flex items-center px-4 py-2 rounded-lg bg-white border border-green-200 text-sm font-semibold text-green-900 hover:bg-green-100/50">
+                            Registration Details
+                        </Link>
+                    </div>
                 </div>
             </template>
         </div>

@@ -9,7 +9,8 @@ use App\Services\Mail\SahodayaMailer;
 use App\Support\SahodayaHomepageContent;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use Illuminate\Auth\Events\Verified;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Response;
@@ -51,7 +52,7 @@ class AuthController extends Controller
             return back()->withErrors(['email' => 'Invalid credentials.']);
         }
 
-        $user = $request->user();
+        $user = $request->user()->fresh();
 
         if ($message = self::portalMismatchMessage($user, $request)) {
             Auth::logout();
@@ -61,13 +62,18 @@ class AuthController extends Controller
             return back()->withErrors(['email' => $message]);
         }
 
+        $request->session()->regenerate();
+
         if ($user->hasRole('school_admin') && ! $user->hasVerifiedEmail()) {
+            $intended = $request->session()->pull('url.intended');
+            if (is_string($intended) && str_contains($intended, '/email/verify/')) {
+                return redirect()->to($intended);
+            }
+
             return redirect()->route('verification.notice');
         }
 
-        $request->session()->regenerate();
-
-        return redirect()->intended(self::homeFor($request->user()));
+        return redirect()->intended(self::homeFor($user));
     }
 
     public function logout(Request $request)
@@ -79,27 +85,67 @@ class AuthController extends Controller
         return redirect()->route('login');
     }
 
-    public function verifyNotice(): Response
+    public function verifyNotice(Request $request): Response|RedirectResponse
     {
-        return inertia('Auth/VerifyEmail');
+        $user = $request->user()->fresh();
+
+        if ($user?->hasVerifiedEmail()) {
+            Auth::login($user);
+            $request->session()->regenerate();
+
+            return redirect()->intended(self::homeFor($user));
+        }
+
+        $tenant = TenantBranding::resolveTenant($request);
+        $branding = ($tenant && $tenant->type === 'sahodaya')
+            ? SahodayaHomepageContent::get($tenant)
+            : [];
+
+        return inertia('Auth/VerifyEmail', [
+            'logoUrl'    => TenantBranding::logoUrl($tenant),
+            'tenantName' => $tenant?->name,
+            'portalUrl'  => $tenant ? TenantDomainSync::publicUrl($tenant) : null,
+            'eyebrow'    => $branding['eyebrow'] ?? null,
+        ]);
     }
 
     public function resendVerification(Request $request)
     {
-        if ($request->user()->hasVerifiedEmail()) {
-            return redirect()->intended(self::homeFor($request->user()));
+        $user = $request->user()->fresh();
+
+        if ($user->hasVerifiedEmail()) {
+            Auth::login($user);
+
+            return redirect()->intended(self::homeFor($user));
         }
 
-        $this->sendVerificationFor($request->user());
+        $this->sendVerificationFor($user);
 
         return back()->with('success', 'Verification link sent to your Gmail.');
     }
 
-    public function verify(EmailVerificationRequest $request)
+    public function verify(Request $request, string $id, string $hash): RedirectResponse
     {
-        $request->fulfill();
+        if (! $request->hasValidSignature()) {
+            abort(403, 'This verification link is invalid or has expired.');
+        }
 
-        return redirect()->intended(self::homeFor($request->user()))
+        $user = User::query()->findOrFail($id);
+
+        if (! hash_equals($hash, sha1($user->getEmailForVerification()))) {
+            abort(403, 'This verification link is invalid.');
+        }
+
+        if (! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+            event(new Verified($user));
+        }
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return redirect()
+            ->intended(self::homeFor($user))
             ->with('success', 'Gmail verified successfully. Welcome!');
     }
 

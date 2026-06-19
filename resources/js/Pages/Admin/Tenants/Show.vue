@@ -55,6 +55,57 @@
                 </div>
             </div>
 
+            <!-- School membership (superadmin) -->
+            <div v-if="tenant.type === 'school'" class="bg-white rounded-xl shadow-sm border border-red-100 p-6">
+                <h3 class="font-bold text-gray-900 mb-1">Membership status</h3>
+                <p class="text-sm text-gray-500 mb-4">
+                    Reject an approved school to block portal access, or permanently delete test registrations.
+                </p>
+
+                <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold capitalize"
+                          :class="membershipStatusClass(tenant.membership_status)">
+                        {{ tenant.membership_status || 'pending' }}
+                    </span>
+                    <span v-if="tenant.school_prefix" class="text-xs font-mono text-gray-500 bg-gray-50 px-2 py-1 rounded">
+                        {{ tenant.school_prefix }}
+                    </span>
+                </div>
+
+                <p v-if="tenant.application_payload?.rejection_reason"
+                   class="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-4">
+                    <span class="font-semibold">Rejection reason:</span>
+                    {{ tenant.application_payload.rejection_reason }}
+                </p>
+
+                <form v-if="tenant.membership_status !== 'rejected'"
+                      @submit.prevent="rejectSchool"
+                      class="space-y-3 max-w-lg mb-6 pb-6 border-b border-gray-100">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Reject school (with reason)</label>
+                        <textarea v-model="rejectForm.reason" rows="3" required
+                                  placeholder="Reason shown to the school admin by email…"
+                                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"></textarea>
+                        <p v-if="rejectForm.errors.reason" class="text-xs text-red-500 mt-1">{{ rejectForm.errors.reason }}</p>
+                    </div>
+                    <button type="submit" :disabled="rejectForm.processing"
+                            class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
+                        Reject school
+                    </button>
+                </form>
+
+                <div class="space-y-2">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Danger zone</p>
+                    <button type="button" @click="deleteTenant"
+                            class="px-4 py-2 rounded-lg border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-50">
+                        Delete school permanently
+                    </button>
+                    <p class="text-xs text-gray-400">
+                        Removes the school, its admin login(s), and domain records. Tenant DB rows for this school are not purged.
+                    </p>
+                </div>
+            </div>
+
             <!-- Branding -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <h3 class="font-bold text-gray-900 mb-1">Logo</h3>
@@ -326,6 +377,33 @@ const adminForm = useForm({
     email: '',
     password: '',
 });
+const rejectForm = useForm({ reason: '' });
+
+function membershipStatusClass(status) {
+    return {
+        approved: 'bg-green-100 text-green-700',
+        pending:  'bg-amber-100 text-amber-800',
+        rejected: 'bg-red-100 text-red-700',
+    }[status] || 'bg-gray-100 text-gray-600';
+}
+
+function rejectSchool() {
+    if (! confirm(`Reject "${props.tenant.name}"? The school admin will be notified by email.`)) {
+        return;
+    }
+
+    rejectForm.post(`/admin/tenants/${props.tenant.id}/reject-membership`, {
+        onSuccess: () => rejectForm.reset(),
+    });
+}
+
+function deleteTenant() {
+    if (! confirm(`Permanently delete "${props.tenant.name}" and its admin account(s)? This cannot be undone.`)) {
+        return;
+    }
+
+    router.delete(`/admin/tenants/${props.tenant.id}`);
+}
 
 function onLogoSelected(e) {
     logoForm.logo = e.target.files[0] ?? null;

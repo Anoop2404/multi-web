@@ -26,7 +26,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user()?->only('id', 'name', 'email'),
+                'user' => $request->user()?->only('id', 'name', 'email', 'email_verified_at'),
             ],
             'features' => [
                 'website_enabled' => \App\Support\FeatureFlags::websiteEnabled(),

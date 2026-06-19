@@ -7,6 +7,7 @@ use App\Models\SiteSection;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\User;
+use App\Services\Membership\MembershipNotifier;
 use App\Services\Tenancy\SahodayaDatabaseProvisioner;
 use App\Support\SahodayaSiteTemplate;
 use App\Support\TenancyDatabase;
@@ -142,12 +143,43 @@ class TenantController extends Controller
 
     public function destroy(Tenant $tenant)
     {
+        abort_if($tenant->type === 'sahodaya' && $tenant->children()->exists(), 422, 'Remove member schools before deleting this Sahodaya.');
+
         $type = $tenant->type;
+
+        User::query()->where('tenant_id', $tenant->id)->each(function (User $user) {
+            $user->syncRoles([]);
+            $user->delete();
+        });
+
         $tenant->delete();
 
         $route = $type === 'sahodaya' ? 'admin.sahodayas.index' : 'admin.schools.index';
 
         return redirect()->route($route)->with('success', 'Tenant deleted.');
+    }
+
+    public function rejectMembership(Request $request, Tenant $tenant, MembershipNotifier $notifier)
+    {
+        abort_if($tenant->type !== 'school', 404);
+
+        $data = $request->validate([
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        $tenant->update([
+            'membership_status'   => 'rejected',
+            'is_active'           => false,
+            'application_payload' => array_merge($tenant->application_payload ?? [], [
+                'rejection_reason' => $data['reason'],
+                'rejected_at'      => now()->toIso8601String(),
+                'rejected_by'      => 'superadmin',
+            ]),
+        ]);
+
+        $notifier->schoolRejected($tenant, $data['reason']);
+
+        return redirect()->route('admin.tenants.show', $tenant)->with('success', 'School marked as rejected.');
     }
 
     public function uploadLogo(Request $request, Tenant $tenant)

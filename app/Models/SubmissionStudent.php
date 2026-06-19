@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\TenantStorage;
 use Illuminate\Database\Eloquent\Model;
 
 class SubmissionStudent extends Model
@@ -31,9 +32,13 @@ class SubmissionStudent extends Model
             return null;
         }
 
-        return route('school.registration.students.image', [
+        $proxyUrl = route('school.registration.students.image', [
             'tenantId' => $schoolId,
             'student'  => $this->id,
         ]);
+
+        $school = Tenant::query()->find($schoolId);
+
+        return TenantStorage::assetUrl($school, $this->image_path, $proxyUrl) ?? $proxyUrl;
     }
 }

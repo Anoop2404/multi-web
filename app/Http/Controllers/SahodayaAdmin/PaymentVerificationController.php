@@ -104,12 +104,13 @@ class PaymentVerificationController extends SahodayaAdminController
             );
 
             $school = $payment->school;
-            if ($school && $school->membership_status === 'pending') {
+            $firstMembershipApproval = $school && $school->membership_status === 'pending';
+
+            if ($firstMembershipApproval) {
                 $school->update([
                     'membership_status' => 'approved',
                     'is_active'         => true,
                 ]);
-                $notifier->schoolApproved($school);
             }
 
             $registration = $payment->registration;
@@ -127,8 +128,14 @@ class PaymentVerificationController extends SahodayaAdminController
                     'membership',
                     ['membership_no' => $registration->reg_no],
                 );
-                $notifier->paymentVerified($payment->school, $payment->academic_year, $registration->reg_no);
-                $notifier->registrationCompleted($payment->school, $payment->academic_year, $registration->reg_no);
+                $notifier->registrationCompleted(
+                    $payment->school,
+                    $payment->academic_year,
+                    $registration->reg_no,
+                    $firstMembershipApproval,
+                );
+            } elseif ($firstMembershipApproval) {
+                $notifier->schoolApproved($school);
             }
         } else {
             $beforeStatus = $payment->status;

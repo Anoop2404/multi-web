@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\TenantStorage;
 use Illuminate\Database\Eloquent\Model;
 
 class Student extends Model
@@ -42,9 +43,17 @@ class Student extends Model
             return null;
         }
 
-        return route('school.students.photo', [
+        $proxyUrl = route('school.students.photo', [
             'tenantId' => $this->tenant_id,
             'student'  => $this->id,
         ]);
+
+        $tenant = $this->relationLoaded('tenant') ? $this->tenant : null;
+
+        return TenantStorage::assetUrl(
+            $tenant ?? Tenant::query()->find($this->tenant_id),
+            $this->photo,
+            $proxyUrl,
+        ) ?? $proxyUrl;
     }
 }

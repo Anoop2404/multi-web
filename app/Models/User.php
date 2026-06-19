@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\PortalVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -43,5 +44,10 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isSuperAdmin(): bool
     {
         return $this->tenant_id === null && $this->hasRole('superadmin');
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new PortalVerifyEmail);
     }
 }

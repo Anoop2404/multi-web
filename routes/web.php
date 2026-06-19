@@ -62,6 +62,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(funct
     Route::delete('tenants/{tenant}/sahodaya-admin/{user}', [TenantController::class, 'destroySahodayaAdmin'])->name('tenants.sahodaya-admin.destroy');
     Route::post('tenants/{tenant}/school-admin', [TenantController::class, 'saveSchoolAdmin'])->name('tenants.school-admin.store');
     Route::delete('tenants/{tenant}/school-admin/{user}', [TenantController::class, 'destroySchoolAdmin'])->name('tenants.school-admin.destroy');
+    Route::post('tenants/{tenant}/reject-membership', [TenantController::class, 'rejectMembership'])->name('tenants.reject-membership');
 
     // ── Builder Inertia pages (superadmin only, website phase) ────────────────
     Route::middleware(['role:superadmin', 'website.enabled'])->prefix('builder')->name('builder.')->group(function () {
@@ -386,10 +387,11 @@ Route::middleware('web')->group(function () {
 
     Route::middleware('auth')->group(function () {
         Route::get('/email/verify', [AuthController::class, 'verifyNotice'])->name('verification.notice');
-        Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verify'])
-            ->middleware('signed')
-            ->name('verification.verify');
         Route::post('/email/verification-notification', [AuthController::class, 'resendVerification'])
             ->name('verification.send');
     });
+
+    Route::get('/email/verify/{id}/{hash}', [AuthController::class, 'verify'])
+        ->middleware('signed')
+        ->name('verification.verify');
 });

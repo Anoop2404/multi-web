@@ -5,6 +5,7 @@ namespace App\Services\Mail;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\Mail\EmailBranding;
 use App\Support\TenancyDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
@@ -50,6 +51,33 @@ class SahodayaMailer
                 $message->from($fromAddress, $fromName);
             }
         });
+    }
+
+    /** @param  array<string, mixed>  $data */
+    public function sendView(string $to, string $subject, string $view, array $data = []): void
+    {
+        if ($to === '') {
+            return;
+        }
+
+        $mailer = $this->resolveMailerName();
+        [$fromAddress, $fromName] = $this->fromAddress();
+
+        Mail::mailer($mailer)->send($view, $this->viewData($data), function ($message) use ($to, $subject, $fromAddress, $fromName) {
+            $message->to($to)->subject($subject);
+
+            if ($fromAddress) {
+                $message->from($fromAddress, $fromName);
+            }
+        });
+    }
+
+    /** @param  list<string>  $recipients  @param  array<string, mixed>  $data */
+    public function sendViewToMany(array $recipients, string $subject, string $view, array $data = []): void
+    {
+        foreach (array_unique(array_filter($recipients)) as $email) {
+            $this->sendView($email, $subject, $view, $data);
+        }
     }
 
     /** @param  list<string>  $recipients */
@@ -98,6 +126,18 @@ class SahodayaMailer
             Config::set('mail.default', $previousDefault);
             Config::set('mail.from', $previousFrom);
         }
+    }
+
+    /** @return array<string, mixed> */
+    public function brandingData(): array
+    {
+        return EmailBranding::forTenant($this->sahodaya(), $this->profile());
+    }
+
+    /** @param  array<string, mixed>  $data  @return array<string, mixed> */
+    private function viewData(array $data): array
+    {
+        return array_merge($this->brandingData(), $data);
     }
 
     private function resolveMailerName(): string
