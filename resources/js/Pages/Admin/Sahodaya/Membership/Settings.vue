@@ -165,7 +165,7 @@
             <!-- Tab: Zoho Email -->
             <form v-show="activeTab === 'email'" @submit.prevent="saveMailSettings" class="space-y-5">
                 <FormSection title="Zoho Mail (SMTP)"
-                             hint="Each Sahodaya sends membership emails from its own Zoho account. Leave password blank to keep the current one.">
+                             hint="Each Sahodaya sends membership emails from its own Zoho or ZeptoMail account. Leave password blank to keep the current one.">
                     <p v-if="profile.mail_configured"
                        class="text-xs font-semibold text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
                         Zoho SMTP is configured for this Sahodaya.
@@ -175,8 +175,8 @@
                         Not configured — emails fall back to the platform default mail settings.
                     </p>
                     <FormGrid>
-                        <FormField label="SMTP Host" hint="Zoho India: smtp.zoho.in · Global: smtp.zoho.com">
-                            <input v-model="mailForm.mail_host" class="field" placeholder="smtp.zoho.in">
+                        <FormField label="SMTP Host" hint="ZeptoMail: smtp.zeptomail.in · Zoho India: smtp.zoho.in · Global: smtp.zoho.com">
+                            <input v-model="mailForm.mail_host" class="field" placeholder="smtp.zeptomail.in">
                         </FormField>
                         <FormField label="Port">
                             <input v-model.number="mailForm.mail_port" type="number" class="field" placeholder="587">
@@ -187,13 +187,16 @@
                                 <option value="ssl">SSL (465)</option>
                             </select>
                         </FormField>
-                        <FormField label="Zoho Email (Username)">
-                            <input v-model="mailForm.mail_username" type="email" class="field" placeholder="office@yourdomain.com">
+                        <FormField label="SMTP Username"
+                                   hint="ZeptoMail: use emailapikey · Zoho Mail: your full email address">
+                            <input v-model="mailForm.mail_username" type="text" class="field"
+                                   placeholder="emailapikey or office@yourdomain.com" autocomplete="off">
                         </FormField>
-                        <FormField label="App Password" hint="Zoho app-specific password. Leave blank to keep existing.">
+                        <FormField label="SMTP Password / Token"
+                                   hint="ZeptoMail Send Mail token, or Zoho app-specific password. Required on first save.">
                             <input v-model="mailForm.mail_password" type="password" class="field" autocomplete="new-password">
                         </FormField>
-                        <FormField label="From Address" hint="Defaults to Zoho username if empty">
+                        <FormField label="From Address" hint="Sender address shown to recipients (required for ZeptoMail)">
                             <input v-model="mailForm.mail_from_address" type="email" class="field">
                         </FormField>
                         <FormField label="From Name" class-extra="sm:col-span-2">

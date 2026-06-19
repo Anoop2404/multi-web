@@ -110,7 +110,7 @@ class SahodayaMailer
         $sahodaya = $this->sahodaya();
 
         $address = $profile?->mail_from_address
-            ?: $profile?->mail_username
+            ?: (filter_var($profile?->mail_username, FILTER_VALIDATE_EMAIL) ? $profile->mail_username : null)
             ?: $profile?->contact_email;
 
         $name = $profile?->mail_from_name ?: $sahodaya?->name;
