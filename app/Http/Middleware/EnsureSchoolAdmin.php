@@ -2,18 +2,21 @@
 
 namespace App\Http\Middleware;
 
+use App\Http\Middleware\Concerns\RedirectsUnauthenticated;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureSchoolAdmin
 {
+    use RedirectsUnauthenticated;
+
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if (!$user) {
-            return redirect()->route('login');
+        if (! $user) {
+            return $this->redirectToLogin($request);
         }
 
         // Superadmin can access any school panel
@@ -33,7 +36,7 @@ class EnsureSchoolAdmin
         }
 
         if ($user->hasRole('school_admin') && ! $user->hasVerifiedEmail()) {
-            return redirect()->route('verification.notice');
+            return \App\Support\InertiaAuth::redirectTo($request, route('verification.notice'));
         }
 
         $tenantId = $request->route('tenantId');

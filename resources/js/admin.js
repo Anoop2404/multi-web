@@ -1,7 +1,16 @@
 import { createApp, h } from 'vue';
-import { createInertiaApp } from '@inertiajs/vue3';
+import { createInertiaApp, router } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createPinia } from 'pinia';
+
+router.on('httpException', (event) => {
+    const status = event.detail.response?.status;
+
+    if (status === 419 || status === 401) {
+        event.preventDefault();
+        window.location.href = '/login?session=expired';
+    }
+});
 
 createInertiaApp({
     title: (title) => `${title} — Sahodaya Admin`,

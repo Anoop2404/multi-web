@@ -22,6 +22,7 @@ class AuthController extends Controller
         if (TenantDomainSync::isCentralHost(request()->getHost())) {
             return inertia('Auth/SuperadminLogin', [
                 'appName' => config('app.name'),
+                'sessionExpired' => request()->query('session') === 'expired',
             ]);
         }
 
@@ -38,6 +39,7 @@ class AuthController extends Controller
             'motto'      => $branding['motto'] ?? null,
             'phone'      => $branding['phone'] ?? null,
             'email'      => $branding['email'] ?? null,
+            'sessionExpired' => request()->query('session') === 'expired',
         ]);
     }
 
@@ -67,13 +69,15 @@ class AuthController extends Controller
         if ($user->hasRole('school_admin') && ! $user->hasVerifiedEmail()) {
             $intended = $request->session()->pull('url.intended');
             if (is_string($intended) && str_contains($intended, '/email/verify/')) {
-                return redirect()->to($intended);
+                return \App\Support\InertiaAuth::redirectTo($request, $intended);
             }
 
-            return redirect()->route('verification.notice');
+            return \App\Support\InertiaAuth::redirectTo($request, route('verification.notice'));
         }
 
-        return redirect()->intended(self::homeFor($user));
+        $target = redirect()->intended(self::homeFor($user));
+
+        return \App\Support\InertiaAuth::redirectTo($request, $target->getTargetUrl());
     }
 
     public function logout(Request $request)
@@ -87,13 +91,20 @@ class AuthController extends Controller
 
     public function verifyNotice(Request $request): Response|RedirectResponse
     {
-        $user = $request->user()->fresh();
+        $user = $request->user()?->fresh();
 
-        if ($user?->hasVerifiedEmail()) {
+        if (! $user) {
+            return \App\Support\InertiaAuth::redirectToLogin(
+                $request,
+                'Your session has expired. Please sign in again.',
+            );
+        }
+
+        if ($user->hasVerifiedEmail()) {
             Auth::login($user);
             $request->session()->regenerate();
 
-            return redirect()->intended(self::homeFor($user));
+            return \App\Support\InertiaAuth::redirectTo($request, redirect()->intended(self::homeFor($user))->getTargetUrl());
         }
 
         $tenant = TenantBranding::resolveTenant($request);
@@ -111,12 +122,19 @@ class AuthController extends Controller
 
     public function resendVerification(Request $request)
     {
-        $user = $request->user()->fresh();
+        $user = $request->user()?->fresh();
+
+        if (! $user) {
+            return \App\Support\InertiaAuth::redirectToLogin(
+                $request,
+                'Your session has expired. Please sign in again.',
+            );
+        }
 
         if ($user->hasVerifiedEmail()) {
             Auth::login($user);
 
-            return redirect()->intended(self::homeFor($user));
+            return \App\Support\InertiaAuth::redirectTo($request, redirect()->intended(self::homeFor($user))->getTargetUrl());
         }
 
         $this->sendVerificationFor($user);

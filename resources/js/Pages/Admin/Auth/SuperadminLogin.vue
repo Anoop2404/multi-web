@@ -73,6 +73,11 @@
                         </div>
 
                         <form class="sp-login-form" @submit.prevent="submit">
+                            <div v-if="sessionExpired || $page.props.flash?.error"
+                                 class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                                {{ $page.props.flash?.error || 'Your session has expired. Please sign in again.' }}
+                            </div>
+
                             <div class="sp-login-field">
                                 <label class="sp-login-label" for="email">Email address</label>
                                 <div class="sp-login-input-wrap">
@@ -124,6 +129,7 @@ import { useForm } from '@inertiajs/vue3';
 
 defineProps({
     appName: { type: String, default: 'Sahodaya Platform' },
+    sessionExpired: { type: Boolean, default: false },
 });
 
 const form = useForm({ email: '', password: '' });

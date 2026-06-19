@@ -3,6 +3,11 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
+use App\Support\InertiaAuth;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -34,7 +39,37 @@ return Application::configure(basePath: dirname(__DIR__))
             'public.cache'    => \App\Http\Middleware\SetPublicCacheHeaders::class,
             'website.enabled' => \App\Http\Middleware\EnsureWebsiteEnabled::class,
         ]);
+
+        $middleware->redirectGuestsTo(fn (Request $request) => route('login').'?session=expired');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $sessionExpiredMessage = 'Your session has expired. Please sign in again.';
+
+        $inertiaSessionExpired = function (Request $request) use ($sessionExpiredMessage) {
+            if ($request->header('X-Inertia') || $request->expectsJson()) {
+                return InertiaAuth::redirectToLogin($request, $sessionExpiredMessage);
+            }
+
+            return null;
+        };
+
+        $exceptions->render(function (TokenMismatchException $e, Request $request) use ($inertiaSessionExpired) {
+            return $inertiaSessionExpired($request);
+        });
+
+        $exceptions->render(function (HttpExceptionInterface $e, Request $request) use ($inertiaSessionExpired) {
+            if ($e->getStatusCode() === 419) {
+                return $inertiaSessionExpired($request);
+            }
+
+            return null;
+        });
+
+        $exceptions->render(function (AuthenticationException $e, Request $request) use ($inertiaSessionExpired) {
+            if ($request->header('X-Inertia')) {
+                return $inertiaSessionExpired($request);
+            }
+
+            return null;
+        });
     })->create();

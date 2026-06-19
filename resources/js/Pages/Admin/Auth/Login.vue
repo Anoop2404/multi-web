@@ -50,6 +50,11 @@
                             </div>
 
                             <form @submit.prevent="submit" class="login-form">
+                                <div v-if="sessionExpired || $page.props.flash?.error"
+                                     class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                                    {{ $page.props.flash?.error || 'Your session has expired. Please sign in again.' }}
+                                </div>
+
                                 <div>
                                     <label class="login-label" for="email">Email</label>
                                     <input
@@ -103,6 +108,7 @@ defineProps({
     motto:      { type: String, default: null },
     phone:      { type: String, default: null },
     email:      { type: String, default: null },
+    sessionExpired: { type: Boolean, default: false },
 });
 
 const form = useForm({ email: '', password: '' });
