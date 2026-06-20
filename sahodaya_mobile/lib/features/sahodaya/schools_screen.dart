@@ -21,6 +21,7 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
   String? _statusFilter;
   String? _paymentFilter;
   List<Map<String, dynamic>> _schools = [];
+  Map<String, dynamic>? _summary;
   String? _error;
   bool _loading = true;
 
@@ -68,14 +69,20 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
       _error = null;
     });
     try {
-      final response = await sahodayaGet(ref, '/schools', query: {
-        'per_page': 100,
-        if (_statusFilter != null) 'status': _statusFilter!,
-        if (_paymentFilter != null) 'payment_status': _paymentFilter!,
-        if (_search.text.trim().isNotEmpty) 'search': _search.text.trim(),
-      });
+      final results = await Future.wait([
+        sahodayaGet(ref, '/schools', query: {
+          'per_page': 100,
+          if (_statusFilter != null) 'status': _statusFilter!,
+          if (_paymentFilter != null) 'payment_status': _paymentFilter!,
+          if (_search.text.trim().isNotEmpty) 'search': _search.text.trim(),
+        }),
+        sahodayaGet(ref, '/dashboard'),
+      ]);
+      final response = results[0];
+      final dash = results[1];
       final data = response['data'];
       _schools = data is List ? data.cast<Map<String, dynamic>>() : [];
+      _summary = (dash['data'] as Map<String, dynamic>?)?['stats'] as Map<String, dynamic>?;
     } catch (error) {
       _error = error.toString();
     } finally {
@@ -130,10 +137,7 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const SaInfoBanner(
-            title: 'Member schools',
-            body: 'Membership status and payment status are shown separately. Payment not done = no proof uploaded yet. Payment pending = proof submitted, awaiting verification.',
-          ),
+          _SchoolSummaryCounts(summary: _summary),
           const SizedBox(height: 12),
           SaSearchField(controller: _search, hint: 'Search schools...'),
           const SizedBox(height: 12),
@@ -239,6 +243,61 @@ class _SahodayaSchoolsScreenState extends ConsumerState<SahodayaSchoolsScreen> {
               );
             }),
         ],
+      ),
+    );
+  }
+}
+
+class _SchoolSummaryCounts extends StatelessWidget {
+  const _SchoolSummaryCounts({this.summary});
+
+  final Map<String, dynamic>? summary;
+
+  @override
+  Widget build(BuildContext context) {
+    if (summary == null) return const SizedBox.shrink();
+
+    final approved = summary!['approved_schools'] as int? ?? 0;
+    final pending = summary!['pending_schools'] as int? ?? 0;
+    final paymentNotDone = summary!['payment_not_done'] as int? ?? summary!['payment_due'] as int? ?? 0;
+    final paymentPending = summary!['payments_pending_verification'] as int? ?? summary!['pending_payments'] as int? ?? 0;
+
+    return SaCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _SummaryChip(label: 'Approved', count: approved, color: const Color(0xFF166534), bg: const Color(0xFFDCFCE7)),
+          _SummaryChip(label: 'Pending', count: pending, color: const Color(0xFFB45309), bg: const Color(0xFFFEF3C7)),
+          _SummaryChip(label: 'Payment not done', count: paymentNotDone, color: AppColors.navyPrimary, bg: AppColors.bgSky),
+          _SummaryChip(label: 'Payment pending', count: paymentPending, color: const Color(0xFFB45309), bg: const Color(0xFFFFFBEB)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  const _SummaryChip({required this.label, required this.count, required this.color, required this.bg});
+
+  final String label;
+  final int count;
+  final Color color;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        '$label · $count',
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
       ),
     );
   }

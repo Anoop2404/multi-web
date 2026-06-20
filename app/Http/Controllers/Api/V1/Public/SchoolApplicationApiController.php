@@ -10,6 +10,7 @@ use App\Services\Membership\MembershipNotifier;
 use App\Services\Mail\SahodayaMailer;
 use App\Support\SchoolApplicationForm;
 use App\Support\TenantBranding;
+use App\Support\TenancyDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -25,7 +26,7 @@ class SchoolApplicationApiController extends ApiController
             return $this->message('School registration is not available for this portal.', 404);
         }
 
-        $profile = SahodayaProfile::firstOrCreate(['tenant_id' => $sahodaya->id]);
+        $profile = $this->resolveProfile($sahodaya);
         $fields  = SchoolApplicationForm::resolve($profile);
         $logoPath = TenantBranding::logoUrl($sahodaya);
         $logoUrl = $logoPath
@@ -53,7 +54,7 @@ class SchoolApplicationApiController extends ApiController
             return $this->message('School registration is not available for this portal.', 404);
         }
 
-        $profile = SahodayaProfile::firstOrCreate(['tenant_id' => $sahodaya->id]);
+        $profile = $this->resolveProfile($sahodaya);
         $fields  = SchoolApplicationForm::resolve($profile);
 
         $data = $request->validate(SchoolApplicationForm::validationRules($fields, $sahodaya));
@@ -126,5 +127,13 @@ class SchoolApplicationApiController extends ApiController
             'school_name' => $school->name,
             'email'       => $user->email,
         ]);
+    }
+
+    private function resolveProfile(Tenant $sahodaya): ?SahodayaProfile
+    {
+        return TenancyDatabase::whenDatabaseReady(
+            $sahodaya,
+            fn () => SahodayaProfile::firstOrCreate(['tenant_id' => $sahodaya->id]),
+        );
     }
 }
