@@ -32,4 +32,15 @@ class SchoolRegisterApi {
       throw apiExceptionFromDio(error);
     }
   }
+
+  Future<void> validateField(String field, String value) async {
+    try {
+      await _dio.post<Map<String, dynamic>>('/api/v1/public/school-register/validate', data: {
+        'field': field,
+        'value': value,
+      });
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
 }

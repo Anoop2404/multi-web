@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -18,6 +20,10 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
   final _values = <String, String>{};
   final _controllers = <String, TextEditingController>{};
   final _errors = <String, String>{};
+  final _validationTimers = <String, Timer>{};
+  final _validating = <String>{};
+
+  static const _liveValidateFields = {'school_email', 'school_prefix', 'cbse_affiliation'};
 
   Map<String, dynamic>? _form;
   bool _loading = true;
@@ -33,6 +39,9 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
 
   @override
   void dispose() {
+    for (final timer in _validationTimers.values) {
+      timer.cancel();
+    }
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -95,7 +104,79 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
 
   bool get _hasStep2 => _enabledKeysForGroup('principal').isNotEmpty || _enabledKeysForGroup('account').isNotEmpty;
 
+  bool get _showSchoolStep => _hasSchoolStep && (!_twoStep || _step == 1);
+
+  bool get _showPrincipalStep => _hasStep2 && (!_twoStep || _step == 2);
+
   Map<String, dynamic>? _field(String key) => _fields[key] as Map<String, dynamic>?;
+
+  void _scheduleFieldValidation(String key) {
+    if (!_liveValidateFields.contains(key)) return;
+
+    _validationTimers[key]?.cancel();
+    _validationTimers[key] = Timer(const Duration(milliseconds: 450), () => _validateField(key));
+  }
+
+  Future<void> _validateField(String key) async {
+    if (!_liveValidateFields.contains(key)) return;
+
+    final value = _values[key]?.trim() ?? '';
+    if (value.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _errors.remove(key);
+          _validating.remove(key);
+        });
+      }
+      return;
+    }
+
+    setState(() => _validating.add(key));
+
+    try {
+      await _api.validateField(key, value);
+      if (mounted) {
+        setState(() {
+          _errors.remove(key);
+          _validating.remove(key);
+        });
+      }
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      final message = _errorMessageFor(error, key);
+      setState(() {
+        if (message != null) {
+          _errors[key] = message;
+        } else {
+          _errors.remove(key);
+        }
+        _validating.remove(key);
+      });
+    }
+  }
+
+  String? _errorMessageFor(ApiException error, String key) {
+    final fieldError = error.errors?[key];
+    if (fieldError is List && fieldError.isNotEmpty) {
+      return fieldError.first.toString();
+    }
+    if (fieldError is String && fieldError.isNotEmpty) {
+      return fieldError;
+    }
+    return error.statusCode == 422 ? error.message : null;
+  }
+
+  Future<bool> _validateLiveFields(Iterable<String> keys) async {
+    var valid = true;
+    for (final key in keys) {
+      if (!_liveValidateFields.contains(key)) continue;
+      final value = _values[key]?.trim() ?? '';
+      if (value.isEmpty) continue;
+      await _validateField(key);
+      if (_errors.containsKey(key)) valid = false;
+    }
+    return valid;
+  }
 
   Future<void> _submit() async {
     setState(() => _errors.clear());
@@ -148,7 +229,7 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
   }
 
   bool _validateStep(int step) {
-    _errors.clear();
+    _errors.removeWhere((key, _) => _liveValidateFields.contains(key));
     var valid = true;
 
     void requireField(String key) {
@@ -175,8 +256,21 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
     return valid;
   }
 
-  void _nextStep() {
-    if (_validateStep(1)) setState(() => _step = 2);
+  Future<void> _nextStep() async {
+    if (!_validateStep(1)) return;
+    final keys = ['school_name', ..._enabledKeysForGroup('school')];
+    if (!await _validateLiveFields(keys)) return;
+    setState(() => _step = 2);
+  }
+
+  Future<void> _register() async {
+    final step = _twoStep ? 2 : 1;
+    if (!_validateStep(step)) return;
+    final keys = step == 1
+        ? ['school_name', ..._enabledKeysForGroup('school')]
+        : [..._enabledKeysForGroup('principal'), ..._enabledKeysForGroup('account')];
+    if (!await _validateLiveFields(keys)) return;
+    await _submit();
   }
 
   @override
@@ -251,9 +345,8 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
                                             _StepIndicator(step: _step),
                                           ],
                                           const SizedBox(height: 20),
-                                          if (_step == 1 && _hasSchoolStep) _buildSchoolStep(),
-                                          if (_step == 2 && _hasStep2) _buildPrincipalStep(),
-                                          if (!_twoStep && _hasSchoolStep && !_hasStep2) _buildSchoolStep(),
+                                          if (_showSchoolStep) _buildSchoolStep(),
+                                          if (_showPrincipalStep) _buildPrincipalStep(),
                                           const SizedBox(height: 20),
                                           _buildActions(),
                                         ],
@@ -299,7 +392,8 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
     final label = field['label']?.toString() ?? key;
     final required = field['required'] == true;
     final hint = field['placeholder']?.toString();
-    final help = field['hint']?.toString();
+    final isValidating = _validating.contains(key);
+    final hasError = _errors[key] != null;
 
     if (key == 'highest_class') {
       return Padding(
@@ -311,13 +405,13 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
               value: _values[key]?.isNotEmpty == true ? _values[key] : null,
-              decoration: _inputDecoration(hint ?? 'Select class', error: _errors[key] != null),
+              decoration: _inputDecoration(hint ?? 'Select class', error: hasError),
               items: _classOptions.entries
                   .map((entry) => DropdownMenuItem(value: entry.key, child: Text(entry.value)))
                   .toList(),
               onChanged: (value) => setState(() => _values[key] = value ?? ''),
             ),
-            if (_errors[key] != null) ...[
+            if (hasError) ...[
               const SizedBox(height: 6),
               Text(_errors[key]!, style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
             ],
@@ -344,17 +438,27 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
           const SizedBox(height: 6),
           TextField(
             controller: _controllerFor(key),
-            onChanged: (value) => _values[key] = value,
+            onChanged: (value) {
+              _values[key] = value;
+              if (_errors.containsKey(key)) {
+                setState(() => _errors.remove(key));
+              }
+              _scheduleFieldValidation(key);
+            },
+            onEditingComplete: () => _validateField(key),
             obscureText: obscure,
             keyboardType: keyboard,
             textCapitalization: key == 'school_prefix' ? TextCapitalization.characters : TextCapitalization.none,
-            decoration: _inputDecoration(hint ?? '', error: _errors[key] != null),
+            decoration: _inputDecoration(hint ?? '', error: hasError).copyWith(
+              suffixIcon: isValidating
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                  : null,
+            ),
           ),
-          if (help != null) ...[
-            const SizedBox(height: 4),
-            Text(help, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), height: 1.4)),
-          ],
-          if (_errors[key] != null) ...[
+          if (hasError) ...[
             const SizedBox(height: 6),
             Text(_errors[key]!, style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
           ],
@@ -381,14 +485,17 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
         else
           TextButton(onPressed: () => context.go('/login'), child: const Text('Sign in')),
         const Spacer(),
-        SaPrimaryButton(label: 'Register', loading: _submitting, onPressed: () {
-          if (_twoStep && _step == 1) {
-            _nextStep();
-            return;
-          }
-          if (!_validateStep(_twoStep ? 2 : 1)) return;
-          _submit();
-        }),
+        SaPrimaryButton(
+          label: 'Register',
+          loading: _submitting,
+          onPressed: () {
+            if (_twoStep && _step == 1) {
+              _nextStep();
+              return;
+            }
+            _register();
+          },
+        ),
       ],
     );
   }
@@ -405,7 +512,15 @@ class _SchoolRegisterScreenState extends State<SchoolRegisterScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF1E5AA8), width: 1.5),
+        borderSide: BorderSide(color: error ? const Color(0xFFF87171) : const Color(0xFF1E5AA8), width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFF87171), width: 1.5),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFF87171), width: 1.5),
       ),
     );
   }

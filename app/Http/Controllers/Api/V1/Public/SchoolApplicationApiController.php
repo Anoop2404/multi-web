@@ -20,11 +20,7 @@ class SchoolApplicationApiController extends ApiController
 {
     public function form(Request $request)
     {
-        $sahodaya = TenantBranding::resolveTenant($request);
-
-        if (! $sahodaya || $sahodaya->type !== 'sahodaya') {
-            return $this->message('School registration is not available for this portal.', 404);
-        }
+        $sahodaya = $this->resolveSahodaya($request);
 
         $profile = $this->resolveProfile($sahodaya);
         $fields  = SchoolApplicationForm::resolve($profile);
@@ -46,13 +42,29 @@ class SchoolApplicationApiController extends ApiController
         ]);
     }
 
+    public function validateField(Request $request)
+    {
+        $sahodaya = $this->resolveSahodaya($request);
+
+        $data = $request->validate([
+            'field' => 'required|in:school_email,school_prefix,cbse_affiliation',
+            'value' => 'required|string|max:255',
+        ]);
+
+        $message = $this->fieldValidationMessage($sahodaya, $data['field'], $data['value']);
+
+        if ($message) {
+            throw ValidationException::withMessages([
+                $data['field'] => [$message],
+            ]);
+        }
+
+        return $this->ok(['valid' => true]);
+    }
+
     public function store(Request $request, MembershipNotifier $notifier)
     {
-        $sahodaya = TenantBranding::resolveTenant($request);
-
-        if (! $sahodaya || $sahodaya->type !== 'sahodaya') {
-            return $this->message('School registration is not available for this portal.', 404);
-        }
+        $sahodaya = $this->resolveSahodaya($request);
 
         $profile = $this->resolveProfile($sahodaya);
         $fields  = SchoolApplicationForm::resolve($profile);
@@ -127,6 +139,35 @@ class SchoolApplicationApiController extends ApiController
             'school_name' => $school->name,
             'email'       => $user->email,
         ]);
+    }
+
+    private function resolveSahodaya(Request $request): Tenant
+    {
+        $sahodaya = TenantBranding::resolveTenant($request);
+
+        if (! $sahodaya || $sahodaya->type !== 'sahodaya') {
+            abort(404, 'School registration is not available for this portal.');
+        }
+
+        return $sahodaya;
+    }
+
+    private function fieldValidationMessage(Tenant $sahodaya, string $field, string $value): ?string
+    {
+        return match ($field) {
+            'school_email' => ! SchoolApplicationForm::isGmailAddress($value)
+                ? 'Login email must be a valid Gmail address (@gmail.com).'
+                : (User::where('email', strtolower(trim($value)))->exists()
+                    ? 'An account with this Gmail address already exists.'
+                    : null),
+            'school_prefix' => SchoolApplicationForm::prefixIsTaken($sahodaya, $value)
+                ? 'This school code is already in use within this Sahodaya.'
+                : null,
+            'cbse_affiliation' => SchoolApplicationForm::affiliationIsTaken($sahodaya, $value)
+                ? 'This CBSE affiliation number is already registered.'
+                : null,
+            default => null,
+        };
     }
 
     private function resolveProfile(Tenant $sahodaya): ?SahodayaProfile

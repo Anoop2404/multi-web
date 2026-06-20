@@ -20,6 +20,7 @@ Route::prefix('v1')->group(function () {
     Route::post('auth/login', [AuthController::class, 'login']);
 
     Route::get('public/school-register', [SchoolApplicationApiController::class, 'form']);
+    Route::post('public/school-register/validate', [SchoolApplicationApiController::class, 'validateField']);
     Route::post('public/school-register', [SchoolApplicationApiController::class, 'store']);
 
     Route::middleware('auth:sanctum')->group(function () {

@@ -72,4 +72,32 @@ class SchoolApplicationApiTest extends TestCase
 
         Notification::assertSentTo($user, PortalVerifyEmail::class);
     }
+
+    public function test_validate_rejects_duplicate_school_prefix(): void
+    {
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'Test Sahodaya',
+            'domain'    => 'api-sahodaya.test',
+            'is_active' => true,
+        ]);
+
+        Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'Existing School',
+            'parent_id'         => $sahodaya->id,
+            'school_prefix'     => 'TEST3',
+            'membership_status' => 'approved',
+            'is_active'         => true,
+        ]);
+
+        $this->postJson('http://api-sahodaya.test/api/v1/public/school-register/validate', [
+            'field' => 'school_prefix',
+            'value' => 'TEST3',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['school_prefix']);
+    }
 }
