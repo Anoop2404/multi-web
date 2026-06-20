@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_providers.dart';
 import '../../core/widgets/sa_admin_shell.dart';
+import '../../core/widgets/sa_widgets.dart';
+import '../../config/app_branding.dart';
+import '../programs/program_drawer_extras.dart';
 import 'dashboard_screen.dart';
 import 'payments_screen.dart';
 import 'schools_screen.dart';
@@ -34,13 +37,15 @@ class _SahodayaShellState extends ConsumerState<SahodayaShell> {
 
     return SaAdminShell(
       roleLabel: 'Sahodaya',
-      tenantName: session.user.tenantName ?? 'Sahodaya',
+      tenantName: session.user.tenantName ?? AppBranding.appName,
       logoUrl: session.user.logoUrl,
       pageTitle: _labels[_index],
       labels: _labels,
       icons: _icons,
       selectedIndex: _index,
       onIndexChanged: (value) => setState(() => _index = value),
+      drawerLeadingExtras: const [SaDrawerSectionLabel('Membership')],
+      drawerTrailingExtras: buildProgramDrawerExtras(context, schoolPortal: false),
       pages: [
         SahodayaDashboardScreen(
           onGoToSchools: () => setState(() => _index = 1),

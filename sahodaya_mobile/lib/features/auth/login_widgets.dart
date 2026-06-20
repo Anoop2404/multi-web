@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../config/app_branding.dart';
 import '../../core/widgets/tenant_logo.dart';
 import 'login_branding.dart';
 
@@ -64,15 +65,23 @@ class LoginBrandPanel extends StatelessWidget {
             logoUrl: branding.resolvedLogoUrl,
             tenantName: branding.tenantName,
             size: wide ? 112 : 88,
+            preferBundledAsset: branding.tenantName == AppBranding.appName,
           ),
           const SizedBox(height: 12),
           _Badge(label: branding.eyebrow, centered: !wide),
           const SizedBox(height: 10),
-          Text(
-            branding.tenantName,
-            textAlign: wide ? TextAlign.start : TextAlign.center,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white, height: 1.25),
-          ),
+          if (branding.tenantName == AppBranding.appName)
+            AppBrandTitle(
+              textAlign: wide ? TextAlign.start : TextAlign.center,
+              line1Size: wide ? 16 : 14,
+              line2Size: wide ? 28 : 24,
+            )
+          else
+            Text(
+              branding.tenantName,
+              textAlign: wide ? TextAlign.start : TextAlign.center,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white, height: 1.25),
+            ),
           const SizedBox(height: 8),
           Text(
             subtitle,

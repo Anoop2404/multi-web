@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 
+import '../../core/auth/auth_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/authenticated_image.dart';
 import '../../core/widgets/sa_widgets.dart';
@@ -92,6 +97,27 @@ class _SchoolStudentsScreenState extends ConsumerState<SchoolStudentsScreen> {
     }
   }
 
+  Future<void> _downloadSampleCsv() async {
+    try {
+      final result = await ref.read(apiClientProvider).download('${schoolBase(ref)}/students/import/template');
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/students_import_template.csv');
+      await file.writeAsBytes(result.bytes);
+      await OpenFile.open(file.path);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sample CSV downloaded')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    }
+  }
+
   Future<void> _uploadPhoto(int studentId) async {
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1200);
@@ -130,33 +156,21 @@ class _SchoolStudentsScreenState extends ConsumerState<SchoolStudentsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton.small(
-            heroTag: 'import',
-            backgroundColor: Colors.white,
-            foregroundColor: AppColors.navyPrimary,
-            onPressed: _importCsv,
-            child: const Icon(Icons.upload_file),
-          ),
-          const SizedBox(height: 8),
-          FloatingActionButton(
-            heroTag: 'add',
-            backgroundColor: AppColors.navyPrimary,
-            onPressed: () => _openForm(),
-            child: const Icon(Icons.add),
-          ),
-        ],
-      ),
       body: RefreshIndicator(
         color: AppColors.navyPrimary,
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
           children: [
             SaSearchField(controller: _search, hint: 'Search students...'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            _StudentActionsCard(
+              classesConfigured: _classes.isNotEmpty,
+              onAdd: () => _openForm(),
+              onImport: _importCsv,
+              onDownloadSample: _downloadSampleCsv,
+            ),
+            const SizedBox(height: 12),
             Text(
               '${_students.length} student${_students.length == 1 ? '' : 's'}',
               style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
@@ -165,7 +179,7 @@ class _SchoolStudentsScreenState extends ConsumerState<SchoolStudentsScreen> {
             if (students.isEmpty)
               const SaEmptyView(
                 title: 'No students yet',
-                subtitle: 'Tap + to add a student or use the upload button to import a CSV.',
+                subtitle: 'Use Add Student above, or download the sample CSV, fill it in Excel, and import.',
                 icon: Icons.school_outlined,
               )
             else
@@ -199,6 +213,94 @@ class _SchoolStudentsScreenState extends ConsumerState<SchoolStudentsScreen> {
               }),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StudentActionsCard extends StatelessWidget {
+  const _StudentActionsCard({
+    required this.classesConfigured,
+    required this.onAdd,
+    required this.onImport,
+    required this.onDownloadSample,
+  });
+
+  final bool classesConfigured;
+  final VoidCallback onAdd;
+  final VoidCallback onImport;
+  final VoidCallback onDownloadSample;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderBlue),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0F0F3D7A), blurRadius: 10, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton.icon(
+            onPressed: classesConfigured ? onAdd : null,
+            icon: const Icon(Icons.person_add_alt_1_outlined, size: 20),
+            label: const Text('Add Student'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.navyPrimary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+          ),
+          if (!classesConfigured) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Classes are not configured yet. Contact your Sahodaya admin before adding students.',
+              style: TextStyle(fontSize: 12, color: Color(0xFFB45309), height: 1.4),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onImport,
+                  icon: const Icon(Icons.upload_file_outlined, size: 18),
+                  label: const Text('Import CSV'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navyPrimary,
+                    side: const BorderSide(color: AppColors.borderBlue),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onDownloadSample,
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: const Text('Sample CSV'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navyPrimary,
+                    side: const BorderSide(color: AppColors.borderBlue),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Download the sample CSV, fill it in Excel, save as CSV, then use Import CSV.',
+            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), height: 1.4),
+          ),
+        ],
       ),
     );
   }

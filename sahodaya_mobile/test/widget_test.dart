@@ -6,6 +6,6 @@ import 'package:sahodaya_mobile/main.dart';
 void main() {
   testWidgets('App boots to splash', (WidgetTester tester) async {
     await tester.pumpWidget(const ProviderScope(child: SahodayaApp()));
-    expect(find.text('Sahodaya'), findsOneWidget);
+    expect(find.text('MALAPPURAM CENTRAL'), findsOneWidget);
   });
 }

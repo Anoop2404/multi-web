@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../config/app_branding.dart';
 import '../theme/app_theme.dart';
 import 'tenant_logo.dart';
 
@@ -177,6 +178,7 @@ class SaDrawerHeader extends StatelessWidget {
             tenantName: tenantName,
             size: 44,
             borderColor: AppColors.accentGold.withValues(alpha: 0.45),
+            preferBundledAsset: tenantName == AppBranding.appName,
           ),
           const SizedBox(height: 12),
           Text(
@@ -189,15 +191,40 @@ class SaDrawerHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            tenantName,
-            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
-          ),
+          if (tenantName == AppBranding.appName)
+            const AppBrandTitle(line1Size: 11, line2Size: 15)
+          else
+            Text(
+              tenantName,
+              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(subtitle!, style: const TextStyle(color: Colors.white54, fontSize: 10, fontFamily: 'monospace')),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class SaDrawerSectionLabel extends StatelessWidget {
+  const SaDrawerSectionLabel(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 4),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          color: Color(0xBFFBBF24),
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }

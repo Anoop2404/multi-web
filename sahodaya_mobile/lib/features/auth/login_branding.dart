@@ -1,3 +1,4 @@
+import '../../config/app_branding.dart';
 import '../../config/env.dart';
 
 class LoginBranding {
@@ -63,8 +64,8 @@ class LoginBranding {
   }
 
   static LoginBranding get fallback => LoginBranding(
-        tenantName: 'Malappuram Central Sahodaya',
-        eyebrow: 'CBSE Sahodaya School Complex',
+        tenantName: AppBranding.appName,
+        eyebrow: AppBranding.eyebrow,
         tagline: 'Uniting CBSE schools for academic excellence, cultural programs, and collaborative growth.',
         motto: 'Caring and Sharing',
         logoUrl: fallbackLogoUrl,

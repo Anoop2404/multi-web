@@ -72,6 +72,26 @@
                 <NavItem :href="`/sahodaya-admin/${sahodaya.id}/membership/reports`"
                          icon="bar-chart" label="Reports"
                          :active="isActive(`/sahodaya-admin/${sahodaya.id}/membership/reports`)" />
+
+                <NavSectionLabel text="Programs" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/kalotsav/registration`"
+                         icon="star" label="Kalotsav"
+                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/kalotsav/registration`)" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/kalotsav/results`"
+                         icon="bar-chart" label="Kalotsav Results"
+                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/kalotsav/results`)" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/sports-meet/registration`"
+                         icon="award" label="Sports Meet"
+                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/sports-meet/registration`)" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/sports-meet/results`"
+                         icon="bar-chart" label="Sports Results"
+                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/sports-meet/results`)" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/kids-fest/registration`"
+                         icon="users" label="Kids Fest"
+                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/kids-fest/registration`)" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/kids-fest/results`"
+                         icon="bar-chart" label="Kids Fest Results"
+                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/kids-fest/results`)" />
             </nav>
 
             <!-- Footer — always pinned at bottom -->
@@ -177,6 +197,7 @@ const icons = {
     inbox:         '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
     'credit-card': '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
     'bar-chart':   '<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
+    award:         '<circle cx="12" cy="8" r="6"/><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/>',
     'log-out':     '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
     'external-link':'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
     layers:         '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',

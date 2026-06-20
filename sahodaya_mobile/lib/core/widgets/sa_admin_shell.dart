@@ -35,7 +35,9 @@ class SaAdminShell extends ConsumerWidget {
     required this.icons,
     required this.selectedIndex,
     required this.onIndexChanged,
-    this.drawerExtras,
+    this.drawerLeadingExtras,
+    this.drawerNavChildren,
+    this.drawerTrailingExtras,
     this.navCount,
     this.navSelectedIndex,
   });
@@ -49,7 +51,9 @@ class SaAdminShell extends ConsumerWidget {
   final List<IconData> icons;
   final int selectedIndex;
   final ValueChanged<int> onIndexChanged;
-  final List<Widget>? drawerExtras;
+  final List<Widget>? drawerLeadingExtras;
+  final List<Widget>? drawerNavChildren;
+  final List<Widget>? drawerTrailingExtras;
   final int? navCount;
   final int? navSelectedIndex;
 
@@ -109,17 +113,21 @@ class SaAdminShell extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   children: [
-                    if (drawerExtras != null) ...drawerExtras!,
-                    for (var i = 0; i < labels.length; i++)
-                      SaDrawerTile(
-                        icon: icons[i],
-                        label: labels[i],
-                        selected: selectedIndex == i,
-                        onTap: () {
-                          Navigator.pop(context);
-                          onIndexChanged(i);
-                        },
-                      ),
+                    if (drawerLeadingExtras != null) ...drawerLeadingExtras!,
+                    if (drawerNavChildren != null)
+                      ...drawerNavChildren!
+                    else
+                      for (var i = 0; i < labels.length; i++)
+                        SaDrawerTile(
+                          icon: icons[i],
+                          label: labels[i],
+                          selected: selectedIndex == i,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onIndexChanged(i);
+                          },
+                        ),
+                    if (drawerTrailingExtras != null) ...drawerTrailingExtras!,
                   ],
                 ),
               ),

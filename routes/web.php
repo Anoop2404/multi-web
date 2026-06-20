@@ -195,6 +195,10 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/registration/payment', [AnnualRegistrationController::class, 'uploadPayment'])->name('registration.payment.upload');
     Route::get('/registration/payments/{payment}/proof', [AnnualRegistrationController::class, 'paymentProof'])->name('registration.payment.proof');
 
+    Route::get('/programs/{program}/{view}', [\App\Http\Controllers\SchoolAdmin\ProgramPlaceholderController::class, 'show'])
+        ->whereIn('view', ['registration', 'results'])
+        ->name('programs.show');
+
     // Website & CMS (disabled until WEBSITE_ENABLED=true)
     Route::middleware('website.enabled')->group(function () {
     // News
@@ -375,6 +379,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/membership/reports/export/payments-done', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPaymentsDone'])->name('membership.reports.export.payments-done');
         Route::get('/membership/reports/export/submissions', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportSubmissions'])->name('membership.reports.export.submissions');
         Route::get('/membership/reports/export/payments', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPayments'])->name('membership.reports.export.payments');
+
+        Route::get('/programs/{program}/{view}', [\App\Http\Controllers\SahodayaAdmin\ProgramPlaceholderController::class, 'show'])
+            ->whereIn('view', ['registration', 'results'])
+            ->name('programs.show');
 
         Route::post('/membership/logo', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'uploadLogo'])->name('membership.logo');
         Route::put('/membership/application-form', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateApplicationForm'])->name('membership.application-form.update');

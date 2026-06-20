@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../config/app_branding.dart';
 import '../../config/env.dart';
 import '../theme/app_theme.dart';
 
@@ -11,6 +12,7 @@ class TenantLogo extends StatelessWidget {
     required this.size,
     this.fit = BoxFit.cover,
     this.borderColor,
+    this.preferBundledAsset = false,
   });
 
   final String logoUrl;
@@ -18,6 +20,7 @@ class TenantLogo extends StatelessWidget {
   final double size;
   final BoxFit fit;
   final Color? borderColor;
+  final bool preferBundledAsset;
 
   static String resolveUrl(String? logoUrl) {
     if (logoUrl == null || logoUrl.isEmpty) {
@@ -31,6 +34,7 @@ class TenantLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     final initial = tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'S';
     final resolved = resolveUrl(logoUrl);
+    final useAsset = preferBundledAsset || logoUrl.isEmpty;
 
     return Container(
       width: size,
@@ -45,16 +49,26 @@ class TenantLogo extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Transform.scale(
         scale: 1.18,
-        child: Image.network(
-          resolved,
-          fit: fit,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentGold));
-          },
-          errorBuilder: (_, __, ___) => _AvatarFallback(initial: initial, fontSize: size * 0.4),
-        ),
+        child: useAsset
+            ? _assetImage(initial)
+            : Image.network(
+                resolved,
+                fit: fit,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentGold));
+                },
+                errorBuilder: (_, __, ___) => _assetImage(initial),
+              ),
       ),
+    );
+  }
+
+  Widget _assetImage(String initial) {
+    return Image.asset(
+      AppBranding.logoAsset,
+      fit: fit,
+      errorBuilder: (_, __, ___) => _AvatarFallback(initial: initial, fontSize: size * 0.4),
     );
   }
 }

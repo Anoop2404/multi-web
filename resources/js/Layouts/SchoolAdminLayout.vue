@@ -53,6 +53,26 @@
                 <NavItem :href="`/school-admin/${tid}/registration`" icon="clipboard" label="Annual Registration"
                          :active="isActive(`/school-admin/${tid}/registration`)" />
 
+                <NavSectionLabel text="Programs" />
+                <NavItem :href="`/school-admin/${tid}/programs/kalotsav/registration`"
+                         icon="star" label="Kalotsav"
+                         :active="isExact(`/school-admin/${tid}/programs/kalotsav/registration`)" />
+                <NavItem :href="`/school-admin/${tid}/programs/kalotsav/results`"
+                         icon="bar-chart" label="Kalotsav Results"
+                         :active="isExact(`/school-admin/${tid}/programs/kalotsav/results`)" />
+                <NavItem :href="`/school-admin/${tid}/programs/sports-meet/registration`"
+                         icon="award" label="Sports Meet"
+                         :active="isExact(`/school-admin/${tid}/programs/sports-meet/registration`)" />
+                <NavItem :href="`/school-admin/${tid}/programs/sports-meet/results`"
+                         icon="bar-chart" label="Sports Results"
+                         :active="isExact(`/school-admin/${tid}/programs/sports-meet/results`)" />
+                <NavItem :href="`/school-admin/${tid}/programs/kids-fest/registration`"
+                         icon="users" label="Kids Fest"
+                         :active="isExact(`/school-admin/${tid}/programs/kids-fest/registration`)" />
+                <NavItem :href="`/school-admin/${tid}/programs/kids-fest/results`"
+                         icon="bar-chart" label="Kids Fest Results"
+                         :active="isExact(`/school-admin/${tid}/programs/kids-fest/results`)" />
+
                 <template v-if="websiteEnabled">
                     <NavSectionLabel text="Website" />
                     <NavItem :href="`/school-admin/${tid}/news`" icon="file-text" label="News"
@@ -193,6 +213,7 @@ const icons = {
     folder:        '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
     briefcase:     '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>',
     'bar-chart':   '<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
+    award:         '<circle cx="12" cy="8" r="6"/><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/>',
     award:         '<circle cx="12" cy="8" r="6"/><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/>',
     inbox:         '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
     settings:      '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',

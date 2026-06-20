@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../config/env.dart';
+import '../../config/app_branding.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/auth/auth_providers.dart';
+import '../../core/widgets/app_brand_logo.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -29,17 +30,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.5), width: 2),
-                ),
-                child: const Icon(Icons.school, size: 36, color: AppColors.accentGold),
-              ),
+              const AppBrandLogo(size: 96),
               const SizedBox(height: 16),
-              Text(AppEnv.appName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
+              const AppBrandTitle(
+                textAlign: TextAlign.center,
+                line1Size: 13,
+                line2Size: 22,
+              ),
               const SizedBox(height: 24),
               const CircularProgressIndicator(color: AppColors.accentGold),
             ],
