@@ -2,7 +2,7 @@
     <div class="max-w-7xl mx-auto px-4 py-8">
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-2">
-                @if(!empty($logo = $tenant->getSetting('logo')))
+                @if(!empty($logo = \App\Support\TenantBranding::logoUrl($tenant)))
                 <img loading="lazy" src="{{ $logo }}" class="h-8" alt="{{ $tenant->name }}">
                 @else
                 <span class="font-bold font-heading" style="color: var(--color-primary)">{{ $tenant->name ?? 'School' }}</span>

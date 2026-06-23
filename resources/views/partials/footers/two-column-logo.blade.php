@@ -2,7 +2,7 @@
     <div class="max-w-7xl mx-auto px-4 py-12 grid md:grid-cols-2 gap-8">
         <div>
             <a href="/" class="flex items-center gap-3 mb-4">
-                @if(!empty($logo = $tenant->getSetting('logo')))
+                @if(!empty($logo = \App\Support\TenantBranding::logoUrl($tenant)))
                 <img loading="lazy" src="{{ $logo }}" class="h-12 brightness-0 invert" alt="{{ $tenant->name }}">
                 @else
                 <span class="text-xl font-bold text-white font-heading">{{ $tenant->name ?? 'School' }}</span>

@@ -59,7 +59,7 @@ class SahodayaTenantBranding
             'region'      => $region,
             'tagline'     => self::tagline($tenant, $region),
             'motto'       => 'Caring and Sharing',
-            'logo'        => $tenant->getSetting('logo'),
+            'logo'        => TenantBranding::logoUrl($tenant),
             'phone'       => $profile?->contact_phone ?: ($footer['phone'] ?? null),
             'email'       => $profile?->contact_email ?: ($footer['email'] ?? null),
             'address'     => $profile?->address ?: ($footer['address'] ?? null),

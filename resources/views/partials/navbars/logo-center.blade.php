@@ -3,7 +3,7 @@
         {{-- Top row: logo centered --}}
         <div class="flex items-center justify-center py-3 border-b border-gray-100">
             <a href="/" class="flex items-center gap-3">
-                @if(isset($tenant) && !empty($logo = $tenant->getSetting('logo')))
+                @if(isset($tenant) && !empty($logo = \App\Support\TenantBranding::logoUrl($tenant)))
                     <img loading="lazy" src="{{ $logo }}" class="h-14" alt="{{ $tenant->name }}">
                 @else
                     <div class="text-center">

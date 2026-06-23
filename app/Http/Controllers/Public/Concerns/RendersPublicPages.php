@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Public\Concerns;
 
 use App\Models\Tenant;
+use App\Support\TenantBranding;
 use App\Support\TenantCache;
 use Illuminate\Http\Response;
 
@@ -30,7 +31,7 @@ trait RendersPublicPages
                 'widgets'      => $tenant->settings()->where('key', 'widgets')->first()?->value ?? [],
                 'seo'          => $tenant->settings()->where('key', 'seo')->first()?->value ?? [],
                 'locale'       => $tenant->settings()->where('key', 'locale')->first()?->value ?? 'en',
-                'logo'         => $tenant->settings()->where('key', 'logo')->first()?->value,
+                'logo'         => TenantBranding::logoUrl($tenant),
             ]
         );
     }

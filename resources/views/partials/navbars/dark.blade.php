@@ -2,7 +2,7 @@
      style="background-color: var(--color-primary)">
     <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
         <a href="/" class="flex items-center gap-3">
-            @if(isset($tenant) && !empty($logo = $tenant->getSetting('logo')))
+            @if(isset($tenant) && !empty($logo = \App\Support\TenantBranding::logoUrl($tenant)))
                 <img loading="lazy" src="{{ $logo }}" class="h-10 brightness-0 invert" alt="{{ $tenant->name }}">
             @else
                 <span class="text-xl font-bold font-heading text-white">{{ $tenant->name ?? 'School' }}</span>

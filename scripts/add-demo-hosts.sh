@@ -9,6 +9,8 @@ REQUIRED_HOSTS=(
   "127.0.0.1  sahodaya.test"
   "127.0.0.1  malappuramsahodaya.test"
   "127.0.0.1  malappuram.sahodaya.test"
+  "127.0.0.1  vadakarasahodaya.test"
+  "127.0.0.1  vadakara.sahodaya.test"
   "127.0.0.1  amu-school.sahodaya.test"
   "127.0.0.1  kv-malappuram.sahodaya.test"
   "127.0.0.1  albirr.sahodaya.test"
