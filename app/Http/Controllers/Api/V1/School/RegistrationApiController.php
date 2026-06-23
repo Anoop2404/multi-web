@@ -16,6 +16,7 @@ use App\Models\SubmissionTeacher;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\UploadBackupService;
 use App\Services\Membership\EffectiveMasterDataResolver;
+use App\Services\Membership\FeeReceiptService;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\RegistrationStatusService;
 use App\Support\AcademicYear;
@@ -299,6 +300,8 @@ class RegistrationApiController extends SchoolApiController
             'uploaded_by_user_id' => $request->user()->id,
             'status'              => 'submitted',
         ]);
+
+        app(FeeReceiptService::class)->createForMembershipPayment($payment);
 
         $registration->update(['registration_status' => 'payment_submitted']);
         $notifier->paymentSubmitted(

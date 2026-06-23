@@ -4,7 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
 use App\Models\Circular;
-use App\Models\KalotsavEvent;
+use App\Models\FestEvent;
 use App\Models\OfficeBearers;
 use App\Models\Student;
 use App\Models\Tenant;
@@ -54,7 +54,8 @@ class DashboardController extends SahodayaAdminController
             'payments_pending_verification_amount' => $paymentSummary['payments_pending_verification_amount'],
             'office_bearers'     => OfficeBearers::where('tenant_id', $this->sahodaya->id)->count(),
             'circulars'          => Circular::where('tenant_id', $this->sahodaya->id)->count(),
-            'kalotsav_events'    => KalotsavEvent::where('tenant_id', $this->sahodaya->id)->count(),
+            'kalotsav_events'    => FestEvent::where('tenant_id', $this->sahodaya->id)->count(),
+            'fest_events'        => FestEvent::where('tenant_id', $this->sahodaya->id)->count(),
         ];
 
         $recentCirculars = Circular::where('tenant_id', $this->sahodaya->id)
@@ -62,10 +63,11 @@ class DashboardController extends SahodayaAdminController
             ->limit(5)
             ->get(['id', 'title', 'category', 'issued_date']);
 
-        $activeKalotsav = KalotsavEvent::where('tenant_id', $this->sahodaya->id)
-            ->where('is_active', true)
-            ->orderByDesc('event_date')
-            ->first();
+        $activeKalotsav = FestEvent::where('tenant_id', $this->sahodaya->id)
+            ->where('results_published', false)
+            ->whereIn('status', ['registration_open', 'ongoing', 'published'])
+            ->orderByDesc('event_start')
+            ->first(['id', 'title', 'event_start', 'status']);
 
         return $this->inertia('Sahodaya/Dashboard', compact('stats', 'recentCirculars', 'activeKalotsav'));
     }

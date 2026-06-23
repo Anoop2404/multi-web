@@ -2,10 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Public\AdmissionEnquiryController;
+use App\Http\Controllers\Public\RegistrationLandingController;
+use App\Http\Controllers\Public\FestPortalController;
 use App\Http\Controllers\Public\EventController;
 use App\Http\Controllers\Public\GalleryAlbumController;
 use App\Http\Controllers\Public\NewsArticleController;
 use App\Http\Controllers\Public\SchoolApplicationController;
+use App\Http\Controllers\Public\SahodayaCmsPageController;
 use App\Http\Controllers\Public\SeoController;
 use App\Http\Controllers\Public\TcRequestController;
 use App\Http\Middleware\InitializeTenancyByRequestHost;
@@ -22,16 +26,47 @@ Route::middleware([
 
     // Home route is registered in CentralRouteServiceProvider (host-aware central + tenant).
 
+    // Portal landing (register + login options; always available)
+    Route::get('/portal', RegistrationLandingController::class)->name('tenant.portal');
+
     // School membership application (always available on Sahodaya tenants)
     Route::get('/school-register', [SchoolApplicationController::class, 'create'])->name('school-register.create');
     Route::post('/school-register', [SchoolApplicationController::class, 'store'])->name('school-register.store');
 
-    // Public website (disabled until WEBSITE_ENABLED=true)
-    Route::middleware('website.enabled')->group(function () {
+    // Public festival portal (always available on Sahodaya tenants)
+    Route::prefix('fest')->name('tenant.fest.')->group(function () {
+        Route::get('/', [FestPortalController::class, 'index'])->name('index');
+        Route::get('/{event}', [FestPortalController::class, 'show'])->name('show');
+        Route::get('/{event}/schedule', [FestPortalController::class, 'schedule'])->name('schedule');
+        Route::get('/{event}/live', [FestPortalController::class, 'live'])->name('live');
+        Route::get('/{event}/search', [FestPortalController::class, 'search'])->name('search');
+        Route::get('/{event}/participant/{chestNo}', [FestPortalController::class, 'participant'])->name('participant');
+    });
+
+    // Public website pages (require global + tenant public-site setting)
+    Route::middleware(['website.enabled', 'public.website.enabled'])->group(function () {
         Route::get('/news', [NewsArticleController::class, 'index'])->name('tenant.news.index');
         Route::get('/news/{slug}', [NewsArticleController::class, 'show'])->name('tenant.news.show');
         Route::get('/events', [EventController::class, 'index'])->name('tenant.events.index');
         Route::get('/events/{slug}', [EventController::class, 'show'])->name('tenant.events.show');
+
+        // CKSC-style CMS pages (must be registered before /gallery/{slug})
+        Route::get('/about', fn () => app(SahodayaCmsPageController::class)->show('about'))->name('tenant.sahodaya.about');
+        Route::get('/executive', fn () => app(SahodayaCmsPageController::class)->show('executive'))->name('tenant.sahodaya.executive');
+        Route::get('/contact', fn () => app(SahodayaCmsPageController::class)->show('contact'))->name('tenant.sahodaya.contact');
+        Route::get('/contactus', fn () => app(SahodayaCmsPageController::class)->show('contact'));
+        Route::get('/downloads', fn () => app(SahodayaCmsPageController::class)->show('downloads'))->name('tenant.sahodaya.downloads');
+        Route::get('/download', fn () => app(SahodayaCmsPageController::class)->show('downloads'));
+        Route::get('/gallery/function', fn () => app(SahodayaCmsPageController::class)->show('gallery/function'))->name('tenant.sahodaya.gallery.function');
+        Route::get('/gallery/programme', fn () => app(SahodayaCmsPageController::class)->show('gallery/programme'))->name('tenant.sahodaya.gallery.programme');
+        Route::get('/gallery/sahodya', fn () => app(SahodayaCmsPageController::class)->show('gallery/sahodya'))->name('tenant.sahodaya.gallery.sahodya');
+        Route::get('/moa/structure', fn () => app(SahodayaCmsPageController::class)->show('moa/structure'))->name('tenant.sahodaya.moa.structure');
+        Route::get('/moa/rules', fn () => app(SahodayaCmsPageController::class)->show('moa/rules'))->name('tenant.sahodaya.moa.rules');
+        Route::get('/moa/meetings', fn () => app(SahodayaCmsPageController::class)->show('moa/meetings'))->name('tenant.sahodaya.moa.meetings');
+        Route::get('/moa/authority', fn () => app(SahodayaCmsPageController::class)->show('moa/authority'))->name('tenant.sahodaya.moa.authority');
+        Route::get('/moa/activities', fn () => app(SahodayaCmsPageController::class)->show('moa/activities'))->name('tenant.sahodaya.moa.activities');
+        Route::get('/moa/election', fn () => app(SahodayaCmsPageController::class)->show('moa/election'))->name('tenant.sahodaya.moa.election');
+
         Route::get('/gallery/{slug}', [GalleryAlbumController::class, 'show'])->name('tenant.gallery.show');
 
         Route::post('/admission-enquiry', [AdmissionEnquiryController::class, 'store'])->name('admission-enquiry.store');

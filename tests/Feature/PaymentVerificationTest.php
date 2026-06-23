@@ -6,6 +6,7 @@ use App\Models\MembershipPayment;
 use App\Models\Registration;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
+use App\Services\Membership\FeeReceiptService;
 use App\Support\AcademicYear;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SahodayaMasterDataSeeder;
@@ -61,6 +62,8 @@ class PaymentVerificationTest extends TestCase
             'status'             => 'submitted',
         ]);
 
+        app(FeeReceiptService::class)->createForMembershipPayment($payment);
+
         return compact('sahodaya', 'school', 'registration', 'payment');
     }
 
@@ -85,6 +88,7 @@ class PaymentVerificationTest extends TestCase
         $this->assertSame('rejected', $payment->status);
         $this->assertSame('Invalid transaction reference', $payment->rejection_reason);
         $this->assertSame('payment_rejected', $registration->registration_status);
+        $this->assertSame('rejected', $payment->feeReceipt?->status);
     }
 
     public function test_sahodaya_admin_can_verify_payment(): void
@@ -107,6 +111,7 @@ class PaymentVerificationTest extends TestCase
 
         $this->assertSame('verified', $payment->status);
         $this->assertSame('completed', $registration->registration_status);
+        $this->assertSame('approved', $payment->feeReceipt?->status);
     }
 
     public function test_sahodaya_admin_can_stream_local_payment_proof(): void

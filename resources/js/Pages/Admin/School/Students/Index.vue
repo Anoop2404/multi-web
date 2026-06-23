@@ -110,7 +110,7 @@
                         </button>
                     </td>
                     <td class="px-4 py-3 font-medium text-gray-900">{{ student.name }}</td>
-                    <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ student.admission_number || '—' }}</td>
+                    <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ student.reg_no || student.admission_number || '—' }}</td>
                     <td class="px-4 py-3 text-xs text-gray-600 capitalize">{{ formatGender(student.gender) }}</td>
                     <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{{ formatDate(student.dob) }}</td>
                     <td class="px-4 py-3 text-xs text-gray-500">{{ student.parent_email || '—' }}</td>
@@ -122,6 +122,8 @@
                     <td class="px-4 py-3 text-right whitespace-nowrap">
                         <button type="button" @click="openEditModal(student)"
                                 class="text-xs font-semibold text-[#0f3d7a] hover:underline mr-3">Edit</button>
+                        <button v-if="!student.user_id" type="button" @click="openPortalModal(student)"
+                                class="text-xs font-semibold text-indigo-600 hover:underline mr-3">Portal</button>
                         <button type="button" @click="remove(student)"
                                 class="text-xs text-red-400 hover:text-red-600 hover:underline">Remove</button>
                     </td>
@@ -287,6 +289,19 @@
                         </div>
                     </div>
 
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Portal email <span class="font-normal text-gray-400">(optional)</span></label>
+                        <input v-model="registerForm.email" type="email" placeholder="student@example.com"
+                               class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
+                    </div>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input v-model="registerForm.create_login" type="checkbox"> Create student portal login
+                    </label>
+                    <div v-if="registerForm.create_login">
+                        <input v-model="registerForm.password" type="password" placeholder="Min 8 characters" minlength="8"
+                               class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm">
+                    </div>
+
                     <div class="flex items-center justify-end gap-3 pt-2">
                         <button type="button" @click="closeRegisterModal" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
                         <button type="submit" :disabled="registerForm.processing"
@@ -295,6 +310,21 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Portal login modal -->
+        <div v-if="showPortal && portalStudent" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closePortalModal"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md border p-6 space-y-4">
+                <h3 class="font-bold">Portal login — {{ portalStudent.name }}</h3>
+                <input v-model="portalForm.email" type="email" placeholder="Email" class="w-full border rounded-lg px-3 py-2 text-sm" required>
+                <input v-model="portalForm.password" type="password" placeholder="Password (min 8)" class="w-full border rounded-lg px-3 py-2 text-sm" required>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="closePortalModal" class="text-sm text-gray-500">Cancel</button>
+                    <button type="button" @click="submitPortal" :disabled="portalForm.processing"
+                            class="sa-btn-primary px-4 py-2 rounded-lg text-sm font-semibold">Create login</button>
+                </div>
             </div>
         </div>
 
@@ -384,6 +414,8 @@ const page = usePage();
 const showRegister = ref(false);
 const showImport = ref(false);
 const showEdit = ref(false);
+const showPortal = ref(false);
+const portalStudent = ref(null);
 const editingStudent = ref(null);
 const editPhotoPreview = ref(null);
 
@@ -413,7 +445,12 @@ const registerForm = useForm({
     name:            '',
     gender:          '',
     dob:             '',
+    email:           '',
+    create_login:    false,
+    password:        '',
 });
+
+const portalForm = useForm({ email: '', password: '' });
 
 const importForm = useForm({ file: null });
 
@@ -595,6 +632,27 @@ function submitRegister() {
             closeRegisterModal();
             registerForm.reset();
         },
+    });
+}
+
+function openPortalModal(student) {
+    portalStudent.value = student;
+    portalForm.email = student.email || student.parent_email || '';
+    portalForm.password = '';
+    portalForm.clearErrors();
+    showPortal.value = true;
+}
+
+function closePortalModal() {
+    showPortal.value = false;
+    portalStudent.value = null;
+    portalForm.reset();
+}
+
+function submitPortal() {
+    portalForm.post(`/school-admin/${props.school.id}/students/${portalStudent.value.id}/portal-login`, {
+        preserveScroll: true,
+        onSuccess: () => closePortalModal(),
     });
 }
 

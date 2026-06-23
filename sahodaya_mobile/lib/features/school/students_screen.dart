@@ -4,13 +4,13 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/auth/auth_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/authenticated_image.dart';
+import '../../core/widgets/image_picker_sheet.dart';
 import '../../core/widgets/sa_widgets.dart';
 import 'school_api.dart';
 import 'student_form_screen.dart';
@@ -119,8 +119,7 @@ class _SchoolStudentsScreenState extends ConsumerState<SchoolStudentsScreen> {
   }
 
   Future<void> _uploadPhoto(int studentId) async {
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1200);
+    final image = await pickImageFromCameraOrGallery(context, maxWidth: 1200);
     if (image == null) return;
 
     try {

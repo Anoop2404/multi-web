@@ -1,7 +1,8 @@
 {{-- hero/full-bleed.blade.php — Immersive full-viewport hero with parallax-like bg --}}
+@php use App\Support\TenantStorage; $bgImage = TenantStorage::siteMediaUrl($tenant, $config['bg_image'] ?? null); @endphp
 <section class="relative min-h-[80vh] flex items-end overflow-hidden"
-         @if(!empty($config['bg_image']))
-         style="background-image: url('{{ $config['bg_image'] }}'); background-size: cover; background-position: center;"
+         @if($bgImage)
+         style="background-image: url('{{ $bgImage }}'); background-size: cover; background-position: center;"
          @else
          style="background: linear-gradient(160deg, var(--color-primary) 0%, #0f172a 100%);"
          @endif>

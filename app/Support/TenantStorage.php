@@ -127,6 +127,41 @@ class TenantStorage
         return self::storeUploadedFile($file, 'submissions/'.$schoolId, self::photosDisk());
     }
 
+    /** Store a public website image (hero, sections) — always on public disk for browser access. */
+    public static function storeSiteMedia($file, string $tenantId): string
+    {
+        return $file->store('site-media/'.$tenantId, 'public');
+    }
+
+    /** Resolve stored path or URL for display on the public site. */
+    public static function siteMediaUrl(?Tenant $tenant, ?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        if (str_starts_with($path, '/')) {
+            return $path;
+        }
+
+        $relative = ltrim($path, '/');
+
+        if (Storage::disk('public')->exists($relative)) {
+            return Storage::disk('public')->url($relative);
+        }
+
+        $fromAsset = self::assetUrl($tenant, $relative);
+        if ($fromAsset) {
+            return $fromAsset;
+        }
+
+        return '/storage/'.$relative;
+    }
+
     public static function isS3Configured(): bool
     {
         return filled(config('filesystems.disks.s3.key'))

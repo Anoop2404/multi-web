@@ -44,7 +44,23 @@
                     </FormGrid>
                 </FormSection>
 
-                <FormSection title="Academic Year" hint="Controls which year schools register for, fee slabs, and reports.">
+                <FormSection title="Academic Year" hint="Controls which year schools register for, fee slabs, and reports. Manage lifecycle under Academic Years.">
+                    <div v-if="activeAcademicYearRecord" class="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                        <span class="px-2.5 py-1 rounded-full bg-green-100 text-green-800 font-semibold">
+                            Active record: {{ activeAcademicYearRecord.label }}
+                        </span>
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/academic-years`"
+                           class="text-purple-700 underline hover:text-purple-900">
+                            Open Academic Years →
+                        </a>
+                    </div>
+                    <div v-else class="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-100 text-xs text-amber-900">
+                        No academic year record is active yet.
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/academic-years`"
+                           class="ml-1 font-semibold underline hover:text-amber-950">
+                            Create and activate one →
+                        </a>
+                    </div>
                     <FormGrid>
                         <FormField label="Active Academic Year" class-extra="sm:col-span-2"
                                    :hint="`Format: 2026-27. Calendar default without override: ${calendarYear}`">
@@ -291,6 +307,9 @@
                         <FormField label="Amount (₹)">
                             <input v-model.number="slabForm.amount" type="number" step="0.01" min="0" class="field w-32">
                         </FormField>
+                        <FormField label="Due Date">
+                            <input v-model="slabForm.due_date" type="date" class="field w-36">
+                        </FormField>
                         <button type="submit" class="btn-secondary mb-0.5">Add Slab</button>
                     </form>
                     <!-- Slabs table -->
@@ -300,6 +319,7 @@
                                 <tr>
                                     <th class="text-left px-4 py-2.5 font-semibold text-gray-600 text-xs">Students</th>
                                     <th class="text-right px-4 py-2.5 font-semibold text-gray-600 text-xs">Amount</th>
+                                    <th class="text-right px-4 py-2.5 font-semibold text-gray-600 text-xs">Due</th>
                                     <th class="px-4 py-2.5 w-10"></th>
                                 </tr>
                             </thead>
@@ -310,6 +330,9 @@
                                     </td>
                                     <td class="px-4 py-3 text-right font-bold text-green-700">
                                         ₹{{ Number(slab.amount).toLocaleString('en-IN') }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right text-xs text-gray-500">
+                                        {{ slab.due_date ? new Date(slab.due_date).toLocaleDateString('en-IN') : '—' }}
                                     </td>
                                     <td class="px-4 py-3 text-right">
                                         <button @click="removeSlab(slab)" class="text-xs text-red-400 hover:text-red-600">Remove</button>
@@ -333,7 +356,8 @@
                 <p class="text-sm text-gray-500">
                     Registration dates apply to the <strong class="text-gray-700">active academic year</strong>
                     (<span class="font-mono">{{ academicYear }}</span>).
-                    Change the year under <button type="button" class="text-purple-700 underline" @click="activeTab = 'profile'">Profile & Rules</button>.
+                    Manage year lifecycle under
+                    <a :href="`/sahodaya-admin/${sahodaya.id}/academic-years`" class="text-purple-700 underline">Academic Years</a>.
                 </p>
                 <FormSection :title="`Registration Window — ${academicYear}`"
                              hint="Schools can only submit annual registration during this period.">
@@ -593,6 +617,7 @@ const props = defineProps({
     feeSlabs:                { type: Array, default: () => [] },
     registrationWindow:      { type: Object, default: null },
     academicYear:            String,
+    activeAcademicYearRecord:{ type: Object, default: null },
     calendarYear:          String,
     academicYearOptions:   { type: Array, default: () => [] },
     masterClasses:           { type: Array, default: () => [] },
@@ -648,7 +673,7 @@ const windowForm  = useForm({
     registration_starts_at: props.registrationWindow?.registration_starts_at?.slice(0, 10) || '',
     registration_ends_at:   props.registrationWindow?.registration_ends_at?.slice(0, 10) || '',
 });
-const slabForm = useForm({ academic_year: props.academicYear, min_students: 0, max_students: null, amount: 0 });
+const slabForm = useForm({ academic_year: props.academicYear, min_students: 0, max_students: null, amount: 0, due_date: '' });
 const categoryForm = useForm({ code: '', label: '', sort_order: null });
 const editCategoryForm = useForm({ code: '', label: '', sort_order: null });
 const editingCategoryId = ref(null);
@@ -722,7 +747,7 @@ function sendTestMail() {
 }
 function saveFormConfig() { formConfig.put(`/sahodaya-admin/${props.sahodaya.id}/membership/application-form`); }
 function saveWindow()  { windowForm.put(`/sahodaya-admin/${props.sahodaya.id}/membership/registration-window`); }
-function addSlab()     { slabForm.post(`/sahodaya-admin/${props.sahodaya.id}/membership/fee-slabs`, { onSuccess: () => slabForm.reset('min_students', 'max_students', 'amount') }); }
+function addSlab()     { slabForm.post(`/sahodaya-admin/${props.sahodaya.id}/membership/fee-slabs`, { onSuccess: () => slabForm.reset('min_students', 'max_students', 'amount', 'due_date') }); }
 function removeSlab(s) { router.delete(`/sahodaya-admin/${props.sahodaya.id}/membership/fee-slabs/${s.id}`); }
 
 function saveFees() {

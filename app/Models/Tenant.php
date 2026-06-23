@@ -78,6 +78,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function setSetting(string $key, mixed $value): void
     {
         $this->settings()->updateOrCreate(['key' => $key], ['value' => $value]);
+        TenantCache::forget($this->id, "setting:{$key}");
         $this->invalidateCache();
     }
 

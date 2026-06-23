@@ -47,6 +47,7 @@ class MembershipSettingsController extends SahodayaAdminController
             'feeSlabs'           => MembershipFeeSlab::where('sahodaya_id', $this->sahodaya->id)->where('academic_year', $academicYear)->orderBy('min_students')->get(),
             'registrationWindow' => SahodayaRegistrationWindow::where('sahodaya_id', $this->sahodaya->id)->where('academic_year', $academicYear)->first(),
             'academicYear'       => $academicYear,
+            'activeAcademicYearRecord' => \App\Support\AcademicYear::activeRecord(),
             'calendarYear'       => AcademicYear::calendarCurrent(),
             'academicYearOptions'=> AcademicYear::options(),
             'globalCategories'   => ClassCategory::global()->active()->orderBy('sort_order')->get()->map(function (ClassCategory $category) use ($categoryOverrides) {
@@ -301,9 +302,13 @@ class MembershipSettingsController extends SahodayaAdminController
             'min_students'  => 'required|integer|min:0',
             'max_students'  => 'nullable|integer|min:0',
             'amount'        => 'required|numeric|min:0',
+            'due_date'      => 'nullable|date',
         ]);
 
-        MembershipFeeSlab::create(array_merge($data, ['sahodaya_id' => $this->sahodaya->id]));
+        MembershipFeeSlab::create(array_merge($data, [
+            'sahodaya_id'      => $this->sahodaya->id,
+            'academic_year_id' => AcademicYear::recordIdForLabel($data['academic_year']),
+        ]));
 
         return back()->with('success', 'Fee slab added.');
     }
@@ -326,7 +331,9 @@ class MembershipSettingsController extends SahodayaAdminController
 
         SahodayaRegistrationWindow::updateOrCreate(
             ['sahodaya_id' => $this->sahodaya->id, 'academic_year' => $data['academic_year']],
-            $data
+            array_merge($data, [
+                'academic_year_id' => AcademicYear::recordIdForLabel($data['academic_year']),
+            ])
         );
 
         return back()->with('success', 'Registration window saved.');

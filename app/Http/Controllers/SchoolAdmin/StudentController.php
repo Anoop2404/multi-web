@@ -6,8 +6,10 @@ use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\UploadBackupService;
+use App\Services\Portal\StudentPortalProvisioner;
 use App\Services\Students\StudentCsvImporter;
 use App\Services\Students\StudentRegistrationNumberGenerator;
+use App\Support\StudentRecordHelper;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -47,7 +49,9 @@ class StudentController extends SchoolAdminController
                 $q->where(function ($inner) use ($term) {
                     $inner->where('name', 'like', $term)
                         ->orWhere('parent_email', 'like', $term)
+                        ->orWhere('email', 'like', $term)
                         ->orWhere('admission_number', 'like', $term)
+                        ->orWhere('reg_no', 'like', $term)
                         ->orWhere('roll_number', 'like', $term)
                         ->orWhere('parent_name', 'like', $term);
                 });
@@ -96,9 +100,24 @@ class StudentController extends SchoolAdminController
         $data = $this->validatedStudentCreate($request);
         $data['tenant_id'] = $this->school->id;
         $data['status'] = 'active';
-        $data['admission_number'] = app(StudentRegistrationNumberGenerator::class)->generate($this->school);
+        $regNo = app(StudentRegistrationNumberGenerator::class)->generate($this->school);
+        $data['admission_number'] = $regNo;
+        $data['reg_no'] = $regNo;
+        $data['academic_year_id'] = StudentRecordHelper::activeAcademicYearIdForSchool($this->school);
+
+        if ($request->filled('email')) {
+            $data['email'] = strtolower($request->input('email'));
+        }
 
         $student = Student::create($data);
+
+        if ($request->boolean('create_login') && $request->filled('email') && $request->filled('password')) {
+            app(StudentPortalProvisioner::class)->provision(
+                $student,
+                $request->input('email'),
+                $request->input('password'),
+            );
+        }
 
         app(DataChangeLogger::class)->created(
             $student,
@@ -109,6 +128,20 @@ class StudentController extends SchoolAdminController
         );
 
         return back()->with('success', 'Student registered successfully.');
+    }
+
+    public function provisionPortal(Request $request, string $tenantId, Student $student)
+    {
+        abort_if($student->tenant_id !== $this->school->id, 403);
+
+        $data = $request->validate([
+            'email'    => 'required|email|max:255',
+            'password' => 'required|string|min:8',
+        ]);
+
+        app(StudentPortalProvisioner::class)->provision($student, $data['email'], $data['password']);
+
+        return back()->with('success', 'Student portal login created.');
     }
 
     public function edit(string $tenantId, Student $student)
@@ -292,9 +325,12 @@ class StudentController extends SchoolAdminController
                 'required',
                 Rule::exists('school_classes', 'id')->where('tenant_id', $this->school->id),
             ],
-            'name'   => 'required|string|max:255',
-            'gender' => 'required|in:male,female,other',
-            'dob'    => 'nullable|date',
+            'name'         => 'required|string|max:255',
+            'gender'       => 'required|in:male,female,other',
+            'dob'          => 'nullable|date',
+            'email'        => 'nullable|email|max:255',
+            'create_login' => 'boolean',
+            'password'     => 'nullable|string|min:8',
         ]);
     }
 

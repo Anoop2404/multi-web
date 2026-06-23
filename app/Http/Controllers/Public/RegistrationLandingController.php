@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Public\Concerns\RendersPublicPages;
+use App\Support\NavConfigDefaults;
+use App\Support\PortalNavLinks;
 use App\Support\SahodayaHomepageContent;
 use App\Support\TenantBranding;
 use Illuminate\Http\Request;
@@ -20,6 +22,15 @@ class RegistrationLandingController extends Controller
             ? SahodayaHomepageContent::get($tenant)
             : [];
 
+        $navConfig = NavConfigDefaults::resolve(
+            $tenant,
+            $tenant->getSetting('nav_config', [])
+        );
+        $portalCta = array_merge(
+            PortalNavLinks::portalCtaDefaults(),
+            $navConfig['portal_cta'] ?? []
+        );
+
         return view('public.registration-landing', [
             'tenant'     => $tenant,
             'isSahodaya' => $tenant->type === 'sahodaya',
@@ -29,6 +40,7 @@ class RegistrationLandingController extends Controller
             'motto'      => $branding['motto'] ?? null,
             'phone'      => $branding['phone'] ?? null,
             'email'      => $branding['email'] ?? null,
+            'portalCta'  => $portalCta,
         ]);
     }
 }

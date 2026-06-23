@@ -13,6 +13,10 @@ use App\Http\Controllers\Api\V1\Sahodaya\ReportsApiController;
 use App\Http\Controllers\Api\V1\Sahodaya\SchoolsApiController;
 use App\Http\Controllers\Api\V1\Sahodaya\SettingsApiController;
 use App\Http\Controllers\Api\V1\Sahodaya\SubmissionsApiController;
+use App\Http\Controllers\Api\V1\NotificationsApiController;
+use App\Http\Controllers\Api\V1\Sahodaya\EventsApiController;
+use App\Http\Controllers\Api\V1\Sahodaya\McqExamsApiController;
+use App\Http\Controllers\Api\V1\Sahodaya\TrainingApiController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -26,6 +30,10 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('auth/me', [AuthController::class, 'me']);
+
+        Route::get('notifications', [NotificationsApiController::class, 'index']);
+        Route::post('notifications/{notification}/read', [NotificationsApiController::class, 'markRead']);
+        Route::post('notifications/fcm-token', [NotificationsApiController::class, 'storeFcmToken']);
 
         Route::prefix('school/{tenantId}')
             ->middleware('school.admin.api')
@@ -82,6 +90,13 @@ Route::prefix('v1')->group(function () {
 
                 Route::get('reports/summary', [ReportsApiController::class, 'summary']);
                 Route::get('settings', [SettingsApiController::class, 'show']);
+
+                Route::get('events', [EventsApiController::class, 'index']);
+                Route::get('events/{event}', [EventsApiController::class, 'show']);
+                Route::get('mcq-exams', [McqExamsApiController::class, 'index']);
+                Route::get('mcq-exams/{exam}', [McqExamsApiController::class, 'show']);
+                Route::get('training', [TrainingApiController::class, 'index']);
+                Route::get('training/{program}', [TrainingApiController::class, 'show']);
             });
     });
 });

@@ -134,6 +134,20 @@ return [
                 ['key' => 'secondary_cta_url',   'type' => 'url',   'label' => 'Secondary Button URL'],
             ],
         ],
+        'cksc-slider' => [
+            'label' => 'CKSC Image Slider',
+            'description' => 'Full-width slider with circular logo overlay (Confederation style)',
+            'fields' => [
+                ['key' => 'logo',             'type' => 'media',    'label' => 'Center Logo (circular)'],
+                ['key' => 'autoplay_seconds', 'type' => 'number',   'label' => 'Autoplay Interval (seconds)', 'default' => 5],
+                ['key' => 'slides',           'type' => 'repeater', 'label' => 'Slides',
+                 'fields' => [
+                     ['key' => 'title',   'type' => 'text',     'label' => 'Title'],
+                     ['key' => 'content', 'type' => 'textarea', 'label' => 'Description'],
+                     ['key' => 'image',   'type' => 'media',    'label' => 'Background Image'],
+                 ]],
+            ],
+        ],
     ],
 
     'about' => [

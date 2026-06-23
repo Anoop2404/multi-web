@@ -6,6 +6,7 @@ use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Services\Students\StudentRegistrationNumberGenerator;
+use App\Support\StudentRecordHelper;
 use Illuminate\Http\UploadedFile;
 
 class StudentCsvImporter
@@ -118,7 +119,10 @@ class StudentCsvImporter
                 'school_class_id'  => $schoolClass->id,
                 'name'             => $name,
                 'parent_email'     => $email !== '' ? $email : null,
-                'admission_number' => app(StudentRegistrationNumberGenerator::class)->generate($this->school),
+                'email'            => $email !== '' ? $email : null,
+                'admission_number' => ($regNo = app(StudentRegistrationNumberGenerator::class)->generate($this->school)),
+                'reg_no'           => $regNo,
+                'academic_year_id' => StudentRecordHelper::activeAcademicYearIdForSchool($this->school),
                 'status'           => 'active',
             ]);
 

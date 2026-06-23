@@ -1,4 +1,4 @@
-<section class="py-16 px-4">
+<section id="about" class="py-16 px-4 scroll-mt-24">
     <div class="max-w-4xl mx-auto">
         @if(!empty($config['heading']))
         <h2 class="text-3xl md:text-4xl font-bold font-heading text-center mb-6" style="color: var(--color-primary)">{{ $config['heading'] }}</h2>

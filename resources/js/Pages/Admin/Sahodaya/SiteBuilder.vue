@@ -1,11 +1,327 @@
 <template>
-    <SahodayaAdminLayout title="Website Layout & Sections" :sahodaya="sahodaya" :publicUrl="publicUrl"
+    <SahodayaAdminLayout title="Sahodaya Website Builder" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
                          :pendingPaymentsCount="pendingPaymentsCount">
         <div class="space-y-5 max-w-5xl">
 
-            <!-- Toolbar -->
+            <!-- Public website toggle -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="font-bold text-gray-900">Public Website</h2>
+                    <p class="text-sm text-gray-500 mt-1">
+                        <template v-if="publicWebsiteEnabled">
+                            Visitors see your full marketing website at {{ publicUrl || 'your domain' }}.
+                        </template>
+                        <template v-else>
+                            Visitors see the registration portal with School Registration and Admin Login only.
+                        </template>
+                    </p>
+                </div>
+                <label class="flex items-center gap-3 cursor-pointer shrink-0">
+                    <span class="text-sm font-semibold text-gray-600">{{ publicWebsiteEnabled ? 'Enabled' : 'Disabled' }}</span>
+                    <button type="button" @click="togglePublicWebsite" :disabled="publicWebsiteSaving"
+                            class="relative inline-flex h-7 w-12 items-center rounded-full transition"
+                            :class="publicWebsiteEnabled ? 'bg-green-500' : 'bg-gray-300'">
+                        <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition"
+                              :class="publicWebsiteEnabled ? 'translate-x-6' : 'translate-x-1'"></span>
+                    </button>
+                </label>
+            </div>
+
+            <!-- Website template (layout from CKSC reference, content from this Sahodaya) -->
+            <div class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white border border-white/10"
+                 style="background: linear-gradient(135deg, var(--color-primary, #5b21b6), var(--color-secondary, #7c3aed));">
+                <div>
+                    <h2 class="font-bold">Apply Website Template</h2>
+                    <p class="text-sm text-white/80 mt-1">
+                        Pill menu, hero slider, and homepage sections — personalized with {{ sahodaya.name }} contact details, region, and theme colours.
+                    </p>
+                </div>
+                <button @click="applyCkscTemplate" :disabled="ckscTemplateSaving"
+                        class="px-4 py-2 text-sm font-bold rounded-xl disabled:opacity-50 shrink-0"
+                        style="background: var(--color-accent, #f59e0b); color: #1e1b4b;">
+                    {{ ckscTemplateSaving ? 'Applying…' : 'Apply & personalize' }}
+                </button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex flex-wrap gap-1">
+                <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id"
+                        class="px-4 py-2 rounded-xl text-sm font-semibold transition"
+                        :class="activeTab === tab.id
+                            ? 'bg-[#1e1b4b] text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-50'">
+                    {{ tab.label }}
+                </button>
+                <a v-if="publicUrl" :href="publicUrl" target="_blank"
+                   class="ml-auto self-center text-xs text-purple-600 hover:text-purple-800 font-semibold px-3">
+                    Preview site ↗
+                </a>
+            </div>
+
+            <!-- ── Navigation & Login ─────────────────────────────────────── -->
+            <div v-if="activeTab === 'navigation'" class="space-y-5">
+                <div v-if="!navConfig.items?.length"
+                     class="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h3 class="font-bold text-amber-900">No navigation menu yet</h3>
+                        <p class="text-sm text-amber-800 mt-1">Your public site navbar is empty. Load the default Sahodaya menu or add items below.</p>
+                    </div>
+                    <button @click="loadDefaultNav" :disabled="defaultNavSaving"
+                            class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
+                        {{ defaultNavSaving ? 'Loading…' : 'Load default navigation menu' }}
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1.5">Navbar style</label>
+                        <select v-model="navConfig.layout_variant"
+                                class="w-full max-w-md border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                            <option v-for="opt in navLayoutOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                            <h2 class="font-bold text-gray-900">Portal Login</h2>
+                            <p class="text-sm text-gray-500 mt-1">
+                                One Login button in the navbar opens the portal page with registration and admin login options.
+                            </p>
+                        </div>
+                        <button @click="ensurePortalLinks" :disabled="portalSaving"
+                                class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
+                            {{ portalSaving ? 'Adding…' : '+ Add portal links to menu & footer' }}
+                        </button>
+                    </div>
+
+                    <div class="grid sm:grid-cols-2 gap-4 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" v-model="navConfig.portal_cta.show_in_navbar" class="w-4 h-4 rounded text-purple-600">
+                            <span class="text-sm font-medium text-gray-700">Show Login button in navbar</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" v-model="navConfig.portal_cta.show_in_menu" class="w-4 h-4 rounded text-purple-600">
+                            <span class="text-sm font-medium text-gray-700">Include registration & login in menu</span>
+                        </label>
+                    </div>
+
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Navbar button label</label>
+                            <input v-model="navConfig.portal_cta.portal_label"
+                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Portal page URL</label>
+                            <input v-model="navConfig.portal_cta.portal_url"
+                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wide pt-2">Portal landing page options</p>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Registration button label</label>
+                            <input v-model="navConfig.portal_cta.register_label"
+                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Registration URL</label>
+                            <input v-model="navConfig.portal_cta.register_url"
+                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Admin login button label</label>
+                            <input v-model="navConfig.portal_cta.login_label"
+                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Admin login URL</label>
+                            <input v-model="navConfig.portal_cta.login_url"
+                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-bold text-gray-900">Navigation Menu Items</h3>
+                        <button @click="addNavItem"
+                                class="text-xs px-3 py-1.5 rounded-xl bg-[#1e1b4b] text-white font-semibold hover:bg-[#312e81] transition">
+                            + Add Item
+                        </button>
+                    </div>
+                    <div class="space-y-2">
+                        <div v-for="(item, idx) in navConfig.items" :key="idx"
+                             class="flex flex-wrap items-center gap-3 bg-gray-50 rounded-xl p-3">
+                            <input v-model="item.label" placeholder="Label"
+                                   class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200">
+                            <input v-model="item.url" placeholder="/url"
+                                   class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-200">
+                            <button @click="removeNavItem(idx)" class="text-red-400 hover:text-red-600 text-lg px-1">&times;</button>
+                        </div>
+                        <p v-if="!navConfig.items?.length" class="text-sm text-gray-400 text-center py-4">No menu items yet.</p>
+                    </div>
+                    <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
+                        <button @click="saveNav" :disabled="navSaving"
+                                class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
+                            {{ navSaving ? 'Saving…' : 'Save Navigation' }}
+                        </button>
+                        <span v-if="navSaved" class="text-sm text-green-600 font-medium">Saved!</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Footer links ───────────────────────────────────────────── -->
+            <div v-if="activeTab === 'footer'" class="space-y-5">
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                    <div>
+                        <h2 class="font-bold text-gray-900">Footer Quick Links</h2>
+                        <p class="text-sm text-gray-500 mt-1">Registration and login links appear here for visitors scrolling to the footer.</p>
+                    </div>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" v-model="footerIncludePortal" class="w-4 h-4 rounded text-purple-600">
+                        <span class="text-sm font-medium text-gray-700">Include school registration & login links when saving</span>
+                    </label>
+                    <div class="space-y-2">
+                        <div v-for="(link, idx) in footerConfig.quick_links" :key="idx"
+                             class="flex flex-wrap items-center gap-3 bg-gray-50 rounded-xl p-3">
+                            <input v-model="link.label" placeholder="Label"
+                                   class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                            <input v-model="link.url" placeholder="/url"
+                                   class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono">
+                            <button @click="removeFooterLink(idx)" class="text-red-400 hover:text-red-600 text-lg px-1">&times;</button>
+                        </div>
+                    </div>
+                    <button @click="addFooterLink"
+                            class="text-xs px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition">
+                        + Add link
+                    </button>
+                    <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
+                        <button @click="saveFooter" :disabled="footerSaving"
+                                class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
+                            {{ footerSaving ? 'Saving…' : 'Save Footer' }}
+                        </button>
+                        <span v-if="footerSaved" class="text-sm text-green-600 font-medium">Saved!</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Theme colours ─────────────────────────────────────────── -->
+            <div v-if="activeTab === 'theme'" class="space-y-5">
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
+                    <div>
+                        <h2 class="font-bold text-gray-900">Theme Colours</h2>
+                        <p class="text-sm text-gray-500 mt-1">
+                            Controls navbar, buttons, hero gradient, section headings, and footer across your public site.
+                        </p>
+                    </div>
+
+                    <!-- Live preview -->
+                    <div class="rounded-2xl overflow-hidden border border-gray-100">
+                        <div class="h-28 flex items-end p-5 text-white"
+                             :style="{ background: `linear-gradient(135deg, ${themeConfig.primary}, ${themeConfig.secondary})` }">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider opacity-80">Hero preview</p>
+                                <p class="font-bold text-lg">{{ sahodaya.name }}</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-0">
+                            <div class="flex-1 h-10 flex items-center justify-center text-xs font-bold text-white"
+                                 :style="{ background: themeConfig.primary }">Primary</div>
+                            <div class="flex-1 h-10 flex items-center justify-center text-xs font-bold text-white"
+                                 :style="{ background: themeConfig.secondary }">Secondary</div>
+                            <div class="flex-1 h-10 flex items-center justify-center text-xs font-bold text-gray-900"
+                                 :style="{ background: themeConfig.accent_color }">Accent</div>
+                        </div>
+                    </div>
+
+                    <!-- Presets -->
+                    <div>
+                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Quick presets</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button v-for="preset in themePresets" :key="preset.id" type="button"
+                                    @click="applyThemePreset(preset)"
+                                    class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition text-sm">
+                                <span class="flex gap-0.5">
+                                    <span class="w-4 h-4 rounded-full border border-white shadow-sm" :style="{ background: preset.primary }"></span>
+                                    <span class="w-4 h-4 rounded-full border border-white shadow-sm -ml-2" :style="{ background: preset.secondary }"></span>
+                                </span>
+                                {{ preset.label }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Custom colours -->
+                    <div class="grid sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Primary colour</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" v-model="themeConfig.primary" class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="text" v-model="themeConfig.primary"
+                                       class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase">
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">Navbar, headings, buttons</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Secondary colour</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" v-model="themeConfig.secondary" class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="text" v-model="themeConfig.secondary"
+                                       class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase">
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">Hero gradient end, page headers</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Accent colour</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" v-model="themeConfig.accent_color" class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="text" v-model="themeConfig.accent_color"
+                                       class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase">
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">Highlights, badges, CTAs</p>
+                        </div>
+                    </div>
+
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Heading font</label>
+                            <select v-model="themeConfig.font_heading"
+                                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+                                <option value="Inter">Inter</option>
+                                <option value="Roboto">Roboto</option>
+                                <option value="Poppins">Poppins</option>
+                                <option value="Montserrat">Montserrat</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Body font</label>
+                            <select v-model="themeConfig.font_body"
+                                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
+                                <option value="Inter">Inter</option>
+                                <option value="Roboto">Roboto</option>
+                                <option value="Poppins">Poppins</option>
+                                <option value="Montserrat">Montserrat</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
+                        <button @click="saveTheme" :disabled="themeSaving"
+                                class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
+                            {{ themeSaving ? 'Saving…' : 'Save Theme Colours' }}
+                        </button>
+                        <span v-if="themeSaved" class="text-sm text-green-600 font-medium">Saved! Refresh public site to see changes.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Page Sections ──────────────────────────────────────────── -->
+            <template v-if="activeTab === 'sections'">
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3.5 flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
                     <h2 class="font-bold text-gray-900">Page Sections</h2>
@@ -132,6 +448,8 @@
                             <SectionFieldEditor
                                 :fields="fieldsFor(section.section_type, section.variant)"
                                 :config="editConfigs[section.id] || section.config || {}"
+                                :upload-media="uploadSiteMedia"
+                                :media-preview="mediaPreviewUrl"
                                 @update="val => editConfigs[section.id] = val" />
                         </div>
                         <div v-else class="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-xs text-amber-700">
@@ -158,6 +476,7 @@
                     </div>
                 </div>
             </div>
+            </template>
         </div>
 
         <!-- Add section modal -->
@@ -242,12 +561,66 @@ const props = defineProps({
     sections:                { type: Array,  default: () => [] },
     sectionTypes:            { type: Object, default: () => ({}) },
     fieldDefs:               { type: Object, default: () => ({}) },
+    navConfig:               { type: Object, default: () => ({}) },
+    footerConfig:            { type: Object, default: () => ({}) },
+    portalDefaults:          { type: Object, default: () => ({}) },
+    publicWebsiteEnabled:    { type: Boolean, default: true },
+    defaultNavConfig:        { type: Object, default: () => ({}) },
+    navLayoutOptions:        { type: Array,  default: () => [] },
+    navNeedsSetup:           { type: Boolean, default: false },
+    themeConfig:             { type: Object, default: () => ({}) },
+    themePresets:            { type: Array,  default: () => [] },
 });
+
+const tabs = [
+    { id: 'sections', label: 'Page Sections' },
+    { id: 'theme', label: 'Theme Colours' },
+    { id: 'navigation', label: 'Navigation & Login' },
+    { id: 'footer', label: 'Footer Links' },
+];
+const activeTab = ref(props.navNeedsSetup ? 'navigation' : 'sections');
 
 const sections    = ref([...(props.sections ?? [])]);
 const expandedId  = ref(null);
 const editConfigs = reactive({});
 const saving      = reactive({});
+
+const navConfig = reactive({
+    layout_variant: props.navConfig?.layout_variant ?? 'sahodaya-modern',
+    items: [...(props.navConfig?.items ?? [])],
+    portal_cta: {
+        ...(props.portalDefaults ?? {}),
+        ...(props.navConfig?.portal_cta ?? {}),
+    },
+});
+const footerConfig = reactive({
+    quick_links: [...(props.footerConfig?.quick_links ?? [])],
+    tagline: props.footerConfig?.tagline ?? '',
+    copyright: props.footerConfig?.copyright ?? '',
+    phone: props.footerConfig?.phone ?? '',
+    email: props.footerConfig?.email ?? '',
+    layout_variant: props.footerConfig?.layout_variant ?? 'three-column',
+});
+const footerIncludePortal = ref(true);
+const navSaving = ref(false);
+const navSaved = ref(false);
+const footerSaving = ref(false);
+const footerSaved = ref(false);
+const portalSaving = ref(false);
+const publicWebsiteEnabled = ref(props.publicWebsiteEnabled ?? true);
+const publicWebsiteSaving = ref(false);
+const defaultNavSaving = ref(false);
+const ckscTemplateSaving = ref(false);
+const themeSaving = ref(false);
+const themeSaved = ref(false);
+const themeConfig = reactive({
+    primary: props.themeConfig?.primary ?? '#1e40af',
+    secondary: props.themeConfig?.secondary ?? '#7c3aed',
+    accent_color: props.themeConfig?.accent_color ?? '#f59e0b',
+    font_heading: props.themeConfig?.font_heading ?? 'Inter',
+    font_body: props.themeConfig?.font_body ?? 'Inter',
+});
+const themePresets = props.themePresets?.length ? props.themePresets : [];
 
 const addModal = reactive({
     open: false, selectedType: null, selectedVariant: null, saving: false,
@@ -289,7 +662,7 @@ function formatDate(d) {
 // ── API calls (using fetch directly — same pattern as super-admin builder) ───
 
 function csrf() { return document.querySelector('meta[name=csrf-token]')?.content ?? ''; }
-const baseUrl = computed(() => `/admin/api/tenants/${props.sahodaya.id}`);
+const baseUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/site-builder/api`);
 
 async function apiPatch(path, body) {
     const r = await fetch(`${baseUrl.value}${path}`, {
@@ -314,7 +687,166 @@ async function apiDelete(path) {
     });
 }
 
-// ── Actions ───────────────────────────────────────────────────────────────────
+function mediaPreviewUrl(stored) {
+    if (!stored) return '';
+    if (stored.startsWith('http') || stored.startsWith('/')) return stored;
+    return `/storage/${stored.replace(/^\//, '')}`;
+}
+
+async function uploadSiteMedia(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(`${baseUrl.value}/media`, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+        body: fd,
+    });
+    if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.message || 'Image upload failed');
+    }
+    const data = await r.json();
+    return data.path ?? data.url;
+}
+
+// ── Nav & footer actions ──────────────────────────────────────────────────────
+
+function addNavItem() {
+    navConfig.items.push({ label: '', url: '/', external: false, children: [] });
+}
+function removeNavItem(idx) {
+    navConfig.items.splice(idx, 1);
+}
+async function saveNav() {
+    navSaving.value = true;
+    navSaved.value = false;
+    try {
+        const r = await apiPost('/nav', {
+            layout_variant: navConfig.layout_variant,
+            items: navConfig.items,
+            portal_cta: navConfig.portal_cta,
+        });
+        if (r.nav?.items) navConfig.items = r.nav.items;
+        navSaved.value = true;
+        setTimeout(() => { navSaved.value = false; }, 2500);
+    } finally {
+        navSaving.value = false;
+    }
+}
+
+function addFooterLink() {
+    if (!Array.isArray(footerConfig.quick_links)) footerConfig.quick_links = [];
+    footerConfig.quick_links.push({ label: '', url: '/' });
+}
+function removeFooterLink(idx) {
+    footerConfig.quick_links.splice(idx, 1);
+}
+async function saveFooter() {
+    footerSaving.value = true;
+    footerSaved.value = false;
+    try {
+        const r = await apiPost('/footer', {
+            ...footerConfig,
+            include_portal_links: footerIncludePortal.value,
+        });
+        if (r.footer?.quick_links) footerConfig.quick_links = r.footer.quick_links;
+        footerSaved.value = true;
+        setTimeout(() => { footerSaved.value = false; }, 2500);
+    } finally {
+        footerSaving.value = false;
+    }
+}
+
+async function ensurePortalLinks() {
+    portalSaving.value = true;
+    try {
+        const r = await apiPost('/portal-links', {});
+        if (r.nav) {
+            navConfig.items = r.nav.items ?? navConfig.items;
+            navConfig.portal_cta = { ...navConfig.portal_cta, ...(r.nav.portal_cta ?? {}) };
+        }
+        if (r.footer?.quick_links) footerConfig.quick_links = r.footer.quick_links;
+        navSaved.value = true;
+        footerSaved.value = true;
+        setTimeout(() => { navSaved.value = false; footerSaved.value = false; }, 2500);
+    } finally {
+        portalSaving.value = false;
+    }
+}
+
+const navLayoutOptions = props.navLayoutOptions?.length
+    ? props.navLayoutOptions
+    : [{ value: 'sahodaya-modern', label: 'Sahodaya Modern' }];
+
+async function loadDefaultNav() {
+    defaultNavSaving.value = true;
+    try {
+        const r = await apiPost('/default-nav', {});
+        if (r.nav) {
+            navConfig.layout_variant = r.nav.layout_variant ?? navConfig.layout_variant;
+            navConfig.items = r.nav.items ?? [];
+            navConfig.portal_cta = { ...navConfig.portal_cta, ...(r.nav.portal_cta ?? {}) };
+        }
+        if (r.footer?.quick_links) footerConfig.quick_links = r.footer.quick_links;
+        navSaved.value = true;
+        setTimeout(() => { navSaved.value = false; }, 2500);
+    } finally {
+        defaultNavSaving.value = false;
+    }
+}
+
+async function applyCkscTemplate() {
+    if (!confirm('Replace homepage sections with the CKSC layout (pill menu, hero slider, About, Services, Journey, Gallery, etc.)? Your saved theme colours will be kept.')) {
+        return;
+    }
+    ckscTemplateSaving.value = true;
+    try {
+        const r = await apiPost('/apply-cksc-template', { replace_sections: true });
+        if (r.nav) {
+            navConfig.layout_variant = r.nav.layout_variant ?? 'cksc-pill';
+            navConfig.items = r.nav.items ?? [];
+            navConfig.portal_cta = { ...navConfig.portal_cta, ...(r.nav.portal_cta ?? {}) };
+        }
+        if (r.sections) sections.value = r.sections;
+        navSaved.value = true;
+        setTimeout(() => { navSaved.value = false; }, 3000);
+    } finally {
+        ckscTemplateSaving.value = false;
+    }
+}
+
+function applyThemePreset(preset) {
+    themeConfig.primary = preset.primary;
+    themeConfig.secondary = preset.secondary;
+    themeConfig.accent_color = preset.accent_color ?? themeConfig.accent_color;
+}
+
+async function saveTheme() {
+    themeSaving.value = true;
+    try {
+        const r = await apiPost('/theme', { ...themeConfig });
+        if (r.theme) {
+            Object.assign(themeConfig, r.theme);
+        }
+        themeSaved.value = true;
+        setTimeout(() => { themeSaved.value = false; }, 3000);
+    } finally {
+        themeSaving.value = false;
+    }
+}
+
+async function togglePublicWebsite() {
+    publicWebsiteSaving.value = true;
+    try {
+        const enabled = !publicWebsiteEnabled.value;
+        const r = await apiPost('/public-website', { enabled });
+        publicWebsiteEnabled.value = r.enabled ?? enabled;
+    } finally {
+        publicWebsiteSaving.value = false;
+    }
+}
+
+// ── Section actions ───────────────────────────────────────────────────────────
 
 function toggleEdit(section) {
     if (expandedId.value === section.id) {
@@ -420,14 +952,72 @@ const SectionFieldEditor = defineComponent({
     props: {
         fields: Array,
         config: Object,
+        uploadMedia: Function,
+        mediaPreview: Function,
     },
     emits: ['update'],
     setup(props, { emit }) {
         const local = reactive({ ...(props.config ?? {}) });
+        const mediaUploading = reactive({});
 
         function onInput(key, val) {
             local[key] = val;
             emit('update', { ...local });
+        }
+
+        function mediaKey(scope, key, idx = null) {
+            return idx === null ? scope : `${scope}-${idx}-${key}`;
+        }
+
+        function renderMediaField(label, value, onChange, key) {
+            const preview = props.mediaPreview?.(value) ?? value;
+            const uploading = !!mediaUploading[key];
+
+            return h('div', { class: 'space-y-2 col-span-2' }, [
+                h('label', { class: 'text-[11px] text-gray-400 font-medium block' }, label),
+                preview
+                    ? h('div', { class: 'relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50' }, [
+                        h('img', {
+                            src: preview,
+                            alt: label,
+                            class: 'w-full h-28 object-cover',
+                        }),
+                        h('button', {
+                            type: 'button',
+                            onClick: () => onChange(''),
+                            class: 'absolute top-1 right-1 bg-white/90 text-red-500 text-xs px-2 py-0.5 rounded shadow',
+                        }, 'Remove'),
+                    ])
+                    : null,
+                h('input', {
+                    type: 'file',
+                    accept: 'image/jpeg,image/png,image/webp,image/gif',
+                    disabled: uploading,
+                    onChange: async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !props.uploadMedia) return;
+                        mediaUploading[key] = true;
+                        try {
+                            const path = await props.uploadMedia(file);
+                            onChange(path);
+                        } catch (err) {
+                            alert(err.message || 'Upload failed');
+                        } finally {
+                            mediaUploading[key] = false;
+                            e.target.value = '';
+                        }
+                    },
+                    class: 'block w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100',
+                }),
+                h('input', {
+                    type: 'url',
+                    value: value ?? '',
+                    placeholder: 'Or paste image URL',
+                    onInput: e => onChange(e.target.value),
+                    class: 'w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-purple-200 focus:outline-none',
+                }),
+                uploading ? h('p', { class: 'text-xs text-purple-600' }, 'Uploading…') : null,
+            ]);
         }
 
         function onRepeaterAdd(key, itemDef) {
@@ -464,7 +1054,14 @@ const SectionFieldEditor = defineComponent({
                         h('div', { key: idx, class: 'border border-gray-200 bg-white rounded-xl p-3 space-y-2' }, [
                             h('div', { class: 'grid grid-cols-2 gap-2' },
                                 (field.fields ?? []).map(sub =>
-                                    h('div', { key: sub.key }, [
+                                    sub.type === 'media'
+                                        ? renderMediaField(
+                                            sub.label,
+                                            item[sub.key] ?? '',
+                                            val => onRepeaterField(field.key, idx, sub.key, val),
+                                            mediaKey(field.key, sub.key, idx),
+                                        )
+                                        : h('div', { key: sub.key }, [
                                         h('label', { class: 'text-[11px] text-gray-400 font-medium' }, sub.label),
                                         sub.type === 'textarea'
                                             ? h('textarea', {
@@ -549,7 +1146,18 @@ const SectionFieldEditor = defineComponent({
                 ]);
             }
 
-            // Default: text / number / url / email / media
+            if (field.type === 'media') {
+                return h('div', { key: field.key }, [
+                    renderMediaField(
+                        field.label,
+                        local[field.key] ?? '',
+                        val => onInput(field.key, val),
+                        mediaKey('top', field.key),
+                    ),
+                ]);
+            }
+
+            // Default: text / number / url / email
             return h('div', { key: field.key }, [
                 h('label', { class: 'block text-xs font-bold text-gray-700 mb-1.5' }, [
                     field.label,

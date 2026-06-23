@@ -42,7 +42,7 @@
 
                 <template v-if="websiteEnabled">
                 <NavSectionLabel text="Website" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/site-builder`"    icon="layers"     label="Layout & Sections" :active="isActive(`/sahodaya-admin/${sahodaya.id}/site-builder`)" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/site-builder`"    icon="layers"     label="Sahodaya Site Builder" :active="isActive(`/sahodaya-admin/${sahodaya.id}/site-builder`)" />
                 <NavItem :href="`/sahodaya-admin/${sahodaya.id}/public-content`"  icon="edit"       label="Website Content"   :active="isActive(`/sahodaya-admin/${sahodaya.id}/public-content`)" />
                 <NavItem :href="`/sahodaya-admin/${sahodaya.id}/office-bearers`"  icon="users"      label="Office Bearers"    :active="isActive(`/sahodaya-admin/${sahodaya.id}/office-bearers`)" />
                 <NavItem :href="`/sahodaya-admin/${sahodaya.id}/circulars`"       icon="file-text"  label="Circulars"         :active="isActive(`/sahodaya-admin/${sahodaya.id}/circulars`)" />
@@ -52,6 +52,9 @@
                 </template>
 
                 <NavSectionLabel text="Membership" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/academic-years`"
+                         icon="calendar" label="Academic Years"
+                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/academic-years`)" />
                 <NavItem :href="`/sahodaya-admin/${sahodaya.id}/public-content`"
                          icon="edit" label="Portal Content"
                          :active="isActive(`/sahodaya-admin/${sahodaya.id}/public-content`)" />
@@ -74,6 +77,21 @@
                          :active="isActive(`/sahodaya-admin/${sahodaya.id}/membership/reports`)" />
 
                 <NavSectionLabel text="Programs" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/events`"
+                         icon="star" label="Events"
+                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/events`)" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/display-screens`"
+                         icon="layers" label="Display Screens"
+                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/display-screens`)" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams`"
+                         icon="file-text" label="MCQ Exams"
+                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/mcq-exams`)" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/training`"
+                         icon="users" label="Teacher Training"
+                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/training`)" />
+                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/ledger`"
+                         icon="credit-card" label="Accounts"
+                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/ledger`)" />
                 <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/kalotsav/registration`"
                          icon="star" label="Kalotsav"
                          :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/kalotsav/registration`)" />

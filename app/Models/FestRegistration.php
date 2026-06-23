@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class FestRegistration extends Model
+{
+    protected $fillable = [
+        'event_id', 'item_id', 'school_id', 'mode', 'status',
+        'fee_receipt_id', 'submitted_at',
+    ];
+
+    protected $casts = ['submitted_at' => 'datetime'];
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(FestEvent::class, 'event_id');
+    }
+
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(FestEventItem::class, 'item_id');
+    }
+
+    public function feeReceipt(): BelongsTo
+    {
+        return $this->belongsTo(FeeReceipt::class);
+    }
+
+    public function groups(): HasMany
+    {
+        return $this->hasMany(FestGroup::class, 'registration_id');
+    }
+
+    public function participants(): HasMany
+    {
+        return $this->hasMany(FestParticipant::class, 'registration_id');
+    }
+}

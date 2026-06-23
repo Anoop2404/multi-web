@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -43,8 +44,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'sahodaya.admin'    => \App\Http\Middleware\EnsureSahodayaAdmin::class,
             'school.admin.api'  => \App\Http\Middleware\EnsureSchoolAdminApi::class,
             'sahodaya.admin.api'=> \App\Http\Middleware\EnsureSahodayaAdminApi::class,
+            'student.portal'    => \App\Http\Middleware\EnsureStudentPortal::class,
+            'teacher.portal'    => \App\Http\Middleware\EnsureTeacherPortal::class,
+            'judge.portal'      => \App\Http\Middleware\EnsureJudgePortal::class,
             'public.cache'    => \App\Http\Middleware\SetPublicCacheHeaders::class,
             'website.enabled' => \App\Http\Middleware\EnsureWebsiteEnabled::class,
+            'public.website.enabled' => \App\Http\Middleware\EnsureTenantPublicWebsiteEnabled::class,
         ]);
 
         $middleware->redirectGuestsTo(fn (Request $request) => route('login').'?session=expired');

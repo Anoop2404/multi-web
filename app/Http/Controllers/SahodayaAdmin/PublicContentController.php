@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Support\FeatureFlags;
 use App\Support\SahodayaHomepageContent;
+use App\Support\TenantPublicSite;
 use Illuminate\Http\Request;
 
 class PublicContentController extends SahodayaAdminController
@@ -11,7 +12,8 @@ class PublicContentController extends SahodayaAdminController
     public function index()
     {
         return $this->inertia('Sahodaya/PublicContent/Index', [
-            'content' => SahodayaHomepageContent::get($this->sahodaya),
+            'content'              => SahodayaHomepageContent::get($this->sahodaya),
+            'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->sahodaya),
         ]);
     }
 
@@ -52,7 +54,12 @@ class PublicContentController extends SahodayaAdminController
             'links.*.label'      => 'required_with:links|string|max:100',
             'links.*.url'        => 'nullable|string|max:500',
             'links.*.icon'       => 'nullable|string|max:10',
+            'public_website_enabled' => 'nullable|boolean',
         ]);
+
+        if ($request->has('public_website_enabled')) {
+            TenantPublicSite::setEnabled($this->sahodaya, $request->boolean('public_website_enabled'));
+        }
 
         SahodayaHomepageContent::update($this->sahodaya, $data);
 

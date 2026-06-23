@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
 use App\Models\MembershipPayment;
 use App\Services\Audit\DataChangeLogger;
+use App\Services\Membership\FeeReceiptService;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\RegistrationStatusService;
 use App\Support\AcademicYear;
@@ -133,6 +134,8 @@ class PaymentVerificationController extends SahodayaAdminController
                 'verified_at'         => now(),
             ]);
 
+            app(FeeReceiptService::class)->syncFromMembershipPayment($payment->fresh());
+
             app(DataChangeLogger::class)->updated(
                 $payment,
                 "Payment verified for {$payment->school?->name}",
@@ -183,6 +186,8 @@ class PaymentVerificationController extends SahodayaAdminController
                 'verified_by_user_id' => $request->user()->id,
                 'verified_at'         => now(),
             ]);
+
+            app(FeeReceiptService::class)->syncFromMembershipPayment($payment->fresh());
 
             app(DataChangeLogger::class)->updated(
                 $payment,

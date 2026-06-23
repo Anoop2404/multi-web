@@ -48,9 +48,16 @@ class SahodayaSiteTemplate
                     ],
                     ['label' => 'Useful Links', 'url' => '/#useful-links', 'external' => false, 'children' => []],
                     ['label' => 'Contact', 'url' => '/#contact', 'external' => false, 'children' => []],
+                    ['label' => 'School Registration', 'url' => '/school-register', 'external' => false, 'children' => []],
                     ['label' => 'School Login', 'url' => '/login', 'external' => false, 'children' => []],
                 ],
+                'portal_cta' => PortalNavLinks::portalCtaDefaults(),
             ]]
+        );
+
+        TenantSetting::updateOrCreate(
+            ['tenant_id' => $sahodaya->id, 'key' => TenantPublicSite::SETTING_KEY],
+            ['value' => ['enabled' => true]]
         );
     }
 
@@ -83,7 +90,8 @@ class SahodayaSiteTemplate
                 'email'          => $sahodaya->sahodayaProfile?->contact_email,
                 'quick_links'    => [
                     ['label' => 'CBSE Official', 'url' => 'https://www.cbse.gov.in'],
-                    ['label' => 'School Registration', 'url' => '/school-register'],
+                    ['label' => 'School Registration', 'url' => PortalNavLinks::REGISTER_URL],
+                    ['label' => 'School Login', 'url' => PortalNavLinks::LOGIN_URL],
                 ],
             ]]
         );

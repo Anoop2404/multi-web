@@ -75,6 +75,8 @@
 
                 <template v-if="websiteEnabled">
                     <NavSectionLabel text="Website" />
+                    <NavItem :href="`/school-admin/${tid}/site-builder`" icon="layers" label="Site Builder"
+                             :active="isActive(`/school-admin/${tid}/site-builder`)" />
                     <NavItem :href="`/school-admin/${tid}/news`" icon="file-text" label="News"
                              :active="isActive(`/school-admin/${tid}/news`)" />
                     <NavItem :href="`/school-admin/${tid}/events`" icon="calendar" label="Events"

@@ -8,6 +8,7 @@ use App\Http\Resources\PaymentDueItemResource;
 use App\Models\MembershipPayment;
 use App\Support\AcademicYear;
 use App\Services\Audit\DataChangeLogger;
+use App\Services\Membership\FeeReceiptService;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\RegistrationStatusService;
 use App\Support\TenancyDatabase;
@@ -83,6 +84,8 @@ class PaymentsApiController extends SahodayaApiController
                 'verified_at'         => now(),
             ]);
 
+            app(FeeReceiptService::class)->syncFromMembershipPayment($payment->fresh());
+
             $school = $payment->school;
             if ($school && $school->membership_status === 'pending') {
                 $school->update(['membership_status' => 'approved', 'is_active' => true]);
@@ -105,6 +108,8 @@ class PaymentsApiController extends SahodayaApiController
                 'verified_by_user_id' => $request->user()->id,
                 'verified_at'         => now(),
             ]);
+
+            app(FeeReceiptService::class)->syncFromMembershipPayment($payment->fresh());
 
             $registration = $payment->registration;
             if ($registration) {

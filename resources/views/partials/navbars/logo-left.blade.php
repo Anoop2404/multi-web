@@ -10,10 +10,16 @@
 
         <div class="hidden md:flex items-center gap-6">
             @foreach($items as $item)
+                @if(!empty($item['children']))
+                    {{-- flat nav variants: show parent as link --}}
+                    <a href="{{ $item['url'] }}" class="text-gray-600 hover:text-primary transition-colors text-sm font-medium">{{ $item['label'] }}</a>
+                @else
                 <a href="{{ $item['url'] }}" class="text-gray-600 hover:text-primary transition-colors text-sm font-medium">
                     {{ $item['label'] }}
                 </a>
+                @endif
             @endforeach
+            @include('partials.navbars.portal-cta', ['navConfig' => $navConfig ?? []])
         </div>
 
         <button @click="open = !open" class="md:hidden p-2">
@@ -29,5 +35,6 @@
                 {{ $item['label'] }}
             </a>
         @endforeach
+        @include('partials.navbars.portal-cta-mobile', ['navConfig' => $navConfig ?? []])
     </div>
 </nav>

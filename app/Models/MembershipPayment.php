@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class MembershipPayment extends Model
 {
     protected $fillable = [
-        'school_id', 'academic_year', 'registration_id', 'amount',
+        'school_id', 'academic_year', 'registration_id', 'fee_receipt_id', 'amount',
         'payment_proof_path', 'payment_method', 'transaction_ref',
         'uploaded_by_user_id', 'status', 'rejection_reason',
         'verified_by_user_id', 'verified_at',
@@ -22,6 +22,8 @@ class MembershipPayment extends Model
 
     public function school()       { return $this->belongsTo(Tenant::class, 'school_id'); }
     public function registration() { return $this->belongsTo(Registration::class); }
+    public function feeReceipt()   { return $this->belongsTo(FeeReceipt::class); }
+    public function feeReceipts()  { return $this->morphMany(FeeReceipt::class, 'feeable'); }
 
     public function getProofUrlAttribute(): ?string
     {

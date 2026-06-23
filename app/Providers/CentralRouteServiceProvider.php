@@ -6,7 +6,6 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Public\PublicSiteController;
 use App\Http\Controllers\Public\RegistrationLandingController;
 use App\Http\Middleware\SetPublicCacheHeaders;
-use App\Support\FeatureFlags;
 use App\Support\TenantDomainSync;
 use App\Support\TenantRequestResolver;
 use Illuminate\Http\Request;
@@ -35,7 +34,7 @@ class CentralRouteServiceProvider extends ServiceProvider
 
                     TenantRequestResolver::initializeFromRequest($request);
 
-                    if (FeatureFlags::websiteEnabled()) {
+                    if (\App\Support\TenantPublicSite::isEnabled(tenancy()->tenant)) {
                         return app(PublicSiteController::class)->home($request);
                     }
 

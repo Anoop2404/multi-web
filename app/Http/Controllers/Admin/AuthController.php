@@ -181,6 +181,14 @@ class AuthController extends Controller
             return "/school-admin/{$user->tenant_id}";
         }
 
+        if ($user->hasRole('student') && $user->tenant_id) {
+            return "/portal/student/{$user->tenant_id}";
+        }
+
+        if ($user->hasRole('teacher') && $user->tenant_id) {
+            return "/portal/teacher/{$user->tenant_id}";
+        }
+
         return route('admin.dashboard');
     }
 
@@ -236,6 +244,10 @@ class AuthController extends Controller
 
             if ($user->hasRole('sahodaya_admin')) {
                 return $user->tenant_id === $hostTenant->parent_id ? null : 'Invalid credentials.';
+            }
+
+            if ($user->hasRole('student') || $user->hasRole('teacher')) {
+                return $user->tenant_id === $hostTenant->id ? null : 'This account belongs to another school.';
             }
         }
 

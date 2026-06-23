@@ -113,6 +113,12 @@ const navGroups = computed(() => {
             ],
         },
         {
+            label: 'Subscriptions',
+            items: [
+                { href: '/admin/billing', icon: '💳', label: 'Billing & Subscriptions' },
+            ],
+        },
+        {
             label: 'Platform Rules',
             items: [
                 { href: '/admin/master-data/class-categories', icon: '📚', label: 'Class Categories' },

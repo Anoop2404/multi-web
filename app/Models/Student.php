@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 class Student extends Model
 {
     protected $fillable = [
-        'tenant_id', 'school_class_id',
-        'admission_number', 'roll_number', 'name', 'dob', 'gender', 'blood_group',
+        'tenant_id', 'user_id', 'academic_year_id', 'school_class_id',
+        'admission_number', 'reg_no', 'roll_number', 'name', 'email', 'dob', 'gender', 'blood_group',
         'parent_name', 'parent_phone', 'parent_email', 'address',
         'admission_date', 'status', 'photo', 'notes',
     ];
@@ -19,8 +19,9 @@ class Student extends Model
         'admission_date' => 'date',
     ];
 
-    public function tenant()      { return $this->belongsTo(Tenant::class); }
-    public function schoolClass() { return $this->belongsTo(SchoolClass::class); }
+    public function tenant()       { return $this->belongsTo(Tenant::class); }
+    public function schoolClass()  { return $this->belongsTo(SchoolClass::class); }
+    public function academicYear() { return $this->belongsTo(AcademicYearRecord::class, 'academic_year_id'); }
 
     public function scopeActive($q) { return $q->where('status', 'active'); }
 

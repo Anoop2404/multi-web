@@ -44,6 +44,7 @@ class SectionVariantResolver
         ],
         'nav' => [
             'modern' => 'sahodaya-modern',
+            'cksc'   => 'cksc-pill',
         ],
     ];
 

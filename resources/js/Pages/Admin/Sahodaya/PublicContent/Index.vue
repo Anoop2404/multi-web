@@ -4,6 +4,22 @@
                          :pendingSubmissionsCount="pendingSubmissionsCount"
                          :pendingPaymentsCount="pendingPaymentsCount">
         <div class="max-w-4xl space-y-5">
+            <!-- Public website status -->
+            <div v-if="websiteEnabled" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="font-bold text-gray-900">Public Website</h2>
+                    <p class="text-sm text-gray-500 mt-1">
+                        {{ publicSiteEnabled
+                            ? 'Full marketing website is live. Disable to show only registration and login.'
+                            : 'Portal mode — visitors see School Registration and Admin Login at your domain.' }}
+                    </p>
+                </div>
+                <label class="flex items-center gap-3 cursor-pointer shrink-0">
+                    <span class="text-sm font-semibold text-gray-600">{{ publicSiteEnabled ? 'Enabled' : 'Disabled' }}</span>
+                    <input type="checkbox" v-model="publicSiteEnabled" class="w-5 h-5 rounded text-purple-600">
+                </label>
+            </div>
+
             <!-- Save bar -->
             <div class="flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3">
                 <div class="flex border-b-0 gap-1 flex-wrap">
@@ -209,7 +225,10 @@ const props = defineProps({
     pendingSubmissionsCount: { type: Number, default: 0 },
     pendingPaymentsCount:    { type: Number, default: 0 },
     content:                 Object,
+    publicWebsiteEnabled:    { type: Boolean, default: true },
 });
+
+const publicSiteEnabled = ref(props.publicWebsiteEnabled ?? true);
 
 const activeTab = ref('hero');
 
@@ -239,7 +258,12 @@ function addProgramme()    { form.programmes.push({ label: '', description: '', 
 function addYear()         { form.years.push({ year: '', links: [] }); }
 function addYearLink(yi)   { form.years[yi].links.push({ label: '', url: '#', icon: '🔗' }); }
 function addLink()         { form.links.push({ label: '', url: 'https://', icon: '🔗' }); }
-function save()            { form.put(`/sahodaya-admin/${props.sahodaya.id}/public-content`); }
+function save() {
+    form.transform(data => ({
+        ...data,
+        ...(websiteEnabled.value ? { public_website_enabled: publicSiteEnabled.value } : {}),
+    })).put(`/sahodaya-admin/${props.sahodaya.id}/public-content`);
+}
 
 const ContentCard = defineComponent({
     props: { title: String, hint: String },

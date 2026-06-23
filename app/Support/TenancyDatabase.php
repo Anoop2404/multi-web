@@ -101,6 +101,10 @@ class TenancyDatabase
     public static function initializeForTenant(Tenant $tenant): void
     {
         if (! self::enabled()) {
+            if (! tenancy()->initialized || tenant()?->id !== $tenant->id) {
+                tenancy()->initialize($tenant);
+            }
+
             return;
         }
 

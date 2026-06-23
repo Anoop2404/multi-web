@@ -37,7 +37,7 @@
                 <StatCard v-if="websiteEnabled" :value="stats.circulars"        label="Circulars"        color="indigo" icon="📄" />
                 <StatCard v-else :value="`₹${Number(stats.payments_pending_verification_amount || stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Payment Pending" color="amber" icon="💳"
                           :hint="`${stats.payments_pending_verification ?? stats.pending_payments ?? 0} awaiting verification`" />
-                <StatCard v-if="websiteEnabled" :value="stats.kalotsav_events"  label="Kalotsav Events" color="amber"  icon="🏆" />
+                <StatCard v-if="websiteEnabled" :value="stats.fest_events ?? stats.kalotsav_events"  label="Fest Events" color="amber"  icon="🏆" />
                 <StatCard v-else :value="`₹${Number(stats.approved_amount || 0).toLocaleString('en-IN')}`" label="Approved Fees" color="green" icon="✅" />
                 <StatCard :value="`₹${Number(stats.payment_not_done_amount || stats.payment_due_amount || 0).toLocaleString('en-IN')}`" label="Payment Not Done" color="navy" icon="🧾"
                           :hint="`${stats.payment_not_done ?? stats.payment_due ?? 0} schools`" />

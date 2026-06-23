@@ -14,6 +14,7 @@ use App\Models\SubmissionTeacher;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\UploadBackupService;
 use App\Services\Membership\EffectiveMasterDataResolver;
+use App\Services\Membership\FeeReceiptService;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\RegistrationStatusService;
 use App\Support\AcademicYear;
@@ -350,6 +351,8 @@ class AnnualRegistrationController extends SchoolAdminController
             'uploaded_by_user_id' => $request->user()->id,
             'status'              => 'submitted',
         ]);
+
+        app(FeeReceiptService::class)->createForMembershipPayment($payment);
 
         $backup->update([
             'related_type' => $payment->getMorphClass(),

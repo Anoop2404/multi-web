@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/image_picker_sheet.dart';
 import '../../core/widgets/sa_widgets.dart';
 import 'registration_counts_screen.dart';
 import 'registration_submission_students_screen.dart';
@@ -59,8 +59,7 @@ class _SchoolRegistrationScreenState extends ConsumerState<SchoolRegistrationScr
   }
 
   Future<void> _uploadPayment() async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery);
+    final file = await pickImageFromCameraOrGallery(context);
     if (file == null) return;
 
     try {
