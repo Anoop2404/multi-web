@@ -61,7 +61,7 @@ class TenantBranding
                 return self::publicPath($stored);
             }
 
-            return TenantStorage::assetUrl($tenant, $stored) ?? self::publicPath($stored);
+            return TenantStorage::logoUrl($tenant, $stored) ?? self::publicPath('/storage/'.$stored);
         }
 
         if ($tenant->subdomain && isset(self::DEFAULT_LOGOS[$tenant->subdomain])) {
@@ -83,7 +83,7 @@ class TenantBranding
 
     public static function storeUpload(Tenant $tenant, \Illuminate\Http\UploadedFile $file): string
     {
-        $path = $file->store('logos/'.$tenant->id, 's3');
+        $path = TenantStorage::storeLogo($file, $tenant->id);
 
         TenancyDatabase::runWhenDatabaseReady(
             $tenant,
@@ -95,6 +95,8 @@ class TenantBranding
             fn () => $tenant->getSetting('logo'),
         );
 
-        return $stored ? self::publicPath($stored) : self::publicPath($path);
+        $resolved = TenantStorage::logoUrl($tenant, $stored ?? $path);
+
+        return $resolved ?? self::publicPath('/storage/'.$path);
     }
 }

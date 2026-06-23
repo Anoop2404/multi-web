@@ -34,7 +34,7 @@ class SettingsController extends SchoolAdminController
 
         // Handle logo upload
         if ($request->hasFile('logo')) {
-            $path = $request->file('logo')->store('logos/' . $this->school->id, 's3');
+            $path = \App\Support\TenantStorage::storeLogo($request->file('logo'), $this->school->id);
             $this->school->setSetting('logo', $path);
         }
 
