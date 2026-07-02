@@ -30,3 +30,20 @@ Thumbs.db
 /test-results/
 /playwright-report/
 /tests/e2e/report/
+
+# Tenant uploads (local disk; production may use S3)
+/storage/tenant*/
+
+# Static WordPress/HTML mirrors — not the Laravel platform
+/sahodaya-websites/
+
+# Mobile build outputs
+/sahodaya_mobile/dist/
+/sahodaya_mobile/android/build/
+
+# Local UX audit output
+/storage/app/ux-audit/
+
+# Server-only
+/.well-known/
+/.env.e2e
