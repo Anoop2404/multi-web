@@ -167,7 +167,7 @@
 import { ref, watch } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import EventScopePicker from '@/Components/School/EventScopePicker.vue';
+import EventScopePicker from '@/Components/school/EventScopePicker.vue';
 
 const props = defineProps({
     school: Object,
