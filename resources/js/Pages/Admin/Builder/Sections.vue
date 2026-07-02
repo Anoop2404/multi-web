@@ -2,7 +2,7 @@
     <AdminLayout title="Section Manager">
         <div class="space-y-6">
             <!-- Tenant selector -->
-            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+            <div class="card flex items-center gap-4">
                 <label class="text-sm font-semibold text-gray-600">Editing site:</label>
                 <select v-model="selectedTenantId" @change="loadSections"
                         class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 max-w-xs focus:outline-none focus:ring-2">
@@ -10,7 +10,7 @@
                     <option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }} ({{ t.type }})</option>
                 </select>
                 <button v-if="selectedTenantId" @click="addSection"
-                        class="ml-auto bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">
+                        class="btn-primary ml-auto">
                     + Add Section
                 </button>
             </div>
@@ -20,7 +20,7 @@
                 <div v-if="loading" class="text-center text-gray-400 py-8">Loading sections…</div>
 
                 <div v-else-if="sections.length === 0"
-                     class="bg-white rounded-xl p-10 text-center text-gray-400 border border-dashed border-gray-200">
+                     class="card card--dashed p-10 text-center text-slate-400">
                     No sections yet. Click "Add Section" to begin building this site.
                 </div>
 
@@ -87,29 +87,29 @@
                 <form @submit.prevent="saveSection" class="p-6 space-y-4">
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">Section Type</label>
+                            <label class="form-label mb-1">Section Type</label>
                             <select v-model="modal.form.section_type"
-                                    class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                                    class="field">
                                 <option v-for="t in sectionTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">Variant</label>
+                            <label class="form-label mb-1">Variant</label>
                             <select v-model="modal.form.variant"
-                                    class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                                    class="field">
                                 <option v-for="v in variantsFor(modal.form.section_type)" :key="v" :value="v">{{ v }}</option>
                             </select>
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Config</label>
+                        <label class="form-label mb-1">Config</label>
                         <div class="flex gap-2 mb-2">
                             <button type="button" @click="modal.editMode = 'form'"
-                                    :class="modal.editMode === 'form' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'"
+                                    :class="modal.editMode === 'form' ? ' text-white' : 'bg-gray-100 text-gray-600'"
                                     class="text-xs px-3 py-1 rounded-lg font-medium transition">Form</button>
                             <button type="button" @click="modal.editMode = 'json'"
-                                    :class="modal.editMode === 'json' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'"
+                                    :class="modal.editMode === 'json' ? ' text-white' : 'bg-gray-100 text-gray-600'"
                                     class="text-xs px-3 py-1 rounded-lg font-medium transition">JSON</button>
                         </div>
                         <SectionConfigForm v-if="modal.editMode === 'form' && modal.fieldDefs.length"
@@ -131,7 +131,7 @@
 
                     <div class="flex gap-3 pt-2">
                         <button type="submit"
-                                class="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition">
+                                class="btn-primary flex-1">
                             {{ modal.editing ? 'Save Changes' : 'Add Section' }}
                         </button>
                         <button type="button" @click="modal.open = false"

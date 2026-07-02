@@ -2,7 +2,10 @@
     <SahodayaAdminLayout title="Office Bearers" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
-                         :pendingPaymentsCount="pendingPaymentsCount">
+                         :pendingPaymentsCount="pendingPaymentsCount"
+                         :show-header-title="false">
+        <PageHeader title="Office bearers" eyebrow="Website"
+                    description="Leadership profiles shown on the public Sahodaya website." />
         <div class="space-y-6">
 
             <!-- Add / Edit panel -->
@@ -186,9 +189,3 @@ const Field = defineComponent({
 });
 </script>
 
-<style scoped>
-@reference "../../../../../css/app.css";
-.field {
-    @apply w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white;
-}
-</style>

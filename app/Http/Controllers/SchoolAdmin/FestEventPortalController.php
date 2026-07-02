@@ -8,6 +8,7 @@ use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Services\Events\EventContext;
+use App\Support\SchoolFestProgram;
 use Illuminate\Http\Request;
 
 class FestEventPortalController extends SchoolAdminController
@@ -67,6 +68,7 @@ class FestEventPortalController extends SchoolAdminController
     public function storeAppeal(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        abort_unless($event->appeals_open, 422, 'Appeals are not open for this event.');
 
         $data = $request->validate([
             'participant_id' => 'required|exists:fest_participants,id',
@@ -81,6 +83,7 @@ class FestEventPortalController extends SchoolAdminController
             'event_id'              => $event->id,
             'participant_id'        => $participant->id,
             'reason'                => $data['reason'],
+            'fee_amount'            => $event->appeal_fee_amount,
             'status'                => 'pending',
             'submitted_by_user_id'  => $request->user()->id,
         ]);
@@ -88,26 +91,62 @@ class FestEventPortalController extends SchoolAdminController
         return back()->with('success', 'Appeal submitted.');
     }
 
+    public function appeals(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $appeals = FestAppeal::where('event_id', $event->id)
+            ->whereHas('participant.registration', fn ($q) => $q->where('school_id', $this->school->id))
+            ->with(['participant.student', 'participant.teacher', 'participant.registration.item'])
+            ->latest()
+            ->get();
+
+        $registrations = FestRegistration::where('event_id', $event->id)
+            ->where('school_id', $this->school->id)
+            ->with(['item', 'participants.student', 'participants.teacher'])
+            ->get();
+
+        return $this->inertia('School/Events/Appeals', [
+            'school'        => $this->school->only('id', 'name'),
+            'event'         => $event->only('id', 'title', 'status', 'appeals_open', 'appeal_fee_amount'),
+            'appeals'       => $appeals,
+            'registrations' => $registrations,
+        ]);
+    }
+
     /** @return \Illuminate\Http\RedirectResponse */
     public function festHub(string $tenantId)
     {
         $event = FestEvent::where('tenant_id', $this->school->parent_id)
+            ->visibleToSchool($this->school->id)
             ->whereIn('status', ['published', 'registration_open', 'ongoing'])
             ->orderByDesc('event_start')
             ->first();
 
         if (! $event) {
-            return redirect("/school-admin/{$this->school->id}/programs/kalotsav/registration");
+            return redirect("/school-admin/{$this->school->id}");
         }
+
+        $programSlug = SchoolFestProgram::slugForEventType($event->event_type);
 
         $registrations = FestRegistration::where('event_id', $event->id)
             ->where('school_id', $this->school->id)
-            ->with(['item', 'participants.student'])
+            ->with(['item', 'participants.student', 'participants.teacher'])
+            ->get();
+
+        $appeals = FestAppeal::where('event_id', $event->id)
+            ->whereHas('participant.registration', fn ($q) => $q->where('school_id', $this->school->id))
+            ->with(['participant.student', 'participant.registration.item'])
+            ->latest()
+            ->limit(5)
             ->get();
 
         return $this->inertia('School/Events/FestHub', [
-            'event'         => $event,
-            'registrations' => $registrations,
+            'event'           => $event,
+            'registrations'   => $registrations,
+            'appeals'         => $appeals,
+            'programSlug'     => $programSlug,
+            'registrationUrl' => "/school-admin/{$this->school->id}/programs/{$programSlug}/registration",
         ]);
     }
 }

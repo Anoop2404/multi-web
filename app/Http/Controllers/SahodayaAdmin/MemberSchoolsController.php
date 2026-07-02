@@ -95,7 +95,7 @@ class MemberSchoolsController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Schools/Show', [
             'school' => array_merge($school->only(
                 'id', 'name', 'school_prefix', 'membership_status', 'is_active',
-                'subdomain', 'created_at', 'application_payload'
+                'fest_registration_closed', 'subdomain', 'created_at', 'application_payload'
             ), [
                 'student_count'  => Student::where('tenant_id', $school->id)->where('status', 'active')->count(),
                 'classes_count'  => SchoolClass::where('tenant_id', $school->id)->where('is_active', true)->count(),
@@ -128,6 +128,18 @@ class MemberSchoolsController extends SahodayaAdminController
         return back()->with('success', 'School application rejected.');
     }
 
+    public function toggleFestRegistration(string $tenantId, Tenant $school)
+    {
+        abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+
+        $closed = ! (bool) $school->fest_registration_closed;
+        $school->update(['fest_registration_closed' => $closed]);
+
+        return back()->with('success', $closed
+            ? 'Fest registration closed for this school.'
+            : 'Fest registration reopened for this school.');
+    }
+
     private function attachSchoolMetrics($schools): void
     {
         $pageIds = $schools->pluck('id');
@@ -141,6 +153,7 @@ class MemberSchoolsController extends SahodayaAdminController
             $school->setAttribute('contact_email', $payload['school_email'] ?? $payload['contact_email'] ?? null);
             $school->setAttribute('contact_phone', $payload['phone'] ?? $payload['contact_phone'] ?? null);
             $school->setAttribute('affiliation', $payload['cbse_affiliation'] ?? $payload['affiliation_number'] ?? null);
+            $school->setAttribute('fest_registration_closed', (bool) $school->fest_registration_closed);
 
             return $school;
         });

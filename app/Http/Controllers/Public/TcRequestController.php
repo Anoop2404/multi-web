@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
-use App\Mail\TcRequestReceived;
 use App\Models\TcRequest;
+use App\Models\Tenant;
+use App\Services\Mail\SchoolSiteMailer;
+use App\Support\Mail\EmailBranding;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
 
 class TcRequestController extends Controller
 {
@@ -34,11 +35,23 @@ class TcRequestController extends Controller
 
         $tcRequest = TcRequest::create($data);
 
-        // Notify school admin
-        $contactEmail = $tenant->settings()->where('key', 'contact')->first()?->value['email'] ?? null;
-        if ($contactEmail) {
-            Mail::to($contactEmail)->queue(new TcRequestReceived($tcRequest, $tenant));
-        }
+        $sahodaya = $tenant->parent_id ? Tenant::query()->find($tenant->parent_id) : null;
+        app(SchoolSiteMailer::class)->sendToSchoolContact(
+            $tenant,
+            "TC Request – {$tcRequest->student_name} (Adm: {$tcRequest->admission_number})",
+            'emails.tc-request',
+            array_merge(
+                EmailBranding::forTenant($sahodaya ?? $tenant),
+                [
+                    'tcRequest'      => $tcRequest,
+                    'school'         => $tenant,
+                    'headerTitle'    => 'Transfer Certificate Request',
+                    'headerSubtitle' => $tenant->name,
+                    'headerEyebrow'  => 'TC Portal',
+                    'footerNote'     => 'Submitted via '.$tenant->name.' TC Portal',
+                ],
+            ),
+        );
 
         return back()->with('tc_success',
             'Your TC request has been submitted. We will notify you when it is ready for collection.');

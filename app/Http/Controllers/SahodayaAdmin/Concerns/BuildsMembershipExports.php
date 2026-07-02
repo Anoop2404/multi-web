@@ -69,6 +69,7 @@ trait BuildsMembershipExports
     protected function paymentsQuery(array $schoolIds, array $filters): Builder
     {
         $query = MembershipPayment::whereIn('school_id', $schoolIds)
+            ->where('status', '!=', 'superseded')
             ->with('school:id,name,school_prefix,parent_id')
             ->orderByDesc('created_at');
 

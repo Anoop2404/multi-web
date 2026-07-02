@@ -26,7 +26,7 @@
 
             <form @submit.prevent="resend" class="space-y-3">
                 <button type="submit" :disabled="form.processing"
-                        class="w-full bg-[#0f3d7a] hover:bg-[#1a4f8c] text-white py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50">
+                        class="btn-primary w-full disabled:opacity-50">
                     Resend verification email
                 </button>
             </form>

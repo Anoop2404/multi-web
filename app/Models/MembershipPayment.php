@@ -9,7 +9,7 @@ class MembershipPayment extends Model
     protected $fillable = [
         'school_id', 'academic_year', 'registration_id', 'fee_receipt_id', 'amount',
         'payment_proof_path', 'payment_method', 'transaction_ref',
-        'uploaded_by_user_id', 'status', 'rejection_reason',
+        'uploaded_by_user_id', 'status', 'rejection_reason', 'superseded_by_payment_id',
         'verified_by_user_id', 'verified_at',
     ];
 
@@ -24,6 +24,7 @@ class MembershipPayment extends Model
     public function registration() { return $this->belongsTo(Registration::class); }
     public function feeReceipt()   { return $this->belongsTo(FeeReceipt::class); }
     public function feeReceipts()  { return $this->morphMany(FeeReceipt::class, 'feeable'); }
+    public function supersededBy() { return $this->belongsTo(self::class, 'superseded_by_payment_id'); }
 
     public function getProofUrlAttribute(): ?string
     {

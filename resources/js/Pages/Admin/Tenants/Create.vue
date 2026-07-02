@@ -1,7 +1,7 @@
 <template>
     <AdminLayout :title="defaultType === 'sahodaya' ? 'Add Sahodaya' : 'Add School'">
         <div class="max-w-2xl">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+            <div class="card">
                 <div class="flex items-center gap-2 mb-1">
                     <span :class="defaultType === 'sahodaya' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'"
                           class="px-2 py-0.5 rounded-full text-xs font-semibold capitalize">
@@ -16,7 +16,7 @@
                     <input type="hidden" v-model="form.type">
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Name *</label>
+                        <label class="form-label mb-1.5">Name *</label>
                         <input v-model="form.name" type="text" required
                                class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2"
                                :class="form.errors.name ? 'border-red-300' : 'border-gray-200'">
@@ -27,10 +27,10 @@
                         <p class="text-xs font-semibold text-indigo-800 uppercase tracking-wide">Domain assignment</p>
 
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Custom Domain</label>
+                            <label class="form-label mb-1.5">Custom Domain</label>
                             <input v-model="form.domain" type="text"
                                    :placeholder="defaultType === 'sahodaya' ? 'malappuramsahodaya.com' : 'school.edu.in'"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 font-mono bg-white">
+                                   class="field font-mono">
                             <p class="text-xs text-gray-500 mt-1">
                                 {{ defaultType === 'sahodaya'
                                     ? 'Public portal URL (e.g. malappuramsahodaya.com). Point DNS to your server.'
@@ -40,7 +40,7 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Platform Subdomain</label>
+                            <label class="form-label mb-1.5">Platform Subdomain</label>
                             <div class="flex items-center gap-1">
                                 <input v-model="form.subdomain" type="text" :placeholder="defaultType === 'sahodaya' ? 'malappuram' : 'schoolname'"
                                        class="flex-1 border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 font-mono bg-white">
@@ -57,10 +57,10 @@
                     <div v-if="defaultType === 'sahodaya'" class="rounded-lg border border-emerald-100 bg-emerald-50/50 p-4 space-y-3">
                         <p class="text-xs font-semibold text-emerald-800 uppercase tracking-wide">PostgreSQL database</p>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Database name</label>
+                            <label class="form-label mb-1.5">Database name</label>
                             <input v-model="form.database_name" type="text"
                                    :placeholder="databaseNamePlaceholder"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 font-mono bg-white">
+                                   class="field font-mono">
                             <p class="text-xs text-gray-500 mt-1">
                                 Lowercase letters, numbers, underscores only. Must start with a letter.
                                 Leave blank to use the auto-generated name on the next screen.
@@ -70,9 +70,9 @@
                     </div>
 
                     <div v-if="defaultType === 'school'">
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Parent Sahodaya *</label>
+                        <label class="form-label mb-1.5">Parent Sahodaya *</label>
                         <select v-model="form.parent_id" required
-                                class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white">
+                                class="field">
                             <option value="">— Select Sahodaya —</option>
                             <option v-for="s in sahodayas" :key="s.id" :value="s.id">{{ s.name }}</option>
                         </select>
@@ -80,9 +80,9 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Plan</label>
+                        <label class="form-label mb-1.5">Plan</label>
                         <select v-model="form.plan"
-                                class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white">
+                                class="field">
                             <option value="free">Free</option>
                             <option value="basic">Basic</option>
                             <option value="pro">Pro</option>
@@ -91,8 +91,7 @@
 
                     <div class="flex items-center gap-4 pt-2">
                         <button type="submit" :disabled="form.processing"
-                                :class="defaultType === 'sahodaya' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'"
-                                class="text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition disabled:opacity-50">
+                                class="btn-primary disabled:opacity-50">
                             Create {{ defaultType === 'sahodaya' ? 'Sahodaya' : 'School' }}
                         </button>
                         <Link :href="cancelUrl" class="text-sm text-gray-500 hover:text-gray-700">Cancel</Link>

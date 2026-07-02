@@ -24,6 +24,7 @@ class ScreenSettingController extends SahodayaAdminController
         return $this->inertia('Sahodaya/DisplayScreens/Index', [
             'screens' => $screens,
             'events'  => $events,
+            'defaultEventId' => request()->filled('event_id') ? (int) request('event_id') : null,
         ]);
     }
 

@@ -26,7 +26,10 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user()?->only('id', 'name', 'email', 'email_verified_at'),
+                'user' => fn () => $request->user() ? array_merge(
+                    $request->user()->only('id', 'name', 'email', 'email_verified_at'),
+                    ['roles' => $request->user()->getRoleNames()->values()->all()]
+                ) : null,
             ],
             'features' => [
                 'website_enabled' => \App\Support\FeatureFlags::websiteEnabled(),
@@ -35,7 +38,9 @@ class HandleInertiaRequests extends Middleware
                 'success'      => fn () => $request->session()->get('success'),
                 'error'        => fn () => $request->session()->get('error'),
                 'importResult' => fn () => $request->session()->get('importResult'),
+                'studentPortalCredentials' => fn () => $request->session()->get('studentPortalCredentials'),
             ],
+            'old' => fn () => $request->old(),
         ];
     }
 }

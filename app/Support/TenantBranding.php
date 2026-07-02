@@ -87,7 +87,16 @@ class TenantBranding
 
         TenancyDatabase::runWhenDatabaseReady(
             $tenant,
-            fn () => $tenant->setSetting('logo', $path),
+            function () use ($tenant, $path) {
+                $tenant->setSetting('logo', $path);
+
+                // Keep hero section in sync when logo is uploaded after template apply.
+                $tenant->sections()->where('section_type', 'hero')->each(function ($section) use ($path) {
+                    $config = $section->config ?? [];
+                    $config['logo'] = $path;
+                    $section->update(['config' => $config]);
+                });
+            },
         );
 
         $stored = TenancyDatabase::whenDatabaseReady(

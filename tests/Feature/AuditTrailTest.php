@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ClassCategory;
 use App\Models\DataChangeLog;
+use App\Models\SahodayaProfile;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
@@ -28,6 +29,12 @@ class AuditTrailTest extends TestCase
             'type'      => 'sahodaya',
             'name'      => 'Test Sahodaya',
             'is_active' => true,
+        ]);
+
+        SahodayaProfile::create([
+            'tenant_id'         => $sahodaya->id,
+            'prefix'            => 'TST',
+            'student_data_mode' => 'counts_only',
         ]);
 
         $school = Tenant::create([

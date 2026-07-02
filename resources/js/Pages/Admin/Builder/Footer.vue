@@ -2,7 +2,7 @@
     <AdminLayout title="Footer Builder">
         <div class="max-w-3xl space-y-6">
             <!-- Tenant selector -->
-            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+            <div class="card flex items-center gap-4">
                 <label class="text-sm font-semibold text-gray-600 shrink-0">Tenant:</label>
                 <select v-model="selectedTenantId" @change="loadFooter"
                         class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2">
@@ -11,7 +11,7 @@
                 </select>
             </div>
 
-            <div v-if="selectedTenantId" class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-6">
+            <div v-if="selectedTenantId" class="card space-y-6">
                 <!-- Layout variant -->
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Footer Style</label>
@@ -30,27 +30,27 @@
                 <!-- Contact info -->
                 <div class="grid sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Tagline</label>
+                        <label class="form-label mb-1">Tagline</label>
                         <textarea v-model="footerConfig.tagline" rows="2"
-                                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-none"></textarea>
+                                  class="field resize-none"></textarea>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Copyright Text</label>
+                        <label class="form-label mb-1">Copyright Text</label>
                         <input v-model="footerConfig.copyright" type="text"
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                               class="field">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Address</label>
+                        <label class="form-label mb-1">Address</label>
                         <textarea v-model="footerConfig.address" rows="2"
-                                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-none"></textarea>
+                                  class="field resize-none"></textarea>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Phone</label>
+                        <label class="form-label mb-1">Phone</label>
                         <input v-model="footerConfig.phone" type="text"
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                               class="field">
                         <label class="block text-xs font-semibold text-gray-600 mb-1 mt-2">Email</label>
                         <input v-model="footerConfig.email" type="email"
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                               class="field">
                     </div>
                 </div>
 
@@ -59,7 +59,7 @@
                     <div class="flex items-center justify-between mb-3">
                         <label class="text-sm font-semibold text-gray-700">Quick Links</label>
                         <button @click="addQuickLink"
-                                class="text-xs px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition">
+                                class="text-xs px-3 py-1.5 rounded-lg text-white font-medium transition">
                             + Add Link
                         </button>
                     </div>
@@ -77,7 +77,7 @@
 
                 <!-- Sahodaya Link -->
                 <div class="border-t border-gray-100 pt-4">
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Sahodaya Link (optional)</label>
+                    <label class="form-label mb-1">Sahodaya Link (optional)</label>
                     <div class="flex gap-2">
                         <input v-model="footerConfig.sahodaya_link.label" placeholder="Label"
                                class="flex-1 border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1">
@@ -88,7 +88,7 @@
 
                 <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
                     <button @click="saveFooter"
-                            class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition">
+                            class="btn-primary text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition">
                         Save Footer
                     </button>
                     <span v-if="saved" class="text-sm text-green-600 font-medium">✓ Saved!</span>

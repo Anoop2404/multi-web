@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class LedgerTransaction extends Model
 {
     protected $fillable = [
-        'tenant_id', 'financial_year_id', 'account_head_id', 'reference_type', 'reference_id',
+        'tenant_id', 'journal_id', 'financial_year_id', 'account_head_id', 'reference_type', 'reference_id',
         'entry_type', 'amount', 'description', 'transaction_date', 'posted_by',
     ];
 

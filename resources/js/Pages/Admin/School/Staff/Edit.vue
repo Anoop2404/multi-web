@@ -1,31 +1,35 @@
 <template>
-    <SchoolAdminLayout :title="`Edit: ${staff.name}`" :school="school">
+    <SchoolAdminLayout :title="`Edit: ${staff.name}`" :school="school" :show-header-title="false">
+        <PageHeader :title="`Edit: ${staff.name}`" eyebrow="Website"
+            description="Update staff profile shown on the public school website." />
+
+
         <div class="max-w-2xl">
             <form @submit.prevent="submit" class="space-y-5">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
+                <div class="card space-y-5">
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Full Name *</label>
+                            <label class="form-label mb-1.5">Full Name *</label>
                             <input v-model="form.name" type="text" required
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Designation *</label>
+                            <label class="form-label mb-1.5">Designation *</label>
                             <input v-model="form.designation" type="text" required
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                     </div>
 
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Department</label>
+                            <label class="form-label mb-1.5">Department</label>
                             <input v-model="form.department" type="text" placeholder="Science, Arts, Admin..."
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Qualification</label>
+                            <label class="form-label mb-1.5">Qualification</label>
                             <input v-model="form.qualification" type="text" placeholder="M.Sc., B.Ed."
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                     </div>
 
@@ -47,7 +51,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ staff.photo ? 'Replace Photo' : 'Photo' }}</label>
+                        <label class="form-label mb-1.5">{{ staff.photo ? 'Replace Photo' : 'Photo' }}</label>
                         <input type="file" accept="image/*" @change="form.photo = $event.target.files[0]"
                                class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700">
                     </div>
@@ -60,7 +64,7 @@
 
                 <div class="flex items-center gap-4">
                     <button type="submit" :disabled="form.processing"
-                            class="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-700 transition disabled:opacity-50">
+                            class="btn-primary disabled:opacity-50">
                         Save Changes
                     </button>
                     <Link :href="`/school-admin/${school.id}/staff`" class="text-sm text-gray-500 hover:text-gray-700">Cancel</Link>

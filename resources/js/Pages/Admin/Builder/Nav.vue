@@ -2,7 +2,7 @@
     <AdminLayout title="Navigation Builder">
         <div class="max-w-3xl space-y-6">
             <!-- Tenant selector -->
-            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+            <div class="card flex items-center gap-4">
                 <label class="text-sm font-semibold text-gray-600 shrink-0">Tenant:</label>
                 <select v-model="selectedTenantId" @change="loadNav"
                         class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2">
@@ -11,7 +11,7 @@
                 </select>
             </div>
 
-            <div v-if="selectedTenantId" class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-6">
+            <div v-if="selectedTenantId" class="card space-y-6">
                 <!-- Layout variant -->
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Navbar Style</label>
@@ -32,7 +32,7 @@
                     <div class="flex items-center justify-between mb-3">
                         <label class="text-sm font-semibold text-gray-700">Navigation Items</label>
                         <button @click="addItem"
-                                class="text-xs px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition">
+                                class="text-xs px-3 py-1.5 rounded-lg text-white font-medium transition">
                             + Add Item
                         </button>
                     </div>
@@ -60,7 +60,7 @@
 
                 <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
                     <button @click="saveNav"
-                            class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition">
+                            class="btn-primary text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition">
                         Save Navigation
                     </button>
                     <span v-if="saved" class="text-sm text-green-600 font-medium">✓ Saved!</span>

@@ -1,15 +1,19 @@
 <template>
-    <SchoolAdminLayout title="Events" :school="school">
+    <SchoolAdminLayout title="Events" :school="school" :show-header-title="false">
+        <PageHeader title="Events" eyebrow="Programs"
+            description="Fest programs, exams, training, and Sahodaya circulars." />
+
+
         <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <p class="text-sm text-gray-500">{{ events.total }} events</p>
                 <Link :href="`/school-admin/${school.id}/events/create`"
-                      class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition">
+                      class="btn-primary px-4 py-2 rounded-lg text-sm font-semibold transition">
                     + New Event
                 </Link>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="card card--flush">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b border-gray-100">
                         <tr>

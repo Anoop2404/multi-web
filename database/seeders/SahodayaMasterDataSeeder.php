@@ -14,7 +14,7 @@ class SahodayaMasterDataSeeder extends Seeder
         $categories = [
             ['code' => 'PRE',   'label' => 'Pre-Primary',       'min_class' => null, 'max_class' => null, 'sort_order' => 0],
             ['code' => 'PRY',   'label' => 'Primary',           'min_class' => 1,  'max_class' => 5,  'sort_order' => 1],
-            ['code' => 'UP',    'label' => 'Upper Primary',     'min_class' => 6,  'max_class' => 8,  'sort_order' => 2],
+            ['code' => 'UP',    'label' => 'Middle (Classes 6–8)',     'min_class' => 6,  'max_class' => 8,  'sort_order' => 2],
             ['code' => 'SEC',   'label' => 'Secondary',         'min_class' => 9,  'max_class' => 10, 'sort_order' => 3],
             ['code' => 'SrSEC', 'label' => 'Senior Secondary',  'min_class' => 11, 'max_class' => 12, 'sort_order' => 4],
         ];

@@ -75,8 +75,7 @@ class EnsurePortalAdmin extends Command
             'tenant_id'         => $tenant->id,
             'name'              => $name,
             'email'             => $email,
-            'password'          => $password,
-            'plain_password'    => $password,
+            'password'          => Hash::make($password),
             'email_verified_at' => now(),
         ]);
         $user->save();

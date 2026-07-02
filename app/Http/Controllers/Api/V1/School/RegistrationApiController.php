@@ -11,13 +11,15 @@ use App\Models\SahodayaProfile;
 use App\Models\SahodayaRegistrationWindow;
 use App\Models\SchoolClass;
 use App\Models\SchoolYearStudentCount;
-use App\Models\SubmissionStudent;
+use App\Models\Student;
+use App\Services\Membership\SchoolYearSubmissionReviewService;
 use App\Models\SubmissionTeacher;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\UploadBackupService;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Membership\FeeReceiptService;
 use App\Services\Membership\MembershipNotifier;
+use App\Services\Membership\MembershipRegistrationWindowService;
 use App\Services\Membership\RegistrationStatusService;
 use App\Support\AcademicYear;
 use App\Support\TenantStorage;
@@ -47,10 +49,13 @@ class RegistrationApiController extends SchoolApiController
         $window = $profile
             ? SahodayaRegistrationWindow::where('sahodaya_id', $sahodaya->id)->where('academic_year', $academicYear)->first()
             : null;
+        $windowService = app(MembershipRegistrationWindowService::class);
+        $windowBlockReason = $windowService->blockReason($window);
 
         $payments = $registration
             ? MembershipPayment::where('school_id', $this->school->id)
                 ->where('academic_year', $academicYear)
+                ->where('status', '!=', 'superseded')
                 ->orderByDesc('created_at')
                 ->get()
             : collect();
@@ -67,16 +72,22 @@ class RegistrationApiController extends SchoolApiController
                 'payment_details_text'        => $profile->paymentDetailsText(),
             ] : null,
             'registration_window' => $window,
+            'registration_window_block_reason' => $windowBlockReason,
             'payments'              => MembershipPaymentResource::collection($payments),
-            'can_begin'             => $profile && ! $registration && filled($this->school->school_prefix),
+            'can_begin'             => $profile && ! $registration && filled($this->school->school_prefix) && ! $windowBlockReason,
             'categories'            => $resolver->classCategories($sahodaya?->id)->values(),
             'classes'               => SchoolClass::where('tenant_id', $this->school->id)->active()->orderBy('display_order')->get(),
         ]);
     }
 
-    public function begin(RegistrationStatusService $service)
+    public function begin(RegistrationStatusService $service, MembershipRegistrationWindowService $windowService)
     {
         $academicYear = AcademicYear::forSchool($this->school);
+        $window = $windowService->forSchool($this->school, $academicYear);
+        if ($reason = $windowService->blockReason($window)) {
+            return $this->error($reason, 422);
+        }
+
         $alreadyStarted = Registration::where('school_id', $this->school->id)
             ->where('academic_year', $academicYear)
             ->exists();
@@ -101,66 +112,30 @@ class RegistrationApiController extends SchoolApiController
 
     public function storeSubmissionStudent(Request $request)
     {
-        $registration = $this->currentRegistration();
-        $submission = $registration->submission;
-        abort_unless(in_array($submission->full_records_status, ['pending', 'rejected']), 403);
-
-        $data = $request->validate([
-            'school_class_id' => [
-                'required',
-                Rule::exists('school_classes', 'id')->where('tenant_id', $this->school->id),
-            ],
-            'name'           => 'required|string|max:255',
-            'section'        => 'nullable|string|max:10',
-            'gender'         => 'nullable|in:male,female,other',
-            'dob'            => 'nullable|date',
-            'guardian_name'  => 'nullable|string|max:255',
-            'guardian_phone' => 'nullable|string|max:30',
-            'image'          => 'nullable|image|max:2048',
-        ]);
-
-        $schoolClass = SchoolClass::where('tenant_id', $this->school->id)->findOrFail($data['school_class_id']);
-        $data['class'] = $schoolClass->name;
-
-        if ($request->hasFile('image')) {
-            $file = $request->file('image');
-            $data['image_path'] = TenantStorage::storeSubmissionImage($file, $this->school->id);
-        }
-        unset($data['image']);
-
-        $student = $submission->students()->create($data);
-
-        return $this->ok($student, 201);
+        abort(422, 'Student records are managed in the main Students module.');
     }
 
     public function submissionStudents(EffectiveMasterDataResolver $resolver)
     {
         $registration = $this->currentRegistration();
-        $submission = $registration->submission;
+
+        $students = Student::where('tenant_id', $this->school->id)
+            ->where('status', 'active')
+            ->with('schoolClass.classCategory')
+            ->orderBy('name')
+            ->get();
 
         return $this->ok([
-            'registration' => RegistrationResource::make($registration),
-            'submission'   => $submission,
-            'categories'   => $resolver->classCategories($this->school->parent_id)->values(),
-            'classes'      => SchoolClass::where('tenant_id', $this->school->id)->active()->orderBy('display_order')->get(),
-            'students'     => $submission->students()
-                ->with('schoolClass.classCategory')
-                ->orderBy('school_class_id')
-                ->orderBy('name')
-                ->get(),
+            'registration'  => RegistrationResource::make($registration),
+            'submission'    => $registration->submission,
+            'students'      => $students,
+            'student_total' => $students->count(),
         ]);
     }
 
     public function destroySubmissionStudent(string $tenantId, string $studentId)
     {
-        $registration = $this->currentRegistration();
-        $student = SubmissionStudent::where('school_year_submission_id', $registration->submission->id)
-            ->findOrFail($studentId);
-        abort_unless(in_array($registration->submission->full_records_status, ['pending', 'rejected']), 403);
-
-        $student->delete();
-
-        return $this->message('Student removed.');
+        abort(422, 'Student records are managed in the main Students module.');
     }
 
     public function counts(EffectiveMasterDataResolver $resolver)
@@ -242,25 +217,14 @@ class RegistrationApiController extends SchoolApiController
         return $this->message('Teacher removed.');
     }
 
-    public function submitTrack(Request $request, RegistrationStatusService $service)
+    public function submitTrack(Request $request, RegistrationStatusService $service, SchoolYearSubmissionReviewService $reviewService)
     {
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
 
         $data = $request->validate(['track' => 'required|in:full_records,counts,teachers']);
 
-        $field = match ($data['track']) {
-            'full_records' => 'full_records_status',
-            'counts'       => 'counts_status',
-            'teachers'     => 'teacher_status',
-        };
-
-        abort_unless(in_array($submission->{$field}, ['pending', 'rejected']), 403);
-
-        $submission->update([
-            $field => 'approved',
-            str_replace('_status', '_rejection_reason', $field) => null,
-        ]);
+        $reviewService->submitTrack($submission, $this->school, $data['track']);
 
         $profile = SahodayaProfile::where('tenant_id', $this->school->parent_id)->firstOrFail();
         $submission->refresh();
@@ -271,7 +235,7 @@ class RegistrationApiController extends SchoolApiController
             $registration->update(['registration_status' => 'data_pending']);
         }
 
-        return $this->message('Section submitted.', 200, RegistrationResource::make($registration->fresh()->load('submission')));
+        return $this->message('Submitted for Sahodaya review.', 200, RegistrationResource::make($registration->fresh()->load('submission')));
     }
 
     public function uploadPayment(Request $request, MembershipNotifier $notifier)
@@ -289,6 +253,11 @@ class RegistrationApiController extends SchoolApiController
         $file = $request->file('payment_proof');
         $path = TenantStorage::storeUploadedFile($file, "payments/{$this->school->id}");
 
+        $superseded = MembershipPayment::where('school_id', $this->school->id)
+            ->where('academic_year', $registration->academic_year)
+            ->whereIn('status', ['submitted', 'rejected'])
+            ->get();
+
         $payment = MembershipPayment::create([
             'school_id'           => $this->school->id,
             'academic_year'       => $registration->academic_year,
@@ -300,6 +269,13 @@ class RegistrationApiController extends SchoolApiController
             'uploaded_by_user_id' => $request->user()->id,
             'status'              => 'submitted',
         ]);
+
+        foreach ($superseded as $old) {
+            $old->update([
+                'status' => 'superseded',
+                'superseded_by_payment_id' => $payment->id,
+            ]);
+        }
 
         app(FeeReceiptService::class)->createForMembershipPayment($payment);
 

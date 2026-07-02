@@ -6,6 +6,7 @@ use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestMark;
 use App\Models\FestRegistration;
+use App\Models\FestSchoolEventFee;
 use App\Models\Tenant;
 use App\Support\ExcelExport;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -95,26 +96,29 @@ class FestExportService
 
     public function fees(FestEvent $event): StreamedResponse
     {
-        $schools = $this->schoolNames($event);
-        $feeService = app(FestRegistrationFeeService::class);
+        $schoolIds = FestSchoolEventFee::where('event_id', $event->id)->pluck('school_id')->unique();
+        $schools = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
 
-        $rows = FestRegistration::where('event_id', $event->id)
-            ->with(['item', 'feeReceipt'])
-            ->whereNotNull('fee_receipt_id')
+        $rows = FestSchoolEventFee::where('event_id', $event->id)
+            ->with('feeReceipt')
+            ->orderBy('school_id')
             ->get()
-            ->map(fn (FestRegistration $r) => [
-                $schools[$r->school_id] ?? $r->school_id,
-                $r->item?->title ?? '',
-                $feeService->amountDue($event, $r),
-                $r->feeReceipt?->amount ?? '',
-                $r->feeReceipt?->status ?? '',
-                $r->feeReceipt?->transaction_ref ?? '',
-                $r->feeReceipt?->payment_date?->format('Y-m-d') ?? '',
+            ->map(fn (FestSchoolEventFee $fee) => [
+                $schools[$fee->school_id] ?? $fee->school_id,
+                $fee->school_registration_fee,
+                $fee->participation_item_count,
+                $fee->participation_fee,
+                $fee->total_due,
+                $fee->feeReceipt?->amount ?? '',
+                $fee->status,
+                $fee->feeReceipt?->transaction_ref ?? '',
+                $fee->feeReceipt?->payment_date?->format('Y-m-d') ?? '',
+                $fee->feeReceipt?->receipt_number ?? '',
             ]);
 
         return ExcelExport::download(
             $this->filename($event, 'fees'),
-            ['School', 'Item', 'Due', 'Paid', 'Status', 'Transaction Ref', 'Payment Date'],
+            ['School', 'School Reg Fee', 'Item Count', 'Participation Fee', 'Total Due', 'Paid', 'Status', 'Txn Ref', 'Payment Date', 'Receipt No'],
             $rows,
         );
     }

@@ -9,10 +9,14 @@ class FestParticipant extends Model
 {
     protected $fillable = [
         'registration_id', 'group_id', 'student_id', 'teacher_id',
-        'participant_type', 'chest_no', 'disqualified_at', 'disqualification_reason',
+        'participant_type', 'participant_role', 'chest_no', 'chest_revealed_at',
+        'level_registration_number', 'disqualified_at', 'disqualification_reason',
     ];
 
-    protected $casts = ['disqualified_at' => 'datetime'];
+    protected $casts = [
+        'disqualified_at'   => 'datetime',
+        'chest_revealed_at' => 'datetime',
+    ];
 
     public function registration(): BelongsTo
     {

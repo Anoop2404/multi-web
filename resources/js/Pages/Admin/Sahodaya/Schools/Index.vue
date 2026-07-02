@@ -4,18 +4,17 @@
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
                          :pendingPaymentsCount="pendingPaymentsCount">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div>
-                <p class="text-sm text-gray-600">
-                    <strong class="text-[#0f3d7a]">{{ verifiedCount }}</strong> verified member schools
-                    <span v-if="activeAcademicYear" class="text-gray-400"> · {{ activeAcademicYear }}</span>
-                </p>
-            </div>
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`"
-                  class="text-xs font-semibold text-[#0f3d7a] hover:underline">
-                Pending approvals → Payments
-            </Link>
-        </div>
+        <PageHeader
+            title="Member schools"
+            eyebrow="Membership"
+            :description="`${verifiedCount} verified schools${activeAcademicYear ? ' · ' + activeAcademicYear : ''}`"
+        >
+            <template #actions>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`" class="btn-secondary text-sm">
+                    Pending approvals →
+                </Link>
+            </template>
+        </PageHeader>
 
         <SahodayaDataTable :columns="columns"
                            :links="schools.links"
@@ -30,14 +29,14 @@
                     <div class="flex-1 min-w-[180px] max-w-sm">
                         <input v-model="filterForm.search" type="search" placeholder="Search name or prefix…"
                                @keyup.enter="applyFilters"
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
+                               class="field">
                     </div>
                     <input v-model="filterForm.date_from" type="date" title="Registered from"
                            class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
                     <input v-model="filterForm.date_to" type="date" title="Registered to"
                            class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
                     <button @click="applyFilters"
-                            class="bg-[#0f3d7a] hover:bg-[#1a4f8c] text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                            class="btn-primary">
                         Apply
                     </button>
                     <button v-if="hasActiveFilters" @click="clearFilters"

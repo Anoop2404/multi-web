@@ -1,24 +1,28 @@
 <template>
-    <SchoolAdminLayout title="Staff Members" :school="school">
+    <SchoolAdminLayout title="Staff Members" :school="school" :show-header-title="false">
+        <PageHeader title="Staff Members" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <div class="flex gap-2">
                     <button v-for="t in ['all','teaching','non-teaching','admin']" :key="t"
                             @click="typeFilter = t"
-                            class="px-3 py-1.5 rounded-full text-xs font-medium transition"
-                            :class="typeFilter === t ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
+                            class="chip-tab"
+                            :class="{ 'chip-tab--active': typeFilter === t }">
                         {{ t === 'all' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1) }}
                     </button>
                 </div>
                 <Link :href="`/school-admin/${school.id}/staff/create`"
-                      class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition">
+                      class="btn-primary">
                     + Add Staff
                 </Link>
             </div>
 
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div v-for="member in filtered" :key="member.id"
-                     class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 hover:shadow-md transition">
+                     class="card-list-row hover:shadow-md">
                     <div class="w-14 h-14 rounded-full overflow-hidden bg-gray-100 shrink-0">
                         <img v-if="member.photo" :src="member.photo" class="w-full h-full object-cover">
                         <div v-else class="w-full h-full flex items-center justify-center bg-blue-100 text-blue-700 font-bold text-lg">

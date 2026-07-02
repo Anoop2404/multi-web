@@ -1,17 +1,20 @@
 <template>
-    <SahodayaAdminLayout title="Display Screens" :sahodaya="sahodaya" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount">
-        <form @submit.prevent="create" class="bg-white border rounded-xl p-4 mb-4 grid md:grid-cols-4 gap-2">
+    <SahodayaEventsLayout title="Display Screens" :sahodaya="sahodaya" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <PageHeader title="Display screens" eyebrow="Tools"
+                    :description="eventContext ? `Manage live display boards for ${eventContext.title}.` : 'Create public display URLs for schedules, results, and leaderboards.'" />
+
+        <form @submit.prevent="create" class="card mb-4 grid md:grid-cols-4 gap-3">
             <input v-model="form.title" class="field" placeholder="Screen title" required>
             <input v-model="form.slug" class="field" placeholder="slug (optional)">
             <select v-model="form.event_id" class="field">
                 <option value="">No event linked</option>
                 <option v-for="e in events" :key="e.id" :value="e.id">{{ e.title }}</option>
             </select>
-            <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Create screen</button>
+            <button class="btn-primary">Create screen</button>
         </form>
 
-        <ul class="bg-white border rounded-xl divide-y">
+        <ul class="card-list">
             <li v-for="screen in screens" :key="screen.id" class="p-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p class="font-medium">{{ screen.title }}</p>
@@ -29,24 +32,32 @@
             </li>
             <li v-if="!screens.length" class="p-6 text-center text-gray-400 text-sm">No display screens yet</li>
         </ul>
-    </SahodayaAdminLayout>
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
-import { router, useForm } from '@inertiajs/vue3';
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { computed } from 'vue';
+import { router, useForm, usePage } from '@inertiajs/vue3';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
-    screens: Array, events: Array,
+    screens: Array, events: Array, defaultEventId: { type: [String, Number], default: null },
 });
 
-const form = useForm({ title: '', slug: '', event_id: '' });
+const page = usePage();
+const eventContext = computed(() => page.props.event ?? null);
+
+const form = useForm({
+    title: '',
+    slug: '',
+    event_id: props.defaultEventId ?? page.props.event?.id ?? '',
+});
 
 function create() {
     form.post(`/sahodaya-admin/${props.sahodaya.id}/display-screens`, {
         preserveScroll: true,
-        onSuccess: () => form.reset(),
+        onSuccess: () => form.reset('title', 'slug'),
     });
 }
 
@@ -63,8 +74,3 @@ function remove(id) {
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/display-screens/${id}`, { preserveScroll: true });
 }
 </script>
-
-<style scoped>
-@reference "../../../../../css/app.css";
-.field { @apply border border-gray-200 rounded-lg px-3 py-2 text-sm; }
-</style>

@@ -9,7 +9,8 @@ class FestMark extends Model
 {
     protected $fillable = [
         'event_id', 'item_id', 'participant_id', 'grade', 'position',
-        'score', 'ref_data_json', 'locked_by', 'locked_at',
+        'score', 'measurement_value', 'measurement_unit',
+        'ref_data_json', 'locked_by', 'locked_at',
     ];
 
     protected $casts = [

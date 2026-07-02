@@ -1,95 +1,101 @@
 <template>
-    <SchoolAdminLayout title="Submission Students" :school="school">
-        <div class="max-w-4xl space-y-4">
-            <Link :href="`/school-admin/${school.id}/registration`" class="text-sm text-blue-600">← Registration</Link>
-            <p class="text-sm text-gray-500">Status: {{ submission.full_records_status }}</p>
-            <p v-if="submission.full_records_rejection_reason" class="text-sm text-red-600">Rejected: {{ submission.full_records_rejection_reason }}</p>
+    <SchoolAdminLayout title="Student records" :school="school" :show-header-title="false">
+        <PageHeader title="Student records for membership" eyebrow="Membership"
+                    description="Your school student list (same records used for fest registration). Submit when ready for Sahodaya review." />
 
-            <div v-if="!classes.length"
-                 class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
-                No classes are available yet. Contact your Sahodaya admin — classes are configured centrally.
+        <div class="max-w-4xl space-y-4">
+            <Link :href="`/school-admin/${school.id}/registration`" class="text-sm text-blue-600">← Annual registration</Link>
+
+            <div class="notice-banner notice-banner--info text-sm">
+                Student data is maintained under
+                <Link :href="`/school-admin/${school.id}/students`" class="link-brand font-semibold">Records → Students</Link>.
+                This page shows a read-only snapshot for your annual submission.
             </div>
 
-            <form v-if="['pending','rejected'].includes(submission.full_records_status) && classes.length"
-                  @submit.prevent="add"
-                  class="bg-white border rounded-xl p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <input v-model="form.name" required placeholder="Name *" class="border rounded-lg px-3 py-2 text-sm">
-                <select v-model="form.school_class_id" required class="border rounded-lg px-3 py-2 text-sm">
-                    <option value="">Class *</option>
-                    <optgroup v-for="cat in categories" :key="cat.id" :label="cat.label">
-                        <option v-for="c in classesInCategory(cat.id)" :key="c.id" :value="c.id">
-                            Class {{ c.name }}
-                        </option>
-                    </optgroup>
-                </select>
-                <input v-model="form.section" placeholder="Section" class="border rounded-lg px-3 py-2 text-sm">
-                <input v-model="form.guardian_name" placeholder="Guardian name" class="border rounded-lg px-3 py-2 text-sm">
-                <button type="submit" class="sm:col-span-2 lg:col-span-4 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold">
-                    Add Student
-                </button>
-            </form>
+            <div class="flex flex-wrap items-center gap-3">
+                <span class="text-sm capitalize">Status: <strong>{{ statusLabel(submission.full_records_status) }}</strong></span>
+                <Link :href="`/school-admin/${school.id}/students`" class="btn-secondary text-sm">Manage students →</Link>
+            </div>
 
-            <table class="w-full text-sm bg-white border rounded-xl overflow-hidden">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 py-2 text-left">Name</th>
-                        <th class="px-4 py-2 text-left">Category</th>
-                        <th class="px-4 py-2 text-left">Class</th>
-                        <th class="px-4 py-2 text-left">Section</th>
-                        <th class="px-4 py-2"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="s in students" :key="s.id" class="border-t">
-                        <td class="px-4 py-2 font-medium">{{ s.name }}</td>
-                        <td class="px-4 py-2 text-gray-500 text-xs">{{ s.school_class?.class_category?.label || '—' }}</td>
-                        <td class="px-4 py-2">{{ s.school_class?.name || s.class }}</td>
-                        <td class="px-4 py-2 text-gray-500">{{ s.section || '—' }}</td>
-                        <td class="px-4 py-2">
-                            <button v-if="['pending','rejected'].includes(submission.full_records_status)"
-                                    @click="remove(s)" class="text-red-400 text-xs">Remove</button>
-                        </td>
-                    </tr>
-                    <tr v-if="!students.length">
-                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">No students added yet.</td>
-                    </tr>
-                </tbody>
-            </table>
+            <p v-if="submission.full_records_rejection_reason" class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-3">
+                Rejected: {{ submission.full_records_rejection_reason }}
+            </p>
 
-            <button v-if="['pending','rejected'].includes(submission.full_records_status)"
-                    @click="submit"
-                    class="bg-[#0f3d7a] text-white px-4 py-2 rounded-lg text-sm font-semibold">
-                Submit for Review
+            <div class="card card--flush overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                        <tr>
+                            <th class="p-3">Name</th>
+                            <th class="p-3">Reg no</th>
+                            <th class="p-3">Category</th>
+                            <th class="p-3">Class</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="s in students" :key="s.id" class="border-t">
+                            <td class="p-3 font-medium">{{ s.name }}</td>
+                            <td class="p-3 font-mono text-xs text-slate-500">{{ s.reg_no || '—' }}</td>
+                            <td class="p-3 text-xs text-slate-500">{{ s.school_class?.class_category?.label || '—' }}</td>
+                            <td class="p-3">{{ s.school_class?.name || '—' }}</td>
+                        </tr>
+                        <tr v-if="!students.length">
+                            <td colspan="4" class="p-8 text-center text-gray-400">
+                                No active students yet.
+                                <Link :href="`/school-admin/${school.id}/students`" class="link-brand font-semibold">Add students</Link>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="text-xs text-slate-500">{{ studentTotal }} active student{{ studentTotal === 1 ? '' : 's' }}</p>
+
+            <button v-if="canSubmit"
+                    type="button"
+                    class="btn-primary"
+                    :disabled="studentTotal < 1"
+                    @click="submit">
+                Submit student records for Sahodaya review
             </button>
+            <p v-else-if="submission.full_records_status === 'submitted'" class="text-sm text-amber-700">
+                Awaiting Sahodaya approval…
+            </p>
+            <p v-else-if="submission.full_records_status === 'approved'" class="text-sm text-green-700">
+                Student records approved.
+            </p>
         </div>
     </SchoolAdminLayout>
 </template>
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import { Link, router, useForm } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 const props = defineProps({
-    school:       Object,
+    school: Object,
     registration: Object,
-    submission:   Object,
-    categories:   { type: Array, default: () => [] },
-    classes:      { type: Array, default: () => [] },
-    students:     { type: Array, default: () => [] },
+    submission: Object,
+    students: { type: Array, default: () => [] },
+    studentTotal: { type: Number, default: 0 },
 });
 
-const form = useForm({ name: '', school_class_id: '', section: '', guardian_name: '' });
+const canSubmit = computed(() =>
+    ['pending', 'rejected'].includes(props.submission?.full_records_status),
+);
 
-function classesInCategory(categoryId) {
-    return props.classes.filter(c => c.class_category_id === categoryId);
+function statusLabel(status) {
+    return {
+        pending: 'Not submitted',
+        submitted: 'Awaiting review',
+        approved: 'Approved',
+        rejected: 'Rejected',
+        not_applicable: 'Not required',
+    }[status] ?? status;
 }
 
-function add() {
-    form.post(`/school-admin/${props.school.id}/registration/students`, {
-        onSuccess: () => form.reset('name', 'section', 'guardian_name'),
-    });
+function submit() {
+    if (!confirm(`Submit ${props.studentTotal} student record(s) for Sahodaya review?`)) return;
+    router.post(`/school-admin/${props.school.id}/registration/submit-track`, { track: 'full_records' });
 }
-
-function remove(s) { router.delete(`/school-admin/${props.school.id}/registration/students/${s.id}`); }
-function submit() { router.post(`/school-admin/${props.school.id}/registration/submit-track`, { track: 'full_records' }); }
 </script>

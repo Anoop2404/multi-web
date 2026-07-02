@@ -35,81 +35,25 @@
                 </a>
             </div>
 
+            <SahodayaSidebarNavSearch v-model="navSearch" />
+
             <!-- Navigation -->
-            <nav class="flex-1 min-h-0 py-3 px-2 overflow-y-auto space-y-0.5">
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}`" icon="grid" label="Dashboard"
-                         :active="isExact(`/sahodaya-admin/${sahodaya.id}`)" />
-
-                <template v-if="websiteEnabled">
-                <NavSectionLabel text="Website" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/site-builder`"    icon="layers"     label="Sahodaya Site Builder" :active="isActive(`/sahodaya-admin/${sahodaya.id}/site-builder`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/public-content`"  icon="edit"       label="Website Content"   :active="isActive(`/sahodaya-admin/${sahodaya.id}/public-content`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/office-bearers`"  icon="users"      label="Office Bearers"    :active="isActive(`/sahodaya-admin/${sahodaya.id}/office-bearers`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/circulars`"       icon="file-text"  label="Circulars"         :active="isActive(`/sahodaya-admin/${sahodaya.id}/circulars`)" />
-
-                <NavSectionLabel text="Events" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/kalotsav`" icon="star" label="Kalotsav / Events" :active="isActive(`/sahodaya-admin/${sahodaya.id}/kalotsav`)" />
+            <nav class="flex-1 min-h-0 py-1 px-2 overflow-y-auto space-y-0.5">
+                <p v-if="navSearch.trim() && !filteredNavGroups.length"
+                   class="px-3 py-6 text-center text-sm text-white/50">
+                    No menus match “{{ navSearch.trim() }}”
+                </p>
+                <template v-for="group in filteredNavGroups" :key="group.section">
+                    <p class="px-3 pt-4 pb-1 text-[10px] font-bold text-[#fbbf24]/75 uppercase tracking-widest">
+                        {{ group.section }}
+                    </p>
+                    <SahodayaNavItem v-for="item in group.items" :key="item.href"
+                                     :href="item.href"
+                                     :icon="item.icon"
+                                     :label="item.label"
+                                     :badge="item.badge ?? 0"
+                                     :active="adminNavItemActive(page.url, item.href, item.exact)" />
                 </template>
-
-                <NavSectionLabel text="Membership" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/academic-years`"
-                         icon="calendar" label="Academic Years"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/academic-years`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/public-content`"
-                         icon="edit" label="Portal Content"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/public-content`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/membership/settings`"
-                         icon="settings" label="Configuration"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/membership/settings`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/schools`"
-                         icon="building" label="Schools"
-                         :badge="approvedSchoolsCount"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/schools`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/membership/submissions`"
-                         icon="inbox" label="Student Counts"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/membership/submissions`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`"
-                         icon="credit-card" label="Payments"
-                         :badge="pendingPaymentsCount"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/membership/payments`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/membership/reports`"
-                         icon="bar-chart" label="Reports"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/membership/reports`)" />
-
-                <NavSectionLabel text="Programs" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/events`"
-                         icon="star" label="Events"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/events`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/display-screens`"
-                         icon="layers" label="Display Screens"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/display-screens`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams`"
-                         icon="file-text" label="MCQ Exams"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/mcq-exams`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/training`"
-                         icon="users" label="Teacher Training"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/training`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/ledger`"
-                         icon="credit-card" label="Accounts"
-                         :active="isActive(`/sahodaya-admin/${sahodaya.id}/ledger`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/kalotsav/registration`"
-                         icon="star" label="Kalotsav"
-                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/kalotsav/registration`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/kalotsav/results`"
-                         icon="bar-chart" label="Kalotsav Results"
-                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/kalotsav/results`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/sports-meet/registration`"
-                         icon="award" label="Sports Meet"
-                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/sports-meet/registration`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/sports-meet/results`"
-                         icon="bar-chart" label="Sports Results"
-                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/sports-meet/results`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/kids-fest/registration`"
-                         icon="users" label="Kids Fest"
-                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/kids-fest/registration`)" />
-                <NavItem :href="`/sahodaya-admin/${sahodaya.id}/programs/kids-fest/results`"
-                         icon="bar-chart" label="Kids Fest Results"
-                         :active="isExact(`/sahodaya-admin/${sahodaya.id}/programs/kids-fest/results`)" />
             </nav>
 
             <!-- Footer — always pinned at bottom -->
@@ -137,22 +81,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
                         </svg>
                     </button>
-                    <h1 class="text-base font-bold text-[#041525] truncate">{{ title }}</h1>
+                    <h1 v-if="showHeaderTitle" class="text-base font-bold text-[#041525] truncate">{{ title }}</h1>
+                    <span v-if="isStaffUser" class="hidden sm:inline text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-medium">View only</span>
                     <slot name="header-suffix" />
                 </div>
                 <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-                    <transition name="fade">
-                        <span v-if="$page.props.flash?.success"
-                              class="text-xs font-medium bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                            <span class="text-green-500">✓</span> {{ $page.props.flash.success }}
-                        </span>
-                    </transition>
-                    <transition name="fade">
-                        <span v-if="$page.props.flash?.error"
-                              class="text-xs font-medium bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                            <span>✕</span> {{ $page.props.flash.error }}
-                        </span>
-                    </transition>
                     <a v-if="websiteEnabled && publicUrl" :href="publicUrl" target="_blank" rel="noopener"
                        class="sa-preview-btn inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-white text-xs font-semibold transition shadow-sm">
                         <SvgIcon name="external-link" class="w-3.5 h-3.5" />
@@ -171,7 +104,9 @@
                 </div>
             </header>
 
-            <main class="sa-main flex-1 p-4 lg:p-6 overflow-auto">
+            <main class="sa-main flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isStaffUser }">
+                <StaffReadOnlyBanner v-if="isStaffUser" />
+                <FlashBanner />
                 <slot />
             </main>
         </div>
@@ -181,9 +116,24 @@
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
 import SignOutButton from '@/Components/SignOutButton.vue';
+import StaffReadOnlyBanner from '@/Components/StaffReadOnlyBanner.vue';
+import FlashBanner from '@/Components/ui/FlashBanner.vue';
+import SahodayaNavItem from '@/Components/sahodaya/SahodayaNavItem.vue';
+import SahodayaSidebarNavSearch from '@/Components/sahodaya/SahodayaSidebarNavSearch.vue';
+import { filterNavGroups } from '@/support/filterNavGroups.js';
+import {
+    adminNavItemActive,
+    detectSahodayaMcqExamIdFromUrl,
+    detectSahodayaMcqHubFromUrl,
+    detectSahodayaMcqSeriesIdFromUrl,
+    sahodayaAdminNav,
+    sahodayaMcqExamScopedNav,
+    sahodayaMcqHubNav,
+    sahodayaMcqSeriesScopedNav,
+} from '@/support/sahodayaAdminNav.js';
 import { computed, defineComponent, h, ref, watch } from 'vue';
 
-defineProps({
+const props = defineProps({
     title:                  { type: String, default: '' },
     sahodaya:               { type: Object, required: true },
     publicUrl:              { type: String, default: null },
@@ -191,15 +141,65 @@ defineProps({
     pendingSchoolsCount:    { type: Number, default: 0 },
     pendingSubmissionsCount:{ type: Number, default: 0 },
     pendingPaymentsCount:   { type: Number, default: 0 },
+    isStaff:                { type: Boolean, default: false },
+    showHeaderTitle:        { type: Boolean, default: true },
 });
 
 const page = usePage();
 const mobileNavOpen = ref(false);
+const navSearch = ref('');
+const isStaffUser = computed(() => props.isStaff || page.props.isStaff);
 const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
+
+const STAFF_NAV = {
+    website: ['website.view', 'website.manage', 'website.news'],
+    membership: ['membership.view', 'membership.manage'],
+    fest: ['fest.view', 'fest.manage', 'fest.marks', 'fest.registrations', 'fest.results', 'fest.settings', 'fest.finance', 'fest.certificates', 'fest.catering', 'fest.schedule'],
+    mcq: ['mcq.view', 'mcq.manage', 'mcq.attendance', 'mcq.marks'],
+    training: ['fest.view', 'fest.manage'],
+    ledger: ['membership.view', 'membership.manage'],
+    users: ['users.manage'],
+};
+
+function canNav(section) {
+    if (!isStaffUser.value) return true;
+    const perms = page.props.staffPermissions ?? [];
+    const required = STAFF_NAV[section];
+    if (!required) return true;
+    return required.some(p => perms.includes(p));
+}
 
 watch(() => page.url, () => {
     mobileNavOpen.value = false;
+    navSearch.value = '';
 });
+
+const navGroups = computed(() => {
+    const options = {
+        canNav,
+        websiteEnabled: websiteEnabled.value,
+        approvedSchoolsCount: props.approvedSchoolsCount,
+        pendingPaymentsCount: props.pendingPaymentsCount,
+    };
+
+    const examId = detectSahodayaMcqExamIdFromUrl(page.url);
+    if (examId) {
+        return sahodayaMcqExamScopedNav(props.sahodaya.id, examId, options);
+    }
+
+    const seriesId = detectSahodayaMcqSeriesIdFromUrl(page.url);
+    if (seriesId) {
+        return sahodayaMcqSeriesScopedNav(props.sahodaya.id, seriesId, options);
+    }
+
+    if (detectSahodayaMcqHubFromUrl(page.url)) {
+        return sahodayaMcqHubNav(props.sahodaya.id, options);
+    }
+
+    return sahodayaAdminNav(props.sahodaya.id, options);
+});
+
+const filteredNavGroups = computed(() => filterNavGroups(navGroups.value, navSearch.value));
 
 function isActive(href)  { return page.url.startsWith(href); }
 function isExact(href)   { return page.url === href || page.url === href + '/'; }
@@ -235,15 +235,6 @@ const SvgIcon = defineComponent({
             class: props.class || 'w-4 h-4',
             innerHTML: icons[props.name] || '',
         });
-    },
-});
-
-const NavSectionLabel = defineComponent({
-    props: { text: String },
-    setup(props) {
-        return () => h('p', {
-            class: 'px-3 pt-4 pb-1 text-[10px] font-bold text-[#fbbf24]/75 uppercase tracking-widest',
-        }, props.text);
     },
 });
 
@@ -319,9 +310,20 @@ const NavItem = defineComponent({
 }
 
 .sa-main {
-    background: linear-gradient(180deg, #f0f9ff 0%, #f8fafc 100%);
+    background:
+        radial-gradient(ellipse 120% 80% at 100% 0%, rgba(15, 61, 122, 0.06) 0%, transparent 55%),
+        radial-gradient(ellipse 80% 50% at 0% 100%, rgba(212, 160, 23, 0.05) 0%, transparent 50%),
+        linear-gradient(180deg, #f4f7fb 0%, #f8fafc 100%);
 }
 
 .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.staff-readonly :deep(button[type="submit"]:not(.staff-allow)),
+.staff-readonly :deep(input:not([type="hidden"]):not([readonly])),
+.staff-readonly :deep(select),
+.staff-readonly :deep(textarea) {
+    pointer-events: none;
+    opacity: 0.65;
+}
 </style>

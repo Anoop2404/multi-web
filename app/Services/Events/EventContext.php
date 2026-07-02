@@ -118,20 +118,43 @@ class EventContext
 
     public function recalculateSchoolPoints(): void
     {
-        $pointsBySchool = FestMark::where('event_id', $this->event->id)
-            ->join('fest_participants', 'fest_marks.participant_id', '=', 'fest_participants.id')
-            ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
-            ->selectRaw('fest_registrations.school_id, SUM(COALESCE(fest_marks.score, 0)) as total')
-            ->groupBy('fest_registrations.school_id')
-            ->pluck('total', 'school_id');
+        $gradePointService = app(FestGradePointService::class);
 
-        $ranked = $pointsBySchool->sortDesc()->values();
+        $marks = FestMark::where('event_id', $this->event->id)
+            ->with(['participant.registration'])
+            ->get();
+
+        $pointsBySchool = [];
+
+        foreach ($marks as $mark) {
+            $participant = $mark->participant;
+            if (! $participant || $participant->disqualified_at) {
+                continue;
+            }
+
+            $schoolId = $participant->registration?->school_id;
+            if (! $schoolId) {
+                continue;
+            }
+
+            $pointsBySchool[$schoolId] = ($pointsBySchool[$schoolId] ?? 0)
+                + $gradePointService->pointsForMark($this->event, $mark);
+        }
+
         $rank = 1;
+        $previousTotal = null;
+        $position = 0;
 
-        foreach ($pointsBySchool->sortDesc() as $schoolId => $total) {
+        foreach (collect($pointsBySchool)->sortDesc() as $schoolId => $total) {
+            $position++;
+            if ($previousTotal !== null && (int) $total < (int) $previousTotal) {
+                $rank = $position;
+            }
+            $previousTotal = (int) $total;
+
             FestResult::updateOrCreate(
                 ['event_id' => $this->event->id, 'item_id' => null, 'school_id' => $schoolId],
-                ['total_points' => (int) $total, 'rank' => $rank++]
+                ['total_points' => (int) $total, 'rank' => $rank]
             );
         }
     }

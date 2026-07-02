@@ -106,7 +106,7 @@
                     <Link v-for="link in students.links" :key="link.label"
                           :href="link.url || '#'"
                           class="px-3 py-1 rounded text-sm"
-                          :class="link.active ? 'bg-[#0f3d7a] text-white' : 'text-gray-600 hover:bg-gray-100'"
+                          :class="link.active ? 'pagination-link--active' : 'pagination-link'"
                           v-html="link.label" />
                 </div>
             </div>

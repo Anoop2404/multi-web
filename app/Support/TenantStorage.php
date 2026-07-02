@@ -81,6 +81,13 @@ class TenantStorage
                     }
                 }
 
+                if ($disk === 'public') {
+                    $centralPath = self::storageRoot('app/public/'.$relativePath);
+                    if ($localServeUrl && ! is_file($centralPath) && $tenant && self::publicFilePath($tenant, $relativePath)) {
+                        return $localServeUrl;
+                    }
+                }
+
                 return $storage->url($relativePath);
             } catch (\Throwable) {
                 continue;
@@ -99,8 +106,12 @@ class TenantStorage
         $relativePath = ltrim($relativePath, '/');
 
         foreach (self::downloadDisks() as $disk) {
-            if (self::disk($disk)->exists($relativePath)) {
-                return self::disk($disk)->response($relativePath);
+            try {
+                if (self::disk($disk)->exists($relativePath)) {
+                    return self::disk($disk)->response($relativePath);
+                }
+            } catch (\Throwable) {
+                continue;
             }
         }
 
@@ -120,6 +131,49 @@ class TenantStorage
     public static function storeStudentPhoto($file, string $schoolId): string
     {
         return self::storeUploadedFile($file, 'students/'.$schoolId, self::photosDisk());
+    }
+
+    public static function storeTeacherPhoto($file, string $schoolId): string
+    {
+        return self::storeUploadedFile($file, 'teachers/'.$schoolId, self::photosDisk());
+    }
+
+    /** Embed path as data URI for PDF rendering (local file path or base64). */
+    public static function photoDataUri(?Tenant $tenant, ?string $relativePath): ?string
+    {
+        if (! $relativePath) {
+            return null;
+        }
+
+        if (str_starts_with($relativePath, 'data:image/')) {
+            return $relativePath;
+        }
+
+        if (str_starts_with($relativePath, 'http://') || str_starts_with($relativePath, 'https://')) {
+            return $relativePath;
+        }
+
+        if ($tenant) {
+            $absolute = self::publicFilePath($tenant, $relativePath);
+            if ($absolute && is_file($absolute)) {
+                return $absolute;
+            }
+        }
+
+        foreach (self::downloadDisks() as $disk) {
+            try {
+                if (self::disk($disk)->exists($relativePath)) {
+                    $contents = self::disk($disk)->get($relativePath);
+                    $mime = self::disk($disk)->mimeType($relativePath) ?: 'image/jpeg';
+
+                    return 'data:'.$mime.';base64,'.base64_encode($contents);
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
     }
 
     public static function storeSubmissionImage($file, string $schoolId): string
@@ -208,7 +262,12 @@ class TenantStorage
 
     private static function photosDisk(): string
     {
-        return self::isS3Configured() ? 's3' : self::uploadDisk();
+        if (self::isS3Configured()) {
+            return 's3';
+        }
+
+        // Never use tenant-suffixed public disk — files are not reachable via the /storage symlink.
+        return self::SHARED_DISK;
     }
 
     /** @return list<string> */

@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\AdmissionEnquiry;
+use App\Models\FestEvent;
+use App\Models\FestRegistration;
+use App\Models\FestSchoolEventFee;
 use App\Models\NewsArticle;
 use App\Models\Registration;
 use App\Models\SahodayaProfile;
@@ -10,6 +13,7 @@ use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\TcRequest;
 use App\Support\AcademicYear;
+use App\Support\ProgramRouteMap;
 
 class DashboardController extends SchoolAdminController
 {
@@ -20,13 +24,48 @@ class DashboardController extends SchoolAdminController
         return $this->inertia('School/Dashboard', [
             'stats' => [
                 ['label' => 'Active Students',      'value' => Student::where('tenant_id', $tid)->where('status', 'active')->count()],
-                ['label' => 'News Articles',       'value' => NewsArticle::where('tenant_id', $tid)->count()],
+                ['label' => 'Teachers',            'value' => \App\Models\Teacher::where('tenant_id', $tid)->count()],
                 ['label' => 'New Enquiries',       'value' => AdmissionEnquiry::where('tenant_id', $tid)->where('status', 'new')->count()],
                 ['label' => 'Pending TC Requests', 'value' => TcRequest::where('tenant_id', $tid)->where('status', 'pending')->count()],
             ],
+            'programSummaries' => $this->programSummaries(),
+            'dashboardExtras'  => app(\App\Services\Events\ProgramHubDataService::class)->schoolDashboardExtras($this->school),
             'setup' => $this->setupStatus(),
             'membershipComplete' => $this->membershipComplete(),
         ]);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function programSummaries(): array
+    {
+        $sahodayaId = $this->school->parent_id;
+        if (! $sahodayaId) {
+            return [];
+        }
+
+        $programs = [
+            ['slug' => 'kalotsav', 'label' => 'Kalotsav', 'type' => 'kalolsavam'],
+            ['slug' => 'sports-meet', 'label' => 'Sports Meet', 'type' => 'sports'],
+            ['slug' => 'kids-fest', 'label' => 'Kids Fest', 'type' => 'kids_fest'],
+            ['slug' => 'teacher-fest', 'label' => 'Teacher Fest', 'type' => 'teacher_fest'],
+        ];
+
+        return collect($programs)->map(function (array $p) use ($sahodayaId) {
+            $events = FestEvent::where('tenant_id', $sahodayaId)->ofType($p['type'])->visibleToSchool($this->school->id);
+            $open = (clone $events)->whereIn('status', ['published', 'registration_open', 'ongoing'])->count();
+            $eventIds = (clone $events)->pluck('id');
+            $regs = FestRegistration::where('school_id', $this->school->id)->whereIn('event_id', $eventIds)->whereIn('status', ['submitted', 'approved'])->count();
+            $feesPending = FestSchoolEventFee::where('school_id', $this->school->id)->whereIn('event_id', $eventIds)->whereIn('status', ['pending', 'proof_uploaded'])->count();
+
+            return [
+                'slug'           => $p['slug'],
+                'label'          => $p['label'],
+                'open_events'    => $open,
+                'registrations'  => $regs,
+                'fees_pending'   => $feesPending,
+                'hub_url'        => '/school-admin/'.$this->school->id.'/'.ProgramRouteMap::prefixFromSlug($p['slug']),
+            ];
+        })->all();
     }
 
     private function setupStatus(): array

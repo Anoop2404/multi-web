@@ -1,5 +1,9 @@
 <template>
-    <SchoolAdminLayout title="Admission Enquiries" :school="school">
+    <SchoolAdminLayout title="Admission Enquiries" :school="school" :show-header-title="false">
+        <PageHeader title="Admission Enquiries" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="space-y-4">
             <!-- Status counts -->
             <div class="grid grid-cols-3 gap-4">
@@ -13,7 +17,7 @@
             </div>
 
             <!-- Table -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="card card--flush">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b border-gray-100">
                         <tr>

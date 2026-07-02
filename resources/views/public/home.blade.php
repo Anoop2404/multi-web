@@ -12,6 +12,7 @@
             'config'  => $section->config ?? [],
             'section' => $section,
             'tenant'  => $tenant,
+            'logo'    => $logo ?? \App\Support\TenantBranding::logoUrl($tenant),
         ])
         </div>
     @empty

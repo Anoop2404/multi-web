@@ -5,7 +5,9 @@ namespace App\Services\Membership;
 use App\Models\MembershipFeeSlab;
 use App\Models\Registration;
 use App\Models\SahodayaProfile;
+use App\Models\SchoolYearStudentCount;
 use App\Models\SchoolYearSubmission;
+use App\Models\Student;
 use App\Models\Tenant;
 
 class MembershipFeeCalculator
@@ -21,6 +23,10 @@ class MembershipFeeCalculator
             ),
             default => 0.0,
         };
+
+        if ($registration->fee_override && isset($registration->fee_override['override_amount'])) {
+            $amount = (float) $registration->fee_override['override_amount'];
+        }
 
         $registration->update([
             'membership_fee_amount' => $amount,
@@ -61,8 +67,31 @@ class MembershipFeeCalculator
 
         return match ($profile->membership_fee_type) {
             'fixed' => (float) ($profile->fixed_membership_fee_amount ?? 0),
-            'variable_by_student_count' => $this->fromSlabs($school->parent_id, $academicYear, 0),
+            'variable_by_student_count' => $this->fromSlabs(
+                $school->parent_id,
+                $academicYear,
+                $this->estimateStudentCount($school, $academicYear)
+            ),
             default => 0.0,
         };
+    }
+
+    public function estimateStudentCount(Tenant $school, string $academicYear): int
+    {
+        $activeCount = Student::where('tenant_id', $school->id)
+            ->where('status', 'active')
+            ->count();
+
+        if ($activeCount > 0) {
+            return $activeCount;
+        }
+
+        $priorYear = SchoolYearStudentCount::query()
+            ->whereHas('submission', fn ($q) => $q
+                ->where('school_id', $school->id)
+                ->where('academic_year', '!=', $academicYear))
+            ->sum('total_count');
+
+        return (int) $priorYear;
     }
 }

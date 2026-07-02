@@ -1,46 +1,50 @@
 <template>
-    <SchoolAdminLayout title="Achievements" :school="school">
+    <SchoolAdminLayout title="Achievements" :school="school" :show-header-title="false">
+        <PageHeader title="Achievements" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="space-y-6">
             <!-- Add form -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="card">
                 <h3 class="font-bold text-gray-800 mb-4">{{ editing ? 'Edit Achievement' : 'Add Achievement' }}</h3>
                 <form @submit.prevent="save" class="space-y-4">
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Title *</label>
+                            <label class="form-label mb-1.5">Title *</label>
                             <input v-model="form.title" type="text" required
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Category</label>
+                            <label class="form-label mb-1.5">Category</label>
                             <select v-model="form.category"
-                                    class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white">
+                                    class="field">
                                 <option value="">— Select —</option>
                                 <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Level</label>
+                            <label class="form-label mb-1.5">Level</label>
                             <select v-model="form.level"
-                                    class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white">
+                                    class="field">
                                 <option value="">— Select —</option>
                                 <option v-for="l in levels" :key="l" :value="l">{{ l }}</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Date Achieved</label>
+                            <label class="form-label mb-1.5">Date Achieved</label>
                             <input v-model="form.achieved_at" type="date"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Photo / Trophy Image</label>
+                            <label class="form-label mb-1.5">Photo / Trophy Image</label>
                             <input type="file" accept="image/*" @change="form.image = $event.target.files[0]"
                                    class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100">
                         </div>
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Description</label>
+                            <label class="form-label mb-1.5">Description</label>
                             <textarea v-model="form.description" rows="3"
-                                      class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 resize-none"></textarea>
+                                      class="field resize-none"></textarea>
                         </div>
                     </div>
 
@@ -56,7 +60,7 @@
             </div>
 
             <!-- List -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="card card--flush">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b border-gray-100">
                         <tr>

@@ -269,6 +269,21 @@
             transition: transform .15s, color .15s;
         }
         .portal-action:hover .portal-action-arrow { transform: translateX(3px); color: var(--navy-600); }
+        .portal-action-ghost {
+            padding: .75rem 1rem;
+            border-radius: .75rem;
+            border: 1px dashed #cbd5e1;
+            background: #f8fafc;
+            text-decoration: none;
+            color: inherit;
+            display: flex; align-items: center; gap: .75rem;
+            transition: border-color .15s, background .15s;
+        }
+        .portal-action-ghost:hover {
+            border-color: var(--navy-600);
+            background: #fff;
+        }
+        .portal-action-ghost .portal-action-title { font-size: .8125rem; font-weight: 600; color: #475569; }
 
         /* ── Form card ── */
         .portal-form-wrap { width: 100%; max-width: 30rem; }

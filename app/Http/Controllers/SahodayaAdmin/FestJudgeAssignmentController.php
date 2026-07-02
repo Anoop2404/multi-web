@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\FestPageActivity;
 use App\Models\FestEvent;
 use App\Models\FestJudgeAssignment;
 use App\Models\User;
+use App\Services\Audit\PlatformAuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -25,14 +27,14 @@ class FestJudgeAssignmentController extends SahodayaAdminController
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
-        return $this->inertia('Sahodaya/Events/Judges', [
+        return $this->inertia('Sahodaya/Events/Judges', $this->withEventActivity($event, FestPageActivity::JUDGES, [
             'event'       => $event,
             'assignments' => $assignments,
             'judges'      => $judges,
-        ]);
+        ]));
     }
 
-    public function store(Request $request, string $tenantId, FestEvent $event)
+    public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
@@ -50,14 +52,23 @@ class FestJudgeAssignmentController extends SahodayaAdminController
             'user_id'  => $data['user_id'],
         ]);
 
+        $audit->festEvent($event, FestPageActivity::JUDGES, 'fest.judge.assigned', 'Judge assigned to item', [
+            'item_id' => $data['item_id'],
+            'user_id' => $data['user_id'],
+        ]);
+
         return back()->with('success', 'Judge assigned.');
     }
 
-    public function destroy(string $tenantId, FestEvent $event, FestJudgeAssignment $assignment)
+    public function destroy(string $tenantId, FestEvent $event, FestJudgeAssignment $assignment, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($assignment->event_id !== $event->id, 403);
         $assignment->delete();
+
+        $audit->festEvent($event, FestPageActivity::JUDGES, 'fest.judge.unassigned', 'Judge assignment removed', [
+            'assignment_id' => $assignment->id,
+        ]);
 
         return back()->with('success', 'Assignment removed.');
     }

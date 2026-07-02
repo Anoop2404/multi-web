@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SchoolAdmin;
 use App\Models\Circular;
 use App\Models\CircularAcknowledgement;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CircularAcknowledgementController extends SchoolAdminController
 {
@@ -36,5 +37,23 @@ class CircularAcknowledgementController extends SchoolAdminController
         );
 
         return back()->with('success', 'Circular acknowledged.');
+    }
+
+    public function download(string $tenantId, Circular $circular)
+    {
+        abort_if($circular->tenant_id !== $this->school->parent_id, 403);
+
+        $disk = config('filesystems.default', 's3');
+
+        if (! Storage::disk($disk)->exists($circular->file_path)) {
+            abort(404, 'Circular file not found.');
+        }
+
+        if ($disk === 's3' || $disk === 'private') {
+            $url = Storage::disk($disk)->temporaryUrl($circular->file_path, now()->addMinutes(15));
+            return redirect($url);
+        }
+
+        return Storage::disk($disk)->download($circular->file_path);
     }
 }

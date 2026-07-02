@@ -1,0 +1,139 @@
+<template>
+    <SahodayaEventsLayout :title="`${event.title} — Registration Register`" :sahodaya="sahodaya" :event="event"
+                         :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <PageHeader :title="`${event.title} — Registration & Fees Register`" eyebrow="Reports"
+                    description="Fest ID per student, linked item registrations, chest numbers, and school fee status.">
+            <template #actions>
+                <a :href="exportUrl" class="btn-primary text-sm">Export CSV ↓</a>
+                <Link :href="feesUrl" class="btn-secondary text-sm">Event fees →</Link>
+            </template>
+        </PageHeader>
+
+        <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="hub" />
+
+        <div class="notice-banner notice-banner--info mb-4 text-sm max-w-3xl">
+            <p class="font-semibold text-[#0f3d7a] mb-1">How IDs work</p>
+            <ul class="list-disc pl-4 space-y-0.5 text-slate-700">
+                <li><strong>Fest ID</strong> — one number per student per event (e.g. S-0001), shared across all their items.</li>
+                <li><strong>Chest no</strong> — assigned per on-stage item when Sahodaya approves (hidden until reveal if configured).</li>
+                <li><strong>Fees</strong> — billed per school (school registration + item fees); not per student line item payment.</li>
+            </ul>
+        </div>
+
+        <div class="card !p-4 mb-4 flex flex-wrap gap-3 items-end">
+            <FormField label="Filter by school" class-extra="mb-0">
+                <select v-model="schoolFilter" class="field text-sm w-56" @change="applyFilter">
+                    <option value="">All schools</option>
+                    <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
+                </select>
+            </FormField>
+            <div class="text-xs text-slate-500 ml-auto">
+                {{ totals.participants }} participant line(s) · {{ totals.registrations }} registration(s)
+                <span v-if="totals.fee_required"> · ₹{{ totals.total_due }} due · ₹{{ totals.total_collected }} collected</span>
+            </div>
+        </div>
+
+        <div v-if="schoolSummaries.length && !schoolFilter" class="card card--flush mb-6 overflow-hidden">
+            <div class="px-5 py-3 border-b bg-slate-50/80">
+                <h3 class="section-title text-sm">School fee summary</h3>
+            </div>
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                    <tr>
+                        <th class="p-3">School</th>
+                        <th class="p-3">Items</th>
+                        <th class="p-3">Total due</th>
+                        <th class="p-3">Status</th>
+                        <th class="p-3">Receipt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="s in schoolSummaries" :key="s.school_id" class="border-t">
+                        <td class="p-3 font-medium">{{ s.school_name }}</td>
+                        <td class="p-3">{{ s.item_count }}</td>
+                        <td class="p-3 font-semibold">₹{{ s.total_due }}</td>
+                        <td class="p-3"><span :class="feeStatusClass(s.fee_status)" class="text-xs font-semibold px-2 py-0.5 rounded">{{ s.fee_status }}</span></td>
+                        <td class="p-3 text-xs font-mono">{{ s.receipt_no ?? '—' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card card--flush overflow-hidden">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                    <tr>
+                        <th class="p-3">School</th>
+                        <th class="p-3">Participant</th>
+                        <th class="p-3">Fest ID</th>
+                        <th class="p-3">Item</th>
+                        <th class="p-3">Status</th>
+                        <th class="p-3">Chest</th>
+                        <th class="p-3">Item fee</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="row in rows" :key="row.participant_id" class="border-t align-top">
+                        <td class="p-3 text-xs">{{ row.school_name }}</td>
+                        <td class="p-3">
+                            <span class="font-medium">{{ row.participant_name }}</span>
+                            <p class="text-xs font-mono text-[#0f3d7a]">{{ row.participant_reg_no }}</p>
+                        </td>
+                        <td class="p-3 font-mono text-xs font-semibold text-[#0f3d7a]">{{ row.level_reg }}</td>
+                        <td class="p-3 text-xs">{{ row.item_title }}</td>
+                        <td class="p-3 text-xs capitalize">
+                            {{ row.registration_status }}
+                            <span v-if="row.participant_role === 'standby'" class="text-slate-500"> · standby</span>
+                        </td>
+                        <td class="p-3 font-mono text-xs">{{ row.chest_no }}</td>
+                        <td class="p-3 text-xs whitespace-nowrap">{{ row.item_fee != null ? `₹${row.item_fee}` : '—' }}</td>
+                    </tr>
+                    <tr v-if="!rows.length">
+                        <td colspan="7" class="p-8 text-center text-gray-400">No registrations yet.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <EventPageActivityLog :logs="activityLogs" class="mt-8" />
+    </SahodayaEventsLayout>
+</template>
+
+<script setup>
+import { computed, ref } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
+import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+
+const props = defineProps({
+    sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
+    event: Object, rows: Array, schoolSummaries: Array, totals: Object,
+    schools: Object, filterSchoolId: { type: String, default: '' },
+    feesUrl: String, activityLogs: { type: Array, default: () => [] },
+});
+
+const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/registration-register`;
+const schoolFilter = ref(props.filterSchoolId || '');
+
+const exportUrl = computed(() => {
+    const q = schoolFilter.value ? `?school_id=${schoolFilter.value}` : '';
+    return `${base}/export${q}`;
+});
+
+function applyFilter() {
+    router.get(base, schoolFilter.value ? { school_id: schoolFilter.value } : {}, {
+        preserveScroll: true,
+        preserveState: true,
+    });
+}
+
+function feeStatusClass(status) {
+    return {
+        approved: 'bg-emerald-100 text-emerald-800',
+        proof_uploaded: 'bg-amber-100 text-amber-800',
+        rejected: 'bg-red-100 text-red-700',
+        pending: 'bg-slate-100 text-slate-600',
+    }[status] ?? 'bg-slate-100 text-slate-600';
+}
+</script>

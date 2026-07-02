@@ -213,7 +213,7 @@ class MembershipRegistrationTest extends TestCase
         $this->assertStringContainsString('UPI: knr-sahodaya@upi', $profile->paymentDetailsText());
     }
 
-    public function test_submission_student_image_upload_stores_on_s3(): void
+    public function test_student_photo_upload_stores_on_s3(): void
     {
         Storage::fake('s3');
         Storage::fake('shared');
@@ -221,10 +221,6 @@ class MembershipRegistrationTest extends TestCase
 
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
         ['school' => $school] = $this->cluster();
-
-        SahodayaProfile::where('tenant_id', $school->parent_id)->update([
-            'student_data_mode' => 'full_records',
-        ]);
 
         app(\App\Services\Students\SchoolClassProvisioner::class)->ensureForSchool($school);
         $class = \App\Models\SchoolClass::where('tenant_id', $school->id)->firstOrFail();
@@ -235,24 +231,27 @@ class MembershipRegistrationTest extends TestCase
         ]);
         $admin->assignRole('school_admin');
 
-        app(RegistrationStatusService::class)->beginAnnualRegistration($school->fresh());
+        $student = \App\Models\Student::create([
+            'tenant_id'       => $school->id,
+            'school_class_id' => $class->id,
+            'name'            => 'Photo Student',
+            'status'          => 'active',
+        ]);
 
-        $file = UploadedFile::fake()->image('submission-student.jpg');
+        $file = UploadedFile::fake()->image('student.jpg');
 
         $this->actingAs($admin)
-            ->post("/school-admin/{$school->id}/registration/students", [
-                'name'            => 'Submission Student',
-                'school_class_id' => $class->id,
-                'image'           => $file,
+            ->post("/school-admin/{$school->id}/students/{$student->id}/photo", [
+                'photo' => $file,
             ])
             ->assertRedirect();
 
-        $student = \App\Models\SubmissionStudent::firstOrFail();
-        $this->assertNotNull($student->image_path);
-        Storage::disk('s3')->assertExists($student->image_path);
+        $student->refresh();
+        $this->assertNotNull($student->photo);
+        Storage::disk('s3')->assertExists($student->photo);
 
         $this->actingAs($admin)
-            ->get("/school-admin/{$school->id}/registration/students/{$student->id}/image")
+            ->get("/school-admin/{$school->id}/students/{$student->id}/photo")
             ->assertOk();
     }
 }

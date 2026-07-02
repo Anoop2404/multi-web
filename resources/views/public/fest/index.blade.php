@@ -11,7 +11,10 @@
             <p class="text-sm text-gray-500">{{ $event->event_start?->format('d M Y') }} · {{ ucfirst(str_replace('_', ' ', $event->status)) }}</p>
         </a>
         @empty
-        <p class="text-gray-400">No public festivals at this time.</p>
+        <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+            <p class="text-gray-600 font-medium">No festivals are public yet</p>
+            <p class="text-sm text-gray-400 mt-2">Published schedules and results will appear here when your Sahodaya opens the fest portal.</p>
+        </div>
         @endforelse
     </div>
 </section>

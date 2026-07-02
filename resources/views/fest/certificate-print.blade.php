@@ -32,18 +32,29 @@
     </div>
     <div class="cert">
         <div class="inner">
-            <p class="org">Certificate of Achievement</p>
+            <p class="org">{{ ($recordBreak ?? null) ? 'Record Break Achievement' : 'Certificate of Achievement' }}</p>
             <h1>{{ $event?->title ?? 'Kalotsav' }}</h1>
             <p class="subtitle">{{ $item?->title ?? '' }}</p>
             <p class="detail">This is to certify that</p>
             <p class="name">{{ $student?->name ?? 'Participant' }}</p>
-            @if($mark?->position)
+            @if($recordBreak)
+            <p class="position">{{ $recordBreak->prize_label }}</p>
+            <p class="detail">
+                Broke the standing record:
+                <strong>{{ $recordBreak->previous_value }}</strong> →
+                <strong>{{ $recordBreak->new_value }} {{ $recordBreak->record_unit }}</strong>
+            </p>
+            @elseif($mark?->position)
             <p class="position">Position #{{ $mark->position }}</p>
             @endif
             @if($mark?->grade)
             <p class="detail">Grade: <strong>{{ $mark->grade }}</strong></p>
             @endif
+            @if($recordBreak)
+            <p class="detail">has achieved this athletic record distinction.</p>
+            @else
             <p class="detail">has participated and achieved this distinction.</p>
+            @endif
         </div>
         <div class="meta">
             <span>ID: {{ $certificate->verification_uuid }}</span>

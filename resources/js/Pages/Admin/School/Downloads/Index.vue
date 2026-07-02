@@ -1,46 +1,50 @@
 <template>
-    <SchoolAdminLayout title="Downloads" :school="school">
+    <SchoolAdminLayout title="Downloads" :school="school" :show-header-title="false">
+        <PageHeader title="Downloads" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="space-y-6">
             <!-- Upload form -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="card">
                 <h3 class="font-bold text-gray-800 mb-4">Upload New File</h3>
                 <form @submit.prevent="upload" class="space-y-4">
                     <div class="grid sm:grid-cols-3 gap-4">
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">File Title *</label>
+                            <label class="form-label mb-1.5">File Title *</label>
                             <input v-model="form.title" type="text" required
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Category *</label>
+                            <label class="form-label mb-1.5">Category *</label>
                             <select v-model="form.category" required
-                                    class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white">
+                                    class="field">
                                 <option v-for="c in categories" :key="c.value" :value="c.value">{{ c.label }}</option>
                             </select>
                         </div>
                     </div>
                     <div class="grid sm:grid-cols-2 gap-4 items-end">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Academic Year</label>
+                            <label class="form-label mb-1.5">Academic Year</label>
                             <input v-model="form.academic_year" type="text" placeholder="2025-26"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">File (PDF / DOC / XLS) *</label>
+                            <label class="form-label mb-1.5">File (PDF / DOC / XLS) *</label>
                             <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" required
                                    @change="form.file = $event.target.files[0]"
                                    class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
                         </div>
                     </div>
                     <button type="submit" :disabled="form.processing"
-                            class="bg-purple-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-purple-700 transition disabled:opacity-50">
+                            class="btn-primary px-6 py-2.5 rounded-lg text-sm font-semibold transition disabled:opacity-50">
                         Upload File
                     </button>
                 </form>
             </div>
 
             <!-- Files list -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="card card--flush">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b border-gray-100">
                         <tr>

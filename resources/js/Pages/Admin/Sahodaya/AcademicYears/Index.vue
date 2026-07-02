@@ -3,6 +3,12 @@
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
                          :pendingPaymentsCount="pendingPaymentsCount">
+        <PageHeader
+            title="Academic years"
+            eyebrow="Membership"
+            description="Manage academic and financial year lifecycle. The active year scopes registrations, fees, and reports."
+        />
+
         <div class="max-w-4xl space-y-6">
 
             <!-- Info banner -->
@@ -11,7 +17,7 @@
                 <p class="text-xs text-blue-700/80">
                     The active academic year controls which year all new registrations, event entries,
                     and exam registrations are scoped to. Only one year can be active at a time.
-                    The active year also syncs with the "Active Academic Year" field in Membership Settings.
+                    Fest events can be assigned a specific academic year — schools may only register students enrolled in that year.
                 </p>
             </div>
 
@@ -53,7 +59,7 @@
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-semibold text-gray-900">Academic Years</h3>
                     <button @click="showAyForm = !showAyForm"
-                            class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                            class="btn-primary">
                         + Add Year
                     </button>
                 </div>
@@ -110,7 +116,7 @@
                         <div class="flex gap-2 shrink-0">
                             <button v-if="ay.status === 'upcoming'"
                                     @click="activateYear(ay)"
-                                    class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition">
+                                    class="btn-primary text-xs px-3 py-1.5 rounded-lg font-medium transition">
                                 Activate
                             </button>
                             <button v-if="ay.status === 'active'"
@@ -128,7 +134,7 @@
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-semibold text-gray-900">Financial Years</h3>
                     <button @click="showFyForm = !showFyForm"
-                            class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                            class="btn-primary">
                         + Add Year
                     </button>
                 </div>

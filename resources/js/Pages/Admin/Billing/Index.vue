@@ -43,7 +43,7 @@
                                 View Receipt
                             </a>
                             <button @click="approveReceipt(r)"
-                                    class="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition">
+                                    class="btn-primary text-xs px-3 py-1.5 rounded-lg font-medium transition">
                                 Approve
                             </button>
                             <button @click="openRejectModal(r)"
@@ -60,7 +60,7 @@
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="font-semibold text-gray-900">Tenant Subscriptions</h3>
                     <button @click="showSubForm = !showSubForm"
-                            class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                            class="btn-primary">
                         + Add / Update
                     </button>
                 </div>
@@ -128,7 +128,7 @@
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="font-semibold text-gray-900">Subscription Plans</h3>
                     <button @click="showPlanForm = !showPlanForm"
-                            class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                            class="btn-primary">
                         + Add Plan
                     </button>
                 </div>

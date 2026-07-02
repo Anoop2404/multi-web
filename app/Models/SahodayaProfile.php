@@ -11,11 +11,12 @@ class SahodayaProfile extends Model
         'tenant_id', 'slug', 'prefix', 'cbse_region', 'address',
         'contact_email', 'contact_phone',
         'student_data_mode', 'membership_fee_type', 'fixed_membership_fee_amount',
-        'teacher_registration_enabled', 'payment_instructions', 'prefixes_locked',
+        'teacher_registration_enabled', 'student_edit_lock_enabled', 'student_edit_lock_at', 'payment_instructions', 'prefixes_locked',
         'payment_bank_name', 'payment_account_no', 'payment_ifsc', 'payment_upi',
-        'application_form_config', 'active_academic_year',
+        'application_form_config', 'active_academic_year', 'fest_class_group_scheme',
+        'receipt_template_json', 'receipt_next_number',
         'mail_host', 'mail_port', 'mail_encryption', 'mail_username', 'mail_password',
-        'mail_from_address', 'mail_from_name',
+        'mail_from_address', 'mail_from_name', 'mail_transport', 'zeptomail_region',
     ];
 
     protected $hidden = [
@@ -25,8 +26,11 @@ class SahodayaProfile extends Model
     protected $casts = [
         'fixed_membership_fee_amount'  => 'decimal:2',
         'teacher_registration_enabled' => 'boolean',
+        'student_edit_lock_enabled'    => 'boolean',
+        'student_edit_lock_at'         => 'datetime',
         'prefixes_locked'              => 'boolean',
         'application_form_config'      => 'array',
+        'receipt_template_json'        => 'array',
         'mail_password'                => 'encrypted',
         'mail_port'                    => 'integer',
     ];
@@ -58,7 +62,20 @@ class SahodayaProfile extends Model
 
     public function mailIsConfigured(): bool
     {
-        return filled($this->mail_username) && filled($this->mail_password);
+        if (! filled($this->mail_password)) {
+            return false;
+        }
+
+        if ($this->usesZeptoMailApi()) {
+            return filled($this->mail_from_address);
+        }
+
+        return filled($this->mail_username);
+    }
+
+    public function usesZeptoMailApi(): bool
+    {
+        return ($this->mail_transport ?? 'zeptomail_api') === 'zeptomail_api';
     }
 
     /** Formatted payment details for schools (payment step). */

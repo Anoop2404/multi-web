@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Support\PersistDefaults;
 use App\Models\BoardResult;
 use App\Models\Topper;
 use Illuminate\Http\Request;
@@ -32,6 +33,10 @@ class BoardResultController extends SchoolAdminController
         ]);
 
         $data['tenant_id'] = $this->school->id;
+        $data = PersistDefaults::coalesce($data, [
+            'distinctions' => 0,
+            'first_class'  => 0,
+        ]);
 
         $result = BoardResult::updateOrCreate(
             ['tenant_id' => $this->school->id, 'class' => $data['class'], 'academic_year' => $data['academic_year']],
@@ -75,6 +80,9 @@ class BoardResultController extends SchoolAdminController
 
         $data['board_result_id'] = $boardResult->id;
         $data['tenant_id']       = $this->school->id;
+        $data = PersistDefaults::coalesce($data, [
+            'rank' => 1,
+        ]);
 
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store(

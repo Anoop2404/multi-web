@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\Teacher;
-use App\Models\User;
 use App\Support\AcademicYear;
+use App\Support\TenantStorage;
+use App\Services\Portal\TeacherPortalProvisioner;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Role;
 
 class TeacherController extends SchoolAdminController
 {
@@ -15,7 +14,11 @@ class TeacherController extends SchoolAdminController
     {
         $teachers = Teacher::where('tenant_id', $this->school->id)
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(fn (Teacher $t) => [
+                ...$t->only('id', 'name', 'email', 'designation', 'user_id'),
+                'photo_url' => $t->photoUrl(),
+            ]);
 
         return $this->inertia('School/Teachers/Index', compact('teachers'));
     }
@@ -31,8 +34,7 @@ class TeacherController extends SchoolAdminController
             'password'     => 'nullable|string|min:8',
         ]);
 
-        $yearId = \App\Models\AcademicYearRecord::where('tenant_id', $this->school->parent_id)
-            ->where('is_active', true)->value('id');
+        $yearId = AcademicYear::activeId();
 
         $teacher = Teacher::create([
             'tenant_id'        => $this->school->id,
@@ -45,15 +47,11 @@ class TeacherController extends SchoolAdminController
         ]);
 
         if ($request->boolean('create_login') && ! empty($data['email']) && ! empty($data['password'])) {
-            $user = User::create([
-                'name'      => $data['name'],
-                'email'     => strtolower($data['email']),
-                'password'  => Hash::make($data['password']),
-                'tenant_id' => $this->school->id,
-            ]);
-            Role::findByName('teacher', 'web');
-            $user->assignRole('teacher');
-            $teacher->update(['user_id' => $user->id]);
+            app(TeacherPortalProvisioner::class)->provision(
+                $teacher,
+                $data['email'],
+                $data['password']
+            );
         }
 
         return back()->with('success', 'Teacher added.');
@@ -65,5 +63,32 @@ class TeacherController extends SchoolAdminController
         $teacher->delete();
 
         return back()->with('success', 'Teacher removed.');
+    }
+
+    public function showPhoto(string $tenantId, Teacher $teacher)
+    {
+        abort_if($teacher->tenant_id !== $this->school->id, 403);
+        abort_unless($teacher->photo, 404);
+
+        try {
+            return TenantStorage::downloadResponse($this->school, $teacher->photo);
+        } catch (\Throwable) {
+            abort(404, 'Photo not found.');
+        }
+    }
+
+    public function updatePhoto(Request $request, string $tenantId, Teacher $teacher)
+    {
+        abort_if($teacher->tenant_id !== $this->school->id, 403);
+
+        $request->validate([
+            'photo' => 'required|image|max:2048',
+        ]);
+
+        $teacher->update([
+            'photo' => TenantStorage::storeTeacherPhoto($request->file('photo'), $this->school->id),
+        ]);
+
+        return back()->with('success', 'Teacher photo updated.');
     }
 }

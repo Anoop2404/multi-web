@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\FestPageActivity;
 use App\Models\FestEvent;
 use App\Models\FestHouse;
 use App\Models\FestHouseSchool;
 use App\Models\Tenant;
 use App\Services\Events\EventContext;
+use App\Services\Audit\PlatformAuditLogger;
 use Illuminate\Http\Request;
 
 class FestHouseController extends SahodayaAdminController
@@ -28,16 +30,16 @@ class FestHouseController extends SahodayaAdminController
 
         $assignedSchoolIds = FestHouseSchool::where('event_id', $event->id)->pluck('school_id');
 
-        return $this->inertia('Sahodaya/Events/Houses', [
+        return $this->inertia('Sahodaya/Events/Houses', $this->withEventActivity($event, FestPageActivity::HOUSES, [
             'event'           => $event,
             'houses'          => $houses,
             'schools'         => $schools,
             'houseScoreboard' => EventContext::for($event)->scoreboardByHouse(),
             'assignedSchoolIds' => $assignedSchoolIds,
-        ]);
+        ]));
     }
 
-    public function storeHouse(Request $request, string $tenantId, FestEvent $event)
+    public function storeHouse(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
@@ -52,10 +54,12 @@ class FestHouseController extends SahodayaAdminController
             'sort_order' => (FestHouse::where('event_id', $event->id)->max('sort_order') ?? 0) + 1,
         ]));
 
+        $audit->festEvent($event, FestPageActivity::HOUSES, 'fest.house.created', "House created: {$data['name']}");
+
         return back()->with('success', 'House created.');
     }
 
-    public function assignSchool(Request $request, string $tenantId, FestEvent $event, FestHouse $house)
+    public function assignSchool(Request $request, string $tenantId, FestEvent $event, FestHouse $house, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($house->event_id !== $event->id, 403);
@@ -69,14 +73,22 @@ class FestHouseController extends SahodayaAdminController
             ['house_id' => $house->id]
         );
 
+        $audit->festEvent($event, FestPageActivity::HOUSES, 'fest.house.school_assigned', 'School assigned to house', [
+            'house_id'  => $house->id,
+            'school_id' => $data['school_id'],
+        ]);
+
         return back()->with('success', 'School assigned to house.');
     }
 
-    public function destroyHouse(string $tenantId, FestEvent $event, FestHouse $house)
+    public function destroyHouse(string $tenantId, FestEvent $event, FestHouse $house, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($house->event_id !== $event->id, 403);
+        $name = $house->name;
         $house->delete();
+
+        $audit->festEvent($event, FestPageActivity::HOUSES, 'fest.house.deleted', "House removed: {$name}");
 
         return back()->with('success', 'House removed.');
     }

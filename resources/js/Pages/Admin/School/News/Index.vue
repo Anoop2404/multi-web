@@ -1,15 +1,19 @@
 <template>
-    <SchoolAdminLayout title="News Articles" :school="school">
+    <SchoolAdminLayout title="News Articles" :school="school" :show-header-title="false">
+        <PageHeader title="News Articles" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <p class="text-sm text-gray-500">{{ articles.total }} articles</p>
                 <Link :href="`/school-admin/${school.id}/news/create`"
-                      class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition">
+                      class="btn-primary">
                     + New Article
                 </Link>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="card card--flush">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b border-gray-100">
                         <tr>

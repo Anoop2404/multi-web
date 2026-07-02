@@ -1,5 +1,9 @@
 <template>
-    <SchoolAdminLayout title="School Code" :school="school">
+    <SchoolAdminLayout title="School Code" :school="school" :show-header-title="false">
+        <PageHeader title="School Code" eyebrow="Students"
+            description="Student records, teachers, and portal access." />
+
+
         <div class="max-w-2xl space-y-6">
             <div class="bg-blue-50 border border-blue-100 rounded-xl p-5 text-sm text-blue-900 space-y-2">
                 <p class="font-semibold">What is the school code?</p>
@@ -26,7 +30,7 @@
 
                 <form v-else @submit.prevent="submit" class="space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">School code *</label>
+                        <label class="form-label mb-1.5">School code *</label>
                         <input v-model="form.school_prefix" type="text" required maxlength="10"
                                class="w-full max-w-xs border border-gray-200 rounded-lg px-4 py-2.5 text-sm font-mono uppercase focus:outline-none focus:ring-2"
                                placeholder="AMU"
@@ -44,7 +48,7 @@
 
                     <div class="flex items-center gap-3 pt-2">
                         <button type="submit" :disabled="form.processing"
-                                class="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                                class="btn-primary disabled:opacity-50">
                             Save school code
                         </button>
                         <Link v-if="schoolCode" :href="`/school-admin/${school.id}`" class="text-sm text-gray-500 hover:text-gray-700">

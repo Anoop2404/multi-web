@@ -1,12 +1,14 @@
 <template>
-    <SahodayaAdminLayout :title="`${event.title} — Catering`" :sahodaya="sahodaya" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount">
+    <SahodayaEventsLayout :title="`${event.title} — Catering`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <PageHeader :title="`${event.title} — Catering`" eyebrow="Operations"
+                    description="Manage catering orders from schools." />
         <div class="grid grid-cols-3 gap-3 mb-4 text-center text-sm">
             <div class="bg-white border rounded-xl p-3"><p class="text-xl font-bold">{{ summary.total_heads }}</p><p class="text-gray-500 text-xs">Total meals</p></div>
             <div class="bg-white border rounded-xl p-3"><p class="text-xl font-bold text-green-700">{{ summary.confirmed }}</p><p class="text-gray-500 text-xs">Confirmed</p></div>
             <div class="bg-white border rounded-xl p-3"><p class="text-xl font-bold text-amber-600">{{ summary.requested }}</p><p class="text-gray-500 text-xs">Pending</p></div>
         </div>
-        <div class="bg-white border rounded-xl overflow-hidden">
+        <div class="card card--flush">
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left">
                     <tr><th class="p-3">School</th><th class="p-3">Date</th><th class="p-3">Meal</th><th class="p-3">Heads</th><th class="p-3">Status</th><th class="p-3"></th></tr>
@@ -26,16 +28,19 @@
                 </tbody>
             </table>
         </div>
-    </SahodayaAdminLayout>
+            <EventPageActivityLog :logs="activityLogs" class="mt-8" />
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
 import { router } from '@inertiajs/vue3';
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, orders: Array, schools: Object, summary: Object,
+    activityLogs: { type: Array, default: () => [] },
 });
 
 function setStatus(id, status) {

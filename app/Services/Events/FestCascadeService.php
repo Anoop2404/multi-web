@@ -7,14 +7,28 @@ use App\Models\FestEventItem;
 
 class FestCascadeService
 {
-    public function spawnChildEvent(FestEvent $parent, string $title): FestEvent
+    public function spawnChildEvent(FestEvent $parent, string $title, array $overrides = []): FestEvent
     {
-        $child = FestEvent::create([
+        $levelRound = $overrides['level_round'] ?? $parent->level_round ?? 'sahodaya';
+
+        if (! isset($overrides['fee_type'])) {
+            $fee = $levelRound === 'school'
+                ? app(FestEventFeeResolver::class)->resolveSchoolRoundFromParent($parent)
+                : app(FestEventFeeResolver::class)->resolveForEvent($parent);
+
+            $overrides['fee_type'] = $fee['fee_type'];
+            $overrides['fee_amount'] = $fee['fee_amount'];
+        }
+
+        $child = FestEvent::create(array_merge([
             'tenant_id'          => $parent->tenant_id,
             'academic_year_id'   => $parent->academic_year_id,
             'title'              => $title,
             'event_type'         => $parent->event_type,
             'conductor_level'    => $parent->conductor_level,
+            'conduct_levels'     => $parent->conduct_levels ?? ['sahodaya'],
+            'level_round'        => $parent->level_round ?? 'sahodaya',
+            'state_program_id'   => $parent->state_program_id,
             'is_cascaded'        => true,
             'parent_event_id'    => $parent->id,
             'registration_open'  => $parent->registration_open,
@@ -22,27 +36,14 @@ class FestCascadeService
             'event_start'        => $parent->event_start,
             'event_end'          => $parent->event_end,
             'venue'              => $parent->venue,
-            'fee_type'           => $parent->fee_type,
-            'fee_amount'         => $parent->fee_amount,
+            'fee_type'           => $overrides['fee_type'] ?? $parent->fee_type,
+            'fee_amount'         => $overrides['fee_amount'] ?? $parent->fee_amount,
             'status'             => 'draft',
             'description'        => "Cascaded from {$parent->title}",
-        ]);
+        ], $overrides));
 
-        foreach ($parent->items as $item) {
-            FestEventItem::create([
-                'event_id'         => $child->id,
-                'title'            => $item->title,
-                'category'         => $item->category,
-                'participant_type' => $item->participant_type,
-                'gender'           => $item->gender,
-                'class_group'      => $item->class_group,
-                'max_per_school'   => $item->max_per_school,
-                'min_group_size'   => $item->min_group_size,
-                'max_group_size'   => $item->max_group_size,
-                'qualify_count'    => $item->qualify_count,
-                'display_order'    => $item->display_order,
-            ]);
-        }
+        $parent->loadMissing('items');
+        app(FestItemSyncService::class)->copyAllItemsToChild($parent, $child);
 
         return $child;
     }

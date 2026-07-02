@@ -2,7 +2,7 @@
     <AdminLayout title="Widgets Configuration">
         <div class="max-w-3xl space-y-6">
             <!-- Tenant selector -->
-            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+            <div class="card flex items-center gap-4">
                 <label class="text-sm font-semibold text-gray-600 shrink-0">Tenant:</label>
                 <select v-model="selectedTenantId" @change="loadWidgets"
                         class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2">
@@ -22,9 +22,9 @@
                         </label>
                     </div>
                     <div v-if="widgets.whatsapp_enabled">
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">WhatsApp Number (with country code)</label>
+                        <label class="form-label mb-1.5">WhatsApp Number (with country code)</label>
                         <input v-model="widgets.whatsapp_number" placeholder="+919876543210"
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                               class="field">
                     </div>
                 </div>
 
@@ -39,14 +39,14 @@
                     </div>
                     <div v-if="widgets.topbar.show" class="grid sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Phone</label>
+                            <label class="form-label mb-1.5">Phone</label>
                             <input v-model="widgets.topbar.phone" placeholder="+91 484 123 4567"
-                                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
+                            <label class="form-label mb-1.5">Email</label>
                             <input v-model="widgets.topbar.email" placeholder="info@school.edu.in"
-                                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                     </div>
 
@@ -56,7 +56,7 @@
                             <div v-for="platform in ['facebook','youtube','instagram','twitter','linkedin']" :key="platform">
                                 <label class="block text-xs text-gray-500 mb-1 capitalize">{{ platform }}</label>
                                 <input v-model="widgets.social_links[platform]" :placeholder="`https://www.${platform}.com/yourpage`"
-                                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 font-mono">
+                                       class="field text-xs font-mono">
                             </div>
                         </div>
                     </div>
@@ -73,21 +73,21 @@
                     </div>
                     <div v-if="widgets.admission_banner.show" class="space-y-3">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Banner Message</label>
+                            <label class="form-label mb-1.5">Banner Message</label>
                             <input v-model="widgets.admission_banner.message"
                                    placeholder="Admissions open for 2025-26! Limited seats available."
-                                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div class="grid sm:grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Link Text</label>
+                                <label class="form-label mb-1.5">Link Text</label>
                                 <input v-model="widgets.admission_banner.link_text" placeholder="Apply Now"
-                                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                                       class="field">
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1.5">Link URL</label>
+                                <label class="form-label mb-1.5">Link URL</label>
                                 <input v-model="widgets.admission_banner.link_url" placeholder="/admissions"
-                                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 font-mono">
+                                       class="field font-mono">
                             </div>
                         </div>
                     </div>
@@ -116,13 +116,13 @@
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" v-model="widgets.cbse_badge_show" class="sr-only peer">
-                            <div class="w-10 h-6 bg-gray-200 peer-checked:bg-blue-600 rounded-full transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></div>
+                            <div class="w-10 h-6 bg-gray-200 peer-checked:bg-[#041525] rounded-full transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></div>
                         </label>
                     </div>
                     <div v-if="widgets.cbse_badge_show">
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Affiliation Number</label>
+                        <label class="form-label mb-1.5">Affiliation Number</label>
                         <input v-model="widgets.cbse_affiliation_number" placeholder="930123"
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                               class="field">
                     </div>
                 </div>
 
@@ -156,7 +156,7 @@
 
                 <div class="flex items-center gap-3">
                     <button @click="saveWidgets"
-                            class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition">
+                            class="btn-primary text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition">
                         Save Widgets
                     </button>
                     <span v-if="saved" class="text-sm text-green-600 font-medium">✓ Saved!</span>

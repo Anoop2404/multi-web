@@ -10,6 +10,8 @@ class PortalNavLinks
 
     public const LOGIN_URL = '/login';
 
+    public const SCHOOL_LOGIN_URL = '/school-login';
+
     /** @return array<string, mixed> */
     public static function portalCtaDefaults(): array
     {
@@ -20,8 +22,10 @@ class PortalNavLinks
             'portal_url'        => self::PORTAL_URL,
             'register_label'    => 'School Registration',
             'register_url'      => self::REGISTER_URL,
-            'login_label'       => 'Admin Login',
-            'login_url'         => self::LOGIN_URL,
+            'login_label'       => 'School Login',
+            'login_url'         => self::SCHOOL_LOGIN_URL,
+            'admin_login_label' => 'Sahodaya Admin Login',
+            'admin_login_url'   => self::LOGIN_URL,
         ];
     }
 
@@ -45,7 +49,7 @@ class PortalNavLinks
     {
         $defaults = [
             ['label' => 'School Registration', 'url' => self::REGISTER_URL, 'external' => false, 'children' => []],
-            ['label' => 'School Login', 'url' => self::LOGIN_URL, 'external' => false, 'children' => []],
+            ['label' => 'School Login', 'url' => self::SCHOOL_LOGIN_URL, 'external' => false, 'children' => []],
         ];
 
         foreach ($defaults as $link) {
@@ -79,7 +83,7 @@ class PortalNavLinks
 
         foreach ([
             ['label' => 'School Registration', 'url' => self::REGISTER_URL],
-            ['label' => 'School Login', 'url' => self::LOGIN_URL],
+            ['label' => 'School Login', 'url' => self::SCHOOL_LOGIN_URL],
         ] as $link) {
             $exists = collect($links)->contains(fn ($l) => ($l['url'] ?? '') === $link['url']);
             if (! $exists) {

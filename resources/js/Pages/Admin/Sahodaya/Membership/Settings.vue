@@ -3,9 +3,15 @@
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
                          :pendingPaymentsCount="pendingPaymentsCount">
+        <PageHeader
+            title="Membership Settings"
+            eyebrow="Configuration"
+            description="Manage Sahodaya identity, registration windows, fees, class master, and payment details. Each tab saves independently."
+        />
+
         <div class="max-w-3xl space-y-5">
             <!-- Quick guide -->
-            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900">
+            <div class="card card--accent text-sm text-indigo-900">
                 <p class="font-semibold mb-2">Where to change things</p>
                 <p class="text-xs text-indigo-700/80 mb-2">Each tab has its own <strong>Save</strong> button — changes are not shared across tabs until you save that section.</p>
                 <ul class="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-indigo-800/90 text-xs">
@@ -17,11 +23,12 @@
             </div>
 
             <!-- Tab bar -->
-            <div class="flex border-b border-gray-200 gap-1">
+            <div class="flex flex-wrap gap-1 border-b border-slate-200/90 pb-px">
                 <button v-for="t in tabs" :key="t.key"
+                        type="button"
                         @click="activeTab = t.key"
-                        :class="['px-4 py-2.5 text-sm font-semibold border-b-2 transition',
-                                 activeTab === t.key ? 'border-[#1e1b4b] text-[#1e1b4b]' : 'border-transparent text-gray-500 hover:text-gray-700']">
+                        :class="['rounded-t-xl px-4 py-2.5 text-sm font-semibold transition -mb-px border-b-2',
+                                 activeTab === t.key ? 'border-[#041525] bg-white text-[#041525] shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800']">
                     {{ t.label }}
                 </button>
             </div>
@@ -132,11 +139,46 @@
                     </FormGrid>
                 </FormSection>
 
-                <div class="flex">
+                <FormSection title="Student record lock" hint="After the lock time (or when toggled on), schools cannot edit students directly — they must submit change requests for your approval.">
+                    <FormGrid>
+                        <FormField label="">
+                            <label class="flex items-center gap-3 cursor-pointer mt-2">
+                                <input v-model="profileForm.student_edit_lock_enabled" type="checkbox"
+                                       class="w-4 h-4 text-purple-600 rounded">
+                                <span class="text-sm font-medium text-gray-700">Lock student edits now (manual)</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1">When checked, all member schools are locked immediately regardless of the date below.</p>
+                        </FormField>
+                        <FormField label="Auto-lock after date & time">
+                            <input v-model="profileForm.student_edit_lock_at" type="datetime-local" class="field">
+                            <p class="text-xs text-gray-500 mt-1">Schools can edit freely until this moment, then must request changes.</p>
+                        </FormField>
+                    </FormGrid>
+                    <p class="text-xs text-gray-500">
+                        <Link :href="`/sahodaya-admin/${sahodaya.id}/student-change-requests`" class="link-brand font-semibold">
+                            Review pending change requests →
+                        </Link>
+                    </p>
+                </FormSection>
+
+                <FormSection title="Fest class categories" hint="Default age-category labels for Kalotsav / Sports item fees across events.">
+                    <FormGrid>
+                        <FormField label="Class category scheme" class-extra="sm:col-span-2">
+                            <select v-model="profileForm.fest_class_group_scheme" class="field">
+                                <option v-for="(label, key) in classGroupSchemeOptions" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">
+                                CBSE Kerala uses Category I–IV (classes III–XII). Sahodaya standard uses LP–HSS (classes I–XII).
+                            </p>
+                        </FormField>
+                    </FormGrid>
+                </FormSection>
+
+                <FormActions>
                     <button type="submit" :disabled="profileForm.processing" class="btn-primary">
-                        Save Profile & Rules
+                        {{ profileForm.processing ? 'Saving…' : 'Save profile & rules' }}
                     </button>
-                </div>
+                </FormActions>
             </form>
 
             <!-- Tab: Payment Details -->
@@ -178,42 +220,32 @@
                 </div>
             </form>
 
-            <!-- Tab: Zoho Email -->
+            <!-- Tab: ZeptoMail API -->
             <form v-show="activeTab === 'email'" @submit.prevent="saveMailSettings" class="space-y-5">
-                <FormSection title="Zoho Mail (SMTP)"
-                             hint="Each Sahodaya sends membership emails from its own Zoho or ZeptoMail account. Leave password blank to keep the current one.">
+                <FormSection title="ZeptoMail API"
+                             hint="Uses the HTTP API (not SMTP) so you avoid ZeptoMail’s ~100 emails/day SMTP cap. Each Sahodaya uses its own token and verified domain. Leave token blank to keep the current one.">
                     <p v-if="profile.mail_configured"
                        class="text-xs font-semibold text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
-                        Zoho SMTP is configured for this Sahodaya.
+                        ZeptoMail API is configured for this Sahodaya.
                     </p>
                     <p v-else
                        class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                         Not configured — emails fall back to the platform default mail settings.
                     </p>
                     <FormGrid>
-                        <FormField label="SMTP Host" hint="ZeptoMail: smtp.zeptomail.in · Zoho India: smtp.zoho.in · Global: smtp.zoho.com">
-                            <input v-model="mailForm.mail_host" class="field" placeholder="smtp.zeptomail.in">
-                        </FormField>
-                        <FormField label="Port">
-                            <input v-model.number="mailForm.mail_port" type="number" class="field" placeholder="587">
-                        </FormField>
-                        <FormField label="Encryption">
-                            <select v-model="mailForm.mail_encryption" class="field">
-                                <option value="tls">TLS (587)</option>
-                                <option value="ssl">SSL (465)</option>
+                        <FormField label="ZeptoMail region">
+                            <select v-model="mailForm.zeptomail_region" class="field">
+                                <option value="in">India (api.zeptomail.in)</option>
+                                <option value="com">Global (api.zeptomail.com)</option>
+                                <option value="eu">EU (api.zeptomail.eu)</option>
                             </select>
                         </FormField>
-                        <FormField label="SMTP Username"
-                                   hint="ZeptoMail: use emailapikey · Zoho Mail: your full email address">
-                            <input v-model="mailForm.mail_username" type="text" class="field"
-                                   placeholder="emailapikey or office@yourdomain.com" autocomplete="off">
-                        </FormField>
-                        <FormField label="SMTP Password / Token"
-                                   hint="ZeptoMail Send Mail token, or Zoho app-specific password. Required on first save.">
+                        <FormField label="ZeptoMail API token" class-extra="sm:col-span-2"
+                                   hint="ZeptoMail → SMTP/API → Send Mail token. Paste the full Zoho-enczapikey … value.">
                             <input v-model="mailForm.mail_password" type="password" class="field" autocomplete="new-password">
                         </FormField>
-                        <FormField label="From Address" hint="Sender address shown to recipients (required for ZeptoMail)">
-                            <input v-model="mailForm.mail_from_address" type="email" class="field">
+                        <FormField label="From Address" hint="Verified domain address, e.g. noreply@vadakarasahodaya.in" required>
+                            <input v-model="mailForm.mail_from_address" type="email" class="field" required>
                         </FormField>
                         <FormField label="From Name" class-extra="sm:col-span-2">
                             <input v-model="mailForm.mail_from_name" class="field" :placeholder="sahodaya.name">
@@ -232,6 +264,63 @@
                     <input v-model="testMailForm.test_email" type="email"
                            placeholder="Test recipient (optional)"
                            class="field max-w-xs">
+                </div>
+            </form>
+
+            <!-- Tab: Receipt Template -->
+            <form v-show="activeTab === 'receipt'" @submit.prevent="saveReceiptTemplate" class="space-y-5">
+                <FormSection title="Membership Fee Receipt"
+                             hint="Official receipt emailed to schools when Sahodaya verifies membership payment. Matches your printed receipt book layout.">
+                    <p class="text-xs text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-3">
+                        Next receipt number: <strong class="font-mono">{{ receiptForm.receipt_next_number }}</strong>
+                        · Placeholders for purpose line:
+                        <span v-for="(ph, i) in receiptPlaceholders" :key="ph" class="font-mono text-[11px]">{{ ph }}<span v-if="i < receiptPlaceholders.length - 1">, </span></span>
+                    </p>
+                    <FormGrid>
+                        <FormField label="Header title" class-extra="sm:col-span-2"
+                                   hint="Leave blank to use Sahodaya name in capitals">
+                            <input v-model="receiptForm.header_title" class="field" placeholder="MALAPPURAM CENTRAL SAHODAYA (MCS)">
+                        </FormField>
+                        <FormField label="Subtitle" class-extra="sm:col-span-2">
+                            <textarea v-model="receiptForm.header_subtitle" rows="2" class="field"></textarea>
+                        </FormField>
+                        <FormField label="Registered office line" class-extra="sm:col-span-2"
+                                   hint="Defaults to office address from Profile tab if empty">
+                            <textarea v-model="receiptForm.registered_office" rows="2" class="field"></textarea>
+                        </FormField>
+                        <FormField label="Purpose template" class-extra="sm:col-span-2">
+                            <input v-model="receiptForm.purpose_template" class="field"
+                                   placeholder="Annual Sahodaya membership fee for {{academic_year}}">
+                        </FormField>
+                        <FormField label="Accent colour">
+                            <input v-model="receiptForm.accent_color" type="color" class="field h-10 p-1">
+                        </FormField>
+                        <FormField label="Next receipt number">
+                            <input v-model.number="receiptForm.receipt_next_number" type="number" min="1" class="field font-mono">
+                        </FormField>
+                        <FormField label="Receiver signature label">
+                            <input v-model="receiptForm.receiver_label" class="field">
+                        </FormField>
+                        <FormField label="Counter signature label">
+                            <input v-model="receiptForm.counter_label" class="field">
+                        </FormField>
+                    </FormGrid>
+                    <div class="flex flex-wrap gap-6 mt-3">
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                            <input type="checkbox" v-model="receiptForm.show_logo" class="w-4 h-4 text-purple-600 rounded">
+                            Show Sahodaya logo on receipt
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                            <input type="checkbox" v-model="receiptForm.auto_email_on_verify" class="w-4 h-4 text-purple-600 rounded">
+                            Email receipt to school when payment is verified
+                        </label>
+                    </div>
+                </FormSection>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="submit" :disabled="receiptForm.processing" class="btn-primary">Save Receipt Template</button>
+                    <a :href="`/sahodaya-admin/${sahodaya.id}/membership/receipt-template/preview`"
+                       target="_blank" rel="noopener"
+                       class="btn-secondary">Preview sample receipt ↗</a>
                 </div>
             </form>
 
@@ -296,25 +385,33 @@
                 <FormSection v-if="feeForm.membership_fee_type === 'variable_by_student_count'"
                              :title="`Fee Slabs — ${academicYear}`"
                              hint="Schools are billed the slab matching their student count.">
-                    <!-- Add slab form -->
-                    <form @submit.prevent="addSlab" class="flex flex-wrap gap-3 items-end mb-4">
+                    <!-- Add slab -->
+                    <div class="mb-4 flex flex-wrap items-end gap-3">
                         <FormField label="Min Students">
-                            <input v-model.number="slabForm.min_students" type="number" min="0" class="field w-24">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="slabForm.min_students" type="number" min="0" class="field w-24">
+                            </template>
                         </FormField>
                         <FormField label="Max Students">
-                            <input v-model.number="slabForm.max_students" type="number" min="0" class="field w-24" placeholder="∞">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="slabForm.max_students" type="number" min="0" class="field w-24" placeholder="∞">
+                            </template>
                         </FormField>
                         <FormField label="Amount (₹)">
-                            <input v-model.number="slabForm.amount" type="number" step="0.01" min="0" class="field w-32">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="slabForm.amount" type="number" step="0.01" min="0" class="field w-32">
+                            </template>
                         </FormField>
                         <FormField label="Due Date">
-                            <input v-model="slabForm.due_date" type="date" class="field w-36">
+                            <template #default="{ id }">
+                                <input :id="id" v-model="slabForm.due_date" type="date" class="field w-36">
+                            </template>
                         </FormField>
-                        <button type="submit" class="btn-secondary mb-0.5">Add Slab</button>
-                    </form>
+                        <button type="button" @click="addSlab" class="btn-secondary mb-0.5">Add Slab</button>
+                    </div>
                     <!-- Slabs table -->
-                    <div v-if="feeSlabs.length" class="border border-gray-100 rounded-xl overflow-hidden">
-                        <table class="w-full text-sm">
+                    <div v-if="feeSlabs.length" class="overflow-hidden rounded-xl border border-slate-100">
+                        <table class="data-table">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="text-left px-4 py-2.5 font-semibold text-gray-600 text-xs">Students</th>
@@ -341,7 +438,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <p v-else class="text-sm text-gray-400 text-center py-4">No slabs defined yet.</p>
+                    <EmptyState v-else title="No fee slabs yet" description="Add slabs above to bill schools by student count." icon="💰" />
                 </FormSection>
 
                 <div class="flex">
@@ -354,29 +451,42 @@
             <!-- Tab: Registration Window -->
             <div v-show="activeTab === 'window'" class="space-y-5">
                 <p class="text-sm text-gray-500">
-                    Registration dates apply to the <strong class="text-gray-700">active academic year</strong>
+                    Student add/edit windows apply to the <strong class="text-gray-700">active academic year</strong>
                     (<span class="font-mono">{{ academicYear }}</span>).
-                    Manage year lifecycle under
-                    <a :href="`/sahodaya-admin/${sahodaya.id}/academic-years`" class="text-purple-700 underline">Academic Years</a>.
                 </p>
-                <FormSection :title="`Registration Window — ${academicYear}`"
-                             hint="Schools can only submit annual registration during this period.">
-                    <form @submit.prevent="saveWindow" class="space-y-4">
-                        <FormGrid>
-                            <FormField label="Opens On">
-                                <input v-model="windowForm.registration_starts_at" type="date" class="field">
-                            </FormField>
-                            <FormField label="Closes On">
-                                <input v-model="windowForm.registration_ends_at" type="date" class="field">
-                            </FormField>
-                        </FormGrid>
-                        <div v-if="windowForm.registration_starts_at && windowForm.registration_ends_at"
-                             class="bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 text-sm text-purple-700 font-medium">
-                            Registration open {{ new Date(windowForm.registration_starts_at).toLocaleDateString('en-IN', {day:'numeric',month:'long'}) }}
-                            to {{ new Date(windowForm.registration_ends_at).toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'}) }}
-                        </div>
-                        <button type="submit" class="btn-primary">Save Window</button>
-                    </form>
+                <FormSection :title="`Membership Registration — ${academicYear}`"
+                             hint="Annual membership registration window.">
+                    <FormGrid>
+                        <FormField label="Opens On">
+                            <input v-model="windowForm.registration_starts_at" type="date" class="field">
+                        </FormField>
+                        <FormField label="Closes On">
+                            <input v-model="windowForm.registration_ends_at" type="date" class="field">
+                        </FormField>
+                    </FormGrid>
+                </FormSection>
+                <FormSection :title="`Student Add Window — ${academicYear}`"
+                             hint="When schools can add new students.">
+                    <FormGrid>
+                        <FormField label="Add opens">
+                            <input v-model="windowForm.add_open" type="datetime-local" class="field">
+                        </FormField>
+                        <FormField label="Add closes">
+                            <input v-model="windowForm.add_close" type="datetime-local" class="field">
+                        </FormField>
+                    </FormGrid>
+                </FormSection>
+                <FormSection :title="`Student Edit Window — ${academicYear}`"
+                             hint="When schools can edit or delete existing students.">
+                    <FormGrid>
+                        <FormField label="Edit opens">
+                            <input v-model="windowForm.edit_open" type="datetime-local" class="field">
+                        </FormField>
+                        <FormField label="Edit closes">
+                            <input v-model="windowForm.edit_close" type="datetime-local" class="field">
+                        </FormField>
+                    </FormGrid>
+                    <button type="button" @click="saveWindow" class="btn-primary mt-4">Save Windows</button>
                 </FormSection>
             </div>
 
@@ -389,8 +499,8 @@
 
                 <FormSection title="Classes"
                              hint="Each row is one class. Schools pick from this list when registering students.">
-                    <div v-if="masterClasses.length" class="border border-gray-100 rounded-xl overflow-hidden">
-                        <table class="w-full text-sm">
+                    <div v-if="masterClasses.length" class="overflow-hidden rounded-xl border border-slate-100">
+                        <table class="data-table">
                             <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                                 <tr>
                                     <th class="text-left px-4 py-2.5 font-semibold w-16">Sort</th>
@@ -435,7 +545,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <p v-else class="text-sm text-gray-400 text-center py-6">No classes yet — add your first class below.</p>
+                    <EmptyState v-else title="No classes yet" description="Add your first class below — all member schools inherit this list." icon="📚" />
 
                     <form @submit.prevent="addClass" class="flex flex-wrap gap-3 items-end mt-4 pt-4 border-t border-gray-100">
                         <FormField label="Sort order" hint="Lower = first in lists">
@@ -492,7 +602,7 @@
                                                    :checked="!hiddenCategoryIds.includes(cat.id)"
                                                    @change="toggleCategory(cat.id, !$event.target.checked)"
                                                    class="sr-only peer">
-                                            <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:bg-purple-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                                            <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-[#041525]/20 rounded-full peer peer-checked:bg-[#041525] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
                                         </label>
                                     </div>
                                 </div>
@@ -572,7 +682,7 @@
                                        :checked="!hiddenTypeIds.includes(t.id)"
                                        @change="toggleType(t.id, !$event.target.checked)"
                                        class="sr-only peer">
-                                <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:bg-purple-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-[#041525]/20 rounded-full peer peer-checked:bg-[#041525] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
                             </label>
                         </div>
                     </div>
@@ -604,8 +714,8 @@
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import { router, useForm } from '@inertiajs/vue3';
-import { ref, computed, defineComponent, h } from 'vue';
+import { Link, router, useForm } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
 
 const props = defineProps({
     sahodaya:                Object,
@@ -630,6 +740,10 @@ const props = defineProps({
     hiddenTypeIds:           { type: Array, default: () => [] },
     applicationFormFields:   { type: Object, default: () => ({}) },
     applicationFormGroups:   { type: Object, default: () => ({}) },
+    receiptTemplate:         { type: Object, default: () => ({}) },
+    receiptPlaceholders:     { type: Array, default: () => [] },
+    receiptNextNumber:       { type: Number, default: 1 },
+    classGroupSchemeOptions: { type: Object, default: () => ({}) },
 });
 
 const activeTab = ref('profile');
@@ -637,7 +751,8 @@ const activeTab = ref('profile');
 const tabs = [
     { key: 'profile',    label: 'Profile & Rules' },
     { key: 'payment',    label: 'Payment Details' },
-    { key: 'email',      label: 'Zoho Email' },
+    { key: 'email',      label: 'ZeptoMail API' },
+    { key: 'receipt',    label: 'Receipt Template' },
     { key: 'form',       label: 'Registration Form' },
     { key: 'window',     label: 'Registration Window' },
     { key: 'fees',       label: 'Membership Fees' },
@@ -658,20 +773,25 @@ const paymentForm = useForm({
     payment_instructions:  props.profile?.payment_instructions ?? '',
 });
 const mailForm = useForm({
-    mail_host:         props.profile?.mail_host ?? 'smtp.zoho.in',
-    mail_port:         props.profile?.mail_port ?? 587,
-    mail_encryption:   props.profile?.mail_encryption ?? 'tls',
-    mail_username:     props.profile?.mail_username ?? '',
+    zeptomail_region:  props.profile?.zeptomail_region ?? 'in',
     mail_password:     '',
     mail_from_address: props.profile?.mail_from_address ?? '',
     mail_from_name:    props.profile?.mail_from_name ?? '',
 });
 const testMailForm = useForm({ test_email: props.profile?.contact_email ?? '' });
+const receiptForm = useForm({
+    ...props.receiptTemplate,
+    receipt_next_number: props.receiptNextNumber,
+});
 const logoForm    = useForm({ logo: null });
 const windowForm  = useForm({
     academic_year:          props.academicYear,
     registration_starts_at: props.registrationWindow?.registration_starts_at?.slice(0, 10) || '',
     registration_ends_at:   props.registrationWindow?.registration_ends_at?.slice(0, 10) || '',
+    add_open:               props.registrationWindow?.add_open_local || '',
+    add_close:              props.registrationWindow?.add_close_local || '',
+    edit_open:              props.registrationWindow?.edit_open_local || '',
+    edit_close:             props.registrationWindow?.edit_close_local || '',
 });
 const slabForm = useForm({ academic_year: props.academicYear, min_students: 0, max_students: null, amount: 0, due_date: '' });
 const categoryForm = useForm({ code: '', label: '', sort_order: null });
@@ -741,6 +861,9 @@ function saveMailSettings() {
     mailForm.put(`/sahodaya-admin/${props.sahodaya.id}/membership/mail-settings`, {
         onSuccess: () => mailForm.mail_password = '',
     });
+}
+function saveReceiptTemplate() {
+    receiptForm.put(`/sahodaya-admin/${props.sahodaya.id}/membership/receipt-template`);
 }
 function sendTestMail() {
     testMailForm.post(`/sahodaya-admin/${props.sahodaya.id}/membership/mail-settings/test`);
@@ -838,48 +961,4 @@ function uploadLogo() {
 function onLogoSelected(e) {
     logoForm.logo = e.target.files[0] ?? null;
 }
-
-// Utility sub-components
-const FormSection = defineComponent({
-    props: { title: String, hint: String },
-    setup(props, { slots }) {
-        return () => h('div', { class: 'bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4' }, [
-            h('div', { class: 'mb-1' }, [
-                h('h3', { class: 'font-bold text-gray-900' }, props.title),
-                props.hint ? h('p', { class: 'text-xs text-gray-400 mt-0.5' }, props.hint) : null,
-            ]),
-            slots.default?.(),
-        ]);
-    },
-});
-
-const FormGrid = defineComponent({
-    setup(_, { slots }) {
-        return () => h('div', { class: 'grid sm:grid-cols-2 gap-4' }, slots.default?.());
-    },
-});
-
-const FormField = defineComponent({
-    props: { label: String, hint: String, classExtra: String },
-    setup(props, { slots }) {
-        return () => h('div', { class: props.classExtra ?? '' }, [
-            props.label ? h('label', { class: 'block text-xs font-semibold text-gray-600 mb-1.5' }, props.label) : null,
-            slots.default?.(),
-            props.hint ? h('p', { class: 'text-[11px] text-gray-400 mt-1' }, props.hint) : null,
-        ]);
-    },
-});
 </script>
-
-<style scoped>
-@reference "../../../../../css/app.css";
-.field {
-    @apply w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white;
-}
-.btn-primary {
-    @apply px-6 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50;
-}
-.btn-secondary {
-    @apply px-4 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-sm font-bold rounded-xl transition;
-}
-</style>

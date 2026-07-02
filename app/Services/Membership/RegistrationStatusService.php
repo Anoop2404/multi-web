@@ -29,6 +29,8 @@ class RegistrationStatusService
             return $existing;
         }
 
+        $this->assertPriorYearResolved($school, $academicYear);
+
         $submission = $this->createSubmission($school, $academicYear, $profile);
 
         return $this->createRegistration($school, $academicYear, $profile, $submission);
@@ -135,5 +137,23 @@ class RegistrationStatusService
     public function markDataPending(Registration $registration): void
     {
         $registration->update(['registration_status' => 'data_pending']);
+    }
+
+    private function assertPriorYearResolved(Tenant $school, string $academicYear): void
+    {
+        $years = AcademicYear::options();
+        $index = array_search($academicYear, $years, true);
+        if ($index === false || ! isset($years[$index + 1])) {
+            return;
+        }
+
+        $priorYear = $years[$index + 1];
+        $priorReg = Registration::where('school_id', $school->id)
+            ->where('academic_year', $priorYear)
+            ->first();
+
+        if ($priorReg && ! in_array($priorReg->registration_status, ['completed', 'approved'], true)) {
+            throw new \RuntimeException('Prior year registration is unresolved. Contact your Sahodaya office.');
+        }
     }
 }

@@ -5,7 +5,9 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
 use App\Models\MembershipPayment;
 use App\Services\Audit\DataChangeLogger;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Membership\FeeReceiptService;
+use App\Services\Membership\MembershipReceiptService;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\RegistrationStatusService;
 use App\Support\AcademicYear;
@@ -25,7 +27,8 @@ class PaymentVerificationController extends SahodayaAdminController
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
 
-        $base = MembershipPayment::whereIn('school_id', $schoolIds);
+        $base = MembershipPayment::whereIn('school_id', $schoolIds)
+            ->where('status', '!=', 'superseded');
         $statusCounts = [
             'payment-due' => $this->unpaidRegistrationsCount($this->sahodaya->id, $schoolIds, $year),
             'submitted'   => (clone $base)->where('status', 'submitted')->count(),
@@ -116,7 +119,7 @@ class PaymentVerificationController extends SahodayaAdminController
         ], $rows);
     }
 
-    public function verify(Request $request, string $tenantId, MembershipPayment $payment, MembershipNotifier $notifier)
+    public function verify(Request $request, string $tenantId, MembershipPayment $payment, MembershipNotifier $notifier, PlatformAuditLogger $audit)
     {
         abort_if($payment->school->parent_id !== $this->sahodaya->id, 403);
         abort_unless($payment->status === 'submitted', 403);
@@ -135,6 +138,14 @@ class PaymentVerificationController extends SahodayaAdminController
             ]);
 
             app(FeeReceiptService::class)->syncFromMembershipPayment($payment->fresh());
+
+            $receiptService = app(MembershipReceiptService::class);
+            $receiptService->issueForPayment($payment->fresh());
+            $freshReceipt = $payment->fresh()->feeReceipt;
+            $receiptNo = $freshReceipt?->receipt_number;
+            $receiptHtml = $freshReceipt
+                ? $receiptService->readGeneratedReceipt($freshReceipt)
+                : null;
 
             app(DataChangeLogger::class)->updated(
                 $payment,
@@ -174,10 +185,18 @@ class PaymentVerificationController extends SahodayaAdminController
                     $payment->academic_year,
                     $registration->reg_no,
                     $firstMembershipApproval,
+                    $receiptHtml,
+                    $receiptNo,
                 );
             } elseif ($firstMembershipApproval) {
                 $notifier->schoolApproved($school);
             }
+
+            $audit->paymentVerified($payment->fresh());
+
+            $this->notifyMembershipPaymentInApp($payment->school, 'membership.payment.approved', [
+                'academic_year' => $payment->academic_year,
+            ]);
         } else {
             $beforeStatus = $payment->status;
             $payment->update([
@@ -212,6 +231,12 @@ class PaymentVerificationController extends SahodayaAdminController
             }
 
             $notifier->paymentRejected($payment->school, $payment->academic_year, $data['reason']);
+            $audit->paymentRejected($payment->fresh(), $data['reason']);
+
+            $this->notifyMembershipPaymentInApp($payment->school, 'membership.payment.rejected', [
+                'academic_year' => $payment->academic_year,
+                'reason'        => $data['reason'],
+            ]);
         }
 
         return back()->with('success', 'Payment review recorded.');
@@ -229,5 +254,15 @@ class PaymentVerificationController extends SahodayaAdminController
         abort_unless($payment->payment_proof_path, 404);
 
         return TenantStorage::downloadResponse($payment->school, $payment->payment_proof_path);
+    }
+
+    private function notifyMembershipPaymentInApp(\App\Models\Tenant $school, string $template, array $replacements): void
+    {
+        $service = app(\App\Services\Notifications\NotificationService::class);
+
+        foreach (\App\Models\User::role(['school_admin', 'school_staff'])->where('tenant_id', $school->id)->get() as $user) {
+            $service->notifyFromTemplate($user, $template, $replacements,
+                "/school-admin/{$school->id}/registration");
+        }
     }
 }

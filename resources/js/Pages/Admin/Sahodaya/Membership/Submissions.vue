@@ -1,12 +1,17 @@
 <template>
-    <SahodayaAdminLayout title="Student Counts" :sahodaya="sahodaya" :publicUrl="publicUrl"
+    <SahodayaAdminLayout title="Annual submissions" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
-                         :pendingPaymentsCount="pendingPaymentsCount">
-        <p class="text-sm text-gray-500 mb-4">
-            Read-only view of student totals submitted by schools. Membership is completed after payment is verified under
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`" class="text-[#0f3d7a] font-semibold hover:underline">Payments</Link>.
-        </p>
+                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <PageHeader
+            title="Annual submissions"
+            eyebrow="Membership"
+            description="Review student records, counts, and teachers submitted by schools before membership payment."
+        >
+            <template #actions>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`" class="btn-secondary text-sm">Payments →</Link>
+            </template>
+        </PageHeader>
 
         <div v-if="submissions.length" class="space-y-3">
             <Link v-for="s in submissions" :key="s.id"
@@ -26,6 +31,10 @@
                         <p class="text-2xl font-bold text-[#0f3d7a]">{{ s.student_total ?? 0 }}</p>
                         <p class="text-[11px] text-gray-400 uppercase tracking-wide">students</p>
                     </div>
+                    <span v-if="s.pending_tracks?.length"
+                          class="text-xs px-2 py-1 rounded-full font-semibold bg-amber-100 text-amber-800">
+                        {{ s.pending_tracks.length }} pending review
+                    </span>
                     <span v-if="s.registration_status"
                           class="text-xs px-2 py-1 rounded-full font-medium capitalize bg-gray-100 text-gray-600">
                         {{ s.registration_status.replace(/_/g, ' ') }}
@@ -38,7 +47,7 @@
         <div v-else class="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
             <div class="text-5xl mb-3">👨‍🎓</div>
             <p class="text-gray-600 font-semibold">No registration data yet</p>
-            <p class="text-sm text-gray-400 mt-1">Counts appear when schools begin annual registration.</p>
+            <p class="text-sm text-gray-400 mt-1">Submissions appear when schools begin annual registration.</p>
         </div>
     </SahodayaAdminLayout>
 </template>
@@ -48,11 +57,8 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link } from '@inertiajs/vue3';
 
 defineProps({
-    sahodaya:                Object,
-    publicUrl:               { type: String, default: null },
-    pendingSchoolsCount:     { type: Number, default: 0 },
-    pendingSubmissionsCount: { type: Number, default: 0 },
-    pendingPaymentsCount:    { type: Number, default: 0 },
-    submissions:             { type: Array, default: () => [] },
+    sahodaya: Object, publicUrl: String,
+    pendingSchoolsCount: Number, pendingSubmissionsCount: Number, pendingPaymentsCount: Number,
+    submissions: Array,
 });
 </script>

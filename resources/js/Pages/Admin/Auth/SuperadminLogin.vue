@@ -73,10 +73,7 @@
                         </div>
 
                         <form class="sp-login-form" @submit.prevent="submit">
-                            <div v-if="sessionExpired || $page.props.flash?.error"
-                                 class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-                                {{ $page.props.flash?.error || 'Your session has expired. Please sign in again.' }}
-                            </div>
+                            <AuthLoginAlerts :session-expired="sessionExpired" :auth-error="authError" />
 
                             <div class="sp-login-field">
                                 <label class="sp-login-label" for="email">Email address</label>
@@ -89,11 +86,11 @@
                                         required
                                         autocomplete="email"
                                         class="sp-login-input"
-                                        :class="{ 'sp-login-input--error': form.errors.email }"
+                                        :class="{ 'sp-login-input--error': fieldErrors.email }"
                                         placeholder="admin@platform.com"
                                     />
                                 </div>
-                                <p v-if="form.errors.email" class="sp-login-error">{{ form.errors.email }}</p>
+                                <p v-if="fieldErrors.email" class="sp-login-error">{{ fieldErrors.email }}</p>
                             </div>
 
                             <div class="sp-login-field">
@@ -107,9 +104,11 @@
                                         required
                                         autocomplete="current-password"
                                         class="sp-login-input"
+                                        :class="{ 'sp-login-input--error': fieldErrors.password || authError }"
                                         placeholder="Enter your password"
                                     />
                                 </div>
+                                <p v-if="fieldErrors.password" class="sp-login-error">{{ fieldErrors.password }}</p>
                             </div>
 
                             <button type="submit" class="sp-login-btn" :disabled="form.processing">
@@ -125,18 +124,15 @@
 </template>
 
 <script setup>
-import { useForm } from '@inertiajs/vue3';
+import AuthLoginAlerts from '@/Components/auth/AuthLoginAlerts.vue';
+import { useAuthLoginForm } from '@/support/useAuthLoginForm.js';
 
 defineProps({
     appName: { type: String, default: 'Sahodaya Platform' },
     sessionExpired: { type: Boolean, default: false },
 });
 
-const form = useForm({ email: '', password: '' });
-
-function submit() {
-    form.post('/login', { preserveState: false });
-}
+const { form, authError, fieldErrors, submit } = useAuthLoginForm();
 </script>
 
 <style scoped>

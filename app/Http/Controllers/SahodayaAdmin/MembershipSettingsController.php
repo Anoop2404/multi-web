@@ -13,7 +13,8 @@ use App\Models\TeachingTypeOverride;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Membership\MasterClassService;
 use App\Support\AcademicYear;
-use App\Support\SahodayaHomepageContent;
+use App\Support\MembershipReceiptTemplate;
+use App\Support\FestClassGroupScheme;
 use App\Support\SchoolApplicationForm;
 use App\Support\TenantBranding;
 use App\Services\Audit\DataChangeLogger;
@@ -21,7 +22,6 @@ use App\Services\Mail\SahodayaMailer;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\Mailer\Exception\TransportException;
 
 class MembershipSettingsController extends SahodayaAdminController
 {
@@ -40,12 +40,21 @@ class MembershipSettingsController extends SahodayaAdminController
 
         $academicYear = AcademicYear::forSahodaya($this->sahodaya->id);
 
+        $window = SahodayaRegistrationWindow::where('sahodaya_id', $this->sahodaya->id)->where('academic_year', $academicYear)->first();
+        $registrationWindow = $window ? array_merge($window->toArray(), [
+            'add_open_local'  => $window->add_open?->format('Y-m-d\TH:i'),
+            'add_close_local' => $window->add_close?->format('Y-m-d\TH:i'),
+            'edit_open_local' => $window->edit_open?->format('Y-m-d\TH:i'),
+            'edit_close_local'=> $window->edit_close?->format('Y-m-d\TH:i'),
+        ]) : null;
+
         return $this->inertia('Sahodaya/Membership/Settings', [
             'profile'            => array_merge($profile->toArray(), [
                 'mail_configured' => $profile->mailIsConfigured(),
+                'student_edit_lock_at' => $profile->student_edit_lock_at?->format('Y-m-d\TH:i'),
             ]),
             'feeSlabs'           => MembershipFeeSlab::where('sahodaya_id', $this->sahodaya->id)->where('academic_year', $academicYear)->orderBy('min_students')->get(),
-            'registrationWindow' => SahodayaRegistrationWindow::where('sahodaya_id', $this->sahodaya->id)->where('academic_year', $academicYear)->first(),
+            'registrationWindow' => $registrationWindow,
             'academicYear'       => $academicYear,
             'activeAcademicYearRecord' => \App\Support\AcademicYear::activeRecord(),
             'calendarYear'       => AcademicYear::calendarCurrent(),
@@ -71,6 +80,10 @@ class MembershipSettingsController extends SahodayaAdminController
                 'principal' => 'Principal Details',
                 'account'   => 'Login Account',
             ],
+            'receiptTemplate'       => MembershipReceiptTemplate::resolve($profile, $this->sahodaya),
+            'receiptPlaceholders'   => config('membership_receipt.placeholders', []),
+            'receiptNextNumber'     => $profile->receipt_next_number ?? 1,
+            'classGroupSchemeOptions' => FestClassGroupScheme::options(),
         ]);
     }
 
@@ -90,12 +103,15 @@ class MembershipSettingsController extends SahodayaAdminController
             'membership_fee_type'          => 'required|in:fixed,variable_by_student_count',
             'fixed_membership_fee_amount'  => 'nullable|numeric|min:0',
             'teacher_registration_enabled' => 'boolean',
+            'student_edit_lock_enabled'    => 'boolean',
+            'student_edit_lock_at'         => 'nullable|date',
             'payment_instructions'         => 'nullable|string|max:5000',
             'payment_bank_name'            => 'nullable|string|max:150',
             'payment_account_no'           => 'nullable|string|max:50',
             'payment_ifsc'                 => 'nullable|string|max:20',
             'payment_upi'                  => 'nullable|string|max:100',
             'active_academic_year'         => ['nullable', 'string', 'max:10', 'regex:/^\d{4}-\d{2}$/'],
+            'fest_class_group_scheme'      => 'nullable|in:cbse,sahodaya',
         ]);
 
         if ($profile->prefixes_locked && isset($data['prefix']) && $data['prefix'] !== $profile->prefix) {
@@ -198,16 +214,13 @@ class MembershipSettingsController extends SahodayaAdminController
         $profile = SahodayaProfile::firstOrCreate(['tenant_id' => $this->sahodaya->id]);
 
         $data = $request->validate([
-            'mail_host'         => 'nullable|string|max:255',
-            'mail_port'         => 'nullable|integer|min:1|max:65535',
-            'mail_encryption'   => 'nullable|string|in:tls,ssl',
-            'mail_username'     => 'nullable|string|max:255',
+            'zeptomail_region'  => 'nullable|string|in:in,com,eu',
             'mail_password'     => 'nullable|string|max:512',
-            'mail_from_address' => 'nullable|email|max:255',
+            'mail_from_address' => 'required|email|max:255',
             'mail_from_name'    => 'nullable|string|max:255',
         ]);
 
-        foreach (['mail_host', 'mail_username', 'mail_password', 'mail_from_address', 'mail_from_name'] as $field) {
+        foreach (['mail_password', 'mail_from_address', 'mail_from_name'] as $field) {
             if (isset($data[$field]) && is_string($data[$field])) {
                 $data[$field] = trim($data[$field]);
             }
@@ -215,27 +228,19 @@ class MembershipSettingsController extends SahodayaAdminController
 
         if (empty($data['mail_password'])) {
             unset($data['mail_password']);
+        } elseif (! filled($profile->mail_password)) {
+            // first save requires token
         }
 
-        $username = strtolower($data['mail_username'] ?? $profile->mail_username ?? '');
-        $host = strtolower($data['mail_host'] ?? $profile->mail_host ?? '');
-
-        if ($username === 'emailapikey' && $host !== '' && ! str_contains($host, 'zeptomail')) {
+        if (empty($data['mail_password']) && ! filled($profile->mail_password)) {
             throw ValidationException::withMessages([
-                'mail_host' => 'ZeptoMail requires smtp.zeptomail.in (India) or smtp.zeptomail.com — not smtp.zoho.in.',
+                'mail_password' => 'Paste your ZeptoMail Send Mail token (Zoho-enczapikey …).',
             ]);
         }
 
-        $fromAddress = strtolower($data['mail_from_address'] ?? $profile->mail_from_address ?? '');
-        if ($username === 'emailapikey' && $fromAddress === '') {
-            throw ValidationException::withMessages([
-                'mail_from_address' => 'From Address is required for ZeptoMail (e.g. noreply@yourdomain.com). It must match your verified domain.',
-            ]);
-        }
+        $profile->update(array_merge($data, ['mail_transport' => 'zeptomail_api']));
 
-        $profile->update($data);
-
-        return back()->with('success', 'Zoho mail settings saved.');
+        return back()->with('success', 'ZeptoMail API settings saved.');
     }
 
     public function testMailSettings(Request $request)
@@ -247,7 +252,7 @@ class MembershipSettingsController extends SahodayaAdminController
         ]);
 
         if (! $profile->mailIsConfigured()) {
-            return back()->with('error', 'Save Zoho SMTP username and password before sending a test email.');
+            return back()->with('error', 'Save your ZeptoMail API token and From address before sending a test email.');
         }
 
         $to = $data['test_email'] ?? $profile->contact_email ?? $request->user()->email;
@@ -258,32 +263,16 @@ class MembershipSettingsController extends SahodayaAdminController
                 'Test email — '.$this->sahodaya->name,
                 'emails.test-mail',
                 [
-                    'headerTitle'    => 'SMTP Test',
+                    'headerTitle'    => 'ZeptoMail API Test',
                     'headerSubtitle' => $this->sahodaya->name,
                     'headerEyebrow'  => 'Mail Settings',
                 ],
             );
-        } catch (TransportException $e) {
-            return back()->with('error', $this->smtpAuthErrorMessage($profile));
+        } catch (\Throwable $e) {
+            return back()->with('error', 'ZeptoMail API failed: '.$e->getMessage());
         }
 
         return back()->with('success', "Test email sent to {$to}.");
-    }
-
-    private function smtpAuthErrorMessage(SahodayaProfile $profile): string
-    {
-        $host = strtolower((string) $profile->mail_host);
-        $username = strtolower((string) $profile->mail_username);
-
-        if ($username === 'emailapikey' && ! str_contains($host, 'zeptomail')) {
-            return 'SMTP authentication failed: host is set to '.$profile->mail_host.' but ZeptoMail requires smtp.zeptomail.in. Update the host, re-paste the Send Mail token, and save again.';
-        }
-
-        if ($username === 'emailapikey') {
-            return 'SMTP authentication failed: re-copy the Send Mail token from ZeptoMail (SMTP/API tab). Use username emailapikey exactly, port 587 with TLS, and regenerate the token if needed.';
-        }
-
-        return 'SMTP authentication failed: check username, app password, host, and port. For Zoho Mail use smtp.zoho.in with your full email and an app-specific password.';
     }
 
     public function uploadLogo(Request $request)
@@ -327,6 +316,10 @@ class MembershipSettingsController extends SahodayaAdminController
             'academic_year'          => 'required|string|max:10',
             'registration_starts_at' => 'nullable|date',
             'registration_ends_at'   => 'nullable|date|after_or_equal:registration_starts_at',
+            'add_open'               => 'nullable|date',
+            'add_close'              => 'nullable|date|after_or_equal:add_open',
+            'edit_open'              => 'nullable|date',
+            'edit_close'             => 'nullable|date|after_or_equal:edit_open',
         ]);
 
         SahodayaRegistrationWindow::updateOrCreate(
@@ -336,7 +329,7 @@ class MembershipSettingsController extends SahodayaAdminController
             ])
         );
 
-        return back()->with('success', 'Registration window saved.');
+        return back()->with('success', 'Registration and student edit windows saved.');
     }
 
     public function storeCustomCategory(Request $request)
@@ -369,6 +362,10 @@ class MembershipSettingsController extends SahodayaAdminController
             'max_class'  => 'nullable|integer|min:1|max:12',
             'sort_order' => 'nullable|integer|min:0',
             'is_active'  => 'boolean',
+        ]);
+
+        $data = \App\Support\PersistDefaults::coalesce($data, [
+            'sort_order' => $classCategory->sort_order ?? 0,
         ]);
 
         $classCategory->update($data);

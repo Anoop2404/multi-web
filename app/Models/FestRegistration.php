@@ -30,6 +30,11 @@ class FestRegistration extends Model
         return $this->belongsTo(FeeReceipt::class);
     }
 
+    public function school(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class, 'school_id');
+    }
+
     public function groups(): HasMany
     {
         return $this->hasMany(FestGroup::class, 'registration_id');

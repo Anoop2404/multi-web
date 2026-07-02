@@ -14,22 +14,24 @@ class Tenant extends BaseTenant implements TenantWithDatabase
 
     protected $fillable = [
         'id', 'type', 'name', 'domain', 'subdomain',
-        'parent_id', 'plan', 'is_active',
-        'school_prefix', 'membership_status', 'application_payload', 'prefixes_locked',
+        'parent_id', 'plan', 'is_active', 'fest_registration_closed',
+        'school_prefix', 'membership_status', 'renewal_status', 'application_payload', 'prefixes_locked',
     ];
 
     protected $casts = [
-        'is_active'           => 'boolean',
-        'data'                => 'array',
-        'application_payload' => 'array',
-        'prefixes_locked'     => 'boolean',
+        'is_active'                 => 'boolean',
+        'fest_registration_closed'  => 'boolean',
+        'data'                      => 'array',
+        'application_payload'       => 'array',
+        'prefixes_locked'           => 'boolean',
     ];
 
     public static function getCustomColumns(): array
     {
         return [
             'id', 'type', 'name', 'domain', 'subdomain', 'parent_id', 'plan', 'is_active',
-            'school_prefix', 'membership_status', 'application_payload', 'prefixes_locked',
+            'fest_registration_closed',
+            'school_prefix', 'membership_status', 'renewal_status', 'application_payload', 'prefixes_locked',
         ];
     }
 

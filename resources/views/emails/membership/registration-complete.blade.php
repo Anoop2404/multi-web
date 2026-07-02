@@ -7,11 +7,20 @@
 
     <p>{{ $body }}</p>
 
-    @include('emails.partials.detail-table', ['rows' => [
+    @include('emails.partials.detail-table', ['rows' => array_filter([
         'Academic year'  => $academicYear,
         'Membership No.' => $membershipNo,
+        'Receipt No.'    => $receiptNo ?? null,
         'Status'         => 'Complete',
-    ]])
+    ])])
+
+    @if(!empty($receiptNo))
+        @include('emails.partials.alert-box', [
+            'variant' => 'info',
+            'title' => 'Official receipt attached',
+            'message' => "Receipt No. {$receiptNo} is attached as an HTML file. Open it in your browser and print for your records.",
+        ])
+    @endif
 
     @if(!empty($firstApproval))
         @include('emails.partials.alert-box', [

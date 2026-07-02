@@ -38,9 +38,13 @@ Route::middleware([
         Route::get('/', [FestPortalController::class, 'index'])->name('index');
         Route::get('/{event}', [FestPortalController::class, 'show'])->name('show');
         Route::get('/{event}/schedule', [FestPortalController::class, 'schedule'])->name('schedule');
+        Route::get('/{event}/items/{item}', [FestPortalController::class, 'itemSchedule'])->name('item-schedule');
+        Route::get('/{event}/items/{item}/results', [FestPortalController::class, 'itemResults'])->name('item-results');
         Route::get('/{event}/live', [FestPortalController::class, 'live'])->name('live');
+        Route::get('/{event}/live/data', [FestPortalController::class, 'liveData'])->name('live.data');
+        Route::get('/{event}/records', [FestPortalController::class, 'records'])->name('records');
         Route::get('/{event}/search', [FestPortalController::class, 'search'])->name('search');
-        Route::get('/{event}/participant/{chestNo}', [FestPortalController::class, 'participant'])->name('participant');
+        Route::get('/{event}/participant/{ref}', [FestPortalController::class, 'participant'])->name('participant');
     });
 
     // Public website pages (require global + tenant public-site setting)

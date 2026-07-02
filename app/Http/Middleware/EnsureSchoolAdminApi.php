@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Tenant;
+use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,7 +22,7 @@ class EnsureSchoolAdminApi
             return $next($request);
         }
 
-        if (! $user->hasAnyRole(['school_admin', 'sahodaya_admin'])) {
+        if (! $user->hasAnyRole(array_merge(TenantUserCatalog::schoolManagementRoles(), ['sahodaya_admin']))) {
             return response()->json(['message' => 'Forbidden.'], 403);
         }
 
@@ -30,11 +31,11 @@ class EnsureSchoolAdminApi
             return response()->json(['message' => 'Forbidden.'], 403);
         }
 
-        if ($user->hasRole('school_admin') && ! $user->hasVerifiedEmail()) {
+        if ($user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal']) && ! $user->hasVerifiedEmail()) {
             return response()->json(['message' => 'Email verification required.'], 403);
         }
 
-        if ($tenantId && $user->hasRole('school_admin')) {
+        if ($tenantId && $user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal'])) {
             $school = Tenant::find($tenantId);
             if ($school?->membership_status === 'rejected') {
                 return response()->json(['message' => 'Your school application was rejected.'], 403);

@@ -1,48 +1,52 @@
 <template>
-    <SchoolAdminLayout title="Board Results" :school="school">
+    <SchoolAdminLayout title="Board Results" :school="school" :show-header-title="false">
+        <PageHeader title="Board Results" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="space-y-6">
             <!-- Add result form -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="card">
                 <h3 class="font-bold text-gray-800 mb-4">Add / Update Board Result</h3>
                 <form @submit.prevent="submit" class="space-y-4">
                     <div class="grid sm:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Class *</label>
+                            <label class="form-label mb-1.5">Class *</label>
                             <select v-model="form.class" required
-                                    class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white">
+                                    class="field">
                                 <option value="10">Class X (CBSE)</option>
                                 <option value="12">Class XII (CBSE)</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Academic Year *</label>
+                            <label class="form-label mb-1.5">Academic Year *</label>
                             <input v-model="form.academic_year" type="text" required placeholder="2024-25"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Pass % *</label>
+                            <label class="form-label mb-1.5">Pass % *</label>
                             <input v-model="form.pass_percent" type="number" required min="0" max="100" step="0.01"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Total Appeared *</label>
+                            <label class="form-label mb-1.5">Total Appeared *</label>
                             <input v-model="form.total_appeared" type="number" required min="0"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Passed *</label>
+                            <label class="form-label mb-1.5">Passed *</label>
                             <input v-model="form.pass_count" type="number" required min="0"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Distinctions</label>
+                            <label class="form-label mb-1.5">Distinctions</label>
                             <input v-model="form.distinctions" type="number" min="0"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
                         <button type="submit" :disabled="form.processing"
-                                class="bg-indigo-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50">
+                                class="btn-primary text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition disabled:opacity-50">
                             Save & Add Toppers →
                         </button>
                         <p class="text-xs text-gray-400">If a result for this class + year already exists, it will be updated.</p>
@@ -53,7 +57,7 @@
             <!-- Existing results -->
             <div class="space-y-4">
                 <div v-for="r in results" :key="r.id"
-                     class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                     class="card card--flush">
                     <!-- Header -->
                     <div class="flex items-center justify-between px-5 py-4 bg-gray-50 border-b border-gray-100">
                         <div>
@@ -91,7 +95,7 @@
                 </div>
 
                 <div v-if="!results.length"
-                     class="bg-white rounded-xl border border-dashed border-gray-200 p-10 text-center text-gray-400">
+                     class="card card--dashed p-10 text-center text-slate-400">
                     No board results added yet.
                 </div>
             </div>

@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Mail\SahodayaMailer;
 use App\Support\Mail\EmailBranding;
 use App\Support\TenantDomainSync;
 use Illuminate\Auth\Notifications\VerifyEmail;
@@ -16,6 +17,24 @@ class PortalVerifyEmail extends VerifyEmail
 {
     public function toMail($notifiable): MailMessage
     {
+        return (new MailMessage)
+            ->subject($this->subjectFor($notifiable))
+            ->view('emails.verify-email', $this->viewDataFor($notifiable));
+    }
+
+    public function deliverVia(SahodayaMailer $mailer, User $user): void
+    {
+        $mailer->sendView(
+            $user->email,
+            $this->subjectFor($user),
+            'emails.verify-email',
+            $this->viewDataFor($user),
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function viewDataFor(User $notifiable): array
+    {
         $school = $notifiable->tenant_id
             ? Tenant::query()->find($notifiable->tenant_id)
             : null;
@@ -26,17 +45,24 @@ class PortalVerifyEmail extends VerifyEmail
 
         $branding = EmailBranding::forTenant($sahodaya);
 
-        return (new MailMessage)
-            ->subject('Verify your Gmail — '.($branding['sahodayaName'] ?? config('app.name')))
-            ->view('emails.verify-email', array_merge($branding, [
-                'headerTitle'       => 'Gmail Verification',
-                'headerSubtitle'    => $school?->name,
-                'headerEyebrow'     => 'School Portal',
-                'userName'          => $notifiable->name,
-                'schoolName'        => $school?->name,
-                'verificationUrl'   => $this->verificationUrl($notifiable),
-                'verificationMins'  => (int) Config::get('auth.verification.expire', 60),
-            ]));
+        return array_merge($branding, [
+            'headerTitle'      => 'Gmail Verification',
+            'headerSubtitle'   => $school?->name,
+            'headerEyebrow'    => 'School Portal',
+            'userName'         => $notifiable->name,
+            'schoolName'       => $school?->name,
+            'verificationUrl'  => $this->verificationUrl($notifiable),
+            'verificationMins' => (int) Config::get('auth.verification.expire', 60),
+        ]);
+    }
+
+    public function subjectFor(User $notifiable): string
+    {
+        $school = $notifiable->tenant_id ? Tenant::query()->find($notifiable->tenant_id) : null;
+        $sahodaya = $school?->parent_id ? Tenant::query()->find($school->parent_id) : $school;
+        $branding = EmailBranding::forTenant($sahodaya);
+
+        return 'Verify your Gmail — '.($branding['sahodayaName'] ?? config('app.name'));
     }
 
     protected function verificationUrl($notifiable): string

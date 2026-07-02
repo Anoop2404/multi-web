@@ -4,10 +4,19 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
 use App\Models\Circular;
+use App\Models\FestAppeal;
 use App\Models\FestEvent;
+use App\Models\FestRegistration;
+use App\Models\FestSchoolEventFee;
+use App\Models\McqExam;
+use App\Models\McqSchoolFee;
+use App\Models\MembershipPayment;
 use App\Models\OfficeBearers;
+use App\Models\Registration;
+use App\Models\SchoolYearSubmission;
 use App\Models\Student;
 use App\Models\Tenant;
+use App\Models\TrainingProgram;
 use App\Support\AcademicYear;
 use App\Support\TenancyDatabase;
 
@@ -28,6 +37,33 @@ class DashboardController extends SahodayaAdminController
             ->where('membership_status', 'approved')
             ->pluck('id')
             ->all();
+
+        $activeStatuses = ['published', 'registration_open', 'ongoing'];
+        $festEventIds = FestEvent::where('tenant_id', $this->sahodaya->id)->pluck('id');
+
+        $actionQueue = array_filter([
+            'membership_data_pending' => Registration::query()
+                ->whereIn('school_id', $schoolIds)
+                ->where('academic_year', $year)
+                ->whereIn('registration_status', ['data_pending', 'data_rejected'])
+                ->count(),
+            'membership_payments' => MembershipPayment::whereIn('school_id', $schoolIds)
+                ->where('status', 'submitted')
+                ->count(),
+            'fest_fee_proofs' => FestSchoolEventFee::whereIn('event_id', $festEventIds)
+                ->where('status', 'proof_uploaded')
+                ->count(),
+            'mcq_fee_proofs' => McqSchoolFee::query()
+                ->whereHas('exam', fn ($q) => $q->where('tenant_id', $this->sahodaya->id))
+                ->where('status', 'proof_uploaded')
+                ->count(),
+            'fest_appeals' => FestAppeal::whereIn('event_id', $festEventIds)
+                ->where('status', 'pending')
+                ->count(),
+            'fest_registrations_review' => FestRegistration::whereIn('event_id', $festEventIds)
+                ->where('status', 'submitted')
+                ->count(),
+        ], fn (int $count) => $count > 0);
 
         $stats = [
             'approved_schools'   => count($approvedSchoolIds),
@@ -54,8 +90,15 @@ class DashboardController extends SahodayaAdminController
             'payments_pending_verification_amount' => $paymentSummary['payments_pending_verification_amount'],
             'office_bearers'     => OfficeBearers::where('tenant_id', $this->sahodaya->id)->count(),
             'circulars'          => Circular::where('tenant_id', $this->sahodaya->id)->count(),
-            'kalotsav_events'    => FestEvent::where('tenant_id', $this->sahodaya->id)->count(),
-            'fest_events'        => FestEvent::where('tenant_id', $this->sahodaya->id)->count(),
+            'fest_events'        => $festEventIds->count(),
+            'active_fest_events' => FestEvent::where('tenant_id', $this->sahodaya->id)
+                ->whereIn('status', $activeStatuses)
+                ->count(),
+            'fest_registrations' => $festEventIds->isEmpty()
+                ? 0
+                : FestRegistration::whereIn('event_id', $festEventIds)->count(),
+            'mcq_exams'          => McqExam::where('tenant_id', $this->sahodaya->id)->count(),
+            'training_programs'  => TrainingProgram::where('tenant_id', $this->sahodaya->id)->count(),
         ];
 
         $recentCirculars = Circular::where('tenant_id', $this->sahodaya->id)
@@ -63,12 +106,33 @@ class DashboardController extends SahodayaAdminController
             ->limit(5)
             ->get(['id', 'title', 'category', 'issued_date']);
 
-        $activeKalotsav = FestEvent::where('tenant_id', $this->sahodaya->id)
-            ->where('results_published', false)
-            ->whereIn('status', ['registration_open', 'ongoing', 'published'])
+        $activeEvents = FestEvent::where('tenant_id', $this->sahodaya->id)
+            ->whereIn('status', $activeStatuses)
+            ->withCount('registrations')
             ->orderByDesc('event_start')
-            ->first(['id', 'title', 'event_start', 'status']);
+            ->limit(6)
+            ->get(['id', 'title', 'event_type', 'status', 'event_start']);
 
-        return $this->inertia('Sahodaya/Dashboard', compact('stats', 'recentCirculars', 'activeKalotsav'));
+        $festOps = [
+            'programs' => [
+                ['slug' => 'kalotsav', 'prefix' => 'kalotsav', 'label' => 'Kalotsav', 'icon' => '🏆'],
+                ['slug' => 'sports-meet', 'prefix' => 'sports', 'label' => 'Sports Meet', 'icon' => '🏅'],
+                ['slug' => 'kids-fest', 'prefix' => 'kids-fest', 'label' => 'Kids Fest', 'icon' => '🎈'],
+                ['slug' => 'teacher-fest', 'prefix' => 'teacher-fest', 'label' => 'Teacher Fest', 'icon' => '👩‍🏫'],
+                ['slug' => 'custom', 'prefix' => 'programs/custom', 'label' => 'Custom Events', 'icon' => '📅'],
+            ],
+        ];
+
+        $dashboardExtras = app(\App\Services\Events\ProgramHubDataService::class)
+            ->sahodayaDashboardExtras($this->sahodaya);
+
+        return $this->inertia('Sahodaya/Dashboard', compact(
+            'stats',
+            'actionQueue',
+            'recentCirculars',
+            'activeEvents',
+            'festOps',
+            'dashboardExtras',
+        ));
     }
 }

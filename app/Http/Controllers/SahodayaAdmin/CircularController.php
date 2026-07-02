@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\Circular;
+use App\Models\CircularAcknowledgement;
+use App\Models\Tenant;
+use App\Models\User;
+use App\Services\Notifications\NotificationService;
 use Illuminate\Http\Request;
 
 class CircularController extends SahodayaAdminController
@@ -11,7 +15,18 @@ class CircularController extends SahodayaAdminController
     {
         $circulars = Circular::where('tenant_id', $this->sahodaya->id)
             ->orderByDesc('issued_date')
-            ->get();
+            ->get()
+            ->map(function (Circular $c) {
+                $ackCount = CircularAcknowledgement::where('circular_id', $c->id)->count();
+                $schoolCount = Tenant::where('parent_id', $this->sahodaya->id)
+                    ->where('type', 'school')
+                    ->count();
+
+                $c->setAttribute('ack_count', $ackCount);
+                $c->setAttribute('school_count', $schoolCount);
+
+                return $c;
+            });
 
         return $this->inertia('Sahodaya/Circulars/Index', compact('circulars'));
     }
@@ -31,7 +46,23 @@ class CircularController extends SahodayaAdminController
         $data['file_path']  = $request->file('file')->store('sahodaya/' . $this->sahodaya->id . '/circulars', 's3');
 
         unset($data['file']);
-        Circular::create($data);
+        $circular = Circular::create($data);
+
+        $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->pluck('id');
+
+        $notifier = app(NotificationService::class);
+        $schoolAdmins = User::role('school_admin')->whereIn('tenant_id', $schoolIds)->get();
+        foreach ($schoolAdmins as $admin) {
+            $notifier->notifyFromTemplate(
+                $admin,
+                'circular.published',
+                ['circular_title' => $circular->title],
+                "/school-admin/{$admin->tenant_id}/circulars"
+            );
+        }
 
         return back()->with('success', 'Circular uploaded.');
     }

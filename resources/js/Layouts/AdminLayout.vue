@@ -13,8 +13,15 @@
             :class="mobileNavOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
         >
             <div class="p-4 border-b border-gray-700 flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">S</div>
-                <h1 class="text-white font-bold text-base leading-tight">Sahodaya Platform</h1>
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
+                     :class="isStateAdmin ? 'bg-[#0f3d7a]' : 'bg-[#0f3d7a]'">
+                    {{ isStateAdmin ? 'ST' : 'S' }}
+                </div>
+                <div>
+                    <h1 class="text-white font-bold text-base leading-tight">Sahodaya Platform</h1>
+                    <p v-if="isStateStaff && !isSuperAdmin" class="text-amber-400 text-xs">State Staff (view only)</p>
+                    <p v-else-if="isStateAdmin && !isSuperAdmin" class="text-amber-400 text-xs">State Admin</p>
+                </div>
             </div>
 
             <nav class="flex-1 p-3 space-y-0.5 overflow-y-auto">
@@ -26,7 +33,7 @@
                         :href="item.href"
                         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors"
                         :class="isActive(item.href)
-                            ? 'bg-indigo-600 text-white'
+                            ? 'bg-[#0f3d7a] text-white'
                             : 'text-gray-400 hover:bg-gray-800 hover:text-white'"
                     >
                         <span class="text-base leading-none">{{ item.icon }}</span>
@@ -59,13 +66,12 @@
                     <h2 class="text-base font-semibold text-gray-700 truncate">{{ title }}</h2>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <span v-if="$page.props.flash?.success"
-                          class="hidden sm:inline bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
-                        {{ $page.props.flash.success }}
-                    </span>
+                    <slot name="header-actions" />
                 </div>
             </header>
-            <main class="flex-1 p-4 lg:p-6 overflow-auto">
+            <main class="flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isStateStaff && !isSuperAdmin }">
+                <StaffReadOnlyBanner v-if="isStateStaff && !isSuperAdmin" />
+                <FlashBanner />
                 <slot />
             </main>
         </div>
@@ -75,6 +81,8 @@
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
 import SignOutButton from '@/Components/SignOutButton.vue';
+import StaffReadOnlyBanner from '@/Components/StaffReadOnlyBanner.vue';
+import FlashBanner from '@/Components/ui/FlashBanner.vue';
 import { computed, ref, watch } from 'vue';
 
 defineProps({
@@ -88,9 +96,42 @@ watch(() => page.url, () => {
     mobileNavOpen.value = false;
 });
 
+const userRoles = computed(() => page.props.auth?.user?.roles ?? []);
+const isStateAdmin = computed(() => userRoles.value.some(r => ['state_admin', 'state_staff'].includes(r)));
+const isStateStaff = computed(() => userRoles.value.includes('state_staff'));
+const isSuperAdmin = computed(() => userRoles.value.includes('superadmin'));
 const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
 
-const navGroups = computed(() => {
+// State admin sees a limited nav
+const stateNavGroups = computed(() => [
+    {
+        label: 'Overview',
+        items: [
+            { href: '/admin/state-dashboard', icon: '📊', label: 'Dashboard' },
+        ],
+    },
+    {
+        label: 'State Programs',
+        items: [
+            { href: '/admin/state-programs', icon: '🏆', label: 'All Programs' },
+        ],
+    },
+    {
+        label: 'Finance',
+        items: [
+            { href: '/admin/state-remittances', icon: '💳', label: 'Remittances' },
+        ],
+    },
+    {
+        label: 'Clusters',
+        items: [
+            { href: '/admin/sahodayas', icon: '🏛️', label: 'Sahodaya Clusters' },
+        ],
+    },
+]);
+
+// Superadmin sees everything
+const superNavGroups = computed(() => {
     const groups = [
         {
             label: 'Overview',
@@ -119,8 +160,17 @@ const navGroups = computed(() => {
             ],
         },
         {
+            label: 'Security',
+            items: [
+                { href: '/admin/state-users', icon: '👤', label: 'State Users' },
+                { href: '/admin/audit-logs', icon: '📋', label: 'Audit Log' },
+            ],
+        },
+        {
             label: 'Platform Rules',
             items: [
+                { href: '/admin/state-programs',               icon: '🏆', label: 'State Programs' },
+                { href: '/admin/state-remittances',            icon: '💳', label: 'State Remittances' },
                 { href: '/admin/master-data/class-categories', icon: '📚', label: 'Class Categories' },
                 { href: '/admin/master-data/teaching-types',   icon: '👩‍🏫', label: 'Teaching Types' },
             ],
@@ -132,11 +182,11 @@ const navGroups = computed(() => {
             {
                 label: 'Site Builder',
                 items: [
-                    { href: '/admin/builder/sections',  icon: '📐', label: 'Sections' },
-                    { href: '/admin/builder/theme',     icon: '🎨', label: 'Theme & Skin' },
-                    { href: '/admin/builder/nav',       icon: '🧭', label: 'Navigation' },
-                    { href: '/admin/builder/footer',    icon: '🦶', label: 'Footer' },
-                    { href: '/admin/builder/widgets',   icon: '🔧', label: 'Widgets' },
+                    { href: '/admin/builder/sections', icon: '📐', label: 'Sections' },
+                    { href: '/admin/builder/theme',    icon: '🎨', label: 'Theme & Skin' },
+                    { href: '/admin/builder/nav',      icon: '🧭', label: 'Navigation' },
+                    { href: '/admin/builder/footer',   icon: '🦶', label: 'Footer' },
+                    { href: '/admin/builder/widgets',  icon: '🔧', label: 'Widgets' },
                 ],
             },
             {
@@ -151,7 +201,23 @@ const navGroups = computed(() => {
     return groups;
 });
 
+const navGroups = computed(() => {
+    if (isSuperAdmin.value) return superNavGroups.value;
+    if (isStateAdmin.value) return stateNavGroups.value;
+    return [];
+});
+
 function isActive(href) {
     return page.url === href || page.url.startsWith(href + '/');
 }
 </script>
+
+<style scoped>
+.staff-readonly :deep(button[type="submit"]:not(.staff-allow)),
+.staff-readonly :deep(input:not([type="hidden"]):not([readonly])),
+.staff-readonly :deep(select),
+.staff-readonly :deep(textarea) {
+    pointer-events: none;
+    opacity: 0.65;
+}
+</style>

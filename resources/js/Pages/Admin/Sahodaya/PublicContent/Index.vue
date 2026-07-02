@@ -2,7 +2,10 @@
     <SahodayaAdminLayout :title="pageTitle" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
-                         :pendingPaymentsCount="pendingPaymentsCount">
+                         :pendingPaymentsCount="pendingPaymentsCount"
+                         :show-header-title="false">
+        <PageHeader :title="pageTitle" eyebrow="Website"
+                    description="Edit hero text, contact details, announcements, and links shown on your public site or registration portal." />
         <div class="max-w-4xl space-y-5">
             <!-- Public website status -->
             <div v-if="websiteEnabled" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
@@ -289,9 +292,3 @@ const Field = defineComponent({
 });
 </script>
 
-<style scoped>
-@reference "../../../../../css/app.css";
-.field {
-    @apply w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white;
-}
-</style>

@@ -17,23 +17,30 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $fillable = [
         'tenant_id',
+        'school_house_id',
         'name',
         'email',
+        'username',
         'password',
-        'plain_password',
+        'must_change_password',
+        'last_login_at',
+        'created_by_user_id',
+        'group_classes',
     ];
 
     protected $hidden = [
         'password',
-        'plain_password',
         'remember_token',
     ];
 
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'email_verified_at'      => 'datetime',
+            'password'               => 'hashed',
+            'must_change_password'   => 'boolean',
+            'last_login_at'          => 'datetime',
+            'group_classes'          => 'array',
         ];
     }
 

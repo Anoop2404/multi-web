@@ -19,7 +19,7 @@
             </div>
 
             <!-- Header -->
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div class="card">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <div class="flex flex-wrap items-center gap-2">
@@ -60,6 +60,25 @@
                     Login account:
                     <span class="font-medium">{{ school.has_login ? (school.login_email || 'Yes') : 'Not created' }}</span>
                 </p>
+            </div>
+
+            <!-- Fest registration -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-bold text-gray-900 mb-1">Fest Registration</h3>
+                        <p class="text-sm text-gray-600">
+                            Status:
+                            <span :class="school.fest_registration_closed ? 'text-red-700 font-semibold' : 'text-emerald-700 font-semibold'">
+                                {{ school.fest_registration_closed ? 'Closed for this school' : 'Open' }}
+                            </span>
+                        </p>
+                    </div>
+                    <button type="button" @click="toggleFestRegistration"
+                            :class="school.fest_registration_closed ? 'btn-primary' : 'btn-secondary text-red-700 border-red-200 bg-red-50'">
+                        {{ school.fest_registration_closed ? 'Reopen fest registration' : 'Close fest registration' }}
+                    </button>
+                </div>
             </div>
 
             <!-- Annual registration -->
@@ -112,16 +131,22 @@
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import { defineComponent, h } from 'vue';
 
-defineProps({
+const props = defineProps({
     sahodaya: Object, publicUrl: String,
     approvedSchoolsCount: Number, pendingSchoolsCount: Number,
     pendingSubmissionsCount: Number, pendingPaymentsCount: Number,
     school: Object, detailFields: Array, registration: Object,
     recentPayments: Array, academicYear: String,
 });
+
+function toggleFestRegistration() {
+    const action = props.school.fest_registration_closed ? 'reopen' : 'close';
+    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} fest registration for this school?`)) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/toggle-fest-registration`, {}, { preserveScroll: true });
+}
 
 function formatDate(d) {
     if (!d) return '—';

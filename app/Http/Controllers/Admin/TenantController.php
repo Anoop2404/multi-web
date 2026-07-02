@@ -14,6 +14,7 @@ use App\Support\TenancyDatabase;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class TenantController extends Controller
@@ -264,8 +265,7 @@ class TenantController extends Controller
         $user->fill([
             'name'              => $data['name'],
             'email'             => $data['email'],
-            'password'          => $data['password'],
-            'plain_password'    => $data['password'],
+            'password'          => Hash::make($data['password']),
             'email_verified_at' => now(),
         ]);
         $user->save();
@@ -387,18 +387,17 @@ class TenantController extends Controller
         }
     }
 
-    /** @return list<array{id: int, name: string, email: string, plain_password: ?string, created_at: ?string}> */
+    /** @return list<array{id: int, name: string, email: string, created_at: ?string}> */
     private function portalAdmins(Tenant $tenant, string $role): array
     {
         return User::role($role)
             ->where('tenant_id', $tenant->id)
             ->orderBy('name')
-            ->get(['id', 'name', 'email', 'plain_password', 'created_at'])
+            ->get(['id', 'name', 'email', 'created_at'])
             ->map(fn (User $user) => [
                 'id'             => $user->id,
                 'name'           => $user->name,
                 'email'          => $user->email,
-                'plain_password' => $user->plain_password,
                 'created_at'     => $user->created_at?->toIso8601String(),
             ])
             ->all();

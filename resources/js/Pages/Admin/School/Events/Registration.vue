@@ -1,93 +1,1029 @@
 <template>
-    <SchoolAdminLayout :title="`${programLabel} Registration`" :school="school">
-        <div v-if="registrations?.length" class="bg-white border rounded-xl p-4 mb-4">
-            <h3 class="font-semibold text-sm mb-2">Your submissions</h3>
-            <ul class="text-sm divide-y">
-                <li v-for="reg in registrations" :key="reg.id" class="py-3 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                        <p class="font-medium">{{ reg.event?.title }} — {{ reg.item?.title }}</p>
-                        <p class="text-xs text-gray-500">{{ reg.status }} · {{ reg.participants?.length ?? 0 }} participant(s)
-                            <span v-if="reg.participants?.[0]?.group?.team_name"> · Team: {{ reg.participants[0].group.team_name }}</span>
-                        </p>
-                    </div>
-                    <form v-if="reg.event?.fee_type !== 'none' && !reg.fee_receipt_id && reg.status === 'submitted'"
-                          @submit.prevent="uploadPayment(reg)" class="flex gap-2 items-center">
-                        <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="e => paymentFiles[reg.id] = e.target.files[0]" class="text-xs" required>
-                        <button class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Upload fee</button>
-                    </form>
-                </li>
+    <SchoolAdminLayout :title="`${programLabel} Registration`" :school="school" :show-header-title="false">
+        <PageHeader
+            :title="`${programLabel} Registration`"
+            :eyebrow="programLabel"
+            :description="isSports
+                ? 'Pick athletes per event, then register. Age groups are filtered automatically.'
+                : isTeacherFest
+                    ? 'Register teachers for open Teacher Fest events.'
+                    : `Register students for open ${programLabel} events.`"
+        >
+            <template #actions>
+                <button v-if="!isTeacherFest" type="button" class="btn-secondary text-sm" @click="showAddStudent = true">
+                    {{ isLocked ? 'Request student' : '+ Add student' }}
+                </button>
+                <button v-if="events.length" type="button" class="btn-secondary text-sm" @click="showBulkImport = !showBulkImport">
+                    Import CSV
+                </button>
+                <a :href="`${programBase}/reports`" class="btn-secondary text-sm">Reports →</a>
+            </template>
+        </PageHeader>
+
+        <div v-if="showBulkImport && events.length" class="card mb-5 max-w-2xl text-sm border-indigo-100">
+            <div class="flex items-center justify-between gap-2 mb-3">
+                <p class="font-semibold text-slate-800">Bulk import from CSV</p>
+                <button type="button" class="text-slate-400 hover:text-slate-600 text-lg leading-none" @click="showBulkImport = false">×</button>
+            </div>
+            <p class="text-xs text-slate-500 mb-3">Columns: item_id, item_title, reg_no, team_name, role (performer|standby)</p>
+            <div class="flex flex-wrap gap-2 items-end">
+                <a :href="`${programBase}/import-template`"
+                   class="btn-secondary text-xs">Download template</a>
+                <select v-model="importEventId" class="field text-sm max-w-xs">
+                    <option value="">Select event</option>
+                    <option v-for="ev in events" :key="ev.id" :value="ev.id">{{ ev.title }}</option>
+                </select>
+                <input type="file" accept=".csv,text/csv" class="text-xs" @change="onImportFile">
+                <button type="button" class="btn-primary text-xs" :disabled="!importEventId || !importFile || importForm.processing"
+                        @click="submitImport">
+                    Import CSV
+                </button>
+            </div>
+            <ul v-if="$page.props.importErrors?.length" class="mt-3 text-xs text-red-600 list-disc pl-4">
+                <li v-for="(err, i) in $page.props.importErrors" :key="i">{{ err }}</li>
             </ul>
         </div>
 
-        <div v-if="!events.length" class="bg-amber-50 border border-amber-100 rounded-xl p-6 text-sm text-amber-800">
-            No events are open for registration right now.
+        <details v-if="!isTeacherFest && isSports" class="mb-5 max-w-3xl rounded-xl border border-slate-200/80 bg-slate-50/50 text-sm group">
+            <summary class="px-4 py-3 cursor-pointer select-none font-medium text-slate-700 flex items-center justify-between gap-2">
+                <span>How Sports Meet registration works</span>
+                <span class="text-xs text-slate-400 group-open:hidden">Show tips</span>
+            </summary>
+            <div class="px-4 pb-4 pt-0 border-t border-slate-100">
+                <ol class="list-decimal pl-4 space-y-1 text-slate-600 mt-3 mb-3">
+                    <li>Use <strong>Pick athletes</strong> on each row, then <strong>Register</strong>.</li>
+                    <li>Students qualify when age on cutoff is <strong>under N</strong> (U14 = under 14) and gender matches.</li>
+                    <li>Sahodaya approves → chest numbers on fest day → results under Reports.</li>
+                </ol>
+                <p class="text-xs text-slate-500">
+                    <button type="button" class="link-brand font-semibold" @click="showAddStudent = true">Add student</button>
+                    or
+                    <a :href="`/school-admin/${school.id}/students`" class="link-brand font-semibold">manage students →</a>
+                </p>
+            </div>
+        </details>
+
+        <div v-else-if="!isTeacherFest" class="notice-banner notice-banner--info mb-6 max-w-3xl text-sm">
+            Register students against each event item in the list below. Item fees are charged per registration;
+            annual Sahodaya membership is paid separately under Annual Registration.
+            <button type="button" class="link-brand font-semibold" @click="showAddStudent = true">Add student</button>
+            or
+            <a :href="`/school-admin/${school.id}/students`" class="link-brand font-semibold whitespace-nowrap">manage all students →</a>
         </div>
-        <div v-else class="space-y-4">
-            <div v-for="event in events" :key="event.id" class="bg-white border rounded-xl p-4">
-                <h3 class="font-semibold">{{ event.title }}</h3>
-                <p v-if="event.fee_type !== 'none'" class="text-xs text-gray-500 mt-1">Fee: ₹{{ event.fee_amount }} ({{ event.fee_type.replace('_', ' ') }})</p>
-                <form @submit.prevent="submit(event)" class="mt-3 space-y-2">
-                    <select v-model="forms[event.id].item_id" class="field" required @change="onItemChange(event.id)">
-                        <option value="">Select item</option>
-                        <option v-for="item in event.items" :key="item.id" :value="item.id">
-                            {{ item.title }} ({{ item.participant_type }})
-                        </option>
-                    </select>
-                    <input v-if="selectedItem(event.id)?.participant_type !== 'individual'"
-                           v-model="forms[event.id].team_name" class="field" placeholder="Team / group name" required>
-                    <select v-model="forms[event.id].student_ids" multiple class="field h-28" required>
-                        <option v-for="s in students" :key="s.id" :value="s.id">{{ s.name }} ({{ s.reg_no || 'no reg' }})</option>
-                    </select>
-                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Submit Registration</button>
+
+        <EmptyState
+            v-if="!events.length"
+            title="No events open for registration"
+            description="Check back when Sahodaya or your school publishes an event with registration open."
+            icon="📅"
+        />
+
+        <div v-else class="space-y-5">
+            <div v-if="focusEventId && displayEvents.length === 1" class="notice-banner notice-banner--info text-sm mb-2">
+                Showing Sahodaya event registration. <Link :href="`${programBase}/registration`" class="link-brand font-semibold">View all events</Link>
+            </div>
+            <div v-for="event in displayEvents" :key="event.id" class="card !p-0 overflow-hidden" :id="`event-${event.id}`">
+                <!-- Event header -->
+                <div class="px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <h3 class="text-lg font-bold text-slate-900">{{ event.title }}</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">{{ event.payer_label }}</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2 shrink-0">
+                            <span class="text-xs font-bold px-2.5 py-1 rounded-full capitalize"
+                                  :class="statusClass(event.status)">
+                                {{ statusLabel(event.status) }}
+                            </span>
+                            <span class="text-xs font-semibold px-2.5 py-1 rounded-full"
+                                  :class="event.level_round === 'school' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'">
+                                {{ event.level_label || event.level_round }}
+                            </span>
+                            <a v-if="['ongoing','registration_open','published'].includes(event.status)"
+                               :href="`${programBase}/fest-day/${event.id}`"
+                               class="text-xs font-semibold text-indigo-600 px-2 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100">
+                                Fest day →
+                            </a>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                        <span v-if="event.academic_year_label"
+                              class="inline-flex items-center gap-1 rounded-lg bg-violet-50 text-violet-800 px-2.5 py-1 border border-violet-100">
+                            Academic year <strong class="font-mono">{{ event.academic_year_label }}</strong>
+                        </span>
+                        <span v-if="event.quotas && eventType === 'sports'"
+                              class="inline-flex items-center gap-1 rounded-lg bg-emerald-50 text-emerald-800 px-2.5 py-1 border border-emerald-100">
+                            <strong>{{ event.quotas.used.total }}</strong> school {{ event.quotas.used.total === 1 ? 'entry' : 'entries' }}
+                        </span>
+                        <span v-if="event.sports_age_cutoff_date"
+                              class="inline-flex items-center gap-1 rounded-lg bg-slate-100 text-slate-600 px-2.5 py-1">
+                            Age cutoff {{ event.sports_age_cutoff_date }}
+                        </span>
+                    </div>
+                    <p v-if="event.age_rule_summary" class="text-xs text-indigo-800 mt-3 leading-relaxed">
+                        {{ event.age_rule_summary }}
+                    </p>
+                </div>
+
+                <div class="p-5">
+                <!-- Kalotsav-style participation quotas -->
+                <div v-if="event.quotas && eventType === 'kalolsavam'" class="grid sm:grid-cols-3 gap-2 mb-4">
+                    <div class="bg-gray-50 border rounded-lg px-3 py-2 text-xs">
+                        <span class="text-gray-500">On-stage</span>
+                        <p class="font-semibold">{{ event.quotas.used.on_stage }}/{{ limitLabel(event.quotas.limits?.max_onstage_per_student) }}</p>
+                    </div>
+                    <div class="bg-gray-50 border rounded-lg px-3 py-2 text-xs">
+                        <span class="text-gray-500">Off-stage</span>
+                        <p class="font-semibold">{{ event.quotas.used.off_stage }}/{{ limitLabel(event.quotas.limits?.max_offstage_per_student) }}</p>
+                    </div>
+                    <div class="bg-gray-50 border rounded-lg px-3 py-2 text-xs">
+                        <span class="text-gray-500">Group</span>
+                        <p class="font-semibold">{{ event.quotas.used.group }}/{{ limitLabel(event.quotas.limits?.max_group_per_student) }}</p>
+                    </div>
+                </div>
+
+                <div v-if="!canRegister(event)" class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
+                    {{ registrationClosedMessage(event) }}
+                </div>
+
+                <!-- ── SPORTS: age group nav + filtered list ── -->
+                <div v-else-if="isSports" class="space-y-4">
+                    <template v-if="!sportsGroups(event).length">
+                        <p class="text-sm text-slate-400 py-8 text-center">No items in this event yet.</p>
+                    </template>
+                    <template v-else>
+                        <!-- Filters -->
+                        <div class="flex flex-wrap gap-2 items-center sticky top-0 z-10 -mx-1 px-1 py-2 bg-white/95 backdrop-blur border-b border-slate-100">
+                            <input v-model="sportsSearch[event.id]"
+                                   type="search"
+                                   class="field flex-1 min-w-[10rem] !py-1.5 text-sm"
+                                   placeholder="Search events…"
+                                   autocomplete="off">
+                            <div class="flex flex-wrap gap-1">
+                                <button type="button"
+                                        class="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                                        :class="!sportsAgeFilter[event.id] ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
+                                        @click="sportsAgeFilter[event.id] = ''">
+                                    All
+                                </button>
+                                <button v-for="g in sportsGroups(event)" :key="g.key"
+                                        type="button"
+                                        class="text-xs px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
+                                        :class="sportsAgeFilter[event.id] === g.key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
+                                        @click="sportsAgeFilter[event.id] = g.key">
+                                    {{ g.label }}
+                                    <span v-if="g.openCount" class="font-semibold"
+                                          :class="sportsAgeFilter[event.id] === g.key ? 'text-indigo-100' : 'text-indigo-600'">
+                                        · {{ g.openCount }} open
+                                    </span>
+                                    <span v-if="g.registeredCount" class="opacity-75">· {{ g.registeredCount }} done</span>
+                                </button>
+                            </div>
+                            <button v-if="sportsSearch[event.id]?.trim() || sportsAgeFilter[event.id]"
+                                    type="button"
+                                    class="btn-secondary text-xs !py-1"
+                                    @click="clearSportsFilters(event.id)">
+                                Clear
+                            </button>
+                            <p v-if="sportsRegistrationSummary(event)"
+                               class="w-full sm:w-auto sm:ml-auto text-[11px] text-slate-500 order-last sm:order-none">
+                                {{ sportsRegistrationSummary(event) }}
+                            </p>
+                        </div>
+
+                        <p v-if="filteredSportsGroups(event).length === 0" class="text-sm text-slate-400 py-6 text-center">
+                            No events match your filters.
+                        </p>
+
+                        <div v-for="group in filteredSportsGroups(event)" :key="group.key"
+                             class="rounded-xl border border-slate-200/80 overflow-hidden shadow-sm">
+                            <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-semibold text-sm text-slate-800">{{ group.label }}</span>
+                                    <span class="text-[11px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">
+                                        {{ groupVisibleItemCount(group) }} events
+                                    </span>
+                                </div>
+                                <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                                    <span>{{ group.eligibleCount }} eligible athletes</span>
+                                    <span v-if="group.openCount" class="text-indigo-700 font-semibold">
+                                        {{ group.openCount }} open
+                                    </span>
+                                    <span v-if="group.registeredCount" class="text-emerald-700 font-semibold">
+                                        {{ group.registeredCount }} registered
+                                    </span>
+                                    <span v-if="group.noEligibleCount" class="text-amber-700">
+                                        {{ group.noEligibleCount }} need athletes
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div v-for="(genderGroup, gi) in group.genderGroups" :key="gi">
+                                <div v-if="genderGroup.label"
+                                     class="px-4 py-1 bg-white border-b border-slate-50 flex items-center gap-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                        {{ genderGroup.label }}
+                                    </span>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="data-table w-full text-sm">
+                                        <thead>
+                                            <tr>
+                                                <th class="min-w-[140px]">Event</th>
+                                                <th v-if="event.fee_required" class="w-20">Fee</th>
+                                                <th class="min-w-[120px]">Registered</th>
+                                                <th class="text-right min-w-[220px]">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <FestRegistrationItemRow
+                                                v-for="item in genderGroup.items"
+                                                :key="item.id"
+                                                layout="sports"
+                                                :row-id="itemRowId(event.id, item.id)"
+                                                :item="item"
+                                                :form="itemForms[itemFormKey(event.id, item.id)]"
+                                                :registrations="registrationsForItem(event.id, item.id)"
+                                                :eligible-students="eligibleStudentsForItem(event.id, item)"
+                                                :all-students="studentsForEvent(event.id)"
+                                                :student-ineligibility-reason="(student) => studentIneligibilityReason(student, event, item)"
+                                                :show-fee="event.fee_required"
+                                                :blocked="isItemBlocked(event, item)"
+                                                :block-reason="itemBlockReason(event, item)"
+                                                :error-message="itemErrors[itemFormKey(event.id, item.id)]"
+                                                :status-label="itemStatusMeta(event, item).label"
+                                                :status-class="itemStatusMeta(event, item).badgeClass"
+                                                :status-hint="itemStatusMeta(event, item).hint"
+                                                performer-label="athletes"
+                                                :is-teacher-fest="false"
+                                                :event-type="eventType"
+                                                :teachers="[]"
+                                                :student-label="studentOptionLabel"
+                                                :registered-names="registeredNames"
+                                                :can-withdraw="canWithdraw"
+                                                @register="submitItem(event, item)"
+                                                @withdraw="withdraw"
+                                                @add-student="showAddStudent = true"
+                                            />
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- ── KALOTSAV / KIDS FEST / TEACHER FEST: generic flat table ── -->
+                <form v-else class="mt-4 space-y-4" @submit.prevent>
+                    <div class="rounded-xl border border-gray-100 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 border-b border-gray-100">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[160px]">Event item</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[140px]">Eligibility</th>
+                                        <th v-if="event.fee_required" class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">Item fee</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[120px]">Registered</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-48">
+                                            {{ isTeacherFest ? 'Teachers' : 'Students' }}
+                                        </th>
+                                        <th class="px-3 py-2 w-24"></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-50">
+                                    <FestRegistrationItemRow
+                                        v-for="item in allItems(event)"
+                                        :key="item.id"
+                                        :row-id="itemRowId(event.id, item.id)"
+                                        :item="item"
+                                        :form="itemForms[itemFormKey(event.id, item.id)]"
+                                        :registrations="registrationsForItem(event.id, item.id)"
+                                        :eligible-students="eligibleStudentsForItem(event.id, item)"
+                                        :all-students="studentsForEvent(event.id)"
+                                        :student-ineligibility-reason="(student) => studentIneligibilityReason(student, event, item)"
+                                        :show-fee="event.fee_required"
+                                        :blocked="isItemBlocked(event, item)"
+                                        :block-reason="itemBlockReason(event, item)"
+                                        :error-message="itemErrors[itemFormKey(event.id, item.id)]"
+                                        :status-label="itemStatusMeta(event, item).label"
+                                        :status-class="itemStatusMeta(event, item).badgeClass"
+                                        :status-hint="itemStatusMeta(event, item).hint"
+                                        :performer-label="isTeacherFest ? 'teachers' : 'students'"
+                                        :is-teacher-fest="isTeacherFest"
+                                        :event-type="eventType"
+                                        :teachers="teachers"
+                                        :student-label="studentOptionLabel"
+                                        :registered-names="registeredNames"
+                                        :can-withdraw="canWithdraw"
+                                        :column-count="event.fee_required ? 6 : 5"
+                                        @register="submitItem(event, item)"
+                                        @withdraw="withdraw"
+                                        @add-student="showAddStudent = true"
+                                    />
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </form>
+
+                <!-- Item fees — separate from annual Sahodaya membership -->
+                <div v-if="event.fee_required && event.school_fee" class="mt-4 border-t border-gray-100 pt-4 space-y-3">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-800">Event item fees</p>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Charged per item you register below. Annual Sahodaya membership (₹{{ formatMoney(schoolMembershipFeeAmount(event)) }}+)
+                            is paid separately under
+                            <a :href="`/school-admin/${school.id}/registration`" class="link-brand font-semibold">Annual Registration</a>
+                            — not here.
+                        </p>
+                    </div>
+                    <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm">
+                        <ul v-if="itemFeeLines(event).length" class="text-xs text-indigo-900 space-y-1">
+                            <li v-for="(line, i) in itemFeeLines(event)" :key="i" class="flex justify-between gap-4">
+                                <span>{{ line.label }}</span>
+                                <span class="font-semibold shrink-0">₹{{ formatMoney(line.amount) }}</span>
+                            </li>
+                        </ul>
+                        <p v-else class="text-xs text-indigo-800">Register items above to see item fees here.</p>
+                        <p class="font-semibold text-indigo-900 mt-2 pt-2 border-t border-indigo-100">
+                            Item fees due: ₹{{ formatMoney(itemFeesDue(event)) }}
+                            <span v-if="event.school_fee.participation_item_count" class="font-normal text-indigo-700">
+                                ({{ event.school_fee.participation_item_count }} item{{ event.school_fee.participation_item_count === 1 ? '' : 's' }})
+                            </span>
+                        </p>
+                        <div class="mt-2 flex flex-wrap gap-2 items-center">
+                            <span v-if="event.school_fee.status === 'approved'" class="text-xs text-green-700 font-semibold">Payment approved</span>
+                            <span v-else-if="event.school_fee.status === 'proof_uploaded'" class="text-xs text-amber-700 font-semibold">Payment pending approval</span>
+                            <span v-else-if="event.school_fee.status === 'rejected'" class="text-xs text-red-600 font-semibold">Payment rejected — re-upload</span>
+                            <form v-if="itemFeesDue(event) > 0 && ['pending', 'rejected'].includes(event.school_fee.status)"
+                                  @submit.prevent="uploadEventPayment(event)" class="flex flex-wrap gap-2 items-center">
+                                <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                                       @change="e => eventPaymentFiles[event.id] = e.target.files[0]" class="text-xs">
+                                <input v-model="eventPaymentRefs[event.id]" class="field text-xs w-36" placeholder="Txn ref (opt)">
+                                <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">Upload item fee proof</button>
+                            </form>
+                            <a v-if="event.school_fee.status === 'approved'"
+                               :href="`${programBase}/events/${event.id}/receipt`"
+                               target="_blank" rel="noopener"
+                               class="px-2 py-1 bg-green-50 border border-green-300 text-green-700 text-xs font-semibold rounded">
+                                View Receipt ↗
+                            </a>
+                            <a v-if="itemFeesDue(event) > 0"
+                               :href="`${programBase}/events/${event.id}/invoice`"
+                               target="_blank" rel="noopener"
+                               class="px-2 py-1 bg-indigo-50 border border-indigo-300 text-indigo-700 text-xs font-semibold rounded">
+                                Download Invoice ↗
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <p v-else-if="canRegister(event) && !event.fee_required" class="text-xs text-gray-400 mt-4 border-t border-gray-100 pt-4">No fee for this round</p>
+                </div>
             </div>
         </div>
+
+        <QuickAddStudentModal
+            v-model="showAddStudent"
+            :school="school"
+            :school-classes="schoolClasses"
+            :student-edit-lock="studentEditLock"
+        />
     </SchoolAdminLayout>
 </template>
 
 <script setup>
-import { reactive } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, reactive, ref, onMounted } from 'vue';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import QuickAddStudentModal from '@/Components/school/QuickAddStudentModal.vue';
+import FestRegistrationItemRow from '@/Components/school/FestRegistrationItemRow.vue';
+import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
+import { genderLabel } from '@/support/festItemEligibility.js';
 
-const props = defineProps({ school: Object, program: String, events: Array, registrations: Array, students: Array });
+const props = defineProps({
+    school: Object,
+    program: [String, Object],
+    programMeta: { type: Object, default: null },
+    eventType: String,
+    events: Array,
+    focusEventId: { type: Number, default: null },
+    registrations: Array,
+    students: Array,
+    studentsByEvent: { type: Object, default: () => ({}) },
+    schoolClasses: { type: Array, default: () => [] },
+    teachers: { type: Array, default: () => [] },
+    isTeacherFest: { type: Boolean, default: false },
+    studentEditLock: { type: Object, default: () => ({ locked: false }) },
+});
 
-const labels = { kalotsav: 'Kalotsav', 'sports-meet': 'Sports Meet', 'kids-fest': 'Kids Fest' };
-const programLabel = labels[props.program] ?? props.program;
+const { programSlug, programLabel, programBase } = useSchoolProgramContext(props);
 
-const forms = reactive({});
-const paymentFiles = reactive({});
+const isSports = computed(() => props.eventType === 'sports');
+const isLocked = computed(() => !!props.studentEditLock?.locked);
+
+const displayEvents = computed(() => {
+    if (!props.focusEventId) return props.events ?? [];
+    return (props.events ?? []).filter((e) => e.id === props.focusEventId);
+});
+
+onMounted(() => {
+    if (!props.focusEventId) return;
+    requestAnimationFrame(() => {
+        document.getElementById(`event-${props.focusEventId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+});
+
+const importEventId = ref('');
+const importFile = ref(null);
+const importForm = useForm({ event_id: '', file: null });
+const showAddStudent = ref(false);
+const showBulkImport = ref(false);
+const sportsSearch = reactive({});
+const sportsAgeFilter = reactive({});
+
+const kalotsavItemGroups = [
+    { key: 'on_stage', label: 'On stage' },
+    { key: 'off_stage', label: 'Off stage' },
+    { key: 'group', label: 'Group / team' },
+    { key: 'other', label: 'Other' },
+];
+
+const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'];
+const SPORTS_MALE_VALS = new Set(['male', 'm', 'boys', 'boy']);
+const SPORTS_FEMALE_VALS = new Set(['female', 'f', 'girls', 'girl']);
+
+function sportsGroups(event) {
+    const grouped = event?.items_grouped ?? {};
+    const labels = event?.item_group_labels ?? {};
+    const students = studentsForEvent(event.id);
+    const allRegs = props.registrations ?? [];
+
+    return Object.keys(grouped)
+        .filter((key) => (grouped[key]?.length ?? 0) > 0)
+        .sort((a, b) => {
+            const ai = SPORTS_AGE_ORDER.indexOf(a.toLowerCase());
+            const bi = SPORTS_AGE_ORDER.indexOf(b.toLowerCase());
+            return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+        })
+        .map((key) => {
+            const items = grouped[key] ?? [];
+            const label = labels[key] ?? String(key).toUpperCase();
+            const itemIds = new Set(items.map((i) => Number(i.id)));
+
+            const eligibleCount = students.filter(
+                (s) => (s.eligible_sports_groups ?? []).map(g => g.toLowerCase()).includes(key.toLowerCase()),
+            ).length;
+
+            const registeredCount = allRegs.filter(
+                (r) => Number(r.event_id) === Number(event.id)
+                    && itemIds.has(Number(r.item_id))
+                    && !['withdrawn', 'rejected'].includes(r.status),
+            ).length;
+
+            let openCount = 0;
+            let noEligibleCount = 0;
+            for (const item of items) {
+                const status = itemRegistrationStatus(event, item);
+                if (status === 'open' || status === 'partial') openCount++;
+                else if (status === 'no_eligible') noEligibleCount++;
+            }
+
+            const maleItems = items.filter((i) => SPORTS_MALE_VALS.has(String(i.gender ?? '').toLowerCase()));
+            const femaleItems = items.filter((i) => SPORTS_FEMALE_VALS.has(String(i.gender ?? '').toLowerCase()));
+            const openItems = items.filter(
+                (i) => !SPORTS_MALE_VALS.has(String(i.gender ?? '').toLowerCase())
+                    && !SPORTS_FEMALE_VALS.has(String(i.gender ?? '').toLowerCase()),
+            );
+
+            const hasBoth = maleItems.length > 0 && femaleItems.length > 0;
+            const genderGroups = [];
+            if (maleItems.length) genderGroups.push({ gender: 'male', label: hasBoth ? 'Boys' : '', items: maleItems });
+            if (femaleItems.length) genderGroups.push({ gender: 'female', label: hasBoth ? 'Girls' : '', items: femaleItems });
+            if (openItems.length) {
+                genderGroups.push({ gender: 'open', label: hasBoth ? 'Open / Mixed' : '', items: openItems });
+            }
+            if (!genderGroups.length) genderGroups.push({ gender: 'all', label: '', items });
+
+            return { key, label, items, eligibleCount, registeredCount, openCount, noEligibleCount, genderGroups };
+        });
+}
+
+function sportsRegistrationSummary(event) {
+    const groups = filteredSportsGroups(event);
+    let open = 0;
+    let registered = 0;
+    let noMatch = 0;
+    let total = 0;
+
+    for (const group of groups) {
+        for (const gg of group.genderGroups) {
+            for (const item of gg.items) {
+                total++;
+                const status = itemRegistrationStatus(event, item);
+                if (status === 'open' || status === 'partial') open++;
+                else if (status === 'registered') registered++;
+                else if (status === 'no_eligible') noMatch++;
+            }
+        }
+    }
+
+    if (!total) return '';
+
+    const parts = [`${total} event${total === 1 ? '' : 's'}`];
+    if (open) parts.push(`${open} open for registration`);
+    if (registered) parts.push(`${registered} registered`);
+    if (noMatch) parts.push(`${noMatch} need matching athletes`);
+    return parts.join(' · ');
+}
+
+function filteredSportsGroups(event) {
+    const ageKey = sportsAgeFilter[event.id] ?? '';
+    const q = (sportsSearch[event.id] ?? '').trim().toLowerCase();
+
+    return sportsGroups(event)
+        .filter((group) => !ageKey || group.key === ageKey)
+        .map((group) => {
+            if (!q) return group;
+            const genderGroups = group.genderGroups
+                .map((gg) => ({
+                    ...gg,
+                    items: gg.items.filter((item) => String(item.title ?? '').toLowerCase().includes(q)),
+                }))
+                .filter((gg) => gg.items.length);
+            return { ...group, genderGroups };
+        })
+        .filter((group) => group.genderGroups.length);
+}
+
+function groupVisibleItemCount(group) {
+    return group.genderGroups.reduce((n, gg) => n + gg.items.length, 0);
+}
+
+function clearSportsFilters(eventId) {
+    sportsSearch[eventId] = '';
+    sportsAgeFilter[eventId] = '';
+}
+
+function onImportFile(e) {
+    importFile.value = e.target.files[0] ?? null;
+}
+
+function submitImport() {
+    importForm.event_id = importEventId.value;
+    importForm.file = importFile.value;
+    importForm.post(`${programBase.value}/import`, {
+        forceFormData: true,
+        preserveScroll: true,
+    });
+}
+
+const itemGroups = kalotsavItemGroups;
+
+function itemGroupsFor(event) {
+    const grouped = event?.items_grouped ?? {};
+    const labels = event?.item_group_labels ?? {};
+
+    if (props.eventType === 'sports') {
+        return Object.keys(grouped)
+            .filter((key) => (grouped[key]?.length ?? 0) > 0)
+            .map((key) => ({ key, label: labels[key] ?? String(key).toUpperCase() }));
+    }
+
+    if (props.eventType === 'kids_fest') {
+        return Object.keys(grouped)
+            .filter((key) => (grouped[key]?.length ?? 0) > 0)
+            .map((key) => ({ key, label: labels[key] ?? 'Events' }));
+    }
+
+    return kalotsavItemGroups.filter((g) => (grouped[g.key]?.length ?? 0) > 0);
+}
+
+function limitLabel(val) {
+    return val == null || val === '' ? '∞' : val;
+}
+
+const itemForms = reactive({});
+const itemErrors = reactive({});
+const eventPaymentFiles = reactive({});
+const eventPaymentRefs = reactive({});
+const page = usePage();
+
+function allItemsStatic(event) {
+    return event?.items ?? [];
+}
+
+function itemFormKey(eventId, itemId) {
+    return `${eventId}-${itemId}`;
+}
 
 for (const e of props.events) {
-    forms[e.id] = { item_id: '', team_name: '', student_ids: [] };
+    eventPaymentRefs[e.id] = '';
+    sportsSearch[e.id] = '';
+    sportsAgeFilter[e.id] = '';
+    for (const item of allItemsStatic(e)) {
+        itemForms[itemFormKey(e.id, item.id)] = {
+            team_name: '',
+            student_ids: [],
+            teacher_ids: [],
+            standby_ids: [],
+        };
+    }
 }
 
-function selectedItem(eventId) {
+function allItems(event) {
+    return event?.items ?? [];
+}
+
+function formatMoney(value) {
+    const n = Number(value);
+    if (Number.isNaN(n)) return '0.00';
+    return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function registrationsForItem(eventId, itemId) {
+    return (props.registrations ?? []).filter(
+        reg => Number(reg.event_id) === Number(eventId) && Number(reg.item_id) === Number(itemId)
+            && !['withdrawn', 'rejected'].includes(reg.status),
+    );
+}
+
+function registeredNames(reg) {
+    const labels = (reg.participants ?? [])
+        .filter(p => p.participant_role !== 'standby')
+        .map((p) => {
+            const name = p.student?.name ?? p.teacher?.name;
+            const regNo = p.student?.reg_no ?? p.teacher?.reg_no;
+            const festId = p.level_registration_number;
+            if (name && festId) return `${name} (${festId})`;
+            if (name && regNo) return `${name} (${regNo})`;
+            return name ?? regNo;
+        })
+        .filter(Boolean);
+    return labels.length ? labels.join(', ') : 'Registered';
+}
+
+function isGroupItemRow(item) {
+    return item && ['group', 'team'].includes(item.participant_type);
+}
+
+function studentsForEvent(eventId) {
+    const map = props.studentsByEvent ?? {};
+    return map[eventId] ?? map[String(eventId)] ?? props.students ?? [];
+}
+
+function studentMatchesItem(student, event, item) {
+    if (event?.academic_year_id && student.academic_year_id && event.academic_year_id !== student.academic_year_id) {
+        return false;
+    }
+    if (props.eventType === 'kalolsavam') {
+        if (!student.eligible_kalolsav) return false;
+        if (item.class_group && item.class_group !== 'open' && student.kalolsav_class_group !== item.class_group) return false;
+    }
+    if (props.eventType === 'kids_fest') {
+        if (!student.eligible_kids_fest) return false;
+        if (item.kids_band && item.kids_band !== 'open' && student.kids_fest_band !== item.kids_band) return false;
+    }
+    if (props.eventType === 'sports') {
+        if (!student.dob) {
+            return false;
+        }
+        if (item.age_group && item.age_group !== 'open') {
+            const groups = student.eligible_sports_groups ?? [];
+            if (!groups.includes(item.age_group)) return false;
+        }
+    }
+    if (item.gender && !['open', 'mixed'].includes(item.gender) && student.gender && student.gender !== item.gender) {
+        return false;
+    }
+    return true;
+}
+
+function eligibleStudentsForItem(eventId, item) {
     const event = props.events.find(e => e.id === eventId);
-    return event?.items?.find(i => i.id === forms[eventId]?.item_id);
+    const pool = studentsForEvent(eventId);
+    return pool.filter(s => studentMatchesItem(s, event, item));
 }
 
-function onItemChange(eventId) {
-    forms[eventId].student_ids = [];
-    forms[eventId].team_name = '';
+function studentIneligibilityReason(student, event, item) {
+    if (event?.academic_year_id && student.academic_year_id
+        && Number(event.academic_year_id) !== Number(student.academic_year_id)) {
+        return 'Not enrolled in this event\'s academic year';
+    }
+
+    const itemGender = String(item.gender ?? 'open').toLowerCase();
+    const studentGender = String(student.gender ?? '').toLowerCase();
+    if (!['open', 'mixed'].includes(itemGender)) {
+        if (!studentGender || studentGender === 'open') {
+            return 'Set gender on the student profile';
+        }
+        if (studentGender !== itemGender) {
+            return `This item is for ${genderLabel(itemGender) ?? itemGender} only`;
+        }
+    }
+
+    if (props.eventType === 'sports') {
+        if (!student.dob) {
+            return 'Date of birth is required for sports';
+        }
+        const itemAge = item.age_group;
+        if (itemAge && itemAge !== 'open') {
+            const groups = student.eligible_sports_groups ?? [];
+            if (!groups.includes(itemAge)) {
+                const underN = String(itemAge).replace(/^u/i, '');
+                const ageHint = student.sports_age_on_cutoff != null
+                    ? ` (age ${student.sports_age_on_cutoff} on cutoff)`
+                    : '';
+                return `Must be under ${underN} on cutoff date${ageHint} — not eligible for ${String(itemAge).toUpperCase()}`;
+            }
+        }
+    }
+
+    if (props.eventType === 'kalolsavam') {
+        if (!student.eligible_kalolsav) return 'Not eligible for Kalotsav (Classes 3–12)';
+    }
+
+    if (props.eventType === 'kids_fest') {
+        if (!student.eligible_kids_fest) return 'Not eligible for Kids Fest (Pre-KG to Class 2)';
+    }
+
+    return 'Not eligible for this item';
 }
 
-function submit(event) {
-    router.post(`/school-admin/${props.school.id}/programs/${props.program}/register`, {
+function itemFeeLines(event) {
+    const lines = event.school_fee?.breakdown?.items ?? [];
+    return lines.filter(line => !String(line.label).toLowerCase().includes('school registration'));
+}
+
+function itemFeesDue(event) {
+    return itemFeeLines(event).reduce((sum, line) => sum + Number(line.amount || 0), 0);
+}
+
+function schoolMembershipFeeAmount(event) {
+    const line = (event.school_fee?.breakdown?.items ?? []).find(
+        l => String(l.label).toLowerCase().includes('school registration'),
+    );
+    return line?.amount ?? event.school_fee?.school_registration_fee ?? 0;
+}
+
+function canRegister(event) {
+    return event.status === 'registration_open';
+}
+
+function statusLabel(status) {
+    const labels = {
+        published: 'Published — registration not open',
+        registration_open: 'Registration open',
+        ongoing: 'Event ongoing',
+        completed: 'Completed',
+        draft: 'Draft',
+    };
+    return labels[status] ?? status;
+}
+
+function statusClass(status) {
+    if (status === 'registration_open') return 'bg-green-50 text-green-700';
+    if (status === 'published') return 'bg-amber-50 text-amber-800';
+    if (status === 'ongoing') return 'bg-blue-50 text-blue-700';
+    return 'bg-gray-100 text-gray-600';
+}
+
+function registrationClosedMessage(event) {
+    if (event.status === 'published') {
+        return 'This event is published but registration has not been opened yet. Check back when your Sahodaya opens registration.';
+    }
+    if (event.status === 'ongoing') {
+        return 'Registration is closed — this event is already in progress.';
+    }
+    if (event.status === 'completed') {
+        return 'This event has ended. Registration is no longer available.';
+    }
+    return 'Registration is not open for this event.';
+}
+
+function studentOptionLabel(student) {
+    const parts = [];
+    if (student.reg_no) parts.push(student.reg_no);
+    parts.push(student.class_name || 'no class');
+    if (student.sports_age_on_cutoff != null) parts.push(`age ${student.sports_age_on_cutoff}`);
+    if (student.sports_age_group) parts.push(String(student.sports_age_group).toUpperCase());
+    if (student.kalolsav_class_group) parts.push(`Cat ${categoryShort(student)}`);
+    if (student.kids_fest_band) parts.push(student.kids_fest_band);
+    const g = genderLabel(student.gender);
+    if (g) parts.push(g);
+    return parts.join(' · ');
+}
+
+function categoryShort(student) {
+    const map = { lp: '1', up: '2', hs: '3', hss: '4' };
+    return map[student.kalolsav_class_group] ?? student.kalolsav_class_group;
+}
+
+function performerCount(reg) {
+    const performers = reg.participants?.filter(p => p.participant_role !== 'standby') ?? reg.participants ?? [];
+    return performers.length;
+}
+
+function standbyCount(reg) {
+    return reg.participants?.filter(p => p.participant_role === 'standby').length ?? 0;
+}
+
+function canWithdraw(reg) {
+    if (['withdrawn', 'rejected'].includes(reg.status)) return false;
+    const event = props.events.find(e => e.id === reg.event_id);
+    if (!event) return reg.status === 'submitted';
+    if (event.results_published || ['completed', 'cancelled'].includes(event.status)) return false;
+    return event.status === 'registration_open' || reg.status === 'submitted';
+}
+
+function withdraw(id) {
+    if (!confirm('Cancel this registration?')) return;
+    router.post(`${programBase.value}/registrations/${id}/withdraw`, {}, { preserveScroll: true });
+}
+
+function itemRegistrationCount(eventId, itemId) {
+    return registrationsForItem(eventId, itemId).length;
+}
+
+function itemMaxPerSchool(item) {
+    const max = Number(item.max_per_school ?? 1);
+    return max > 0 ? max : 1;
+}
+
+function isItemFull(event, item) {
+    return itemRegistrationCount(event.id, item.id) >= itemMaxPerSchool(item);
+}
+
+function itemBlockReason(event, item) {
+    if (isItemFull(event, item)) {
+        const max = itemMaxPerSchool(item);
+        return max === 1
+            ? 'Your school already has an entry for this item (max 1 per school).'
+            : `Maximum ${max} entries per school for this item — limit reached.`;
+    }
+
+    const quotas = event.quotas;
+    if (!quotas) return '';
+
+    const limits = quotas.limits ?? {};
+    if (item.stage_type === 'on_stage' && limits.max_onstage_per_student != null
+        && quotas.used.on_stage >= limits.max_onstage_per_student) {
+        return `School on-stage participation limit reached (max ${limits.max_onstage_per_student}).`;
+    }
+    if (item.stage_type === 'off_stage' && limits.max_offstage_per_student != null
+        && quotas.used.off_stage >= limits.max_offstage_per_student) {
+        return `School off-stage participation limit reached (max ${limits.max_offstage_per_student}).`;
+    }
+    if (['group', 'team'].includes(item.participant_type) && limits.max_group_per_student != null
+        && quotas.used.group >= limits.max_group_per_student) {
+        return `School group/team participation limit reached (max ${limits.max_group_per_student}).`;
+    }
+
+    return '';
+}
+
+function isItemBlocked(event, item) {
+    return Boolean(itemBlockReason(event, item));
+}
+
+function itemEligibleAthleteCount(eventId, item) {
+    return eligibleStudentsForItem(eventId, item).length;
+}
+
+function itemRegistrationStatus(event, item) {
+    const regs = itemRegistrationCount(event.id, item.id);
+    const max = itemMaxPerSchool(item);
+
+    if (isItemFull(event, item)) {
+        return regs > 0 ? 'registered' : 'full';
+    }
+
+    if (itemEligibleAthleteCount(event.id, item) === 0) {
+        return 'no_eligible';
+    }
+
+    if (regs > 0 && max > 1) {
+        return 'partial';
+    }
+
+    return 'open';
+}
+
+function itemStatusMeta(event, item) {
+    const status = itemRegistrationStatus(event, item);
+    const eligible = itemEligibleAthleteCount(event.id, item);
+    const regs = itemRegistrationCount(event.id, item.id);
+    const max = itemMaxPerSchool(item);
+
+    if (status === 'registered') {
+        return {
+            label: 'Registered',
+            badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+            hint: max === 1 ? 'Entry submitted for this event' : `${regs} of ${max} school entries used`,
+        };
+    }
+
+    if (status === 'full') {
+        return {
+            label: 'Full',
+            badgeClass: 'bg-amber-50 text-amber-800 border-amber-100',
+            hint: '',
+        };
+    }
+
+    if (status === 'no_eligible') {
+        return {
+            label: 'No match',
+            badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
+            hint: 'No athletes meet age/gender for this event',
+        };
+    }
+
+    if (status === 'partial') {
+        return {
+            label: 'Open',
+            badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+            hint: `${regs}/${max} entries · ${eligible} athlete${eligible === 1 ? '' : 's'} eligible`,
+        };
+    }
+
+    return {
+        label: 'Open',
+        badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+        hint: `${eligible} athlete${eligible === 1 ? '' : 's'} can register`,
+    };
+}
+
+function itemRowId(eventId, itemId) {
+    return `reg-item-${itemFormKey(eventId, itemId)}`;
+}
+
+function extractItemErrors(errors, itemId) {
+    const key = `items.${itemId}`;
+    const messages = errors?.[key];
+    if (Array.isArray(messages)) return messages.join(' ');
+    if (typeof messages === 'string') return messages;
+    return '';
+}
+
+function scrollToItemRow(eventId, itemId) {
+    const el = document.getElementById(itemRowId(eventId, itemId));
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function submitItem(event, item) {
+    const key = itemFormKey(event.id, item.id);
+    const form = itemForms[key];
+    const standby = (form.standby_ids ?? []).slice(0, 2);
+
+    delete itemErrors[key];
+
+    if (isItemBlocked(event, item)) {
+        itemErrors[key] = itemBlockReason(event, item);
+        scrollToItemRow(event.id, item.id);
+        return;
+    }
+
+    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > 1) {
+        itemErrors[key] = 'This item allows only one participant.';
+        scrollToItemRow(event.id, item.id);
+        return;
+    }
+
+    router.post(`${programBase.value}/register`, {
         event_id: event.id,
-        ...forms[event.id],
-    }, { preserveScroll: true });
+        item_id: item.id,
+        team_name: form.team_name,
+        student_ids: form.student_ids,
+        teacher_ids: form.teacher_ids,
+        standby_ids: standby,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            delete itemErrors[key];
+            form.student_ids = [];
+            form.teacher_ids = [];
+            form.standby_ids = [];
+            form.team_name = '';
+        },
+        onError: (errors) => {
+            itemErrors[key] = extractItemErrors(errors, item.id)
+                || errors.registration
+                || page.props.flash?.error
+                || 'Could not register for this item.';
+            scrollToItemRow(event.id, item.id);
+        },
+    });
 }
 
-function uploadPayment(reg) {
-    const file = paymentFiles[reg.id];
-    if (!file) return;
-    router.post(`/school-admin/${props.school.id}/programs/${props.program}/registrations/${reg.id}/payment`, {
+function uploadEventPayment(event) {
+    const file = eventPaymentFiles[event.id];
+    if (!file) {
+        alert('Choose a payment proof file first, or skip — registration does not require it.');
+        return;
+    }
+    router.post(`${programBase.value}/events/${event.id}/payment`, {
         payment_proof: file,
+        transaction_ref: eventPaymentRefs[event.id] || null,
     }, { forceFormData: true, preserveScroll: true });
 }
 </script>
-<style scoped>
-@reference "../../../../../css/app.css";
-.field { @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm; }
-</style>

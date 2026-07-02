@@ -4,6 +4,12 @@
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
                          :pendingPaymentsCount="pendingPaymentsCount">
+        <PageHeader
+            title="Membership Reports"
+            eyebrow="Analytics"
+            description="School lists, payment status, submissions, and exportable Excel reports for the active academic year."
+        />
+
         <div class="space-y-5">
             <!-- Summary -->
             <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -25,27 +31,33 @@
             <div class="flex flex-wrap gap-2">
                 <button v-for="t in reportTabs" :key="t.key"
                         @click="switchTab(t.key)"
-                        :class="['px-4 py-2 rounded-xl text-sm font-semibold border transition',
-                                 tab === t.key
-                                     ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]'
-                                     : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300']">
+                        :class="['tab-btn', tab === t.key ? 'tab-btn--active' : '']">
                     {{ t.label }}
                 </button>
             </div>
 
             <!-- Search + date + export -->
-            <div class="flex flex-wrap items-end gap-3">
-                <input v-model="searchForm.search" type="search"
-                       :placeholder="searchPlaceholder"
-                       @keyup.enter="applySearch"
-                       class="border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20 w-full max-w-xs">
-                <input v-model="searchForm.date_from" type="date"
-                       class="border border-gray-200 rounded-xl px-3 py-2 text-sm">
-                <input v-model="searchForm.date_to" type="date"
-                       class="border border-gray-200 rounded-xl px-3 py-2 text-sm">
-                <button @click="applySearch"
-                        class="bg-[#0f3d7a] text-white px-4 py-2 rounded-xl text-sm font-semibold">Apply</button>
-                <a :href="exportUrl()" class="export-btn ml-auto">Download Excel ↓</a>
+            <div class="card flex flex-wrap items-end gap-4">
+                <FormField label="Search" class-extra="w-full max-w-xs">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="searchForm.search" type="search"
+                               :placeholder="searchPlaceholder"
+                               @keyup.enter="applySearch"
+                               class="field">
+                    </template>
+                </FormField>
+                <FormField label="From">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="searchForm.date_from" type="date" class="field">
+                    </template>
+                </FormField>
+                <FormField label="To">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="searchForm.date_to" type="date" class="field">
+                    </template>
+                </FormField>
+                <button type="button" @click="applySearch" class="btn-primary">Apply filters</button>
+                <a :href="exportUrl()" class="btn-secondary ml-auto">Download Excel ↓</a>
             </div>
 
             <!-- Schools list -->
@@ -308,7 +320,7 @@ const PaginationLinks = defineComponent({
                 p.links.map((link, i) => h(Link, {
                     key: i,
                     href: link.url || '#',
-                    class: ['px-3 py-1 rounded-lg text-sm', link.active ? 'bg-[#0f3d7a] text-white' : 'text-gray-600 hover:bg-gray-100'],
+                    class: ['px-3 py-1 rounded-lg text-sm', link.active ? 'pagination-link--active' : 'text-gray-600 hover:bg-gray-100'],
                     innerHTML: link.label,
                 })))
             : null;

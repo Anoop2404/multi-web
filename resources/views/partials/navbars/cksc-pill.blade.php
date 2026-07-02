@@ -2,6 +2,11 @@
 <nav class="fixed top-0 left-0 right-0 z-50 px-3 sm:px-5 pt-3 sm:pt-4 backdrop-blur-md cksc-pill-nav"
      x-data="{ open: false, activeSubmenu: null }">
     <div class="max-w-[1440px] mx-auto px-4 sm:px-8 py-3 sm:py-4 bg-white/95 rounded-[19px] shadow-lg flex items-center justify-center relative">
+        @if(!empty($logo))
+        <a href="/" class="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 z-10 hidden sm:block">
+            <img src="{{ $logo }}" alt="{{ $tenant->name }}" class="h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover border-2 border-white shadow-md">
+        </a>
+        @endif
         <button @click="open = !open" class="md:hidden absolute left-4 p-2 rounded-lg hover:bg-gray-100" aria-label="Menu">
             <div class="flex flex-col gap-1">
                 <span class="block w-6 h-0.5 rounded bg-primary"></span>

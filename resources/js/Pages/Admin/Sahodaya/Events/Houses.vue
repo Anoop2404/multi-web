@@ -1,15 +1,17 @@
 <template>
-    <SahodayaAdminLayout :title="`${event.title} — Houses`" :sahodaya="sahodaya" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount">
-        <form @submit.prevent="createHouse" class="bg-white border rounded-xl p-4 mb-4 flex flex-wrap gap-2">
+    <SahodayaEventsLayout :title="`${event.title} — Houses`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <PageHeader :title="`${event.title} — Houses`" eyebrow="Operations"
+                    description="Configure houses and assign schools for house scoring." />
+        <form @submit.prevent="createHouse" class="card mb-4 flex flex-wrap gap-2">
             <input v-model="houseForm.name" class="field" placeholder="House name" required>
             <input v-model="houseForm.color" class="field w-24" placeholder="#color">
             <input v-model="houseForm.motto" class="field flex-1" placeholder="Motto (optional)">
-            <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Add house</button>
+            <button class="btn-primary">Add house</button>
         </form>
 
         <div class="grid lg:grid-cols-2 gap-4">
-            <div v-for="house in houses" :key="house.id" class="bg-white border rounded-xl p-4">
+            <div v-for="house in houses" :key="house.id" class="card">
                 <div class="flex justify-between items-start mb-3">
                     <div>
                         <span class="inline-block w-4 h-4 rounded-full mr-2 align-middle" :style="{ background: house.color || '#ccc' }"></span>
@@ -23,7 +25,7 @@
                         <option value="">Assign school…</option>
                         <option v-for="s in availableSchools(house.id)" :key="s.id" :value="s.id">{{ s.name }}</option>
                     </select>
-                    <button class="px-3 py-2 bg-gray-900 text-white rounded-lg text-xs">Assign</button>
+                    <button class="btn-primary px-3 py-2 rounded-lg text-xs">Assign</button>
                 </form>
                 <ul class="text-xs text-gray-600 space-y-1">
                     <li v-for="a in house.school_assignments" :key="a.id">· {{ schoolName(a.school_id) }}</li>
@@ -39,17 +41,20 @@
                 </li>
             </ol>
         </div>
-    </SahodayaAdminLayout>
+            <EventPageActivityLog :logs="activityLogs" class="mt-8" />
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
 import { reactive } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, houses: Array, schools: Array, houseScoreboard: Array, assignedSchoolIds: Array,
+    activityLogs: { type: Array, default: () => [] },
 });
 
 const houseForm = useForm({ name: '', color: '', motto: '' });
@@ -84,7 +89,3 @@ function removeHouse(id) {
 }
 </script>
 
-<style scoped>
-@reference "../../../../../css/app.css";
-.field { @apply border border-gray-200 rounded-lg px-3 py-2 text-sm; }
-</style>

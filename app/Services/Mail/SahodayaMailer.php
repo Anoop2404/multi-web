@@ -25,9 +25,7 @@ class SahodayaMailer
 
     public function isConfigured(): bool
     {
-        $profile = $this->profile();
-
-        return filled($profile?->mail_username) && filled($profile?->mail_password);
+        return (bool) $this->profile()?->mailIsConfigured();
     }
 
     public function contactEmail(): ?string
@@ -38,6 +36,20 @@ class SahodayaMailer
     public function sendRaw(string $to, string $subject, string $body): void
     {
         if ($to === '') {
+            return;
+        }
+
+        if ($this->isConfigured() && $this->usesZeptoMailApi()) {
+            [$fromAddress, $fromName] = $this->fromAddress();
+            $this->zeptoClient()->send(
+                $fromAddress ?? '',
+                $fromName,
+                [['address' => $to]],
+                $subject,
+                nl2br(e($body)),
+                $body,
+            );
+
             return;
         }
 
@@ -53,23 +65,44 @@ class SahodayaMailer
         });
     }
 
-    /** @param  array<string, mixed>  $data */
-    public function sendView(string $to, string $subject, string $view, array $data = []): void
-    {
+    /** @param  list<array{content: string, name: string, mime?: string}>  $attachments */
+    public function sendViewWithAttachments(
+        string $to,
+        string $subject,
+        string $view,
+        array $data = [],
+        array $attachments = [],
+    ): void {
         if ($to === '') {
             return;
         }
 
-        $mailer = $this->resolveMailerName();
-        [$fromAddress, $fromName] = $this->fromAddress();
+        if ($this->isConfigured() && $this->usesZeptoMailApi()) {
+            $this->sendHtmlViaApi($to, $subject, $view, $data, $attachments);
 
-        Mail::mailer($mailer)->send($view, $this->viewData($data), function ($message) use ($to, $subject, $fromAddress, $fromName) {
-            $message->to($to)->subject($subject);
+            return;
+        }
 
-            if ($fromAddress) {
-                $message->from($fromAddress, $fromName);
-            }
-        });
+        $this->sendViaSmtpMailer($to, $subject, $view, $data, $attachments);
+    }
+
+    /** @param  list<string>  $recipients  @param  array<string, mixed>  $data  @param  list<array{content: string, name: string, mime?: string}>  $attachments */
+    public function sendViewToManyWithAttachments(
+        array $recipients,
+        string $subject,
+        string $view,
+        array $data = [],
+        array $attachments = [],
+    ): void {
+        foreach (array_unique(array_filter($recipients)) as $email) {
+            $this->sendViewWithAttachments($email, $subject, $view, $data, $attachments);
+        }
+    }
+
+    /** @param  array<string, mixed>  $data */
+    public function sendView(string $to, string $subject, string $view, array $data = []): void
+    {
+        $this->sendViewWithAttachments($to, $subject, $view, $data);
     }
 
     /** @param  list<string>  $recipients  @param  array<string, mixed>  $data */
@@ -90,17 +123,23 @@ class SahodayaMailer
 
     public function sendVerification(User $user): void
     {
+        if ($this->isConfigured() && $this->usesZeptoMailApi()) {
+            (new \App\Notifications\PortalVerifyEmail)->deliverVia($this, $user);
+
+            return;
+        }
+
         $this->withSahodayaMailer(function () use ($user) {
             $user->sendEmailVerificationNotification();
         });
     }
 
     /**
-     * Run a mail callback using this Sahodaya's SMTP + From address (required for ZeptoMail).
+     * Run a mail callback using this Sahodaya's mail settings.
      */
     public function withSahodayaMailer(callable $callback): void
     {
-        if (! $this->isConfigured()) {
+        if (! $this->isConfigured() || $this->usesZeptoMailApi()) {
             $callback();
 
             return;
@@ -134,10 +173,69 @@ class SahodayaMailer
         return EmailBranding::forTenant($this->sahodaya(), $this->profile());
     }
 
+    /** @param  array<string, mixed>  $data  @param  list<array{content: string, name: string, mime?: string}>  $attachments */
+    private function sendHtmlViaApi(string $to, string $subject, string $view, array $data = [], array $attachments = []): void
+    {
+        [$fromAddress, $fromName] = $this->fromAddress();
+        $html = view($view, $this->viewData($data))->render();
+
+        $this->zeptoClient()->send(
+            $fromAddress ?? '',
+            $fromName,
+            [['address' => $to]],
+            $subject,
+            $html,
+            attachments: $attachments,
+        );
+    }
+
+    /** @param  array<string, mixed>  $data  @param  list<array{content: string, name: string, mime?: string}>  $attachments */
+    private function sendViaSmtpMailer(
+        string $to,
+        string $subject,
+        string $view,
+        array $data = [],
+        array $attachments = [],
+    ): void {
+        $mailer = $this->resolveMailerName();
+        [$fromAddress, $fromName] = $this->fromAddress();
+
+        Mail::mailer($mailer)->send($view, $this->viewData($data), function ($message) use ($to, $subject, $fromAddress, $fromName, $attachments) {
+            $message->to($to)->subject($subject);
+
+            if ($fromAddress) {
+                $message->from($fromAddress, $fromName);
+            }
+
+            foreach ($attachments as $attachment) {
+                $message->attachData(
+                    $attachment['content'],
+                    $attachment['name'],
+                    ['mime' => $attachment['mime'] ?? 'application/octet-stream'],
+                );
+            }
+        });
+    }
+
     /** @param  array<string, mixed>  $data  @return array<string, mixed> */
     private function viewData(array $data): array
     {
         return array_merge($this->brandingData(), $data);
+    }
+
+    private function usesZeptoMailApi(): bool
+    {
+        return (bool) $this->profile()?->usesZeptoMailApi();
+    }
+
+    private function zeptoClient(): ZeptoMailApiClient
+    {
+        $profile = $this->profile();
+
+        return new ZeptoMailApiClient(
+            (string) $profile?->mail_password,
+            $profile?->zeptomail_region ?: 'in',
+        );
     }
 
     private function resolveMailerName(): string

@@ -253,6 +253,8 @@ class MembershipNotifier
         string $academicYear,
         string $membershipNo,
         bool $firstMembershipApproval = false,
+        ?string $receiptHtml = null,
+        ?string $receiptNo = null,
     ): void {
         $sahodaya = $this->sahodayaFor($school);
 
@@ -260,22 +262,40 @@ class MembershipNotifier
             ? "Welcome! Your school's membership with {$sahodaya?->name} has been approved and your {$academicYear} annual registration is complete."
             : "Your {$academicYear} annual Sahodaya membership registration is complete. Payment has been verified and your membership is now active.";
 
-        $this->notifySchoolAdmins(
+        if ($receiptHtml) {
+            $body .= ' Your official membership fee receipt is attached to this email.';
+        }
+
+        $viewData = [
+            'headerTitle'    => 'Membership Complete',
+            'headerSubtitle' => $school->name,
+            'headerEyebrow'  => $academicYear,
+            'title'          => $firstMembershipApproval ? 'Welcome to the Sahodaya network' : 'Annual membership active',
+            'body'           => $body,
+            'academicYear'   => $academicYear,
+            'membershipNo'   => $membershipNo,
+            'firstApproval'  => $firstMembershipApproval,
+            'receiptNo'      => $receiptNo,
+            'loginUrl'       => EmailBranding::schoolLoginUrl($sahodaya),
+            'dashboardUrl'   => EmailBranding::schoolAdminUrl($sahodaya, $school),
+        ];
+
+        $attachments = [];
+        if ($receiptHtml) {
+            $filename = 'membership-receipt-'.($receiptNo ?: $membershipNo).'.html';
+            $attachments[] = [
+                'content' => $receiptHtml,
+                'name'    => $filename,
+                'mime'    => 'text/html',
+            ];
+        }
+
+        $this->notifySchoolAdminsWithAttachments(
             $school,
-            "Membership complete — {$membershipNo}",
+            'Membership complete — '.$membershipNo.($receiptNo ? " (Receipt {$receiptNo})" : ''),
             'emails.membership.registration-complete',
-            [
-                'headerTitle'    => 'Membership Complete',
-                'headerSubtitle' => $school->name,
-                'headerEyebrow'  => $academicYear,
-                'title'          => $firstMembershipApproval ? 'Welcome to the Sahodaya network' : 'Annual membership active',
-                'body'           => $body,
-                'academicYear'   => $academicYear,
-                'membershipNo'   => $membershipNo,
-                'firstApproval'  => $firstMembershipApproval,
-                'loginUrl'       => EmailBranding::schoolLoginUrl($sahodaya),
-                'dashboardUrl'   => EmailBranding::schoolAdminUrl($sahodaya, $school),
-            ],
+            $viewData,
+            $attachments,
         );
     }
 
@@ -298,9 +318,14 @@ class MembershipNotifier
         );
     }
 
-    /** @param  array<string, mixed>  $viewData */
-    private function notifySchoolAdmins(Tenant $school, string $subject, string $view, array $viewData): void
-    {
+    /** @param  array<string, mixed>  $viewData  @param  list<array{content: string, name: string, mime?: string}>  $attachments */
+    private function notifySchoolAdminsWithAttachments(
+        Tenant $school,
+        string $subject,
+        string $view,
+        array $viewData,
+        array $attachments = [],
+    ): void {
         $admins = User::where('tenant_id', $school->id)->get();
         $recipients = $admins->pluck('email')->all();
 
@@ -309,12 +334,19 @@ class MembershipNotifier
             $recipients[] = $email;
         }
 
-        $this->mailerFor($school->parent_id)->sendViewToMany(
-            $recipients,
-            $subject,
-            $view,
-            $viewData,
-        );
+        $mailer = $this->mailerFor($school->parent_id);
+
+        if ($attachments) {
+            $mailer->sendViewToManyWithAttachments($recipients, $subject, $view, $viewData, $attachments);
+        } else {
+            $mailer->sendViewToMany($recipients, $subject, $view, $viewData);
+        }
+    }
+
+    /** @param  array<string, mixed>  $viewData */
+    private function notifySchoolAdmins(Tenant $school, string $subject, string $view, array $viewData): void
+    {
+        $this->notifySchoolAdminsWithAttachments($school, $subject, $view, $viewData);
     }
 
     private function sahodayaFor(Tenant $school): ?Tenant
@@ -334,5 +366,41 @@ class MembershipNotifier
     private function mailerFor(?string $sahodayaId): SahodayaMailer
     {
         return SahodayaMailer::for($sahodayaId ?? '');
+    }
+
+    public function reminderWindowClosing(Tenant $school, string $academicYear, int $daysLeft): void
+    {
+        $email = $this->schoolContactEmail($school);
+        if (! $email) {
+            return;
+        }
+
+        $this->mailerFor($school->parent_id)->sendView(
+            $email,
+            'Membership registration closing soon — '.$school->name,
+            'emails.membership.generic-school',
+            [
+                'title'          => 'Registration closing soon',
+                'body'           => "Annual membership registration for {$academicYear} closes in {$daysLeft} day(s). Please begin registration in the school portal.",
+            ],
+        );
+    }
+
+    public function reminderPaymentDue(Tenant $school, string $academicYear, float $amount): void
+    {
+        $email = $this->schoolContactEmail($school);
+        if (! $email) {
+            return;
+        }
+
+        $this->mailerFor($school->parent_id)->sendView(
+            $email,
+            'Membership payment due — '.$school->name,
+            'emails.membership.generic-school',
+            [
+                'title'          => 'Payment due',
+                'body'           => "Membership fee of ₹".number_format($amount, 2)." for {$academicYear} is pending. Please upload payment proof in the school portal.",
+            ],
+        );
     }
 }

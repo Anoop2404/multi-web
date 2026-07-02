@@ -57,6 +57,11 @@ class AcademicYear
         return self::activeRecord()?->label;
     }
 
+    public static function activeId(): ?int
+    {
+        return self::activeRecord()?->id;
+    }
+
     public static function recordIdForLabel(?string $label): ?int
     {
         if (! $label || ! self::academicYearsTableExists()) {

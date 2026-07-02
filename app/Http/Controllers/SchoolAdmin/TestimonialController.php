@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Support\PersistDefaults;
 use App\Models\Testimonial;
 use Illuminate\Http\Request;
 
@@ -29,6 +30,7 @@ class TestimonialController extends SchoolAdminController
 
         $data['tenant_id'] = $this->school->id;
         $data['is_active'] = $request->boolean('is_active');
+        $data = PersistDefaults::coalesce($data, ['display_order' => 0]);
 
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('testimonials/' . $this->school->id, 's3');
@@ -52,6 +54,7 @@ class TestimonialController extends SchoolAdminController
         ]);
 
         $data['is_active'] = $request->boolean('is_active');
+        $data = PersistDefaults::coalesce($data, ['display_order' => $testimonial->display_order ?? 0]);
 
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('testimonials/' . $this->school->id, 's3');

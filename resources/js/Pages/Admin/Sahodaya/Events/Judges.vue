@@ -1,7 +1,9 @@
 <template>
-    <SahodayaAdminLayout :title="`${event.title} — Judges`" :sahodaya="sahodaya" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount">
-        <form @submit.prevent="assign" class="bg-white border rounded-xl p-4 mb-4 flex flex-wrap gap-2">
+    <SahodayaEventsLayout :title="`${event.title} — Judges`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <PageHeader :title="`${event.title} — Judges`" eyebrow="Registration"
+                    description="Assign judges to event items." />
+        <form @submit.prevent="assign" class="card mb-4 flex flex-wrap gap-2">
             <select v-model="form.item_id" class="field" required>
                 <option value="">Select item</option>
                 <option v-for="item in event.items" :key="item.id" :value="item.id">{{ item.title }}</option>
@@ -10,10 +12,10 @@
                 <option value="">Select judge</option>
                 <option v-for="j in judges" :key="j.id" :value="j.id">{{ j.name }} ({{ j.email }})</option>
             </select>
-            <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Assign</button>
+            <button class="btn-primary">Assign</button>
         </form>
 
-        <div class="bg-white border rounded-xl overflow-hidden">
+        <div class="card card--flush">
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left">
                     <tr><th class="p-3">Item</th><th class="p-3">Judge</th><th class="p-3"></th></tr>
@@ -32,16 +34,19 @@
         </div>
 
         <p class="text-xs text-gray-500 mt-4">Judges log in at <code>/portal/judge/{{ sahodaya.id }}</code></p>
-    </SahodayaAdminLayout>
+            <EventPageActivityLog :logs="activityLogs" class="mt-8" />
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
 import { router, useForm } from '@inertiajs/vue3';
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, assignments: Array, judges: Array,
+    activityLogs: { type: Array, default: () => [] },
 });
 
 const form = useForm({ item_id: '', user_id: '' });
@@ -58,7 +63,3 @@ function remove(id) {
 }
 </script>
 
-<style scoped>
-@reference "../../../../../css/app.css";
-.field { @apply border border-gray-200 rounded-lg px-3 py-2 text-sm min-w-[180px]; }
-</style>

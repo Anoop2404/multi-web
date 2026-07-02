@@ -1,18 +1,23 @@
 <template>
-    <SahodayaAdminLayout :title="`${event.title} — Attendance`" :sahodaya="sahodaya" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount">
+    <SahodayaEventsLayout :title="`${event.title} — Attendance`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <PageHeader :title="`${event.title} — Attendance`" eyebrow="Registration"
+                    description="Mark participant attendance by item." />
         <div class="flex flex-wrap gap-3 mb-4">
             <select v-model="itemFilter" class="border rounded-lg px-3 py-2 text-sm">
                 <option value="">All items</option>
                 <option v-for="item in event.items" :key="item.id" :value="item.id">{{ item.title }}</option>
             </select>
             <button v-if="itemFilter" type="button" @click="bulkMark('present')"
-                    class="px-3 py-2 bg-green-600 text-white rounded-lg text-sm">Mark all present</button>
+                    class="btn-primary px-3 py-2 rounded-lg text-sm">Mark all present</button>
             <button v-if="itemFilter" type="button" @click="bulkMark('absent')"
                     class="px-3 py-2 bg-red-600 text-white rounded-lg text-sm">Mark all absent</button>
+            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/attendance/import-template`" class="text-xs font-semibold text-indigo-600 self-center">CSV template</a>
+            <input type="file" accept=".csv" class="text-xs" @change="onImportFile">
+            <button type="button" class="btn-secondary text-xs" :disabled="!importFile" @click="submitImport">Import attendance</button>
         </div>
 
-        <div class="bg-white border rounded-xl overflow-hidden">
+        <div class="card card--flush">
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left">
                     <tr>
@@ -41,20 +46,25 @@
                 </tbody>
             </table>
         </div>
-    </SahodayaAdminLayout>
+            <EventPageActivityLog :logs="activityLogs" class="mt-8" />
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { router, useForm } from '@inertiajs/vue3';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, participants: Array, attendance: Object,
+    activityLogs: { type: Array, default: () => [] },
 });
 
 const itemFilter = ref('');
+const importFile = ref(null);
+const importForm = useForm({ file: null });
 
 const filteredParticipants = computed(() => {
     if (!itemFilter.value) return props.participants;
@@ -85,5 +95,15 @@ function bulkMark(status) {
         participant_ids: ids,
         status,
     }, { preserveScroll: true });
+}
+
+function onImportFile(e) { importFile.value = e.target.files[0] ?? null; }
+
+function submitImport() {
+    importForm.file = importFile.value;
+    importForm.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/attendance/import`, {
+        forceFormData: true,
+        preserveScroll: true,
+    });
 }
 </script>

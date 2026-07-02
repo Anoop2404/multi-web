@@ -9,6 +9,7 @@ use App\Models\MembershipPayment;
 use App\Support\AcademicYear;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Membership\FeeReceiptService;
+use App\Services\Membership\MembershipReceiptService;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\RegistrationStatusService;
 use App\Support\TenancyDatabase;
@@ -86,10 +87,18 @@ class PaymentsApiController extends SahodayaApiController
 
             app(FeeReceiptService::class)->syncFromMembershipPayment($payment->fresh());
 
+            $receiptService = app(MembershipReceiptService::class);
+            $receiptService->issueForPayment($payment->fresh());
+            $freshReceipt = $payment->fresh()->feeReceipt;
+            $receiptNo = $freshReceipt?->receipt_number;
+            $receiptHtml = $freshReceipt
+                ? $receiptService->readGeneratedReceipt($freshReceipt)
+                : null;
+
             $school = $payment->school;
-            if ($school && $school->membership_status === 'pending') {
+            $firstApproval = $school && $school->membership_status === 'pending';
+            if ($firstApproval) {
                 $school->update(['membership_status' => 'approved', 'is_active' => true]);
-                $notifier->schoolApproved($school);
             }
 
             $registration = $payment->registration;
@@ -99,7 +108,16 @@ class PaymentsApiController extends SahodayaApiController
                 $registration->update(['registration_status' => 'completed']);
                 $registration->refresh();
                 $notifier->paymentVerified($payment->school, $payment->academic_year, $registration->reg_no);
-                $notifier->registrationCompleted($payment->school, $payment->academic_year, $registration->reg_no);
+                $notifier->registrationCompleted(
+                    $payment->school,
+                    $payment->academic_year,
+                    $registration->reg_no,
+                    $firstApproval,
+                    $receiptHtml,
+                    $receiptNo,
+                );
+            } elseif ($firstApproval) {
+                $notifier->schoolApproved($school);
             }
         } else {
             $payment->update([

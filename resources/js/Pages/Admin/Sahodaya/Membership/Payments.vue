@@ -3,13 +3,14 @@
                          :approvedSchoolsCount="approvedSchoolsCount"
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
-                         :pendingPaymentsCount="pendingPaymentsCount">
-        <div class="space-y-5">
-            <p class="text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-                Verifying a payment completes annual registration. For new schools, it also
-                <strong>approves membership</strong> automatically.
-            </p>
+                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <PageHeader
+            title="Membership payments"
+            eyebrow="Membership"
+            description="Verify annual Sahodaya membership fees from member schools. Separate from fest event registration fees."
+        />
 
+        <div class="space-y-5">
             <!-- Fee totals -->
             <div class="grid sm:grid-cols-3 gap-3">
                 <SummaryCard label="Payment Pending"
@@ -38,10 +39,7 @@
             <div class="flex flex-wrap gap-2">
                 <button v-for="tab in statusTabs" :key="tab.key"
                         @click="switchStatus(tab.key)"
-                        :class="['px-4 py-2 rounded-xl text-sm font-semibold border transition',
-                                 activeStatus === tab.key
-                                     ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]'
-                                     : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300']">
+                        :class="['tab-btn', activeStatus === tab.key ? 'tab-btn--active' : '']">
                     {{ tab.label }}
                     <span v-if="statusCounts[tab.key] > 0"
                           :class="['ml-1.5 text-xs px-1.5 py-0.5 rounded-full',
@@ -70,7 +68,7 @@
                            class="border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
                 </div>
                 <button @click="applyFilters"
-                        class="bg-[#0f3d7a] hover:bg-[#1a4f8c] text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
+                        class="btn-primary">
                     Apply
                 </button>
                 <a :href="exportUrl()"
@@ -152,10 +150,18 @@
                                 📎 View upload ↗
                             </a>
                         </div>
+                        <div v-if="p.status === 'verified'" class="shrink-0">
+                            <p class="text-xs font-semibold text-gray-500 mb-2">Official Receipt</p>
+                            <a :href="`/sahodaya-admin/${sahodaya.id}/membership/payments/${p.id}/receipt`"
+                               target="_blank" rel="noopener"
+                               class="flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 text-sm text-indigo-800 font-semibold hover:bg-indigo-100 transition">
+                                🧾 View receipt ↗
+                            </a>
+                        </div>
 
                         <div v-if="p.status === 'submitted'" class="flex-1 flex flex-wrap items-center gap-2 w-full">
                             <button type="button" @click="verifyPayment(p)"
-                                    class="px-5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition">
+                                    class="btn-primary px-5 py-2 rounded-xl text-sm font-bold transition">
                                 Verify
                             </button>
                             <button type="button" @click="rejectPayment(p)"
@@ -180,14 +186,14 @@
                 <Link v-for="link in payments.links" :key="link.label"
                       :href="link.url || '#'"
                       class="px-3 py-1 rounded-lg text-sm"
-                      :class="link.active ? 'bg-[#0f3d7a] text-white' : 'text-gray-600 hover:bg-gray-100'"
+                      :class="link.active ? 'pagination-link--active' : 'pagination-link'"
                       v-html="link.label" />
             </div>
             <div v-if="paymentDue?.links?.length > 3 && activeStatus === 'payment-due'" class="flex justify-center gap-1">
                 <Link v-for="link in paymentDue.links" :key="link.label"
                       :href="link.url || '#'"
                       class="px-3 py-1 rounded-lg text-sm"
-                      :class="link.active ? 'bg-[#0f3d7a] text-white' : 'text-gray-600 hover:bg-gray-100'"
+                      :class="link.active ? 'pagination-link--active' : 'pagination-link'"
                       v-html="link.label" />
             </div>
         </div>

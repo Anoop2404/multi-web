@@ -1,0 +1,5 @@
+@extends('emails.layouts.sahodaya')
+
+@section('content')
+    <p style="margin:0 0 12px;font-size:15px;line-height:1.5;">{{ $body }}</p>
+@endsection

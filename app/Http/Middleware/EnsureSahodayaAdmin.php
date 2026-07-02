@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Middleware\Concerns\RedirectsUnauthenticated;
+use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,7 +24,7 @@ class EnsureSahodayaAdmin
             return $next($request);
         }
 
-        if (!$user->hasRole('sahodaya_admin')) {
+        if (! $user->hasAnyRole(TenantUserCatalog::sahodayaAdminPanelRoles())) {
             abort(403);
         }
 
@@ -31,6 +32,13 @@ class EnsureSahodayaAdmin
         if ($tenantId && $user->tenant_id !== $tenantId) {
             abort(403);
         }
+
+        $request->attributes->set(
+            'isSahodayaStaff',
+            ! $user->isSuperAdmin()
+            && ! $user->hasRole('sahodaya_admin')
+            && $user->hasAnyRole(TenantUserCatalog::sahodayaPermissionRoles()),
+        );
 
         return $next($request);
     }

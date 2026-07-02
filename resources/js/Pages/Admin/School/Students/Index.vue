@@ -1,36 +1,50 @@
 <template>
-    <SchoolAdminLayout title="Students" :school="school">
-        <div class="space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="text-sm text-gray-600">
-                    <strong class="text-[#0f3d7a]">{{ students.total ?? 0 }}</strong>
-                    {{ (students.total ?? 0) === 1 ? 'student' : 'students' }}
-                    <span v-if="hasActiveFilters" class="text-gray-400"> · filtered</span>
-                </p>
-                <div class="flex flex-wrap gap-2">
-                    <button type="button" @click="openImportModal"
-                            class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition">
-                        Import CSV
-                    </button>
-                    <button type="button" @click="openRegisterModal"
-                            :disabled="!schoolClasses.length"
-                            :title="!schoolClasses.length ? 'Classes are configured by your Sahodaya' : ''"
-                            class="sa-btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">
-                        + Register Student
-                    </button>
-                </div>
-            </div>
+    <SchoolAdminLayout title="Students" :school="school" :show-header-title="false">
+        <PageHeader
+            title="Students"
+            eyebrow="Records"
+            :description="`${students.total ?? 0} ${(students.total ?? 0) === 1 ? 'student' : 'students'}${hasActiveFilters ? ' · filtered' : ''}`"
+        >
+            <template #actions>
+                <Link v-if="isLocked" :href="`/school-admin/${school.id}/students/change-requests`"
+                      class="btn-secondary">
+                    Change requests{{ pendingChangeRequests ? ` (${pendingChangeRequests})` : '' }}
+                </Link>
+                <button v-if="isLocked" type="button" @click="openCreateRequestModal" class="btn-primary">
+                    Request new student
+                </button>
+                <button v-if="!isLocked" type="button" @click="openImportModal" class="btn-secondary">
+                    Import CSV
+                </button>
+                <Link v-if="!isLocked" :href="`/school-admin/${school.id}/students/bulk`"
+                      :class="['btn-secondary', !schoolClasses.length ? 'pointer-events-none opacity-50' : '']"
+                      :title="!schoolClasses.length ? 'Classes are configured by your Sahodaya' : ''">
+                    Bulk add
+                </Link>
+                <Link v-if="!isLocked" :href="`/school-admin/${school.id}/students/create`"
+                      :class="['btn-primary', !schoolClasses.length ? 'pointer-events-none opacity-50' : '']"
+                      :title="!schoolClasses.length ? 'Classes are configured by your Sahodaya' : ''">
+                    + Add student
+                </Link>
+            </template>
+        </PageHeader>
 
-            <div v-if="!school.school_prefix"
-                 class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
+        <div class="space-y-4">
+            <div v-if="!school.school_prefix" class="notice-banner notice-banner--warning">
                 Set your
-                <Link :href="`/school-admin/${school.id}/setup/code`" class="font-semibold underline">school code</Link>
+                <Link :href="`/school-admin/${school.id}/setup/code`" class="link-brand">school code</Link>
                 before managing students.
             </div>
 
-            <div v-else-if="!schoolClasses.length"
-                 class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
+            <div v-else-if="!schoolClasses.length" class="notice-banner notice-banner--warning">
                 No classes are configured for your Sahodaya yet. Please contact your Sahodaya admin to set up the class master under Configuration.
+            </div>
+
+            <div v-if="isLocked" class="notice-banner notice-banner--warning">
+                {{ studentEditLock.message }}
+                <Link :href="`/school-admin/${school.id}/students/change-requests`" class="link-brand font-semibold ml-1">
+                    View change requests{{ pendingChangeRequests ? ` (${pendingChangeRequests} pending)` : '' }} →
+                </Link>
             </div>
 
             <SahodayaDataTable
@@ -45,56 +59,39 @@
             >
                 <template #toolbar>
                     <div class="space-y-3">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-                            <div>
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Category</label>
-                                <select v-model="filterForm.class_category_id" @change="onCategoryChange"
-                                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20 focus:border-[#0f3d7a]/40">
+                        <FormGrid class-extra="sm:grid-cols-2 lg:grid-cols-4 items-end">
+                            <FormField label="Category">
+                                <select v-model="filterForm.class_category_id" @change="onCategoryChange" class="field">
                                     <option :value="null">All categories</option>
                                     <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Class</label>
-                                <select v-model="filterForm.school_class_id"
-                                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20 focus:border-[#0f3d7a]/40">
+                            </FormField>
+                            <FormField label="Class">
+                                <select v-model="filterForm.school_class_id" class="field">
                                     <option :value="null">All classes</option>
                                     <option v-for="c in filteredClasses" :key="c.id" :value="c.id">Class {{ c.name }}</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Status</label>
-                                <select v-model="filterForm.status"
-                                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20 focus:border-[#0f3d7a]/40">
+                            </FormField>
+                            <FormField label="Status">
+                                <select v-model="filterForm.status" class="field">
                                     <option value="active">Active</option>
                                     <option value="all">All statuses</option>
                                     <option value="transferred">Transferred</option>
                                     <option value="graduated">Graduated</option>
                                     <option value="withdrawn">Withdrawn</option>
                                 </select>
-                            </div>
+                            </FormField>
                             <div class="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-1">
-                                <button type="button" @click="applyFilters"
-                                        class="flex-1 bg-[#0f3d7a] hover:bg-[#1a4f8c] text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
-                                    Apply
-                                </button>
-                                <button v-if="hasActiveFilters" type="button" @click="clearFilters"
-                                        class="px-3 py-2 rounded-lg text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition">
-                                    Clear
-                                </button>
+                                <button type="button" @click="applyFilters" class="btn-primary flex-1">Apply</button>
+                                <button v-if="hasActiveFilters" type="button" @click="clearFilters" class="btn-ghost">Clear</button>
                             </div>
-                        </div>
-                        <div class="flex flex-col sm:flex-row gap-2 sm:items-end">
-                            <div class="flex-1 max-w-md">
-                                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Search</label>
+                        </FormGrid>
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+                            <FormField label="Search" class-extra="flex-1 max-w-md">
                                 <input v-model="filterForm.search" type="search" placeholder="Name, reg no, email, roll no…"
-                                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20 focus:border-[#0f3d7a]/40"
-                                       @keyup.enter="applyFilters">
-                            </div>
-                            <button type="button" @click="applyFilters"
-                                    class="sm:mb-0.5 px-4 py-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] text-[#0f3d7a] text-sm font-semibold hover:bg-[#dbeafe] transition">
-                                Search
-                            </button>
+                                       class="field" @keyup.enter="applyFilters">
+                            </FormField>
+                            <button type="button" @click="applyFilters" class="btn-secondary sm:mb-0.5">Search</button>
                         </div>
                     </div>
                 </template>
@@ -121,71 +118,59 @@
                     </td>
                     <td class="px-4 py-3 text-right whitespace-nowrap">
                         <button type="button" @click="openEditModal(student)"
-                                class="text-xs font-semibold text-[#0f3d7a] hover:underline mr-3">Edit</button>
+                                class="link-brand text-xs mr-3">{{ isLocked ? 'Request change' : 'Edit' }}</button>
                         <button v-if="!student.user_id" type="button" @click="openPortalModal(student)"
-                                class="text-xs font-semibold text-indigo-600 hover:underline mr-3">Portal</button>
-                        <button type="button" @click="remove(student)"
+                                class="link-brand text-xs mr-3">Portal</button>
+                        <button v-if="!isLocked" type="button" @click="remove(student)"
                                 class="text-xs text-red-400 hover:text-red-600 hover:underline">Remove</button>
                     </td>
                 </tr>
             </SahodayaDataTable>
 
-            <p v-if="!students.data?.length && school.school_prefix && schoolClasses.length"
+            <p v-if="!students.data?.length && school.school_prefix && schoolClasses.length && !isLocked"
                class="text-center text-sm text-gray-500 -mt-2">
-                <button type="button" @click="openRegisterModal" class="text-[#0f3d7a] font-semibold hover:underline">
-                    Register your first student
-                </button>
+                <Link :href="`/school-admin/${school.id}/students/create`" class="link-brand font-semibold hover:underline">
+                    Add your first student
+                </Link>
             </p>
         </div>
 
         <!-- Edit student modal -->
         <div v-if="showEdit && editingStudent" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closeEditModal"></div>
-            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-[#f0f9ff] to-white">
+            <div class="relative modal-shell max-w-md">
+                <div class="modal-head">
                     <div>
-                        <h3 class="font-bold text-[#041525]">Edit Student</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">Update profile, class, gender, and contact details</p>
+                        <h3 class="font-bold text-[#041525]">{{ isLocked ? 'Request student change' : 'Edit Student' }}</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            {{ isLocked
+                                ? 'Proposed changes are sent to Sahodaya for approval before they take effect.'
+                                : 'Update profile, class, gender, and contact details' }}
+                        </p>
                     </div>
                     <button type="button" @click="closeEditModal" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
                 </div>
 
                 <form @submit.prevent="submitEdit" class="p-6 space-y-4">
-                    <div class="flex items-center gap-4">
-                        <div class="w-16 h-16 rounded-full overflow-hidden border border-gray-200 bg-gray-100 shrink-0">
-                            <img v-if="editPhotoPreview || editingStudent.photo_url"
-                                 :src="editPhotoPreview || editingStudent.photo_url"
-                                 :alt="editForm.name" class="w-full h-full object-cover">
-                            <span v-else class="w-full h-full flex items-center justify-center text-sm text-gray-400 font-semibold">
-                                {{ initials(editForm.name || editingStudent.name) }}
-                            </span>
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Profile photo</label>
-                            <input type="file" accept="image/*" @change="onEditPhotoChange"
-                                   class="w-full text-sm text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#f0f9ff] file:text-[#0f3d7a]">
-                            <p class="text-xs text-gray-400 mt-1">JPG or PNG, max 2 MB</p>
-                            <p v-if="editForm.errors.photo" class="text-xs text-red-500 mt-1">{{ editForm.errors.photo }}</p>
-                        </div>
-                    </div>
+                    <ProfilePhotoCropper v-model="editPhotoFile" :existing-url="editingStudent.photo_url" />
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Reg. No.</label>
+                        <label class="form-label mb-1.5">Reg. No.</label>
                         <input :value="editingStudent.admission_number || '—'" type="text" readonly
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 text-gray-500 font-mono cursor-not-allowed">
+                               class="field bg-gray-50 text-gray-500 font-mono cursor-not-allowed">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Full name *</label>
+                        <label class="form-label mb-1.5">Full name *</label>
                         <input v-model="editForm.name" type="text" required
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
+                               class="field">
                         <p v-if="editForm.errors.name" class="text-xs text-red-500 mt-1">{{ editForm.errors.name }}</p>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Class *</label>
+                        <label class="form-label mb-1.5">Class *</label>
                         <select v-model="editForm.school_class_id" required
-                                class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
+                                class="field">
                             <option value="">Select class</option>
                             <option v-for="c in schoolClassesSorted" :key="c.id" :value="c.id">
                                 {{ formatClassOption(c) }}
@@ -196,9 +181,9 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Gender *</label>
+                            <label class="form-label mb-1.5">Gender *</label>
                             <select v-model="editForm.gender" required
-                                    class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
+                                    class="field">
                                 <option value="">Select gender</option>
                                 <option value="male">Male</option>
                                 <option value="female">Female</option>
@@ -207,107 +192,87 @@
                             <p v-if="editForm.errors.gender" class="text-xs text-red-500 mt-1">{{ editForm.errors.gender }}</p>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Date of birth <span class="font-normal text-gray-400">(optional)</span></label>
-                            <input v-model="editForm.dob" type="date"
-                                   class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
+                            <label class="form-label mb-1.5">Date of birth *</label>
+                            <input v-model="editForm.dob" type="date" required
+                                   class="field">
                             <p v-if="editForm.errors.dob" class="text-xs text-red-500 mt-1">{{ editForm.errors.dob }}</p>
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Email <span class="font-normal text-gray-400">(optional)</span></label>
+                        <label class="form-label mb-1.5">Email <span class="font-normal text-gray-400">(optional)</span></label>
                         <input v-model="editForm.parent_email" type="email" placeholder="student@example.com"
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
+                               class="field">
                         <p v-if="editForm.errors.parent_email" class="text-xs text-red-500 mt-1">{{ editForm.errors.parent_email }}</p>
+                    </div>
+
+                    <div v-if="isLocked">
+                        <label class="form-label mb-1.5">Reason for change *</label>
+                        <textarea v-model="editForm.reason" rows="3" required
+                                  placeholder="Explain why this update is needed (e.g. typo in name, class correction)…"
+                                  class="field"></textarea>
+                        <p v-if="editForm.errors.reason" class="text-xs text-red-500 mt-1">{{ editForm.errors.reason }}</p>
                     </div>
 
                     <div class="flex items-center justify-end gap-3 pt-2">
                         <button type="button" @click="closeEditModal" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
                         <button type="submit" :disabled="editForm.processing"
-                                class="sa-btn-primary px-5 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50">
-                            Save changes
+                                class="btn-primary disabled:opacity-50">
+                            {{ isLocked ? 'Submit change request' : 'Save changes' }}
                         </button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- Register student modal -->
-        <div v-if="showRegister" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closeRegisterModal"></div>
-            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-[#f0f9ff] to-white">
+        <!-- Request new student when locked -->
+        <div v-if="showCreateRequest && isLocked" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closeCreateRequestModal"></div>
+            <div class="relative modal-shell max-w-md">
+                <div class="modal-head">
                     <div>
-                        <h3 class="font-bold text-[#041525]">Register Student</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">Sahodaya reg no. assigned automatically</p>
+                        <h3 class="font-bold text-[#041525]">Request new student</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Sahodaya will review and create the record if approved.</p>
                     </div>
-                    <button type="button" @click="closeRegisterModal" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                    <button type="button" @click="closeCreateRequestModal" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
                 </div>
-
-                <div v-if="!schoolClasses.length" class="p-6 text-sm text-amber-800">
-                    Classes are set by your Sahodaya. Contact your Sahodaya admin if no classes appear here.
-                </div>
-
-                <form v-else @submit.prevent="submitRegister" class="p-6 space-y-4">
+                <form @submit.prevent="submitCreateRequest" class="p-6 space-y-4">
+                    <ProfilePhotoCropper v-model="createPhotoFile" />
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Class *</label>
-                        <select v-model="registerForm.school_class_id" required
-                                class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
+                        <label class="form-label mb-1.5">Full name *</label>
+                        <input v-model="createForm.name" type="text" required class="field">
+                    </div>
+                    <div>
+                        <label class="form-label mb-1.5">Class *</label>
+                        <select v-model="createForm.school_class_id" required class="field">
                             <option value="">Select class</option>
-                            <option v-for="c in schoolClassesSorted" :key="c.id" :value="c.id">
-                                {{ formatClassOption(c) }}
-                            </option>
+                            <option v-for="c in schoolClassesSorted" :key="c.id" :value="c.id">{{ formatClassOption(c) }}</option>
                         </select>
-                        <p class="text-xs text-gray-400 mt-1">Classes are assigned by your Sahodaya (e.g. Class 10 in Secondary).</p>
-                        <p v-if="registerForm.errors.school_class_id" class="text-xs text-red-500 mt-1">{{ registerForm.errors.school_class_id }}</p>
                     </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Full name *</label>
-                        <input v-model="registerForm.name" type="text" required placeholder="Rahul Kumar" autofocus
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
-                        <p v-if="registerForm.errors.name" class="text-xs text-red-500 mt-1">{{ registerForm.errors.name }}</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Gender *</label>
-                            <select v-model="registerForm.gender" required
-                                    class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
-                                <option value="">Select gender</option>
+                            <label class="form-label mb-1.5">Gender *</label>
+                            <select v-model="createForm.gender" required class="field">
+                                <option value="">Select</option>
                                 <option value="male">Male</option>
                                 <option value="female">Female</option>
                                 <option value="other">Other</option>
                             </select>
-                            <p v-if="registerForm.errors.gender" class="text-xs text-red-500 mt-1">{{ registerForm.errors.gender }}</p>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Date of birth <span class="font-normal text-gray-400">(optional)</span></label>
-                            <input v-model="registerForm.dob" type="date"
-                                   class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
-                            <p v-if="registerForm.errors.dob" class="text-xs text-red-500 mt-1">{{ registerForm.errors.dob }}</p>
+                            <label class="form-label mb-1.5">Date of birth *</label>
+                            <input v-model="createForm.dob" type="date" required class="field">
                         </div>
                     </div>
-
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Portal email <span class="font-normal text-gray-400">(optional)</span></label>
-                        <input v-model="registerForm.email" type="email" placeholder="student@example.com"
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
+                        <label class="form-label mb-1.5">Reason for adding *</label>
+                        <textarea v-model="createForm.reason" rows="3" required class="field"
+                                  placeholder="Explain why this student must be added after the lock date…"></textarea>
+                        <p v-if="createForm.errors.reason" class="text-xs text-red-500 mt-1">{{ createForm.errors.reason }}</p>
                     </div>
-                    <label class="flex items-center gap-2 text-sm">
-                        <input v-model="registerForm.create_login" type="checkbox"> Create student portal login
-                    </label>
-                    <div v-if="registerForm.create_login">
-                        <input v-model="registerForm.password" type="password" placeholder="Min 8 characters" minlength="8"
-                               class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm">
-                    </div>
-
-                    <div class="flex items-center justify-end gap-3 pt-2">
-                        <button type="button" @click="closeRegisterModal" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
-                        <button type="submit" :disabled="registerForm.processing"
-                                class="sa-btn-primary px-5 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50">
-                            Register Student
-                        </button>
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" @click="closeCreateRequestModal" class="text-sm text-gray-500">Cancel</button>
+                        <button type="submit" :disabled="createForm.processing" class="btn-primary">Submit request</button>
                     </div>
                 </form>
             </div>
@@ -316,14 +281,14 @@
         <!-- Portal login modal -->
         <div v-if="showPortal && portalStudent" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closePortalModal"></div>
-            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md border p-6 space-y-4">
+            <div class="relative modal-shell max-w-md p-6 space-y-4">
                 <h3 class="font-bold">Portal login — {{ portalStudent.name }}</h3>
                 <input v-model="portalForm.email" type="email" placeholder="Email" class="w-full border rounded-lg px-3 py-2 text-sm" required>
                 <input v-model="portalForm.password" type="password" placeholder="Password (min 8)" class="w-full border rounded-lg px-3 py-2 text-sm" required>
                 <div class="flex justify-end gap-2">
                     <button type="button" @click="closePortalModal" class="text-sm text-gray-500">Cancel</button>
                     <button type="button" @click="submitPortal" :disabled="portalForm.processing"
-                            class="sa-btn-primary px-4 py-2 rounded-lg text-sm font-semibold">Create login</button>
+                            class="btn-primary">Create login</button>
                 </div>
             </div>
         </div>
@@ -331,8 +296,8 @@
         <!-- Import CSV modal -->
         <div v-if="showImport" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closeImportModal"></div>
-            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-100 overflow-hidden max-h-[90vh] flex flex-col">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-[#f0f9ff] to-white shrink-0">
+            <div class="relative modal-shell max-w-lg max-h-[90vh] flex flex-col">
+                <div class="modal-head shrink-0">
                     <div>
                         <h3 class="font-bold text-[#041525]">Import Students</h3>
                         <p class="text-xs text-gray-500 mt-0.5">Bulk upload from CSV (opens in Excel)</p>
@@ -365,7 +330,7 @@
 
                     <form @submit.prevent="submitImport" class="space-y-4">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">CSV file *</label>
+                            <label class="form-label mb-1.5">CSV file *</label>
                             <input type="file" accept=".csv,.txt,text/csv" required @change="onImportFile"
                                    class="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#f0f9ff] file:text-[#0f3d7a]">
                             <p class="text-xs text-gray-400 mt-1">Save your Excel sheet as CSV before uploading.</p>
@@ -384,7 +349,7 @@
                         <div class="flex items-center justify-end gap-3 pt-1">
                             <button type="button" @click="closeImportModal" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
                             <button type="submit" :disabled="importForm.processing || !classNames.length"
-                                    class="sa-btn-primary px-5 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50">
+                                    class="btn-primary disabled:opacity-50">
                                 Import students
                             </button>
                         </div>
@@ -398,6 +363,7 @@
 <script setup>
 import SahodayaDataTable from '@/Components/SahodayaDataTable.vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import ProfilePhotoCropper from '@/Components/school/ProfilePhotoCropper.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
@@ -408,16 +374,21 @@ const props = defineProps({
     categories: { type: Array, default: () => [] },
     classes:    { type: Array, default: () => [] },
     classNames: { type: Array, default: () => [] },
+    studentEditLock: { type: Object, default: () => ({ locked: false }) },
+    pendingChangeRequests: { type: Number, default: 0 },
 });
 
+const isLocked = computed(() => !!props.studentEditLock?.locked);
+
 const page = usePage();
-const showRegister = ref(false);
 const showImport = ref(false);
 const showEdit = ref(false);
+const showCreateRequest = ref(false);
 const showPortal = ref(false);
 const portalStudent = ref(null);
 const editingStudent = ref(null);
-const editPhotoPreview = ref(null);
+const editPhotoFile = ref(null);
+const createPhotoFile = ref(null);
 
 const importResult = computed(() => page.props.flash?.importResult ?? null);
 
@@ -440,16 +411,6 @@ const filterForm = reactive({
     search:            props.filters?.search ?? '',
 });
 
-const registerForm = useForm({
-    school_class_id: '',
-    name:            '',
-    gender:          '',
-    dob:             '',
-    email:           '',
-    create_login:    false,
-    password:        '',
-});
-
 const portalForm = useForm({ email: '', password: '' });
 
 const importForm = useForm({ file: null });
@@ -460,6 +421,16 @@ const editForm = useForm({
     gender:          '',
     dob:             '',
     parent_email:    '',
+    photo:           null,
+    reason:          '',
+});
+
+const createForm = useForm({
+    school_class_id: '',
+    name:            '',
+    gender:          '',
+    dob:             '',
+    reason:          '',
     photo:           null,
 });
 
@@ -555,15 +526,13 @@ function toggleSort(key) {
     }), { preserveState: true, preserveScroll: true });
 }
 
-function openRegisterModal() {
-    registerForm.reset();
-    registerForm.clearErrors();
-    showRegister.value = true;
-}
-
-function closeRegisterModal() {
-    showRegister.value = false;
-    clearModalQuery();
+function clearModalQuery() {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('import') || url.searchParams.has('edit')) {
+        url.searchParams.delete('import');
+        url.searchParams.delete('edit');
+        window.history.replaceState({}, '', url.pathname + url.search);
+    }
 }
 
 function openImportModal() {
@@ -577,62 +546,68 @@ function closeImportModal() {
     clearModalQuery();
 }
 
-function clearModalQuery() {
-    const url = new URL(window.location.href);
-    if (url.searchParams.has('register') || url.searchParams.has('import') || url.searchParams.has('edit')) {
-        url.searchParams.delete('register');
-        url.searchParams.delete('import');
-        url.searchParams.delete('edit');
-        window.history.replaceState({}, '', url.pathname + url.search);
-    }
-}
-
 function openEditModal(student) {
     editingStudent.value = student;
-    editPhotoPreview.value = null;
+    editPhotoFile.value = null;
     editForm.clearErrors();
     editForm.school_class_id = student.school_class_id ?? student.school_class?.id ?? '';
     editForm.name = student.name ?? '';
     editForm.gender = student.gender ?? '';
     editForm.dob = dobInputValue(student.dob);
     editForm.parent_email = student.parent_email ?? '';
-    editForm.photo = null;
+    editForm.reason = '';
     showEdit.value = true;
 }
 
 function closeEditModal() {
     showEdit.value = false;
     editingStudent.value = null;
-    editPhotoPreview.value = null;
+    editPhotoFile.value = null;
     editForm.reset();
     clearModalQuery();
 }
 
-function onEditPhotoChange(event) {
-    const file = event.target.files?.[0] ?? null;
-    editForm.photo = file;
-    if (editPhotoPreview.value) URL.revokeObjectURL(editPhotoPreview.value);
-    editPhotoPreview.value = file ? URL.createObjectURL(file) : null;
+function openCreateRequestModal() {
+    createForm.clearErrors();
+    createPhotoFile.value = null;
+    showCreateRequest.value = true;
+}
+
+function closeCreateRequestModal() {
+    showCreateRequest.value = false;
+    createPhotoFile.value = null;
+    createForm.reset();
+}
+
+function submitCreateRequest() {
+    createForm
+        .transform(data => ({ ...data, photo: createPhotoFile.value }))
+        .post(`/school-admin/${props.school.id}/students/change-request`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => closeCreateRequestModal(),
+        });
 }
 
 function submitEdit() {
+    if (isLocked.value) {
+        editForm
+            .transform(data => ({ ...data, photo: editPhotoFile.value }))
+            .post(`/school-admin/${props.school.id}/students/${editingStudent.value.id}/change-request`, {
+                forceFormData: true,
+                preserveScroll: true,
+                onSuccess: () => closeEditModal(),
+            });
+        return;
+    }
+
     editForm
-        .transform(data => ({ ...data, _method: 'put' }))
+        .transform(data => ({ ...data, photo: editPhotoFile.value, _method: 'put' }))
         .post(`/school-admin/${props.school.id}/students/${editingStudent.value.id}`, {
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => closeEditModal(),
         });
-}
-
-function submitRegister() {
-    registerForm.post(`/school-admin/${props.school.id}/students`, {
-        preserveScroll: true,
-        onSuccess: () => {
-            closeRegisterModal();
-            registerForm.reset();
-        },
-    });
 }
 
 function openPortalModal(student) {
@@ -680,8 +655,11 @@ function onCategoryChange() {
 
 onMounted(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('register') === '1') openRegisterModal();
-    if (params.get('import') === '1' || importResult.value) openImportModal();
+    if (params.get('register') === '1' && !isLocked.value) {
+        router.visit(`/school-admin/${props.school.id}/students/create`);
+        return;
+    }
+    if (!isLocked.value && (params.get('import') === '1' || importResult.value)) openImportModal();
     const editId = params.get('edit');
     if (editId) {
         const student = props.students?.data?.find(s => String(s.id) === editId);
@@ -725,15 +703,3 @@ function dobInputValue(value) {
     return str.length >= 10 ? str.slice(0, 10) : str;
 }
 </script>
-
-<style scoped>
-.sa-btn-primary {
-    background: linear-gradient(135deg, #0f3d7a, #1e5aa8);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(15, 61, 122, 0.25);
-}
-
-.sa-btn-primary:hover:not(:disabled) {
-    background: linear-gradient(135deg, #1a4f8c, #2563eb);
-}
-</style>

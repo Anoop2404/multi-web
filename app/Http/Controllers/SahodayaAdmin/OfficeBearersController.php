@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Support\PersistDefaults;
 use App\Models\OfficeBearers;
 use Illuminate\Http\Request;
 
@@ -32,6 +33,7 @@ class OfficeBearersController extends SahodayaAdminController
 
         $data['tenant_id'] = $this->sahodaya->id;
         $data['is_active'] = true;
+        $data = PersistDefaults::coalesce($data, ['display_order' => 0]);
 
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('sahodaya/' . $this->sahodaya->id . '/bearers', 's3');
@@ -61,6 +63,8 @@ class OfficeBearersController extends SahodayaAdminController
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('sahodaya/' . $this->sahodaya->id . '/bearers', 's3');
         }
+
+        $data = PersistDefaults::coalesce($data, ['display_order' => $bearer->display_order ?? 0]);
 
         $bearer->update($data);
         return back()->with('success', 'Office bearer updated.');

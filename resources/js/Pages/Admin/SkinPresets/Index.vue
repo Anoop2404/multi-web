@@ -11,7 +11,7 @@
             <!-- Presets grid -->
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 <div v-for="preset in presets" :key="preset.id"
-                     class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                     class="card card--flush">
                     <!-- Color preview bar -->
                     <div class="h-3 flex">
                         <div class="flex-1" :style="{ background: preset.theme?.primary }"></div>

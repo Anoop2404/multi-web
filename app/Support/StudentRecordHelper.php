@@ -2,8 +2,8 @@
 
 namespace App\Support;
 
-use App\Models\AcademicYearRecord;
 use App\Models\Tenant;
+use App\Support\AcademicYear;
 
 class StudentRecordHelper
 {
@@ -13,8 +13,6 @@ class StudentRecordHelper
             return null;
         }
 
-        return AcademicYearRecord::where('tenant_id', $school->parent_id)
-            ->where('is_active', true)
-            ->value('id');
+        return AcademicYear::activeId();
     }
 }

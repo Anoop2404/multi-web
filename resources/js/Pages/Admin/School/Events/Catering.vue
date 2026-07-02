@@ -1,6 +1,10 @@
 <template>
-    <SchoolAdminLayout :title="`${event.title} — Meals`" :school="school">
-        <form @submit.prevent="submit" class="bg-white border rounded-xl p-4 mb-4 grid sm:grid-cols-2 gap-2">
+    <SchoolAdminLayout :title="`${event.title} — Meals`" :school="school" :show-header-title="false">
+        <PageHeader :title="`${event.title} — Meals`" eyebrow="Fest"
+            description="Order meals and catering for fest participants." />
+
+
+        <form @submit.prevent="submit" class="card mb-4 grid sm:grid-cols-2 gap-2">
             <input v-model="form.meal_date" type="date" class="field" required>
             <select v-model="form.meal_type" class="field" required>
                 <option value="breakfast">Breakfast</option>
@@ -10,7 +14,7 @@
             </select>
             <input v-model.number="form.head_count" type="number" min="1" class="field" placeholder="Head count" required>
             <input v-model="form.notes" class="field" placeholder="Notes (optional)">
-            <button class="sm:col-span-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Request meals</button>
+            <button class="sm:col-span-2 px-4 py-2 text-white rounded-lg text-sm">Request meals</button>
         </form>
         <ul class="bg-white border rounded-xl divide-y text-sm">
             <li v-for="o in orders" :key="o.id" class="p-3 flex justify-between">
@@ -36,7 +40,3 @@ function submit() {
 }
 </script>
 
-<style scoped>
-@reference "../../../../../css/app.css";
-.field { @apply border border-gray-200 rounded-lg px-3 py-2 text-sm; }
-</style>

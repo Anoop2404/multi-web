@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Models\PersonalAccessToken;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Support\MobileAuthPayload;
 use App\Support\SahodayaHomepageContent;
 use App\Support\TenantBranding;
@@ -50,10 +51,18 @@ class AuthController extends ApiController
         ]);
 
         $email = strtolower(trim($data['email']));
+        $auditContext = [
+            'portal'     => 'mobile_api',
+            'host'       => $request->getHost(),
+            'device'     => $data['device_name'],
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+        ];
 
         if (! Auth::attempt(['email' => $email, 'password' => $data['password']])) {
+            app(PlatformAuditLogger::class)->loginFailed($email, 'invalid_credentials', context: $auditContext);
+
             throw ValidationException::withMessages([
-                'email' => ['Invalid credentials.'],
+                'email' => ['Invalid email or password. Please check your credentials and try again.'],
             ]);
         }
 
@@ -62,10 +71,19 @@ class AuthController extends ApiController
         if ($message = MobileAuthPayload::assertCanLogin($user)) {
             Auth::logout();
 
+            app(PlatformAuditLogger::class)->loginPortalRejected(
+                $user->id,
+                $user->email,
+                $message,
+                context: $auditContext,
+            );
+
             throw ValidationException::withMessages([
                 'email' => [$message],
             ]);
         }
+
+        app(PlatformAuditLogger::class)->login($user->id, $user->email, context: $auditContext);
 
         $token = $user->createToken($data['device_name'])->plainTextToken;
 
@@ -77,6 +95,15 @@ class AuthController extends ApiController
 
     public function logout(Request $request)
     {
+        $user = $request->user();
+
+        if ($user) {
+            app(PlatformAuditLogger::class)->logout($user->id, $user->email, context: [
+                'portal' => 'mobile_api',
+                'host'   => $request->getHost(),
+            ]);
+        }
+
         if ($bearer = $request->bearerToken()) {
             PersonalAccessToken::findToken($bearer)?->delete();
         } else {

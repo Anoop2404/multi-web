@@ -1,5 +1,8 @@
 <template>
-    <SchoolAdminLayout title="School Website Builder" :school="school" :publicUrl="publicUrl">
+    <SchoolAdminLayout title="School Website Builder" :school="school" :publicUrl="publicUrl" :show-header-title="false">
+        <PageHeader title="School Website Builder" eyebrow="School" />
+
+
         <div class="space-y-5 max-w-5xl">
 
             <!-- Public website toggle -->

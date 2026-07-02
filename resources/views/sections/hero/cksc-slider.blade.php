@@ -1,5 +1,6 @@
 {{-- hero/cksc-slider — Image slider with circular logo overlay (CKSC standalone style) --}}
 @php
+    use App\Support\TenantBranding;
     use App\Support\TenantStorage;
 
     $slides = $config['slides'] ?? [];
@@ -10,7 +11,9 @@
             'image'   => $config['bg_image'],
         ]];
     }
-    $logo = TenantStorage::siteMediaUrl($tenant, $config['logo'] ?? ($logo ?? null));
+    $logo = TenantStorage::logoUrl($tenant, $config['logo'] ?? null)
+        ?? ($logo ?? null)
+        ?? TenantBranding::logoUrl($tenant);
     $interval = max(3, (int) ($config['autoplay_seconds'] ?? 5));
     $slideImage = fn (?string $img) => TenantStorage::siteMediaUrl($tenant, $img);
 @endphp

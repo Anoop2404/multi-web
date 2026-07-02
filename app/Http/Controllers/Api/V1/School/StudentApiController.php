@@ -10,6 +10,7 @@ use App\Services\Audit\UploadBackupService;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Students\StudentCsvImporter;
 use App\Services\Students\StudentRegistrationNumberGenerator;
+use App\Services\Students\StudentEditLockService;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -65,6 +66,7 @@ class StudentApiController extends SchoolApiController
     public function store(Request $request)
     {
         abort_unless(filled($this->school->school_prefix), 403, 'Set school code first.');
+        app(StudentEditLockService::class)->assertEditable($this->school);
 
         $data = $request->validate([
             'school_class_id' => [
@@ -95,6 +97,7 @@ class StudentApiController extends SchoolApiController
     public function update(Request $request, string $tenantId, string $studentId)
     {
         $student = Student::where('tenant_id', $this->school->id)->findOrFail($studentId);
+        app(StudentEditLockService::class)->assertEditable($this->school);
 
         $data = $request->validate([
             'school_class_id' => [
@@ -114,6 +117,7 @@ class StudentApiController extends SchoolApiController
 
     public function destroy(string $tenantId, string $studentId)
     {
+        app(StudentEditLockService::class)->assertEditable($this->school);
         $student = Student::where('tenant_id', $this->school->id)->findOrFail($studentId);
         $student->delete();
 
@@ -122,6 +126,8 @@ class StudentApiController extends SchoolApiController
 
     public function uploadPhoto(Request $request, string $tenantId, string $studentId)
     {
+        app(StudentEditLockService::class)->assertEditable($this->school);
+
         $student = Student::where('tenant_id', $this->school->id)->findOrFail($studentId);
 
         $request->validate(['photo' => 'required|image|max:2048']);
@@ -164,6 +170,8 @@ class StudentApiController extends SchoolApiController
 
     public function import(Request $request)
     {
+        app(StudentEditLockService::class)->assertEditable($this->school);
+
         $request->validate(['file' => 'required|file|mimes:csv,txt|max:2048']);
 
         $file = $request->file('file');

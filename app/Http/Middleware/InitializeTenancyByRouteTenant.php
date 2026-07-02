@@ -27,6 +27,10 @@ class InitializeTenancyByRouteTenant
         $tenant = $this->resolveTenant($request);
 
         if ($tenant) {
+            if (! $tenant->is_active && ! $request->user()?->isSuperAdmin()) {
+                abort(403, 'This organization is inactive.');
+            }
+
             TenancyDatabase::initializeForTenant($tenant);
         }
 

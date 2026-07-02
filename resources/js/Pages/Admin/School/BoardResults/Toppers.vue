@@ -1,43 +1,47 @@
 <template>
-    <SchoolAdminLayout :title="`Toppers — Class ${boardResult.class} (${boardResult.academic_year})`" :school="school">
+    <SchoolAdminLayout :title="`Toppers — Class ${boardResult.class} (${boardResult.academic_year})`" :school="school" :show-header-title="false">
+        <PageHeader title="`Toppers — Class ${boardResult.class} (${boardResult.academic_year})`" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="max-w-3xl space-y-6">
             <!-- Add topper form -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="card">
                 <h3 class="font-bold text-gray-800 mb-4">Add Topper</h3>
                 <form @submit.prevent="submit" class="space-y-4">
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Student Name *</label>
+                            <label class="form-label mb-1.5">Student Name *</label>
                             <input v-model="form.name" type="text" required
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Percentage *</label>
+                            <label class="form-label mb-1.5">Percentage *</label>
                             <input v-model="form.percentage" type="number" required min="0" max="100" step="0.01"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Rank</label>
+                            <label class="form-label mb-1.5">Rank</label>
                             <input v-model="form.rank" type="number" min="1" placeholder="1"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Stream (Class XII only)</label>
+                            <label class="form-label mb-1.5">Stream (Class XII only)</label>
                             <input v-model="form.stream" type="text" placeholder="Science / Commerce / Arts"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Total Marks</label>
+                            <label class="form-label mb-1.5">Total Marks</label>
                             <input v-model="form.total_marks" type="number" min="0"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Marks Obtained</label>
+                            <label class="form-label mb-1.5">Marks Obtained</label>
                             <input v-model="form.marks_obtained" type="number" min="0"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Photo</label>
+                            <label class="form-label mb-1.5">Photo</label>
                             <input type="file" accept="image/*" @change="form.photo = $event.target.files[0]"
                                    class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
                         </div>
@@ -48,7 +52,7 @@
                     </div>
                     <div class="flex items-center gap-3">
                         <button type="submit" :disabled="form.processing"
-                                class="bg-indigo-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50">
+                                class="btn-primary text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition disabled:opacity-50">
                             Add Topper
                         </button>
                         <Link :href="`/school-admin/${school.id}/board-results`"
@@ -58,7 +62,7 @@
             </div>
 
             <!-- Toppers list -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="card card--flush">
                 <div class="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
                     <h3 class="font-bold text-gray-800">Toppers ({{ boardResult.toppers?.length ?? 0 }})</h3>
                 </div>

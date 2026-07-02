@@ -8,7 +8,7 @@
         <div class="login-wrap">
             <div class="login-page-inner">
 
-                <a href="/" class="login-back">
+                <a href="/portal" class="login-back">
                     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
                     Back to portal
                 </a>
@@ -46,14 +46,11 @@
                             <div class="login-form-intro">
                                 <p class="login-form-heading">Admin Access</p>
                                 <h2 class="login-form-title">Sign In</h2>
-                                <p class="login-form-sub">Enter your credentials to access the admin dashboard.</p>
+                                <p class="login-form-sub">Enter your credentials to access the Sahodaya admin dashboard.</p>
                             </div>
 
                             <form @submit.prevent="submit" class="login-form">
-                                <div v-if="sessionExpired || $page.props.flash?.error"
-                                     class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-                                    {{ $page.props.flash?.error || 'Your session has expired. Please sign in again.' }}
-                                </div>
+                                <AuthLoginAlerts :session-expired="sessionExpired" :auth-error="authError" />
 
                                 <div>
                                     <label class="login-label" for="email">Email</label>
@@ -64,10 +61,10 @@
                                         required
                                         autocomplete="email"
                                         class="login-input"
-                                        :class="{ 'login-input-error': form.errors.email }"
+                                        :class="{ 'login-input-error': fieldErrors.email }"
                                         placeholder="you@school.edu"
                                     />
-                                    <p v-if="form.errors.email" class="login-error">{{ form.errors.email }}</p>
+                                    <p v-if="fieldErrors.email" class="login-error">{{ fieldErrors.email }}</p>
                                 </div>
 
                                 <div>
@@ -79,14 +76,21 @@
                                         required
                                         autocomplete="current-password"
                                         class="login-input"
+                                        :class="{ 'login-input-error': fieldErrors.password || authError }"
                                         placeholder="••••••••"
                                     />
+                                    <p v-if="fieldErrors.password" class="login-error">{{ fieldErrors.password }}</p>
                                 </div>
 
                                 <button type="submit" :disabled="form.processing" class="login-btn">
                                     {{ form.processing ? 'Signing in...' : 'Sign In' }}
                                 </button>
                             </form>
+
+                            <p class="login-alt mt-5 text-center text-xs text-slate-400">
+                                Member school?
+                                <a href="/school-login" class="text-[#1e5aa8] hover:underline">School login for event registration</a>
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -98,7 +102,8 @@
 </template>
 
 <script setup>
-import { useForm } from '@inertiajs/vue3';
+import AuthLoginAlerts from '@/Components/auth/AuthLoginAlerts.vue';
+import { useAuthLoginForm } from '@/support/useAuthLoginForm.js';
 
 defineProps({
     logoUrl:    { type: String, default: null },
@@ -111,11 +116,7 @@ defineProps({
     sessionExpired: { type: Boolean, default: false },
 });
 
-const form = useForm({ email: '', password: '' });
-
-function submit() {
-    form.post('/login', { preserveState: false });
-}
+const { form, authError, fieldErrors, submit } = useAuthLoginForm();
 </script>
 
 <style scoped>

@@ -2,53 +2,84 @@
 
 namespace App\Services\Events;
 
-use App\Models\AccountHead;
 use App\Models\FeeReceipt;
+use App\Models\FestEvent;
 use App\Models\FestRegistration;
+use App\Models\FestSchoolEventFee;
 use App\Models\LedgerTransaction;
+use App\Services\Ledger\LedgerPostingService;
+use App\Support\LedgerAccountCatalog;
 
 class FestFeeLedgerService
 {
-    public function postApprovedReceipt(FeeReceipt $receipt): ?LedgerTransaction
+    public function postApprovedReceipt(FeeReceipt $receipt, bool $forceRepost = false): ?LedgerTransaction
     {
         if ($receipt->status !== 'approved') {
             return null;
         }
 
-        if ($receipt->feeable_type !== FestRegistration::class) {
+        [$sahodayaId, $description, $eventId] = match ($receipt->feeable_type) {
+            FestSchoolEventFee::class => $this->schoolEventFeeContext($receipt),
+            FestRegistration::class => $this->registrationContext($receipt),
+            default => [null, null, null],
+        };
+
+        if (! $sahodayaId || ! $eventId) {
             return null;
         }
 
-        $existing = LedgerTransaction::where('reference_type', FeeReceipt::class)
-            ->where('reference_id', $receipt->id)
-            ->first();
-
-        if ($existing) {
-            return $existing;
-        }
-
-        $registration = FestRegistration::with('event')->find($receipt->feeable_id);
-        if (! $registration?->event) {
+        $event = FestEvent::find($eventId);
+        if (! $event) {
             return null;
         }
 
-        $sahodayaId = $registration->event->tenant_id;
-
-        $head = AccountHead::firstOrCreate(
-            ['tenant_id' => $sahodayaId, 'code' => 'EVENT-FEE'],
-            ['name' => 'Event Registration Fees', 'type' => 'income', 'is_active' => true]
+        $incomeCode = LedgerAccountCatalog::festIncomeCode($event);
+        app(LedgerPostingService::class)->ensureHead(
+            $sahodayaId,
+            $incomeCode,
+            LedgerAccountCatalog::festIncomeHeadName($event),
+            LedgerAccountCatalog::festIncomeCategory($event),
+            $event->id,
         );
 
-        return LedgerTransaction::create([
-            'tenant_id'        => $sahodayaId,
-            'account_head_id'  => $head->id,
-            'reference_type'   => FeeReceipt::class,
-            'reference_id'     => $receipt->id,
-            'entry_type'       => 'credit',
-            'amount'           => $receipt->amount,
-            'description'      => "Event fee — registration #{$registration->id}",
-            'transaction_date' => $receipt->payment_date ?? now()->toDateString(),
-            'posted_by'        => $receipt->reviewed_by,
-        ]);
+        $rows = app(LedgerPostingService::class)->postIncomeReceipt(
+            $receipt,
+            $sahodayaId,
+            $incomeCode,
+            $description ?? 'Event fee receipt',
+            $forceRepost
+        );
+
+        return $rows[1] ?? $rows[0] ?? null;
+    }
+
+    /** @return array{0: ?string, 1: ?string, 2: ?string} */
+    private function schoolEventFeeContext(FeeReceipt $receipt): array
+    {
+        $fee = FestSchoolEventFee::with('event', 'school')->find($receipt->feeable_id);
+        if (! $fee?->event) {
+            return [null, null, null];
+        }
+
+        return [
+            $fee->event->tenant_id,
+            "Event fee — {$fee->school?->name} — {$fee->event->title}",
+            $fee->event->id,
+        ];
+    }
+
+    /** @return array{0: ?string, 1: ?string, 2: ?string} */
+    private function registrationContext(FeeReceipt $receipt): array
+    {
+        $registration = FestRegistration::with('event')->find($receipt->feeable_id);
+        if (! $registration?->event) {
+            return [null, null, null];
+        }
+
+        return [
+            $registration->event->tenant_id,
+            "Event fee — registration #{$registration->id}",
+            $registration->event->id,
+        ];
     }
 }

@@ -2,7 +2,10 @@
     <SahodayaAdminLayout title="Sahodaya Website Builder" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
-                         :pendingPaymentsCount="pendingPaymentsCount">
+                         :pendingPaymentsCount="pendingPaymentsCount"
+                         :show-header-title="false">
+        <PageHeader title="Website builder" eyebrow="Website"
+                    description="Design homepage sections, navigation, theme colours, and apply the CKSC-style template." />
         <div class="space-y-5 max-w-5xl">
 
             <!-- Public website toggle -->
@@ -93,7 +96,7 @@
                             </p>
                         </div>
                         <button @click="ensurePortalLinks" :disabled="portalSaving"
-                                class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
+                                class="btn-primary px-4 py-2 text-sm font-bold rounded-xl transition disabled:opacity-50">
                             {{ portalSaving ? 'Adding…' : '+ Add portal links to menu & footer' }}
                         </button>
                     </div>

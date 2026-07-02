@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class FeeReceipt extends Model
 {
     protected $fillable = [
-        'feeable_type', 'feeable_id', 'file_path', 'transaction_ref', 'bank_name',
+        'feeable_type', 'feeable_id', 'receipt_number', 'file_path', 'generated_receipt_path', 'transaction_ref', 'bank_name',
         'payment_date', 'amount', 'status', 'rejection_reason',
         'uploaded_by_user_id', 'reviewed_by', 'reviewed_at',
     ];

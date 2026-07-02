@@ -198,6 +198,41 @@ class StudentRegistrationTest extends TestCase
         $this->assertStringContainsString('Rahul Kumar', $csv);
     }
 
+    public function test_student_photo_url_uses_serve_route_for_tenant_public_disk(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['tenant' => $school, 'class' => $class] = $this->schoolWithClass();
+
+        $relative = 'students/'.$school->id.'/tenant-public.jpg';
+        $tenantDir = base_path('storage/tenant'.$school->id.'/app/public/'.$relative);
+        @mkdir(dirname($tenantDir), 0777, true);
+        file_put_contents($tenantDir, 'fake-image-bytes');
+
+        $student = Student::create([
+            'tenant_id'       => $school->id,
+            'school_class_id' => $class->id,
+            'name'            => 'Tenant Public Photo',
+            'status'          => 'active',
+            'admission_number'=> app(StudentRegistrationNumberGenerator::class)->generate($school),
+            'photo'           => $relative,
+        ]);
+
+        $photoUrl = $student->fresh()->photoUrl();
+        $this->assertSame("/school-admin/{$school->id}/students/{$student->id}/photo", $photoUrl);
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        $this->actingAs($admin)
+            ->get("/school-admin/{$school->id}/students/{$student->id}/photo")
+            ->assertOk();
+
+        @unlink($tenantDir);
+    }
+
     public function test_student_photo_url_uses_serve_route_and_streams_from_s3(): void
     {
         Storage::fake('s3');

@@ -9,8 +9,10 @@ use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\Tenant;
-use App\Events\FestScoreboardUpdated;
-use App\Services\Events\EventContext;
+use App\Services\Events\EventLifecycleGate;
+use App\Services\Events\FestMarkSaveService;
+use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestPublicVisibilityService;
 use Illuminate\Http\Request;
 
 class JudgeDashboardController extends Controller
@@ -31,10 +33,38 @@ class JudgeDashboardController extends Controller
 
         $assignmentsByEvent = $assignments->groupBy('event_id')->map(fn ($group) => $group->values());
 
+        $itemProgress = $assignments->groupBy('item_id')->map(function ($group) use ($user) {
+            $item = $group->first()->item;
+            $eventId = $group->first()->event_id;
+            $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q
+                ->where('event_id', $eventId)
+                ->where('item_id', $item?->id)
+                ->where('status', 'approved'))
+                ->pluck('id');
+
+            $total = $participantIds->count();
+            $marked = FestMark::where('event_id', $eventId)
+                ->where('item_id', $item?->id)
+                ->whereIn('participant_id', $participantIds)
+                ->where(function ($q) {
+                    $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position');
+                })
+                ->count();
+
+            return [
+                'item_id'    => $item?->id,
+                'item_title' => $item?->title,
+                'event_id'   => $eventId,
+                'marked'     => $marked,
+                'total'      => $total,
+            ];
+        })->values();
+
         return inertia('Portal/Judge/Dashboard', [
-            'sahodaya'    => $sahodaya->only('id', 'name'),
-            'events'      => $events,
-            'assignments' => $assignmentsByEvent,
+            'sahodaya'     => $sahodaya->only('id', 'name'),
+            'events'       => $events,
+            'assignments'  => $assignmentsByEvent,
+            'itemProgress' => $itemProgress,
         ]);
     }
 
@@ -60,16 +90,28 @@ class JudgeDashboardController extends Controller
             ->get()
             ->keyBy('participant_id');
 
+        $visibility = app(FestPublicVisibilityService::class);
+        $maskNames = $visibility->strictAnonymity($event) && ! $event->results_published;
+
+        $participantLabels = [];
+        foreach ($registrations as $reg) {
+            foreach ($reg->participants as $p) {
+                $participantLabels[$p->id] = $visibility->publicReference($event, $p);
+            }
+        }
+
         return inertia('Portal/Judge/MarkEntry', [
-            'sahodaya'      => Tenant::find($tenantId)?->only('id', 'name'),
-            'event'         => $event->load('items'),
-            'registrations' => $registrations,
-            'marks'         => $marks,
-            'assignedItems' => $itemIds->values(),
+            'sahodaya'          => Tenant::find($tenantId)?->only('id', 'name'),
+            'event'             => $event->load('items'),
+            'registrations'     => $registrations,
+            'marks'             => $marks,
+            'assignedItems'     => $itemIds->values(),
+            'maskNames'         => $maskNames,
+            'participantLabels' => $participantLabels,
         ]);
     }
 
-    public function storeMark(Request $request, string $tenantId, FestEvent $event)
+    public function storeMark(Request $request, string $tenantId, FestEvent $event, FestMarkSaveService $markSave)
     {
         abort_if($event->tenant_id !== $tenantId, 403);
 
@@ -77,11 +119,13 @@ class JudgeDashboardController extends Controller
         $itemIds = $this->assignedItemIds($user->id, $event->id);
 
         $data = $request->validate([
-            'participant_id' => 'required|exists:fest_participants,id',
-            'item_id'        => 'required|exists:fest_event_items,id',
-            'grade'          => 'nullable|in:A,B,C',
-            'position'       => 'nullable|integer|min:1|max:255',
-            'score'          => 'nullable|numeric|min:0',
+            'participant_id'    => 'required|exists:fest_participants,id',
+            'item_id'           => 'required|exists:fest_event_items,id',
+            'grade'             => 'nullable|in:A,A+,B,C',
+            'position'          => 'nullable|integer|min:1|max:255',
+            'score'             => 'nullable|numeric|min:0',
+            'measurement_value' => 'nullable|string|max:50',
+            'measurement_unit'  => 'nullable|string|max:20',
         ]);
 
         if ($itemIds->isNotEmpty() && ! $itemIds->contains($data['item_id'])
@@ -89,22 +133,17 @@ class JudgeDashboardController extends Controller
             abort(403, 'You are not assigned to this item.');
         }
 
-        $participant = FestParticipant::findOrFail($data['participant_id']);
-        abort_if($participant->registration->event_id !== $event->id, 403);
+        EventLifecycleGate::allowMarkEntry($event);
 
-        FestMark::updateOrCreate(
-            ['item_id' => $data['item_id'], 'participant_id' => $data['participant_id']],
-            array_merge($data, [
-                'event_id'  => $event->id,
-                'locked_by' => $user->id,
-                'locked_at' => now(),
-            ])
+        $result = $markSave->save($event, $data, $user->id);
+
+        app(PlatformAuditLogger::class)->judgeMarkEntered(
+            $event,
+            (int) $data['participant_id'],
+            (int) $data['item_id'],
         );
 
-        EventContext::for($event)->recalculateSchoolPoints();
-        FestScoreboardUpdated::dispatch($event->fresh());
-
-        return back()->with('success', 'Mark saved.');
+        return back()->with('success', $result['message']);
     }
 
     private function assignedItemIds(int $userId, int $eventId)

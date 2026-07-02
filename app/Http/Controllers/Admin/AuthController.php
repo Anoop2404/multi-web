@@ -9,6 +9,9 @@ use App\Services\Mail\SahodayaMailer;
 use App\Support\SahodayaHomepageContent;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
+use App\Support\TenantUserCatalog;
+use App\Services\Audit\PlatformAuditLogger;
+use App\Support\InertiaAuth;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,17 +46,132 @@ class AuthController extends Controller
         ]);
     }
 
+    public function showSchoolLogin(): Response|RedirectResponse
+    {
+        if (TenantDomainSync::isCentralHost(request()->getHost())) {
+            return redirect()->route('login');
+        }
+
+        $tenant = TenantBranding::resolveTenant();
+        if (! $tenant || $tenant->type !== 'sahodaya') {
+            return redirect()->route('login');
+        }
+
+        $branding = SahodayaHomepageContent::get($tenant);
+
+        return inertia('Auth/SchoolLogin', [
+            'logoUrl'    => TenantBranding::logoUrl($tenant),
+            'tenantName' => $tenant->name,
+            'motto'      => $branding['motto'] ?? null,
+            'phone'      => $branding['phone'] ?? null,
+            'email'      => $branding['email'] ?? null,
+            'showRegisterLink' => true,
+            'sessionExpired' => request()->query('session') === 'expired',
+        ]);
+    }
+
+    public function showPortalLogin(): Response|RedirectResponse
+    {
+        if (TenantDomainSync::isCentralHost(request()->getHost())) {
+            return redirect()->route('login');
+        }
+
+        $tenant = TenantBranding::resolveTenant();
+        if (! $tenant || ! in_array($tenant->type, ['sahodaya', 'school'], true)) {
+            return redirect()->route('login');
+        }
+
+        $branding = $tenant->type === 'sahodaya'
+            ? SahodayaHomepageContent::get($tenant)
+            : [];
+
+        return inertia('Auth/PortalLogin', [
+            'logoUrl'        => TenantBranding::logoUrl($tenant),
+            'tenantName'     => $tenant->name,
+            'motto'          => $branding['motto'] ?? null,
+            'sessionExpired' => request()->query('session') === 'expired',
+        ]);
+    }
+
+    public function showForgotPassword(): Response|RedirectResponse
+    {
+        if (TenantDomainSync::isCentralHost(request()->getHost())) {
+            return redirect()->route('login');
+        }
+
+        return inertia('Auth/ForgotPassword', [
+            'status' => session('status'),
+        ]);
+    }
+
+    public function sendResetLink(Request $request): RedirectResponse
+    {
+        $request->validate(['email' => 'required|email']);
+
+        $status = \Illuminate\Support\Facades\Password::sendResetLink(
+            ['email' => strtolower(trim($request->input('email')))],
+        );
+
+        return $status === \Illuminate\Support\Facades\Password::RESET_LINK_SENT
+            ? back()->with('status', __($status))
+            : back()->withErrors(['email' => __($status)]);
+    }
+
+    public function showResetPassword(Request $request, string $token): Response
+    {
+        return inertia('Auth/ResetPassword', [
+            'token' => $token,
+            'email' => $request->query('email', ''),
+        ]);
+    }
+
+    public function resetPassword(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'token'    => 'required',
+            'email'    => 'required|email',
+            'password' => 'required|confirmed|min:8',
+        ]);
+
+        $status = \Illuminate\Support\Facades\Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password): void {
+                $user->forceFill(['password' => \Illuminate\Support\Facades\Hash::make($password)])->save();
+            },
+        );
+
+        return $status === \Illuminate\Support\Facades\Password::PASSWORD_RESET
+            ? redirect()->route('portal.login')->with('success', 'Password reset. You can sign in now.')
+            : back()->withErrors(['email' => __($status)]);
+    }
+
     public function login(Request $request)
     {
-        $credentials = $request->validate([
-            'email' => 'required|email',
+        $data = $request->validate([
+            'email'    => 'required|string',
             'password' => 'required',
         ]);
 
-        $credentials['email'] = strtolower(trim($credentials['email']));
+        $identifier = trim($data['email']);
+        $field = str_contains($identifier, '@') ? 'email' : 'username';
+        if ($field === 'email') {
+            $identifier = strtolower($identifier);
+        }
 
-        if (!Auth::attempt($credentials, $request->boolean('remember'))) {
-            return back()->withErrors(['email' => 'Invalid credentials.']);
+        $credentials = [$field => $identifier, 'password' => $data['password']];
+        $auditContext = self::auditContext($request);
+
+        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            app(PlatformAuditLogger::class)->loginFailed(
+                $identifier,
+                'invalid_credentials',
+                context: $auditContext,
+            );
+
+            return self::authErrorResponse(
+                $request,
+                'Invalid username/email or password. Please check your credentials and try again.',
+            );
         }
 
         $user = $request->user()->fresh();
@@ -63,12 +181,27 @@ class AuthController extends Controller
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return back()->withErrors(['email' => $message]);
+            app(PlatformAuditLogger::class)->loginPortalRejected(
+                $user->id,
+                $user->email,
+                $message,
+                context: $auditContext,
+            );
+
+            return self::authErrorResponse($request, $message);
         }
 
         $request->session()->regenerate();
 
-        if ($user->hasRole('school_admin') && ! $user->hasVerifiedEmail()) {
+        $user->update(['last_login_at' => now()]);
+
+        app(PlatformAuditLogger::class)->login($user->id, $user->email, context: $auditContext);
+
+        if ($user->must_change_password) {
+            return redirect()->route('password.change');
+        }
+
+        if ($user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal']) && ! $user->hasVerifiedEmail()) {
             $intended = $request->session()->pull('url.intended');
             if (is_string($intended) && str_contains($intended, '/email/verify/')) {
                 return redirect()->to($intended);
@@ -77,16 +210,66 @@ class AuthController extends Controller
             return redirect()->route('verification.notice');
         }
 
-        return \App\Support\InertiaAuth::intended($request, self::homeFor($user));
+        $home = self::homeFor($user);
+        if ($home === null) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            app(PlatformAuditLogger::class)->loginNoPortal($user->id, $user->email, context: $auditContext);
+
+            return self::authErrorResponse(
+                $request,
+                'Your account has no portal assigned. Contact your administrator.',
+            );
+        }
+
+        return InertiaAuth::intended($request, $home);
     }
 
     public function logout(Request $request)
     {
+        $user = $request->user();
+
+        if ($user) {
+            app(PlatformAuditLogger::class)->logout(
+                $user->id,
+                $user->email,
+                context: self::auditContext($request),
+            );
+        }
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    /** @return array<string, mixed> */
+    private static function auditContext(Request $request): array
+    {
+        $hostTenant = TenantBranding::resolveTenant($request);
+
+        return [
+            'host'        => $request->getHost(),
+            'portal'      => match (true) {
+                $request->routeIs('school.login') || str_contains($request->headers->get('referer', ''), 'school-login') => 'school',
+                $request->routeIs('portal.login') || str_contains($request->headers->get('referer', ''), 'portal/login') => 'portal',
+                TenantDomainSync::isCentralHost($request->getHost()) => 'superadmin',
+                default => 'sahodaya',
+            },
+            'tenant_id'   => $hostTenant?->id,
+            'tenant_type' => $hostTenant?->type,
+            'user_agent'  => substr((string) $request->userAgent(), 0, 255),
+        ];
+    }
+
+    private static function authErrorResponse(Request $request, string $message): RedirectResponse
+    {
+        return back()
+            ->withInput($request->only('email'))
+            ->withErrors(['email' => $message]);
     }
 
     public function verifyNotice(Request $request): Response|RedirectResponse
@@ -167,18 +350,49 @@ class AuthController extends Controller
             ->with('success', 'Gmail verified successfully. Welcome!');
     }
 
-    public static function homeFor(User $user): string
+    public static function homeFor(User $user): ?string
     {
         if ($user->isSuperAdmin()) {
             return route('admin.dashboard');
+        }
+
+        if ($user->hasAnyRole(['state_admin', 'state_staff'])) {
+            return route('admin.state.dashboard');
         }
 
         if ($user->hasRole('sahodaya_admin') && $user->tenant_id) {
             return "/sahodaya-admin/{$user->tenant_id}";
         }
 
-        if ($user->hasRole('school_admin') && $user->tenant_id) {
+        if ($user->hasRole('sahodaya_staff') && $user->tenant_id) {
+            return "/sahodaya-admin/{$user->tenant_id}";
+        }
+
+        if ($user->hasAnyRole([
+            'registration_coordinator',
+            'event_coordinator',
+            'sahodaya_finance',
+            'certificate_collector',
+            'data_entry',
+            'mark_entry_admin',
+        ]) && $user->tenant_id) {
+            return "/sahodaya-admin/{$user->tenant_id}";
+        }
+
+        if ($user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal']) && $user->tenant_id) {
             return "/school-admin/{$user->tenant_id}";
+        }
+
+        if ($user->hasAnyRole(['school_staff', 'school_event_coordinator']) && $user->tenant_id) {
+            return "/school-admin/{$user->tenant_id}";
+        }
+
+        if ($user->hasRole('group_admin') && $user->tenant_id) {
+            return "/portal/group/{$user->tenant_id}";
+        }
+
+        if ($user->hasRole('house_admin') && $user->tenant_id) {
+            return "/portal/house-admin/{$user->tenant_id}";
         }
 
         if ($user->hasRole('student') && $user->tenant_id) {
@@ -189,7 +403,23 @@ class AuthController extends Controller
             return "/portal/teacher/{$user->tenant_id}";
         }
 
-        return route('admin.dashboard');
+        if ($user->hasAnyRole(['mark_entry_coordinator', 'mark_entry_admin']) && $user->tenant_id) {
+            return "/portal/fest-coordinator/{$user->tenant_id}";
+        }
+
+        if ($user->hasAnyRole(['exam_controller', 'exam_staff']) && $user->tenant_id) {
+            return "/portal/exam/{$user->tenant_id}";
+        }
+
+        if ($user->hasRole('judge') && $user->tenant_id) {
+            return "/portal/judge/{$user->tenant_id}";
+        }
+
+        if ($user->hasRole('fest_ops') && $user->tenant_id) {
+            return "/portal/fest-ops/{$user->tenant_id}";
+        }
+
+        return null;
     }
 
     private static function sendVerificationFor(User $user): void
@@ -211,7 +441,20 @@ class AuthController extends Controller
         $host = strtolower($request->getHost());
 
         if (TenantDomainSync::isCentralHost($host)) {
-            return $user->isSuperAdmin() ? null : 'School and Sahodaya admins must sign in on their portal website, not the superadmin site.';
+            if ($user->isSuperAdmin()) {
+                return null;
+            }
+            if ($user->hasAnyRole(['state_admin', 'state_staff'])) {
+                return null; // state admins log in at the central domain
+            }
+            if ($user->hasAnyRole(array_merge(
+                ['sahodaya_staff', 'school_staff', 'judge', 'exam_controller', 'exam_staff', 'mark_entry_admin', 'mark_entry_coordinator', 'group_admin', 'house_admin', 'fest_ops'],
+                array_diff(TenantUserCatalog::sahodayaPermissionRoles(), ['sahodaya_staff']),
+            ))) {
+                return 'This account must sign in on your Sahodaya or school portal website, not the superadmin site.';
+            }
+
+            return 'School and Sahodaya admins must sign in on their portal website, not the superadmin site.';
         }
 
         $hostTenant = TenantBranding::resolveTenant($request);
@@ -226,12 +469,33 @@ class AuthController extends Controller
                     : 'This Sahodaya admin account belongs to another cluster. Use your own Sahodaya portal URL.';
             }
 
+            if ($user->hasRole('sahodaya_staff')
+                || $user->hasAnyRole(array_diff(TenantUserCatalog::sahodayaAdminPanelRoles(), ['sahodaya_admin', 'sahodaya_staff']))) {
+                return $user->tenant_id === $hostTenant->id
+                    ? null
+                    : 'This Sahodaya staff account belongs to another cluster. Use your own Sahodaya portal URL.';
+            }
+
+            if ($user->hasAnyRole(TenantUserCatalog::sahodayaPortalOnlyRoles())) {
+                return $user->tenant_id === $hostTenant->id
+                    ? null
+                    : 'This account belongs to another Sahodaya cluster. Sign in on your assigned portal URL.';
+            }
+
             if ($user->hasRole('school_admin')) {
                 $school = Tenant::find($user->tenant_id);
 
                 return $school?->parent_id === $hostTenant->id
                     ? null
                     : 'This school account belongs to another Sahodaya. Sign in on your Sahodaya portal (link in your registration email).';
+            }
+
+            if ($user->hasAnyRole(['teacher', 'student', 'group_admin', 'house_admin'])) {
+                $school = Tenant::find($user->tenant_id);
+
+                return $school?->parent_id === $hostTenant->id
+                    ? null
+                    : 'This account belongs to another Sahodaya cluster. Sign in on your school portal URL.';
             }
         }
 
@@ -242,8 +506,26 @@ class AuthController extends Controller
                     : 'This login is for a different school. Use your school\'s Sahodaya portal to sign in.';
             }
 
+            if ($user->hasRole('school_staff')) {
+                return $user->tenant_id === $hostTenant->id
+                    ? null
+                    : 'This school staff account belongs to another school.';
+            }
+
             if ($user->hasRole('sahodaya_admin')) {
                 return $user->tenant_id === $hostTenant->parent_id ? null : 'Invalid credentials.';
+            }
+
+            if ($user->hasRole('group_admin')) {
+                return $user->tenant_id === $hostTenant->id
+                    ? null
+                    : 'This group admin account belongs to another school.';
+            }
+
+            if ($user->hasRole('house_admin')) {
+                return $user->tenant_id === $hostTenant->id
+                    ? null
+                    : 'This house admin account belongs to another school.';
             }
 
             if ($user->hasRole('student') || $user->hasRole('teacher')) {

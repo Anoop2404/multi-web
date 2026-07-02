@@ -9,10 +9,13 @@ class FestSchedule extends Model
 {
     protected $fillable = [
         'event_id', 'item_id', 'participant_id',
-        'scheduled_at', 'stage', 'sort_order',
+        'scheduled_at', 'stage', 'stage_id', 'sort_order', 'called_at',
     ];
 
-    protected $casts = ['scheduled_at' => 'datetime'];
+    protected $casts = [
+        'scheduled_at' => 'datetime',
+        'called_at'    => 'datetime',
+    ];
 
     public function event(): BelongsTo
     {
@@ -27,5 +30,10 @@ class FestSchedule extends Model
     public function participant(): BelongsTo
     {
         return $this->belongsTo(FestParticipant::class, 'participant_id');
+    }
+
+    public function festStage(): BelongsTo
+    {
+        return $this->belongsTo(FestStage::class, 'stage_id');
     }
 }

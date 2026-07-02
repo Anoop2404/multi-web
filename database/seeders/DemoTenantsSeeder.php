@@ -78,6 +78,9 @@ class DemoTenantsSeeder extends Seeder
             SahodayaSiteTemplate::apply($malappuram);
         }
 
+        $this->command?->line('Seeding fest master catalogs…');
+        (new FestCatalogSeeder)->run($malappuram->id);
+
         $malappuram->setSetting('logo', '/images/tenants/malappuram-logo.png');
 
         SahodayaHomepageContent::update($malappuram, [

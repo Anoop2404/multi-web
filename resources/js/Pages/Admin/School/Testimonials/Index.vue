@@ -1,34 +1,38 @@
 <template>
-    <SchoolAdminLayout title="Testimonials" :school="school">
+    <SchoolAdminLayout title="Testimonials" :school="school" :show-header-title="false">
+        <PageHeader title="Testimonials" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="space-y-6">
             <!-- Add / Edit form -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="card">
                 <h3 class="font-bold text-gray-800 mb-4">{{ editing ? 'Edit Testimonial' : 'Add Testimonial' }}</h3>
                 <form @submit.prevent="save" class="space-y-4">
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Name *</label>
+                            <label class="form-label mb-1.5">Name *</label>
                             <input v-model="form.name" type="text" required
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Designation</label>
+                            <label class="form-label mb-1.5">Designation</label>
                             <input v-model="form.designation" type="text" placeholder="Parent of Class X Student, Alumnus..."
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Display Order</label>
+                            <label class="form-label mb-1.5">Display Order</label>
                             <input v-model="form.display_order" type="number" min="0" placeholder="0"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Testimonial Quote *</label>
+                            <label class="form-label mb-1.5">Testimonial Quote *</label>
                             <textarea v-model="form.quote" rows="4" required
                                       placeholder="Share their experience..."
-                                      class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 resize-none"></textarea>
+                                      class="field resize-none"></textarea>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Photo</label>
+                            <label class="form-label mb-1.5">Photo</label>
                             <input type="file" accept="image/*" @change="form.photo = $event.target.files[0]"
                                    class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100">
                         </div>
@@ -50,7 +54,7 @@
             </div>
 
             <!-- List -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="card card--flush">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b border-gray-100">
                         <tr>

@@ -1,40 +1,44 @@
 <template>
-    <SchoolAdminLayout title="Job Vacancies" :school="school">
+    <SchoolAdminLayout title="Job Vacancies" :school="school" :show-header-title="false">
+        <PageHeader title="Job Vacancies" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="space-y-6">
             <!-- Add / Edit form -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="card">
                 <h3 class="font-bold text-gray-800 mb-4">{{ editing ? 'Edit Vacancy' : 'Post New Vacancy' }}</h3>
                 <form @submit.prevent="save" class="space-y-4">
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Position Title *</label>
+                            <label class="form-label mb-1.5">Position Title *</label>
                             <input v-model="form.title" type="text" required placeholder="PGT Mathematics, Office Assistant..."
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Qualification Required</label>
+                            <label class="form-label mb-1.5">Qualification Required</label>
                             <input v-model="form.qualification" type="text" placeholder="M.Sc., B.Ed., CTET..."
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Experience</label>
+                            <label class="form-label mb-1.5">Experience</label>
                             <input v-model="form.experience" type="text" placeholder="2+ years, Fresher welcome..."
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Application Deadline</label>
+                            <label class="form-label mb-1.5">Application Deadline</label>
                             <input v-model="form.last_date" type="date"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Apply via Email</label>
+                            <label class="form-label mb-1.5">Apply via Email</label>
                             <input v-model="form.apply_email" type="email" placeholder="principal@school.edu.in"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Description / Job Details</label>
+                            <label class="form-label mb-1.5">Description / Job Details</label>
                             <textarea v-model="form.description" rows="4"
-                                      class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 resize-none"></textarea>
+                                      class="field resize-none"></textarea>
                         </div>
                         <div class="sm:col-span-2 flex items-center gap-2">
                             <input type="checkbox" id="is_active" v-model="form.is_active" class="rounded">
@@ -44,7 +48,7 @@
 
                     <div class="flex items-center gap-3">
                         <button type="submit" :disabled="form.processing"
-                                class="bg-indigo-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50">
+                                class="btn-primary text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition disabled:opacity-50">
                             {{ editing ? 'Save Changes' : 'Post Vacancy' }}
                         </button>
                         <button v-if="editing" type="button" @click="cancelEdit"
@@ -56,7 +60,7 @@
             <!-- Vacancies list -->
             <div class="space-y-3">
                 <div v-for="vac in vacancies" :key="vac.id"
-                     class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-start justify-between gap-4">
+                     class="card-list-row justify-between">
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-1">
                             <h4 class="font-bold text-gray-800">{{ vac.title }}</h4>
@@ -82,7 +86,7 @@
                 </div>
 
                 <div v-if="!vacancies.length"
-                     class="bg-white rounded-xl border border-dashed border-gray-200 p-10 text-center text-gray-400">
+                     class="card card--dashed p-10 text-center text-slate-400">
                     No vacancies posted yet.
                 </div>
             </div>

@@ -1,0 +1,144 @@
+<?php
+
+namespace App\Http\Controllers\SahodayaAdmin;
+
+use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsFestIdCardResponses;
+use App\Models\FestEvent;
+use App\Support\FestPageActivity;
+use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestIdCardService;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+
+class FestIdCardController extends SahodayaAdminController
+{
+    use BuildsFestIdCardResponses;
+
+    public function index(string $tenantId, FestEvent $event, FestIdCardService $service)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')]);
+
+        $itemCounts = $service->itemParticipantCounts($event);
+        $registrationCounts = $service->itemRegistrationCounts($event);
+
+        return $this->inertia('Sahodaya/Events/IdCards/Index', $this->withEventActivity($event, FestPageActivity::ID_CARDS, [
+            'event'  => $event->only('id', 'title', 'status', 'event_type'),
+            'items'  => $event->items->map(fn ($item) => [
+                'id'                  => $item->id,
+                'title'               => $item->title,
+                'participant_type'    => $item->participant_type,
+                'count'               => $itemCounts[$item->id] ?? 0,
+                'registration_count'  => $registrationCounts[$item->id] ?? 0,
+            ]),
+            'meta'   => $service->indexMeta($event),
+            'schools'=> $service->schoolOptions($event),
+        ]));
+    }
+
+    public function cardsJson(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $this->validated($request);
+        $filters = $this->idCardFilters($request);
+
+        if ($data['audience'] === 'student'
+            && ($filters['scope'] ?? 'item') === 'item'
+            && empty($filters['item_id'])) {
+            return response()->json(['cards' => [], 'message' => 'Select an item to preview cards.']);
+        }
+
+        return response()->json([
+            'cards' => $service->cards($event, $data['audience'], $filters),
+        ]);
+    }
+
+    public function preview(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $this->validated($request);
+        $filters = $this->idCardFilters($request);
+        $service->requireStudentItem($data['audience'], $filters);
+        $cards = $service->cards($event, $data['audience'], $filters);
+
+        return view($this->idCardSheetView($request), $this->idCardViewData(
+            $event,
+            $this->sahodaya->name,
+            $cards,
+            $data['audience'],
+            true,
+        ));
+    }
+
+    public function pdf(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $this->validated($request);
+        $filters = $this->idCardFilters($request);
+        $service->requireStudentItem($data['audience'], $filters);
+        $cards = $service->cards($event, $data['audience'], $filters);
+
+        $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'ID cards PDF generated', [
+            'audience' => $data['audience'],
+            'count'    => count($cards),
+            'template' => $request->input('template', 'standard'),
+            'scope'    => $filters['scope'] ?? 'item',
+        ]);
+
+        $slug = str($event->title)->slug('-');
+        $scopeSuffix = ($filters['scope'] ?? 'item') === 'event' ? 'event-pass' : $data['audience'];
+
+        return Pdf::loadView($this->idCardSheetView($request), $this->idCardViewData(
+            $event,
+            $this->sahodaya->name,
+            $cards,
+            $data['audience'],
+            false,
+        ))->download("{$slug}-{$scopeSuffix}-id-cards.pdf");
+    }
+
+    public function pdfAllItems(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $this->validated($request);
+        abort_unless($data['audience'] === 'student', 422, 'Bulk item PDF is available for student cards only.');
+
+        $filters = $this->idCardFilters($request);
+        unset($filters['item_id'], $filters['scope']);
+        $sections = $service->cardsGroupedByItem($event, $filters);
+        abort_if($sections === [], 422, 'No approved participants found for any item.');
+
+        $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
+
+        $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'All-item ID cards PDF generated', [
+            'audience' => 'student',
+            'count'    => $totalCards,
+            'items'    => count($sections),
+            'template' => $request->input('template', 'standard'),
+        ]);
+
+        $slug = str($event->title)->slug('-');
+
+        return Pdf::loadView($this->idCardSheetView($request), $this->idCardViewData(
+            $event,
+            $this->sahodaya->name,
+            [],
+            'student',
+            false,
+            $sections,
+        ))->download("{$slug}-all-items-id-cards.pdf");
+    }
+
+    /** @return array<string, mixed> */
+    private function validated(Request $request): array
+    {
+        return $request->validate([
+            'audience' => 'required|in:student,volunteer,staff',
+        ]);
+    }
+}

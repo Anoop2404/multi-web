@@ -9,6 +9,8 @@ use App\Models\SahodayaProfile;
 use App\Models\SahodayaRegistrationWindow;
 use App\Models\SchoolClass;
 use App\Models\SchoolYearStudentCount;
+use App\Models\Student;
+use App\Services\Membership\SchoolYearSubmissionReviewService;
 use App\Models\SubmissionStudent;
 use App\Models\SubmissionTeacher;
 use App\Services\Audit\DataChangeLogger;
@@ -16,6 +18,7 @@ use App\Services\Audit\UploadBackupService;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Membership\FeeReceiptService;
 use App\Services\Membership\MembershipNotifier;
+use App\Services\Membership\MembershipRegistrationWindowService;
 use App\Services\Membership\RegistrationStatusService;
 use App\Support\AcademicYear;
 use App\Support\TenantStorage;
@@ -39,13 +42,38 @@ class AnnualRegistrationController extends SchoolAdminController
         $window = $profile
             ? SahodayaRegistrationWindow::where('sahodaya_id', $sahodaya->id)->where('academic_year', $academicYear)->first()
             : null;
+        $windowService = app(MembershipRegistrationWindowService::class);
+        $windowBlockReason = $windowService->blockReason($window);
 
         $payments = $registration
             ? MembershipPayment::where('school_id', $this->school->id)
                 ->where('academic_year', $academicYear)
+                ->where('status', '!=', 'superseded')
                 ->orderByDesc('created_at')
                 ->get()
             : collect();
+
+        $yearOptions = AcademicYear::options();
+        $priorYear = null;
+        $currentIndex = array_search($academicYear, $yearOptions, true);
+        if ($currentIndex !== false && isset($yearOptions[$currentIndex + 1])) {
+            $priorYear = $yearOptions[$currentIndex + 1];
+        }
+
+        $priorRegistration = $priorYear
+            ? Registration::where('school_id', $this->school->id)->where('academic_year', $priorYear)->first()
+            : null;
+
+        $isRenewal = ! $registration
+            && $priorRegistration
+            && in_array($priorRegistration->registration_status, ['completed', 'approved'], true);
+
+        $priorYearSummary = $priorRegistration ? [
+            'academic_year'        => $priorRegistration->academic_year,
+            'reg_no'               => $priorRegistration->reg_no,
+            'registration_status'  => $priorRegistration->registration_status,
+            'membership_fee_amount'=> $priorRegistration->membership_fee_amount,
+        ] : null;
 
         $profilePayload = $profile ? array_merge($profile->toArray(), [
             'payment_details_text' => $profile->paymentDetailsText(),
@@ -56,22 +84,51 @@ class AnnualRegistrationController extends SchoolAdminController
             'registration'       => $registration?->load('submission'),
             'profile'            => $profilePayload,
             'registrationWindow' => $window,
+            'registrationWindowBlockReason' => $windowBlockReason,
             'payments'           => $payments,
-            'canBegin'           => $profile && ! $registration && ! empty($this->school->school_prefix),
+            'canBegin'           => $profile && ! $registration && ! empty($this->school->school_prefix) && ! $windowBlockReason,
+            'isRenewal'          => $isRenewal,
+            'priorYearSummary'   => $priorYearSummary,
             'membershipFeePreview' => $profile && $profile->membership_fee_type === 'fixed'
                 ? $profile->fixed_membership_fee_amount
+                : ($profile && $profile->membership_fee_type === 'variable_by_student_count'
+                    ? app(\App\Services\Membership\MembershipFeeCalculator::class)->estimateFeeForSchool($this->school, $academicYear)
+                    : null),
+            'membershipFeeEstimateStudents' => $profile && $profile->membership_fee_type === 'variable_by_student_count'
+                ? app(\App\Services\Membership\MembershipFeeCalculator::class)->estimateStudentCount($this->school, $academicYear)
                 : null,
+            'trackStatus' => $registration?->submission ? [
+                'full_records' => $registration->submission->full_records_status,
+                'counts'       => $registration->submission->counts_status,
+                'teachers'     => $registration->submission->teacher_status,
+            ] : null,
+            'trackRejectionReasons' => $registration?->submission ? array_filter([
+                'full_records' => $registration->submission->full_records_rejection_reason,
+                'counts'       => $registration->submission->counts_rejection_reason,
+                'teachers'     => $registration->submission->teacher_rejection_reason,
+            ]) : null,
         ]);
     }
 
-    public function begin(RegistrationStatusService $service)
+    public function begin(RegistrationStatusService $service, MembershipRegistrationWindowService $windowService)
     {
         $academicYear = AcademicYear::forSchool($this->school);
+        $window = $windowService->forSchool($this->school, $academicYear);
+        if ($reason = $windowService->blockReason($window)) {
+            return redirect("/school-admin/{$this->school->id}/registration")
+                ->with('error', $reason);
+        }
+
         $alreadyStarted = Registration::where('school_id', $this->school->id)
             ->where('academic_year', $academicYear)
             ->exists();
 
-        $registration = $service->beginAnnualRegistration($this->school);
+        try {
+            $registration = $service->beginAnnualRegistration($this->school);
+        } catch (\RuntimeException $e) {
+            return redirect("/school-admin/{$this->school->id}/registration")
+                ->with('error', $e->getMessage());
+        }
 
         if (! $alreadyStarted) {
             app(DataChangeLogger::class)->created(
@@ -95,71 +152,43 @@ class AnnualRegistrationController extends SchoolAdminController
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
 
+        $students = Student::where('tenant_id', $this->school->id)
+            ->where('status', 'active')
+            ->with('schoolClass.classCategory')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Student $student) => [
+                'id'           => $student->id,
+                'name'         => $student->name,
+                'reg_no'       => $student->reg_no,
+                'gender'       => $student->gender,
+                'dob'          => $student->dob?->format('Y-m-d'),
+                'school_class' => $student->schoolClass ? [
+                    'name'          => $student->schoolClass->name,
+                    'class_category' => $student->schoolClass->classCategory ? [
+                        'label' => $student->schoolClass->classCategory->label,
+                    ] : null,
+                ] : null,
+            ]);
+
         return $this->inertia('School/Registration/Students', [
             'registration' => $registration,
             'submission'   => $submission,
-            'categories'   => $this->classCategories()->values(),
-            'classes'      => $this->schoolClasses(),
-            'students'     => $submission->students()
-                ->with('schoolClass.classCategory')
-                ->orderBy('school_class_id')
-                ->orderBy('name')
-                ->get()
-                ->map(fn (SubmissionStudent $student) => $this->submissionStudentPayload($student)),
+            'students'     => $students,
+            'studentTotal' => $students->count(),
         ]);
     }
 
     public function storeStudent(Request $request)
     {
-        $registration = $this->currentRegistration();
-        $submission = $registration->submission;
-        abort_unless(in_array($submission->full_records_status, ['pending', 'rejected']), 403);
-
-        $data = $request->validate([
-            'school_class_id' => [
-                'required',
-                Rule::exists('school_classes', 'id')->where('tenant_id', $this->school->id),
-            ],
-            'name'           => 'required|string|max:255',
-            'section'        => 'nullable|string|max:10',
-            'gender'         => 'nullable|in:male,female,other',
-            'dob'            => 'nullable|date',
-            'guardian_name'  => 'nullable|string|max:255',
-            'guardian_phone' => 'nullable|string|max:30',
-            'image'          => 'nullable|image|max:2048',
-        ]);
-
-        $schoolClass = SchoolClass::where('tenant_id', $this->school->id)->findOrFail($data['school_class_id']);
-        $data['class'] = $schoolClass->name;
-
-        if ($request->hasFile('image')) {
-            $file = $request->file('image');
-            app(UploadBackupService::class)->store(
-                $file,
-                'submission_student_image',
-                $this->school->id,
-                null,
-                $request->user()->id,
-                ['submission_id' => $submission->id],
-            );
-            $data['image_path'] = TenantStorage::storeSubmissionImage($file, $this->school->id);
-        }
-        unset($data['image']);
-
-        $submission->students()->create($data);
-
-        return back()->with('success', 'Student added.');
+        return redirect("/school-admin/{$this->school->id}/students")
+            ->with('info', 'Student records are managed under Records → Students. Return here to submit for Sahodaya review.');
     }
 
-    public function destroyStudent(string $tenantId, SubmissionStudent $student)
+    public function destroyStudent(string $tenantId, int $student)
     {
-        $registration = $this->currentRegistration();
-        abort_if($student->school_year_submission_id !== $registration->submission->id, 403);
-        abort_unless(in_array($registration->submission->full_records_status, ['pending', 'rejected']), 403);
-
-        $student->delete();
-
-        return back()->with('success', 'Student removed.');
+        return redirect("/school-admin/{$this->school->id}/students")
+            ->with('info', 'Student records are managed under Records → Students.');
     }
 
     public function counts(EffectiveMasterDataResolver $resolver)
@@ -169,12 +198,17 @@ class AnnualRegistrationController extends SchoolAdminController
         $categories = $resolver->classCategories($sahodayaId);
         $submission = $registration->submission;
         $existing = $submission->counts()->get()->keyBy('class_category_id');
+        $dbStudentCount = Student::where('tenant_id', $this->school->id)->where('status', 'active')->count();
+        $submittedTotal = (int) $existing->sum('total_count');
 
         return $this->inertia('School/Registration/Counts', [
             'registration' => $registration,
             'submission'   => $submission,
             'categories'   => $categories,
             'counts'       => $existing,
+            'dbStudentCount' => $dbStudentCount,
+            'countMismatch' => $dbStudentCount > 0 && $submittedTotal > 0
+                && abs($dbStudentCount - $submittedTotal) / max($dbStudentCount, 1) > 0.1,
         ]);
     }
 
@@ -250,35 +284,14 @@ class AnnualRegistrationController extends SchoolAdminController
         return back()->with('success', 'Teacher removed.');
     }
 
-    public function submitTrack(Request $request)
+    public function submitTrack(Request $request, SchoolYearSubmissionReviewService $reviewService)
     {
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
 
         $data = $request->validate(['track' => 'required|in:full_records,counts,teachers']);
 
-        $field = match ($data['track']) {
-            'full_records' => 'full_records_status',
-            'counts'       => 'counts_status',
-            'teachers'     => 'teacher_status',
-        };
-
-        abort_unless(in_array($submission->{$field}, ['pending', 'rejected']), 403);
-
-        $before = $submission->{$field};
-        $submission->update([
-            $field => 'approved',
-            str_replace('_status', '_rejection_reason', $field) => null,
-        ]);
-
-        app(DataChangeLogger::class)->updated(
-            $submission,
-            "Annual registration track submitted: {$data['track']}",
-            [$field => ['old' => $before, 'new' => 'approved']],
-            $this->school->id,
-            'membership',
-            ['track' => $data['track']],
-        );
+        $reviewService->submitTrack($submission, $this->school, $data['track']);
 
         $profile = SahodayaProfile::where('tenant_id', $this->school->parent_id)->firstOrFail();
         $submission->refresh();
@@ -289,7 +302,7 @@ class AnnualRegistrationController extends SchoolAdminController
             $registration->update(['registration_status' => 'data_pending']);
         }
 
-        return back()->with('success', 'Section submitted. Complete all sections to unlock membership payment.');
+        return back()->with('success', 'Submitted for Sahodaya review. You will be notified when approved.');
     }
 
     public function payment()
@@ -299,6 +312,12 @@ class AnnualRegistrationController extends SchoolAdminController
         abort_unless(in_array($registration->registration_status, ['payment_pending', 'payment_rejected']), 403);
 
         $profile = SahodayaProfile::where('tenant_id', $this->school->parent_id)->first();
+        $slab = \App\Models\MembershipFeeSlab::where('sahodaya_id', $this->school->parent_id)
+            ->where('academic_year', $registration->academic_year)
+            ->orderByDesc('min_students')
+            ->first();
+        $isOverdue = $slab?->due_date && now()->startOfDay()->gt($slab->due_date);
+        $lateFee = ($isOverdue && $slab?->late_fee_amount) ? (float) $slab->late_fee_amount : 0;
 
         return $this->inertia('School/Registration/Payment', [
             'registration' => $registration,
@@ -307,8 +326,13 @@ class AnnualRegistrationController extends SchoolAdminController
             ]) : null,
             'payments'     => MembershipPayment::where('school_id', $this->school->id)
                 ->where('academic_year', $registration->academic_year)
+                ->where('status', '!=', 'superseded')
                 ->orderByDesc('created_at')
                 ->get(),
+            'paymentDueDate' => $slab?->due_date?->format('Y-m-d'),
+            'paymentOverdue' => (bool) $isOverdue,
+            'lateFeeAmount'  => $lateFee,
+            'totalDue'       => (float) ($registration->membership_fee_amount ?? 0) + $lateFee,
         ]);
     }
 
@@ -340,6 +364,11 @@ class AnnualRegistrationController extends SchoolAdminController
 
         $path = TenantStorage::storeUploadedFile($file, "payments/{$this->school->id}");
 
+        $superseded = MembershipPayment::where('school_id', $this->school->id)
+            ->where('academic_year', $registration->academic_year)
+            ->whereIn('status', ['submitted', 'rejected'])
+            ->get();
+
         $payment = MembershipPayment::create([
             'school_id'           => $this->school->id,
             'academic_year'       => $registration->academic_year,
@@ -351,6 +380,13 @@ class AnnualRegistrationController extends SchoolAdminController
             'uploaded_by_user_id' => $request->user()->id,
             'status'              => 'submitted',
         ]);
+
+        foreach ($superseded as $old) {
+            $old->update([
+                'status' => 'superseded',
+                'superseded_by_payment_id' => $payment->id,
+            ]);
+        }
 
         app(FeeReceiptService::class)->createForMembershipPayment($payment);
 

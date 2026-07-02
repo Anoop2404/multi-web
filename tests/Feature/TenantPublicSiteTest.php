@@ -33,8 +33,27 @@ class TenantPublicSiteTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('School Registration');
-        $response->assertSee('Admin Login');
+        $response->assertSee('School Login');
+        $response->assertSee('Register students for Kalotsav');
         $response->assertSee('Malappuram Sahodaya');
+    }
+
+    public function test_school_login_page_loads_on_sahodaya_tenant(): void
+    {
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'Malappuram Sahodaya',
+            'subdomain' => 'schoollogin',
+            'is_active' => true,
+        ]);
+
+        $this->get('http://schoollogin.sahodaya.test/school-login')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('tenantName', 'Malappuram Sahodaya')
+                ->where('showRegisterLink', true)
+            );
     }
 
     public function test_public_cms_routes_redirect_when_public_website_disabled(): void
@@ -63,6 +82,7 @@ class TenantPublicSiteTest extends TestCase
         ]);
 
         $this->get('http://linkmode.sahodaya.test/school-register')->assertOk();
+        $this->get('http://linkmode.sahodaya.test/school-login')->assertOk();
         $this->get('http://linkmode.sahodaya.test/login')->assertOk();
     }
 }

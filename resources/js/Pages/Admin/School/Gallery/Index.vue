@@ -1,22 +1,26 @@
 <template>
-    <SchoolAdminLayout title="Gallery" :school="school">
+    <SchoolAdminLayout title="Gallery" :school="school" :show-header-title="false">
+        <PageHeader title="Gallery" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="space-y-6">
             <!-- Create Album -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="card">
                 <h3 class="font-bold text-gray-800 mb-4">Create New Album</h3>
                 <form @submit.prevent="createAlbum" class="flex flex-wrap items-end gap-4">
                     <div class="flex-1 min-w-48">
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Album Name *</label>
+                        <label class="form-label mb-1.5">Album Name *</label>
                         <input v-model="albumForm.title" type="text" required
-                               class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                               class="field">
                     </div>
                     <div class="min-w-48">
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Cover Image</label>
+                        <label class="form-label mb-1.5">Cover Image</label>
                         <input type="file" accept="image/*" @change="albumForm.cover_image = $event.target.files[0]"
                                class="text-sm text-gray-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700">
                     </div>
                     <button type="submit" :disabled="albumForm.processing"
-                            class="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50 shrink-0">
+                            class="btn-primary disabled:opacity-50 shrink-0">
                         Create Album
                     </button>
                 </form>
@@ -24,7 +28,7 @@
 
             <!-- Albums list -->
             <div v-for="album in albums" :key="album.id"
-                 class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                 class="card card--flush">
                 <!-- Album header -->
                 <div class="flex items-center justify-between px-5 py-4 border-b border-gray-50">
                     <div>
@@ -58,7 +62,7 @@
                 </div>
             </div>
 
-            <div v-if="!albums.length" class="bg-white rounded-xl border border-dashed border-gray-200 p-12 text-center text-gray-400">
+            <div v-if="!albums.length" class="card card--dashed p-12 text-center text-slate-400">
                 No albums yet. Create your first album above.
             </div>
         </div>

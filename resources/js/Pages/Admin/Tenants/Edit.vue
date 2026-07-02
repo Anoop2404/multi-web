@@ -1,7 +1,7 @@
 <template>
     <AdminLayout :title="`Edit: ${tenant.name}`">
         <div class="max-w-2xl">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+            <div class="card">
                 <div class="flex items-center justify-between mb-6">
                     <h3 class="text-lg font-bold text-gray-900">Edit {{ tenant.type === 'sahodaya' ? 'Sahodaya' : 'School' }}</h3>
                     <Link :href="`/admin/tenants/${tenant.id}`" class="text-sm text-gray-400 hover:text-gray-600">← Back</Link>
@@ -9,9 +9,9 @@
 
                 <form @submit.prevent="submit" class="space-y-5">
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Name *</label>
+                        <label class="form-label mb-1.5">Name *</label>
                         <input v-model="form.name" type="text" required
-                               class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2">
+                               class="field">
                         <p v-if="form.errors.name" class="text-xs text-red-500 mt-1">{{ form.errors.name }}</p>
                     </div>
 
@@ -19,10 +19,10 @@
                         <p class="text-xs font-semibold text-indigo-800 uppercase tracking-wide">Domain assignment</p>
 
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Custom Domain</label>
+                            <label class="form-label mb-1.5">Custom Domain</label>
                             <input v-model="form.domain" type="text"
                                    :placeholder="tenant.type === 'sahodaya' ? 'malappuramsahodaya.com' : 'school.edu.in'"
-                                   class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 font-mono bg-white">
+                                   class="field font-mono">
                             <p class="text-xs text-gray-500 mt-1">
                                 {{ tenant.type === 'sahodaya'
                                     ? 'Public portal host. DNS must point to your server.'
@@ -32,7 +32,7 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Platform Subdomain</label>
+                            <label class="form-label mb-1.5">Platform Subdomain</label>
                             <div class="flex items-center gap-1">
                                 <input v-model="form.subdomain" type="text"
                                        class="flex-1 border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 font-mono bg-white">
@@ -46,18 +46,18 @@
                     </div>
 
                     <div v-if="tenant.type === 'school'">
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Parent Sahodaya</label>
+                        <label class="form-label mb-1.5">Parent Sahodaya</label>
                         <select v-model="form.parent_id"
-                                class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white">
+                                class="field">
                             <option value="">— No parent —</option>
                             <option v-for="s in sahodayas" :key="s.id" :value="s.id">{{ s.name }}</option>
                         </select>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Plan</label>
+                        <label class="form-label mb-1.5">Plan</label>
                         <select v-model="form.plan"
-                                class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 bg-white">
+                                class="field">
                             <option value="free">Free</option>
                             <option value="basic">Basic</option>
                             <option value="pro">Pro</option>
@@ -71,7 +71,7 @@
 
                     <div class="flex items-center gap-4 pt-2 border-t border-gray-100">
                         <button type="submit" :disabled="form.processing"
-                                class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition disabled:opacity-50">
+                                class="btn-primary disabled:opacity-50">
                             Save Changes
                         </button>
                         <button type="button" @click="deleteTenant"

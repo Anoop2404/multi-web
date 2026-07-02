@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
-use App\Mail\AdmissionEnquiryReceived;
 use App\Models\AdmissionEnquiry;
+use App\Models\Tenant;
+use App\Services\Mail\SchoolSiteMailer;
+use App\Support\Mail\EmailBranding;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
 
 class AdmissionEnquiryController extends Controller
 {
@@ -33,11 +34,23 @@ class AdmissionEnquiryController extends Controller
 
         $enquiry = AdmissionEnquiry::create($data);
 
-        // Notify school admin
-        $contactEmail = $tenant->settings()->where('key', 'contact')->first()?->value['email'] ?? null;
-        if ($contactEmail) {
-            Mail::to($contactEmail)->queue(new AdmissionEnquiryReceived($enquiry, $tenant));
-        }
+        $sahodaya = $tenant->parent_id ? Tenant::query()->find($tenant->parent_id) : null;
+        app(SchoolSiteMailer::class)->sendToSchoolContact(
+            $tenant,
+            "New Admission Enquiry – {$enquiry->student_name}",
+            'emails.admission-enquiry',
+            array_merge(
+                EmailBranding::forTenant($sahodaya ?? $tenant),
+                [
+                    'enquiry'        => $enquiry,
+                    'school'         => $tenant,
+                    'headerTitle'    => 'New Admission Enquiry',
+                    'headerSubtitle' => $tenant->name,
+                    'headerEyebrow'  => 'Admissions',
+                    'footerNote'     => 'Submitted via '.$tenant->name.' Admission Portal',
+                ],
+            ),
+        );
 
         return back()->with('admission_success',
             'Thank you! Your enquiry has been received. We will contact you shortly.');

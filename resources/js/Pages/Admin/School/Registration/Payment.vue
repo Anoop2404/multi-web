@@ -1,9 +1,13 @@
 <template>
-    <SchoolAdminLayout title="Membership Payment" :school="school">
+    <SchoolAdminLayout title="Membership Payment" :school="school" :show-header-title="false">
+        <PageHeader title="Membership Payment" eyebrow="Membership"
+            description="Annual Sahodaya membership registration and school profile." />
+
+
         <div class="max-w-xl space-y-4">
             <Link :href="`/school-admin/${school.id}/registration`" class="text-sm text-blue-600">← Registration</Link>
 
-            <div class="bg-white border rounded-xl p-6 space-y-4">
+            <div class="card space-y-4">
                 <div>
                     <p class="text-sm text-gray-500">Amount due</p>
                     <p class="text-2xl font-bold">₹{{ registration.membership_fee_amount }}</p>
@@ -14,11 +18,11 @@
                 </div>
             </div>
 
-            <form v-if="['payment_pending','payment_rejected'].includes(registration.registration_status)" @submit.prevent="upload" class="bg-white border rounded-xl p-4 space-y-3">
+            <form v-if="['payment_pending','payment_rejected'].includes(registration.registration_status)" @submit.prevent="upload" class="card space-y-3">
                 <input type="file" required accept=".pdf,.jpg,.jpeg,.png" @change="form.payment_proof = $event.target.files[0]" class="text-sm">
                 <input v-model="form.payment_method" placeholder="Payment method" class="w-full border rounded-lg px-3 py-2 text-sm">
                 <input v-model="form.transaction_ref" placeholder="Transaction reference" class="w-full border rounded-lg px-3 py-2 text-sm">
-                <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Upload Proof</button>
+                <button type="submit" class="btn-primary px-4 py-2 rounded-lg text-sm font-semibold">Upload Proof</button>
             </form>
 
             <div v-for="p in payments" :key="p.id" class="text-sm border rounded-lg p-3">

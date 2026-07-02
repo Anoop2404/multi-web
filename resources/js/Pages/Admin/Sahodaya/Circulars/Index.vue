@@ -2,166 +2,195 @@
     <SahodayaAdminLayout title="Circulars" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingSchoolsCount="pendingSchoolsCount"
                          :pendingSubmissionsCount="pendingSubmissionsCount"
-                         :pendingPaymentsCount="pendingPaymentsCount">
-        <div class="space-y-6">
-
-            <!-- Upload card -->
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                    <h3 class="font-bold text-gray-900">Upload New Circular</h3>
-                    <button @click="showForm = !showForm"
-                            class="text-xs font-semibold text-purple-600 hover:text-purple-800 transition">
-                        {{ showForm ? '▲ Collapse' : '▼ Expand' }}
-                    </button>
-                </div>
-                <form v-show="showForm" @submit.prevent="upload" class="p-6 space-y-4">
-                    <div class="grid sm:grid-cols-2 gap-4">
-                        <Field label="Circular Title *" class-extra="sm:col-span-2">
-                            <input v-model="form.title" type="text" required class="field">
-                        </Field>
-                        <Field label="Circular Number">
-                            <input v-model="form.circular_number" type="text" placeholder="SAH/2025/001" class="field font-mono">
-                        </Field>
-                        <Field label="Category">
-                            <select v-model="form.category" class="field">
-                                <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
-                            </select>
-                        </Field>
-                        <Field label="Issue Date">
-                            <input v-model="form.issued_date" type="date" class="field">
-                        </Field>
-                        <Field label="Academic Year">
-                            <input v-model="form.academic_year" type="text" placeholder="2025-26" class="field">
-                        </Field>
-
-                        <!-- Drop zone -->
-                        <div class="sm:col-span-2">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">PDF / Document *</label>
-                            <label class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-xl cursor-pointer transition"
-                                   :class="dragover ? 'border-purple-400 bg-purple-50' : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'"
-                                   @dragover.prevent="dragover = true"
-                                   @dragleave="dragover = false"
-                                   @drop.prevent="onDrop">
-                                <div v-if="form.file" class="flex items-center gap-2 text-sm text-green-700 font-semibold">
-                                    <span>📎</span> {{ form.file.name }}
-                                    <button type="button" @click.prevent="form.file = null" class="text-red-400 hover:text-red-600">✕</button>
-                                </div>
-                                <div v-else class="text-center">
-                                    <div class="text-2xl mb-1">📁</div>
-                                    <p class="text-sm text-gray-400">Drop PDF here or <span class="text-purple-600 font-semibold">browse</span></p>
-                                </div>
-                                <input type="file" accept=".pdf,.doc,.docx" class="sr-only" required
-                                       @change="form.file = $event.target.files[0]">
-                            </label>
-                        </div>
-                    </div>
-                    <button type="submit" :disabled="form.processing || !form.file"
-                            class="px-6 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
-                        {{ form.processing ? 'Uploading…' : 'Upload Circular' }}
-                    </button>
-                </form>
-            </div>
-
-            <!-- Filter tabs -->
-            <div class="flex gap-2 flex-wrap">
-                <button @click="activeCategory = ''"
-                        :class="activeCategory === '' ? 'bg-[#1e1b4b] text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'"
-                        class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition">All ({{ circulars.length }})</button>
-                <button v-for="c in categories" :key="c"
-                        @click="activeCategory = c"
-                        :class="activeCategory === c ? 'bg-[#1e1b4b] text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'"
-                        class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition">
-                    {{ c }} ({{ circulars.filter(ci => ci.category === c).length }})
+                         :pendingPaymentsCount="pendingPaymentsCount"
+                         :show-header-title="false">
+        <div class="max-w-full overflow-x-hidden">
+        <PageHeader
+            title="Circulars"
+            eyebrow="Membership"
+            description="Upload PDF circulars for member schools. Track acknowledgements per school."
+        >
+            <template #actions>
+                <button type="button" class="btn-secondary text-sm" @click="showForm = !showForm">
+                    {{ showForm ? 'Hide upload form' : 'Upload circular' }}
                 </button>
-            </div>
+            </template>
+        </PageHeader>
 
-            <!-- Table -->
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <table v-if="filtered.length" class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-100">
+        <form v-show="showForm" @submit.prevent="upload" class="card mb-6 space-y-4">
+            <h3 class="section-title">Upload new circular</h3>
+            <FormGrid>
+                <FormField label="Circular title" class-extra="sm:col-span-2" required>
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.title" type="text" required class="field">
+                    </template>
+                </FormField>
+                <FormField label="Circular number">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.circular_number" type="text" placeholder="SAH/2025/001" class="field font-mono">
+                    </template>
+                </FormField>
+                <FormField label="Category">
+                    <template #default="{ id }">
+                        <select :id="id" v-model="form.category" class="field">
+                            <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
+                        </select>
+                    </template>
+                </FormField>
+                <FormField label="Issue date">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.issued_date" type="date" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Academic year">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.academic_year" type="text" placeholder="2025-26" class="field">
+                    </template>
+                </FormField>
+                <FormField label="PDF / document" class-extra="sm:col-span-2" required>
+                    <template #default="{ id }">
+                        <label :for="id"
+                               class="flex flex-col items-center justify-center w-full min-h-[7rem] border-2 border-dashed rounded-xl cursor-pointer transition"
+                               :class="dragover ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:border-violet-300 hover:bg-slate-50'"
+                               @dragover.prevent="dragover = true"
+                               @dragleave="dragover = false"
+                               @drop.prevent="onDrop">
+                            <div v-if="form.file" class="flex items-center gap-2 text-sm text-emerald-700 font-semibold">
+                                <span>{{ form.file.name }}</span>
+                                <button type="button" @click.prevent="form.file = null" class="text-red-500 hover:text-red-700">Remove</button>
+                            </div>
+                            <div v-else class="text-center px-4">
+                                <p class="text-sm text-slate-500">Drop PDF here or <span class="text-violet-600 font-semibold">browse</span></p>
+                            </div>
+                            <input :id="id" type="file" accept=".pdf,.doc,.docx" class="sr-only" required
+                                   @change="form.file = $event.target.files[0]">
+                        </label>
+                    </template>
+                </FormField>
+            </FormGrid>
+            <FormActions>
+                <button type="submit" class="btn-primary" :disabled="form.processing || !form.file">
+                    {{ form.processing ? 'Uploading…' : 'Upload circular' }}
+                </button>
+            </FormActions>
+        </form>
+
+        <div class="flex flex-wrap gap-2 mb-4">
+            <button type="button" @click="activeCategory = ''"
+                    :class="activeCategory === '' ? 'btn-primary !py-1.5 !px-3 text-xs' : 'btn-secondary !py-1.5 !px-3 text-xs'">
+                All ({{ circulars.length }})
+            </button>
+            <button v-for="c in categories" :key="c" type="button"
+                    @click="activeCategory = c"
+                    :class="activeCategory === c ? 'btn-primary !py-1.5 !px-3 text-xs' : 'btn-secondary !py-1.5 !px-3 text-xs'">
+                {{ c }} ({{ circulars.filter(ci => ci.category === c).length }})
+            </button>
+        </div>
+
+        <div class="flex flex-wrap gap-3 items-center mb-4">
+            <input v-model="searchQuery" type="search" class="field flex-1 min-w-[12rem] max-w-md"
+                   placeholder="Search title or number…" autocomplete="off">
+            <button v-if="searchQuery.trim()" type="button" class="btn-secondary text-sm" @click="searchQuery = ''">Clear</button>
+        </div>
+
+        <p class="text-xs text-slate-500 mb-3">
+            {{ filtered.length }} circular{{ filtered.length === 1 ? '' : 's' }} shown
+        </p>
+
+        <div class="form-section overflow-hidden !p-0">
+            <EmptyState v-if="!filtered.length" title="No circulars"
+                        :description="searchQuery.trim() ? 'Try another search term.' : 'Upload a circular using the form above.'"
+                        icon="📄" class="p-10" />
+            <div v-else class="overflow-x-auto">
+                <table class="data-table min-w-[640px]">
+                    <thead>
                         <tr>
-                            <th class="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Title</th>
-                            <th class="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Number</th>
-                            <th class="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Category</th>
-                            <th class="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide hidden md:table-cell">Date</th>
-                            <th class="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide hidden md:table-cell">Year</th>
-                            <th class="px-5 py-3 w-24"></th>
+                            <th>Title</th>
+                            <th class="hidden sm:table-cell">Number</th>
+                            <th>Category</th>
+                            <th class="hidden md:table-cell">Date</th>
+                            <th class="hidden lg:table-cell">Ack</th>
+                            <th class="w-28 text-right"></th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-50">
-                        <tr v-for="c in filtered" :key="c.id" class="hover:bg-gray-50/50 transition">
-                            <td class="px-5 py-3.5">
-                                <div class="flex items-center gap-2.5">
-                                    <div class="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-sm shrink-0">📄</div>
-                                    <span class="font-semibold text-gray-800 line-clamp-1">{{ c.title }}</span>
-                                </div>
+                    <tbody>
+                        <tr v-for="c in filtered" :key="c.id">
+                            <td>
+                                <p class="font-medium text-slate-900 line-clamp-2">{{ c.title }}</p>
                             </td>
-                            <td class="px-5 py-3.5 hidden sm:table-cell">
-                                <span class="font-mono text-xs text-gray-400">{{ c.circular_number || '—' }}</span>
-                            </td>
-                            <td class="px-5 py-3.5">
+                            <td class="hidden sm:table-cell font-mono text-xs text-slate-500">{{ c.circular_number || '—' }}</td>
+                            <td>
                                 <span class="text-[11px] font-semibold px-2 py-1 rounded-full"
-                                      :class="categoryColors[c.category] ?? 'bg-gray-100 text-gray-500'">
+                                      :class="categoryColors[c.category] ?? 'bg-slate-100 text-slate-600'">
                                     {{ c.category || 'General' }}
                                 </span>
                             </td>
-                            <td class="px-5 py-3.5 text-xs text-gray-400 hidden md:table-cell">
-                                {{ c.issued_date ? new Date(c.issued_date).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}) : '—' }}
+                            <td class="hidden md:table-cell text-xs text-slate-500">
+                                {{ c.issued_date ? new Date(c.issued_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' }}
                             </td>
-                            <td class="px-5 py-3.5 text-xs text-gray-400 hidden md:table-cell">{{ c.academic_year || '—' }}</td>
-                            <td class="px-5 py-3.5 text-right space-x-3">
-                                <a :href="c.file_path" target="_blank" class="text-xs text-purple-600 hover:text-purple-800 font-semibold">View ↗</a>
-                                <button @click="remove(c)" class="text-xs text-red-400 hover:text-red-600 font-semibold">Delete</button>
+                            <td class="hidden lg:table-cell text-xs">
+                                <span class="font-semibold" :class="c.ack_count >= c.school_count ? 'text-emerald-600' : 'text-amber-600'">
+                                    {{ c.ack_count ?? 0 }}/{{ c.school_count ?? 0 }}
+                                </span>
+                            </td>
+                            <td class="text-right whitespace-nowrap space-x-2">
+                                <a :href="c.file_path" target="_blank" rel="noopener" class="link-brand text-xs">View</a>
+                                <button type="button" @click="remove(c)" class="text-xs text-red-600 hover:text-red-800">Delete</button>
                             </td>
                         </tr>
                     </tbody>
                 </table>
-                <div v-else class="p-14 text-center">
-                    <div class="text-5xl mb-3">📄</div>
-                    <p class="text-gray-500 font-medium">No circulars {{ activeCategory ? `in "${activeCategory}"` : '' }}</p>
-                    <p class="text-sm text-gray-400 mt-1">Upload a circular using the form above.</p>
-                </div>
             </div>
+        </div>
         </div>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import { ref, computed, defineComponent, h } from 'vue';
+import { ref, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 
 const props = defineProps({
-    sahodaya:                Object,
-    publicUrl:               { type: String, default: null },
-    pendingSchoolsCount:     { type: Number, default: 0 },
-    pendingSubmissionsCount: { type: Number, default: 0 },
-    pendingPaymentsCount:    { type: Number, default: 0 },
-    circulars:               { type: Array, default: () => [] },
+    sahodaya: Object,
+    publicUrl: String,
+    pendingSchoolsCount: Number,
+    pendingSubmissionsCount: Number,
+    pendingPaymentsCount: Number,
+    circulars: { type: Array, default: () => [] },
 });
 
 const categories = ['General', 'Academic', 'Kalotsav', 'Meeting', 'Exam', 'Sports', 'Finance', 'Other'];
 
 const categoryColors = {
-    General:  'bg-gray-100 text-gray-600',
+    General: 'bg-slate-100 text-slate-600',
     Academic: 'bg-blue-100 text-blue-700',
     Kalotsav: 'bg-purple-100 text-purple-700',
-    Meeting:  'bg-amber-100 text-amber-700',
-    Exam:     'bg-orange-100 text-orange-700',
-    Sports:   'bg-green-100 text-green-700',
-    Finance:  'bg-teal-100 text-teal-700',
-    Other:    'bg-gray-100 text-gray-500',
+    Meeting: 'bg-amber-100 text-amber-700',
+    Exam: 'bg-orange-100 text-orange-700',
+    Sports: 'bg-green-100 text-green-700',
+    Finance: 'bg-teal-100 text-teal-700',
+    Other: 'bg-slate-100 text-slate-500',
 };
 
-const showForm      = ref(true);
-const dragover      = ref(false);
+const showForm = ref(false);
+const dragover = ref(false);
 const activeCategory = ref('');
+const searchQuery = ref('');
 
-const filtered = computed(() =>
-    activeCategory.value
-        ? props.circulars.filter(c => c.category === activeCategory.value)
-        : props.circulars
-);
+const filtered = computed(() => {
+    let rows = props.circulars;
+    if (activeCategory.value) {
+        rows = rows.filter((c) => c.category === activeCategory.value);
+    }
+    const q = searchQuery.value.trim().toLowerCase();
+    if (!q) {
+        return rows;
+    }
+    return rows.filter((c) =>
+        [c.title, c.circular_number, c.category, c.academic_year].filter(Boolean).join(' ').toLowerCase().includes(q),
+    );
+});
 
 const form = useForm({
     title: '', circular_number: '', category: 'General',
@@ -185,21 +214,4 @@ function remove(c) {
     if (!confirm(`Delete "${c.title}"?`)) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/circulars/${c.id}`);
 }
-
-const Field = defineComponent({
-    props: { label: String, classExtra: String },
-    setup(props, { slots }) {
-        return () => h('div', { class: props.classExtra ?? '' }, [
-            props.label ? h('label', { class: 'block text-xs font-semibold text-gray-600 mb-1.5' }, props.label) : null,
-            slots.default?.(),
-        ]);
-    },
-});
 </script>
-
-<style scoped>
-@reference "../../../../../css/app.css";
-.field {
-    @apply w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white;
-}
-</style>

@@ -44,12 +44,12 @@
                         Edit
                     </Link>
                     <Link :href="`/admin/builder/sections?tenant=${tenant.id}`"
-                          class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition">
+                          class="px-4 py-2 rounded-lg text-white text-sm font-medium transition">
                         Site Builder →
                     </Link>
                     <Link v-if="tenant.type === 'sahodaya'"
                           :href="`/sahodaya-admin/${tenant.id}`"
-                          class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 transition">
+                          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium transition">
                         Sahodaya Admin →
                     </Link>
                 </div>
@@ -82,10 +82,10 @@
                       @submit.prevent="rejectSchool"
                       class="space-y-3 max-w-lg mb-6 pb-6 border-b border-gray-100">
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Reject school (with reason)</label>
+                        <label class="form-label mb-1.5">Reject school (with reason)</label>
                         <textarea v-model="rejectForm.reason" rows="3" required
                                   placeholder="Reason shown to the school admin by email…"
-                                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"></textarea>
+                                  class="field focus:ring-red-200"></textarea>
                         <p v-if="rejectForm.errors.reason" class="text-xs text-red-500 mt-1">{{ rejectForm.errors.reason }}</p>
                     </div>
                     <button type="submit" :disabled="rejectForm.processing"
@@ -107,7 +107,7 @@
             </div>
 
             <!-- Branding -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="card">
                 <h3 class="font-bold text-gray-900 mb-1">Logo</h3>
                 <p class="text-sm text-gray-500 mb-4">
                     Shown on the registration portal, login page, and admin sidebar.
@@ -124,7 +124,7 @@
                         <input type="file" accept="image/*" @change="onLogoSelected"
                                class="text-sm text-gray-600 max-w-xs">
                         <button type="submit" :disabled="!logoForm.logo || logoForm.processing"
-                                class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
+                                class="px-4 py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-50">
                             Upload
                         </button>
                     </form>
@@ -132,7 +132,7 @@
             </div>
 
             <!-- Database (Sahodaya only) -->
-            <div v-if="tenant.type === 'sahodaya' && database" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div v-if="tenant.type === 'sahodaya' && database" class="card">
                 <h3 class="font-bold text-gray-900 mb-1">Database</h3>
                 <p class="text-sm text-gray-500 mb-4">
                     Create the PostgreSQL database manually, enter its name here, then run migrations.
@@ -148,10 +148,10 @@
 
                 <form @submit.prevent="saveDatabase" class="flex flex-wrap items-end gap-3 mb-4">
                     <div class="grow min-w-[16rem]">
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">PostgreSQL database name</label>
+                        <label class="form-label mb-1.5">PostgreSQL database name</label>
                         <input v-model="databaseForm.database_name" type="text" required
                                :placeholder="database.suggested_name"
-                               class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                               class="field font-mono focus:ring-indigo-300">
                         <p class="text-xs text-gray-400 mt-1">Lowercase letters, numbers, underscores. Suggested: {{ database.suggested_name }}</p>
                         <p v-if="databaseForm.errors.database_name" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.database_name }}</p>
                     </div>
@@ -167,7 +167,7 @@
                         Seed default profile & site template
                     </label>
                     <button type="submit" :disabled="migrateForm.processing || !database.configured"
-                            class="px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
+                            class="px-4 py-2.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50">
                         Run migrations
                     </button>
                 </form>
@@ -195,7 +195,6 @@
                             <tr>
                                 <th class="px-4 py-2.5 font-semibold">Name</th>
                                 <th class="px-4 py-2.5 font-semibold">Email</th>
-                                <th class="px-4 py-2.5 font-semibold">Password</th>
                                 <th class="px-4 py-2.5 font-semibold text-right">Actions</th>
                             </tr>
                         </thead>
@@ -203,10 +202,9 @@
                             <tr v-for="admin in portalAdmins" :key="admin.id">
                                 <td class="px-4 py-3 font-medium text-gray-800">{{ admin.name }}</td>
                                 <td class="px-4 py-3 font-mono text-gray-600 text-xs">{{ admin.email }}</td>
-                                <td class="px-4 py-3 font-mono text-gray-800 text-xs">{{ admin.plain_password || '—' }}</td>
                                 <td class="px-4 py-3 text-right space-x-2">
                                     <button type="button" @click="editAdmin(admin)"
-                                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                                            class="link-brand text-xs">
                                         Edit
                                     </button>
                                     <button type="button" @click="removeAdmin(admin)"
@@ -224,28 +222,27 @@
                         {{ adminForm.user_id ? 'Update login' : 'Create login' }}
                     </p>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Full name</label>
+                        <label class="form-label mb-1.5">Full name</label>
                         <input v-model="adminForm.name" type="text" required
-                               class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                               class="field focus:ring-indigo-300">
                         <p v-if="adminForm.errors.name" class="text-xs text-red-500 mt-1">{{ adminForm.errors.name }}</p>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Email (username)</label>
+                        <label class="form-label mb-1.5">Email (username)</label>
                         <input v-model="adminForm.email" type="email" required autocomplete="off"
-                               class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                               class="field focus:ring-indigo-300">
                         <p v-if="adminForm.errors.email" class="text-xs text-red-500 mt-1">{{ adminForm.errors.email }}</p>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Password</label>
+                        <label class="form-label mb-1.5">Password</label>
                         <input v-model="adminForm.password" type="text" required autocomplete="off"
-                               class="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                               class="field font-mono focus:ring-indigo-300">
                         <p class="text-xs text-gray-400 mt-1">Stored in plain text for superadmin reference only.</p>
                         <p v-if="adminForm.errors.password" class="text-xs text-red-500 mt-1">{{ adminForm.errors.password }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <button type="submit" :disabled="adminForm.processing"
-                                class="px-4 py-2.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50"
-                                :class="tenant.type === 'sahodaya' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'">
+                                class="btn-primary disabled:opacity-50">
                             {{ adminForm.user_id ? 'Save changes' : 'Create login' }}
                         </button>
                         <button v-if="adminForm.user_id" type="button" @click="resetAdminForm"
@@ -274,7 +271,7 @@
 
             <div class="grid lg:grid-cols-2 gap-6">
                 <!-- Sections overview -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="card">
                     <h3 class="font-bold text-gray-900 mb-4">Sections ({{ tenantOverview.sections?.length ?? 0 }})</h3>
                     <div v-if="tenantOverview.sections?.length" class="space-y-2">
                         <div v-for="section in tenantOverview.sections" :key="section.id"
@@ -289,7 +286,7 @@
                 </div>
 
                 <!-- Settings overview -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="card">
                     <h3 class="font-bold text-gray-900 mb-4">Settings ({{ tenantOverview.settings?.length ?? 0 }} keys)</h3>
                     <div v-if="tenantOverview.settings?.length" class="space-y-1.5">
                         <div v-for="setting in tenantOverview.settings" :key="setting.key"
@@ -428,7 +425,7 @@ function editAdmin(admin) {
     adminForm.user_id = admin.id;
     adminForm.name = admin.name;
     adminForm.email = admin.email;
-    adminForm.password = admin.plain_password || '';
+    adminForm.password = '';
     adminForm.clearErrors();
 }
 
@@ -469,7 +466,7 @@ const sahodayaLinks = computed(() => {
         { href: `/sahodaya-admin/${id}/membership/reports`, icon: '📊', label: 'Reports', hint: 'Summary & CSV exports' },
         { href: `/sahodaya-admin/${id}/circulars`,          icon: '📄', label: 'Circulars', hint: 'Official notices' },
         { href: `/sahodaya-admin/${id}/office-bearers`,     icon: '👥', label: 'Office Bearers', hint: 'Leadership profiles' },
-        { href: `/sahodaya-admin/${id}/kalotsav`,           icon: '🏆', label: 'Kalotsav', hint: 'Events & results' },
+        { href: `/sahodaya-admin/${id}/programs/kalotsav`, icon: '🏆', label: 'Kalotsav', hint: 'Events & catalog' },
     ];
 });
 </script>

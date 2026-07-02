@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Middleware\Concerns\RedirectsUnauthenticated;
+use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,8 +25,8 @@ class EnsureSchoolAdmin
             return $next($request);
         }
 
-        // Must have school_admin or sahodaya_admin role
-        if (!$user->hasAnyRole(['school_admin', 'sahodaya_admin'])) {
+        // Must have a school panel role
+        if (! $user->hasAnyRole(TenantUserCatalog::schoolPanelRoles()) && ! $user->hasRole('sahodaya_admin')) {
             abort(403);
         }
 
@@ -35,17 +36,22 @@ class EnsureSchoolAdmin
             abort(403);
         }
 
-        if ($user->hasRole('school_admin') && ! $user->hasVerifiedEmail()) {
+        if ($user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal']) && ! $user->hasVerifiedEmail()) {
             return \App\Support\InertiaAuth::redirectTo($request, route('verification.notice'));
         }
 
         $tenantId = $request->route('tenantId');
-        if ($tenantId && $user->hasRole('school_admin')) {
+        if ($tenantId && $user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal'])) {
             $school = \App\Models\Tenant::find($tenantId);
+            if ($school && ! $school->is_active) {
+                abort(403, 'This school account is inactive.');
+            }
             if ($school?->membership_status === 'rejected') {
                 abort(403, 'Your school application was rejected.');
             }
         }
+
+        $request->attributes->set('isSchoolStaff', $user->hasRole('school_staff') && ! $user->isSuperAdmin());
 
         return $next($request);
     }

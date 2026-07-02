@@ -1,10 +1,15 @@
 <template>
-    <SahodayaAdminLayout :title="`${event.title} — Certificates`" :sahodaya="sahodaya" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount">
-        <div class="mb-4">
-            <button @click="generate" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">Generate for top 3</button>
+    <SahodayaEventsLayout :title="`${event.title} — Certificates`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <PageHeader :title="`${event.title} — Certificates`" eyebrow="Operations"
+                    description="Generate and manage participant certificates." />
+        <div class="mb-4 flex flex-wrap gap-2">
+            <button @click="generate" class="btn-primary">Generate for top 3</button>
+            <a v-if="certificates.length"
+               :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/download-zip`"
+               class="btn-secondary">Download all (ZIP)</a>
         </div>
-        <ul class="bg-white border rounded-xl divide-y">
+        <ul class="card-list">
             <li v-for="c in certificates" :key="c.id" class="p-4 flex justify-between items-center text-sm">
                 <div>
                     <p class="font-medium">{{ c.student?.name ?? 'Participant' }}</p>
@@ -15,16 +20,19 @@
             </li>
             <li v-if="!certificates.length" class="p-4 text-gray-400 text-sm">No certificates yet. Publish results or click Generate.</li>
         </ul>
-    </SahodayaAdminLayout>
+            <EventPageActivityLog :logs="activityLogs" class="mt-8" />
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
 import { router } from '@inertiajs/vue3';
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, certificates: Array,
+    activityLogs: { type: Array, default: () => [] },
 });
 
 function generate() {

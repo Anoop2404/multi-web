@@ -112,6 +112,8 @@ class PaymentVerificationTest extends TestCase
         $this->assertSame('verified', $payment->status);
         $this->assertSame('completed', $registration->registration_status);
         $this->assertSame('approved', $payment->feeReceipt?->status);
+        $this->assertNotNull($payment->feeReceipt?->receipt_number);
+        $this->assertNotNull($payment->feeReceipt?->generated_receipt_path);
     }
 
     public function test_sahodaya_admin_can_stream_local_payment_proof(): void

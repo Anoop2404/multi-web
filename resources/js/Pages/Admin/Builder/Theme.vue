@@ -4,7 +4,7 @@
             <!-- Skin preset picker -->
             <div class="lg:col-span-2 space-y-6">
                 <!-- Tenant selector -->
-                <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+                <div class="card flex items-center gap-4">
                     <label class="text-sm font-semibold text-gray-600 shrink-0">Tenant:</label>
                     <select v-model="selectedTenantId" @change="loadTheme"
                             class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2">
@@ -14,7 +14,7 @@
                 </div>
 
                 <!-- Presets -->
-                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <div class="card">
                     <h3 class="font-bold text-gray-900 mb-4">Skin Presets</h3>
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <button v-for="preset in presets" :key="preset.id"
@@ -37,11 +37,11 @@
                 </div>
 
                 <!-- Custom overrides -->
-                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <div class="card">
                     <h3 class="font-bold text-gray-900 mb-4">Custom Theme</h3>
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div v-for="field in themeFields" :key="field.key">
-                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">{{ field.label }}</label>
+                            <label class="form-label mb-1.5">{{ field.label }}</label>
                             <div v-if="field.type === 'color'" class="flex items-center gap-2">
                                 <input type="color" v-model="theme[field.key]"
                                        class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5">
@@ -49,16 +49,16 @@
                                        class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2">
                             </div>
                             <select v-else-if="field.type === 'select'" v-model="theme[field.key]"
-                                    class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white">
+                                    class="field">
                                 <option v-for="opt in field.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                             </select>
                             <input v-else type="text" v-model="theme[field.key]"
-                                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2">
+                                   class="field">
                         </div>
                     </div>
 
                     <button @click="saveTheme" :disabled="!selectedTenantId"
-                            class="mt-6 bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition disabled:opacity-50">
+                            class="mt-6 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition disabled:opacity-50">
                         Save Theme
                     </button>
                     <span v-if="saved" class="ml-3 text-sm text-green-600 font-medium">✓ Saved!</span>
@@ -67,7 +67,7 @@
 
             <!-- Live preview -->
             <div class="space-y-4">
-                <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 sticky top-4">
+                <div class="card sticky top-4">
                     <h3 class="font-bold text-gray-900 mb-3 text-sm">Preview</h3>
                     <div class="rounded-xl overflow-hidden border border-gray-100 space-y-3">
                         <!-- Primary color bar -->

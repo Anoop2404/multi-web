@@ -1,10 +1,14 @@
 <template>
-    <SchoolAdminLayout title="Student Counts" :school="school">
+    <SchoolAdminLayout title="Student Counts" :school="school" :show-header-title="false">
+        <PageHeader title="Student Counts" eyebrow="Membership"
+            description="Annual Sahodaya membership registration and school profile." />
+
+
         <div class="max-w-3xl space-y-4">
             <Link :href="`/school-admin/${school.id}/registration`" class="text-sm text-blue-600">← Registration</Link>
             <p class="text-sm text-gray-500">Status: {{ submission.counts_status }}</p>
 
-            <form @submit.prevent="save" class="bg-white border rounded-xl p-4 space-y-3">
+            <form @submit.prevent="save" class="card space-y-3">
                 <div v-for="cat in categories" :key="cat.id" class="grid grid-cols-4 gap-2 items-center text-sm">
                     <span class="font-medium">{{ cat.label }}</span>
                     <input v-model.number="rows[cat.id].male_count" type="number" min="0" placeholder="Male" class="border rounded px-2 py-1">
@@ -12,11 +16,11 @@
                     <input v-model.number="rows[cat.id].total_count" type="number" min="0" placeholder="Total" class="border rounded px-2 py-1">
                     <p v-if="mismatch(cat.id)" class="col-span-4 text-xs text-amber-600">Total does not match male + female</p>
                 </div>
-                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">Save Counts</button>
+                <button type="submit" class="btn-primary">Save Counts</button>
             </form>
 
             <button v-if="['pending','rejected'].includes(submission.counts_status)" @click="submit"
-                    class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm">Submit counts &amp; continue</button>
+                    class="btn-primary">Submit counts &amp; continue</button>
         </div>
     </SchoolAdminLayout>
 </template>

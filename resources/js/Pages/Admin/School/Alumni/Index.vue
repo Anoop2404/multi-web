@@ -1,18 +1,22 @@
 <template>
-    <SchoolAdminLayout title="Alumni" :school="school">
+    <SchoolAdminLayout title="Alumni" :school="school" :show-header-title="false">
+        <PageHeader title="Alumni" eyebrow="Website"
+            description="School website content and public pages." />
+
+
         <div class="space-y-4">
             <!-- Filter tabs -->
             <div class="flex gap-2">
                 <button v-for="tab in tabs" :key="tab.value"
                         @click="activeTab = tab.value"
-                        :class="activeTab === tab.value ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                        :class="activeTab === tab.value ? ' text-white' : 'chip-tab'"
                         class="px-4 py-1.5 rounded-lg text-xs font-semibold transition">
                     {{ tab.label }} ({{ counts[tab.value] }})
                 </button>
             </div>
 
             <!-- Table -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="card card--flush">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 border-b border-gray-100">
                         <tr>

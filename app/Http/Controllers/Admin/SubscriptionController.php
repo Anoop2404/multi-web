@@ -33,7 +33,7 @@ class SubscriptionController extends Controller
             'pending_receipts'=> $pendingReceipts->count(),
         ];
 
-        return inertia('Admin/Billing/Index', compact('plans', 'subscriptions', 'pendingReceipts', 'stats'));
+        return inertia('Billing/Index', compact('plans', 'subscriptions', 'pendingReceipts', 'stats'));
     }
 
     public function storePlan(Request $request)

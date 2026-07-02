@@ -7,9 +7,10 @@ use App\Models\Student;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\UploadBackupService;
 use App\Services\Portal\StudentPortalProvisioner;
+use App\Services\Students\StudentEditChangeService;
+use App\Services\Students\StudentEditLockService;
 use App\Services\Students\StudentCsvImporter;
-use App\Services\Students\StudentRegistrationNumberGenerator;
-use App\Support\StudentRecordHelper;
+use App\Services\Students\StudentRecordCreator;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -79,6 +80,10 @@ class StudentController extends SchoolAdminController
             'categories' => $this->classCategories()->values(),
             'classes'    => $this->schoolClasses(),
             'classNames' => SchoolClass::where('tenant_id', $this->school->id)->active()->orderBy('display_order')->orderBy('name')->pluck('name')->values(),
+            'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
+            'pendingChangeRequests' => \App\Models\StudentEditChangeRequest::where('school_id', $this->school->id)
+                ->where('status', 'pending')
+                ->count(),
         ]);
     }
 
@@ -88,7 +93,26 @@ class StudentController extends SchoolAdminController
             return redirect("/school-admin/{$this->school->id}/setup/code");
         }
 
-        return redirect("/school-admin/{$this->school->id}/students?register=1");
+        app(StudentEditLockService::class)->assertCanAdd($this->school);
+
+        return $this->inertia('School/Students/Create', [
+            'categories' => $this->classCategories()->values(),
+            'classes'    => $this->schoolClasses(),
+        ]);
+    }
+
+    public function createBulk()
+    {
+        if (! filled($this->school->school_prefix)) {
+            return redirect("/school-admin/{$this->school->id}/setup/code");
+        }
+
+        app(StudentEditLockService::class)->assertCanAdd($this->school);
+
+        return $this->inertia('School/Students/BulkCreate', [
+            'categories' => $this->classCategories()->values(),
+            'classes'    => $this->schoolClasses(),
+        ]);
     }
 
     public function store(Request $request)
@@ -97,37 +121,59 @@ class StudentController extends SchoolAdminController
             return redirect("/school-admin/{$this->school->id}/setup/code");
         }
 
+        app(StudentEditLockService::class)->assertCanAdd($this->school);
+
         $data = $this->validatedStudentCreate($request);
-        $data['tenant_id'] = $this->school->id;
-        $data['status'] = 'active';
-        $regNo = app(StudentRegistrationNumberGenerator::class)->generate($this->school);
-        $data['admission_number'] = $regNo;
-        $data['reg_no'] = $regNo;
-        $data['academic_year_id'] = StudentRecordHelper::activeAcademicYearIdForSchool($this->school);
 
-        if ($request->filled('email')) {
-            $data['email'] = strtolower($request->input('email'));
-        }
+        $student = $this->createStudentRecord($data, $request->file('photo'));
 
-        $student = Student::create($data);
-
-        if ($request->boolean('create_login') && $request->filled('email') && $request->filled('password')) {
-            app(StudentPortalProvisioner::class)->provision(
+        if ($request->boolean('create_login') && $request->filled('email')) {
+            $result = app(StudentPortalProvisioner::class)->provision(
                 $student,
                 $request->input('email'),
                 $request->input('password'),
             );
+
+            return back()->with([
+                'success'        => 'Student registered successfully.',
+                'newCredentials' => [
+                    'username' => $result['user']->username,
+                    'password' => $result['password'],
+                ],
+            ]);
         }
 
-        app(DataChangeLogger::class)->created(
-            $student,
-            "Student registered: {$student->name}",
-            $this->school->id,
-            'students',
-            ['school_class_id' => $student->school_class_id],
-        );
-
         return back()->with('success', 'Student registered successfully.');
+    }
+
+    public function storeBulk(Request $request)
+    {
+        if (! filled($this->school->school_prefix)) {
+            return redirect("/school-admin/{$this->school->id}/setup/code");
+        }
+
+        app(StudentEditLockService::class)->assertCanAdd($this->school);
+
+        $data = $request->validate([
+            'students' => 'required|array|min:1|max:25',
+            'students.*.school_class_id' => [
+                'required',
+                Rule::exists('school_classes', 'id')->where('tenant_id', $this->school->id),
+            ],
+            'students.*.name'   => 'required|string|max:255',
+            'students.*.gender' => 'required|in:male,female,other',
+            'students.*.dob'    => 'required|date|before:today',
+            'students.*.photo'  => 'required|image|max:2048',
+        ]);
+
+        $created = 0;
+        foreach ($data['students'] as $index => $row) {
+            $photo = $request->file("students.{$index}.photo");
+            $this->createStudentRecord($row, $photo);
+            $created++;
+        }
+
+        return back()->with('success', "{$created} student(s) added.");
     }
 
     public function provisionPortal(Request $request, string $tenantId, Student $student)
@@ -136,12 +182,18 @@ class StudentController extends SchoolAdminController
 
         $data = $request->validate([
             'email'    => 'required|email|max:255',
-            'password' => 'required|string|min:8',
+            'password' => 'nullable|string|min:8',
         ]);
 
-        app(StudentPortalProvisioner::class)->provision($student, $data['email'], $data['password']);
+        $result = app(StudentPortalProvisioner::class)->provision($student, $data['email'], $data['password'] ?? null);
 
-        return back()->with('success', 'Student portal login created.');
+        return back()->with([
+            'success'        => 'Student portal login created.',
+            'newCredentials' => [
+                'username' => $result['user']->username,
+                'password' => $result['password'],
+            ],
+        ]);
     }
 
     public function edit(string $tenantId, Student $student)
@@ -154,6 +206,7 @@ class StudentController extends SchoolAdminController
     public function updatePhoto(Request $request, string $tenantId, Student $student)
     {
         abort_if($student->tenant_id !== $this->school->id, 403);
+        app(StudentEditLockService::class)->assertCanEdit($this->school);
 
         $request->validate([
             'photo' => 'required|image|max:2048',
@@ -185,9 +238,89 @@ class StudentController extends SchoolAdminController
         return back()->with('success', 'Student photo updated.');
     }
 
+    public function uploadPhotosZip(Request $request, string $tenantId)
+    {
+        app(StudentEditLockService::class)->assertCanEdit($this->school);
+
+        $request->validate([
+            'zip' => 'required|file|mimes:zip|max:51200',
+        ]);
+
+        $zipPath = $request->file('zip')->getRealPath();
+        $zip = new \ZipArchive;
+        abort_unless($zip->open($zipPath) === true, 422, 'Could not open zip file.');
+
+        $updated = 0;
+        $skipped = 0;
+
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $entry = $zip->getNameIndex($i);
+            if (! $entry || str_ends_with($entry, '/')) {
+                continue;
+            }
+
+            $basename = pathinfo($entry, PATHINFO_FILENAME);
+            if ($basename === '') {
+                $skipped++;
+
+                continue;
+            }
+
+            $student = Student::where('tenant_id', $this->school->id)
+                ->where(function ($q) use ($basename) {
+                    $q->where('reg_no', $basename)
+                        ->orWhere('admission_number', $basename);
+                })
+                ->first();
+
+            if (! $student) {
+                $skipped++;
+
+                continue;
+            }
+
+            $contents = $zip->getFromIndex($i);
+            if ($contents === false) {
+                $skipped++;
+
+                continue;
+            }
+
+            $ext = strtolower(pathinfo($entry, PATHINFO_EXTENSION) ?: 'jpg');
+            if (! in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+                $skipped++;
+
+                continue;
+            }
+
+            $tmp = tempnam(sys_get_temp_dir(), 'fest-photo-');
+            file_put_contents($tmp, $contents);
+
+            $uploaded = new \Illuminate\Http\UploadedFile(
+                $tmp,
+                $basename.'.'.$ext,
+                mime_content_type($tmp) ?: 'image/jpeg',
+                null,
+                true
+            );
+
+            $student->update([
+                'photo' => TenantStorage::storeStudentPhoto($uploaded, $this->school->id),
+            ]);
+
+            @unlink($tmp);
+            $updated++;
+        }
+
+        $zip->close();
+
+        return back()->with('success', "Updated {$updated} student photo(s). {$skipped} file(s) skipped.");
+    }
+
     public function update(Request $request, string $tenantId, Student $student)
     {
         abort_if($student->tenant_id !== $this->school->id, 403);
+        app(StudentEditLockService::class)->assertCanEdit($this->school);
 
         $data = $this->validatedStudentBasicUpdate($request);
         $before = $student->only(array_keys($data));
@@ -222,6 +355,7 @@ class StudentController extends SchoolAdminController
     public function destroy(string $tenantId, Student $student)
     {
         abort_if($student->tenant_id !== $this->school->id, 403);
+        app(StudentEditLockService::class)->assertCanEdit($this->school);
 
         $snapshot = $student->only(['id', 'name', 'school_class_id', 'status', 'parent_email']);
         $name = $student->name;
@@ -238,6 +372,37 @@ class StudentController extends SchoolAdminController
         return back()->with('success', 'Student record removed.');
     }
 
+    public function submitCreateChangeRequest(Request $request, StudentEditChangeService $changeService)
+    {
+        $role = StudentEditChangeService::submittedByRole($request->user());
+        $changeService->submitCreate($request, $this->school, $request->user()?->id, $role);
+
+        return back()->with('success', 'New student request submitted for school review.');
+    }
+
+    public function submitChangeRequest(Request $request, string $tenantId, Student $student, StudentEditChangeService $changeService)
+    {
+        abort_if($student->tenant_id !== $this->school->id, 403);
+
+        $role = StudentEditChangeService::submittedByRole($request->user());
+        $changeService->submitUpdate($request, $this->school, $student, $request->user()?->id, $role);
+
+        return back()->with('success', 'Change request submitted for school review.');
+    }
+
+    public function changeRequests()
+    {
+        $requests = \App\Models\StudentEditChangeRequest::where('school_id', $this->school->id)
+            ->with(['student:id,name,reg_no'])
+            ->latest()
+            ->paginate(20);
+
+        return $this->inertia('School/Students/ChangeRequests', [
+            'requests'        => $requests,
+            'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
+        ]);
+    }
+
     public function showPhoto(string $tenantId, string $studentId)
     {
         $student = Student::query()
@@ -246,7 +411,11 @@ class StudentController extends SchoolAdminController
 
         abort_unless($student->photo, 404);
 
-        return TenantStorage::downloadResponse($this->school, $student->photo);
+        try {
+            return TenantStorage::downloadResponse($this->school, $student->photo);
+        } catch (\Throwable) {
+            abort(404, 'Photo not found.');
+        }
     }
 
     public function importForm()
@@ -274,6 +443,8 @@ class StudentController extends SchoolAdminController
         if (! filled($this->school->school_prefix)) {
             return redirect("/school-admin/{$this->school->id}/setup/code");
         }
+
+        app(StudentEditLockService::class)->assertEditable($this->school);
 
         $request->validate([
             'file' => 'required|file|mimes:csv,txt|max:2048',
@@ -327,11 +498,18 @@ class StudentController extends SchoolAdminController
             ],
             'name'         => 'required|string|max:255',
             'gender'       => 'required|in:male,female,other',
-            'dob'          => 'nullable|date',
+            'dob'          => 'required|date|before:today',
             'email'        => 'nullable|email|max:255',
+            'photo'        => 'required|image|max:2048',
             'create_login' => 'boolean',
             'password'     => 'nullable|string|min:8',
         ]);
+    }
+
+    /** @param  array<string, mixed>  $fields */
+    private function createStudentRecord(array $fields, ?\Illuminate\Http\UploadedFile $photo = null): Student
+    {
+        return app(StudentRecordCreator::class)->create($this->school, $fields, $photo);
     }
 
     /** @return array{school_class_id: int, name: string, gender: string, dob: ?string, parent_email: ?string} */
