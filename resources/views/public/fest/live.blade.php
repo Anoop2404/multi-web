@@ -62,6 +62,14 @@
             @endforeach
         </ul>
         @endif
+        @if(count($categoryLinks ?? []))
+        <h2 class="font-semibold mt-10 mb-3">Category Scoreboards</h2>
+        <div id="category-links" class="flex flex-wrap gap-2">
+            @foreach($categoryLinks as $link)
+            <a href="{{ $link['url'] }}" class="px-3 py-1.5 rounded-full text-xs bg-white/10 border border-white/20 hover:border-amber-400">{{ $link['label'] }}</a>
+            @endforeach
+        </div>
+        @endif
         <p class="mt-8 text-center space-x-4">
             <a href="{{ route('tenant.fest.records', $event->id) }}" class="text-amber-400 text-sm">All records →</a>
             <a href="{{ route('tenant.fest.show', $event->id) }}" class="text-amber-400 text-sm">← Festival hub</a>

@@ -12,6 +12,7 @@ use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\FestEventInvoice;
 use App\Models\FestSchedule;
+use App\Models\FestSchoolVerification;
 use App\Services\Events\FestInvoiceService;
 use App\Services\Events\FestItemFeeResolver;
 use App\Services\Events\FestLevelRegistrationService;
@@ -85,7 +86,19 @@ class FestRegistrationController extends SchoolAdminController
                     ? FestSportsAgeGroup::ageRuleSummary($event)
                     : null);
                 $event->setAttribute('sports_age_cutoff_date', $event->sports_age_cutoff_date?->format('Y-m-d'));
+                $event->setAttribute('require_event_registration', (bool) $event->require_event_registration);
+                $event->setAttribute('allow_student_self_register', (bool) $event->allow_student_self_register);
+                $event->setAttribute('event_registrations', app(\App\Services\Events\FestEventRegistrationService::class)
+                    ->studentEventRegistrations($event, $this->school->id));
                 $event->setAttribute('academic_year_label', $event->academicYear?->label);
+                $verification = FestSchoolVerification::where('event_id', $event->id)
+                    ->where('school_id', $this->school->id)
+                    ->first();
+                $event->setAttribute('verification_status', [
+                    'verification_day'     => $event->verification_day?->format('Y-m-d'),
+                    'documents_verified'   => (bool) ($verification->documents_verified ?? false),
+                    'verified_at'          => $verification?->verified_at?->toIso8601String(),
+                ]);
                 [$grouped, $groupLabels] = $this->groupItemsForEvent($event, $enabledItems);
                 $event->setAttribute('items_grouped', $grouped);
                 $event->setAttribute('item_group_labels', $groupLabels);
@@ -429,11 +442,26 @@ class FestRegistrationController extends SchoolAdminController
 
         return $this->inertia('School/Events/FestDay', [
             'school'      => $this->school->only('id', 'name'),
-            'event'       => $event->only('id', 'title', 'status', 'schedule_published'),
+            'event'       => $event->only('id', 'title', 'status', 'schedule_published', 'verification_day'),
             'program'     => $meta['slug'],
             'programMeta' => $meta,
             'rows'        => $rows,
+            'verificationStatus' => $this->verificationStatusForSchool($event),
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function verificationStatusForSchool(FestEvent $event): array
+    {
+        $record = FestSchoolVerification::where('event_id', $event->id)
+            ->where('school_id', $this->school->id)
+            ->first();
+
+        return [
+            'verification_day'   => $event->verification_day?->format('Y-m-d'),
+            'documents_verified' => (bool) ($record->documents_verified ?? false),
+            'verified_at'        => $record?->verified_at?->toIso8601String(),
+        ];
     }
 
     public function importTemplate(string $program)
@@ -441,23 +469,29 @@ class FestRegistrationController extends SchoolAdminController
         $meta = SchoolFestProgram::meta($program);
         $program = $meta['slug'];
         $headers = ['item_id', 'item_title', 'reg_no', 'team_name', 'role'];
-        $sample = ['123', 'Mono Act', 'S2024001', '', 'performer'];
+        $rows = [
+            ['123', 'Mono Act', 'S2024001', '', 'performer'],
+            ['123', 'Group Dance', 'S2024002', 'Team Alpha', 'performer'],
+            ['123', 'Group Dance', 'S2024003', 'Team Alpha', 'performer'],
+        ];
 
-        return response()->streamDownload(function () use ($headers, $sample) {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, $headers);
-            fputcsv($out, $sample);
-            fputcsv($out, ['123', 'Group Dance', 'S2024002', 'Team Alpha', 'performer']);
-            fputcsv($out, ['123', 'Group Dance', 'S2024003', 'Team Alpha', 'performer']);
-            fclose($out);
-        }, "fest-registration-{$program}-template.csv", ['Content-Type' => 'text/csv']);
+        if ($meta['eventType'] === 'sports') {
+            $rows = [
+                ['456', 'U14 — 100m Boys', 'S2024001', '', 'performer'],
+                ['456', 'U14 — 100m Boys', 'S2024002', '', 'performer'],
+                ['789', 'U14 — Football Boys', 'S2024003', 'Team A', 'performer'],
+                ['789', 'U14 — Football Boys', 'S2024004', 'Team A', 'performer'],
+            ];
+        }
+
+        return \App\Support\ExcelExport::download("fest-registration-{$program}-template", $headers, $rows);
     }
 
     public function importStore(Request $request, string $tenantId, string $program, FestRegistrationImportService $importService)
     {
         $data = $request->validate([
             'event_id' => 'required|exists:fest_events,id',
-            'file'     => 'required|file|mimes:csv,txt|max:5120',
+            'file'     => 'required|file|mimes:csv,txt,xls,xlsx|max:5120',
         ]);
 
         $event = FestEvent::findOrFail($data['event_id']);
@@ -471,7 +505,7 @@ class FestRegistrationController extends SchoolAdminController
         abort_if(! $event->isRegistrationOpen(), 422, 'Registration is closed for this event.');
         \App\Services\Events\EventLifecycleGate::allowRegistration($event);
 
-        $result = $importService->importFromCsv(
+        $result = $importService->importFromSpreadsheet(
             $event,
             $this->school,
             $request->file('file')->getRealPath(),

@@ -4,9 +4,11 @@ namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SchoolClass;
+use App\Models\StudentEditChangeRequest;
 use App\Models\Tenant;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Students\SchoolClassProvisioner;
+use App\Support\SchoolContactRequirements;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
 use Illuminate\Http\Request;
@@ -51,6 +53,10 @@ abstract class SchoolAdminController extends Controller
             'publicUrl'  => TenantDomainSync::publicUrl($this->school),
             'isStaff'    => $this->isStaff,
             'staffPermissions' => $staffPermissions,
+            'leadershipContacts' => SchoolContactRequirements::status($this->school),
+            'pendingChangeRequests' => StudentEditChangeRequest::where('school_id', $this->school->id)
+                ->where('status', 'pending')
+                ->count(),
         ], $props));
     }
 

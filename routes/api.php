@@ -33,7 +33,8 @@ Route::prefix('v1')->group(function () {
 
     Route::get('public/school-register', [SchoolApplicationApiController::class, 'form']);
     Route::post('public/school-register/validate', [SchoolApplicationApiController::class, 'validateField']);
-    Route::post('public/school-register', [SchoolApplicationApiController::class, 'store']);
+    Route::post('public/school-register', [SchoolApplicationApiController::class, 'store'])
+        ->middleware('throttle:10,1');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);

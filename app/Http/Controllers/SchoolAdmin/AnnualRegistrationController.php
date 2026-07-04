@@ -77,23 +77,34 @@ class AnnualRegistrationController extends SchoolAdminController
 
         $profilePayload = $profile ? array_merge($profile->toArray(), [
             'payment_details_text' => $profile->paymentDetailsText(),
+            'membership_fee_configured' => $profile->membershipFeeConfigured($academicYear),
+            'requires_membership_payment' => $profile->requiresMembershipPayment(),
         ]) : null;
+
+        $feeNotConfigured = $profile && ! $profile->membershipFeeConfigured($academicYear);
 
         return $this->inertia('School/Registration/Index', [
             'academicYear'       => $academicYear,
             'registration'       => $registration?->load('submission'),
             'profile'            => $profilePayload,
-            'registrationWindow' => $window,
+            'registrationWindow' => $windowService->displayPayload($window),
             'registrationWindowBlockReason' => $windowBlockReason,
+            'membershipFeeNotConfigured' => $feeNotConfigured,
             'payments'           => $payments,
-            'canBegin'           => $profile && ! $registration && ! empty($this->school->school_prefix) && ! $windowBlockReason,
+            'canBegin'           => $profile
+                && ! $registration
+                && ! empty($this->school->school_prefix)
+                && ! $windowBlockReason
+                && ! $feeNotConfigured,
             'isRenewal'          => $isRenewal,
             'priorYearSummary'   => $priorYearSummary,
-            'membershipFeePreview' => $profile && $profile->membership_fee_type === 'fixed'
+            'membershipFeePreview' => $profile && $profile->membership_fee_type === 'none'
+                ? 0
+                : ($profile && $profile->membership_fee_type === 'fixed'
                 ? $profile->fixed_membership_fee_amount
                 : ($profile && $profile->membership_fee_type === 'variable_by_student_count'
                     ? app(\App\Services\Membership\MembershipFeeCalculator::class)->estimateFeeForSchool($this->school, $academicYear)
-                    : null),
+                    : null)),
             'membershipFeeEstimateStudents' => $profile && $profile->membership_fee_type === 'variable_by_student_count'
                 ? app(\App\Services\Membership\MembershipFeeCalculator::class)->estimateStudentCount($this->school, $academicYear)
                 : null,
@@ -107,12 +118,16 @@ class AnnualRegistrationController extends SchoolAdminController
                 'counts'       => $registration->submission->counts_rejection_reason,
                 'teachers'     => $registration->submission->teacher_rejection_reason,
             ]) : null,
+            'membershipReceiptPaymentId' => $payments->firstWhere('status', 'verified')?->id,
         ]);
     }
 
     public function begin(RegistrationStatusService $service, MembershipRegistrationWindowService $windowService)
     {
         $academicYear = AcademicYear::forSchool($this->school);
+        $profile = SahodayaProfile::where('tenant_id', $this->school->parent_id)->first();
+        abort_unless($profile && $profile->membershipFeeConfigured($academicYear), 422, 'Membership fees are not configured yet. Contact your Sahodaya office.');
+
         $window = $windowService->forSchool($this->school, $academicYear);
         if ($reason = $windowService->blockReason($window)) {
             return redirect("/school-admin/{$this->school->id}/registration")
@@ -212,8 +227,9 @@ class AnnualRegistrationController extends SchoolAdminController
         ]);
     }
 
-    public function saveCounts(Request $request)
+    public function saveCounts(Request $request, MembershipRegistrationWindowService $windowService)
     {
+        $this->assertRegistrationEditAllowed($windowService);
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
         abort_unless(in_array($submission->counts_status, ['pending', 'rejected']), 403);
@@ -258,8 +274,9 @@ class AnnualRegistrationController extends SchoolAdminController
         ]);
     }
 
-    public function storeTeacher(Request $request, EffectiveMasterDataResolver $resolver)
+    public function storeTeacher(Request $request, EffectiveMasterDataResolver $resolver, MembershipRegistrationWindowService $windowService)
     {
+        $this->assertRegistrationEditAllowed($windowService);
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
         abort_unless(in_array($submission->teacher_status, ['pending', 'rejected']), 403);
@@ -275,8 +292,9 @@ class AnnualRegistrationController extends SchoolAdminController
         return back()->with('success', 'Teacher added.');
     }
 
-    public function destroyTeacher(string $tenantId, SubmissionTeacher $teacher)
+    public function destroyTeacher(string $tenantId, SubmissionTeacher $teacher, MembershipRegistrationWindowService $windowService)
     {
+        $this->assertRegistrationEditAllowed($windowService);
         $registration = $this->currentRegistration();
         abort_if($teacher->school_year_submission_id !== $registration->submission->id, 403);
         $teacher->delete();
@@ -284,8 +302,9 @@ class AnnualRegistrationController extends SchoolAdminController
         return back()->with('success', 'Teacher removed.');
     }
 
-    public function submitTrack(Request $request, SchoolYearSubmissionReviewService $reviewService)
+    public function submitTrack(Request $request, SchoolYearSubmissionReviewService $reviewService, MembershipRegistrationWindowService $windowService)
     {
+        $this->assertRegistrationEditAllowed($windowService);
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
 
@@ -462,5 +481,13 @@ class AnnualRegistrationController extends SchoolAdminController
             ->firstOrFail();
 
         return $registration;
+    }
+
+    private function assertRegistrationEditAllowed(MembershipRegistrationWindowService $windowService): void
+    {
+        $window = $windowService->forSchool($this->school, AcademicYear::forSchool($this->school));
+        if ($reason = $windowService->editBlockReason($window)) {
+            abort(403, $reason);
+        }
     }
 }

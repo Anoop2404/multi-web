@@ -44,9 +44,17 @@ import { computed } from 'vue';
 
 const props = defineProps({ sahodaya: Object, events: Array, assignments: Object, itemProgress: { type: Array, default: () => [] } });
 
-const navItems = computed(() => [
-    { href: `/portal/judge/${props.sahodaya.id}`, label: 'Dashboard' },
-]);
+const navItems = computed(() => {
+    const base = `/portal/judge/${props.sahodaya.id}`;
+    const items = [{ href: base, label: 'Dashboard', exact: true }];
+    if (props.events?.length === 1) {
+        items.push({
+            href: `${base}/events/${props.events[0].id}/marks`,
+            label: 'Enter marks',
+        });
+    }
+    return items;
+});
 
 const itemCount = computed(() =>
     props.events.reduce((sum, event) => sum + (props.assignments[event.id]?.length ?? 0), 0),

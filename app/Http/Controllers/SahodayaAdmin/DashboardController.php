@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
+use App\Models\AuditLog;
 use App\Models\Circular;
 use App\Models\FestAppeal;
 use App\Models\FestEvent;
@@ -17,6 +18,7 @@ use App\Models\SchoolYearSubmission;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\TrainingProgram;
+use App\Services\Membership\SahodayaSetupService;
 use App\Support\AcademicYear;
 use App\Support\TenancyDatabase;
 
@@ -24,8 +26,12 @@ class DashboardController extends SahodayaAdminController
 {
     use BuildsMembershipExports;
 
-    public function index()
+    public function index(SahodayaSetupService $setup)
     {
+        if (! $this->isStaff && $setup->shouldPromptWizard($this->sahodaya)) {
+            return redirect("/sahodaya-admin/{$this->sahodaya->id}/setup");
+        }
+
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
         $fees = $this->paymentFeeSummary($this->sahodaya->id, $schoolIds, $year);
@@ -42,6 +48,11 @@ class DashboardController extends SahodayaAdminController
         $festEventIds = FestEvent::where('tenant_id', $this->sahodaya->id)->pluck('id');
 
         $actionQueue = array_filter([
+            'pending_school_applications' => Tenant::query()
+                ->where('parent_id', $this->sahodaya->id)
+                ->where('type', 'school')
+                ->where('membership_status', 'pending')
+                ->count(),
             'membership_data_pending' => Registration::query()
                 ->whereIn('school_id', $schoolIds)
                 ->where('academic_year', $year)
@@ -64,6 +75,19 @@ class DashboardController extends SahodayaAdminController
                 ->where('status', 'submitted')
                 ->count(),
         ], fn (int $count) => $count > 0);
+
+        $base = "/sahodaya-admin/{$this->sahodaya->id}";
+        $appealsEventId = FestAppeal::whereIn('event_id', $festEventIds)
+            ->where('status', 'pending')
+            ->value('event_id');
+        $reviewEventId = FestRegistration::whereIn('event_id', $festEventIds)
+            ->where('status', 'submitted')
+            ->value('event_id');
+
+        $actionQueueLinks = array_filter([
+            'fest_appeals' => $appealsEventId ? "{$base}/events/{$appealsEventId}/appeals" : null,
+            'fest_registrations_review' => $reviewEventId ? "{$base}/events/{$reviewEventId}/registrations" : null,
+        ]);
 
         $stats = [
             'approved_schools'   => count($approvedSchoolIds),
@@ -126,13 +150,29 @@ class DashboardController extends SahodayaAdminController
         $dashboardExtras = app(\App\Services\Events\ProgramHubDataService::class)
             ->sahodayaDashboardExtras($this->sahodaya);
 
+        $recentActivity = AuditLog::query()
+            ->where('properties->tenant_id', $this->sahodaya->id)
+            ->latest()
+            ->limit(5)
+            ->get(['id', 'action', 'description', 'category', 'created_at'])
+            ->map(fn (AuditLog $log) => [
+                'id'          => $log->id,
+                'action'      => $log->action,
+                'description' => $log->description,
+                'category'    => $log->category,
+                'created_at'  => $log->created_at?->toIso8601String(),
+            ])
+            ->all();
+
         return $this->inertia('Sahodaya/Dashboard', compact(
             'stats',
             'actionQueue',
+            'actionQueueLinks',
             'recentCirculars',
             'activeEvents',
             'festOps',
             'dashboardExtras',
+            'recentActivity',
         ));
     }
 }

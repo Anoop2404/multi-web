@@ -72,7 +72,7 @@
                         <div class="flex items-center gap-3">
                             <Link :href="`/school-admin/${school.id}/board-results/${r.id}/toppers`"
                                   class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition">
-                                Manage Toppers ({{ r.toppers?.length ?? 0 }})
+                                {{ r.class == 12 ? 'Manage toppers & subjects' : 'Manage toppers' }} ({{ r.toppers?.length ?? 0 }})
                             </Link>
                             <button @click="remove(r)" class="text-xs text-red-400 hover:underline">Delete</button>
                         </div>

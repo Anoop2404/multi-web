@@ -91,7 +91,8 @@
                 description="Add coordinators, vice principals, or staff using the form above."
                 icon="👥"
             />
-            <table v-else class="data-table">
+            <div v-else class="overflow-x-auto">
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -122,6 +123,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div v-if="editing" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="editing = null">

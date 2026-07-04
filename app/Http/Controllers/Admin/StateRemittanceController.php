@@ -31,7 +31,12 @@ class StateRemittanceController extends Controller
             'amount'   => StateRemittance::where('status', 'verified')->sum('amount'),
         ];
 
-        return inertia('StateRemittances/Index', compact('remittances', 'sahodayas', 'summary'));
+        return inertia('StateRemittances/Index', [
+            'remittances' => $remittances,
+            'sahodayas'   => $sahodayas,
+            'summary'     => $summary,
+            'filters'     => ['status' => $request->get('status', '')],
+        ]);
     }
 
     public function store(Request $request)

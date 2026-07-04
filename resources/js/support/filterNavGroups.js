@@ -4,20 +4,19 @@
  * @param {Array<{ section: string, items: Array<{ label: string }> }>} groups
  * @param {string} query
  */
-export function filterNavGroups(groups, query) {
-    const q = query.trim().toLowerCase();
-    if (!q) {
-        return groups;
-    }
+export function filterNavGroups(groups, query = '') {
+    const q = (query ?? '').trim().toLowerCase();
 
     return groups
         .map((group) => ({
             ...group,
-            items: group.items.filter((item) => {
-                const label = item.label?.toLowerCase() ?? '';
-                const section = group.section?.toLowerCase() ?? '';
-                return label.includes(q) || section.includes(q);
-            }),
+            // Without search: show only non-hidden items
+            // With search: show any item whose label matches, including hidden
+            items: group.items.filter((item) =>
+                q
+                    ? item.label.toLowerCase().includes(q)
+                    : !item.hidden,
+            ),
         }))
         .filter((group) => group.items.length > 0);
 }

@@ -20,6 +20,7 @@ class Student extends Model
     ];
 
     public function tenant()       { return $this->belongsTo(Tenant::class); }
+    public function user()         { return $this->belongsTo(User::class); }
     public function schoolClass()  { return $this->belongsTo(SchoolClass::class); }
     public function schoolHouse()  { return $this->belongsTo(SchoolHouse::class, 'school_house_id'); }
     public function academicYear() { return $this->belongsTo(AcademicYearRecord::class, 'academic_year_id'); }

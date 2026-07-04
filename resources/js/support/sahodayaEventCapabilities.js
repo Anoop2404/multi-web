@@ -35,9 +35,9 @@ export function capabilitiesForEvent(event) {
         catering: type === 'sports',
         foodCoupons: type === 'sports',
         houses: type === 'sports',
-        championship: type === 'kalolsavam' || type === 'kids_fest',
+        championship: type === 'kalolsavam' || type === 'kids_fest' || type === 'english_fest' || type === 'science_fest',
         venues: true,
-        comboRules: type === 'kalolsavam' || type === 'kids_fest' || type === 'custom',
+        comboRules: type === 'kalolsavam' || type === 'kids_fest' || type === 'english_fest' || type === 'science_fest' || type === 'custom',
         gradeBands: type !== 'sports',
         pointRules: true,
         volunteers: true,
@@ -74,6 +74,11 @@ export function settingsTabsForEvent(event) {
 
     if (caps.hasEventFees) {
         tabs.push({ id: 'fees', label: 'Event fees' });
+    }
+
+    if (caps.isSports) {
+        tabs.push({ id: 'registration', label: 'Registration windows' });
+        tabs.push({ id: 'numbering', label: 'Numbering' });
     }
 
     tabs.push({ id: 'volunteers', label: 'Volunteers' });

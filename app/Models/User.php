@@ -23,6 +23,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'username',
         'password',
         'must_change_password',
+        'portal_welcome_seen',
         'last_login_at',
         'created_by_user_id',
         'group_classes',
@@ -39,6 +40,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at'      => 'datetime',
             'password'               => 'hashed',
             'must_change_password'   => 'boolean',
+            'portal_welcome_seen'    => 'boolean',
             'last_login_at'          => 'datetime',
             'group_classes'          => 'array',
         ];

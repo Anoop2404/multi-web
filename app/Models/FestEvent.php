@@ -11,12 +11,14 @@ class FestEvent extends Model
     protected $fillable = [
         'tenant_id', 'academic_year_id', 'title', 'event_type', 'conductor_level',
         'conduct_levels', 'level_round', 'state_program_id', 'conducting_school_id',
-        'is_cascaded', 'parent_event_id', 'cloned_from_event_id',
+        'is_cascaded', 'parent_event_id', 'cluster_key', 'cluster_label', 'cloned_from_event_id',
         'registration_open', 'registration_close', 'event_start', 'event_end', 'sports_age_cutoff_date', 'venue',
-        'fee_type', 'fee_amount', 'fee_settings', 'status', 'results_published', 'description',
+        'fee_type', 'fee_amount', 'fee_settings', 'numbering_settings', 'status', 'results_published', 'description',
         'scoring_locked', 'appeals_open', 'chest_reveal_mode', 'require_judge_scores_before_publish',
         'appeal_fee_amount', 'certificate_collection_open', 'registration_locked', 'schedule_published',
         'record_tracking_enabled', 'default_record_prize_label', 'require_all_marks_before_publish',
+        'require_event_registration', 'event_reg_start', 'event_reg_end', 'allow_student_self_register',
+        'verification_day', 'manual_pdf_path',
     ];
 
     protected $casts = [
@@ -29,15 +31,21 @@ class FestEvent extends Model
         'registration_locked'                 => 'boolean',
         'schedule_published'                  => 'boolean',
         'require_all_marks_before_publish'    => 'boolean',
+        'require_event_registration'          => 'boolean',
+        'allow_student_self_register'         => 'boolean',
         'record_tracking_enabled'             => 'boolean',
         'conduct_levels'                      => 'array',
         'registration_open'                   => 'date',
         'registration_close'                  => 'date',
+        'event_reg_start'                     => 'date',
+        'event_reg_end'                       => 'date',
         'event_start'                         => 'date',
         'event_end'                           => 'date',
+        'verification_day'                    => 'date',
         'sports_age_cutoff_date'              => 'date',
         'fee_amount'                          => 'decimal:2',
         'fee_settings'                        => 'array',
+        'numbering_settings'                  => 'array',
         'appeal_fee_amount'                   => 'decimal:2',
     ];
 

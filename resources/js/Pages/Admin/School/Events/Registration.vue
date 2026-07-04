@@ -13,6 +13,9 @@
                 <button v-if="!isTeacherFest" type="button" class="btn-secondary text-sm" @click="showAddStudent = true">
                     {{ isLocked ? 'Request student' : '+ Add student' }}
                 </button>
+                <button v-if="events.length && isSports" type="button" class="btn-secondary text-sm" @click="showBulkAssign = !showBulkAssign">
+                    Bulk assign items
+                </button>
                 <button v-if="events.length" type="button" class="btn-secondary text-sm" @click="showBulkImport = !showBulkImport">
                     Import CSV
                 </button>
@@ -42,6 +45,27 @@
             <ul v-if="$page.props.importErrors?.length" class="mt-3 text-xs text-red-600 list-disc pl-4">
                 <li v-for="(err, i) in $page.props.importErrors" :key="i">{{ err }}</li>
             </ul>
+        </div>
+
+        <div v-if="showBulkAssign && events.length && isSports" class="card mb-5 max-w-3xl text-sm border-emerald-100">
+            <div class="flex items-center justify-between gap-2 mb-3">
+                <p class="font-semibold text-slate-800">Bulk assign athletes to items</p>
+                <button type="button" class="text-slate-400 hover:text-slate-600 text-lg leading-none" @click="showBulkAssign = false">×</button>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <label class="block text-sm">
+                    <span class="text-gray-600">Event</span>
+                    <select v-model="bulkAssignEventId" class="field mt-1">
+                        <option value="">Select event</option>
+                        <option v-for="ev in events" :key="ev.id" :value="ev.id">{{ ev.title }}</option>
+                    </select>
+                </label>
+            </div>
+            <p class="text-xs text-slate-500 mt-3">Select students and items on the registration grid below, then use bulk assign from the event row actions.</p>
+            <button type="button" class="btn-primary text-xs mt-3" :disabled="!bulkAssignEventId || bulkAssignForm.processing"
+                    @click="submitBulkAssign">
+                Assign selected students to checked items
+            </button>
         </div>
 
         <details v-if="!isTeacherFest && isSports" class="mb-5 max-w-3xl rounded-xl border border-slate-200/80 bg-slate-50/50 text-sm group">
@@ -104,7 +128,20 @@
                                class="text-xs font-semibold text-indigo-600 px-2 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100">
                                 Fest day →
                             </a>
+                            <a :href="`${programBase}/events/${event.id}/substitution-requests`"
+                               class="text-xs font-semibold text-slate-600 px-2 py-1 rounded-full bg-slate-100 hover:bg-slate-200">
+                                Substitutions
+                            </a>
+                            <a :href="`${programBase}/events/${event.id}/clash-requests`"
+                               class="text-xs font-semibold text-slate-600 px-2 py-1 rounded-full bg-slate-100 hover:bg-slate-200">
+                                Clash report
+                            </a>
                         </div>
+                    </div>
+                    <div v-if="event.verification_status?.verification_day" class="mt-3 notice-banner text-xs"
+                         :class="event.verification_status.documents_verified ? 'notice-banner--success' : 'notice-banner--warning'">
+                        Verification day {{ event.verification_status.verification_day }} —
+                        {{ event.verification_status.documents_verified ? 'Documents verified by Sahodaya' : 'Awaiting document verification' }}
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2 text-xs">
                         <span v-if="event.academic_year_label"
@@ -438,6 +475,11 @@ const importFile = ref(null);
 const importForm = useForm({ event_id: '', file: null });
 const showAddStudent = ref(false);
 const showBulkImport = ref(false);
+const showBulkAssign = ref(false);
+const bulkAssignEventId = ref('');
+const bulkAssignStudentIds = ref([]);
+const bulkAssignItemIds = ref([]);
+const bulkAssignForm = useForm({ student_ids: [], item_ids: [] });
 const sportsSearch = reactive({});
 const sportsAgeFilter = reactive({});
 
@@ -1011,6 +1053,31 @@ function submitItem(event, item) {
                 || page.props.flash?.error
                 || 'Could not register for this item.';
             scrollToItemRow(event.id, item.id);
+        },
+    });
+}
+
+function submitBulkAssign() {
+    const event = props.events.find((ev) => ev.id === Number(bulkAssignEventId.value));
+    if (!event) return;
+
+    const studentIds = Object.values(itemForms)
+        .flatMap((form) => form.student_ids ?? [])
+        .filter(Boolean);
+    const itemIds = (event.items ?? []).filter((item) => bulkAssignItemIds.value.includes(item.id)).map((i) => i.id);
+
+    if (!studentIds.length || !itemIds.length) {
+        alert('Pick athletes in item rows and select items for bulk assign.');
+        return;
+    }
+
+    bulkAssignForm.student_ids = [...new Set(studentIds)];
+    bulkAssignForm.item_ids = itemIds;
+    bulkAssignForm.post(`${programBase.value}/events/${event.id}/bulk-assign`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            bulkAssignForm.reset();
+            showBulkAssign.value = false;
         },
     });
 }

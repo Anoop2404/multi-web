@@ -6,6 +6,17 @@
             description="Update the details you submitted when joining this Sahodaya. School name, affiliation number, and school code are managed by your Sahodaya admin."
         />
 
+        <div v-if="leadershipContacts && !leadershipContacts.complete" class="notice-banner notice-banner--warning mb-6 max-w-2xl">
+            <p class="font-semibold text-amber-900">Leadership contacts pending</p>
+            <p class="text-sm mt-1 text-amber-900/90">
+                Complete details for:
+                <span v-for="(item, i) in leadershipContacts.pending" :key="item.key">
+                    {{ item.label }}<span v-if="i < leadershipContacts.pending.length - 1">, </span>
+                </span>.
+                Sahodaya may hold fest registrations until principal, vice principal, and events coordinator are on file.
+            </p>
+        </div>
+
         <div class="max-w-2xl space-y-6">
             <section class="card space-y-3">
                 <h3 class="section-title text-base">School identity</h3>
@@ -110,6 +121,7 @@ const props = defineProps({
     readOnlyFields:      { type: Array, default: () => [] },
     highestClassOptions: { type: Object, default: () => ({}) },
     account:             { type: Object, default: () => ({}) },
+    leadershipContacts:  { type: Object, default: null },
 });
 
 const profileForm = useForm({ ...props.profileData });
@@ -123,8 +135,8 @@ const accountForm = useForm({
 });
 
 function fieldInputType(key) {
-    if (key === 'principal_email') return 'email';
-    if (key === 'phone' || key === 'principal_phone') return 'tel';
+    if (key.endsWith('_email')) return 'email';
+    if (key.endsWith('_phone') || key === 'phone') return 'tel';
     if (key === 'website') return 'url';
     return 'text';
 }

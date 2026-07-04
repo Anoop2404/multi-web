@@ -16,6 +16,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'id', 'type', 'name', 'domain', 'subdomain',
         'parent_id', 'plan', 'is_active', 'fest_registration_closed',
         'school_prefix', 'membership_status', 'renewal_status', 'application_payload', 'prefixes_locked',
+        'school_setup_wizard_dismissed',
     ];
 
     protected $casts = [
@@ -24,6 +25,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'data'                      => 'array',
         'application_payload'       => 'array',
         'prefixes_locked'           => 'boolean',
+        'school_setup_wizard_dismissed' => 'boolean',
     ];
 
     public static function getCustomColumns(): array
@@ -32,6 +34,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'id', 'type', 'name', 'domain', 'subdomain', 'parent_id', 'plan', 'is_active',
             'fest_registration_closed',
             'school_prefix', 'membership_status', 'renewal_status', 'application_payload', 'prefixes_locked',
+            'school_setup_wizard_dismissed',
         ];
     }
 

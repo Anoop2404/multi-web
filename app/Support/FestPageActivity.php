@@ -59,7 +59,7 @@ class FestPageActivity
             self::OVERVIEW => 'Event overview',
             self::ITEMS => 'Items setup',
             self::ITEMS_LIST => 'Item listing',
-            self::LEVELS => 'Levels & cascade',
+            self::LEVELS => 'Rounds & promotion',
             self::ACTIVITY => 'Activity timeline',
             self::SETTINGS => 'Event settings',
             self::REGISTRATIONS => 'Registrations',

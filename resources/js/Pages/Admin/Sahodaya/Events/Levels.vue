@@ -1,8 +1,8 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Levels`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Levels & cascade`" eyebrow="Multi-level"
-                    description="School rounds, promotions, and child events." />
+        <PageHeader :title="`${event.title} — Rounds & promotion`" eyebrow="Multi-level"
+                    :description="event.event_type === 'kids_fest' ? 'Kids Fest clusters, school rounds, and promotions.' : 'School rounds, promotions, and child events.'" />
 
         <EventSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="levels" />
 
@@ -22,14 +22,32 @@
             </div>
 
             <div class="card space-y-4">
-                <h4 class="section-title">Child events</h4>
-                <form @submit.prevent="spawnChild" class="flex gap-2">
+                <h4 class="section-title">{{ event.event_type === 'kids_fest' && !event.parent_event_id ? 'Geographic clusters' : 'Child events' }}</h4>
+
+                <form v-if="event.event_type === 'kids_fest' && !event.parent_event_id" @submit.prevent="spawnCluster" class="space-y-3">
+                    <input v-model="clusterForm.title" class="field" placeholder="Cluster title (e.g. Nilambur Cluster)" required>
+                    <div class="grid sm:grid-cols-2 gap-2">
+                        <input v-model="clusterForm.cluster_key" class="field text-sm" placeholder="Cluster key (nilambur)">
+                        <input v-model="clusterForm.cluster_label" class="field text-sm" placeholder="Display label">
+                    </div>
+                    <input v-model="clusterForm.venue" class="field text-sm" placeholder="Venue">
+                    <div class="grid sm:grid-cols-2 gap-2">
+                        <input v-model="clusterForm.event_start" type="date" class="field text-sm">
+                        <input v-model="clusterForm.event_end" type="date" class="field text-sm">
+                    </div>
+                    <button class="btn-primary text-sm w-full">Create cluster event</button>
+                </form>
+
+                <form v-else @submit.prevent="spawnChild" class="flex gap-2">
                     <input v-model="cascadeForm.title" class="field flex-1" placeholder="Child event title" required>
                     <button class="btn-primary text-sm shrink-0">Spawn child</button>
                 </form>
+
                 <ul v-if="event.child_events?.length" class="text-sm space-y-2">
-                    <li v-for="c in event.child_events" :key="c.id">
+                    <li v-for="c in event.child_events" :key="c.id" class="flex flex-wrap items-center gap-2">
                         <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${c.id}`" class="link-brand">{{ c.title }}</Link>
+                        <span v-if="c.cluster_label" class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">{{ c.cluster_label }}</span>
+                        <span v-if="c.venue" class="text-xs text-slate-400">{{ c.venue }}</span>
                     </li>
                 </ul>
                 <p v-else class="text-sm text-slate-400">No child events yet.</p>
@@ -57,9 +75,20 @@ const props = defineProps({
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const cascadeForm = useForm({ title: '' });
+const clusterForm = useForm({
+    title: '',
+    cluster_key: '',
+    cluster_label: '',
+    venue: '',
+    event_start: '',
+    event_end: '',
+});
 
 function spawnChild() {
     cascadeForm.post(`${base}/spawn`, { preserveScroll: true, onSuccess: () => cascadeForm.reset() });
+}
+function spawnCluster() {
+    clusterForm.post(`${base}/spawn-cluster`, { preserveScroll: true, onSuccess: () => clusterForm.reset() });
 }
 function spawnSchoolRounds() {
     router.post(`${base}/spawn-school-rounds`, {}, { preserveScroll: true });

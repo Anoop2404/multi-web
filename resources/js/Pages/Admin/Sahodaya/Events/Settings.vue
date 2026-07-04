@@ -20,6 +20,8 @@
         <RecordsTab v-else-if="activeTab === 'records'" />
         <LifecycleTab v-else-if="activeTab === 'lifecycle'" />
         <FeesTab v-else-if="activeTab === 'fees'" />
+        <RegistrationTab v-else-if="activeTab === 'registration'" />
+        <NumberingTab v-else-if="activeTab === 'numbering'" />
         <CloneTab v-else-if="activeTab === 'clone'" />
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
@@ -44,6 +46,8 @@ import VolunteersTab from './Settings/Tabs/VolunteersTab.vue';
 import RecordsTab from './Settings/Tabs/RecordsTab.vue';
 import LifecycleTab from './Settings/Tabs/LifecycleTab.vue';
 import FeesTab from './Settings/Tabs/FeesTab.vue';
+import RegistrationTab from './Settings/Tabs/RegistrationTab.vue';
+import NumberingTab from './Settings/Tabs/NumberingTab.vue';
 import CloneTab from './Settings/Tabs/CloneTab.vue';
 
 const props = defineProps({
@@ -71,6 +75,7 @@ const props = defineProps({
     defaultParticipantTypeFees: Object,
     ageGroupLabels: Object,
     defaultAgeGroupFees: Object,
+    numberingSettings: { type: Object, default: () => ({}) },
     initialTab: { type: String, default: 'lifecycle' },
     participationPolicy: Object,
     participationPresets: Object,
@@ -78,6 +83,8 @@ const props = defineProps({
     suggestedAgeCutoff: { type: String, default: null },
     defaultCutoffLabel: { type: String, default: null },
     ageGroupHelp: { type: Array, default: () => [] },
+    schoolVerifications: { type: Array, default: () => [] },
+    mandatoryGaps: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
 });
 

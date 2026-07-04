@@ -128,6 +128,32 @@ class FestEventNotifier
         }
     }
 
+    public function judgeAssigned(\App\Models\FestJudgeAssignment $assignment): void
+    {
+        $assignment->load(['event', 'item', 'user']);
+        $user = $assignment->user;
+        if (! $user) {
+            return;
+        }
+
+        $url = "/portal/judge/{$user->tenant_id}/events/{$assignment->event_id}/marks";
+        $replacements = [
+            'event_title' => $assignment->event->title,
+            'item_title'  => $assignment->item?->title ?? 'Item',
+        ];
+
+        $service = app(NotificationService::class);
+        if (! $service->notifyFromTemplate($user, 'fest.judge.assigned', $replacements, $url)) {
+            $service->notify(
+                $user,
+                'New judging assignment',
+                "You have been assigned to judge {$replacements['item_title']} at {$replacements['event_title']}.",
+                $url,
+                ['in_app', 'email'],
+            );
+        }
+    }
+
     public function promotionCompleted(FestEvent $toEvent, int $count, ?FestEvent $fromEvent = null): void
     {
         $schoolIds = FestRegistration::where('event_id', $toEvent->id)

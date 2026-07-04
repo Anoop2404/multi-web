@@ -20,7 +20,7 @@
                     Promote to next level ★
                 </button>
             </div>
-            <button @click="publish" class="btn-primary">Publish Results</button>
+            <button @click="confirmPublish" class="btn-primary">Publish Results</button>
             <button v-if="event.results_published" @click="unpublish"
                     class="px-4 py-2 border border-red-200 text-red-700 rounded-lg text-sm font-medium">Unpublish</button>
         </div>
@@ -61,11 +61,25 @@
             </div>
         </div>
             <EventPageActivityLog :logs="activityLogs" class="mt-8" />
+
+        <div v-if="publishModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="publishModalOpen = false">
+            <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
+                <h3 class="font-semibold text-gray-900">Publish results?</h3>
+                <p class="text-sm text-gray-600">
+                    Schools and the public portal will see published results for <strong>{{ event.title }}</strong>.
+                    You can unpublish later if needed.
+                </p>
+                <div class="flex gap-2 justify-end">
+                    <button type="button" class="btn-ghost text-sm" @click="publishModalOpen = false">Cancel</button>
+                    <button type="button" class="btn-primary text-sm" @click="publish">Publish now</button>
+                </div>
+            </div>
+        </div>
     </SahodayaEventsLayout>
 </template>
 
 <script setup>
-import { computed, watch } from 'vue';
+import { computed, watch, ref } from 'vue';
 import { router, useForm, Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
@@ -78,6 +92,7 @@ const props = defineProps({
 });
 
 const promoteForm = useForm({ next_event_id: props.suggestedNextId ?? '' });
+const publishModalOpen = ref(false);
 
 watch(() => props.suggestedNextId, (id) => {
     if (id && !promoteForm.next_event_id) promoteForm.next_event_id = id;
@@ -99,7 +114,12 @@ function participantLabel(q) {
         ?? 'Participant';
 }
 
+function confirmPublish() {
+    publishModalOpen.value = true;
+}
+
 function publish() {
+    publishModalOpen.value = false;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/publish`, {}, { preserveScroll: true });
 }
 

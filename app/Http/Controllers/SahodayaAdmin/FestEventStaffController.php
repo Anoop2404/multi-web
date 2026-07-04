@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Support\TenantUserCatalog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class FestEventStaffController extends SahodayaAdminController
@@ -80,10 +81,21 @@ class FestEventStaffController extends SahodayaAdminController
                 'nullable',
                 Rule::exists('fest_venues', 'id')->where('event_id', $event->id),
             ],
+            'head_id' => [
+                'nullable',
+                Rule::when(
+                    Schema::hasTable('fest_item_heads'),
+                    Rule::exists('fest_item_heads', 'id'),
+                ),
+            ],
         ]);
 
         if ($data['duty'] !== 'stage') {
             $data['stage_id'] = null;
+        }
+
+        if ($data['duty'] !== 'discipline') {
+            $data['head_id'] = null;
         }
 
         if (! empty($data['stage_id'])) {
@@ -98,6 +110,7 @@ class FestEventStaffController extends SahodayaAdminController
             'stage_id' => $data['stage_id'] ?? null,
         ], [
             'venue_id' => $data['venue_id'] ?? null,
+            'head_id' => $data['head_id'] ?? null,
         ]);
 
         $user = User::find($data['user_id']);

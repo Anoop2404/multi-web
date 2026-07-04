@@ -16,6 +16,9 @@ class FestCatalogSeeder extends Seeder
         foreach ($eventTypes as $eventType) {
             $added = $service->ensureSeeded($tenantId, $eventType);
             $this->command?->line("  {$eventType}: {$added} new master catalog items");
+            if ($eventType === 'sports') {
+                app(\App\Services\Events\FestItemHeadService::class)->ensureCatalogHeads($tenantId, $eventType);
+            }
         }
     }
 }

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 class FestCatalogItem extends Model
 {
     protected $fillable = [
-        'tenant_id', 'event_type', 'catalog_key', 'source', 'is_enabled', 'fee_enabled',
+        'tenant_id', 'event_type', 'catalog_key', 'source', 'is_enabled', 'is_mandatory', 'fee_enabled',
         'title', 'item_code', 'category', 'stage_type', 'venue_type', 'competition_format',
         'sport_discipline', 'duration_minutes', 'criteria_json', 'participant_type', 'gender',
         'class_group', 'age_group', 'kids_band', 'max_per_school', 'min_group_size',
@@ -18,6 +18,7 @@ class FestCatalogItem extends Model
     protected $casts = [
         'criteria_json' => 'array',
         'is_enabled' => 'boolean',
+        'is_mandatory' => 'boolean',
         'fee_enabled' => 'boolean',
         'fee_amount' => 'decimal:2',
     ];
@@ -39,7 +40,7 @@ class FestCatalogItem extends Model
             'title', 'item_code', 'category', 'stage_type', 'venue_type', 'competition_format',
             'sport_discipline', 'duration_minutes', 'criteria_json', 'participant_type', 'gender',
             'class_group', 'age_group', 'kids_band', 'max_per_school', 'min_group_size',
-            'max_group_size', 'qualify_count', 'display_order',
+            'max_group_size', 'qualify_count', 'display_order', 'is_mandatory',
         ]))->filter(fn ($v) => $v !== null)->all();
 
         if ($this->fee_enabled && $this->fee_amount !== null) {

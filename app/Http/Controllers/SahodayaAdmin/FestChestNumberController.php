@@ -62,6 +62,32 @@ class FestChestNumberController extends SahodayaAdminController
         return back()->with('success', "Assigned {$count} chest number(s).");
     }
 
+    public function assignMissing(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $chestCount = app(\App\Services\Events\FestNumberingService::class)->assignMissingChestNumbers($event);
+
+        $audit->festEvent($event, FestPageActivity::CHEST_NUMBERS, 'fest.chest_numbers.assigned_missing', "Assigned {$chestCount} missing chest number(s)", [
+            'count' => $chestCount,
+        ]);
+
+        return back()->with('success', "Assigned {$chestCount} missing chest number(s).");
+    }
+
+    public function assignItemRegIds(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $count = app(\App\Services\Events\FestNumberingService::class)->assignMissingItemRegNumbers($event);
+
+        $audit->festEvent($event, FestPageActivity::CHEST_NUMBERS, 'fest.item_reg_ids.assigned', "Assigned {$count} item registration ID(s)", [
+            'count' => $count,
+        ]);
+
+        return back()->with('success', "Assigned {$count} item registration ID(s).");
+    }
+
     public function clearChest(string $tenantId, FestEvent $event, FestParticipant $participant, FestChestNumberService $service, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

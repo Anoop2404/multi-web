@@ -9,6 +9,7 @@ use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Models\Tenant;
 use App\Support\ExcelExport;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FestExportService
@@ -98,27 +99,112 @@ class FestExportService
     {
         $schoolIds = FestSchoolEventFee::where('event_id', $event->id)->pluck('school_id')->unique();
         $schools = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
+        $hasCompositeColumns = Schema::hasColumn('fest_school_event_fees', 'student_registration_fee');
 
         $rows = FestSchoolEventFee::where('event_id', $event->id)
             ->with('feeReceipt')
             ->orderBy('school_id')
             ->get()
-            ->map(fn (FestSchoolEventFee $fee) => [
-                $schools[$fee->school_id] ?? $fee->school_id,
-                $fee->school_registration_fee,
-                $fee->participation_item_count,
-                $fee->participation_fee,
-                $fee->total_due,
-                $fee->feeReceipt?->amount ?? '',
-                $fee->status,
-                $fee->feeReceipt?->transaction_ref ?? '',
-                $fee->feeReceipt?->payment_date?->format('Y-m-d') ?? '',
-                $fee->feeReceipt?->receipt_number ?? '',
-            ]);
+            ->map(function (FestSchoolEventFee $fee) use ($schools, $hasCompositeColumns) {
+                $row = [
+                    $schools[$fee->school_id] ?? $fee->school_id,
+                    $fee->school_registration_fee,
+                ];
+
+                if ($hasCompositeColumns) {
+                    $row[] = $fee->student_registration_fee ?? 0;
+                    $row[] = $fee->extra_item_fee ?? 0;
+                }
+
+                return array_merge($row, [
+                    $fee->participation_item_count,
+                    $fee->participation_fee,
+                    $fee->total_due,
+                    $fee->feeReceipt?->amount ?? '',
+                    $fee->status,
+                    $fee->feeReceipt?->transaction_ref ?? '',
+                    $fee->feeReceipt?->payment_date?->format('Y-m-d') ?? '',
+                    $fee->feeReceipt?->receipt_number ?? '',
+                ]);
+            });
+
+        $headers = ['School', 'School Reg'];
+        if ($hasCompositeColumns) {
+            $headers = array_merge($headers, ['Student Reg', 'Extra Items']);
+        }
+        $headers = array_merge($headers, [
+            'Student/Item Count', 'Participation Fee', 'Total Due', 'Paid', 'Status', 'Txn Ref', 'Payment Date', 'Receipt No',
+        ]);
 
         return ExcelExport::download(
             $this->filename($event, 'fees'),
-            ['School', 'School Reg Fee', 'Item Count', 'Participation Fee', 'Total Due', 'Paid', 'Status', 'Txn Ref', 'Payment Date', 'Receipt No'],
+            $headers,
+            $rows,
+        );
+    }
+
+    public function feeBreakdown(FestEvent $event): StreamedResponse
+    {
+        if (! Schema::hasTable('fest_school_event_fee_lines')) {
+            return $this->fees($event);
+        }
+
+        $schoolIds = FestSchoolEventFee::where('event_id', $event->id)->pluck('school_id')->unique();
+        $schools = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
+
+        $rows = FestSchoolEventFee::where('event_id', $event->id)
+            ->with('lines')
+            ->orderBy('school_id')
+            ->get()
+            ->flatMap(function (FestSchoolEventFee $fee) use ($schools) {
+                if ($fee->lines->isEmpty()) {
+                    return [[
+                        $schools[$fee->school_id] ?? $fee->school_id,
+                        'summary',
+                        'Total',
+                        1,
+                        $fee->total_due,
+                        $fee->total_due,
+                        $fee->status,
+                    ]];
+                }
+
+                return $fee->lines->map(fn ($line) => [
+                    $schools[$fee->school_id] ?? $fee->school_id,
+                    $line->line_type,
+                    $line->label,
+                    $line->quantity,
+                    $line->unit_amount,
+                    $line->amount,
+                    $fee->status,
+                ]);
+            });
+
+        return ExcelExport::download(
+            $this->filename($event, 'fee-breakdown'),
+            ['School', 'Line type', 'Label', 'Qty', 'Unit', 'Amount', 'Status'],
+            $rows,
+        );
+    }
+
+    public function studentEventRegistrations(FestEvent $event): StreamedResponse
+    {
+        $rows = \App\Models\FestLevelRegistration::where('event_id', $event->id)
+            ->with(['student:id,name,reg_no', 'school:id,name'])
+            ->orderBy('registration_number')
+            ->get()
+            ->map(fn ($r) => [
+                $r->school?->name ?? $r->school_id,
+                $r->student?->reg_no ?? '',
+                $r->student?->name ?? '',
+                $r->registration_number,
+                $r->status,
+                $r->registered_at?->format('Y-m-d H:i') ?? '',
+            ]);
+
+        return ExcelExport::download(
+            $this->filename($event, 'student-event-registrations'),
+            ['School', 'Reg no', 'Student', 'Event reg ID', 'Status', 'Registered at'],
             $rows,
         );
     }

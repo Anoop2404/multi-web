@@ -18,7 +18,9 @@
                             <div>
                                 <h3 class="form-section-title">Event items</h3>
                                 <p class="form-section-hint">
-                                    Toggle items on/off for this event. Year-independent defaults live in
+                                    Toggle items on/off for this event. Manage dropdown masters in
+                                    <Link :href="taxonomyMastersUrl" class="link-brand">Item category masters →</Link>
+                                    or import from
                                     <Link :href="catalogUrl" class="link-brand">Items & fees catalog →</Link>
                                 </p>
                             </div>
@@ -40,11 +42,16 @@
                                 </select>
                             </FormField>
                             <template v-if="isSports">
-                                <FormField label="Venue">
+                                <FormField v-if="itemHeads.length" label="Item head">
+                                    <select v-model="itemForm.head_id" class="field">
+                                        <option value="">None</option>
+                                        <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
+                                    </select>
+                                </FormField>
+                                <FormField label="Venue type">
                                     <select v-model="itemForm.venue_type" class="field">
-                                        <option value="">Venue</option>
-                                        <option value="outdoor">Outdoor</option>
-                                        <option value="indoor">Indoor</option>
+                                        <option value="">Venue type</option>
+                                        <option v-for="(label, key) in taxonomy.venue_type" :key="key" :value="key">{{ label }}</option>
                                     </select>
                                 </FormField>
                                 <FormField label="Format">
@@ -86,9 +93,7 @@
                             </FormField>
                             <FormField label="Participant type">
                                 <select v-model="itemForm.participant_type" class="field">
-                                    <option value="individual">Individual</option>
-                                    <option value="group">Group</option>
-                                    <option value="team">Team</option>
+                                    <option v-for="(label, key) in taxonomy.participant_type" :key="key" :value="key">{{ label }}</option>
                                 </select>
                             </FormField>
                             <FormField label="Fee override (₹)" class-extra="sm:col-span-2" hint="Optional per-item fee">
@@ -150,17 +155,23 @@
                                                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
                                                 @click="filterGender = ''">All</button>
                                         <button type="button"
-                                                class="text-xs px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
+                                                class="text-xs px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap inline-flex items-center gap-1"
                                                 :class="filterGender === 'male'
                                                     ? 'bg-indigo-600 text-white border-indigo-600 font-semibold'
                                                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
-                                                @click="filterGender = 'male'">Boys</button>
+                                                @click="filterGender = 'male'">
+                                            <FestItemMetaIcons gender="male" bare class="shrink-0" />
+                                            Boys
+                                        </button>
                                         <button type="button"
-                                                class="text-xs px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
+                                                class="text-xs px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap inline-flex items-center gap-1"
                                                 :class="filterGender === 'female'
                                                     ? 'bg-indigo-600 text-white border-indigo-600 font-semibold'
                                                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
-                                                @click="filterGender = 'female'">Girls</button>
+                                                @click="filterGender = 'female'">
+                                            <FestItemMetaIcons gender="female" bare class="shrink-0" />
+                                            Girls
+                                        </button>
                                         <button type="button"
                                                 class="text-xs px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
                                                 :class="filterGender === 'open'
@@ -262,6 +273,12 @@
                         <CheckboxField v-model="editForm.is_enabled" label="Schools can register for this item" />
                     </FormField>
                     <template v-if="isSports">
+                        <FormField v-if="itemHeads.length" label="Item head">
+                            <select v-model="editForm.head_id" class="field">
+                                <option value="">None</option>
+                                <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
+                            </select>
+                        </FormField>
                         <FormField label="Age group">
                             <select v-model="editForm.age_group" class="field">
                                 <option value="">Age group</option>
@@ -274,11 +291,16 @@
                                 <option v-for="(label, key) in taxonomy.gender" :key="key" :value="key">{{ label }}</option>
                             </select>
                         </FormField>
-                        <FormField label="Venue">
+                        <FormField label="Venue type">
                             <select v-model="editForm.venue_type" class="field">
-                                <option value="">Venue</option>
-                                <option value="outdoor">Outdoor</option>
-                                <option value="indoor">Indoor</option>
+                                <option value="">Venue type</option>
+                                <option v-for="(label, key) in taxonomy.venue_type" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                        </FormField>
+                        <FormField label="Format">
+                            <select v-model="editForm.competition_format" class="field">
+                                <option value="">Format</option>
+                                <option v-for="(label, key) in taxonomy.competition_format" :key="key" :value="key">{{ label }}</option>
                             </select>
                         </FormField>
                         <FormField label="Discipline">
@@ -302,9 +324,7 @@
                     </FormField>
                     <FormField label="Participant type">
                         <select v-model="editForm.participant_type" class="field">
-                            <option value="individual">Individual</option>
-                            <option value="group">Group</option>
-                            <option value="team">Team</option>
+                            <option v-for="(label, key) in taxonomy.participant_type" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </FormField>
                     <template v-if="['team', 'group'].includes(editForm.participant_type)">
@@ -359,12 +379,15 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import FestItemMetaIcons from '@/Components/sahodaya/FestItemMetaIcons.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import { festItemListingDetails, festItemSearchHaystack, festItemTagsLine } from '@/support/festItemListingMeta.js';
+import { normalizeFestItemGender } from '@/support/festItemEligibility.js';
 
 const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'];
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, groupedItems: Object, taxonomy: Object,
+    itemHeads: { type: Array, default: () => [] },
+    taxonomyMastersUrl: String,
     catalogSummary: Object, catalogUrl: String,
     levelLabels: Object, itemsByLevel: Object, ownerLevelLabels: Object,
     activityLogs: { type: Array, default: () => [] },
@@ -430,7 +453,7 @@ function itemMatchesFilters(item) {
     const q = searchQuery.value.trim().toLowerCase();
     if (q && !itemMatchesSearch(item, q)) return false;
     if (filterAgeGroup.value && item.age_group !== filterAgeGroup.value) return false;
-    if (filterGender.value && (item.gender ?? 'open') !== filterGender.value) return false;
+    if (filterGender.value && normalizeFestItemGender(item.gender) !== filterGender.value) return false;
     if (filterEnabled.value === 'on' && item.is_enabled === false) return false;
     if (filterEnabled.value === 'off' && item.is_enabled !== false) return false;
     return true;
@@ -457,7 +480,7 @@ function clearFilters() {
 }
 
 const itemForm = useForm({
-    title: '', participant_type: 'individual', stage_type: '', venue_type: '',
+    title: '', participant_type: 'individual', stage_type: '', venue_type: '', head_id: '',
     competition_format: '', sport_discipline: '', class_group: '', age_group: '', kids_band: '', gender: 'open',
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
     fee_amount: null,
@@ -465,7 +488,7 @@ const itemForm = useForm({
 const editingItem = ref(null);
 const editForm = useForm({
     title: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
-    venue_type: '', sport_discipline: '', participant_type: 'individual',
+    venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', head_id: '',
     qualify_count: null, max_per_school: null, fee_amount: null,
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
     min_group_size: null, max_group_size: null,
@@ -498,6 +521,8 @@ function openEditItem(item) {
     editForm.kids_band = item.kids_band ?? '';
     editForm.venue_type = item.venue_type ?? '';
     editForm.sport_discipline = item.sport_discipline ?? '';
+    editForm.competition_format = item.competition_format ?? '';
+    editForm.head_id = item.head_id ?? '';
     editForm.participant_type = item.participant_type ?? 'individual';
     editForm.qualify_count = item.qualify_count ?? null;
     editForm.max_per_school = item.max_per_school ?? null;

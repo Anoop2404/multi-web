@@ -96,6 +96,7 @@ class EventLifecycleGate
         $staffOnly = [
             'registration-list', 'registrations', 'admit-cards', 'clashes', 'clashes-school',
             'fees', 'students', 'student-participation', 'promotions', 'certificate-counts', 'catering',
+            'catering-by-school', 'volunteer-roster', 'id-cards-by-head', 'audit-log-extract',
         ];
 
         if (in_array($exportType, $staffOnly, true)) {
@@ -122,6 +123,21 @@ class EventLifecycleGate
 
         if ($event->require_all_marks_before_publish) {
             self::assertAllParticipantsMarked($event);
+        }
+    }
+
+    /** Block publishing an event that schools would see as empty. */
+    public static function assertCanPublishEvent(FestEvent $event, ?string $venue = null, $eventStart = null): void
+    {
+        if (! $event->items()->exists()) {
+            throw new HttpException(422, 'Add at least one competition item before publishing this event.');
+        }
+
+        $venueValue = $venue ?? $event->venue;
+        $startValue = $eventStart ?? $event->event_start;
+
+        if (! filled($venueValue) && ! filled($startValue)) {
+            throw new HttpException(422, 'Set a venue or event start date before publishing.');
         }
     }
 

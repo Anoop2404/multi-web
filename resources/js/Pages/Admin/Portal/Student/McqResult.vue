@@ -29,6 +29,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { studentPortalNavItems } from '@/support/studentPortalNav.js';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -39,7 +40,5 @@ const props = defineProps({
     showResults: Boolean,
 });
 
-const navItems = computed(() => [
-    { href: `/portal/student/${props.school.id}`, label: 'Dashboard' },
-]);
+const navItems = computed(() => studentPortalNavItems(props.school.id));
 </script>

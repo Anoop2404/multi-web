@@ -11,6 +11,7 @@ use App\Models\TrainingSession;
 use App\Models\TrainingAttendance;
 use App\Services\Fees\ProgramFeeReceiptMailer;
 use App\Services\Fees\ProgramFeeReceiptService;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Notifications\NotificationService;
 use App\Services\Training\TrainingCertificateService;
 use App\Support\TenantStorage;
@@ -58,6 +59,12 @@ class TrainingProgramController extends SahodayaAdminController
 
         $program = TrainingProgram::create($data);
 
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.program.created',
+            "Training program created: {$program->title}",
+        );
+
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/training/{$program->id}")
             ->with('success', 'Training program created.');
     }
@@ -95,6 +102,13 @@ class TrainingProgramController extends SahodayaAdminController
 
         $program->update($data);
 
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.program.updated',
+            "Training program updated: {$program->title}",
+            ['status' => $data['status'] ?? $program->status],
+        );
+
         return back()->with('success', 'Program updated.');
     }
 
@@ -130,6 +144,18 @@ class TrainingProgramController extends SahodayaAdminController
         }
 
         $registration->update(['status' => 'confirmed']);
+
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.registration.confirmed',
+            "Training registration confirmed for {$registration->teacher?->name}",
+            [
+                'registration_id' => $registration->id,
+                'school_id'       => $registration->school_id,
+                'teacher_id'      => $registration->teacher_id,
+            ],
+            $registration,
+        );
 
         $registration->load('teacher', 'program');
         $teacherUser = $registration->teacher?->user_id
@@ -187,6 +213,14 @@ class TrainingProgramController extends SahodayaAdminController
             adminPath: 'payments',
         );
 
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.fee.approved',
+            "Training fee approved for {$registration->teacher?->name}",
+            ['registration_id' => $registration->id, 'school_id' => $registration->school_id],
+            $registration,
+        );
+
         return back()->with('success', 'Training fee approved.');
     }
 
@@ -208,6 +242,18 @@ class TrainingProgramController extends SahodayaAdminController
         }
 
         $registration->update(['fee_receipt_id' => null]);
+
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.fee.rejected',
+            "Training fee rejected for {$registration->teacher?->name}",
+            [
+                'registration_id' => $registration->id,
+                'school_id'       => $registration->school_id,
+                'reason'          => $data['rejection_reason'] ?? null,
+            ],
+            $registration,
+        );
 
         $registration->loadMissing('program');
         $schoolId = $registration->school_id;

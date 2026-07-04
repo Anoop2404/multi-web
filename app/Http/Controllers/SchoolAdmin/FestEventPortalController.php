@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Models\Certificate;
 use App\Models\FestAppeal;
 use App\Models\FestCateringOrder;
 use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Services\Events\EventContext;
+use App\Services\Events\FestCertificateService;
 use App\Support\SchoolFestProgram;
 use Illuminate\Http\Request;
 
@@ -148,5 +150,39 @@ class FestEventPortalController extends SchoolAdminController
             'programSlug'     => $programSlug,
             'registrationUrl' => "/school-admin/{$this->school->id}/programs/{$programSlug}/registration",
         ]);
+    }
+
+    public function downloadCertificatesZip(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q
+            ->where('event_id', $event->id)
+            ->where('school_id', $this->school->id))
+            ->pluck('id');
+
+        $certificates = Certificate::where('entity_type', FestParticipant::class)
+            ->whereIn('entity_id', $participantIds)
+            ->get();
+
+        abort_if($certificates->isEmpty(), 404, 'No certificates to download for your school.');
+
+        $service = app(FestCertificateService::class);
+        $zipPath = storage_path('app/tmp/school-fest-certs-'.$event->id.'-'.$this->school->id.'-'.time().'.zip');
+        @mkdir(dirname($zipPath), 0755, true);
+
+        $zip = new \ZipArchive;
+        $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+
+        foreach ($certificates as $certificate) {
+            $payload = $service->payloadFor($certificate);
+            $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.html';
+            $html = view('fest.certificate-print', $payload)->render();
+            $zip->addFromString($name, $html);
+        }
+
+        $zip->close();
+
+        return response()->download($zipPath, str($event->title)->slug().'-certificates.zip')->deleteFileAfterSend();
     }
 }

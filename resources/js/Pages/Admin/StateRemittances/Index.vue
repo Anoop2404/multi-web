@@ -94,6 +94,12 @@
                         </tr>
                     </tbody>
                 </table>
+                <div v-if="remittances.links?.length > 3" class="px-4 py-3 border-t flex flex-wrap gap-1">
+                    <Link v-for="link in remittances.links" :key="link.label"
+                          :href="link.url || '#'"
+                          :class="['px-3 py-1 rounded-lg text-xs', link.active ? 'bg-indigo-100 text-indigo-800 font-semibold' : 'text-gray-600 hover:bg-gray-100', !link.url && 'opacity-40 pointer-events-none']"
+                          v-html="link.label" />
+                </div>
             </div>
         </div>
 
@@ -113,13 +119,13 @@
 
 <script setup>
 import { ref } from 'vue';
-import { useForm, router } from '@inertiajs/vue3';
+import { Link, useForm, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 
-const props = defineProps({ remittances: Object, sahodayas: Array, summary: Object });
+const props = defineProps({ remittances: Object, sahodayas: Array, summary: Object, filters: Object });
 
 const form = useForm({ sahodaya_id: '', title: '', description: '', amount: '', academic_year: '', due_date: '' });
-const filterStatus = ref('');
+const filterStatus = ref(props.filters?.status ?? '');
 const rejectTarget = ref(null);
 const rejectReason = ref('');
 

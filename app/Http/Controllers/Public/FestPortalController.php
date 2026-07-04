@@ -14,6 +14,9 @@ use App\Models\FestSchedule;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\EventContext;
 use App\Services\Events\FestPublicVisibilityService;
+use App\Services\Events\FestWinnerPosterService;
+use App\Support\TenantStorage;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
 class FestPortalController extends Controller
@@ -89,6 +92,7 @@ class FestPortalController extends Controller
             ->orderByDesc('score')
             ->get()
             ->map(fn (FestMark $m) => [
+                'mark_id'   => $m->id,
                 'reference' => $m->participant
                     ? $this->visibility->publicReference($event, $m->participant)
                     : '—',
@@ -98,9 +102,114 @@ class FestPortalController extends Controller
                 'grade'     => $m->grade,
                 'score'     => $m->score,
                 'result'    => trim(($m->measurement_value ?? '').' '.($m->measurement_unit ?? '')),
+                'poster_url' => in_array((int) $m->position, [1, 2, 3], true)
+                    ? route('tenant.fest.winner-poster', [$event->id, $item->id, $m->id])
+                    : null,
             ]);
 
         return $this->renderPublic('public.fest.item-results', $tenant, compact('event', 'item', 'marks'));
+    }
+
+    public function winnerPoster(int $eventId, FestEventItem $item, FestMark $mark, FestWinnerPosterService $posters)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        abort_if($item->event_id !== $event->id, 404);
+        abort_if($mark->event_id !== $event->id || $mark->item_id !== $item->id, 404);
+        abort_unless($event->results_published, 404);
+        abort_if(! in_array((int) $mark->position, [1, 2, 3], true), 404);
+
+        $rendered = $posters->render($event, $item, $mark, $tenant);
+
+        return response($rendered['content'], 200, [
+            'Content-Type'        => $rendered['mime'],
+            'Content-Disposition' => 'inline; filename="'.$rendered['filename'].'"',
+        ]);
+    }
+
+    public function itemResultsPdf(int $eventId, FestEventItem $item)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        abort_if($item->event_id !== $event->id, 404);
+        abort_unless($event->results_published, 404);
+
+        $marks = FestMark::where('event_id', $event->id)
+            ->where('item_id', $item->id)
+            ->with(['participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->orderBy('position')
+            ->orderByDesc('score')
+            ->get();
+
+        $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($item->title)) ?: 'item';
+
+        return Pdf::loadView('fest.reports.item-wise', [
+            'event' => $event,
+            'item'  => $item,
+            'marks' => $marks,
+            'topN'  => $marks->count(),
+        ])->download("{$slug}-results.pdf");
+    }
+
+    public function scoreboard(Request $request, int $eventId)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        $ctx = EventContext::for($event);
+
+        $clusters = $ctx->scoreboardClusters();
+        $cluster = $request->query('cluster');
+        $categories = $ctx->scoreboardCategories();
+        $category = $request->query('category');
+
+        if ($clusters !== []) {
+            if ($cluster === null) {
+                $cluster = 'combined';
+            }
+        } elseif ($category === null && $categories !== []) {
+            $category = $categories[0];
+        }
+
+        $categoryLabels = collect($categories)
+            ->mapWithKeys(fn (string $key) => [$key => $ctx->scoreboardCategoryLabel($key)])
+            ->all();
+
+        $clusterLabels = collect($clusters)
+            ->mapWithKeys(fn (string $key) => [$key => $ctx->scoreboardClusterLabel($key)])
+            ->all();
+
+        if ($cluster === 'combined' && $clusters !== []) {
+            $scoreboard = $ctx->scoreboardBySchool();
+            $scoreboardTitle = 'Combined (all clusters)';
+        } elseif ($cluster && isset($clusterLabels[$cluster])) {
+            $scoreboard = $ctx->scoreboardByCluster($cluster);
+            $scoreboardTitle = $clusterLabels[$cluster];
+        } else {
+            $scoreboard = $ctx->scoreboardByCategory($category);
+            $scoreboardTitle = $category ? ($categoryLabels[$category] ?? strtoupper($category)) : 'Overall';
+        }
+
+        return $this->renderPublic('public.fest.scoreboard', $tenant, [
+            'event'           => $event,
+            'clusters'        => $clusters,
+            'cluster'         => $cluster,
+            'clusterLabels'   => $clusterLabels,
+            'categories'      => $categories,
+            'category'        => $category,
+            'categoryLabels'  => $categoryLabels,
+            'scoreboard'      => $scoreboard,
+            'scoreboardTitle' => $scoreboardTitle,
+            'pageSeo'         => ['title' => $event->title.' — Scoreboard'],
+        ]);
+    }
+
+    public function manual(int $eventId)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        abort_unless($event->manual_pdf_path, 404);
+
+        return TenantStorage::downloadResponse($tenant, $event->manual_pdf_path);
     }
 
     public function live(int $eventId)
@@ -127,6 +236,13 @@ class FestPortalController extends Controller
     {
         $ctx = EventContext::for($event);
 
+        $categories = $ctx->scoreboardCategories();
+        $categoryLinks = collect($categories)->map(fn (string $key) => [
+            'key'   => $key,
+            'label' => $ctx->scoreboardCategoryLabel($key),
+            'url'   => route('tenant.fest.scoreboard', ['event' => $event->id, 'category' => $key]),
+        ])->all();
+
         $nowSlot = FestSchedule::where('event_id', $event->id)
             ->whereNotNull('scheduled_at')
             ->where('scheduled_at', '<=', now())
@@ -142,6 +258,7 @@ class FestPortalController extends Controller
 
         return [
             'scoreboard'      => $ctx->scoreboardBySchool(),
+            'categoryLinks'   => $categoryLinks,
             'houseScoreboard' => $ctx->scoreboardByHouse(),
             'nowPerforming'   => $nowPerforming,
             'athleticRecords' => $this->publicAthleticRecords($event),

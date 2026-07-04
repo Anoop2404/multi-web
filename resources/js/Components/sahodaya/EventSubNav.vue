@@ -1,8 +1,10 @@
 <template>
-    <nav class="flex flex-wrap gap-2 border-b border-slate-200 pb-4 mb-2">
+    <nav class="flex flex-wrap gap-1.5 border-b border-slate-200 pb-3 mb-4">
         <Link v-for="tab in tabs" :key="tab.key"
               :href="tab.href"
-              :class="active === tab.key ? 'subnav-link subnav-link--active' : 'subnav-link'">
+              :class="active === tab.key
+                  ? 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold bg-[#0f3d7a] text-white'
+                  : 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100'">
             {{ tab.label }}
         </Link>
     </nav>
@@ -22,9 +24,9 @@ const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.
 
 const tabs = computed(() => [
     { key: 'overview', label: 'Overview', href: base.value },
-    { key: 'items', label: 'Items setup', href: `${base.value}/items` },
-    { key: 'items-list', label: 'Item listing', href: `${base.value}/items/list` },
-    { key: 'levels', label: 'Levels & cascade', href: `${base.value}/levels` },
-    { key: 'activity', label: 'Activity log', href: `${base.value}/activity` },
+    { key: 'items', label: 'Items', href: `${base.value}/items` },
+    { key: 'items-list', label: 'Item list', href: `${base.value}/items/list` },
+    { key: 'levels', label: 'Rounds & promotion', href: `${base.value}/levels` },
+    { key: 'activity', label: 'Log', href: `${base.value}/activity` },
 ]);
 </script>

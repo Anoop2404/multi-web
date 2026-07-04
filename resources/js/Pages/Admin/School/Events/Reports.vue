@@ -11,10 +11,17 @@
                 <div class="flex flex-wrap gap-2 mt-2 text-xs">
                     <a :href="`${programBase}/reports/${ev.id}/participation`" class="text-indigo-600 font-semibold">Participation</a>
                     <a :href="`${programBase}/reports/${ev.id}/registration-register`" class="text-indigo-600 font-semibold">Reg & fees register</a>
+                    <a :href="`${programBase}/reports/${ev.id}/fee-summary`" class="text-indigo-600 font-semibold">Fee summary</a>
                     <a :href="`${programBase}/reports/${ev.id}/id-cards`" class="text-indigo-600 font-semibold">ID cards</a>
                     <a :href="`${programBase}/reports/${ev.id}/student-wise`" class="text-indigo-600 font-semibold">Student-wise</a>
                     <a v-if="programSlug === 'teacher-fest'" :href="`${programBase}/reports/${ev.id}/teacher-wise`" class="text-indigo-600 font-semibold">Teacher-wise</a>
                     <a :href="`${programBase}/reports/${ev.id}/item-wise`" class="text-indigo-600 font-semibold">Item-wise</a>
+                    <a :href="`${programBase}/reports/${ev.id}/discipline-participation`" class="text-indigo-600 font-semibold">Discipline</a>
+                    <a :href="`${programBase}/reports/${ev.id}/schedule-clashes`" class="text-indigo-600 font-semibold">Clashes</a>
+                    <a :href="`${programBase}/reports/${ev.id}/mark-entry-status`" class="text-indigo-600 font-semibold">Mark status</a>
+                    <a :href="`${programBase}/reports/${ev.id}/results-summary`" class="text-indigo-600 font-semibold">Results</a>
+                    <a :href="`${programBase}/reports/${ev.id}/group-roster`" target="_blank" class="text-indigo-600 font-semibold">Group roster PDF</a>
+                    <a :href="`${programBase}/reports/${ev.id}/attendance-sheet`" target="_blank" class="text-indigo-600 font-semibold">Attendance PDF</a>
                     <a :href="`${programBase}/reports/${ev.id}/student-wise/export`" class="text-indigo-600 font-semibold">Student CSV</a>
                     <a v-if="programSlug === 'teacher-fest'" :href="`${programBase}/reports/${ev.id}/teacher-wise/export`" class="text-indigo-600 font-semibold">Teacher CSV</a>
                     <a :href="`${programBase}/reports/${ev.id}/item-wise/export`" class="text-indigo-600 font-semibold">Item CSV</a>

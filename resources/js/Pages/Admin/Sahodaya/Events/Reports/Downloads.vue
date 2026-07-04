@@ -51,6 +51,30 @@
                             <input :id="id" v-model.number="params[exp.id].top_n" type="number" min="1" max="50" class="field w-24 text-sm">
                         </template>
                     </FormField>
+                    <FormField v-if="exp.params.includes('head_id')" label="Item head" class-extra="min-w-[12rem]">
+                        <template #default="{ id }">
+                            <select :id="id" v-model="params[exp.id].head_id" class="field text-sm">
+                                <option value="">All heads</option>
+                                <option v-for="h in heads" :key="h.id" :value="h.id">{{ h.name }}</option>
+                            </select>
+                        </template>
+                    </FormField>
+                    <FormField v-if="exp.params.includes('stage_id')" label="Stage" class-extra="min-w-[12rem]">
+                        <template #default="{ id }">
+                            <select :id="id" v-model="params[exp.id].stage_id" class="field text-sm">
+                                <option value="">All stages</option>
+                                <option v-for="st in stages" :key="st.id" :value="st.id">{{ st.name }}</option>
+                            </select>
+                        </template>
+                    </FormField>
+                    <FormField v-if="exp.params.includes('audience')" label="Audience" class-extra="min-w-[10rem]">
+                        <template #default="{ id }">
+                            <select :id="id" v-model="params[exp.id].audience" class="field text-sm">
+                                <option value="">Staff</option>
+                                <option value="public">Public</option>
+                            </select>
+                        </template>
+                    </FormField>
                 </div>
             </div>
         </div>
@@ -68,7 +92,7 @@ import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, phase: String, exports: Array,
-    schools: Array, items: Array, classGroups: Object,
+    schools: Array, items: Array, heads: Array, stages: Array, classGroups: Object,
     activityLogs: { type: Array, default: () => [] },
 });
 

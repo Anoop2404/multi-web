@@ -34,7 +34,7 @@ export function detectSchoolMcqHubFromUrl(url) {
 function examsTrainingItems(schoolId, canNav) {
     const items = [];
     if (canNav('mcq')) {
-        items.push({ label: 'MCQ exams', href: schoolAdminHref(schoolId, 'mcq'), icon: 'clipboard' });
+        items.push({ label: 'MCQ exams', href: schoolAdminHref(schoolId, 'mcq'), icon: 'book-open' });
     }
     if (canNav('training')) {
         items.push({ label: 'Teacher training', href: schoolAdminHref(schoolId, 'training'), icon: 'award' });
@@ -199,103 +199,104 @@ export function schoolAdminNav(schoolId, options = {}) {
         canNav = () => true,
         websiteEnabled = false,
         schoolHasPrefix = true,
+        pendingChangeRequests = 0,
     } = options;
 
     const base = schoolAdminHref(schoolId);
     const groups = [];
 
+    // ── Home ──────────────────────────────────────────────────────────
     groups.push({
         section: 'Home',
         items: [{ label: 'Dashboard', href: base, icon: 'grid', exact: true }],
     });
 
+    // ── School (students + core records) ──────────────────────────────
     if (canNav('students')) {
-        const items = [];
+        const schoolItems = [];
         if (!schoolHasPrefix) {
-            items.push({ label: 'School Code', href: schoolAdminHref(schoolId, 'setup', 'code'), icon: 'hash' });
+            schoolItems.push({ label: 'Set school code', href: schoolAdminHref(schoolId, 'setup', 'code'), icon: 'alert-circle' });
         }
-        items.push(
-            { label: 'Students', href: schoolAdminHref(schoolId, 'students'), icon: 'users' },
-            { label: 'School houses', href: schoolAdminHref(schoolId, 'houses'), icon: 'award' },
-            { label: 'Teachers', href: schoolAdminHref(schoolId, 'teachers'), icon: 'users' },
+        schoolItems.push(
+            { label: 'Students', href: schoolAdminHref(schoolId, 'students'), icon: 'users', badge: pendingChangeRequests },
+            { label: 'Teachers', href: schoolAdminHref(schoolId, 'teachers'), icon: 'user-check' },
+            { label: 'School houses', href: schoolAdminHref(schoolId, 'houses'), icon: 'layers' },
+            { label: 'Settings', href: schoolAdminHref(schoolId, 'settings'), icon: 'settings' },
         );
+        // Hidden — accessible from Settings page
         if (canNav('users')) {
-            items.push({ label: 'Portal users', href: schoolAdminHref(schoolId, 'users'), icon: 'users' });
+            schoolItems.push({ label: 'Portal users', href: schoolAdminHref(schoolId, 'users'), icon: 'shield', hidden: true });
         }
-        groups.push({ section: 'Students', items });
-    } else if (canNav('users')) {
-        groups.push({
-            section: 'Administration',
-            items: [{ label: 'Portal users', href: schoolAdminHref(schoolId, 'users'), icon: 'users' }],
-        });
+        groups.push({ section: 'School', items: schoolItems });
     }
 
+    // ── Membership ────────────────────────────────────────────────────
     if (canNav('membership')) {
         groups.push({
             section: 'Membership',
             items: [
-                { label: 'Registration Details', href: schoolAdminHref(schoolId, 'registration', 'profile'), icon: 'user' },
                 { label: 'Annual Registration', href: schoolAdminHref(schoolId, 'registration'), icon: 'clipboard' },
                 { label: 'Payments & Receipts', href: schoolAdminHref(schoolId, 'payments'), icon: 'credit-card' },
+                // Hidden — tab on Annual Registration page
+                { label: 'Registration Details', href: schoolAdminHref(schoolId, 'registration', 'profile'), icon: 'user', hidden: true },
             ],
         });
     }
 
+    // ── Fest ──────────────────────────────────────────────────────────
     if (canNav('fest')) {
         groups.push({
-            section: 'Fest programs',
+            section: 'Fest',
             items: [
                 ...SCHOOL_FEST_PROGRAMS.map((p) => ({
                     label: p.label,
                     href: schoolProgramHref(schoolId, p.slug),
                     icon: p.icon,
                 })),
-                { label: 'School events', href: schoolAdminHref(schoolId, 'fest-programs'), icon: 'calendar' },
+                { label: 'Reports', href: schoolAdminHref(schoolId, 'fest', 'reports'), icon: 'file-text', exact: true },
+                // Hidden — accessible from program pages and dashboard
+                { label: 'Fest Hub', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'star', hidden: true },
+                { label: 'School events', href: schoolAdminHref(schoolId, 'fest-programs'), icon: 'calendar', hidden: true },
+                { label: 'Food Coupons', href: schoolAdminHref(schoolId, 'food-coupons'), icon: 'clipboard', hidden: true },
+                { label: 'Circulars', href: schoolAdminHref(schoolId, 'circulars'), icon: 'file-text', hidden: true },
+                { label: 'Notifications', href: schoolAdminHref(schoolId, 'notifications'), icon: 'bell', hidden: true },
             ],
         });
-
-        groups.push({
-            section: 'Fest tools',
-            items: festToolItems(schoolId),
-        });
-    }
-    if (canNav('mcq') || canNav('training')) {
-        const items = examsTrainingItems(schoolId, canNav);
-        if (items.length) {
-            groups.push({ section: 'Exams & training', items });
-        }
     }
 
+    // ── Exams & training ──────────────────────────────────────────────
+    const examItems = [];
+    if (canNav('mcq')) {
+        examItems.push({ label: 'MCQ exams', href: schoolAdminHref(schoolId, 'mcq'), icon: 'book-open' });
+    }
+    if (canNav('training')) {
+        examItems.push({ label: 'Teacher training', href: schoolAdminHref(schoolId, 'training'), icon: 'award' });
+    }
+    if (examItems.length) {
+        groups.push({ section: 'Exams & training', items: examItems });
+    }
+
+    // ── Website (collapses to single hub entry) ────────────────────────
     if (websiteEnabled && canNav('website')) {
         groups.push({
             section: 'Website',
             items: [
-                { label: 'Site Builder', href: `${base}/site-builder`, icon: 'layers' },
-                { label: 'News', href: `${base}/news`, icon: 'file-text' },
-                { label: 'Events', href: `${base}/events`, icon: 'calendar' },
-                { label: 'Gallery', href: `${base}/gallery`, icon: 'image' },
-                { label: 'Staff', href: `${base}/staff`, icon: 'users' },
-                { label: 'Achievements', href: `${base}/achievements`, icon: 'star' },
-                { label: 'Downloads', href: `${base}/downloads`, icon: 'folder' },
-                { label: 'Job Vacancies', href: `${base}/job-vacancies`, icon: 'briefcase' },
-                { label: 'Board Results', href: `${base}/board-results`, icon: 'bar-chart' },
-                { label: 'Alumni', href: `${base}/alumni`, icon: 'award' },
-                { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star' },
-                { label: 'Contact Page', href: `${base}/contact`, icon: 'file-text' },
+                { label: 'School Website →', href: `${base}/site-builder`, icon: 'layers' },
+                // Hidden — all accessible from site-builder hub; searchable
+                { label: 'News', href: `${base}/news`, icon: 'file-text', hidden: true },
+                { label: 'Events', href: `${base}/events`, icon: 'calendar', hidden: true },
+                { label: 'Gallery', href: `${base}/gallery`, icon: 'image', hidden: true },
+                { label: 'Staff', href: `${base}/staff`, icon: 'users', hidden: true },
+                { label: 'Achievements', href: `${base}/achievements`, icon: 'star', hidden: true },
+                { label: 'Downloads', href: `${base}/downloads`, icon: 'folder', hidden: true },
+                { label: 'Job Vacancies', href: `${base}/job-vacancies`, icon: 'briefcase', hidden: true },
+                { label: 'Board Results', href: `${base}/board-results`, icon: 'bar-chart', hidden: true },
+                { label: 'Alumni', href: `${base}/alumni`, icon: 'award', hidden: true },
+                { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star', hidden: true },
+                { label: 'Contact Page', href: `${base}/contact`, icon: 'file-text', hidden: true },
+                { label: 'Enquiries', href: `${base}/enquiries`, icon: 'inbox', hidden: true },
+                { label: 'TC Requests', href: `${base}/tc-requests`, icon: 'file-text', hidden: true },
             ],
-        });
-
-        groups.push({
-            section: 'Admissions',
-            items: [
-                { label: 'Enquiries', href: `${base}/enquiries`, icon: 'inbox' },
-                { label: 'TC Requests', href: `${base}/tc-requests`, icon: 'file-text' },
-            ],
-        });
-
-        groups.push({
-            section: 'School',
-            items: [{ label: 'Settings', href: `${base}/settings`, icon: 'settings' }],
         });
     }
 

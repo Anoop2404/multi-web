@@ -108,6 +108,47 @@
                     </FormField>
                 </div>
 
+                <div v-else-if="feeSettingsForm.fee_model === 'sports_composite'" class="space-y-4 border-t border-slate-100 pt-4">
+                    <p class="text-xs text-slate-600">
+                        Sports meet billing: flat school fee + per-student event registration + included item quota, then catalog rates for extra items.
+                    </p>
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <FormField label="School registration (₹)">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="feeSettingsForm.school_registration_flat" type="number" min="0" class="field" placeholder="2000">
+                            </template>
+                        </FormField>
+                        <FormField label="Student registration (₹)">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="feeSettingsForm.per_student_amount" type="number" min="0" class="field" placeholder="300">
+                            </template>
+                        </FormField>
+                        <FormField label="Included items / student">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="feeSettingsForm.included_items_per_student" type="number" min="0" class="field" placeholder="2">
+                            </template>
+                        </FormField>
+                        <FormField label="Default extra item fee (₹)">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="feeSettingsForm.default_item_fee" type="number" min="0" class="field" placeholder="150">
+                            </template>
+                        </FormField>
+                    </div>
+                    <div v-if="event.event_type === 'sports'" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <FormField v-for="(label, key) in ageGroupLabels" :key="key" :label="`${label} extra item`">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="feeSettingsForm.age_group_fees[key]" type="number" min="0"
+                                       class="field" :placeholder="placeholderAmount(defaultAgeGroupFees[key])">
+                            </template>
+                        </FormField>
+                    </div>
+                    <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field max-w-xs">
+                        </template>
+                    </FormField>
+                </div>
+
                 <p v-else-if="feeSettingsForm.fee_model === 'none'" class="text-sm text-slate-600 border-t border-slate-100 pt-4">
                     No fest fee is charged for this event. Schools can register without payment.
                 </p>

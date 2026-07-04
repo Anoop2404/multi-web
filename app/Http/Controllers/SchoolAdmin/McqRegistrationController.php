@@ -287,6 +287,8 @@ class McqRegistrationController extends SchoolAdminController
             "mcq-payments/{$this->school->id}"
         );
 
+        FeeReceipt::supersedePriorForFeeable($schoolFee);
+
         $receipt = FeeReceipt::create([
             'feeable_type'        => McqSchoolFee::class,
             'feeable_id'          => $schoolFee->id,
@@ -359,6 +361,8 @@ class McqRegistrationController extends SchoolAdminController
             $request->file('payment_proof'),
             "mcq-payments/{$this->school->id}"
         );
+
+        FeeReceipt::supersedePriorForFeeable($registration);
 
         $receipt = FeeReceipt::create([
             'feeable_type'        => McqRegistration::class,

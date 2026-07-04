@@ -9,6 +9,7 @@ use App\Models\FestQualification;
 use App\Models\FestStateProgram;
 use App\Models\FestStateProgramPropagation;
 use App\Models\Tenant;
+use App\Support\TenantDomainSync;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -83,21 +84,56 @@ class KalotsavStateController extends Controller
             ->pluck('tenant_event_id');
 
         $qualifications = FestQualification::whereIn('event_id', $eventIds)
-            ->with(['participant.student', 'participant.teacher', 'item', 'event', 'nextLevelEvent'])
+            ->with([
+                'participant.student',
+                'participant.teacher',
+                'participant.registration.school',
+                'item',
+                'event',
+                'nextLevelEvent',
+            ])
             ->orderByDesc('promoted_at')
+            ->get();
+
+        $marks = FestMark::whereIn('event_id', $eventIds)
+            ->whereIn('participant_id', $qualifications->pluck('participant_id'))
             ->get()
-            ->map(fn (FestQualification $q) => [
+            ->keyBy(fn (FestMark $m) => "{$m->event_id}:{$m->item_id}:{$m->participant_id}");
+
+        $tenants = Tenant::whereIn('id', $qualifications->pluck('event.tenant_id')->filter()->unique())
+            ->get()
+            ->keyBy('id');
+
+        $winners = $qualifications->map(function (FestQualification $q) use ($marks, $tenants) {
+            $markKey = "{$q->event_id}:{$q->item_id}:{$q->participant_id}";
+            $mark = $marks->get($markKey);
+            $posterUrl = null;
+
+            if ($mark && in_array((int) $mark->position, [1, 2, 3], true)) {
+                $tenant = $q->event?->tenant_id ? $tenants->get($q->event->tenant_id) : null;
+                $base = $tenant ? TenantDomainSync::publicUrl($tenant) : null;
+                if ($base && $q->event && $q->item) {
+                    $posterUrl = rtrim($base, '/')."/fest/{$q->event_id}/items/{$q->item_id}/winners/{$mark->id}/poster.svg";
+                }
+            }
+
+            return [
                 'participant' => $q->participant?->student?->name ?? $q->participant?->teacher?->name,
                 'reg_no'      => $q->participant?->student?->reg_no,
+                'school'      => $q->participant?->registration?->school?->name,
                 'item'        => $q->item?->title,
+                'category'    => $q->item?->category,
+                'grade'       => $mark?->grade,
                 'from_event'  => $q->event?->title,
                 'next_level'  => $q->nextLevelEvent?->level_round,
                 'promoted_at' => $q->promoted_at?->toDateString(),
-            ]);
+                'poster_url'  => $posterUrl,
+            ];
+        });
 
         return inertia('State/Kalotsav/Winners', [
             'program'    => $stateProgram->only('id', 'title', 'academic_year'),
-            'winners'    => $qualifications,
+            'winners'    => $winners,
         ]);
     }
 
@@ -110,17 +146,33 @@ class KalotsavStateController extends Controller
             ->pluck('tenant_event_id');
 
         $rows = FestQualification::whereIn('event_id', $eventIds)
-            ->with(['participant.student', 'participant.teacher', 'item', 'event', 'nextLevelEvent'])
+            ->with([
+                'participant.student',
+                'participant.teacher',
+                'participant.registration.school',
+                'item',
+                'event',
+                'nextLevelEvent',
+            ])
             ->get();
 
-        return response()->streamDownload(function () use ($rows) {
+        $marks = FestMark::whereIn('event_id', $eventIds)
+            ->whereIn('participant_id', $rows->pluck('participant_id'))
+            ->get()
+            ->keyBy(fn (FestMark $m) => "{$m->event_id}:{$m->item_id}:{$m->participant_id}");
+
+        return response()->streamDownload(function () use ($rows, $marks) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Participant', 'Reg No', 'Item', 'From Event', 'Next Level', 'Promoted At']);
+            fputcsv($out, ['Participant', 'Reg No', 'School', 'Item', 'Category', 'Grade', 'From Event', 'Next Level', 'Promoted At']);
             foreach ($rows as $q) {
+                $mark = $marks->get("{$q->event_id}:{$q->item_id}:{$q->participant_id}");
                 fputcsv($out, [
                     $q->participant?->student?->name ?? $q->participant?->teacher?->name,
                     $q->participant?->student?->reg_no,
+                    $q->participant?->registration?->school?->name,
                     $q->item?->title,
+                    $q->item?->category,
+                    $mark?->grade,
                     $q->event?->title,
                     $q->nextLevelEvent?->level_round,
                     $q->promoted_at?->toDateString(),

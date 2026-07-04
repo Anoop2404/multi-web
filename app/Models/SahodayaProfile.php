@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\MembershipFeeSlab;
 use App\Support\AcademicYear;
 use Illuminate\Database\Eloquent\Model;
 
@@ -12,6 +13,7 @@ class SahodayaProfile extends Model
         'contact_email', 'contact_phone',
         'student_data_mode', 'membership_fee_type', 'fixed_membership_fee_amount',
         'teacher_registration_enabled', 'student_edit_lock_enabled', 'student_edit_lock_at', 'payment_instructions', 'prefixes_locked',
+        'setup_wizard_complete', 'setup_wizard_dismissed_at',
         'payment_bank_name', 'payment_account_no', 'payment_ifsc', 'payment_upi',
         'application_form_config', 'active_academic_year', 'fest_class_group_scheme',
         'receipt_template_json', 'receipt_next_number',
@@ -29,6 +31,8 @@ class SahodayaProfile extends Model
         'student_edit_lock_enabled'    => 'boolean',
         'student_edit_lock_at'         => 'datetime',
         'prefixes_locked'              => 'boolean',
+        'setup_wizard_complete'        => 'boolean',
+        'setup_wizard_dismissed_at'    => 'datetime',
         'application_form_config'      => 'array',
         'receipt_template_json'        => 'array',
         'mail_password'                => 'encrypted',
@@ -58,6 +62,31 @@ class SahodayaProfile extends Model
     public function requiresDataSubmission(): bool
     {
         return $this->requiresStudentData() || $this->teacher_registration_enabled;
+    }
+
+    public function requiresMembershipPayment(): bool
+    {
+        return match ($this->membership_fee_type) {
+            'none' => false,
+            'fixed' => (float) ($this->fixed_membership_fee_amount ?? 0) > 0,
+            'variable_by_student_count' => true,
+            default => false,
+        };
+    }
+
+    /** Whether Sahodaya has explicitly configured the membership fee model for the active year. */
+    public function membershipFeeConfigured(?string $academicYear = null): bool
+    {
+        return match ($this->membership_fee_type) {
+            'none' => true,
+            'fixed' => $this->fixed_membership_fee_amount !== null
+                && (float) $this->fixed_membership_fee_amount > 0,
+            'variable_by_student_count' => MembershipFeeSlab::query()
+                ->where('sahodaya_id', $this->tenant_id)
+                ->where('academic_year', $academicYear ?? $this->resolvedAcademicYear())
+                ->exists(),
+            default => false,
+        };
     }
 
     public function mailIsConfigured(): bool

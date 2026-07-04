@@ -24,6 +24,7 @@
             <ul class="text-sm divide-y">
                 <li v-for="r in registrations" :key="r.id" class="py-2">
                     {{ r.event?.title }} — {{ r.item?.title ?? 'General' }}
+                    <span v-if="r.chest_no" class="text-xs text-indigo-700 ml-1">· Chest #{{ r.chest_no }}</span>
                     <span class="text-xs text-gray-400 ml-1 capitalize">({{ r.status }})</span>
                 </li>
                 <li v-if="!registrations?.length" class="text-gray-400 py-2">No fest registrations yet</li>
@@ -62,9 +63,9 @@
             </ul>
         </section>
 
-        <section v-if="festDaySlots?.length" class="card mb-4">
+        <section id="fest-schedule" class="card mb-4 scroll-mt-24">
             <h2 class="font-semibold text-sm mb-2">My Fest Schedule</h2>
-            <ul class="text-sm divide-y">
+            <ul v-if="festDaySlots?.length" class="text-sm divide-y">
                 <li v-for="(slot, i) in festDaySlots" :key="i" class="py-2">
                     <p class="font-medium">{{ slot.event_title }} — {{ slot.item_title }}</p>
                     <p class="text-xs text-gray-600 mt-0.5">
@@ -78,9 +79,10 @@
                     </p>
                 </li>
             </ul>
+            <p v-else class="text-sm text-gray-400 py-2">No scheduled fest items yet</p>
         </section>
 
-        <section class="card mb-4">
+        <section id="fest-results" class="card mb-4 scroll-mt-24">
             <h2 class="font-semibold text-sm mb-2">Fest Results</h2>
             <ul class="text-sm divide-y">
                 <li v-for="(r, i) in festResults" :key="i" class="py-2">
@@ -97,7 +99,7 @@
             </ul>
         </section>
 
-        <section class="card mb-4">
+        <section id="fest-certs" class="card mb-4 scroll-mt-24">
             <h2 class="font-semibold text-sm mb-2">Fest Certificates</h2>
             <ul class="text-sm divide-y">
                 <li v-for="(c, i) in festCerts" :key="i" class="py-2 flex justify-between items-center gap-2">
@@ -127,14 +129,6 @@
                        target="_blank"
                        class="text-xs font-semibold text-indigo-600 shrink-0">Download PDF ↗</a>
                 </li>
-            </ul>
-        </section>
-
-        <section class="card mb-4">
-            <h2 class="font-semibold text-sm mb-2">Event Registrations</h2>
-            <ul class="text-sm divide-y">
-                <li v-for="r in registrations" :key="r.id" class="py-2">{{ r.event?.title }} — {{ r.item?.title }} ({{ r.status }})</li>
-                <li v-if="!registrations.length" class="text-gray-400 py-2">No registrations yet</li>
             </ul>
         </section>
 
@@ -169,6 +163,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { studentPortalNavItems } from '@/support/studentPortalNav.js';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 
@@ -198,8 +193,5 @@ function submitAppeal() {
     });
 }
 
-const navItems = computed(() => [
-    { href: `/portal/student/${props.school.id}`, label: 'Dashboard' },
-    { href: `/portal/student/${props.school.id}/profile`, label: 'Profile' },
-]);
+const navItems = computed(() => studentPortalNavItems(props.school.id));
 </script>

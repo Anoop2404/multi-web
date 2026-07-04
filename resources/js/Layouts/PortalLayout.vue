@@ -11,11 +11,12 @@
                     <SignOutButton class="text-xs text-red-600 hover:text-red-700 font-semibold px-2 py-1" />
                 </div>
             </div>
-            <nav v-if="navItems.length" class="max-w-5xl mx-auto px-4 sm:px-6 pb-2 flex flex-wrap gap-1">
+            <nav v-if="navItems.length"
+                 class="max-w-5xl mx-auto pb-2 flex gap-1.5 overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-6 sm:flex-wrap sm:overflow-visible">
                 <Link v-for="item in navItems" :key="item.href"
                       :href="item.href"
-                      class="text-xs font-semibold px-3 py-1.5 rounded-lg transition"
-                      :class="isActive(item.href)
+                      class="text-xs font-semibold px-3 py-1.5 rounded-lg transition shrink-0 whitespace-nowrap"
+                      :class="isActive(item)
                           ? 'bg-indigo-600 text-white'
                           : 'text-gray-600 hover:bg-gray-100'">
                     {{ item.label }}
@@ -52,7 +53,31 @@ const accentClass = computed(() => ({
     violet: 'text-violet-600',
 }[props.accent] ?? 'text-indigo-600'));
 
-function isActive(href) {
-    return page.url === href || page.url.startsWith(href + '/');
+function isActive(item) {
+    const href = item.href;
+    const url = page.url.split('?')[0];
+    if (item.exact) {
+        return url === href || url === `${href}/`;
+    }
+    if (url === href || url === `${href}/`) {
+        return true;
+    }
+    if (url.startsWith(`${href}/`)) {
+        return !props.navItems.some((other) =>
+            other.href !== href
+            && other.href.startsWith(`${href}/`)
+            && (url === other.href || url.startsWith(`${other.href}/`)),
+        );
+    }
+    return false;
 }
 </script>
+
+<style scoped>
+.scrollbar-none {
+    scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
+</style>

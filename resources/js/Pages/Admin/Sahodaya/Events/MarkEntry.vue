@@ -32,6 +32,13 @@
         </EmptyState>
 
         <div v-else class="space-y-6">
+            <div class="flex flex-wrap items-center justify-end gap-2">
+                <button type="button" class="btn-secondary text-sm"
+                        :disabled="bulkSaving || !registrations.length"
+                        @click="saveAll">
+                    {{ bulkSaving ? 'Saving all…' : 'Save all marks' }}
+                </button>
+            </div>
             <section v-for="reg in registrations" :key="reg.id" class="card overflow-hidden p-0">
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 bg-slate-50/80">
                     <div>
@@ -112,10 +119,14 @@
                                            placeholder="s/m">
                                 </td>
                                 <td class="text-right">
-                                    <button type="button" class="btn-primary text-xs !min-h-0 px-3 py-2"
-                                            @click="saveMark(p, reg.item)">
-                                        Save
-                                    </button>
+                                    <div class="flex items-center justify-end gap-2">
+                                        <span v-if="savedIds.has(p.id)" class="text-xs font-semibold text-emerald-600">Saved ✓</span>
+                                        <button type="button" class="btn-primary text-xs !min-h-0 px-3 py-2"
+                                                :disabled="savingIds.has(p.id)"
+                                                @click="saveMark(p, reg.item)">
+                                            {{ savingIds.has(p.id) ? 'Saving…' : 'Save' }}
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
@@ -128,7 +139,7 @@
 </template>
 
 <script setup>
-import { reactive, computed } from 'vue';
+import { reactive, computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
@@ -149,6 +160,9 @@ const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/ev
 
 const markForms = reactive({});
 const bulkRank = reactive({});
+const savedIds = ref(new Set());
+const savingIds = ref(new Set());
+const bulkSaving = ref(false);
 for (const reg of props.registrations ?? []) {
     for (const p of reg.participants ?? []) {
         const existing = props.marks[p.id];
@@ -196,11 +210,55 @@ function applyBulkRank(reg) {
 }
 
 function saveMark(participant, item) {
+    savingIds.value = new Set([...savingIds.value, participant.id]);
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, {
         participant_id: participant.id,
         item_id: item.id,
         ...markForms[participant.id],
-    }, { preserveScroll: true });
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            savedIds.value = new Set([...savedIds.value, participant.id]);
+        },
+        onFinish: () => {
+            const next = new Set(savingIds.value);
+            next.delete(participant.id);
+            savingIds.value = next;
+        },
+    });
+}
+
+async function saveAll() {
+    if (bulkSaving.value) return;
+    bulkSaving.value = true;
+    const pairs = [];
+    for (const reg of props.registrations ?? []) {
+        for (const p of markableParticipants(reg)) {
+            if (reg.item?.id) pairs.push({ participant: p, item: reg.item });
+        }
+    }
+    for (const { participant, item } of pairs) {
+        await new Promise((resolve) => {
+            savingIds.value = new Set([...savingIds.value, participant.id]);
+            router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, {
+                participant_id: participant.id,
+                item_id: item.id,
+                ...markForms[participant.id],
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    savedIds.value = new Set([...savedIds.value, participant.id]);
+                },
+                onFinish: () => {
+                    const next = new Set(savingIds.value);
+                    next.delete(participant.id);
+                    savingIds.value = next;
+                    resolve();
+                },
+            });
+        });
+    }
+    bulkSaving.value = false;
 }
 
 function autoRank(item) {

@@ -58,6 +58,9 @@
             <p v-if="selectedCount > 0" class="text-[10px] text-indigo-700 font-medium mt-1 text-right">
                 {{ selectedCount }} athlete{{ selectedCount !== 1 ? 's' : '' }} ready
             </p>
+            <p v-if="selectedAgeNotes.length" class="text-[10px] text-amber-700 mt-1 text-right max-w-xs ml-auto leading-snug">
+                {{ selectedAgeNotes.join(' · ') }}
+            </p>
             <p v-else-if="submitHint" class="text-[10px] text-amber-700 font-medium mt-1 text-right">
                 {{ submitHint }}
             </p>
@@ -116,6 +119,9 @@
                         @click="standbyPickerOpen = true">
                     Standbys ({{ standbySelectedCount }})
                 </button>
+                <span v-else-if="selectedAgeNotes.length" class="text-[10px] text-amber-700 whitespace-nowrap">
+                    {{ selectedAgeNotes[0] }}
+                </span>
                 <span v-else-if="!isTeacherFest && eligibleCount === 0 && rosterCount > 0"
                       class="text-[10px] text-amber-700 whitespace-nowrap">
                     0 eligible
@@ -305,6 +311,21 @@ const submitHint = computed(() => {
         return 'Team name required.';
     }
     return '';
+});
+
+const selectedAgeNotes = computed(() => {
+    if (props.eventType !== 'sports') return [];
+    return (pickerModel.value ?? []).map((id) => {
+        const student = (props.allStudents ?? []).find(s => s.id === id);
+        if (!student) return null;
+        if (student.sports_age_on_cutoff == null) {
+            return `${student.name}: DOB required for age check`;
+        }
+        const group = props.item.age_group && props.item.age_group !== 'open'
+            ? String(props.item.age_group).toUpperCase()
+            : 'eligible';
+        return `${student.name}: age ${student.sports_age_on_cutoff} on cutoff (${group})`;
+    }).filter(Boolean);
 });
 
 const pickerModel = computed({

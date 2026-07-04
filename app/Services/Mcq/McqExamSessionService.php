@@ -82,7 +82,19 @@ class McqExamSessionService
             ]);
         }
 
-        if ($registration->attendance_status === 'pending' && filled($registration->hall_ticket_no)) {
+        if ($exam->requiresHallTicket()) {
+            if (! filled($registration->hall_ticket_no)) {
+                throw ValidationException::withMessages([
+                    'exam' => 'A hall ticket must be issued before starting this exam.',
+                ]);
+            }
+
+            if ($registration->attendance_status === 'pending') {
+                throw ValidationException::withMessages([
+                    'exam' => 'Attendance must be marked present before starting.',
+                ]);
+            }
+        } elseif ($registration->attendance_status === 'pending' && filled($registration->hall_ticket_no)) {
             throw ValidationException::withMessages(['exam' => 'Attendance must be marked present before starting.']);
         }
 
@@ -149,6 +161,21 @@ class McqExamSessionService
         return $expires !== null && now()->greaterThan($expires);
     }
 
+    /** @param  array<int|string, string|null>  $answers  question_id => option_key */
+    public function saveDraftAnswers(McqRegistration $registration, array $answers): void
+    {
+        $this->assertActiveSession($registration, allowExpired: false);
+
+        $normalized = [];
+        foreach ($answers as $questionId => $optionKey) {
+            if ($optionKey !== null && $optionKey !== '') {
+                $normalized[(string) $questionId] = (string) $optionKey;
+            }
+        }
+
+        $registration->update(['draft_answers' => $normalized]);
+    }
+
     /** @param  array<int|string, string>  $answers  question_id => option_key */
     public function submit(McqRegistration $registration, array $answers): McqMark
     {
@@ -158,12 +185,18 @@ class McqExamSessionService
             throw ValidationException::withMessages(['exam' => 'Exam already submitted.']);
         }
 
-        $autoSubmitted = $registration->started_at && $this->isExpired($registration);
+        $expired = $registration->started_at && $this->isExpired($registration);
 
-        if (! $registration->started_at) {
+        if ($registration->started_at) {
+            if (! $expired) {
+                $this->assertCanStart($registration);
+            }
+        } else {
             $this->start($registration);
             $registration->refresh();
         }
+
+        $autoSubmitted = $expired;
 
         $questions = $this->questionsForExam($registration->exam);
         $gradable = $questions->filter(fn (McqQuestion $q) => $this->isGradable($q));
@@ -224,6 +257,25 @@ class McqExamSessionService
         return $mark;
     }
 
+    private function assertActiveSession(McqRegistration $registration, bool $allowExpired = false): void
+    {
+        if ($registration->status === 'submitted') {
+            throw ValidationException::withMessages(['exam' => 'Exam already submitted.']);
+        }
+
+        if (! $registration->started_at) {
+            throw ValidationException::withMessages(['exam' => 'Exam has not started.']);
+        }
+
+        if (! $allowExpired && $this->isExpired($registration)) {
+            throw ValidationException::withMessages(['exam' => 'Exam time has expired.']);
+        }
+
+        if (! $allowExpired) {
+            $this->assertCanStart($registration);
+        }
+    }
+
     private function isGradable(McqQuestion $question): bool
     {
         return filled($question->correct_option_key)
@@ -242,6 +294,7 @@ class McqExamSessionService
         }
 
         return match (true) {
+            $percentage >= 95 => 'A+',
             $percentage >= 90 => 'A',
             $percentage >= 75 => 'B',
             $percentage >= 60 => 'C',

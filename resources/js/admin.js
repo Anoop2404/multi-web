@@ -1,10 +1,13 @@
-import { createApp, h, nextTick } from 'vue';
+import { createApp, h, nextTick, ref, Fragment } from 'vue';
 import { createInertiaApp, router } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createPinia } from 'pinia';
 import { enhanceFormAccessibility } from '@/support/formAccessibility';
 import EmptyState from '@/Components/ui/EmptyState.vue';
 import FlashBanner from '@/Components/ui/FlashBanner.vue';
+import PageProgressBar from '@/Components/ui/PageProgressBar.vue';
+import ConfirmDialog from '@/Components/ui/ConfirmDialog.vue';
+import { registerConfirmDialog } from '@/composables/useConfirm';
 import FormField from '@/Components/ui/FormField.vue';
 import FormGrid from '@/Components/ui/FormGrid.vue';
 import FormSection from '@/Components/ui/FormSection.vue';
@@ -33,7 +36,7 @@ router.on('navigate', () => runAccessibilityPass());
 router.on('success', () => runAccessibilityPass());
 
 createInertiaApp({
-    title: (title) => `${title} — Sahodaya Admin`,
+    title: (title) => (title ? `${title} — Sahodaya Admin` : 'Sahodaya Admin'),
     resolve: (name) =>
         resolvePageComponent(
             `./Pages/Admin/${name}.vue`,
@@ -41,7 +44,16 @@ createInertiaApp({
         ),
     setup({ el, App, props, plugin }) {
         const pinia = createPinia();
-        const app = createApp({ render: () => h(App, props) });
+        const confirmRef = ref(null);
+        registerConfirmDialog(confirmRef);
+
+        const app = createApp({
+            render: () => h(Fragment, null, [
+                h(App, props),
+                h(PageProgressBar),
+                h(ConfirmDialog, { ref: confirmRef }),
+            ]),
+        });
 
         app.component('FormField', FormField);
         app.component('FormGrid', FormGrid);
@@ -64,5 +76,6 @@ createInertiaApp({
     },
     progress: {
         color: '#041525',
+        showSpinner: true,
     },
 });

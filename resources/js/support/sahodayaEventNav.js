@@ -16,7 +16,7 @@ import {
     FEST_SETTINGS,
     FEST_VIEW,
 } from './sahodayaEventNavPermissions.js';
-import { PROGRAM_SLUGS, SAHODAYA_PROGRAMS, festMainMenuNavItems, programForEventType, sahodayaProgramHref } from './sahodayaPrograms.js';
+import { PROGRAM_SLUGS, SAHODAYA_PROGRAMS, programForEventType, sahodayaProgramHref } from './sahodayaPrograms.js';
 
 function eventQuery(eventId) {
     return eventId ? `?event_id=${eventId}` : '';
@@ -26,12 +26,6 @@ export function eventsModuleNav(sahodayaId) {
     const base = `/sahodaya-admin/${sahodayaId}`;
 
     return [
-        {
-            section: 'Main menu',
-            items: [
-                { label: 'Sahodaya home', href: base, icon: 'grid', exact: true, permissions: FEST_VIEW },
-            ],
-        },
         {
             section: 'Fest programs',
             items: PROGRAM_SLUGS.map((slug) => {
@@ -57,19 +51,12 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
 
     const groups = [];
 
+    // Event setup — overview/items/levels live in EventSubNav tab bar
     groups.push({
-        section: 'Main menu',
-        items: festMainMenuNavItems(sahodayaId, program),
-    });
-
-    groups.push({
-        section: 'Event',
+        section: 'Event setup',
         items: [
-            { label: 'Overview', href: base, icon: 'star', exact: true, permissions: FEST_VIEW },
             { label: 'Settings', href: `${base}/settings`, icon: 'settings', permissions: FEST_SETTINGS },
-            { label: 'Event items', href: `${base}/items`, icon: 'file-text', permissions: FEST_MANAGE },
-            { label: 'Levels & cascade', href: `${base}/levels`, icon: 'layers', permissions: FEST_MANAGE },
-            { label: 'Activity log', href: `${base}/activity`, icon: 'file-text', permissions: FEST_VIEW },
+            { label: 'Activity log', href: `${base}/activity`, icon: 'clock', permissions: FEST_VIEW },
         ],
     });
 
@@ -77,32 +64,30 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         section: 'Participants',
         items: [
             { label: 'Registrations', href: `${base}/registrations`, icon: 'inbox', permissions: FEST_REGISTRATIONS },
-            { label: 'Attendance', href: `${base}/attendance`, icon: 'users', permissions: FEST_REGISTRATIONS },
-            { label: 'Venue & schedule', href: `${base}/schedule/items`, icon: 'calendar', permissions: FEST_SCHEDULE },
-            { label: 'Performance order', href: `${base}/schedule`, icon: 'calendar', permissions: FEST_SCHEDULE },
-            { label: 'Judges & staff', href: `${base}/judges`, icon: 'users', permissions: FEST_MANAGE },
+            { label: 'Attendance', href: `${base}/attendance`, icon: 'check-square', permissions: FEST_REGISTRATIONS },
+            { label: 'Stage schedule', href: `${base}/schedule`, icon: 'calendar', permissions: FEST_SCHEDULE },
+            { label: 'Item scheduling', href: `${base}/schedule/items`, icon: 'map-pin', permissions: FEST_SCHEDULE },
         ],
     });
 
     const competitionItems = [
-        { label: 'Mark entry', href: `${base}/marks`, icon: 'bar-chart', permissions: FEST_MARKS },
-        { label: 'Import marks', href: `${base}/marks/import`, icon: 'file-text', permissions: FEST_MARKS },
-        { label: 'Results & publish', href: `${base}/results`, icon: 'star', permissions: FEST_RESULTS },
+        { label: 'Mark entry', href: `${base}/marks`, icon: 'edit', permissions: FEST_MARKS },
+        { label: 'Results & publish', href: `${base}/results`, icon: 'award', permissions: FEST_RESULTS },
         { label: 'Leaderboard', href: `${base}/leaderboard`, icon: 'bar-chart', permissions: FEST_RESULTS },
     ];
 
     if (caps.championship) {
-        competitionItems.push({ label: 'Championship', href: `${base}/championship`, icon: 'award', permissions: FEST_RESULTS });
+        competitionItems.push({ label: 'Championship', href: `${base}/championship`, icon: 'star', permissions: FEST_RESULTS });
     }
 
     if (caps.isSports) {
-        competitionItems.push({ label: 'Chest numbers', href: `${base}/chest-numbers`, icon: 'file-text', permissions: FEST_MANAGE });
+        competitionItems.push({ label: 'Chest numbers', href: `${base}/chest-numbers`, icon: 'hash', permissions: FEST_MANAGE });
     }
 
     groups.push({ section: 'Competition', items: competitionItems });
 
     const outputItems = [
-        { label: 'Reports', href: `${base}/reports`, icon: 'bar-chart', permissions: FEST_VIEW },
+        { label: 'Reports', href: `${base}/reports`, icon: 'file-text', permissions: FEST_VIEW },
         { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permissions: FEST_CERTIFICATES },
         { label: 'ID cards', href: `${base}/id-cards`, icon: 'credit-card', permissions: FEST_VIEW },
     ];
@@ -110,47 +95,47 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
     if (caps.hasEventFees) {
         outputItems.unshift(
             { label: 'Registration fees', href: `${base}/fees`, icon: 'credit-card', permissions: FEST_FINANCE },
-            { label: 'Payment ledger', href: `${base}/fees/ledger`, icon: 'bar-chart', permissions: FEST_FINANCE },
+            { label: 'Payment ledger', href: `${base}/fees/ledger`, icon: 'layers', permissions: FEST_FINANCE },
         );
     }
 
-    groups.push({ section: 'Finance & output', items: outputItems });
+    groups.push({ section: 'Reports & finance', items: outputItems });
 
-    const moreItems = [
+    const adminItems = [
+        { label: 'Judges & staff', href: `${base}/judges`, icon: 'user-check', permissions: FEST_MANAGE },
         { label: 'Appeals', href: `${base}/appeals`, icon: 'inbox', permissions: FEST_MANAGE },
         { label: 'Event staff', href: `${base}/event-staff`, icon: 'users', permissions: FEST_MANAGE },
-        { label: 'Item listing', href: `${base}/items/list`, icon: 'file-text', permissions: FEST_MANAGE },
         { label: 'School invoices', href: `${base}/finance`, icon: 'file-text', permissions: FEST_FINANCE },
     ];
 
     if (caps.athleticRecords) {
-        moreItems.unshift({ label: 'Athletic records', href: `${base}/athletic-records`, icon: 'award', permissions: FEST_MANAGE });
+        adminItems.unshift({ label: 'Athletic records', href: `${base}/athletic-records`, icon: 'star', permissions: FEST_MANAGE });
     }
     if (caps.houses) {
-        moreItems.push({ label: 'Houses', href: `${base}/houses`, icon: 'building', permissions: FEST_MANAGE });
+        adminItems.push({ label: 'Houses', href: `${base}/houses`, icon: 'building', permissions: FEST_MANAGE });
     }
     if (caps.catering) {
-        moreItems.push({ label: 'Catering', href: `${base}/catering`, icon: 'clipboard', permissions: FEST_CATERING });
+        adminItems.push({ label: 'Catering', href: `${base}/catering`, icon: 'clipboard', permissions: FEST_CATERING });
     }
     if (caps.foodCoupons) {
-        moreItems.push({ label: 'Food coupons', href: `${base}/food-coupons`, icon: 'credit-card', permissions: FEST_CATERING });
+        adminItems.push({ label: 'Food coupons', href: `${base}/food-coupons`, icon: 'hash', permissions: FEST_CATERING });
     }
 
-    groups.push({ section: 'More', items: moreItems });
+    groups.push({ section: 'Administration', items: adminItems });
 
     if (programEvents.length) {
-        const visible = programEvents.slice(0, 6);
+        const visible = programEvents.slice(0, 3);
         const items = visible.map((ev) => ({
             label: ev.title,
             href: `${tenantBase}/events/${ev.id}`,
             icon: Number(ev.id) === Number(eventId) ? 'star' : 'layers',
             permissions: FEST_VIEW,
         }));
-        if (program?.slug && programEvents.length > 6) {
+        if (program?.slug && programEvents.length > 3) {
             items.push({
                 label: `All ${programEvents.length} events…`,
                 href: `${sahodayaProgramHref(sahodayaId, program.slug)}${eq}`,
-                icon: 'layers',
+                icon: 'grid',
                 permissions: FEST_VIEW,
             });
         }

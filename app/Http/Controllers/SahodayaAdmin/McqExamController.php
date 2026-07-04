@@ -197,6 +197,7 @@ class McqExamController extends SahodayaAdminController
             'eligibility_config.gender' => 'nullable|in:open,male,female',
             'delivery_mode'    => 'nullable|in:offline,online',
             'status'           => 'required|in:draft,published,ongoing,completed,cancelled',
+            'requires_hall_ticket' => 'nullable|boolean',
         ]);
 
         $fee = (float) ($data['fee_amount'] ?? 0);
@@ -213,7 +214,8 @@ class McqExamController extends SahodayaAdminController
             return back()->withErrors(['eligibility_config' => $error]);
         }
 
-        if (in_array($data['status'], ['published', 'ongoing'], true) && $fee <= 0) {
+        if (in_array($data['status'], ['published', 'ongoing'], true) && $fee <= 0
+            && ($data['exam_type'] ?? $exam->exam_type ?? 'assessment') !== 'practice') {
             return back()->withErrors(['fee_amount' => 'Set a per-student fee before opening registration.']);
         }
 
@@ -228,6 +230,13 @@ class McqExamController extends SahodayaAdminController
             $settings['hall_ticket'] = array_merge($settings['hall_ticket'] ?? [], $data['hall_ticket_settings']);
             $data['settings_json'] = $settings;
             unset($data['hall_ticket_settings']);
+        }
+
+        if (array_key_exists('requires_hall_ticket', $data)) {
+            $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
+            $settings['requires_hall_ticket'] = (bool) $data['requires_hall_ticket'];
+            $data['settings_json'] = $settings;
+            unset($data['requires_hall_ticket']);
         }
 
         $exam->update($data);
@@ -472,5 +481,49 @@ class McqExamController extends SahodayaAdminController
         $approvedCount = app(McqSchoolFeeService::class)->approve($schoolFee, $request->user()->id);
 
         return back()->with('success', "School MCQ fee approved. {$approvedCount} registration(s) confirmed with hall tickets.");
+    }
+
+    public function uploadQuestionPaper(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'question_paper'      => 'required|file|mimes:pdf|max:10240',
+            'question_paper_label'=> 'nullable|string|max:255',
+        ]);
+
+        if ($exam->question_paper_path) {
+            \Illuminate\Support\Facades\Storage::disk(TenantStorage::uploadDisk())->delete($exam->question_paper_path);
+        }
+
+        $path = TenantStorage::storeUploadedFile(
+            $request->file('question_paper'),
+            "mcq/question-papers/{$exam->id}"
+        );
+
+        $exam->update([
+            'question_paper_path'  => $path,
+            'question_paper_label' => $data['question_paper_label'] ?? $exam->title,
+        ]);
+
+        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.question_paper_uploaded', "Question paper uploaded: {$exam->title}");
+
+        return back()->with('success', 'Question paper uploaded and published to the public archive.');
+    }
+
+    public function destroyQuestionPaper(string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        if ($exam->question_paper_path) {
+            \Illuminate\Support\Facades\Storage::disk(TenantStorage::uploadDisk())->delete($exam->question_paper_path);
+        }
+
+        $exam->update([
+            'question_paper_path'  => null,
+            'question_paper_label' => null,
+        ]);
+
+        return back()->with('success', 'Question paper removed from archive.');
     }
 }

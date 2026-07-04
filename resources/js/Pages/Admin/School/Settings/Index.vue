@@ -5,6 +5,19 @@
 
 
         <div class="max-w-2xl space-y-6">
+            <div v-if="!school.school_prefix" class="notice-banner notice-banner--warning text-sm">
+                <p class="font-semibold">Set your school code first</p>
+                <p class="mt-1">
+                    Annual registration and student numbering require a school code.
+                    <Link :href="`/school-admin/${school.id}/setup/code`" class="font-semibold underline ml-1">Set school code →</Link>
+                </p>
+            </div>
+
+            <div class="notice-banner notice-banner--info text-sm">
+                <p class="font-semibold">Before annual registration</p>
+                <p class="mt-1">Complete your school code, contact details, and student records. Phone and email appear on receipts and your public school profile.</p>
+            </div>
+
             <form @submit.prevent="submit" class="space-y-6">
                 <!-- Logo & Branding -->
                 <div class="card space-y-5">
@@ -29,19 +42,19 @@
 
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="form-label mb-1.5">Phone</label>
+                            <label class="form-label mb-1.5">Phone <span class="text-red-500">*</span></label>
                             <input v-model="form.phone" type="tel" placeholder="+91 484 123 4567"
-                                   class="field">
+                                   class="field" required>
                         </div>
                         <div>
-                            <label class="form-label mb-1.5">Email</label>
+                            <label class="form-label mb-1.5">Email <span class="text-red-500">*</span></label>
                             <input v-model="form.email" type="email"
-                                   class="field">
+                                   class="field" required>
                         </div>
                     </div>
 
                     <div>
-                        <label class="form-label mb-1.5">Address</label>
+                        <label class="form-label mb-1.5">Address <span class="text-red-500">*</span></label>
                         <textarea v-model="form.address" rows="3"
                                   class="field resize-none"></textarea>
                     </div>
@@ -135,7 +148,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import { useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
     school:   Object,

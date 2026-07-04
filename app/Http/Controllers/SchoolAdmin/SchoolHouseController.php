@@ -76,7 +76,9 @@ class SchoolHouseController extends SchoolAdminController
     {
         abort_if($house->tenant_id !== $this->school->id, 403);
 
-        Student::where('school_house_id', $house->id)->update(['school_house_id' => null]);
+        Student::where('tenant_id', $this->school->id)
+            ->where('school_house_id', $house->id)
+            ->update(['school_house_id' => null]);
         $house->delete();
 
         return back()->with('success', 'House removed.');

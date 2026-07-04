@@ -15,6 +15,7 @@ class MembershipFeeCalculator
     public function calculateAndApply(Registration $registration, SahodayaProfile $profile, SchoolYearSubmission $submission): void
     {
         $amount = match ($profile->membership_fee_type) {
+            'none' => 0.0,
             'fixed' => (float) $profile->fixed_membership_fee_amount,
             'variable_by_student_count' => $this->fromSlabs(
                 $registration->school->parent_id,
@@ -30,7 +31,9 @@ class MembershipFeeCalculator
 
         $registration->update([
             'membership_fee_amount' => $amount,
-            'registration_status'   => 'payment_pending',
+            'registration_status'   => $profile->requiresMembershipPayment() && $amount > 0
+                ? 'payment_pending'
+                : 'completed',
         ]);
     }
 
@@ -66,6 +69,7 @@ class MembershipFeeCalculator
         }
 
         return match ($profile->membership_fee_type) {
+            'none' => 0.0,
             'fixed' => (float) ($profile->fixed_membership_fee_amount ?? 0),
             'variable_by_student_count' => $this->fromSlabs(
                 $school->parent_id,

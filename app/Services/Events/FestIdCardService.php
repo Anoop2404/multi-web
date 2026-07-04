@@ -70,6 +70,60 @@ class FestIdCardService
         return $sections;
     }
 
+    /**
+     * One ID card section per main item head; items listed on each card footer.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<array{head_title: string, head_id: int, cards: list<array<string, mixed>>}>
+     */
+    public function cardsGroupedByHead(FestEvent $event, array $filters = []): array
+    {
+        $event->loadMissing(['items.head' => fn ($q) => $q->orderBy('sort_order')]);
+
+        $byStudent = [];
+        foreach ($event->items as $item) {
+            if (! $item->head_id) {
+                continue;
+            }
+
+            $itemFilters = array_merge($filters, ['item_id' => $item->id, 'scope' => 'item']);
+            foreach ($this->individualStudentCards($event, $itemFilters) as $card) {
+                $studentKey = $card['student_id'] ?? ($card['name'] ?? uniqid());
+                $headId = $item->head_id;
+                $byStudent[$headId][$studentKey]['head_title'] = $item->head?->name ?? 'General';
+                $byStudent[$headId][$studentKey]['head_id'] = $headId;
+                $byStudent[$headId][$studentKey]['card'] = array_merge($byStudent[$headId][$studentKey]['card'] ?? $card, [
+                    'student_id' => $card['student_id'] ?? null,
+                    'name' => $card['name'] ?? '',
+                    'school_name' => $card['school_name'] ?? '',
+                    'level_registration_number' => $card['level_registration_number'] ?? null,
+                    'photo_url' => $card['photo_url'] ?? null,
+                    'qr_svg' => $card['qr_svg'] ?? null,
+                ]);
+                $byStudent[$headId][$studentKey]['items'][] = $item->title;
+            }
+        }
+
+        $sections = [];
+        foreach ($byStudent as $headId => $students) {
+            $cards = [];
+            foreach ($students as $row) {
+                $card = $row['card'];
+                $card['items_list'] = implode(', ', array_unique($row['items'] ?? []));
+                $cards[] = $card;
+            }
+            if ($cards !== []) {
+                $sections[] = [
+                    'head_title' => $students[array_key_first($students)]['head_title'] ?? 'Head',
+                    'head_id' => $headId,
+                    'cards' => $cards,
+                ];
+            }
+        }
+
+        return $sections;
+    }
+
     /** @return array<string, mixed> */
     public function indexMeta(FestEvent $event, ?string $schoolId = null): array
     {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
+use App\Services\Students\StudentEditLockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
@@ -15,10 +16,16 @@ class StudentProfileController extends Controller
         $student = $request->attributes->get('portalStudent');
         $school = Tenant::findOrFail($tenantId);
 
+        $lockService = app(StudentEditLockService::class);
+
         return inertia('Portal/Student/Profile', [
-            'school'  => $school->only('id', 'name'),
-            'student' => $student->only('id', 'name', 'reg_no', 'parent_phone', 'email'),
-            'user'    => $request->user()->only('id', 'name', 'email'),
+            'school'          => $school->only('id', 'name'),
+            'student'         => array_merge(
+                $student->only('id', 'name', 'reg_no', 'parent_phone', 'email'),
+                ['photo_url' => $student->photoUrl()],
+            ),
+            'user'            => $request->user()->only('id', 'name', 'email'),
+            'studentEditLock' => $lockService->metaForSchool($school),
         ]);
     }
 

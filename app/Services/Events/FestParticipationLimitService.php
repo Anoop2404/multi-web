@@ -140,8 +140,8 @@ class FestParticipationLimitService
             }
         }
 
-        if (! empty($policy['max_total_per_student'])) {
-            $count = $studentRegs->count() + 1;
+        if (! empty($policy['max_total_per_student']) && ! $this->excludedFromTotalCount($item)) {
+            $count = $this->countableTotalForStudent($studentRegs) + 1;
             if ($count > (int) $policy['max_total_per_student']) {
                 $name = Student::where('id', $studentId)->value('name') ?? 'Student';
                 $errors[] = "{$name} exceeds max {$policy['max_total_per_student']} total items.";
@@ -210,5 +210,20 @@ class FestParticipationLimitService
         }
 
         return ['approved'];
+    }
+
+    private function excludedFromTotalCount(FestEventItem $item): bool
+    {
+        return in_array($item->sport_discipline, ['relay', 'march_past'], true);
+    }
+
+    /** @param \Illuminate\Support\Collection<int, FestRegistration> $regs */
+    private function countableTotalForStudent($regs): int
+    {
+        return $regs->filter(function (FestRegistration $r) {
+            $discipline = $r->item?->sport_discipline;
+
+            return ! in_array($discipline, ['relay', 'march_past'], true);
+        })->count();
     }
 }

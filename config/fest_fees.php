@@ -3,6 +3,7 @@
 return [
     'fee_models' => [
         'none' => 'No fee',
+        'sports_composite' => 'Sports composite (school + student + included items)',
         'cksc_tiered' => 'CKSC tiered (school registration + per item)',
         'item_catalog' => 'Item catalog (class group / per-item rates)',
         'flat_school' => 'Flat per school',
@@ -36,6 +37,13 @@ return [
             'first_item' => 350,
             'additional_item' => 100,
             'charge_standbys' => false,
+        ],
+        'sports' => [
+            'fee_model' => 'sports_composite',
+            'school_registration_flat' => 2000,
+            'per_student_amount' => 300,
+            'included_items_per_student' => 2,
+            'default_item_fee' => 150,
         ],
         'school' => [
             'fee_model' => 'none',

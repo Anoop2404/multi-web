@@ -22,7 +22,7 @@
                 <button class="btn-primary">Add teacher</button>
             </form>
 
-            <div class="card card--flush">
+            <div class="card card--flush overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                         <tr>

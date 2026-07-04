@@ -19,6 +19,8 @@ use App\Services\Events\FestEventNotifier;
 use App\Services\Events\FestCatalogService;
 use App\Services\Events\FestItemCatalogService;
 use App\Services\Events\FestQualificationService;
+use App\Services\Events\FestTaxonomyRegistry;
+use App\Models\FestItemHead;
 use Illuminate\Http\Request;
 
 class FestEventController extends SahodayaAdminController
@@ -26,7 +28,7 @@ class FestEventController extends SahodayaAdminController
     public function index(Request $request)
     {
         $type = $request->query('type');
-        $slugMap = ['kalolsavam' => 'kalotsav', 'sports' => 'sports', 'kids_fest' => 'kids-fest', 'teacher_fest' => 'teacher-fest', 'custom' => 'custom'];
+        $slugMap = ['kalolsavam' => 'kalotsav', 'sports' => 'sports', 'kids_fest' => 'kids-fest', 'teacher_fest' => 'teacher-fest', 'english_fest' => 'english-fest', 'science_fest' => 'science-fest', 'custom' => 'custom'];
         if ($type && isset($slugMap[$type])) {
             $prefix = $slugMap[$type] === 'custom' ? 'programs/custom' : $slugMap[$type];
 
@@ -84,6 +86,20 @@ class FestEventController extends SahodayaAdminController
                 'icon' => 'users',
                 'description' => 'Teacher fest programs — registrations, scheduling, marks, and results.',
             ],
+            'english-fest' => [
+                'slug' => 'english-fest',
+                'eventType' => 'english_fest',
+                'label' => 'English Fest',
+                'icon' => 'book',
+                'description' => 'Standalone English literary fest — elocution, essay, quiz, and group items.',
+            ],
+            'science-fest' => [
+                'slug' => 'science-fest',
+                'eventType' => 'science_fest',
+                'label' => 'Science Fest',
+                'icon' => 'flask',
+                'description' => 'Standalone Science Fest — quiz, exhibition, models, and group science items.',
+            ],
             'custom' => [
                 'slug' => 'custom',
                 'eventType' => 'custom',
@@ -127,7 +143,7 @@ class FestEventController extends SahodayaAdminController
     {
         $data = $request->validate([
             'title'              => 'required|string|max:255',
-            'event_type'         => 'required|in:kalolsavam,sports,kids_fest,teacher_fest,custom',
+            'event_type'         => 'required|in:kalolsavam,sports,kids_fest,teacher_fest,english_fest,science_fest,custom',
             'level_round'        => 'nullable|in:state,sahodaya,school',
             'conduct_levels'     => 'nullable|array',
             'conduct_levels.*'   => 'in:state,sahodaya,school',
@@ -240,7 +256,7 @@ class FestEventController extends SahodayaAdminController
 
         $rules = [
             'title'              => 'required|string|max:255',
-            'event_type'         => 'sometimes|required|in:kalolsavam,sports,kids_fest,teacher_fest,custom',
+            'event_type'         => 'sometimes|required|in:kalolsavam,sports,kids_fest,teacher_fest,english_fest,science_fest,custom',
             'academic_year_id'   => 'nullable|exists:academic_years,id',
             'registration_open'  => 'nullable|date',
             'registration_close' => 'nullable|date',
@@ -276,6 +292,20 @@ class FestEventController extends SahodayaAdminController
         }
 
         $data = FestEventPayload::applyDefaults($data);
+
+        $newStatus = $data['status'] ?? $event->status;
+        if (in_array($newStatus, ['published', 'registration_open'], true)
+            && ! in_array($event->status, ['published', 'registration_open', 'ongoing', 'completed'], true)) {
+            try {
+                \App\Services\Events\EventLifecycleGate::assertCanPublishEvent(
+                    $event,
+                    $data['venue'] ?? null,
+                    $data['event_start'] ?? null,
+                );
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                return back()->withErrors(['status' => $e->getMessage()]);
+            }
+        }
 
         $event->update($data);
 
@@ -323,6 +353,31 @@ class FestEventController extends SahodayaAdminController
 
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$child->id}")
             ->with('success', 'Child event created from parent.');
+    }
+
+    public function spawnCluster(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'title'         => 'required|string|max:255',
+            'cluster_key'   => 'nullable|string|max:64',
+            'cluster_label' => 'nullable|string|max:255',
+            'venue'         => 'nullable|string|max:255',
+            'event_start'   => 'nullable|date',
+            'event_end'     => 'nullable|date',
+        ]);
+
+        $child = app(\App\Services\Events\FestKidsFestClusterService::class)
+            ->spawnCluster($event, $data);
+
+        $audit->festEvent($event, FestPageActivity::LEVELS, 'fest.levels.cluster_spawned', "Kids Fest cluster created: {$child->title}", [
+            'child_event_id' => $child->id,
+            'cluster_key'    => $child->cluster_key,
+        ]);
+
+        return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$child->id}")
+            ->with('success', 'Cluster event created.');
     }
 
     public function spawnSchoolRounds(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
@@ -395,20 +450,14 @@ class FestEventController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $data = $request->validate([
+        $registry = app(FestTaxonomyRegistry::class)->forTenant($this->sahodaya->id);
+        $registry->ensureDefaults();
+
+        $data = $request->validate(array_merge([
             'title'                => 'required|string|max:255',
             'item_code'            => 'nullable|string|max:20',
             'category'             => 'nullable|in:music,dance,drama,literary,sports,general',
-            'stage_type'           => 'nullable|in:on_stage,off_stage',
-            'venue_type'           => 'nullable|in:indoor,outdoor',
-            'competition_format'   => 'nullable|in:individual,singles,doubles,mixed_doubles,team,relay,group,board_game',
-            'sport_discipline'     => 'nullable|string|max:40',
             'duration_minutes'     => 'nullable|integer|min:1|max:480',
-            'participant_type'     => 'nullable|in:individual,group,team',
-            'gender'               => 'nullable|in:male,female,mixed,open',
-            'class_group'          => 'nullable|in:lp,up,hs,hss,open',
-            'age_group'            => 'nullable|in:u8,u10,u11,u12,u14,u17,u19,open',
-            'kids_band'            => 'nullable|in:pre_kg,lkg,ukg,class1,class2,open',
             'max_per_school'       => 'nullable|integer|min:1',
             'min_group_size'       => 'nullable|integer|min:1',
             'max_group_size'       => 'nullable|integer|min:1',
@@ -420,7 +469,8 @@ class FestEventController extends SahodayaAdminController
             'standbys'             => 'nullable|integer|min:0',
             'qualify_count'        => 'nullable|integer|min:1',
             'fee_amount'           => 'nullable|numeric|min:0',
-        ]);
+            'head_id'              => 'nullable|exists:fest_item_heads,id',
+        ], $this->taxonomyValidationRules($registry)));
 
         $data['participant_type'] = $data['participant_type'] ?? 'individual';
         $data = FestEventItemPayload::applyDefaults($data);
@@ -461,30 +511,25 @@ class FestEventController extends SahodayaAdminController
         abort_if($item->event_id !== $event->id, 403);
         abort_if($item->isStateCatalog(), 422, 'State catalog items cannot be edited here.');
 
-        $data = $request->validate([
+        $registry = app(FestTaxonomyRegistry::class)->forTenant($this->sahodaya->id);
+        $registry->ensureDefaults();
+
+        $data = $request->validate(array_merge([
             'title'          => 'required|string|max:255',
             'qualify_count'  => 'nullable|integer|min:1',
             'max_per_school' => 'nullable|integer|min:1',
             'fee_amount'     => 'nullable|numeric|min:0',
             'is_enabled'     => 'nullable|boolean',
-            'gender'         => 'nullable|in:male,female,mixed,open',
-            'class_group'    => 'nullable|in:lp,up,hs,hss,open',
-            'age_group'      => 'nullable|in:u8,u10,u11,u12,u14,u17,u19,open',
-            'kids_band'      => 'nullable|in:pre_kg,lkg,ukg,class1,class2,open',
-            'venue_type'           => 'nullable|in:indoor,outdoor',
-            'competition_format'   => 'nullable|string|max:30',
-            'sport_discipline'     => 'nullable|string|max:40',
-            'participant_type'     => 'nullable|in:individual,group,team',
-            'stage_type'           => 'nullable|in:on_stage,off_stage',
-            'min_group_size'       => 'nullable|integer|min:1',
-            'max_group_size'       => 'nullable|integer|min:1',
-            'min_playing'          => 'nullable|integer|min:1',
-            'max_playing'          => 'nullable|integer|min:1',
-            'max_subs'             => 'nullable|integer|min:0',
-            'max_squad'            => 'nullable|integer|min:1',
-            'min_squad'            => 'nullable|integer|min:1',
-            'standbys'             => 'nullable|integer|min:0',
-        ]);
+            'head_id'        => 'nullable|exists:fest_item_heads,id',
+            'min_group_size' => 'nullable|integer|min:1',
+            'max_group_size' => 'nullable|integer|min:1',
+            'min_playing'    => 'nullable|integer|min:1',
+            'max_playing'    => 'nullable|integer|min:1',
+            'max_subs'       => 'nullable|integer|min:0',
+            'max_squad'      => 'nullable|integer|min:1',
+            'min_squad'      => 'nullable|integer|min:1',
+            'standbys'       => 'nullable|integer|min:0',
+        ], $this->taxonomyValidationRules($registry)));
 
         $participantType = $data['participant_type'] ?? $item->participant_type;
 
@@ -573,15 +618,28 @@ class FestEventController extends SahodayaAdminController
 
         $feeSchedule = app(\App\Services\Events\FestSchoolEventFeeService::class)->resolveSchedule($event);
         $classGroupScheme = FestClassGroupScheme::resolveForEvent($event, $feeSchedule);
-        $taxonomy = config('fest_item_taxonomy');
+        $taxonomyRegistry = app(FestTaxonomyRegistry::class)->forTenant($this->sahodaya->id);
+        $taxonomyRegistry->ensureDefaults();
+        $taxonomy = $taxonomyRegistry->allLabels();
         $taxonomy['class_group'] = FestClassGroupScheme::taxonomyClassGroups($classGroupScheme, $event);
-        $taxonomy['age_group'] = FestSportsAgeGroup::labels($this->sahodaya->id);
-        $taxonomy['kids_band'] = \App\Support\FestKidsFestBand::labels();
+
+        $itemHeads = [];
+        if ($event->event_type === 'sports') {
+            app(\App\Services\Events\FestItemHeadService::class)->syncEventHeads($event);
+            $itemHeads = FestItemHead::forTenant($this->sahodaya->id)
+                ->forEvent($event->id)
+                ->whereNull('parent_id')
+                ->orderBy('sort_order')
+                ->get(['id', 'name', 'sport_discipline'])
+                ->all();
+        }
 
         return [
             'event'         => $event,
             'groupedItems'  => $catalogService->groupForDisplay($event->items, $event->event_type),
             'taxonomy'      => $taxonomy,
+            'itemHeads'     => $itemHeads,
+            'taxonomyMastersUrl' => "/sahodaya-admin/{$this->sahodaya->id}/taxonomy-masters",
             'classGroupScheme' => $classGroupScheme,
             'classGroupSchemeOptions' => FestClassGroupScheme::options(),
             'catalogSummary' => $catalogSummary,
@@ -621,6 +679,26 @@ class FestEventController extends SahodayaAdminController
         };
     }
 
+    /** @return array<string, mixed> */
+    private function taxonomyValidationRules(FestTaxonomyRegistry $registry): array
+    {
+        $ageKeys = array_keys(FestSportsAgeGroup::labels($this->sahodaya->id));
+        $classKeys = array_keys(FestClassGroupScheme::labels(null));
+        $kidsKeys = array_keys(\App\Support\FestKidsFestBand::labels());
+
+        return [
+            'stage_type'         => ['nullable', $registry->validationRule('stage_type')],
+            'venue_type'         => ['nullable', $registry->validationRule('venue_type')],
+            'competition_format' => ['nullable', $registry->validationRule('competition_format')],
+            'sport_discipline'   => ['nullable', $registry->validationRule('sport_discipline')],
+            'participant_type'   => ['nullable', $registry->validationRule('participant_type')],
+            'gender'             => ['nullable', $registry->validationRule('gender')],
+            'class_group'        => ['nullable', \Illuminate\Validation\Rule::in($classKeys)],
+            'age_group'          => ['nullable', \Illuminate\Validation\Rule::in($ageKeys)],
+            'kids_band'          => ['nullable', \Illuminate\Validation\Rule::in($kidsKeys)],
+        ];
+    }
+
     private function eventTypes(): array
     {
         return [
@@ -628,6 +706,8 @@ class FestEventController extends SahodayaAdminController
             'sports'       => 'Sports Meet',
             'kids_fest'    => 'Kids Fest',
             'teacher_fest' => 'Teacher Fest',
+            'english_fest' => 'English Fest',
+            'science_fest' => 'Science Fest',
             'custom'       => 'Custom',
         ];
     }

@@ -7,6 +7,32 @@
         />
 
         <div class="max-w-3xl space-y-6">
+            <div v-if="registration && registrationSteps.length" class="card !py-4">
+                <ol class="flex flex-wrap gap-2 sm:gap-0 sm:flex-nowrap items-center text-xs sm:text-sm">
+                    <li v-for="(step, index) in registrationSteps" :key="step.key"
+                        class="flex items-center gap-2 sm:flex-1 min-w-0">
+                        <span class="step-badge shrink-0"
+                              :class="step.state === 'done' ? 'step-badge--done' : step.state === 'current' ? 'step-badge--active' : 'step-badge--pending'">
+                            {{ index + 1 }}
+                        </span>
+                        <span class="truncate font-medium"
+                              :class="step.state === 'current' ? 'text-slate-900' : 'text-slate-500'">
+                            {{ step.label }}
+                        </span>
+                        <span v-if="index < registrationSteps.length - 1" class="hidden sm:inline text-slate-300 mx-2">→</span>
+                    </li>
+                </ol>
+            </div>
+
+            <div v-if="registrationClosingSoon" class="notice-banner notice-banner--warning text-sm">
+                <p class="font-semibold">Registration closes soon</p>
+                <p class="mt-1">
+                    Annual membership registration closes on {{ formatDate(windowDisplayEnd(registrationWindow)) }}
+                    ({{ registrationClosingDays }} day{{ registrationClosingDays === 1 ? '' : 's' }} left).
+                    Complete your submission and payment before the deadline.
+                </p>
+            </div>
+
             <!-- Not started -->
             <div v-if="!registration" class="space-y-5">
                 <div v-if="isRenewal && priorYearSummary" class="notice-banner notice-banner--info space-y-2">
@@ -26,7 +52,11 @@
                         Renew your school's membership each year. You will submit required data (if any), pay the annual fee,
                         and upload payment proof for Sahodaya approval.
                     </p>
-                    <p v-if="membershipFeePreview" class="text-sm text-slate-700">
+                    <p v-if="membershipFeePreview != null && profile?.membership_fee_type === 'none'" class="text-sm text-slate-700">
+                        Membership fee: <span class="text-2xl font-bold text-emerald-700">₹0</span>
+                        <span class="text-slate-400 text-xs"> (no fee — registration completes without payment)</span>
+                    </p>
+                    <p v-else-if="membershipFeePreview != null" class="text-sm text-slate-700">
                         Membership fee: <span class="text-2xl font-bold text-slate-900">₹{{ formatAmount(membershipFeePreview) }}</span>
                         <span class="text-slate-400 text-xs"> (fixed fee set by Sahodaya)</span>
                     </p>
@@ -34,16 +64,20 @@
 
                 <div v-if="registrationWindow" class="notice-banner notice-banner--info text-sm">
                     <p class="font-semibold">Registration window</p>
-                    <p v-if="registrationWindow.registration_starts_at && registrationWindow.registration_ends_at">
-                        Open {{ formatDate(registrationWindow.registration_starts_at) }} —
-                        {{ formatDate(registrationWindow.registration_ends_at) }}
+                    <p v-if="windowDisplayStart(registrationWindow) && windowDisplayEnd(registrationWindow)">
+                        Open {{ formatDate(windowDisplayStart(registrationWindow)) }} —
+                        {{ formatDate(windowDisplayEnd(registrationWindow)) }}
                     </p>
-                    <p v-else-if="registrationWindow.registration_starts_at">
-                        Opens {{ formatDate(registrationWindow.registration_starts_at) }}
+                    <p v-else-if="windowDisplayStart(registrationWindow)">
+                        Opens {{ formatDate(windowDisplayStart(registrationWindow)) }}
                     </p>
-                    <p v-else-if="registrationWindow.registration_ends_at">
-                        Closes {{ formatDate(registrationWindow.registration_ends_at) }}
+                    <p v-else-if="windowDisplayEnd(registrationWindow)">
+                        Closes {{ formatDate(windowDisplayEnd(registrationWindow)) }}
                     </p>
+                </div>
+
+                <div v-if="membershipFeeNotConfigured" class="notice-banner notice-banner--warning text-sm">
+                    Your Sahodaya has not finished configuring membership fees for {{ academicYear }} yet. Contact the Sahodaya office — registration will open once fees are set.
                 </div>
 
                 <div v-if="registrationWindowBlockReason" class="notice-banner notice-banner--warning text-sm">
@@ -180,6 +214,12 @@
                     <div class="flex flex-wrap gap-3 pt-2 border-t border-emerald-200/80">
                         <Link :href="`/school-admin/${school.id}`" class="btn-secondary">Go to Dashboard</Link>
                         <Link :href="`/school-admin/${school.id}/students`" class="btn-primary">Manage Students</Link>
+                        <Link v-if="membershipReceiptPaymentId"
+                              :href="`/school-admin/${school.id}/payments/membership/${membershipReceiptPaymentId}/receipt`"
+                              target="_blank"
+                              class="btn-secondary">
+                            Download receipt
+                        </Link>
                         <Link :href="`/school-admin/${school.id}/registration/profile`" class="btn-secondary">Registration Details</Link>
                     </div>
                 </div>
@@ -192,6 +232,12 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import {
+    windowClosingDays,
+    windowClosingSoon,
+    windowDisplayEnd,
+    windowDisplayStart,
+} from '@/support/membershipRegistrationWindow.js';
 
 const props = defineProps({
     school: Object,
@@ -205,6 +251,51 @@ const props = defineProps({
     priorYearSummary: Object,
     membershipFeePreview: [Number, String, null],
     registrationWindowBlockReason: { type: String, default: null },
+    membershipFeeNotConfigured: { type: Boolean, default: false },
+    membershipReceiptPaymentId: { type: Number, default: null },
+});
+
+const hasDataTracks = computed(() =>
+    props.profile?.student_data_mode === 'full_records'
+    || props.profile?.student_data_mode === 'counts_only'
+    || props.profile?.teacher_registration_enabled
+);
+
+const registrationSteps = computed(() => {
+    if (!props.registration) return [];
+
+    const reg = props.registration;
+    const steps = [];
+
+    if (hasDataTracks.value) {
+        const dataDone = ['payment_pending', 'payment_submitted', 'payment_rejected', 'completed', 'approved'].includes(reg.registration_status)
+            || (reg.submission && (
+                (props.profile?.student_data_mode !== 'full_records' || ['submitted', 'approved'].includes(reg.submission.full_records_status))
+                && (props.profile?.student_data_mode !== 'counts_only' || ['submitted', 'approved'].includes(reg.submission.counts_status))
+                && (!props.profile?.teacher_registration_enabled || ['submitted', 'approved'].includes(reg.submission.teacher_status))
+            ));
+        steps.push({
+            key: 'data',
+            label: 'Submit data',
+            state: reg.registration_status === 'completed' || dataDone ? 'done' : 'current',
+        });
+    }
+
+    const paymentDone = ['completed', 'approved'].includes(reg.registration_status);
+    const paymentCurrent = ['payment_pending', 'payment_submitted', 'payment_rejected'].includes(reg.registration_status);
+    steps.push({
+        key: 'payment',
+        label: 'Pay & upload proof',
+        state: paymentDone ? 'done' : paymentCurrent ? 'current' : 'pending',
+    });
+
+    steps.push({
+        key: 'complete',
+        label: 'Sahodaya approval',
+        state: paymentDone ? 'done' : paymentCurrent && reg.registration_status === 'payment_submitted' ? 'current' : 'pending',
+    });
+
+    return steps;
 });
 
 const paymentForm = useForm({
@@ -224,6 +315,10 @@ const needsDataSteps = computed(() =>
 const latestRejectedPayment = computed(() =>
     props.payments?.find(p => p.status === 'rejected')
 );
+
+const registrationClosingDays = computed(() => windowClosingDays(props.registrationWindow));
+
+const registrationClosingSoon = computed(() => windowClosingSoon(props.registrationWindow));
 
 function formatDate(value) {
     if (! value) return '';

@@ -1,11 +1,12 @@
 <template>
+    <Head :title="title" />
     <div class="sa-layout min-h-screen flex">
         <div v-if="mobileNavOpen"
              class="fixed inset-0 z-40 bg-black/50 lg:hidden"
              @click="mobileNavOpen = false" />
 
         <aside
-            class="sa-sidebar sa-sidebar--events w-72 lg:w-64 h-screen text-white flex flex-col shrink-0 shadow-xl overflow-hidden
+            class="sa-sidebar sa-sidebar--events w-72 lg:w-60 h-screen text-white flex flex-col shrink-0 shadow-xl overflow-hidden
                    fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0
                    transition-transform duration-200 ease-out
                    -translate-x-full lg:translate-x-0"
@@ -26,19 +27,19 @@
                     </div>
                 </div>
 
-                <nav class="flex flex-col gap-1 mt-4 mb-1" aria-label="Leave event">
+                <nav class="flex flex-col gap-1.5 mt-4 mb-1" aria-label="Leave event">
                     <Link :href="`/sahodaya-admin/${sahodaya.id}`"
-                          class="flex items-center gap-2 text-xs text-white/50 hover:text-white/80 transition">
+                          class="inline-flex items-center gap-2 self-start rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white transition">
                         <span aria-hidden="true">←</span> Sahodaya home
                     </Link>
                     <Link v-if="programContext"
                           :href="`${programHubHref}${eventQuery}`"
-                          class="flex items-center gap-2 text-xs text-white/50 hover:text-white/80 transition">
+                          class="inline-flex items-center gap-2 self-start rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white transition">
                         <span aria-hidden="true">←</span> {{ programContext.label }}
                     </Link>
                     <Link v-else-if="eventContext?.id"
                           :href="`/sahodaya-admin/${sahodaya.id}/events`"
-                          class="flex items-center gap-2 text-xs text-white/50 hover:text-white/80 transition">
+                          class="inline-flex items-center gap-2 self-start rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 hover:text-white transition">
                         <span aria-hidden="true">←</span> All events
                     </Link>
                 </nav>
@@ -52,6 +53,22 @@
                             {{ sidebarEyebrow }}
                         </p>
                         <p class="text-sm font-semibold text-white truncate mt-1 leading-tight">{{ sidebarTitle }}</p>
+                        <span v-if="eventContext.status === 'registration_open'"
+                              class="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+                            Registration open
+                        </span>
+                        <span v-else-if="eventContext.status === 'ongoing'"
+                              class="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-100 border border-amber-400/30">
+                            Live
+                        </span>
+                        <span v-else-if="eventContext.status === 'completed'"
+                              class="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-300 border border-slate-400/30">
+                            Completed
+                        </span>
+                        <span v-else-if="eventContext.results_published"
+                              class="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-400/30">
+                            Results published
+                        </span>
                     </div>
                 </div>
             </div>
@@ -64,7 +81,7 @@
                     No menus match “{{ navSearch.trim() }}”
                 </p>
                 <template v-for="group in filteredNavGroups" :key="group.section">
-                    <p class="px-3 pt-4 pb-1 text-[10px] font-bold text-[#fbbf24]/75 uppercase tracking-widest">
+                    <p class="px-3 pt-4 pb-1 text-[11px] font-bold text-[#fbbf24]/90 uppercase tracking-widest">
                         {{ group.section }}
                     </p>
                     <SahodayaNavItem v-for="item in group.items" :key="item.href"
@@ -76,6 +93,9 @@
             </nav>
 
             <div class="sa-sidebar-foot p-3 border-t border-white/10 shrink-0 bg-[#041525]/40">
+                <p v-if="$page.props.auth?.user?.name" class="px-3 pb-2 text-[11px] text-white/50 truncate">
+                    {{ $page.props.auth.user.name }}
+                </p>
                 <SignOutButton
                     class="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm text-white/80 hover:text-white hover:bg-white/10 transition font-medium">
                     <SahodayaSvgIcon name="log-out" class="w-4 h-4" />
@@ -116,7 +136,7 @@
 </template>
 
 <script setup>
-import { Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import SignOutButton from '@/Components/SignOutButton.vue';
 import StaffReadOnlyBanner from '@/Components/StaffReadOnlyBanner.vue';
 import FlashBanner from '@/Components/ui/FlashBanner.vue';

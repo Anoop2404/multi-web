@@ -7,9 +7,11 @@ use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
+use App\Models\FestSchoolEventFeeLine;
 use App\Models\FestStateProgram;
 use App\Models\Tenant;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
 use App\Support\TenantStorage;
 
 class FestSchoolEventFeeService
@@ -17,6 +19,7 @@ class FestSchoolEventFeeService
     public function __construct(
         private FestEventFeeResolver $feeResolver,
         private FestItemFeeResolver $itemFeeResolver,
+        private FestSportsCompositeFeeService $sportsCompositeFeeService,
     ) {}
 
     public function feeRequired(FestEvent $event): bool
@@ -58,6 +61,10 @@ class FestSchoolEventFeeService
 
         if (is_array($event->fee_settings) && filled($event->fee_settings)) {
             $schedule = array_merge($schedule, $event->fee_settings);
+        }
+
+        if ($event->event_type === 'sports' && ($schedule['fee_model'] ?? 'none') === 'none') {
+            $schedule = array_merge(config('fest_fees.level_defaults.sports', []), $schedule);
         }
 
         if (($schedule['fee_model'] ?? '') === 'item_catalog') {
@@ -200,18 +207,45 @@ class FestSchoolEventFeeService
         $studentCount = $this->billableStudentCount($event, $schoolId);
         $feeModel = $schedule['fee_model'] ?? 'none';
 
-        $schoolRegFee = in_array($feeModel, ['cksc_tiered', 'item_catalog'], true)
-            ? $this->schoolRegistrationAmount($school, $schedule)
-            : 0;
-
-        $participationFee = match ($feeModel) {
-            'cksc_tiered' => $this->participationFee($itemCount, $schedule),
-            'item_catalog' => $this->itemFeeResolver->participationTotal($event, $schoolId, $schedule),
-            'per_item' => $itemCount * (float) ($schedule['per_item_amount'] ?? 0),
-            'flat_school' => (float) ($schedule['flat_amount'] ?? $schedule['fee_amount'] ?? 0),
-            'per_student' => $studentCount * (float) ($schedule['per_student_amount'] ?? 0),
+        $schoolRegFee = match ($feeModel) {
+            'sports_composite' => $this->sportsCompositeFeeService->schoolRegistrationAmount($school, $schedule),
+            'cksc_tiered', 'item_catalog' => $this->schoolRegistrationAmount($school, $schedule),
             default => 0,
         };
+
+        $studentRegFee = 0.0;
+        $extraItemFee = 0.0;
+        $compositeLines = [];
+        $useComposite = $feeModel === 'sports_composite' && $this->supportsSportsCompositeSchema();
+
+        if ($useComposite) {
+            $composite = $this->sportsCompositeFeeService->calculate($event, $schoolId, $schedule);
+            $schoolRegFee = $composite['school_reg'];
+            $studentRegFee = $composite['student_reg'];
+            $extraItemFee = $composite['extra_item'];
+            $participationFee = $studentRegFee + $extraItemFee;
+            $participationCount = $composite['student_count'];
+            $compositeLines = $composite['lines'];
+        } else {
+            if ($feeModel === 'sports_composite') {
+                $feeModel = 'item_catalog';
+                $schoolRegFee = $this->schoolRegistrationAmount($school, $schedule);
+            }
+
+            $participationFee = match ($feeModel) {
+                'cksc_tiered' => $this->participationFee($itemCount, $schedule),
+                'item_catalog' => $this->itemFeeResolver->participationTotal($event, $schoolId, $schedule),
+                'per_item' => $itemCount * (float) ($schedule['per_item_amount'] ?? 0),
+                'flat_school' => (float) ($schedule['flat_amount'] ?? $schedule['fee_amount'] ?? 0),
+                'per_student' => $studentCount * (float) ($schedule['per_student_amount'] ?? 0),
+                default => 0,
+            };
+
+            $participationCount = match ($feeModel) {
+                'per_student' => $studentCount,
+                default => $itemCount,
+            };
+        }
 
         $subtotal = $schoolRegFee + $participationFee;
         $total = $this->applySchoolFeeCap($subtotal, $schedule);
@@ -229,18 +263,15 @@ class FestSchoolEventFeeService
             return $record;
         }
 
-        $participationCount = match ($feeModel) {
-            'per_student' => $studentCount,
-            default => $itemCount,
-        };
-
-        $record->fill([
+        $record->fill(array_filter([
             'school_registration_fee' => $schoolRegFee,
+            'student_registration_fee' => $this->supportsSportsCompositeSchema() ? $studentRegFee : null,
             'participation_item_count' => $participationCount,
             'participation_fee' => $participationFee,
+            'extra_item_fee' => $this->supportsSportsCompositeSchema() ? $extraItemFee : null,
             'total_due' => $total,
             'status' => $record->fee_receipt_id ? ($record->status ?? 'proof_uploaded') : 'pending',
-        ]);
+        ], fn ($value) => $value !== null));
 
         if ($total <= 0) {
             $record->status = 'approved';
@@ -248,18 +279,76 @@ class FestSchoolEventFeeService
 
         $record->save();
 
+        if ($useComposite && $this->supportsFeeLines()) {
+            $this->syncFeeLines($record, $compositeLines);
+        } elseif ($this->supportsFeeLines()) {
+            $record->lines()->delete();
+        }
+
         return $record;
     }
 
+    /** @param  list<array{line_type: string, label: string, quantity: int, unit_amount: float, amount: float, meta?: array}>  $lines */
+    private function syncFeeLines(FestSchoolEventFee $fee, array $lines): void
+    {
+        $fee->lines()->delete();
+
+        foreach ($lines as $line) {
+            FestSchoolEventFeeLine::create([
+                'fest_school_event_fee_id' => $fee->id,
+                'line_type' => $line['line_type'],
+                'label' => $line['label'],
+                'quantity' => $line['quantity'] ?? 1,
+                'unit_amount' => $line['unit_amount'] ?? $line['amount'],
+                'amount' => $line['amount'],
+                'meta' => $line['meta'] ?? null,
+            ]);
+        }
+    }
     /** @return array<string, mixed> */
     public function breakdown(FestEvent $event, FestSchoolEventFee $fee, array $schedule): array
     {
+        if ($this->supportsFeeLines()) {
+            $fee->loadMissing('lines');
+        }
         $items = [];
         if ($fee->school_registration_fee > 0) {
             $items[] = ['label' => 'Optional event registration add-on', 'amount' => (float) $fee->school_registration_fee];
         }
 
         $feeModel = $schedule['fee_model'] ?? 'none';
+
+        if ($feeModel === 'sports_composite') {
+            if ($this->supportsFeeLines()) {
+                foreach ($fee->lines as $line) {
+                    $items[] = [
+                        'label' => $line->label,
+                        'amount' => (float) $line->amount,
+                        'line_type' => $line->line_type,
+                    ];
+                }
+            }
+
+            if ($items === [] && $fee->total_due > 0) {
+                if ($fee->school_registration_fee > 0) {
+                    $items[] = ['label' => 'School registration fee', 'amount' => (float) $fee->school_registration_fee, 'line_type' => 'school_reg'];
+                }
+                if ($this->supportsSportsCompositeSchema() && $fee->student_registration_fee > 0) {
+                    $items[] = ['label' => 'Student registration fees', 'amount' => (float) $fee->student_registration_fee, 'line_type' => 'student_reg'];
+                }
+                if ($this->supportsSportsCompositeSchema() && $fee->extra_item_fee > 0) {
+                    $items[] = ['label' => 'Extra item fees', 'amount' => (float) $fee->extra_item_fee, 'line_type' => 'extra_item'];
+                }
+            }
+
+            return [
+                'items' => $items,
+                'total' => (float) $fee->total_due,
+                'item_count' => $fee->participation_item_count,
+                'student_count' => $fee->participation_item_count,
+                'included_quota' => (int) ($schedule['included_items_per_student'] ?? 0),
+            ];
+        }
 
         if ($feeModel === 'item_catalog' && $fee->participation_item_count > 0) {
             $catalog = $this->itemFeeResolver->participationBreakdown($event, $fee->school_id, $schedule);
@@ -323,6 +412,8 @@ class FestSchoolEventFeeService
 
         $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
 
+        FeeReceipt::supersedePriorForFeeable($fee);
+
         $receipt = FeeReceipt::create([
             'feeable_type' => FestSchoolEventFee::class,
             'feeable_id' => $fee->id,
@@ -373,5 +464,16 @@ class FestSchoolEventFeeService
         }
 
         return $total;
+    }
+
+    private function supportsSportsCompositeSchema(): bool
+    {
+        return Schema::hasColumn('fest_school_event_fees', 'student_registration_fee')
+            && Schema::hasColumn('fest_school_event_fees', 'extra_item_fee');
+    }
+
+    private function supportsFeeLines(): bool
+    {
+        return Schema::hasTable('fest_school_event_fee_lines');
     }
 }

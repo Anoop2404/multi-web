@@ -235,6 +235,42 @@ class FestScheduleController extends SahodayaAdminController
         return back()->with('success', 'Schedule slot removed.');
     }
 
+    public function reorder(string $tenantId, FestEvent $event, FestSchedule $schedule, Request $request, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($schedule->event_id !== $event->id, 404);
+
+        $data = $request->validate(['direction' => 'required|in:up,down']);
+
+        $ordered = FestSchedule::where('event_id', $event->id)
+            ->orderBy('scheduled_at')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        $index = $ordered->search(fn (FestSchedule $row) => $row->id === $schedule->id);
+        if ($index === false) {
+            return back();
+        }
+
+        $swapIndex = $data['direction'] === 'up' ? $index - 1 : $index + 1;
+        if ($swapIndex < 0 || $swapIndex >= $ordered->count()) {
+            return back();
+        }
+
+        $other = $ordered[$swapIndex];
+        $currentOrder = $schedule->sort_order;
+        $schedule->update(['sort_order' => $other->sort_order]);
+        $other->update(['sort_order' => $currentOrder]);
+
+        $audit->festEvent($event, FestPageActivity::SCHEDULE, 'fest.schedule.reordered', 'Schedule order updated', [
+            'schedule_id' => $schedule->id,
+            'direction'   => $data['direction'],
+        ]);
+
+        return back()->with('success', 'Schedule order updated.');
+    }
+
     public function itemsIndex(string $tenantId, FestEvent $event, FestItemScheduleService $itemSchedule)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

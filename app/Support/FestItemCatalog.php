@@ -11,6 +11,8 @@ namespace App\Support;
  * | Sports Meet   | 290+  | Kerala state schools athletics + games (U14/U17/U19) |
  * | Kids Fest     | 71    | CKSC / Sahodaya Kids Fest manual pattern    |
  * | Teacher Fest  | 34    | CKSC Teacher Fest programme pattern         |
+ * | English Fest  | 20    | English literary & speech items             |
+ * | Science Fest  | 17    | Science quiz, exhibition & models           |
  */
 class FestItemCatalog
 {
@@ -22,6 +24,8 @@ class FestItemCatalog
             'sports'       => self::sportsItems(),
             'kids_fest'    => self::kidsFestItems(),
             'teacher_fest' => self::teacherFestItems(),
+            'english_fest' => self::englishFestItems(),
+            'science_fest' => self::scienceFestItems(),
             default        => [],
         };
     }
@@ -256,6 +260,38 @@ class FestItemCatalog
                 'gender' => 'mixed',
                 'stage_type' => 'on_stage',
                 'duration_minutes' => 5,
+            ],
+        );
+    }
+
+    /** @return list<array<string, mixed>> */
+    public static function englishFestItems(): array
+    {
+        return self::loadCatalogRows(
+            require __DIR__.'/data/cksc_english_fest_items.php',
+            enrichGroups: true,
+            defaults: [
+                'owner_level' => 'sahodaya',
+                'max_per_school' => 1,
+                'qualify_count' => 2,
+                'participant_type' => 'individual',
+                'gender' => 'mixed',
+            ],
+        );
+    }
+
+    /** @return list<array<string, mixed>> */
+    public static function scienceFestItems(): array
+    {
+        return self::loadCatalogRows(
+            require __DIR__.'/data/cksc_science_fest_items.php',
+            enrichGroups: true,
+            defaults: [
+                'owner_level' => 'sahodaya',
+                'max_per_school' => 1,
+                'qualify_count' => 2,
+                'participant_type' => 'individual',
+                'gender' => 'mixed',
             ],
         );
     }

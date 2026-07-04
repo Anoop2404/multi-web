@@ -5,78 +5,37 @@
                          :pendingPaymentsCount="pendingPaymentsCount">
         <div class="space-y-6">
 
-            <!-- Welcome / hero strip -->
-            <div class="rounded-2xl bg-gradient-to-br from-[#041525] via-[#0a2744] to-[#0f3d7a] text-white p-6 flex flex-col sm:flex-row sm:items-center gap-4 shadow-lg">
-                <div class="flex-1">
-                    <p class="text-[#fbbf24] text-xs font-bold uppercase tracking-widest mb-1">Sahodaya Complex</p>
-                    <h2 class="text-2xl font-extrabold mb-0.5">{{ sahodaya.name }}</h2>
-                    <p class="text-white/70 text-sm">
-                        CBSE Sahodaya School Complex —
-                        <span class="font-semibold text-white">{{ stats.approved_schools ?? 0 }} approved member{{ (stats.approved_schools ?? 0) === 1 ? '' : 's' }}</span><template v-if="(stats.pending_schools ?? 0) > 0"> · <span class="font-semibold text-[#fbbf24]">{{ stats.pending_schools }} pending</span></template><template v-if="(stats.registered_schools ?? 0) > (stats.approved_schools ?? 0) + (stats.pending_schools ?? 0)"> · {{ stats.registered_schools }} registered</template>
-                    </p>
-                </div>
-                <div class="flex flex-wrap gap-2 shrink-0">
-                    <a v-if="websiteEnabled && publicUrl" :href="publicUrl" target="_blank"
-                       class="btn-secondary border-white/20 bg-white/10 text-white hover:bg-white/20 hover:border-white/30">
-                        Preview Site ↗
-                    </a>
-                    <Link v-if="websiteEnabled" :href="`/sahodaya-admin/${sahodaya.id}/public-content`"
-                          class="btn-primary bg-[#fbbf24] text-[#041525] shadow-none hover:bg-[#f59e0b]">
-                        Edit Website →
-                    </Link>
+            <!-- Action queue -->
+            <div v-if="actionQueueItems.length" class="card">
+                <h3 class="section-title text-base mb-4">Action queue</h3>
+                <div class="grid sm:grid-cols-2 gap-3">
+                    <ActionBanner v-for="item in actionQueueItems" :key="item.key"
+                                  :href="item.href" :count="item.count" :label="item.label"
+                                  :color="item.color" :icon="item.icon" />
                 </div>
             </div>
 
-            <!-- Stats row -->
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard v-if="canSee('membership')" :value="stats.approved_schools ?? 0" label="Approved Members" color="blue" icon="🏫" />
-                <StatCard v-if="canSee('membership')" :value="stats.pending_schools ?? 0" label="Pending Schools" color="amber" icon="⏳" />
-                <StatCard v-if="canSee('fest')" :value="stats.fest_events ?? 0" label="Fest Events" color="amber" icon="🏆" />
-                <StatCard v-if="canSee('fest')" :value="stats.active_fest_events ?? 0" label="Active Fests" color="green" icon="📣"
-                          :hint="`${stats.fest_registrations ?? 0} registrations`" />
-                <StatCard v-if="canSee('mcq')" :value="stats.mcq_exams ?? 0" label="MCQ Exams" color="indigo" icon="📝" />
-                <StatCard v-if="canSee('training')" :value="stats.training_programs ?? 0" label="Training" color="navy" icon="🎓" />
-                <StatCard v-if="websiteEnabled && canSee('website')" :value="stats.office_bearers"  label="Office Bearers"   color="navy" icon="👥" />
-                <StatCard v-else-if="canSee('membership')" :value="stats.total_students ?? 0" label="Active Students" color="navy" icon="👨‍🎓"
-                          :hint="'From approved members only'" />
-                <StatCard v-if="websiteEnabled && canSee('website')" :value="stats.circulars"        label="Circulars"        color="indigo" icon="📄" />
-                <StatCard v-if="!websiteEnabled && canSee('membership')" :value="`₹${Number(stats.payments_pending_verification_amount || stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Payment Pending" color="amber" icon="💳"
-                          :hint="`${stats.payments_pending_verification ?? stats.pending_payments ?? 0} awaiting verification`" />
-                <StatCard v-if="!websiteEnabled && canSee('membership')" :value="`₹${Number(stats.approved_amount || 0).toLocaleString('en-IN')}`" label="Approved Fees" color="green" icon="✅" />
-                <StatCard v-if="canSee('membership')" :value="`₹${Number(stats.payment_not_done_amount || stats.payment_due_amount || 0).toLocaleString('en-IN')}`" label="Payment Not Done" color="navy" icon="🧾"
-                          :hint="`${stats.payment_not_done ?? stats.payment_due ?? 0} schools`" />
-                <StatCard v-if="websiteEnabled && canSee('membership')" :value="stats.total_students ?? 0" label="Active Students" color="navy" icon="👨‍🎓"
-                          :hint="'From approved members only'" />
-                <StatCard v-if="websiteEnabled && canSee('membership')" :value="`₹${Number(stats.payments_pending_verification_amount || stats.pending_amount || 0).toLocaleString('en-IN')}`" label="Payment Pending" color="amber" icon="💳"
-                          :hint="`${stats.payments_pending_verification ?? stats.pending_payments ?? 0} awaiting verification`" />
-                <StatCard v-if="websiteEnabled && canSee('membership')" :value="`₹${Number(stats.approved_amount || 0).toLocaleString('en-IN')}`" label="Approved Fees" color="green" icon="✅" />
+            <!-- Empty state -->
+            <div v-if="canSee('membership') && !(stats.approved_schools ?? 0)" class="card">
+                <h3 class="section-title text-base mb-3">Get started</h3>
+                <ol class="step-list text-sm text-slate-600 space-y-3">
+                    <li class="flex gap-3"><span class="step-badge step-badge--active shrink-0">1</span><span>Set up an <Link :href="`/sahodaya-admin/${sahodaya.id}/academic-years`" class="link-brand">academic year</Link></span></li>
+                    <li class="flex gap-3"><span class="step-badge step-badge--pending shrink-0">2</span><span>Invite and approve <Link :href="`/sahodaya-admin/${sahodaya.id}/schools`" class="link-brand">member schools</Link></span></li>
+                    <li class="flex gap-3"><span class="step-badge step-badge--pending shrink-0">3</span><span>Publish your first <Link :href="`/sahodaya-admin/${sahodaya.id}/kalotsav`" class="link-brand">fest event</Link></span></li>
+                </ol>
             </div>
 
-            <!-- Fest & programs ops -->
-            <div v-if="canSee('fest') || canSee('mcq') || canSee('training')" class="card">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="section-title text-base">Fest & program hubs</h3>
-                    <Link :href="`/sahodaya-admin/${sahodaya.id}/events`" class="link-brand text-xs">All events →</Link>
-                </div>
-                <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-                    <Link v-for="p in festOps.programs" :key="p.slug"
-                          :href="programHubHref(p)"
-                          class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-center hover:border-[#0f3d7a]/30 transition">
-                        <p class="text-2xl">{{ p.icon }}</p>
-                        <p class="text-sm font-semibold text-slate-900 mt-2">{{ p.label }}</p>
-                    </Link>
-                </div>
-                <div class="grid sm:grid-cols-3 gap-3">
-                    <QuickAction v-if="canSee('mcq')" :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams`"
-                                 icon="📝" label="MCQ Exams" :desc="`${stats.mcq_exams ?? 0} exams`" />
-                    <QuickAction v-if="canSee('training')" :href="`/sahodaya-admin/${sahodaya.id}/training`"
-                                 icon="🎓" label="Teacher Training" :desc="`${stats.training_programs ?? 0} programs`" />
-                    <QuickAction v-if="canSee('fest')" :href="`/sahodaya-admin/${sahodaya.id}/display-screens`"
-                                 icon="📺" label="Display screens" desc="Live fest boards" />
-                </div>
+            <!-- Key stats (linked) -->
+            <div v-if="primaryStats.length" class="grid sm:grid-cols-3 gap-4">
+                <Link v-for="stat in primaryStats" :key="stat.label" :href="stat.href"
+                      class="rounded-2xl border border-slate-200 bg-white p-5 hover:border-[#0f3d7a]/30 hover:shadow-sm transition block">
+                    <p class="text-2xl font-extrabold text-[#0f3d7a]">{{ stat.value }}</p>
+                    <p class="text-xs text-gray-500 font-medium mt-1">{{ stat.label }}</p>
+                    <p v-if="stat.hint" class="text-[11px] text-indigo-600 mt-1">{{ stat.hint }}</p>
+                </Link>
             </div>
 
-            <!-- Dashboard extras -->
+            <!-- Program status -->
             <div v-if="dashboardExtras?.programStatus?.length" class="card">
                 <h3 class="section-title text-base mb-4">Program status</h3>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -91,65 +50,28 @@
                 </div>
             </div>
 
-            <div v-if="dashboardExtras?.financeSummary" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div v-for="(amount, key) in dashboardExtras.financeSummary" :key="key" class="card card--muted !py-4 text-center">
-                    <p class="text-lg font-bold text-green-700">₹{{ fmt(amount) }}</p>
-                    <p class="text-xs text-slate-500 mt-1 capitalize">{{ key }} fees collected</p>
-                </div>
-            </div>
-
-            <div v-if="dashboardExtras?.schoolActivity?.length" class="card">
-                <h3 class="section-title text-base mb-3">School participation</h3>
-                <div class="flex flex-wrap gap-2">
-                    <span v-for="s in dashboardExtras.schoolActivity" :key="s.id"
-                          class="text-xs px-2 py-1 rounded-full border"
-                          :class="s.active ? 'bg-green-50 border-green-200 text-green-800' : 'bg-slate-50 border-slate-200 text-slate-500'">
-                        {{ s.name }}
-                    </span>
-                </div>
-            </div>
-
-            <!-- Action queue -->
-            <div v-if="actionQueueItems.length" class="card">
-                <h3 class="section-title text-base mb-4">Action queue</h3>
-                <div class="grid sm:grid-cols-2 gap-3">
-                    <ActionBanner v-for="item in actionQueueItems" :key="item.key"
-                                  :href="item.href" :count="item.count" :label="item.label"
-                                  :color="item.color" :icon="item.icon" />
-                </div>
-            </div>
-
-            <!-- Attention required -->
-            <div v-if="canSee('membership') && (pendingSchoolsCount > 0 || pendingPaymentsCount > 0 || (stats.payment_not_done ?? stats.payment_due ?? 0) > 0)" class="grid sm:grid-cols-2 gap-4">
-                <ActionBanner v-if="pendingSchoolsCount > 0"
-                              :href="`/sahodaya-admin/${sahodaya.id}/membership/reports?tab=schools`"
-                              :count="pendingSchoolsCount"
-                              label="schools awaiting membership approval"
-                              color="amber" icon="⏳" />
-                <ActionBanner v-if="(stats.payment_not_done ?? stats.payment_due ?? 0) > 0"
-                              :href="`/sahodaya-admin/${sahodaya.id}/membership/payments?status=payment-due`"
-                              :count="stats.payment_not_done ?? stats.payment_due"
-                              label="schools with payment not done"
-                              color="navy" icon="🧾" />
-                <ActionBanner v-if="(stats.payments_pending_verification ?? pendingPaymentsCount ?? 0) > 0"
-                              :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`"
-                              :count="stats.payments_pending_verification ?? pendingPaymentsCount"
-                              label="payments pending verification"
-                              color="green" icon="💳" />
+            <!-- Recent activity -->
+            <div v-if="recentActivity?.length" class="card">
+                <h3 class="section-title text-base mb-3">Recent activity</h3>
+                <ul class="text-sm divide-y">
+                    <li v-for="entry in recentActivity" :key="entry.id" class="py-2">
+                        <p class="font-medium text-slate-800">{{ entry.description || entry.action }}</p>
+                        <p class="text-xs text-slate-500 mt-0.5 capitalize">
+                            {{ entry.category?.replace(/_/g, ' ') || entry.action }}
+                            <span v-if="entry.created_at"> · {{ formatActivityDate(entry.created_at) }}</span>
+                        </p>
+                    </li>
+                </ul>
             </div>
 
             <div class="grid lg:grid-cols-2 gap-6">
-                <!-- Active fest events -->
                 <div v-if="canSee('fest')" class="card">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="section-title text-base flex items-center gap-2">
-                            <span class="text-lg">🏆</span> Active fest events
-                        </h3>
+                        <h3 class="section-title text-base">Active fest events</h3>
                         <Link :href="`/sahodaya-admin/${sahodaya.id}/events`" class="link-brand text-xs">All events →</Link>
                     </div>
                     <div v-if="activeEvents.length" class="divide-y divide-slate-100">
-                        <div v-for="ev in activeEvents" :key="ev.id"
-                             class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                        <div v-for="ev in activeEvents" :key="ev.id" class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                             <div class="min-w-0">
                                 <p class="text-sm font-semibold text-slate-900 truncate">{{ ev.title }}</p>
                                 <p class="text-xs text-slate-500 mt-0.5 capitalize">
@@ -157,8 +79,7 @@
                                     <span v-if="ev.registrations_count != null"> · {{ ev.registrations_count }} reg.</span>
                                 </p>
                             </div>
-                            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${ev.id}`"
-                                  class="text-xs link-brand shrink-0">Manage →</Link>
+                            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${ev.id}`" class="text-xs link-brand shrink-0">Manage →</Link>
                         </div>
                     </div>
                     <EmptyState v-else title="No active fest events" description="Open a program hub to create or publish an event." icon="🏆">
@@ -168,57 +89,20 @@
                     </EmptyState>
                 </div>
 
-                <!-- Recent Circulars -->
                 <div v-if="websiteEnabled && canSee('website')" class="card">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="section-title text-base flex items-center gap-2">
-                            <span class="text-lg">📄</span> Recent Circulars
-                        </h3>
+                        <h3 class="section-title text-base">Recent circulars</h3>
                         <Link :href="`/sahodaya-admin/${sahodaya.id}/circulars`" class="link-brand text-xs">View all →</Link>
                     </div>
                     <div v-if="recentCirculars.length" class="divide-y divide-slate-100">
-                        <div v-for="c in recentCirculars" :key="c.id"
-                             class="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                            <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-sm shrink-0">📄</div>
+                        <div v-for="c in recentCirculars" :key="c.id" class="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-semibold text-slate-800 truncate">{{ c.title }}</p>
-                                <div class="flex items-center gap-2 mt-0.5">
-                                    <span class="text-[11px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded font-medium">{{ c.category || 'General' }}</span>
-                                    <span class="text-xs text-slate-400">{{ c.issued_date ? new Date(c.issued_date).toLocaleDateString('en-IN', {day:'2-digit',month:'short'}) : '' }}</span>
-                                </div>
+                                <p class="text-xs text-slate-400 mt-0.5">{{ c.issued_date ? new Date(c.issued_date).toLocaleDateString('en-IN', {day:'2-digit',month:'short'}) : '' }}</p>
                             </div>
                         </div>
                     </div>
-                    <EmptyState v-else title="No circulars yet" description="Upload notices and documents for member schools." icon="📄">
-                        <template #action>
-                            <Link :href="`/sahodaya-admin/${sahodaya.id}/circulars`" class="btn-secondary text-xs">Upload Circular</Link>
-                        </template>
-                    </EmptyState>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="card">
-                <h3 class="section-title text-base mb-4">Quick Actions</h3>
-                <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <QuickAction v-if="websiteEnabled && canSee('website')" :href="`/sahodaya-admin/${sahodaya.id}/public-content`"
-                                 icon="✏️" label="Edit Website" desc="Content, announcements, links" />
-                    <QuickAction v-if="!websiteEnabled && canSee('website')" :href="`/sahodaya-admin/${sahodaya.id}/public-content`"
-                                 icon="✏️" label="Portal Content" desc="Tagline, motto, contact details" />
-                    <QuickAction v-if="websiteEnabled && canSee('website')" :href="`/sahodaya-admin/${sahodaya.id}/circulars`"
-                                 icon="📤" label="Upload Circular" desc="Notices and documents" />
-                    <QuickAction v-if="websiteEnabled && canSee('website')" :href="`/sahodaya-admin/${sahodaya.id}/office-bearers`"
-                                 icon="👥" label="Office Bearers" desc="Update leadership details" />
-                    <QuickAction v-if="canSee('membership')" :href="`/sahodaya-admin/${sahodaya.id}/schools`"
-                                 icon="🏫" label="Member Schools" desc="Approved member schools" />
-                    <QuickAction v-if="canSee('membership')" :href="`/sahodaya-admin/${sahodaya.id}/membership/submissions`"
-                                 icon="👨‍🎓" label="Student Counts" desc="View totals by school" />
-                    <QuickAction v-if="canSee('membership')" :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`"
-                                 icon="💳" label="Verify Payments" desc="Membership fee proofs" />
-                    <QuickAction v-if="canSee('membership')" :href="`/sahodaya-admin/${sahodaya.id}/membership/reports`"
-                                 icon="📊" label="Reports" desc="Summary & CSV exports" />
-                    <QuickAction v-if="canSee('membership')" :href="`/sahodaya-admin/${sahodaya.id}/membership/settings`"
-                                 icon="⚙️" label="Membership Config" desc="Fees, windows, rules" />
+                    <EmptyState v-else title="No circulars yet" description="Upload notices for member schools." icon="📄" />
                 </div>
             </div>
 
@@ -240,7 +124,8 @@ const STAFF_SECTIONS = {
     membership: ['membership.view', 'membership.manage'],
     fest: ['fest.view', 'fest.manage', 'fest.marks', 'fest.registrations', 'fest.results', 'fest.settings', 'fest.finance', 'fest.certificates', 'fest.catering', 'fest.schedule'],
     mcq: ['mcq.view', 'mcq.manage', 'mcq.attendance', 'mcq.marks'],
-    training: ['fest.view', 'fest.manage'],
+    training: ['training.view', 'training.manage', 'fest.view', 'fest.manage'],
+    ledger: ['finance.view', 'membership.view', 'membership.manage'],
 };
 
 function canSee(section) {
@@ -259,10 +144,12 @@ const props = defineProps({
     pendingPaymentsCount:    { type: Number, default: 0 },
     stats:                   { type: Object, default: () => ({}) },
     actionQueue:             { type: Object, default: () => ({}) },
+    actionQueueLinks:        { type: Object, default: () => ({}) },
     recentCirculars:         { type: Array,  default: () => [] },
     activeEvents:            { type: Array, default: () => [] },
     festOps:                 { type: Object, default: () => ({ programs: [] }) },
     dashboardExtras:         { type: Object, default: () => ({}) },
+    recentActivity:          { type: Array, default: () => [] },
 });
 
 function programHubHref(p) {
@@ -282,14 +169,52 @@ const actionQueueItems = computed(() => {
     const base = `/sahodaya-admin/${props.sahodaya?.id}`;
     const map = {
         membership_data_pending: { href: `${base}/membership/reports?tab=submissions`, label: 'membership data reviews pending', color: 'amber', icon: '📋' },
+        pending_school_applications: { href: `${base}/schools/applications`, label: 'school applications awaiting review', color: 'amber', icon: '🏫' },
         membership_payments: { href: `${base}/membership/payments`, label: 'membership payments to verify', color: 'green', icon: '💳' },
         fest_fee_proofs: { href: `${base}/fest/payments`, label: 'fest fee proofs awaiting approval', color: 'blue', icon: '🏆' },
         mcq_fee_proofs: { href: `${base}/mcq/payments`, label: 'MCQ batch fees awaiting approval', color: 'indigo', icon: '📝' },
         fest_appeals: { href: `${base}/events`, label: 'open fest appeals', color: 'amber', icon: '⚖️' },
         fest_registrations_review: { href: `${base}/events`, label: 'fest registrations to review', color: 'navy', icon: '📥' },
     };
-    return Object.entries(q).map(([key, count]) => ({ key, count, ...map[key] })).filter((i) => i.label);
+    return Object.entries(q).map(([key, count]) => {
+        const meta = map[key] ?? {};
+        const href = props.actionQueueLinks?.[key] ?? meta.href;
+        return { key, count, ...meta, href };
+    }).filter((i) => i.label);
 });
+
+const primaryStats = computed(() => {
+    const base = `/sahodaya-admin/${props.sahodaya?.id}`;
+    const items = [];
+    if (canSee('membership')) {
+        items.push({
+            label: 'Approved schools',
+            value: props.stats.approved_schools ?? 0,
+            href: `${base}/schools`,
+            hint: (props.stats.pending_schools ?? 0) > 0 ? `${props.stats.pending_schools} pending →` : null,
+        });
+        items.push({
+            label: 'Payments pending',
+            value: `₹${Number(props.stats.payments_pending_verification_amount || props.stats.pending_amount || 0).toLocaleString('en-IN')}`,
+            href: `${base}/membership/payments`,
+            hint: `${props.stats.payments_pending_verification ?? props.pendingPaymentsCount ?? 0} to verify →`,
+        });
+    }
+    if (canSee('fest')) {
+        items.push({
+            label: 'Active fests',
+            value: props.stats.active_fest_events ?? 0,
+            href: `${base}/events`,
+            hint: `${props.stats.fest_registrations ?? 0} registrations`,
+        });
+    }
+    return items;
+});
+
+function formatActivityDate(value) {
+    if (!value) return '';
+    return new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
 
 const colorMap = {
     blue:   { bg: 'bg-blue-50',   text: 'text-blue-600',   num: 'text-blue-700' },

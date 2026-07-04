@@ -15,6 +15,10 @@
             <div class="p-4 bg-gray-50 border rounded-xl text-sm text-gray-500">📅 Schedule — not published yet</div>
             @endif
             <a href="{{ route('tenant.fest.live', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🔴 Live Scoreboard</a>
+            <a href="{{ route('tenant.fest.scoreboard', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🏆 Category Scoreboard</a>
+            @if($event->manual_pdf_path)
+            <a href="{{ route('tenant.fest.manual', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">📄 Event Manual (PDF)</a>
+            @endif
             @if($event->record_tracking_enabled)
             <a href="{{ route('tenant.fest.records', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🏃 Athletic Records</a>
             @endif

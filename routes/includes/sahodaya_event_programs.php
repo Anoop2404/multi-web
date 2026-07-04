@@ -3,10 +3,12 @@
 use App\Http\Controllers\SahodayaAdmin\AthleticRecordsDashboardController;
 use App\Http\Controllers\SahodayaAdmin\FestCatalogController;
 use App\Http\Controllers\SahodayaAdmin\FestEventController;
+use App\Http\Controllers\SahodayaAdmin\EnglishFestProgramController;
 use App\Http\Controllers\SahodayaAdmin\KidsFestProgramController;
 use App\Http\Controllers\SahodayaAdmin\KalotsavProgramController;
 use App\Http\Controllers\SahodayaAdmin\McqDashboardController;
 use App\Http\Controllers\SahodayaAdmin\SportsAgeGroupController;
+use App\Http\Controllers\SahodayaAdmin\ScienceFestProgramController;
 use App\Http\Controllers\SahodayaAdmin\SportsProgramController;
 use App\Http\Controllers\SahodayaAdmin\TeacherFestProgramController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +18,8 @@ $sahodayaFestPrograms = [
     ['prefix' => 'sports', 'slug' => 'sports-meet', 'controller' => SportsProgramController::class],
     ['prefix' => 'kids-fest', 'slug' => 'kids-fest', 'controller' => KidsFestProgramController::class],
     ['prefix' => 'teacher-fest', 'slug' => 'teacher-fest', 'controller' => TeacherFestProgramController::class],
+    ['prefix' => 'english-fest', 'slug' => 'english-fest', 'controller' => EnglishFestProgramController::class],
+    ['prefix' => 'science-fest', 'slug' => 'science-fest', 'controller' => ScienceFestProgramController::class],
 ];
 
 foreach ($sahodayaFestPrograms as $cfg) {
@@ -33,6 +37,8 @@ foreach ($sahodayaFestPrograms as $cfg) {
         if ($prefix === 'sports') {
             Route::get('/records', [AthleticRecordsDashboardController::class, 'index'])->name('records');
             Route::get('/championship', [SportsProgramController::class, 'championship'])->name('championship');
+            Route::get('/results', [SportsProgramController::class, 'results'])->name('results');
+            Route::get('/rankings', [SportsProgramController::class, 'rankings'])->name('rankings');
 
             Route::prefix('age-groups')->name('age-groups.')->group(function () {
                 Route::get('/', [SportsAgeGroupController::class, 'index'])->name('index');
@@ -116,10 +122,10 @@ Route::prefix('programs/custom/catalog')->name('programs.catalog.')->group(funct
 
 Route::get('/programs/{program}/{view}', function (string $tenantId, string $program, string $view) {
     abort_unless(in_array($view, ['registration', 'results'], true), 404);
-    $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest'];
+    $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest', 'english-fest' => 'english-fest', 'science-fest' => 'science-fest'];
     if (isset($map[$program])) {
         return redirect("/sahodaya-admin/{$tenantId}/{$map[$program]}", 301);
     }
 
     return redirect("/sahodaya-admin/{$tenantId}/programs/{$program}");
-})->whereIn('view', ['registration', 'results'])->whereIn('program', ['kalotsav', 'sports-meet', 'kids-fest', 'teacher-fest', 'custom']);
+})->whereIn('view', ['registration', 'results'])->whereIn('program', ['kalotsav', 'sports-meet', 'kids-fest', 'teacher-fest', 'english-fest', 'science-fest', 'custom']);

@@ -43,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'super.admin'       => \App\Http\Middleware\EnsureSuperAdmin::class,
             'state.admin'       => \App\Http\Middleware\EnsureStateAdmin::class,
             'fest.event.ops'    => \App\Http\Middleware\EnsureFestEventOps::class,
+            'fest.discipline'   => \App\Http\Middleware\EnsureFestDisciplineAdmin::class,
             'group.admin'       => \App\Http\Middleware\EnsureGroupAdmin::class,
             'house.admin'       => \App\Http\Middleware\EnsureHouseAdmin::class,
             'school.admin'      => \App\Http\Middleware\EnsureSchoolAdmin::class,

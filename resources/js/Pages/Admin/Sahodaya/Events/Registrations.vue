@@ -22,6 +22,12 @@
                         <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
                     </select>
                 </div>
+                <div class="flex-1 min-w-[180px]">
+                    <label class="text-xs font-semibold text-gray-600">Search participant</label>
+                    <input v-model="searchQuery" type="search" placeholder="Name or reg no…"
+                           class="field text-sm mt-1" @keyup.enter="applySearch">
+                </div>
+                <button type="button" class="btn-secondary text-xs" @click="applySearch">Search</button>
                 <button type="button" class="btn-secondary text-xs" @click="toggleSelectAll">Toggle submitted</button>
                 <button type="button" class="btn-primary text-xs" :disabled="!selectedIds.length" @click="bulkApprove">Approve selected ({{ selectedIds.length }})</button>
                 <button type="button" class="btn-secondary text-xs text-red-600" :disabled="!selectedIds.length" @click="bulkReject">Reject selected</button>
@@ -289,10 +295,12 @@ const props = defineProps({
     registerStudents: { type: Array, default: () => [] },
     registerSchoolId: { type: [String, Number], default: '' },
     eventItems: { type: Array, default: () => [] },
+    filters: { type: Object, default: () => ({ search: '' }) },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const filterSchoolId = ref('');
+const searchQuery = ref(props.filters?.search ?? '');
 const selectedIds = ref([]);
 const overrideLifecycle = ref(false);
 const substituteReg = ref(null);
@@ -441,6 +449,13 @@ function submitOnBehalf() {
         onError: () => { onBehalfSubmitting.value = false; },
         onFinish: () => { onBehalfSubmitting.value = false; },
     });
+}
+
+function applySearch() {
+    router.get(`${base}/registrations`, {
+        search: searchQuery.value || undefined,
+        school_id: filterSchoolId.value || undefined,
+    }, { preserveScroll: true, preserveState: true });
 }
 
 const filteredRegistrations = computed(() => {

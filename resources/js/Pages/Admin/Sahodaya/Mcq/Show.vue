@@ -100,6 +100,13 @@
                 <p v-if="form.delivery_mode === 'online'" class="text-xs text-indigo-700 sm:col-span-2">
                     Online exams require question banks for auto-grading. Link banks under the Question banks tab before exam day.
                 </p>
+                <CheckboxField
+                    v-if="form.delivery_mode === 'online'"
+                    v-model="form.requires_hall_ticket"
+                    label="Require hall ticket before starting"
+                    hint="When enabled, students must have a hall ticket issued and attendance marked present before the online exam can start."
+                    class="sm:col-span-2"
+                />
                 <p v-else class="text-xs text-slate-500 sm:col-span-2">
                     Offline exams use hall tickets and manual mark entry. Question banks are optional.
                 </p>
@@ -130,12 +137,35 @@
                 <button type="submit" class="btn-primary" :disabled="form.processing">Save exam</button>
             </FormActions>
         </form>
+
+        <form @submit.prevent="uploadPaper" class="card mb-6 space-y-4">
+            <h3 class="section-title">Question paper archive</h3>
+            <p class="text-sm text-slate-600">
+                Upload a PDF for the public
+                <a href="/mcq/papers" target="_blank" rel="noopener" class="link-brand">question paper archive ↗</a>.
+            </p>
+            <p v-if="exam.question_paper_path" class="text-sm text-emerald-700">
+                Published: {{ exam.question_paper_label || exam.title }}
+            </p>
+            <FormField label="Archive label">
+                <template #default="{ id }">
+                    <input :id="id" v-model="paperForm.question_paper_label" class="field" placeholder="Optional display name">
+                </template>
+            </FormField>
+            <FormField label="PDF file">
+                <input type="file" accept="application/pdf" class="field text-sm" @change="onPaperFile">
+            </FormField>
+            <div class="flex flex-wrap gap-2">
+                <button type="submit" class="btn-primary text-sm" :disabled="!paperFile || paperForm.processing">Upload question paper</button>
+                <button v-if="exam.question_paper_path" type="button" class="btn-secondary text-sm" @click="removePaper">Remove from archive</button>
+            </div>
+        </form>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
@@ -161,6 +191,7 @@ const form = useForm({
     title: props.exam.title,
     status: props.exam.status,
     delivery_mode: props.exam.delivery_mode ?? 'offline',
+    requires_hall_ticket: !!(props.exam.settings_json?.requires_hall_ticket),
     scheduled_at: props.exam.scheduled_at ? props.exam.scheduled_at.slice(0, 16) : '',
     fee_amount: props.exam.fee_amount ?? '',
     next_hall_ticket_no: props.exam.next_hall_ticket_no ?? 100,
@@ -182,5 +213,32 @@ const pendingApprovalCount = computed(() => props.registrations.filter((r) => r.
 
 function save() {
     form.put(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}`, { preserveScroll: true });
+}
+
+const paperFile = ref(null);
+const paperForm = useForm({
+    question_paper: null,
+    question_paper_label: props.exam.question_paper_label ?? '',
+});
+
+function onPaperFile(e) {
+    paperFile.value = e.target.files?.[0] ?? null;
+}
+
+function uploadPaper() {
+    if (!paperFile.value) return;
+    paperForm.transform(() => ({
+        question_paper: paperFile.value,
+        question_paper_label: paperForm.question_paper_label,
+    })).post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/question-paper`, {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => { paperFile.value = null; },
+    });
+}
+
+function removePaper() {
+    if (!confirm('Remove this question paper from the public archive?')) return;
+    router.delete(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/question-paper`, { preserveScroll: true });
 }
 </script>

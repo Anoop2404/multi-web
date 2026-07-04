@@ -1,12 +1,15 @@
 /** Labels and detail rows for fest event item listings (matches edit form fields). */
 
+import { genderLabel, normalizeFestItemGender } from '@/support/festItemEligibility.js';
+
 export function festItemParticipantTypeLabel(type) {
     return { individual: 'Individual', group: 'Group', team: 'Team' }[type] ?? type ?? 'Individual';
 }
 
 export function festItemGenderLabel(gender, taxonomy) {
-    if (!gender || gender === 'open') return 'Open';
-    return taxonomy?.gender?.[gender] ?? (gender === 'male' ? 'Boys' : gender === 'female' ? 'Girls' : gender);
+    const normalized = normalizeFestItemGender(gender);
+    if (!normalized || normalized === 'open') return 'Open';
+    return taxonomy?.gender?.[normalized] ?? genderLabel(normalized) ?? normalized;
 }
 
 /** @returns {Array<{ label: string, value: string }>} */

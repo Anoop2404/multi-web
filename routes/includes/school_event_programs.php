@@ -1,24 +1,30 @@
 <?php
 
+use App\Http\Controllers\SchoolAdmin\FestClashRequestController;
+use App\Http\Controllers\SchoolAdmin\FestSubstitutionRequestController;
 use App\Http\Controllers\SchoolAdmin\FestRegistrationController;
 use App\Http\Controllers\SchoolAdmin\FestSchoolReportController;
 use App\Http\Controllers\SchoolAdmin\KidsFestController;
 use App\Http\Controllers\SchoolAdmin\KalotsavController;
 use App\Http\Controllers\SchoolAdmin\McqController;
 use App\Http\Controllers\SchoolAdmin\McqRegistrationController;
+use App\Http\Controllers\SchoolAdmin\EnglishFestController;
+use App\Http\Controllers\SchoolAdmin\ScienceFestController;
 use App\Http\Controllers\SchoolAdmin\SportsMeetController;
 use App\Http\Controllers\SchoolAdmin\TeacherFestController;
 use App\Http\Controllers\SchoolAdmin\TrainingController;
 use App\Http\Controllers\SchoolAdmin\TrainingRegistrationController;
 use Illuminate\Support\Facades\Route;
 
-$festProgramSlugs = 'kalotsav|sports-meet|kids-fest|teacher-fest|custom';
+$festProgramSlugs = 'kalotsav|sports-meet|kids-fest|teacher-fest|english-fest|science-fest|custom';
 
 $festPrograms = [
     ['prefix' => 'kalotsav', 'slug' => 'kalotsav', 'controller' => KalotsavController::class],
     ['prefix' => 'sports', 'slug' => 'sports-meet', 'controller' => SportsMeetController::class],
     ['prefix' => 'kids-fest', 'slug' => 'kids-fest', 'controller' => KidsFestController::class],
     ['prefix' => 'teacher-fest', 'slug' => 'teacher-fest', 'controller' => TeacherFestController::class],
+    ['prefix' => 'english-fest', 'slug' => 'english-fest', 'controller' => EnglishFestController::class],
+    ['prefix' => 'science-fest', 'slug' => 'science-fest', 'controller' => ScienceFestController::class],
 ];
 
 foreach ($festPrograms as $cfg) {
@@ -45,6 +51,12 @@ foreach ($festPrograms as $cfg) {
         Route::post('/register', [FestRegistrationController::class, 'store'])
             ->defaults('program', $slug)
             ->name('register');
+        Route::post('/events/{event}/register-students', [\App\Http\Controllers\SchoolAdmin\FestEventStudentRegistrationController::class, 'store'])
+            ->defaults('program', $slug)
+            ->name('event.register-students');
+        Route::post('/events/{event}/bulk-assign', [\App\Http\Controllers\SchoolAdmin\FestEventStudentRegistrationController::class, 'bulkAssign'])
+            ->defaults('program', $slug)
+            ->name('event.bulk-assign');
         Route::post('/registrations/{registration}/withdraw', [FestRegistrationController::class, 'withdraw'])
             ->defaults('program', $slug)
             ->name('registrations.withdraw');
@@ -102,6 +114,39 @@ foreach ($festPrograms as $cfg) {
         Route::get('/reports/{event}/id-cards/pdf', [FestSchoolReportController::class, 'idCardsPdf'])
             ->defaults('program', $slug)
             ->name('reports.id-cards.pdf');
+        Route::get('/reports/{event}/fee-summary', [FestSchoolReportController::class, 'feeSummary'])
+            ->defaults('program', $slug)
+            ->name('reports.fee-summary');
+        Route::get('/reports/{event}/discipline-participation', [FestSchoolReportController::class, 'disciplineParticipation'])
+            ->defaults('program', $slug)
+            ->name('reports.discipline-participation');
+        Route::get('/reports/{event}/schedule-clashes', [FestSchoolReportController::class, 'scheduleClashes'])
+            ->defaults('program', $slug)
+            ->name('reports.schedule-clashes');
+        Route::get('/reports/{event}/mark-entry-status', [FestSchoolReportController::class, 'markEntryStatus'])
+            ->defaults('program', $slug)
+            ->name('reports.mark-entry-status');
+        Route::get('/reports/{event}/results-summary', [FestSchoolReportController::class, 'resultsSummary'])
+            ->defaults('program', $slug)
+            ->name('reports.results-summary');
+        Route::get('/reports/{event}/group-roster', [FestSchoolReportController::class, 'groupRoster'])
+            ->defaults('program', $slug)
+            ->name('reports.group-roster');
+        Route::get('/reports/{event}/attendance-sheet', [FestSchoolReportController::class, 'attendanceSheet'])
+            ->defaults('program', $slug)
+            ->name('reports.attendance-sheet');
+        Route::get('/events/{event}/substitution-requests', [FestSubstitutionRequestController::class, 'index'])
+            ->defaults('program', $slug)
+            ->name('substitution-requests.index');
+        Route::post('/events/{event}/substitution-requests', [FestSubstitutionRequestController::class, 'store'])
+            ->defaults('program', $slug)
+            ->name('substitution-requests.store');
+        Route::get('/events/{event}/clash-requests', [FestClashRequestController::class, 'index'])
+            ->defaults('program', $slug)
+            ->name('clash-requests.index');
+        Route::post('/events/{event}/clash-requests', [FestClashRequestController::class, 'store'])
+            ->defaults('program', $slug)
+            ->name('clash-requests.store');
     });
 }
 
@@ -141,7 +186,7 @@ Route::prefix('training')->name('training.')->group(function () {
 });
 
 Route::get("/programs/{program}", function (string $tenantId, string $program) use ($festProgramSlugs) {
-    $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest'];
+    $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest', 'english-fest' => 'english-fest', 'science-fest' => 'science-fest'];
     if (isset($map[$program])) {
         return redirect("/school-admin/{$tenantId}/{$map[$program]}", 301);
     }
@@ -150,7 +195,7 @@ Route::get("/programs/{program}", function (string $tenantId, string $program) u
 })->where('program', $festProgramSlugs);
 
 Route::get("/programs/{program}/{path}", function (string $tenantId, string $program, string $path) {
-    $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest'];
+    $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest', 'english-fest' => 'english-fest', 'science-fest' => 'science-fest'];
     if (isset($map[$program])) {
         return redirect("/school-admin/{$tenantId}/{$map[$program]}/{$path}", 301);
     }

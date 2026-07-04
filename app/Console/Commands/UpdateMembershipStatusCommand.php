@@ -30,7 +30,10 @@ class UpdateMembershipStatusCommand extends Command
                         ->first();
 
                     if ($current && in_array($current->registration_status, ['completed', 'approved'], true)) {
-                        $school->update(['renewal_status' => 'active']);
+                        $school->update([
+                            'renewal_status' => 'active',
+                            'is_active'      => true,
+                        ]);
 
                         continue;
                     }
@@ -41,7 +44,10 @@ class UpdateMembershipStatusCommand extends Command
                             ->first();
 
                         if ($prior && in_array($prior->registration_status, ['completed', 'approved'], true)) {
-                            $school->update(['renewal_status' => 'renewal_due']);
+                            $school->update([
+                                'renewal_status' => 'renewal_due',
+                                'is_active'      => true,
+                            ]);
 
                             continue;
                         }
@@ -54,6 +60,7 @@ class UpdateMembershipStatusCommand extends Command
 
                     $school->update([
                         'renewal_status' => $lastCompleted ? 'lapsed' : null,
+                        'is_active'      => $lastCompleted ? false : $school->is_active,
                     ]);
                 }
             });

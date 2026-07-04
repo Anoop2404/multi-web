@@ -6,6 +6,7 @@ use App\Models\FestCatalogItem;
 use App\Models\FestEvent;
 use App\Services\Events\FestCatalogService;
 use App\Services\Events\FestItemCatalogService;
+use App\Services\Events\FestTaxonomyRegistry;
 use App\Support\FestPageActivity;
 use App\Support\FestCatalogSections;
 use App\Services\Audit\PlatformAuditLogger;
@@ -22,6 +23,8 @@ class FestCatalogController extends SahodayaAdminController
         'sports-meet'  => ['slug' => 'sports-meet', 'eventType' => 'sports', 'label' => 'Sports Meet'],
         'kids-fest'    => ['slug' => 'kids-fest', 'eventType' => 'kids_fest', 'label' => 'Kids Fest'],
         'teacher-fest' => ['slug' => 'teacher-fest', 'eventType' => 'teacher_fest', 'label' => 'Teacher Fest'],
+        'english-fest' => ['slug' => 'english-fest', 'eventType' => 'english_fest', 'label' => 'English Fest'],
+        'science-fest' => ['slug' => 'science-fest', 'eventType' => 'science_fest', 'label' => 'Science Fest'],
         'custom'       => ['slug' => 'custom', 'eventType' => 'custom', 'label' => 'Custom Events'],
     ];
 
@@ -274,7 +277,8 @@ class FestCatalogController extends SahodayaAdminController
             'program'        => array_merge($meta, ['slug' => $program]),
             'summary'        => $catalogService->summary($this->sahodaya->id, $meta['eventType']),
             'sections'       => FestCatalogSections::summaries($this->sahodaya->id, $meta['eventType']),
-            'taxonomy'       => config('fest_item_taxonomy'),
+            'taxonomy'       => app(FestTaxonomyRegistry::class)->forTenant($this->sahodaya->id)->allLabels(),
+            'taxonomyMastersUrl' => "/sahodaya-admin/{$this->sahodaya->id}/taxonomy-masters",
             'ageGroupLabels' => FestSportsAgeGroup::labels(),
         ];
     }

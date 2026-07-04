@@ -36,12 +36,12 @@ class EnsureSchoolAdmin
             abort(403);
         }
 
-        if ($user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal']) && ! $user->hasVerifiedEmail()) {
+        if ($user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal', 'school_event_coordinator', 'school_staff']) && ! $user->hasVerifiedEmail()) {
             return \App\Support\InertiaAuth::redirectTo($request, route('verification.notice'));
         }
 
         $tenantId = $request->route('tenantId');
-        if ($tenantId && $user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal'])) {
+        if ($tenantId && $user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal', 'school_event_coordinator', 'school_staff'])) {
             $school = \App\Models\Tenant::find($tenantId);
             if ($school && ! $school->is_active) {
                 abort(403, 'This school account is inactive.');

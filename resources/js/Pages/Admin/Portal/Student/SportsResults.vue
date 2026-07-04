@@ -34,6 +34,7 @@
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { studentPortalNavItems } from '@/support/studentPortalNav.js';
 
 const props = defineProps({
     school: Object,
@@ -41,8 +42,5 @@ const props = defineProps({
     results: { type: Array, default: () => [] },
 });
 
-const navItems = computed(() => [
-    { href: `/portal/student/${props.school.id}`, label: 'Dashboard' },
-    { href: `/portal/student/${props.school.id}/sports-results`, label: 'Sports results' },
-]);
+const navItems = computed(() => studentPortalNavItems(props.school.id));
 </script>

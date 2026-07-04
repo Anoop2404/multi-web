@@ -84,19 +84,22 @@ class FestReportService
     }
 
     /** @return list<array<string, mixed>> */
-    public function markEntryStatusRows(): array
+    public function markEntryStatusRows(?string $schoolId = null): array
     {
         $rows = [];
         foreach ($this->items() as $item) {
             $partCount = FestParticipant::whereHas('registration', fn ($q) => $q
                 ->where('event_id', $this->event->id)
                 ->where('item_id', $item->id)
-                ->where('status', 'approved'))->count();
+                ->where('status', 'approved')
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId)))->count();
 
-            $scored = FestMark::where('event_id', $this->event->id)
-                ->where('item_id', $item->id)
-                ->distinct('participant_id')
-                ->count('participant_id');
+            $scoredQuery = FestMark::where('event_id', $this->event->id)
+                ->where('item_id', $item->id);
+            if ($schoolId) {
+                $scoredQuery->whereHas('participant.registration', fn ($q) => $q->where('school_id', $schoolId));
+            }
+            $scored = $scoredQuery->distinct('participant_id')->count('participant_id');
 
             $judges = FestJudgeAssignment::where('event_id', $this->event->id)
                 ->where('item_id', $item->id)
@@ -118,9 +121,9 @@ class FestReportService
     }
 
     /** @return array{summary: array<string, int>, rows: list<array<string, mixed>>} */
-    public function markEntryStatusSummary(): array
+    public function markEntryStatusSummary(?string $schoolId = null): array
     {
-        $rows = $this->markEntryStatusRows();
+        $rows = $this->markEntryStatusRows($schoolId);
 
         return [
             'summary' => [
@@ -228,6 +231,8 @@ class FestReportService
             'registrations' => $this->registrationsXls(),
             'results' => $this->resultsXls(),
             'fees' => app(FestExportService::class)->fees($this->event),
+            'fee-breakdown' => app(FestExportService::class)->feeBreakdown($this->event),
+            'student-event-registrations' => app(FestExportService::class)->studentEventRegistrations($this->event),
             'registration-list' => $this->registrationListPdf($request),
             'school-wise' => $this->schoolWisePdf($request),
             'overall-ranking' => $this->overallRankingPdf(),
@@ -253,6 +258,20 @@ class FestReportService
             'admit-cards' => $this->admitCardsPdf($request),
             'sahodaya-ranking' => $this->sahodayaRankingPdf(),
             'student-participation' => $this->studentParticipationXls($request),
+            'discipline-registration' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportDisciplineRegistration(),
+            'age-group-matrix' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportAgeGroupMatrix($request->input('school_id')),
+            'fee-pending-schools' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportFeePendingSchools(),
+            'head-wise-participants' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportHeadWiseParticipants($request->integer('head_id') ?: null),
+            'team-squad-sheets' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->teamSquadPdf($request->input('school_id')),
+            'medal-tally' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->medalTallyPdf(),
+            'volunteer-roster' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportVolunteerRoster(),
+            'catering-by-school' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportCateringBySchool($request->input('school_id')),
+            'id-cards-by-head' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->idCardsByHeadPdf(
+                $request->integer('head_id') ?: null,
+                $request->input('school_id'),
+                $request->input('template'),
+            ),
+            'audit-log-extract' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportAuditLogExtract(),
             'item-schedule' => $this->itemScheduleCsv($request),
             'item-schedule-pdf' => $this->itemSchedulePdf($request),
             default => abort(404, 'Unknown export type'),

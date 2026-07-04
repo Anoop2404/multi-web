@@ -22,6 +22,13 @@
 
         <form class="card mb-4 flex flex-wrap gap-2 items-end" @submit.prevent="applyFilters">
             <div>
+                <label class="form-label">Sahodaya</label>
+                <select v-model="localFilters.tenant_id" class="field text-sm min-w-[10rem]">
+                    <option value="">All Sahodayas</option>
+                    <option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option>
+                </select>
+            </div>
+            <div>
                 <label class="form-label">Category</label>
                 <select v-model="localFilters.category" class="field text-sm min-w-[10rem]">
                     <option value="">All categories</option>
@@ -108,6 +115,7 @@ const props = defineProps({
     actionSummary: { type: Object, default: () => ({}) },
     filters: { type: Object, default: () => ({}) },
     categories: { type: Object, default: () => ({}) },
+    tenants: { type: Array, default: () => [] },
     total: { type: Number, default: 0 },
 });
 
@@ -117,6 +125,7 @@ const localFilters = reactive({
     from: props.filters.from ?? '',
     to: props.filters.to ?? '',
     q: props.filters.q ?? '',
+    tenant_id: props.filters.tenant_id ?? '',
 });
 
 const exportUrl = computed(() => {

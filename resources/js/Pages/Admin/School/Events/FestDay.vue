@@ -6,6 +6,11 @@
 
         <div class="max-w-4xl">
             <p class="text-sm text-gray-500 mb-4">{{ school.name }} · {{ event.status }}</p>
+            <div v-if="verificationStatus?.verification_day" class="mb-4 p-3 rounded-xl border text-sm"
+                 :class="verificationStatus.documents_verified ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'">
+                Document verification day: <strong>{{ verificationStatus.verification_day }}</strong>
+                · Status: <strong>{{ verificationStatus.documents_verified ? 'Verified' : 'Pending verification' }}</strong>
+            </div>
             <div v-if="!event.schedule_published" class="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
                 Public schedule is not published yet. Times shown here are for your school coordination.
             </div>
@@ -51,6 +56,6 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 
-const props = defineProps({ school: Object, event: Object, program: [String, Object], programMeta: { type: Object, default: null }, rows: Array });
+const props = defineProps({ school: Object, event: Object, program: [String, Object], programMeta: { type: Object, default: null }, rows: Array, verificationStatus: Object });
 const { programLabel, programBase } = useSchoolProgramContext(props);
 </script>

@@ -57,8 +57,12 @@
 
             <!-- Tab: Subscriptions -->
             <div v-show="activeTab === 'subscriptions'">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
                     <h3 class="font-semibold text-gray-900">Tenant Subscriptions</h3>
+                    <form @submit.prevent="applySubSearch" class="flex gap-2 items-center">
+                        <input v-model="subSearch" type="search" placeholder="Search tenant…" class="field text-sm max-w-xs">
+                        <button type="submit" class="btn-secondary text-sm">Search</button>
+                    </form>
                     <button @click="showSubForm = !showSubForm"
                             class="btn-primary">
                         + Add / Update
@@ -72,7 +76,7 @@
                             <label class="label-xs">Tenant <span class="text-red-500">*</span></label>
                             <select v-model="subForm.tenant_id" class="field" required>
                                 <option value="">Select tenant…</option>
-                                <option v-for="t in tenantsForSelect" :key="t.id" :value="t.id">{{ t.name }}</option>
+                                <option v-for="t in tenantsForSelectComputed" :key="t.id" :value="t.id">{{ t.name }}</option>
                             </select>
                         </div>
                         <div>
@@ -120,6 +124,12 @@
                             {{ s.status }}
                         </span>
                     </div>
+                </div>
+                <div v-if="subscriptions.links?.length > 3" class="px-4 py-3 border-t border-gray-200 flex flex-wrap gap-1">
+                    <Link v-for="link in subscriptions.links" :key="link.label"
+                          :href="link.url || '#'"
+                          :class="['px-3 py-1 rounded-lg text-xs', link.active ? 'bg-indigo-100 text-indigo-800 font-semibold' : 'text-gray-600 hover:bg-gray-100', !link.url && 'opacity-40 pointer-events-none']"
+                          v-html="link.label" />
                 </div>
             </div>
 
@@ -203,7 +213,7 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import { ref, reactive, computed, defineComponent, h } from 'vue';
 
 const StatCard = defineComponent({
@@ -228,7 +238,19 @@ const props = defineProps({
     subscriptions:  Object,
     pendingReceipts:Array,
     stats:          Object,
+    filters:        Object,
+    tenantsForSelect: Array,
 });
+
+const subSearch = ref(props.filters?.search ?? '');
+
+function applySubSearch() {
+    router.get('/admin/billing', { search: subSearch.value || undefined }, {
+        preserveState: true,
+        preserveScroll: true,
+        onSuccess: () => { activeTab.value = 'subscriptions'; },
+    });
+}
 
 const activeTab = ref(props.stats.pending_receipts > 0 ? 'receipts' : 'subscriptions');
 const tabs = [
@@ -237,9 +259,11 @@ const tabs = [
     { key: 'plans',         label: 'Plans' },
 ];
 
-// Tenants from subscriptions for select (limited to what's loaded)
-const tenantsForSelect = computed(() =>
-    (props.subscriptions.data ?? []).map(s => s.tenant).filter(Boolean)
+// Tenants for subscription form select
+const tenantsForSelectComputed = computed(() =>
+    props.tenantsForSelect?.length
+        ? props.tenantsForSelect
+        : (props.subscriptions.data ?? []).map(s => s.tenant).filter(Boolean)
 );
 
 // ─── Plan form ─────────────────────────────────────────────────────────────

@@ -147,6 +147,14 @@ class FestEventFeeResolver
             return "₹{$amount} per participating student";
         }
 
+        if ($model === 'sports_composite') {
+            $school = (float) ($schedule['school_registration_flat'] ?? 2000);
+            $student = (float) ($schedule['per_student_amount'] ?? 300);
+            $quota = (int) ($schedule['included_items_per_student'] ?? 2);
+
+            return "₹{$school} school + ₹{$student}/student + {$quota} included items, then catalog rates";
+        }
+
         return 'Fee applies per school for this event';
     }
 
@@ -341,6 +349,22 @@ class FestEventFeeResolver
             ];
 
             return $this->applySchoolFeeCap($normalized, $input);
+        }
+
+        if ($feeModel === 'sports_composite') {
+            return $this->applySchoolFeeCap([
+                'fee_model' => 'sports_composite',
+                'school_registration_flat' => isset($input['school_registration_flat']) && $input['school_registration_flat'] !== ''
+                    ? (float) $input['school_registration_flat'] : 2000,
+                'per_student_amount' => isset($input['per_student_amount']) && $input['per_student_amount'] !== ''
+                    ? (float) $input['per_student_amount'] : 300,
+                'included_items_per_student' => isset($input['included_items_per_student']) && $input['included_items_per_student'] !== ''
+                    ? (int) $input['included_items_per_student'] : 2,
+                'default_item_fee' => isset($input['default_item_fee']) && $input['default_item_fee'] !== ''
+                    ? (float) $input['default_item_fee'] : null,
+                'age_group_fees' => $this->normalizeAgeGroupFees($input['age_group_fees'] ?? [], $tenantId),
+                'class_group_fees' => $this->normalizeClassGroupFees($input['class_group_fees'] ?? []),
+            ], $input);
         }
 
         return [];

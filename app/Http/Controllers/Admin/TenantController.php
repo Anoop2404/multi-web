@@ -24,14 +24,14 @@ class TenantController extends Controller
         return redirect()->route('admin.sahodayas.index');
     }
 
-    public function indexSahodayas()
+    public function indexSahodayas(Request $request)
     {
-        return $this->tenantIndex('sahodaya', 'Sahodaya Clusters', route('admin.sahodayas.create'));
+        return $this->tenantIndex('sahodaya', 'Sahodaya Clusters', route('admin.sahodayas.create'), $request);
     }
 
-    public function indexSchools()
+    public function indexSchools(Request $request)
     {
-        return $this->tenantIndex('school', 'Member Schools', route('admin.schools.create'));
+        return $this->tenantIndex('school', 'Member Schools', route('admin.schools.create'), $request);
     }
 
     public function create()
@@ -331,10 +331,25 @@ class TenantController extends Controller
         ];
     }
 
-    private function tenantIndex(string $type, string $pageTitle, string $createUrl)
+    private function tenantIndex(string $type, string $pageTitle, string $createUrl, Request $request)
     {
+        $filters = $request->validate([
+            'search' => 'nullable|string|max:100',
+            'status' => 'nullable|in:active,inactive,all',
+        ]);
+
         $query = Tenant::query()
             ->where('type', $type)
+            ->when(! empty($filters['search']), function ($q) use ($filters) {
+                $term = '%'.$filters['search'].'%';
+                $q->where(function ($inner) use ($term) {
+                    $inner->where('name', 'like', $term)
+                        ->orWhere('domain', 'like', $term)
+                        ->orWhere('subdomain', 'like', $term);
+                });
+            })
+            ->when(($filters['status'] ?? 'all') === 'active', fn ($q) => $q->where('is_active', true))
+            ->when(($filters['status'] ?? 'all') === 'inactive', fn ($q) => $q->where('is_active', false))
             ->orderBy('name');
 
         if ($type === 'school') {
@@ -344,11 +359,12 @@ class TenantController extends Controller
         }
 
         return inertia('Tenants/Index', [
-            'tenants'          => $query->paginate(20),
+            'tenants'          => $query->paginate(20)->withQueryString(),
             'tenantType'       => $type,
             'pageTitle'        => $pageTitle,
             'createUrl'        => $createUrl,
             'tenantBaseDomain' => config('tenancy.tenant_base_domain'),
+            'filters'          => array_merge(['search' => '', 'status' => 'all'], $filters),
         ]);
     }
 

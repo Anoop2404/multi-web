@@ -9,7 +9,7 @@
             </template>
         </PageHeader>
 
-        <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="hub" />
+        <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="registration-register" />
 
         <div class="notice-banner notice-banner--info mb-4 text-sm max-w-3xl">
             <p class="font-semibold text-[#0f3d7a] mb-1">How IDs work</p>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Tenant;
 use App\Support\AuditLogCatalog;
 use Illuminate\Http\Request;
 use Inertia\Response;
@@ -14,11 +15,12 @@ class AuditLogController extends Controller
     public function index(Request $request): Response
     {
         $filters = [
-            'category' => $request->query('category', ''),
-            'action'   => $request->query('action', ''),
-            'from'     => $request->query('from', ''),
-            'to'       => $request->query('to', ''),
-            'q'        => trim((string) $request->query('q', '')),
+            'category'  => $request->query('category', ''),
+            'action'    => $request->query('action', ''),
+            'from'      => $request->query('from', ''),
+            'to'        => $request->query('to', ''),
+            'q'         => trim((string) $request->query('q', '')),
+            'tenant_id' => $request->query('tenant_id', ''),
         ];
 
         $query = $this->filteredQuery($filters);
@@ -50,6 +52,7 @@ class AuditLogController extends Controller
             'actionSummary' => $actionSummary,
             'filters'       => $filters,
             'categories'    => AuditLogCatalog::categories(),
+            'tenants'       => Tenant::where('type', 'sahodaya')->orderBy('name')->get(['id', 'name']),
             'total'         => (clone $query)->count(),
         ]);
     }
@@ -57,11 +60,12 @@ class AuditLogController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $filters = [
-            'category' => $request->query('category', ''),
-            'action'   => $request->query('action', ''),
-            'from'     => $request->query('from', ''),
-            'to'       => $request->query('to', ''),
-            'q'        => trim((string) $request->query('q', '')),
+            'category'  => $request->query('category', ''),
+            'action'    => $request->query('action', ''),
+            'from'      => $request->query('from', ''),
+            'to'        => $request->query('to', ''),
+            'q'         => trim((string) $request->query('q', '')),
+            'tenant_id' => $request->query('tenant_id', ''),
         ];
 
         $rows = $this->filteredQuery($filters)
@@ -98,6 +102,7 @@ class AuditLogController extends Controller
     {
         return AuditLog::query()
             ->when($filters['category'], fn ($q, $cat) => $q->where('category', $cat))
+            ->when($filters['tenant_id'], fn ($q, $tenantId) => $q->where('properties->tenant_id', $tenantId))
             ->when($filters['action'], fn ($q, $action) => $q->where('action', $action))
             ->when($filters['from'], fn ($q, $from) => $q->whereDate('created_at', '>=', $from))
             ->when($filters['to'], fn ($q, $to) => $q->whereDate('created_at', '<=', $to))

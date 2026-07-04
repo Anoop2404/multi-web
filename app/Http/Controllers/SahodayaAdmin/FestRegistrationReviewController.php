@@ -13,6 +13,8 @@ use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestEventNotifier;
 use App\Services\Events\FestParticipationPolicyService;
 use App\Services\Events\FestRegistrationApprovalService;
+use App\Services\Events\FestMandatoryItemService;
+use App\Support\ExcelExport;
 use App\Services\Events\FestRegistrationBulkService;
 use App\Support\FestPageActivity;
 use App\Services\Events\FestRegistrationCreateService;
@@ -35,6 +37,18 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
         $registrations = FestRegistration::where('event_id', $event->id)
             ->with(['item', 'participants.student', 'participants.teacher', 'participants.group'])
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $term = '%'.$request->input('search').'%';
+                $q->where(function ($inner) use ($term) {
+                    $inner->whereHas('participants.student', fn ($s) => $s
+                        ->where('name', 'like', $term)
+                        ->orWhere('reg_no', 'like', $term)
+                        ->orWhere('admission_number', 'like', $term))
+                        ->orWhereHas('participants.teacher', fn ($t) => $t
+                            ->where('name', 'like', $term)
+                            ->orWhere('reg_no', 'like', $term));
+                });
+            })
             ->latest()
             ->get();
 
@@ -66,6 +80,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'registerStudents'   => $registerStudents,
             'registerSchoolId'   => $registerSchoolId,
             'eventItems'         => $event->items->values(),
+            'filters'            => ['search' => $request->input('search', '')],
         ]));
     }
 
@@ -139,6 +154,13 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 422,
                 'School event fee must be approved before registration approval.'
             );
+        }
+
+        $mandatoryService = app(FestMandatoryItemService::class);
+        $missingMandatory = $mandatoryService->missingForSchool($event, $registration->school_id)
+            ->filter(fn ($item) => (int) $item->id !== (int) $registration->item_id);
+        if ($missingMandatory->isNotEmpty()) {
+            abort(422, 'Mandatory items not registered: '.$missingMandatory->pluck('title')->join(', '));
         }
 
         app(FestRegistrationApprovalService::class)->approve($registration->load(['participants', 'item', 'event']));
@@ -254,21 +276,20 @@ class FestRegistrationReviewController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        return response()->streamDownload(function () {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, ['school_id', 'school_prefix', 'item_id', 'item_title', 'reg_no', 'team_name', 'role']);
-            fputcsv($out, ['', 'SCH001', '123', 'Mono Act', 'S2024001', '', 'performer']);
-            fclose($out);
-        }, "fest-cluster-registration-{$event->id}-template.csv", ['Content-Type' => 'text/csv']);
+        return ExcelExport::download("fest-cluster-registration-{$event->id}-template", [
+            'school_id', 'school_prefix', 'item_id', 'item_title', 'reg_no', 'team_name', 'role',
+        ], [
+            ['', 'SCH001', '123', 'Mono Act', 'S2024001', '', 'performer'],
+        ]);
     }
 
     public function importStore(Request $request, string $tenantId, FestEvent $event, FestRegistrationImportService $importService, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xls,xlsx|max:5120']);
 
-        $result = $importService->importClusterFromCsv(
+        $result = $importService->importClusterFromSpreadsheet(
             $event,
             $this->sahodaya->id,
             $request->file('file')->getRealPath(),

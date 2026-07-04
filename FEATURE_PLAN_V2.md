@@ -492,3 +492,19 @@ District Science Olympiad 2025
 5. **Temp password delivery**: Shown on-screen once only, OR also emailed? Recommended: Both — shown once in UI + emailed with welcome message.
 
 6. **Profile edit scope for teachers/staff**: Should teachers be able to change their own DOB/class-related data, or only name/email/phone? Recommended: name/email/phone only; DOB and joining date = change request.
+
+---
+
+## 10. Mobile apps (one per Sahodaya)
+
+**Decision:** Each Sahodaya gets its **own Play Store / App Store app** (separate bundle ID, name, icon). One shared Flutter codebase (`sahodaya_mobile/`) with build-time white-labeling — not a single multi-tenant picker app.
+
+**Implementation (done):**
+- `tenants/<slug>.env.json` — API URL, app name, bundle IDs, logo asset path
+- `./scripts/build-tenant.sh <slug> apk|aab|ipa` — release builds into `dist/`
+- Android product flavors in `android/app/build.gradle.kts` (one flavor per onboarded Sahodaya)
+- Runtime: app talks only to that Sahodaya's HTTPS host; Laravel API is already tenant-scoped
+
+**Onboard a new Sahodaya:** See `sahodaya_mobile/tenants/README.md`.
+
+**Future (optional):** Super-admin UI to export tenant env JSON + store listing metadata; student/teacher portal apps as separate white-label variants.

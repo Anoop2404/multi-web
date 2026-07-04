@@ -7,9 +7,23 @@ const genderLabels = {
     open: 'Open',
 };
 
+const maleGenderValues = new Set(['male', 'm', 'boy', 'boys']);
+const femaleGenderValues = new Set(['female', 'f', 'girl', 'girls']);
+
+/** Canonical fest item gender key for icons, filters, and labels. */
+export function normalizeFestItemGender(gender) {
+    const g = String(gender ?? '').trim().toLowerCase();
+    if (!g || g === 'open') return 'open';
+    if (maleGenderValues.has(g)) return 'male';
+    if (femaleGenderValues.has(g)) return 'female';
+    if (g === 'mixed' || g === 'common') return 'mixed';
+    return g;
+}
+
 export function genderLabel(gender) {
-    if (!gender || gender === 'open') return null;
-    return genderLabels[gender] ?? gender;
+    const normalized = normalizeFestItemGender(gender);
+    if (!normalized || normalized === 'open') return null;
+    return genderLabels[normalized] ?? normalized;
 }
 
 export function ageGroupLabel(key, labels = {}) {

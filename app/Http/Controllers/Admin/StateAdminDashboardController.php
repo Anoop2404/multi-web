@@ -7,6 +7,7 @@ use App\Models\FestStateProgram;
 use App\Models\StateRemittance;
 use App\Models\Tenant;
 use App\Services\Events\StateDashboardService;
+use App\Support\AcademicYear;
 use Inertia\Response;
 
 class StateAdminDashboardController extends Controller
@@ -17,6 +18,7 @@ class StateAdminDashboardController extends Controller
         $remittances = StateRemittance::query()->get();
 
         return inertia('State/Dashboard', [
+            'activeAcademicYear' => AcademicYear::activeRecordLabel() ?? AcademicYear::current(),
             'stats' => [
                 'total_programs'       => $programs->count(),
                 'draft_programs'       => $programs->where('status', 'draft')->count(),

@@ -19,20 +19,28 @@
             </thead>
             <tbody>
             @forelse($marks as $row)
-            <tr class="border-t">
+                <tr class="border-t">
                 <td class="p-3 font-mono">#{{ $row['position'] ?? '—' }}</td>
                 <td class="p-3 font-mono text-xs">{{ $row['reference'] }}</td>
                 <td class="p-3">{{ $row['name'] ?? '—' }}</td>
                 <td class="p-3">{{ $row['school'] ?? '—' }}</td>
                 <td class="p-3">{{ $row['grade'] ?? '—' }}</td>
-                <td class="p-3">{{ $row['result'] ?: ($row['score'] ?? '—') }}</td>
+                <td class="p-3">
+                    {{ $row['result'] ?: ($row['score'] ?? '—') }}
+                    @if(!empty($row['poster_url']))
+                    <a href="{{ $row['poster_url'] }}" class="block text-xs text-amber-700 mt-1" download>Winner poster ↓</a>
+                    @endif
+                </td>
             </tr>
             @empty
             <tr><td colspan="6" class="p-6 text-center text-gray-400">No published results for this item.</td></tr>
             @endforelse
             </tbody>
         </table>
-        <p class="mt-4"><a href="{{ route('tenant.fest.show', $event->id) }}" class="text-sm text-amber-700">← Festival hub</a></p>
+        <p class="mt-4 flex flex-wrap gap-4">
+            <a href="{{ route('tenant.fest.item-results.pdf', [$event->id, $item->id]) }}" class="text-sm text-amber-700 font-medium">Download PDF ↓</a>
+            <a href="{{ route('tenant.fest.show', $event->id) }}" class="text-sm text-amber-700">← Festival hub</a>
+        </p>
     </div>
 </section>
 @endsection

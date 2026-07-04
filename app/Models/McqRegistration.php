@@ -14,12 +14,13 @@ class McqRegistration extends Model
         'status', 'approval_status', 'approved_at', 'approved_by_user_id',
         'attendance_status', 'attendance_marked_at', 'attendance_marked_by',
         'fee_receipt_id',
-        'started_at', 'submitted_at',
+        'started_at', 'submitted_at', 'draft_answers',
     ];
 
     protected $casts = [
         'started_at'            => 'datetime',
         'submitted_at'          => 'datetime',
+        'draft_answers'         => 'array',
         'approved_at'           => 'datetime',
         'attendance_marked_at'  => 'datetime',
     ];

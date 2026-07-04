@@ -11,6 +11,7 @@ use App\Models\FestRegistration;
 use App\Models\FestSchedule;
 use App\Models\FestSchoolEventFee;
 use App\Models\InAppNotification;
+use App\Models\McqQuestionBank;
 use App\Models\Tenant;
 use App\Models\TrainingRegistration;
 use App\Services\Events\FestCertificateService;
@@ -21,6 +22,122 @@ use Illuminate\Http\Request;
 class TeacherDashboardController extends Controller
 {
     public function index(Request $request, string $tenantId)
+    {
+        return inertia('Portal/Teacher/Dashboard', $this->teacherPortalPayload($request, $tenantId));
+    }
+
+    public function trainingPage(Request $request, string $tenantId)
+    {
+        $payload = $this->teacherPortalPayload($request, $tenantId);
+
+        return inertia('Portal/Teacher/Training', [
+            'school'   => $payload['school'],
+            'teacher'  => $payload['teacher'],
+            'training' => $payload['training'],
+        ]);
+    }
+
+    public function festPage(Request $request, string $tenantId)
+    {
+        $payload = $this->teacherPortalPayload($request, $tenantId);
+
+        return inertia('Portal/Teacher/Fest', [
+            'school'                 => $payload['school'],
+            'teacher'                => $payload['teacher'],
+            'festRegistrations'      => $payload['festRegistrations'],
+            'festDaySlots'           => $payload['festDaySlots'],
+            'festResults'            => $payload['festResults'],
+            'festCerts'              => $payload['festCerts'],
+            'admitCardEvents'        => $payload['admitCardEvents'],
+            'festAppeals'            => $payload['festAppeals'],
+            'festFees'               => $payload['festFees'],
+            'appealableParticipants' => $payload['appealableParticipants'],
+        ]);
+    }
+
+    public function festSchedulePage(Request $request, string $tenantId)
+    {
+        $payload = $this->teacherPortalPayload($request, $tenantId);
+
+        return inertia('Portal/Teacher/FestSchedule', [
+            'school'       => $payload['school'],
+            'teacher'      => $payload['teacher'],
+            'festDaySlots' => $payload['festDaySlots'],
+        ]);
+    }
+
+    public function resultsPage(Request $request, string $tenantId)
+    {
+        $payload = $this->teacherPortalPayload($request, $tenantId);
+
+        return inertia('Portal/Teacher/Results', [
+            'school'      => $payload['school'],
+            'teacher'     => $payload['teacher'],
+            'festResults' => $payload['festResults'],
+        ]);
+    }
+
+    public function certificatesPage(Request $request, string $tenantId)
+    {
+        $payload = $this->teacherPortalPayload($request, $tenantId);
+
+        return inertia('Portal/Teacher/Certificates', [
+            'school'    => $payload['school'],
+            'teacher'   => $payload['teacher'],
+            'festCerts' => $payload['festCerts'],
+        ]);
+    }
+
+    public function admitCard(Request $request, string $tenantId, FestEvent $event)
+    {
+        $teacher = $request->attributes->get('portalTeacher');
+        abort_if($event->tenant_id !== Tenant::findOrFail($tenantId)->parent_id, 403);
+
+        $hasEntry = FestParticipant::where('teacher_id', $teacher->id)
+            ->whereHas('registration', fn ($q) => $q
+                ->where('event_id', $event->id)
+                ->where('school_id', $tenantId)
+                ->where('status', 'approved'))
+            ->exists();
+
+        abort_unless($hasEntry, 403, 'No approved fest entry for this event.');
+
+        return (new FestReportService($event))->downloadAdmitCards(
+            Request::create('/', 'GET', [
+                'school_id'  => $tenantId,
+                'teacher_id' => $teacher->id,
+            ])
+        );
+    }
+
+    public function trainingCertificate(Request $request, string $tenantId, TrainingRegistration $registration)
+    {
+        $teacher = $request->attributes->get('portalTeacher');
+        abort_if($registration->teacher_id !== $teacher->id, 403);
+
+        $certificate = Certificate::where('entity_type', TrainingRegistration::class)
+            ->where('entity_id', $registration->id)
+            ->first();
+
+        if (! $certificate) {
+            app(TrainingCertificateService::class)->assertEligible($registration);
+            $certificate = app(TrainingCertificateService::class)->issue($registration);
+        }
+
+        $registration->load(['program', 'teacher']);
+        $sahodaya = Tenant::findOrFail($registration->program->tenant_id);
+        $fieldValues = app(TrainingCertificateService::class)->resolveFieldValues($registration, $sahodaya);
+
+        return view('training.certificate', [
+            'registration' => $registration,
+            'certificate'  => $certificate,
+            'sahodaya'     => $sahodaya,
+            'fieldValues'  => $fieldValues,
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function teacherPortalPayload(Request $request, string $tenantId): array
     {
         $teacher = $request->attributes->get('portalTeacher');
         $school = Tenant::findOrFail($tenantId);
@@ -37,12 +154,12 @@ class TeacherDashboardController extends Controller
                     ->keyBy('session_id');
 
                 return [
-                    'id'       => $reg->id,
-                    'status'   => $reg->status,
-                    'program'  => $reg->program?->only('id', 'title', 'description'),
-                    'feeReceipt' => $reg->feeReceipt?->only('status'),
+                    'id'               => $reg->id,
+                    'status'           => $reg->status,
+                    'program'          => $reg->program?->only('id', 'title', 'description'),
+                    'feeReceipt'       => $reg->feeReceipt?->only('status'),
                     'certificate_uuid' => $reg->certificate?->verification_uuid,
-                    'sessions' => $sessions->map(fn ($s) => [
+                    'sessions'         => $sessions->map(fn ($s) => [
                         'id'           => $s->id,
                         'title'        => $s->title,
                         'scheduled_at' => $s->scheduled_at?->toIso8601String(),
@@ -52,7 +169,7 @@ class TeacherDashboardController extends Controller
                 ];
             });
 
-        $mcqBanks = \App\Models\McqQuestionBank::where('school_id', $tenantId)
+        $mcqBanks = McqQuestionBank::where('school_id', $tenantId)
             ->where('created_by_user_id', $request->user()->id)
             ->withCount('questions')
             ->latest()
@@ -141,12 +258,12 @@ class TeacherDashboardController extends Controller
             ->limit(10)
             ->get()
             ->map(fn (FestAppeal $a) => [
-                'event_title' => $a->participant?->registration?->event?->title,
-                'item_title'  => $a->participant?->registration?->item?->title,
-                'status'      => $a->status,
-                'reason'      => $a->reason,
-                'resolution'  => $a->resolution_note,
-                'submitted_at'=> $a->created_at?->toIso8601String(),
+                'event_title'  => $a->participant?->registration?->event?->title,
+                'item_title'   => $a->participant?->registration?->item?->title,
+                'status'       => $a->status,
+                'reason'       => $a->reason,
+                'resolution'   => $a->resolution_note,
+                'submitted_at' => $a->created_at?->toIso8601String(),
             ]);
 
         $festFees = FestSchoolEventFee::where('school_id', $tenantId)
@@ -175,68 +292,20 @@ class TeacherDashboardController extends Controller
                 'item_title'     => $p->registration?->item?->title,
             ]);
 
-        return inertia('Portal/Teacher/Dashboard', [
-            'school'            => $school->only('id', 'name'),
-            'teacher'           => $teacher->only('id', 'name', 'reg_no', 'email', 'designation'),
-            'training'          => $training,
-            'mcqBanks'          => $mcqBanks,
-            'festRegistrations' => $festRegistrations,
-            'festResults'       => $festResults,
-            'festDaySlots'      => $festDaySlots,
-            'festCerts'         => $festCerts,
-            'festAppeals'       => $festAppeals,
-            'festFees'          => $festFees,
+        return [
+            'school'                 => $school->only('id', 'name'),
+            'teacher'                => $teacher->only('id', 'name', 'reg_no', 'email', 'designation'),
+            'training'               => $training,
+            'mcqBanks'               => $mcqBanks,
+            'festRegistrations'      => $festRegistrations,
+            'festResults'            => $festResults,
+            'festDaySlots'           => $festDaySlots,
+            'festCerts'              => $festCerts,
+            'festAppeals'            => $festAppeals,
+            'festFees'               => $festFees,
             'appealableParticipants' => $appealableParticipants,
-            'admitCardEvents'   => $admitCardEvents,
-            'notifications'     => $notifications,
-        ]);
-    }
-
-    public function admitCard(Request $request, string $tenantId, FestEvent $event)
-    {
-        $teacher = $request->attributes->get('portalTeacher');
-        abort_if($event->tenant_id !== Tenant::findOrFail($tenantId)->parent_id, 403);
-
-        $hasEntry = FestParticipant::where('teacher_id', $teacher->id)
-            ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
-                ->where('school_id', $tenantId)
-                ->where('status', 'approved'))
-            ->exists();
-
-        abort_unless($hasEntry, 403, 'No approved fest entry for this event.');
-
-        return (new FestReportService($event))->downloadAdmitCards(
-            Request::create('/', 'GET', [
-                'school_id'  => $tenantId,
-                'teacher_id' => $teacher->id,
-            ])
-        );
-    }
-
-    public function trainingCertificate(Request $request, string $tenantId, TrainingRegistration $registration)
-    {
-        $teacher = $request->attributes->get('portalTeacher');
-        abort_if($registration->teacher_id !== $teacher->id, 403);
-
-        $certificate = Certificate::where('entity_type', TrainingRegistration::class)
-            ->where('entity_id', $registration->id)
-            ->first();
-
-        if (! $certificate) {
-            app(TrainingCertificateService::class)->assertEligible($registration);
-            $certificate = app(TrainingCertificateService::class)->issue($registration);
-        }
-
-        $registration->load(['program', 'teacher']);
-        $sahodaya = Tenant::findOrFail($registration->program->tenant_id);
-        $fieldValues = app(TrainingCertificateService::class)->resolveFieldValues($registration, $sahodaya);
-
-        return view('training.certificate', [
-            'registration' => $registration,
-            'certificate'  => $certificate,
-            'sahodaya'       => $sahodaya,
-            'fieldValues'    => $fieldValues,
-        ]);
+            'admitCardEvents'        => $admitCardEvents,
+            'notifications'          => $notifications,
+        ];
     }
 }

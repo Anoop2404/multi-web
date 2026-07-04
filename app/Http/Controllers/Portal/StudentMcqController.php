@@ -69,6 +69,7 @@ class StudentMcqController extends Controller
             'registration' => $registration->only('id', 'status', 'started_at'),
             'exam'         => $registration->exam->only('id', 'title', 'duration_minutes', 'scheduled_at'),
             'questions'    => $sessions->paperForStudent($registration),
+            'savedAnswers' => $registration->draft_answers ?? [],
             'expiresAt'    => $sessions->expiresAt($registration)?->toIso8601String(),
             'started'      => (bool) $registration->started_at,
         ]);
@@ -93,6 +94,21 @@ class StudentMcqController extends Controller
         ]);
     }
 
+    public function saveAnswer(Request $request, string $tenantId, McqRegistration $registration, McqExamSessionService $sessions)
+    {
+        $student = $request->attributes->get('portalStudent');
+        abort_if($registration->school_id !== $tenantId || $registration->student_id !== $student->id, 403);
+
+        $data = $request->validate([
+            'answers'   => 'required|array',
+            'answers.*' => 'nullable|string|max:10',
+        ]);
+
+        $sessions->saveDraftAnswers($registration, $data['answers']);
+
+        return response()->json(['saved' => true]);
+    }
+
     public function submitExam(Request $request, string $tenantId, McqRegistration $registration, McqExamSessionService $sessions)
     {
         $student = $request->attributes->get('portalStudent');
@@ -103,17 +119,26 @@ class StudentMcqController extends Controller
             'answers.*' => 'nullable|string|max:10',
         ]);
 
+        $registration->loadMissing('exam');
+        $autoSubmitted = $registration->started_at && $sessions->isExpired($registration);
+
         $mark = $sessions->submit($registration, $data['answers']);
 
         app(PlatformAuditLogger::class)->mcqRegistration(
             $registration->fresh(['exam']),
-            'mcq.exam.submitted',
-            "Student submitted online MCQ exam with score {$mark->score}",
+            $autoSubmitted ? 'mcq.exam.auto_submitted' : 'mcq.exam.submitted',
+            $autoSubmitted
+                ? "Student auto-submitted online MCQ exam (time expired) with score {$mark->score}"
+                : "Student submitted online MCQ exam with score {$mark->score}",
         );
+
+        $message = $autoSubmitted
+            ? "Time expired — your answers were auto-submitted. Score: {$mark->score}"
+            : "Exam submitted. Score: {$mark->score}";
 
         return redirect()->route('portal.student.mcq.exam', [
             'tenantId'     => $tenantId,
             'registration' => $registration->id,
-        ])->with('success', "Exam submitted. Score: {$mark->score}");
+        ])->with('success', $message);
     }
 }

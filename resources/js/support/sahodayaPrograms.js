@@ -157,6 +157,7 @@ export function programScopedNav(sahodayaId, programSlug, events = []) {
     const setupItems = [
         { label: 'Overview', href: programBase, icon: 'grid', exact: true, permissions: FEST_VIEW },
         { label: 'Item catalog', href: sahodayaProgramHref(sahodayaId, programSlug, 'catalog'), icon: 'file-text', permissions: FEST_MANAGE },
+        { label: 'Category masters', href: `${base}/taxonomy-masters`, icon: 'settings', permissions: FEST_MANAGE },
     ];
 
     if (programSlug === 'sports-meet') {

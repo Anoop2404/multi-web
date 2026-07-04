@@ -10,45 +10,24 @@ use App\Models\FestRegistration;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\Tenant;
+use App\Support\ExcelImport;
 
 class FestRegistrationImportService
 {
     /** @return array{imported: int, skipped: int, errors: list<string>} */
     public function importFromCsv(FestEvent $event, Tenant $school, string $path, bool $isTeacherFest = false): array
     {
-        $handle = fopen($path, 'r');
-        if ($handle === false) {
-            return ['imported' => 0, 'skipped' => 0, 'errors' => ['Could not read CSV file.']];
-        }
+        return $this->importFromSpreadsheet($event, $school, $path, $isTeacherFest);
+    }
 
-        $header = fgetcsv($handle);
-        if ($header === false) {
-            fclose($handle);
-
-            return ['imported' => 0, 'skipped' => 0, 'errors' => ['CSV file is empty.']];
-        }
-
-        $header = array_map(fn ($h) => strtolower(trim((string) $h)), $header);
-        $rows = [];
-
-        while (($row = fgetcsv($handle)) !== false) {
-            if ($row === [null] || $row === false) {
-                continue;
-            }
-
-            $assoc = [];
-            foreach ($header as $i => $key) {
-                $assoc[$key] = trim((string) ($row[$i] ?? ''));
-            }
-
-            if ($assoc === [] || ($assoc['reg_no'] ?? '') === '') {
-                continue;
-            }
-
-            $rows[] = $assoc;
-        }
-
-        fclose($handle);
+    /** @return array{imported: int, skipped: int, errors: list<string>} */
+    public function importFromSpreadsheet(FestEvent $event, Tenant $school, string $path, bool $isTeacherFest = false): array
+    {
+        $parsed = ExcelImport::associativeRows($path);
+        $rows = collect($parsed['rows'])
+            ->filter(fn (array $row) => ($row['reg_no'] ?? '') !== '')
+            ->values()
+            ->all();
 
         if ($rows === []) {
             return ['imported' => 0, 'skipped' => 0, 'errors' => ['No data rows found.']];
@@ -278,32 +257,17 @@ class FestRegistrationImportService
      */
     public function importClusterFromCsv(FestEvent $event, string $sahodayaId, string $path): array
     {
-        $handle = fopen($path, 'r');
-        if ($handle === false) {
-            return ['imported' => 0, 'skipped' => 0, 'errors' => ['Could not read CSV file.']];
-        }
+        return $this->importClusterFromSpreadsheet($event, $sahodayaId, $path);
+    }
 
-        $header = fgetcsv($handle);
-        if ($header === false) {
-            fclose($handle);
-
-            return ['imported' => 0, 'skipped' => 0, 'errors' => ['CSV file is empty.']];
-        }
-
-        $header = array_map(fn ($h) => strtolower(trim((string) $h)), $header);
+    /** @return array{imported: int, skipped: int, errors: list<string>} */
+    public function importClusterFromSpreadsheet(FestEvent $event, string $sahodayaId, string $path): array
+    {
+        $parsed = ExcelImport::associativeRows($path);
         $bySchool = [];
 
-        while (($row = fgetcsv($handle)) !== false) {
-            if ($row === [null] || $row === false) {
-                continue;
-            }
-
-            $assoc = [];
-            foreach ($header as $i => $key) {
-                $assoc[$key] = trim((string) ($row[$i] ?? ''));
-            }
-
-            if ($assoc === [] || ($assoc['reg_no'] ?? '') === '') {
+        foreach ($parsed['rows'] as $assoc) {
+            if (($assoc['reg_no'] ?? '') === '') {
                 continue;
             }
 
@@ -318,8 +282,6 @@ class FestRegistrationImportService
 
             $bySchool[$school->id][] = $assoc;
         }
-
-        fclose($handle);
 
         $imported = 0;
         $skipped = 0;

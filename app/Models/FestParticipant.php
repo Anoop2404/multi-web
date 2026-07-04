@@ -8,9 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class FestParticipant extends Model
 {
     protected $fillable = [
-        'registration_id', 'group_id', 'student_id', 'teacher_id',
+        'registration_id', 'group_id', 'student_id', 'teacher_id', 'event_id',
         'participant_type', 'participant_role', 'chest_no', 'chest_revealed_at',
-        'level_registration_number', 'disqualified_at', 'disqualification_reason',
+        'level_registration_number', 'item_registration_number', 'disqualified_at', 'disqualification_reason',
     ];
 
     protected $casts = [

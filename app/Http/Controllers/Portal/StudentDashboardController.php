@@ -22,105 +22,79 @@ use Illuminate\Http\Request;
 
 class StudentDashboardController extends Controller
 {
+    public function festSchedule(Request $request, string $tenantId)
+    {
+        [$student, $school] = $this->portalContext($request, $tenantId);
+
+        return inertia('Portal/Student/FestSchedule', [
+            'school'       => $school->only('id', 'name'),
+            'student'      => $student->only('id', 'name', 'reg_no'),
+            'festDaySlots' => $this->festDaySlots($student, $tenantId),
+        ]);
+    }
+
+    public function festResultsPage(Request $request, string $tenantId)
+    {
+        [$student, $school] = $this->portalContext($request, $tenantId);
+
+        return inertia('Portal/Student/FestResults', [
+            'school'      => $school->only('id', 'name'),
+            'student'     => $student->only('id', 'name', 'reg_no'),
+            'festResults' => $this->festResults($student, $tenantId),
+        ]);
+    }
+
+    public function festCertificates(Request $request, string $tenantId)
+    {
+        [$student, $school] = $this->portalContext($request, $tenantId);
+
+        return inertia('Portal/Student/FestCertificates', [
+            'school'    => $school->only('id', 'name'),
+            'student'   => $student->only('id', 'name', 'reg_no'),
+            'festCerts' => $this->festCertificatesFor($student, $tenantId),
+        ]);
+    }
+
+    public function mcqHub(Request $request, string $tenantId)
+    {
+        [$student, $school] = $this->portalContext($request, $tenantId);
+
+        return inertia('Portal/Student/McqHub', [
+            'school'   => $school->only('id', 'name'),
+            'student'  => $student->only('id', 'name', 'reg_no'),
+            'mcqExams' => $this->mcqExamsFor($student),
+        ]);
+    }
+
     public function index(Request $request, string $tenantId)
     {
-        $student = $request->attributes->get('portalStudent');
-        $school = Tenant::findOrFail($tenantId);
+        [$student, $school] = $this->portalContext($request, $tenantId);
 
         $registrations = FestRegistration::where('school_id', $tenantId)
             ->whereHas('participants', fn ($q) => $q->where('student_id', $student->id))
-            ->with(['event', 'item'])
-            ->latest()
-            ->limit(10)
-            ->get();
-
-        $mcqExams = McqRegistration::where('student_id', $student->id)
-            ->with(['exam', 'mark'])
+            ->with(['event', 'item', 'participants' => fn ($q) => $q->where('student_id', $student->id)])
             ->latest()
             ->limit(10)
             ->get()
-            ->map(function (McqRegistration $reg) {
-                $exam = $reg->exam;
-                if (! $exam) {
-                    return null;
-                }
-
-                return array_merge(
-                    McqResultPresenter::forExamList($exam, $reg),
-                    [
-                        'show_hall_ticket' => (bool) $reg->hall_ticket_no,
-                        'can_take_online'  => $exam->isOnlineDelivery()
-                            && in_array($exam->status, ['published', 'ongoing'], true)
-                            && $reg->status !== 'submitted'
-                            && $reg->attendance_status !== 'absent'
-                            && app(\App\Services\Mcq\McqExamSessionService::class)->canTakeOnline($reg),
-                        'delivery_mode'      => $exam->delivery_mode ?? 'offline',
-                        'registration_route_id' => $reg->id,
-                    ]
-                );
-            })
-            ->filter()
-            ->values();
-
-        $festResults = FestParticipant::where('student_id', $student->id)
-            ->whereHas('registration', fn ($q) => $q->where('school_id', $tenantId))
-            ->whereHas('registration.event', fn ($q) => $q->where('results_published', true))
-            ->with(['registration.event', 'registration.item', 'mark'])
-            ->latest()
-            ->limit(20)
-            ->get()
-            ->map(fn (FestParticipant $p) => [
-                'event_title' => $p->registration?->event?->title,
-                'item_title'  => $p->registration?->item?->title,
-                'grade'       => $p->mark?->grade,
-                'position'    => $p->mark?->position,
-                'score'       => $p->mark?->score,
-                'chest_no'    => $p->chest_no,
+            ->map(fn (FestRegistration $r) => [
+                'id'       => $r->id,
+                'status'   => $r->status,
+                'event'    => $r->event?->only('id', 'title'),
+                'item'     => $r->item?->only('id', 'title'),
+                'chest_no' => $r->participants->first()?->chest_no,
             ]);
 
-        $festCertificates = FestParticipant::where('student_id', $student->id)
-            ->whereHas('registration', fn ($q) => $q->where('school_id', $tenantId))
-            ->pluck('id');
+        $mcqExams = $this->mcqExamsFor($student);
 
-        $certService = app(FestCertificateService::class);
-        $festCerts = Certificate::where('entity_type', FestParticipant::class)
-            ->whereIn('entity_id', $festCertificates)
-            ->orderByDesc('generated_at')
-            ->limit(10)
-            ->get()
-            ->map(fn (Certificate $c) => array_merge(
-                ['uuid' => $c->verification_uuid],
-                $certService->payloadFor($c)
-            ));
+        $festResults = $this->festResults($student, $tenantId);
+        $festCerts = $this->festCertificatesFor($student, $tenantId);
 
         $notifications = InAppNotification::where('user_id', $request->user()->id)
             ->latest()
             ->limit(10)
             ->get();
 
-        $festDaySlots = FestParticipant::where('student_id', $student->id)
-            ->whereHas('registration', fn ($q) => $q
-                ->where('school_id', $tenantId)
-                ->where('status', 'approved'))
-            ->whereHas('registration.event', fn ($q) => $q->whereIn('status', ['ongoing', 'registration_open', 'published']))
-            ->with(['registration.event', 'registration.item'])
-            ->get()
-            ->map(function (FestParticipant $p) {
-                $schedule = FestSchedule::where('participant_id', $p->id)->first();
-
-                return [
-                    'event_title'    => $p->registration?->event?->title,
-                    'item_title'     => $p->registration?->item?->title,
-                    'chest_no'       => $p->chest_no,
-                    'level_reg'      => $p->level_registration_number,
-                    'order'          => $schedule?->sort_order,
-                    'scheduled_at'   => $schedule?->scheduled_at?->toIso8601String(),
-                    'stage'          => $schedule?->stage,
-                    'event_status'   => $p->registration?->event?->status,
-                ];
-            })
-            ->filter(fn ($row) => $row['event_title'])
-            ->values();
+        $festDaySlots = $this->festDaySlots($student, $tenantId);
 
         $participantIds = FestParticipant::where('student_id', $student->id)
             ->whereHas('registration', fn ($q) => $q->where('school_id', $tenantId))
@@ -248,6 +222,115 @@ class StudentDashboardController extends Controller
                 'student_id' => $student->id,
             ])
         );
+    }
+
+    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
+    private function mcqExamsFor($student)
+    {
+        return McqRegistration::where('student_id', $student->id)
+            ->with(['exam', 'mark'])
+            ->latest()
+            ->limit(20)
+            ->get()
+            ->map(function (McqRegistration $reg) {
+                $exam = $reg->exam;
+                if (! $exam) {
+                    return null;
+                }
+
+                return array_merge(
+                    McqResultPresenter::forExamList($exam, $reg),
+                    [
+                        'show_hall_ticket' => (bool) $reg->hall_ticket_no,
+                        'can_take_online'  => $exam->isOnlineDelivery()
+                            && in_array($exam->status, ['published', 'ongoing'], true)
+                            && $reg->status !== 'submitted'
+                            && $reg->attendance_status !== 'absent'
+                            && app(\App\Services\Mcq\McqExamSessionService::class)->canTakeOnline($reg),
+                        'delivery_mode'         => $exam->delivery_mode ?? 'offline',
+                        'registration_route_id' => $reg->id,
+                    ]
+                );
+            })
+            ->filter()
+            ->values();
+    }
+
+    /** @return array{0: \App\Models\Student, 1: Tenant} */
+    private function portalContext(Request $request, string $tenantId): array
+    {
+        $student = $request->attributes->get('portalStudent');
+        $school = Tenant::findOrFail($tenantId);
+
+        return [$student, $school];
+    }
+
+    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
+    private function festDaySlots($student, string $tenantId)
+    {
+        return FestParticipant::where('student_id', $student->id)
+            ->whereHas('registration', fn ($q) => $q
+                ->where('school_id', $tenantId)
+                ->where('status', 'approved'))
+            ->whereHas('registration.event', fn ($q) => $q->whereIn('status', ['ongoing', 'registration_open', 'published']))
+            ->with(['registration.event', 'registration.item'])
+            ->get()
+            ->map(function (FestParticipant $p) {
+                $schedule = FestSchedule::where('participant_id', $p->id)->first();
+
+                return [
+                    'event_title'  => $p->registration?->event?->title,
+                    'item_title'   => $p->registration?->item?->title,
+                    'chest_no'     => $p->chest_no,
+                    'level_reg'    => $p->level_registration_number,
+                    'order'        => $schedule?->sort_order,
+                    'scheduled_at' => $schedule?->scheduled_at?->toIso8601String(),
+                    'stage'        => $schedule?->stage,
+                    'event_status' => $p->registration?->event?->status,
+                ];
+            })
+            ->filter(fn ($row) => $row['event_title'])
+            ->values();
+    }
+
+    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
+    private function festResults($student, string $tenantId)
+    {
+        return FestParticipant::where('student_id', $student->id)
+            ->whereHas('registration', fn ($q) => $q->where('school_id', $tenantId))
+            ->whereHas('registration.event', fn ($q) => $q->where('results_published', true))
+            ->with(['registration.event', 'registration.item', 'mark'])
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->map(fn (FestParticipant $p) => [
+                'event_title' => $p->registration?->event?->title,
+                'item_title'  => $p->registration?->item?->title,
+                'grade'       => $p->mark?->grade,
+                'position'    => $p->mark?->position,
+                'score'       => $p->mark?->score,
+                'chest_no'    => $p->chest_no,
+            ]);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
+    private function festCertificatesFor($student, string $tenantId)
+    {
+        $participantIds = FestParticipant::where('student_id', $student->id)
+            ->whereHas('registration', fn ($q) => $q->where('school_id', $tenantId))
+            ->pluck('id');
+
+        $certService = app(FestCertificateService::class);
+
+        return Certificate::where('entity_type', FestParticipant::class)
+            ->whereIn('entity_id', $participantIds)
+            ->orderByDesc('generated_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (Certificate $c) => array_merge(
+                ['uuid' => $c->verification_uuid],
+                $certService->payloadFor($c)
+            ));
     }
 
     /** @return list<array<string, mixed>> */

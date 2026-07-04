@@ -46,11 +46,15 @@ class FestJudgeAssignmentController extends SahodayaAdminController
             ],
         ]);
 
-        FestJudgeAssignment::firstOrCreate([
+        $assignment = FestJudgeAssignment::firstOrCreate([
             'event_id' => $event->id,
             'item_id'  => $data['item_id'],
             'user_id'  => $data['user_id'],
         ]);
+
+        if ($assignment->wasRecentlyCreated) {
+            app(\App\Services\Events\FestEventNotifier::class)->judgeAssigned($assignment);
+        }
 
         $audit->festEvent($event, FestPageActivity::JUDGES, 'fest.judge.assigned', 'Judge assigned to item', [
             'item_id' => $data['item_id'],

@@ -26,6 +26,12 @@
                       :title="!schoolClasses.length ? 'Classes are configured by your Sahodaya' : ''">
                     + Add student
                 </Link>
+                <button v-if="studentsWithoutPortal > 0" type="button"
+                        :disabled="bulkProvisionForm.processing"
+                        class="btn-secondary text-sm"
+                        @click="confirmBulkProvision">
+                    {{ bulkProvisionForm.processing ? 'Creating…' : `Bulk create logins (${studentsWithoutPortal})` }}
+                </button>
             </template>
         </PageHeader>
 
@@ -121,6 +127,8 @@
                                 class="link-brand text-xs mr-3">{{ isLocked ? 'Request change' : 'Edit' }}</button>
                         <button v-if="!student.user_id" type="button" @click="openPortalModal(student)"
                                 class="link-brand text-xs mr-3">Portal</button>
+                        <button v-else type="button" @click="openLoginModal(student)"
+                                class="link-brand text-xs mr-3">Login</button>
                         <button v-if="!isLocked" type="button" @click="remove(student)"
                                 class="text-xs text-red-400 hover:text-red-600 hover:underline">Remove</button>
                     </td>
@@ -293,6 +301,23 @@
             </div>
         </div>
 
+        <!-- Existing portal login info -->
+        <div v-if="showLogin && loginStudent" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closeLoginModal"></div>
+            <div class="relative modal-shell max-w-md p-6 space-y-4">
+                <h3 class="font-bold">Student portal login — {{ loginStudent.name }}</h3>
+                <p class="text-sm text-gray-600">Share these credentials with the student. They sign in at the participant portal.</p>
+                <div class="rounded-lg border bg-gray-50 p-3 text-sm space-y-2">
+                    <p><span class="text-gray-500">Username / email:</span> <span class="font-mono font-semibold">{{ loginStudent.portal_email || '—' }}</span></p>
+                    <p class="text-xs text-gray-500">Password was set when the portal account was created. Use reset flow if forgotten.</p>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="closeLoginModal" class="text-sm text-gray-500">Close</button>
+                    <a href="/portal/login" target="_blank" rel="noopener" class="btn-primary text-sm">Open portal login ↗</a>
+                </div>
+            </div>
+        </div>
+
         <!-- Import CSV modal -->
         <div v-if="showImport" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closeImportModal"></div>
@@ -376,6 +401,7 @@ const props = defineProps({
     classNames: { type: Array, default: () => [] },
     studentEditLock: { type: Object, default: () => ({ locked: false }) },
     pendingChangeRequests: { type: Number, default: 0 },
+    studentsWithoutPortal: { type: Number, default: 0 },
 });
 
 const isLocked = computed(() => !!props.studentEditLock?.locked);
@@ -385,7 +411,9 @@ const showImport = ref(false);
 const showEdit = ref(false);
 const showCreateRequest = ref(false);
 const showPortal = ref(false);
+const showLogin = ref(false);
 const portalStudent = ref(null);
+const loginStudent = ref(null);
 const editingStudent = ref(null);
 const editPhotoFile = ref(null);
 const createPhotoFile = ref(null);
@@ -610,6 +638,17 @@ function submitEdit() {
         });
 }
 
+const csrfToken = computed(() => page.props.csrf_token ?? document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '');
+
+const bulkProvisionForm = useForm({});
+
+function confirmBulkProvision() {
+    if (!confirm(`Create portal logins for all ${props.studentsWithoutPortal} student(s) without one? Each student will receive a welcome email.`)) return;
+    bulkProvisionForm.post(`/school-admin/${props.school.id}/students/bulk-portal-provision`, {
+        preserveScroll: true,
+    });
+}
+
 function openPortalModal(student) {
     portalStudent.value = student;
     portalForm.email = student.email || student.parent_email || '';
@@ -622,6 +661,16 @@ function closePortalModal() {
     showPortal.value = false;
     portalStudent.value = null;
     portalForm.reset();
+}
+
+function openLoginModal(student) {
+    loginStudent.value = student;
+    showLogin.value = true;
+}
+
+function closeLoginModal() {
+    showLogin.value = false;
+    loginStudent.value = null;
 }
 
 function submitPortal() {

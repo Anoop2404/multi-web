@@ -132,6 +132,20 @@
                             <option value="">Age group</option>
                             <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
                         </select>
+                        <div v-if="isSports" class="grid grid-cols-2 gap-2">
+                            <select v-model="customForm.venue_type" class="field text-sm">
+                                <option value="">Venue</option>
+                                <option v-for="(label, key) in taxonomy?.venue_type ?? {}" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                            <select v-model="customForm.competition_format" class="field text-sm">
+                                <option value="">Format</option>
+                                <option v-for="(label, key) in taxonomy?.competition_format ?? {}" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                        </div>
+                        <select v-if="isSports" v-model="customForm.sport_discipline" class="field text-sm">
+                            <option value="">Discipline</option>
+                            <option v-for="(label, key) in taxonomy?.sport_discipline ?? {}" :key="key" :value="key">{{ label }}</option>
+                        </select>
                         <div class="grid grid-cols-2 gap-2">
                             <select v-model="customForm.gender" class="field text-sm">
                                 <option value="open">Open gender</option>
@@ -144,6 +158,7 @@
                             </select>
                         </div>
                         <input v-model.number="customForm.fee_amount" type="number" min="0" step="0.01" class="field text-sm" placeholder="Fee ₹ (optional)">
+                        <Link v-if="taxonomyMastersUrl" :href="taxonomyMastersUrl" class="text-xs link-brand block">Category masters →</Link>
                         <button type="submit" class="btn-primary w-full text-sm" :disabled="customForm.processing">Add item</button>
                     </form>
                 </FormSection>
@@ -188,6 +203,20 @@
                     <select v-if="isSports" v-model="editForm.age_group" class="field text-sm">
                         <option value="">Age group</option>
                         <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
+                    </select>
+                    <div v-if="isSports" class="grid grid-cols-2 gap-2">
+                        <select v-model="editForm.venue_type" class="field text-sm">
+                            <option value="">Venue</option>
+                            <option v-for="(label, key) in taxonomy?.venue_type ?? {}" :key="key" :value="key">{{ label }}</option>
+                        </select>
+                        <select v-model="editForm.competition_format" class="field text-sm">
+                            <option value="">Format</option>
+                            <option v-for="(label, key) in taxonomy?.competition_format ?? {}" :key="key" :value="key">{{ label }}</option>
+                        </select>
+                    </div>
+                    <select v-if="isSports" v-model="editForm.sport_discipline" class="field text-sm">
+                        <option value="">Discipline</option>
+                        <option v-for="(label, key) in taxonomy?.sport_discipline ?? {}" :key="key" :value="key">{{ label }}</option>
                     </select>
                     <input v-model.number="editForm.fee_amount" type="number" min="0" step="0.01" class="field text-sm" placeholder="Fee ₹">
                 </div>
@@ -235,6 +264,7 @@ const props = defineProps({
     summary: Object,
     filters: Object,
     taxonomy: Object,
+    taxonomyMastersUrl: String,
     ageGroupLabels: Object,
     groupedItems: Object,
     activityLogs: { type: Array, default: () => [] },
@@ -259,6 +289,9 @@ const editForm = reactive({
     gender: 'open',
     participant_type: 'individual',
     age_group: '',
+    venue_type: '',
+    competition_format: '',
+    sport_discipline: '',
     fee_amount: null,
 });
 
@@ -284,6 +317,9 @@ const customForm = useForm({
     participant_type: 'individual',
     gender: 'open',
     age_group: '',
+    venue_type: '',
+    competition_format: '',
+    sport_discipline: '',
     fee_amount: null,
 });
 
@@ -361,6 +397,9 @@ function openEdit(item) {
         gender: item.gender ?? 'open',
         participant_type: item.participant_type ?? 'individual',
         age_group: item.age_group ?? '',
+        venue_type: item.venue_type ?? '',
+        competition_format: item.competition_format ?? '',
+        sport_discipline: item.sport_discipline ?? '',
         fee_amount: item.fee_amount,
     });
 }
@@ -372,6 +411,9 @@ function saveEdit() {
         gender: editForm.gender,
         participant_type: editForm.participant_type,
         age_group: editForm.age_group || null,
+        venue_type: editForm.venue_type || null,
+        competition_format: editForm.competition_format || null,
+        sport_discipline: editForm.sport_discipline || null,
         fee_enabled: editForm.fee_amount != null,
         fee_amount: editForm.fee_amount,
     }, {

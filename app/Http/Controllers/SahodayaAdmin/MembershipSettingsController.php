@@ -100,7 +100,7 @@ class MembershipSettingsController extends SahodayaAdminController
             'contact_email'                => 'nullable|email|max:255',
             'contact_phone'                => 'nullable|string|max:30',
             'student_data_mode'            => 'required|in:full_records,counts_only,not_required',
-            'membership_fee_type'          => 'required|in:fixed,variable_by_student_count',
+            'membership_fee_type'          => 'required|in:fixed,variable_by_student_count,none',
             'fixed_membership_fee_amount'  => 'nullable|numeric|min:0',
             'teacher_registration_enabled' => 'boolean',
             'student_edit_lock_enabled'    => 'boolean',
@@ -163,9 +163,30 @@ class MembershipSettingsController extends SahodayaAdminController
         $profile = SahodayaProfile::firstOrCreate(['tenant_id' => $this->sahodaya->id]);
 
         $data = $request->validate([
-            'membership_fee_type'         => 'required|in:fixed,variable_by_student_count',
-            'fixed_membership_fee_amount' => 'nullable|numeric|min:0',
+            'membership_fee_type'         => 'required|in:fixed,variable_by_student_count,none',
+            'fixed_membership_fee_amount' => [
+                'nullable', 'numeric', 'min:0',
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($request->input('membership_fee_type') !== 'fixed') {
+                        return;
+                    }
+                    if ($value === null || $value === '') {
+                        $fail('Enter the fixed membership fee amount, or choose “No membership fee (₹0)”.');
+                    }
+                    if ((float) $value <= 0) {
+                        $fail('Fixed membership fee must be greater than ₹0. Choose “No membership fee (₹0)” if schools should not pay.');
+                    }
+                },
+            ],
         ]);
+
+        if ($data['membership_fee_type'] === 'none') {
+            $data['fixed_membership_fee_amount'] = 0;
+        }
+
+        if ($data['membership_fee_type'] === 'variable_by_student_count') {
+            $data['fixed_membership_fee_amount'] = null;
+        }
 
         $before = $profile->only(array_keys($data));
         $profile->update($data);
@@ -326,6 +347,8 @@ class MembershipSettingsController extends SahodayaAdminController
             ['sahodaya_id' => $this->sahodaya->id, 'academic_year' => $data['academic_year']],
             array_merge($data, [
                 'academic_year_id' => AcademicYear::recordIdForLabel($data['academic_year']),
+                'registration_starts_at' => $data['add_open'] ?? $data['registration_starts_at'] ?? null,
+                'registration_ends_at'   => $data['add_close'] ?? $data['registration_ends_at'] ?? null,
             ])
         );
 

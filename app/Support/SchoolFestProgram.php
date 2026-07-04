@@ -10,6 +10,8 @@ class SchoolFestProgram
         'sports-meet'  => ['slug' => 'sports-meet', 'label' => 'Sports Meet', 'eventType' => 'sports'],
         'kids-fest'    => ['slug' => 'kids-fest', 'label' => 'Kids Fest', 'eventType' => 'kids_fest'],
         'teacher-fest' => ['slug' => 'teacher-fest', 'label' => 'Teacher Fest', 'eventType' => 'teacher_fest'],
+        'english-fest' => ['slug' => 'english-fest', 'label' => 'English Fest', 'eventType' => 'english_fest'],
+        'science-fest' => ['slug' => 'science-fest', 'label' => 'Science Fest', 'eventType' => 'science_fest'],
         'custom'       => ['slug' => 'custom', 'label' => 'Custom Events', 'eventType' => 'custom'],
     ];
 
@@ -32,6 +34,8 @@ class SchoolFestProgram
             'sports'       => 'sports-meet',
             'kids_fest'    => 'kids-fest',
             'teacher_fest' => 'teacher-fest',
+            'english_fest' => 'english-fest',
+            'science_fest' => 'science-fest',
             'custom'       => 'custom',
             default        => 'kalotsav',
         };

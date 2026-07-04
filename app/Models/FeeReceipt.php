@@ -44,4 +44,19 @@ class FeeReceipt extends Model
     {
         return $this->status === 'rejected';
     }
+
+    public function isSuperseded(): bool
+    {
+        return $this->status === 'superseded';
+    }
+
+    /** Mark prior uploaded/rejected proofs inactive when a school re-uploads. */
+    public static function supersedePriorForFeeable(Model $feeable): void
+    {
+        static::query()
+            ->where('feeable_type', $feeable->getMorphClass())
+            ->where('feeable_id', $feeable->getKey())
+            ->whereIn('status', ['uploaded', 'rejected'])
+            ->update(['status' => 'superseded']);
+    }
 }

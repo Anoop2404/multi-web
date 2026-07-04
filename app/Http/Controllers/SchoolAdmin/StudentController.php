@@ -37,7 +37,7 @@ class StudentController extends SchoolAdminController
         $dir  = $filters['dir'] ?? 'asc';
 
         $query = Student::where('tenant_id', $this->school->id)
-            ->with(['schoolClass.classCategory'])
+            ->with(['schoolClass.classCategory', 'user:id,email,name'])
             ->when(! empty($filters['class_category_id']), function ($q) use ($filters) {
                 $q->whereHas('schoolClass', fn ($c) => $c->where('class_category_id', $filters['class_category_id']));
             })
@@ -83,6 +83,11 @@ class StudentController extends SchoolAdminController
             'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
             'pendingChangeRequests' => \App\Models\StudentEditChangeRequest::where('school_id', $this->school->id)
                 ->where('status', 'pending')
+                ->count(),
+            'studentsWithoutPortal' => Student::where('tenant_id', $this->school->id)
+                ->where('status', 'active')
+                ->whereNull('user_id')
+                ->whereNotNull('reg_no')
                 ->count(),
         ]);
     }
@@ -418,6 +423,47 @@ class StudentController extends SchoolAdminController
         }
     }
 
+    public function bulkProvisionPortal(Request $request)
+    {
+        // Provision portal logins for all students who don't have one yet using reg_no as username.
+        $students = Student::where('tenant_id', $this->school->id)
+            ->whereNull('user_id')
+            ->whereNotNull('reg_no')
+            ->get();
+
+        if ($students->isEmpty()) {
+            return back()->with('success', 'All students already have portal logins.');
+        }
+
+        $provisioner = app(StudentPortalProvisioner::class);
+        $created = 0;
+        $skipped = 0;
+        $errors = [];
+
+        foreach ($students as $student) {
+            try {
+                $result = $provisioner->ensureRegNoLogin($student, notify: true);
+                if ($result['created']) {
+                    $created++;
+                } else {
+                    $skipped++;
+                }
+            } catch (\Throwable $e) {
+                $errors[] = "{$student->name}: {$e->getMessage()}";
+            }
+        }
+
+        $msg = "{$created} portal login(s) created.";
+        if ($skipped) {
+            $msg .= " {$skipped} already had logins.";
+        }
+        if ($errors) {
+            $msg .= ' ' . count($errors) . ' failed.';
+        }
+
+        return back()->with('success', $msg);
+    }
+
     public function importForm()
     {
         if (! filled($this->school->school_prefix)) {
@@ -532,6 +578,7 @@ class StudentController extends SchoolAdminController
     {
         $data = $student->toArray();
         $data['photo_url'] = $student->photoUrl();
+        $data['portal_email'] = $student->user?->email ?? $student->email ?? $student->parent_email;
 
         return $data;
     }

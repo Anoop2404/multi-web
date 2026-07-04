@@ -52,6 +52,16 @@
                     <p class="font-semibold text-slate-900">Skin Presets</p>
                     <p class="text-xs text-slate-500 mt-0.5">Pre-built color themes for schools</p>
                 </Link>
+                <Link href="/admin/audit" class="track-card block">
+                    <div class="text-2xl mb-2">📋</div>
+                    <p class="font-semibold text-slate-900">Audit Logs</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Platform activity and security events</p>
+                </Link>
+                <Link href="/admin/billing" class="track-card block">
+                    <div class="text-2xl mb-2">💳</div>
+                    <p class="font-semibold text-slate-900">Billing</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Subscriptions, plans, and receipts</p>
+                </Link>
             </div>
 
             <div class="notice-banner notice-banner--info">

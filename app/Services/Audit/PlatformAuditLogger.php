@@ -227,6 +227,19 @@ class PlatformAuditLogger
         );
     }
 
+    public function training(
+        \App\Models\TrainingProgram $program,
+        string $action,
+        string $description,
+        array $properties = [],
+        ?Model $subject = null,
+    ): AuditLog {
+        return $this->log($action, $description, $subject ?? $program, array_merge([
+            'program_id' => $program->id,
+            'tenant_id'  => $program->tenant_id,
+        ], $properties), category: 'training');
+    }
+
     public function portalProvisioned(User $user, string $role, string $tenantId): AuditLog
     {
         return $this->log(

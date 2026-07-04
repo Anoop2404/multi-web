@@ -1,4 +1,5 @@
 <template>
+    <Head :title="title" />
     <div class="sa-layout min-h-screen flex">
         <div v-if="mobileNavOpen"
              class="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -44,7 +45,7 @@
                     No menus match “{{ navSearch.trim() }}”
                 </p>
                 <template v-for="group in filteredNavGroups" :key="group.section">
-                    <p class="px-3 pt-4 pb-1 text-[10px] font-bold text-[#fbbf24]/75 uppercase tracking-widest">
+                    <p class="px-3 pt-4 pb-1 text-[11px] font-bold text-[#fbbf24]/90 uppercase tracking-widest">
                         {{ group.section }}
                     </p>
                     <SahodayaNavItem v-for="item in group.items" :key="item.href"
@@ -91,16 +92,9 @@
                         <SvgIcon name="external-link" class="w-3.5 h-3.5" />
                         <span class="hidden sm:inline">Preview Site</span>
                     </a>
-                    <div class="hidden sm:flex items-center gap-2 pl-2 border-l border-gray-200">
-                        <span v-if="$page.props.auth?.user?.name" class="text-xs text-gray-500 hidden sm:inline max-w-[8rem] truncate">
-                            {{ $page.props.auth.user.name }}
-                        </span>
-                        <SignOutButton
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:text-red-600 hover:bg-red-50 transition">
-                            <SvgIcon name="log-out" class="w-3.5 h-3.5" />
-                            Sign out
-                        </SignOutButton>
-                    </div>
+                    <span v-if="$page.props.auth?.user?.name" class="hidden sm:inline text-xs text-gray-500 max-w-[10rem] truncate">
+                        {{ $page.props.auth.user.name }}
+                    </span>
                 </div>
             </header>
 
@@ -114,7 +108,7 @@
 </template>
 
 <script setup>
-import { Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import SignOutButton from '@/Components/SignOutButton.vue';
 import StaffReadOnlyBanner from '@/Components/StaffReadOnlyBanner.vue';
 import FlashBanner from '@/Components/ui/FlashBanner.vue';
@@ -141,6 +135,8 @@ const props = defineProps({
     pendingSchoolsCount:    { type: Number, default: 0 },
     pendingSubmissionsCount:{ type: Number, default: 0 },
     pendingPaymentsCount:   { type: Number, default: 0 },
+    setupIncompleteCount:    { type: Number, default: 0 },
+    pendingChangeRequests:  { type: Number, default: 0 },
     isStaff:                { type: Boolean, default: false },
     showHeaderTitle:        { type: Boolean, default: true },
 });
@@ -156,8 +152,8 @@ const STAFF_NAV = {
     membership: ['membership.view', 'membership.manage'],
     fest: ['fest.view', 'fest.manage', 'fest.marks', 'fest.registrations', 'fest.results', 'fest.settings', 'fest.finance', 'fest.certificates', 'fest.catering', 'fest.schedule'],
     mcq: ['mcq.view', 'mcq.manage', 'mcq.attendance', 'mcq.marks'],
-    training: ['fest.view', 'fest.manage'],
-    ledger: ['membership.view', 'membership.manage'],
+    training: ['training.view', 'training.manage', 'fest.view', 'fest.manage'],
+    ledger: ['finance.view', 'membership.view', 'membership.manage'],
     users: ['users.manage'],
 };
 
@@ -180,6 +176,11 @@ const navGroups = computed(() => {
         websiteEnabled: websiteEnabled.value,
         approvedSchoolsCount: props.approvedSchoolsCount,
         pendingPaymentsCount: props.pendingPaymentsCount,
+        pendingSubmissionsCount: props.pendingSubmissionsCount || page.props.pendingSubmissionsCount || 0,
+        pendingSchoolsCount: props.pendingSchoolsCount || page.props.pendingSchoolsCount || 0,
+        setupIncompleteCount: props.setupIncompleteCount ?? page.props.setupIncompleteCount ?? 0,
+        pendingChangeRequests: props.pendingChangeRequests || page.props.pendingChangeRequests || 0,
+        stateRemittancesEnabled: page.props.stateRemittancesEnabled !== false,
     };
 
     const examId = detectSahodayaMcqExamIdFromUrl(page.url);

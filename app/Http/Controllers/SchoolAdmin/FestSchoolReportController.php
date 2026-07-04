@@ -13,6 +13,7 @@ use App\Services\Events\FestParticipationLimitService;
 use App\Services\Events\FestIdCardService;
 use App\Services\Events\FestRegistrationRegisterService;
 use App\Services\Events\FestReportService;
+use App\Services\Events\FestSchoolReportAnalyticsService;
 use App\Support\SchoolFestProgram;
 use Illuminate\Http\Request;
 
@@ -461,5 +462,105 @@ class FestSchoolReportController extends SchoolAdminController
             'student',
             false,
         ))->download("{$slug}-{$scopeSuffix}-id-cards.pdf");
+    }
+
+    public function feeSummary(FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $meta = SchoolFestProgram::meta($program);
+        $analytics = new FestSchoolReportAnalyticsService($event, $this->school->id);
+
+        return $this->inertia('School/Events/ReportFeeSummary', [
+            'program'     => $meta['slug'],
+            'programMeta' => $meta,
+            'school'      => $this->school->only('id', 'name'),
+            'event'       => $event->only('id', 'title', 'status'),
+            'fee'         => $analytics->feeSummary(),
+            'paymentsUrl' => "/school-admin/{$this->school->id}/payments",
+        ]);
+    }
+
+    public function disciplineParticipation(FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $meta = SchoolFestProgram::meta($program);
+        $analytics = new FestSchoolReportAnalyticsService($event, $this->school->id);
+
+        return $this->inertia('School/Events/ReportDisciplineParticipation', [
+            'program'     => $meta['slug'],
+            'programMeta' => $meta,
+            'school'      => $this->school->only('id', 'name'),
+            'event'       => $event->only('id', 'title'),
+            'rows'        => $analytics->disciplineParticipationRows(),
+        ]);
+    }
+
+    public function scheduleClashes(FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $meta = SchoolFestProgram::meta($program);
+        $analytics = new FestSchoolReportAnalyticsService($event, $this->school->id);
+        $clashes = $analytics->scheduleClashes();
+
+        return $this->inertia('School/Events/ReportScheduleClashes', [
+            'program'     => $meta['slug'],
+            'programMeta' => $meta,
+            'school'      => $this->school->only('id', 'name'),
+            'event'       => $event->only('id', 'title'),
+            'participant' => $clashes['participant'],
+            'stage'       => $clashes['stage'],
+            'csvUrl'      => "/sahodaya-admin/{$this->school->parent_id}/events/{$event->id}/reports/export/clashes?school_id={$this->school->id}",
+        ]);
+    }
+
+    public function markEntryStatus(FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $meta = SchoolFestProgram::meta($program);
+        $data = (new FestSchoolReportAnalyticsService($event, $this->school->id))->markEntryStatus();
+
+        return $this->inertia('School/Events/ReportMarkEntryStatus', [
+            'program'     => $meta['slug'],
+            'programMeta' => $meta,
+            'school'      => $this->school->only('id', 'name'),
+            'event'       => $event->only('id', 'title'),
+            'summary'     => $data['summary'],
+            'rows'        => $data['rows'],
+            'csvUrl'      => "/sahodaya-admin/{$this->school->parent_id}/events/{$event->id}/reports/export/mark-entry-status",
+        ]);
+    }
+
+    public function resultsSummary(FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $meta = SchoolFestProgram::meta($program);
+        $results = (new FestSchoolReportAnalyticsService($event, $this->school->id))->resultsSummary();
+
+        return $this->inertia('School/Events/ReportResultsSummary', [
+            'program'     => $meta['slug'],
+            'programMeta' => $meta,
+            'school'      => $this->school->only('id', 'name'),
+            'event'       => $event->only('id', 'title'),
+            'results'     => $results,
+        ]);
+    }
+
+    public function groupRoster(FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        return redirect("/sahodaya-admin/{$this->school->parent_id}/events/{$event->id}/reports/export/team-squad-sheets?school_id={$this->school->id}");
+    }
+
+    public function attendanceSheet(FestEvent $event, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        return redirect("/sahodaya-admin/{$this->school->parent_id}/events/{$event->id}/reports/export/attendance-sheet-school?school_id={$this->school->id}");
     }
 }

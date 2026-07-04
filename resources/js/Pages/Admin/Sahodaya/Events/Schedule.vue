@@ -77,8 +77,14 @@
                         <td class="p-3">{{ row.fest_stage?.name || row.stage || '—' }}</td>
                         <td class="p-3">{{ row.item?.title }}</td>
                         <td class="p-3">{{ participantLabel(row) }}</td>
-                        <td class="p-3 text-right">
-                            <button type="button" class="text-xs text-red-600 font-semibold" @click="removeSlot(row.id)">Remove</button>
+                        <td class="p-3 text-right whitespace-nowrap">
+                            <div class="flex items-center justify-end gap-1">
+                                <button type="button" class="text-xs text-slate-500 hover:text-slate-800 px-1"
+                                        title="Move up" @click="moveSlot(row, 'up')">↑</button>
+                                <button type="button" class="text-xs text-slate-500 hover:text-slate-800 px-1"
+                                        title="Move down" @click="moveSlot(row, 'down')">↓</button>
+                                <button type="button" class="text-xs text-red-600 font-semibold ml-2" @click="removeSlot(row.id)">Remove</button>
+                            </div>
                         </td>
                     </tr>
                     <tr v-if="!schedules.length"><td colspan="6" class="p-6 text-center text-gray-400">No schedule yet</td></tr>
@@ -123,6 +129,12 @@ function importSchedule() {
 function removeSlot(id) {
     if (!confirm('Remove this schedule slot?')) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/schedule/${id}`, { preserveScroll: true });
+}
+
+function moveSlot(row, direction) {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/schedule/${row.id}/reorder`, {
+        direction,
+    }, { preserveScroll: true });
 }
 
 const participantsForItem = computed(() =>

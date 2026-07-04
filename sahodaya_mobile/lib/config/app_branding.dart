@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'tenant_config.dart';
+
 class AppBranding {
   const AppBranding._();
 
-  static const String logoAsset = 'assets/images/malappuram_logo.png';
-  static const String appName = 'Malappuram Central Sahodaya';
-  static const String nameLine1 = 'Malappuram Central';
-  static const String nameLine2 = 'Sahodaya';
-  static const String eyebrow = 'CBSE Sahodaya School Complex';
+  static const String logoAsset = TenantConfig.logoAsset;
+  static const String appName = TenantConfig.appName;
+  static const String nameLine1 = TenantConfig.nameLine1;
+  static const String nameLine2 = TenantConfig.nameLine2;
+  static const String eyebrow = TenantConfig.eyebrow;
 }
 
 class AppBrandTitle extends StatelessWidget {

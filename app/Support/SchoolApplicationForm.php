@@ -75,19 +75,55 @@ class SchoolApplicationForm
                 'label'       => 'Principal Name',
                 'group'       => 'principal',
                 'placeholder' => 'Principal full name',
-                'default'     => ['enabled' => false, 'required' => false],
+                'default'     => ['enabled' => true, 'required' => true],
             ],
             'principal_email' => [
                 'label'       => 'Principal Email',
                 'group'       => 'principal',
                 'placeholder' => 'principal@school.edu',
-                'default'     => ['enabled' => false, 'required' => false],
+                'default'     => ['enabled' => true, 'required' => true],
             ],
             'principal_phone' => [
                 'label'       => 'Principal Phone',
                 'group'       => 'principal',
                 'placeholder' => 'Principal phone number',
-                'default'     => ['enabled' => false, 'required' => false],
+                'default'     => ['enabled' => true, 'required' => true],
+            ],
+            'vice_principal_name' => [
+                'label'       => 'Vice Principal Name',
+                'group'       => 'leadership',
+                'placeholder' => 'Vice principal full name',
+                'default'     => ['enabled' => true, 'required' => true],
+            ],
+            'vice_principal_email' => [
+                'label'       => 'Vice Principal Email',
+                'group'       => 'leadership',
+                'placeholder' => 'vice.principal@school.edu',
+                'default'     => ['enabled' => true, 'required' => true],
+            ],
+            'vice_principal_phone' => [
+                'label'       => 'Vice Principal Phone',
+                'group'       => 'leadership',
+                'placeholder' => 'Vice principal phone',
+                'default'     => ['enabled' => true, 'required' => true],
+            ],
+            'event_coordinator_name' => [
+                'label'       => 'Events Coordinator Name',
+                'group'       => 'leadership',
+                'placeholder' => 'Fest / events coordinator name',
+                'default'     => ['enabled' => true, 'required' => true],
+            ],
+            'event_coordinator_email' => [
+                'label'       => 'Events Coordinator Email',
+                'group'       => 'leadership',
+                'placeholder' => 'events@school.edu',
+                'default'     => ['enabled' => true, 'required' => true],
+            ],
+            'event_coordinator_phone' => [
+                'label'       => 'Events Coordinator Phone',
+                'group'       => 'leadership',
+                'placeholder' => 'Events coordinator phone',
+                'default'     => ['enabled' => true, 'required' => true],
             ],
             'password' => [
                 'label'       => 'Password',
@@ -375,6 +411,8 @@ class SchoolApplicationForm
         return [
             'phone', 'website', 'address', 'district', 'highest_class',
             'principal_name', 'principal_email', 'principal_phone',
+            'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
+            'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
         ];
     }
 
@@ -398,6 +436,12 @@ class SchoolApplicationForm
                 'district'                => 'string|max:100',
                 'principal_name'          => 'string|max:255',
                 'principal_email'         => 'nullable|email|max:255',
+                'vice_principal_name'     => 'string|max:255',
+                'vice_principal_email'    => 'nullable|email|max:255',
+                'vice_principal_phone'    => 'string|max:30',
+                'event_coordinator_name'  => 'string|max:255',
+                'event_coordinator_email' => 'nullable|email|max:255',
+                'event_coordinator_phone' => 'string|max:30',
                 default                   => 'string|max:255',
             };
         }
@@ -467,6 +511,8 @@ class SchoolApplicationForm
         return [
             'school_email', 'school_prefix', 'phone', 'cbse_affiliation', 'highest_class', 'website',
             'address', 'district', 'principal_name', 'principal_email', 'principal_phone',
+            'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
+            'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
         ];
     }
 
@@ -476,6 +522,8 @@ class SchoolApplicationForm
         return [
             'school_email', 'school_prefix', 'phone', 'cbse_affiliation', 'highest_class', 'website',
             'address', 'district', 'principal_name', 'principal_email', 'principal_phone',
+            'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
+            'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
         ];
     }
 }

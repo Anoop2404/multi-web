@@ -74,6 +74,14 @@ class FestSportsAutoRankService
 
     private function lowerIsBetter(FestEventItem $item): bool
     {
+        if ($item->ranking_direction === 'asc') {
+            return true;
+        }
+
+        if ($item->ranking_direction === 'desc') {
+            return false;
+        }
+
         $section = strtolower((string) ($item->section ?? ''));
         $title = strtolower((string) $item->title);
 

@@ -22,13 +22,15 @@ class FestLevelRegistrationService
         }
 
         $prefix = strtoupper(substr($event->level_round ?? 'S', 0, 1));
-        $seq = FestLevelRegistration::where('event_id', $event->id)->count() + 1;
-        $number = sprintf('%s-%04d', $prefix, $seq);
+        $number = app(FestNumberingService::class)->nextEventRegNumber($event);
 
         FestLevelRegistration::create([
             'event_id'             => $event->id,
             'student_id'           => $student->id,
+            'school_id'            => $student->tenant_id,
             'registration_number'  => $number,
+            'status'               => 'active',
+            'registered_at'        => now(),
         ]);
 
         return $number;

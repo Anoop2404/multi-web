@@ -32,7 +32,7 @@
             </div>
 
             <Link :href="`/portal/group/${school.id}/students`"
-                  class="block w-full text-center py-3 text-white rounded-xl font-semibold">
+                  class="btn-primary block w-full text-center py-3 rounded-xl font-semibold">
                 View Students →
             </Link>
         </div>

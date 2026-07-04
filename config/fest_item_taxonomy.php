@@ -33,6 +33,7 @@ return [
         'track'         => 'Track (Running)',
         'field'         => 'Field (Jump/Throw)',
         'relay'         => 'Relay',
+        'march_past'    => 'March Past',
         'team_game'     => 'Team Games',
         'racket'        => 'Racket Sports',
         'board_game'    => 'Board Games',

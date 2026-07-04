@@ -89,7 +89,7 @@ class TenantUserCatalog
     /** @return list<string> */
     public static function festEventDuties(): array
     {
-        return ['coordinator', 'stage', 'registration', 'attendance', 'food', 'appeals', 'certificates', 'marks'];
+        return ['coordinator', 'stage', 'registration', 'attendance', 'food', 'appeals', 'certificates', 'marks', 'discipline'];
     }
 
     /** @return array<string, string> */
@@ -129,6 +129,7 @@ class TenantUserCatalog
             'appeals'      => 'Appeals officer',
             'certificates' => 'Certificates',
             'marks'        => 'Mark entry coordinator',
+            'discipline'   => 'Discipline / item head admin',
         ];
     }
 
@@ -146,6 +147,9 @@ class TenantUserCatalog
             'fest.catering',
             'fest.schedule',
             'fest.certificates',
+            'training.view',
+            'training.manage',
+            'finance.view',
             'mcq.view',
             'mcq.manage',
             'mcq.attendance',
@@ -219,7 +223,7 @@ class TenantUserCatalog
         return match ($role) {
             'sahodaya_staff'           => self::sahodayaStaffDefaults(),
             'registration_coordinator' => ['fest.view', 'fest.registrations'],
-            'sahodaya_finance'         => ['fest.view', 'fest.finance', 'membership.view'],
+            'sahodaya_finance'         => ['fest.view', 'fest.finance', 'finance.view', 'membership.view'],
             'certificate_collector'    => ['fest.view', 'fest.certificates'],
             'data_entry'               => ['fest.view', 'fest.manage', 'fest.marks'],
             'event_coordinator'        => ['fest.view', 'fest.manage', 'fest.schedule', 'fest.settings'],
@@ -370,8 +374,8 @@ class TenantUserCatalog
             'membership' => ['membership.view', 'membership.manage'],
             'fest'       => ['fest.view', 'fest.manage', 'fest.marks', 'fest.registrations', 'fest.results', 'fest.settings', 'fest.finance', 'fest.certificates', 'fest.catering', 'fest.schedule'],
             'mcq'        => ['mcq.view', 'mcq.manage', 'mcq.attendance', 'mcq.marks'],
-            'training'   => ['fest.view', 'fest.manage'],
-            'ledger'     => ['membership.view', 'membership.manage', 'fest.finance'],
+            'training'   => ['training.view', 'training.manage', 'fest.view', 'fest.manage'],
+            'ledger'     => ['finance.view', 'membership.view', 'membership.manage', 'fest.finance'],
             'users'      => ['users.manage'],
         ];
     }
@@ -386,7 +390,7 @@ class TenantUserCatalog
             'membership' => ['membership.view', 'membership.manage'],
             'fest'       => ['fest.view', 'fest.manage'],
             'mcq'        => ['mcq.view', 'mcq.manage'],
-            'training'   => ['fest.view', 'fest.manage'],
+            'training'   => ['training.view', 'training.manage', 'fest.view', 'fest.manage'],
             'website'    => ['website.view', 'website.manage', 'website.news'],
             'users'      => ['users.manage'],
         ];

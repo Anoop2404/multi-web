@@ -7,6 +7,25 @@
         />
 
         <div class="max-w-4xl space-y-6">
+            <div v-if="leadershipContacts && !leadershipContacts.complete" class="notice-banner notice-banner--warning">
+                <p class="font-semibold">Action required — leadership contacts pending</p>
+                <p class="mt-1 text-sm">
+                    {{ leadershipContacts.summary }}.
+                    <Link :href="`/school-admin/${school.id}/registration/profile`" class="font-semibold underline ml-1">
+                        Complete registration profile →
+                    </Link>
+                </p>
+            </div>
+
+            <div v-if="registrationClosingSoon" class="notice-banner notice-banner--warning text-sm">
+                <p class="font-semibold">Annual registration closes soon</p>
+                <p class="mt-1">
+                    Membership registration closes on {{ formatWindowDate(windowDisplayEnd(registrationWindow)) }}
+                    ({{ registrationClosingDays }} day{{ registrationClosingDays === 1 ? '' : 's' }} left).
+                    <Link :href="`/school-admin/${school.id}/registration`" class="font-semibold underline ml-1">Continue registration →</Link>
+                </p>
+            </div>
+
             <div v-if="membershipComplete" class="notice-banner notice-banner--success">
                 <p class="font-semibold">{{ membershipComplete.academicYear }} membership complete</p>
                 <p class="mt-1 text-sm opacity-90">
@@ -14,8 +33,11 @@
                 </p>
             </div>
 
-            <div class="card space-y-3">
-                <h2 class="section-title text-base">Welcome</h2>
+            <div v-if="showSetupWizard && !setupComplete" class="card space-y-3">
+                <div class="flex items-start justify-between gap-3">
+                    <h2 class="section-title text-base">Welcome</h2>
+                    <button type="button" class="text-xs text-slate-500 hover:text-slate-700" @click="dismissWizard">Dismiss</button>
+                </div>
                 <p class="text-sm leading-relaxed text-slate-600">
                     Use this panel to manage your school's student records and complete
                     <strong>annual Sahodaya membership registration</strong> each academic year.
@@ -26,7 +48,7 @@
                 </ul>
             </div>
 
-            <div class="card">
+            <div v-if="showSetupWizard && !setupComplete" class="card">
                 <h3 class="section-title text-base mb-4">Get started</h3>
                 <ol class="step-list">
                     <li class="step-item" :class="!setup.hasSchoolCode && 'opacity-100'">
@@ -39,6 +61,9 @@
                                 A short code unique within your Sahodaya — used in student registration numbers
                                 <span v-if="setup.regNoExample" class="font-mono">(e.g. {{ setup.regNoExample }})</span>.
                             </p>
+                            <p v-if="setup.codeLocked" class="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                Your school code is locked and cannot be changed — all registration numbers depend on it.
+                            </p>
                             <p v-if="setup.hasSchoolCode" class="mt-1 font-mono text-xs text-emerald-700">{{ setup.schoolCode }}</p>
                             <Link v-else :href="`/school-admin/${school.id}/setup/code`" class="link-brand mt-2 inline-block text-xs">
                                 Set school code →
@@ -47,14 +72,21 @@
                     </li>
 
                     <li class="step-item" :class="!setup.hasSchoolCode && 'opacity-50'">
-                        <span class="step-badge" :class="setup.studentCount > 0 ? 'step-badge--done' : setup.hasSchoolCode ? 'step-badge--active' : 'step-badge--pending'">
-                            {{ setup.studentCount > 0 ? '✓' : '2' }}
+                        <span class="step-badge" :class="stepTwoDone ? 'step-badge--done' : setup.hasSchoolCode ? 'step-badge--active' : 'step-badge--pending'">
+                            {{ stepTwoDone ? '✓' : '2' }}
                         </span>
                         <div>
-                            <p class="font-semibold text-slate-900">Register students</p>
+                            <p class="font-semibold text-slate-900">
+                                {{ setup.requiresStudents ? 'Register students' : 'Student data (optional)' }}
+                            </p>
                             <p class="mt-0.5 text-xs text-slate-500">
-                                Classes (1–12, etc.) are provided by your Sahodaya — pick the class when registering.
-                                Or <Link :href="`/school-admin/${school.id}/students?import=1`" class="link-brand">import from CSV</Link>.
+                                <template v-if="setup.requiresStudents">
+                                    Classes are provided by your Sahodaya — pick the class when registering.
+                                    Or <Link :href="`/school-admin/${school.id}/students?import=1`" class="link-brand">import from CSV</Link>.
+                                </template>
+                                <template v-else>
+                                    Your Sahodaya uses teacher/counts-only registration — student records are optional unless you need them for fest/MCQ.
+                                </template>
                             </p>
                             <Link v-if="setup.hasSchoolCode" :href="`/school-admin/${school.id}/students?register=1`"
                                   class="link-brand mt-2 inline-block text-xs">
@@ -80,16 +112,17 @@
             </div>
 
             <div v-if="setup.studentCount > 0" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div v-for="stat in stats" :key="stat.label" class="stat-tile">
+                <Link v-for="stat in linkedStats" :key="stat.label" :href="stat.href"
+                      class="stat-tile hover:border-[#0f3d7a]/40 transition block">
                     <p class="stat-tile-label">{{ stat.label }}</p>
                     <p class="stat-tile-value">{{ stat.value }}</p>
-                </div>
+                </Link>
             </div>
 
-            <div v-if="programSummaries?.length" class="card">
+            <div v-if="openProgramSummaries.length" class="card">
                 <h3 class="section-title text-base mb-4">Fest programs</h3>
                 <div class="grid sm:grid-cols-2 gap-3">
-                    <Link v-for="p in programSummaries" :key="p.slug" :href="p.hub_url"
+                    <Link v-for="p in openProgramSummaries" :key="p.slug" :href="p.hub_url"
                           class="rounded-xl border border-slate-200 p-4 hover:border-[#0f3d7a]/40 hover:bg-slate-50/80 transition">
                         <p class="font-semibold text-slate-900">{{ p.label }}</p>
                         <p class="text-xs text-slate-500 mt-2">
@@ -98,6 +131,19 @@
                         </p>
                     </Link>
                 </div>
+            </div>
+
+            <div v-if="recentActivity?.length" class="card">
+                <h3 class="section-title text-base mb-3">Recent activity</h3>
+                <ul class="text-sm divide-y">
+                    <li v-for="entry in recentActivity" :key="entry.id" class="py-2">
+                        <p class="font-medium text-slate-800">{{ entry.description }}</p>
+                        <p class="text-xs text-slate-500 mt-0.5 capitalize">
+                            {{ entry.log_name?.replace(/_/g, ' ') || entry.action }}
+                            <span v-if="entry.created_at"> · {{ formatActivityDate(entry.created_at) }}</span>
+                        </p>
+                    </li>
+                </ul>
             </div>
 
             <div v-if="dashboardExtras && Object.keys(dashboardExtras).length" class="space-y-4">
@@ -165,15 +211,60 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import {
+    windowClosingDays,
+    windowClosingSoon,
+    windowDisplayEnd,
+} from '@/support/membershipRegistrationWindow.js';
 
-defineProps({
+const props = defineProps({
     school: Object,
     stats:  { type: Array, default: () => [] },
     programSummaries: { type: Array, default: () => [] },
     dashboardExtras: { type: Object, default: () => ({}) },
     setup:  { type: Object, required: true },
     membershipComplete: { type: Object, default: null },
+    leadershipContacts: { type: Object, default: null },
+    recentActivity: { type: Array, default: () => [] },
+    registrationWindow: { type: Object, default: null },
+    showSetupWizard: { type: Boolean, default: true },
+});
+
+const dismissForm = useForm({});
+
+const stepTwoDone = computed(() =>
+    props.setup.requiresStudents ? props.setup.studentCount > 0 : true
+);
+
+const setupComplete = computed(() =>
+    props.setup.hasSchoolCode
+    && stepTwoDone.value
+    && props.setup.hasRegistration
+);
+
+function dismissWizard() {
+    dismissForm.post(`/school-admin/${props.school.id}/setup/dismiss-wizard`);
+}
+
+const registrationClosingDays = computed(() => windowClosingDays(props.registrationWindow));
+
+const registrationClosingSoon = computed(() =>
+    windowClosingSoon(props.registrationWindow) && !props.membershipComplete
+);
+
+const openProgramSummaries = computed(() =>
+    (props.programSummaries ?? []).filter(p => (p.open_events ?? 0) > 0)
+);
+
+const linkedStats = computed(() => {
+    const base = `/school-admin/${props.school.id}`;
+    return [
+        { label: 'Active students', value: props.stats?.[0]?.value ?? 0, href: `${base}/students` },
+        { label: 'Teachers', value: props.stats?.[1]?.value ?? 0, href: `${base}/teachers` },
+        { label: 'Annual registration', value: props.membershipComplete ? 'Complete ✓' : (props.setup.hasRegistration ? 'In progress' : 'Start'), href: `${base}/registration` },
+    ];
 });
 
 function fmt(v) {
@@ -189,5 +280,15 @@ function actionTypeLabel(type) {
         mcq_register: 'MCQ registration',
     };
     return labels[type] ?? 'Action';
+}
+
+function formatActivityDate(value) {
+    if (!value) return '';
+    return new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function formatWindowDate(value) {
+    if (!value) return '';
+    return new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 </script>

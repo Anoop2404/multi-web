@@ -10,6 +10,36 @@
         />
 
         <div class="max-w-3xl space-y-5">
+            <!-- Setup checklist — only shown when required settings are incomplete -->
+            <div v-if="incompleteSetup.length" class="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
+                <div class="flex items-start gap-3 mb-3">
+                    <span class="text-xl shrink-0">⚠️</span>
+                    <div>
+                        <p class="font-bold text-amber-900 text-sm">Required setup incomplete</p>
+                        <p class="text-xs text-amber-800 mt-0.5">Complete these settings before inviting schools — missing items will block registration or payments.</p>
+                    </div>
+                </div>
+                <ul class="space-y-2">
+                    <li v-for="item in incompleteSetup" :key="item.key"
+                        class="flex items-start gap-2.5 text-sm">
+                        <span class="mt-0.5 w-4 h-4 rounded-full border-2 border-amber-400 shrink-0 flex items-center justify-center">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        </span>
+                        <span class="text-amber-900">
+                            {{ item.label }}
+                            <button type="button"
+                                    @click="activeTab = item.tab"
+                                    class="ml-1 text-amber-700 underline hover:text-amber-950 font-semibold text-xs">
+                                → Go to {{ item.tabLabel }}
+                            </button>
+                        </span>
+                    </li>
+                </ul>
+            </div>
+            <div v-else-if="setupDoneOnce" class="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 flex items-center gap-2 text-sm text-green-800">
+                <span>✅</span> All required settings are configured.
+            </div>
+
             <!-- Quick guide -->
             <div class="card card--accent text-sm text-indigo-900">
                 <p class="font-semibold mb-2">Where to change things</p>
@@ -27,9 +57,11 @@
                 <button v-for="t in tabs" :key="t.key"
                         type="button"
                         @click="activeTab = t.key"
-                        :class="['rounded-t-xl px-4 py-2.5 text-sm font-semibold transition -mb-px border-b-2',
+                        :class="['relative rounded-t-xl px-4 py-2.5 text-sm font-semibold transition -mb-px border-b-2',
                                  activeTab === t.key ? 'border-[#041525] bg-white text-[#041525] shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800']">
                     {{ t.label }}
+                    <span v-if="tabsWithWarnings.has(t.key)"
+                          class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400"></span>
                 </button>
             </div>
 
@@ -40,7 +72,7 @@
                         <FormField label="Sahodaya Name" class-extra="sm:col-span-2">
                             <input v-model="profileForm.name" class="field" placeholder="Malappuram Sahodaya">
                         </FormField>
-                        <FormField label="Registration Prefix" hint="Sahodaya code used in numbers. School membership: MLM/GHS/0001. Student: MLM/GHS/26/0001. Locked after first number is issued.">
+                        <FormField label="Registration Prefix" :required="!profile.prefixes_locked" hint="Sahodaya code used in numbers. School membership: MLM/GHS/0001. Student: MLM/GHS/26/0001. Locked after first number is issued.">
                             <input v-model="profileForm.prefix" :disabled="profile.prefixes_locked"
                                    class="field" :class="profile.prefixes_locked ? 'bg-gray-50 cursor-not-allowed' : ''"
                                    placeholder="MLM">
@@ -183,6 +215,10 @@
 
             <!-- Tab: Payment Details -->
             <form v-show="activeTab === 'payment'" @submit.prevent="savePaymentDetails" class="space-y-5">
+                <div v-if="!paymentForm.payment_bank_name && !paymentForm.payment_account_no && !paymentForm.payment_upi"
+                     class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                    ⚠️ No payment details saved yet. Schools won't know where to pay their membership fee until you fill in at least one field below.
+                </div>
                 <FormSection title="Bank & UPI Details"
                              hint="Shown to schools when they pay annual membership fees. Keep this up to date.">
                     <FormGrid>
@@ -374,10 +410,21 @@
                             <select v-model="feeForm.membership_fee_type" class="field">
                                 <option value="fixed">Fixed fee (same for all schools)</option>
                                 <option value="variable_by_student_count">Variable by student count (slabs)</option>
+                                <option value="none">No membership fee (₹0)</option>
                             </select>
+                            <p v-if="feeForm.membership_fee_type === 'none'" class="text-xs text-slate-600 mt-2">
+                                Schools complete annual registration without a payment step. Save this tab to apply.
+                            </p>
                         </FormField>
-                        <FormField v-if="feeForm.membership_fee_type === 'fixed'" label="Fixed Amount (₹)">
-                            <input v-model.number="feeForm.fixed_membership_fee_amount" type="number" step="0.01" min="0" class="field">
+                        <FormField v-if="feeForm.membership_fee_type === 'fixed'"
+                                   label="Fixed Amount (₹)" required>
+                            <input v-model.number="feeForm.fixed_membership_fee_amount" type="number" step="0.01" min="0.01" class="field"
+                                   :class="(!feeForm.fixed_membership_fee_amount || feeForm.fixed_membership_fee_amount <= 0) ? 'border-amber-300 focus:ring-amber-400' : ''"
+                                   required>
+                            <p v-if="!feeForm.fixed_membership_fee_amount || feeForm.fixed_membership_fee_amount <= 0"
+                               class="text-xs text-amber-600 mt-1">
+                                Enter an amount greater than ₹0, or choose “No membership fee (₹0)” above.
+                            </p>
                         </FormField>
                     </FormGrid>
                 </FormSection>
@@ -451,38 +498,31 @@
             <!-- Tab: Registration Window -->
             <div v-show="activeTab === 'window'" class="space-y-5">
                 <p class="text-sm text-gray-500">
-                    Student add/edit windows apply to the <strong class="text-gray-700">active academic year</strong>
+                    Windows apply to the <strong class="text-gray-700">active academic year</strong>
                     (<span class="font-mono">{{ academicYear }}</span>).
                 </p>
-                <FormSection :title="`Membership Registration — ${academicYear}`"
-                             hint="Annual membership registration window.">
+                <div v-if="!registrationWindow || (!registrationWindow.add_open && !registrationWindow.add_close && !registrationWindow.registration_starts_at)"
+                     class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                    ⚠️ No window is configured for <strong>{{ academicYear }}</strong>. Until you save dates below, schools can register and add students at any time.
+                </div>
+                <FormSection :title="`Annual membership registration — ${academicYear}`"
+                             hint="When member schools can begin annual registration and add new students.">
                     <FormGrid>
-                        <FormField label="Opens On">
-                            <input v-model="windowForm.registration_starts_at" type="date" class="field">
-                        </FormField>
-                        <FormField label="Closes On">
-                            <input v-model="windowForm.registration_ends_at" type="date" class="field">
-                        </FormField>
-                    </FormGrid>
-                </FormSection>
-                <FormSection :title="`Student Add Window — ${academicYear}`"
-                             hint="When schools can add new students.">
-                    <FormGrid>
-                        <FormField label="Add opens">
+                        <FormField label="Registration opens" hint="Schools can start annual membership from this date/time">
                             <input v-model="windowForm.add_open" type="datetime-local" class="field">
                         </FormField>
-                        <FormField label="Add closes">
+                        <FormField label="Registration closes" hint="No new registrations after this date/time">
                             <input v-model="windowForm.add_close" type="datetime-local" class="field">
                         </FormField>
                     </FormGrid>
                 </FormSection>
-                <FormSection :title="`Student Edit Window — ${academicYear}`"
-                             hint="When schools can edit or delete existing students.">
+                <FormSection :title="`Amendment window — ${academicYear}`"
+                             hint="After initial submission, schools can correct data only during this window.">
                     <FormGrid>
-                        <FormField label="Edit opens">
+                        <FormField label="Edits open" hint="Corrections allowed from">
                             <input v-model="windowForm.edit_open" type="datetime-local" class="field">
                         </FormField>
-                        <FormField label="Edit closes">
+                        <FormField label="Edits close" hint="Registration locked for edits after">
                             <input v-model="windowForm.edit_close" type="datetime-local" class="field">
                         </FormField>
                     </FormGrid>
@@ -715,7 +755,7 @@
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
     sahodaya:                Object,
@@ -746,8 +786,6 @@ const props = defineProps({
     classGroupSchemeOptions: { type: Object, default: () => ({}) },
 });
 
-const activeTab = ref('profile');
-
 const tabs = [
     { key: 'profile',    label: 'Profile & Rules' },
     { key: 'payment',    label: 'Payment Details' },
@@ -759,6 +797,26 @@ const tabs = [
     { key: 'categories', label: 'Class Master' },
     { key: 'types',      label: 'Teaching Types' },
 ];
+
+const tabKeys = tabs.map((t) => t.key);
+
+function resolveInitialTab() {
+    const fromUrl = new URLSearchParams(window.location.search).get('tab');
+    if (fromUrl && tabKeys.includes(fromUrl)) {
+        return fromUrl;
+    }
+    const stored = sessionStorage.getItem(`sah-settings-tab-${props.sahodaya?.id}`);
+    if (stored && tabKeys.includes(stored)) {
+        return stored;
+    }
+    return 'profile';
+}
+
+const activeTab = ref(resolveInitialTab());
+
+watch(activeTab, (tab) => {
+    sessionStorage.setItem(`sah-settings-tab-${props.sahodaya?.id}`, tab);
+});
 
 // Forms
 const profileForm = useForm({
@@ -839,6 +897,99 @@ const paymentPreview = computed(() => {
 
     return lines.join('\n');
 });
+
+// ─── Setup checklist ──────────────────────────────────────────────────────────
+// Each item: { key, label, tab, tabLabel, done }
+const setupChecklist = computed(() => {
+    const p = props.profile ?? {};
+    const regWin = props.registrationWindow;
+    // Use reactive form state so checklist / dots update as the user fills fields without saving
+    const hasPayment = !!(
+        paymentForm.payment_bank_name ||
+        paymentForm.payment_account_no ||
+        paymentForm.payment_upi
+    );
+    // Fee: use the fee form's reactive state for immediate feedback
+    const feeOk = feeForm.membership_fee_type === 'none'
+        ? true
+        : (feeForm.membership_fee_type === 'variable_by_student_count'
+        ? (props.feeSlabs?.length > 0)
+        : ((feeForm.fixed_membership_fee_amount ?? 0) > 0));
+    const windowOk = !!(regWin?.add_open && regWin?.add_close);
+
+    return [
+        {
+            key: 'prefix',
+            label: 'Set a Sahodaya registration prefix (e.g. MLM) — required for all membership numbers.',
+            tab: 'profile',
+            tabLabel: 'Profile & Rules',
+            done: !!profileForm.prefix,
+        },
+        {
+            key: 'academic_year',
+            label: 'Activate an academic year — required for fees, windows, and reports.',
+            tab: 'profile',
+            tabLabel: 'Profile & Rules',
+            done: !!props.activeAcademicYearRecord,
+        },
+        {
+            key: 'fee',
+            label: feeForm.membership_fee_type === 'none'
+                ? 'No membership fee — schools register without payment.'
+                : (feeForm.membership_fee_type === 'variable_by_student_count'
+                ? 'Add at least one fee slab for the active academic year.'
+                : 'Set a fixed membership fee amount greater than ₹0, or choose “No membership fee (₹0)”.'),
+            tab: 'fees',
+            tabLabel: 'Membership Fees',
+            done: feeOk,
+        },
+        {
+            key: 'window',
+            label: 'Set the student add/close window dates for the active academic year.',
+            tab: 'window',
+            tabLabel: 'Registration Window',
+            done: windowOk,
+        },
+        {
+            key: 'payment',
+            label: 'Add bank or UPI payment details so schools know where to remit fees.',
+            tab: 'payment',
+            tabLabel: 'Payment Details',
+            done: hasPayment,
+        },
+        {
+            key: 'classes',
+            label: 'Add at least one class to the Class Master (LKG, 1, 2, 3…).',
+            tab: 'categories',
+            tabLabel: 'Class Master',
+            done: (props.masterClasses?.length ?? 0) > 0,
+        },
+        {
+            key: 'mail',
+            label: 'Configure ZeptoMail API so notifications go from your Sahodaya email, not the platform default.',
+            tab: 'email',
+            tabLabel: 'ZeptoMail API',
+            done: !!props.profile?.mail_configured,
+        },
+    ];
+});
+
+const incompleteSetup = computed(() => setupChecklist.value.filter(i => !i.done));
+
+// True once at least one item is done (avoids "All configured" on a fresh install)
+const setupDoneOnce = computed(() => {
+    const list = setupChecklist.value;
+    return list.length > 0 && list.every(i => i.done);
+});
+
+const tabsWithWarnings = computed(() => {
+    const set = new Set();
+    for (const item of incompleteSetup.value) {
+        set.add(item.tab);
+    }
+    return set;
+});
+// ──────────────────────────────────────────────────────────────────────────────
 
 const nextClassSort = computed(() => {
     if (! props.masterClasses?.length) return 1;

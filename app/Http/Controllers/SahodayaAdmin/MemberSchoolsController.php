@@ -44,6 +44,41 @@ class MemberSchoolsController extends SahodayaAdminController
         ]);
     }
 
+    public function applications(Request $request)
+    {
+        $filters = $this->schoolListFilters($request);
+
+        $schools = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'pending')
+            ->when($filters['search'] !== '', function ($q) use ($filters) {
+                $search = $filters['search'];
+                $q->where(function ($inner) use ($search) {
+                    $inner->where('name', 'like', "%{$search}%")
+                        ->orWhere('school_prefix', 'like', "%{$search}%");
+                });
+            })
+            ->when($filters['date_from'], fn ($q) => $q->whereDate('created_at', '>=', $filters['date_from']))
+            ->when($filters['date_to'], fn ($q) => $q->whereDate('created_at', '<=', $filters['date_to']))
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $schools->getCollection()->transform(function (Tenant $school) {
+            $payload = $school->application_payload ?? [];
+            $school->setAttribute('contact_email', $payload['school_email'] ?? $payload['contact_email'] ?? null);
+            $school->setAttribute('contact_phone', $payload['phone'] ?? $payload['contact_phone'] ?? null);
+            $school->setAttribute('affiliation', $payload['cbse_affiliation'] ?? $payload['affiliation_number'] ?? null);
+
+            return $school;
+        });
+
+        return $this->inertia('Sahodaya/Schools/Applications', [
+            'schools' => $schools,
+            'filters' => $filters,
+        ]);
+    }
+
     public function export(Request $request): StreamedResponse
     {
         $filters = $this->schoolListFilters($request);

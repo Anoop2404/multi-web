@@ -60,6 +60,8 @@ class FestReportController extends SahodayaAdminController
             'exports'      => $exports,
             'schools'      => $service->schools(),
             'items'        => $service->items()->map->only(['id', 'title', 'class_group']),
+            'heads'        => \App\Models\FestItemHead::forTenant($this->sahodaya->id)->forEvent($event->id)->orderBy('sort_order')->get(['id', 'name']),
+            'stages'       => $service->scheduleStages()->map(fn ($s) => ['id' => $s->id, 'name' => $s->name]),
             'classGroups'  => FestReportService::classGroups($event),
             'currentPhase' => $currentPhase,
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::reportsPhase($phase)),
@@ -233,6 +235,54 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
+    public function disciplineRegistration(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+
+        return $this->inertia('Sahodaya/Events/Reports/DisciplineRegistration', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'rows'   => $analytics->disciplineRegistrationRows(),
+            'xlsUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/discipline-registration",
+        ])));
+    }
+
+    public function ageGroupMatrix(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $schoolId = $request->input('school_id');
+        $data = $analytics->ageGroupMatrix($schoolId ?: null);
+
+        return $this->inertia('Sahodaya/Events/Reports/AgeGroupMatrix', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'matrix'         => $data,
+            'schools'        => (new FestReportService($event))->schools(),
+            'filterSchoolId' => $schoolId,
+            'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/age-group-matrix?'.http_build_query(array_filter(['school_id' => $schoolId])),
+        ])));
+    }
+
+    public function feeCollection(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $rows = $analytics->feeCollectionRows();
+
+        return $this->inertia('Sahodaya/Events/Reports/FeeCollection', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'rows'   => $rows,
+            'totals' => [
+                'schools'  => count($rows),
+                'due'      => round(collect($rows)->sum('total_due'), 2),
+                'collected'=> round(collect($rows)->where('status', 'approved')->sum('total_due'), 2),
+                'pending'  => collect($rows)->whereIn('status', ['pending', 'proof_uploaded'])->count(),
+            ],
+            'xlsUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/fee-pending-schools",
+            'feesUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/fees",
+        ])));
+    }
+
     public function registrationRegister(Request $request, string $tenantId, FestEvent $event, FestRegistrationRegisterService $register)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -263,6 +313,7 @@ class FestReportController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $catalog = collect(FestReportCatalog::exports($tenantId, $event->id))->firstWhere('id', $exportType);
+        abort_unless(is_array($catalog), 404, 'Unknown report export.');
         $phase = $catalog['phase'] ?? 'before';
 
         $audit->festEvent($event, FestPageActivity::reportsPhase($phase), 'fest.report.exported', "Report exported: {$exportType}", [

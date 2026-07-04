@@ -69,6 +69,28 @@ export function useEventSettingsForms(props) {
         sports_age_cutoff_date: props.event.sports_age_cutoff_date ?? '',
     });
 
+    const lifecycleForm = useForm({
+        verification_day: props.event.verification_day ?? '',
+        manual_pdf: null,
+        remove_manual: false,
+    });
+
+    const registrationSettingsForm = useForm({
+        require_event_registration: props.event.require_event_registration ?? false,
+        event_reg_start: props.event.event_reg_start ?? '',
+        event_reg_end: props.event.event_reg_end ?? '',
+        allow_student_self_register: props.event.allow_student_self_register ?? false,
+    });
+
+    const numberingSettingsForm = useForm({
+        event_reg_start: props.numberingSettings?.event_reg_start ?? 1,
+        event_reg_prefix: props.numberingSettings?.event_reg_prefix ?? 'S-',
+        chest_no_start: props.numberingSettings?.chest_no_start ?? 1,
+        chest_no_prefix: props.numberingSettings?.chest_no_prefix ?? '',
+        auto_assign_on_approve: props.numberingSettings?.auto_assign_on_approve ?? true,
+        auto_assign_chest_on_create: props.numberingSettings?.auto_assign_chest_on_create ?? false,
+    });
+
     const existingFeeSettings = props.event.fee_settings ?? {};
     const schedule = props.feeSchedule ?? {};
     const feeSettingsForm = useForm({
@@ -83,6 +105,8 @@ export function useEventSettingsForms(props) {
         flat_amount: existingFeeSettings.flat_amount ?? schedule.flat_amount ?? '',
         per_item_amount: existingFeeSettings.per_item_amount ?? schedule.per_item_amount ?? '',
         per_student_amount: existingFeeSettings.per_student_amount ?? schedule.per_student_amount ?? '',
+        school_registration_flat: existingFeeSettings.school_registration_flat ?? schedule.school_registration_flat ?? '',
+        included_items_per_student: existingFeeSettings.included_items_per_student ?? schedule.included_items_per_student ?? '',
         school_fee_cap: existingFeeSettings.school_fee_cap ?? schedule.school_fee_cap ?? '',
         class_group_scheme: existingFeeSettings.class_group_scheme ?? schedule.class_group_scheme ?? '',
         include_school_registration: existingFeeSettings.include_school_registration ?? schedule.include_school_registration ?? false,
@@ -138,6 +162,22 @@ export function useEventSettingsForms(props) {
 
     function saveEligibility() {
         eligibilityForm.put(`${base}/eligibility-settings`, { preserveScroll: true });
+    }
+
+    function saveLifecycle() {
+        lifecycleForm.post(`${base}/lifecycle-settings`, {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => lifecycleForm.reset('manual_pdf'),
+        });
+    }
+
+    function saveRegistrationSettings() {
+        registrationSettingsForm.put(`${base}/registration-settings`, { preserveScroll: true });
+    }
+
+    function saveNumberingSettings() {
+        numberingSettingsForm.put(`${base}/numbering-settings`, { preserveScroll: true });
     }
 
     function backfillRegs() {
@@ -211,6 +251,9 @@ export function useEventSettingsForms(props) {
         volunteerForm,
         cloneForm,
         eligibilityForm,
+        lifecycleForm,
+        registrationSettingsForm,
+        numberingSettingsForm,
         feeSettingsForm,
         effectiveClassGroupLabels,
         ageRuleSummary: computed(() => props.ageRuleSummary ?? ''),
@@ -221,6 +264,9 @@ export function useEventSettingsForms(props) {
         saveSettings,
         saveFeeSettings,
         saveEligibility,
+        saveLifecycle,
+        saveRegistrationSettings,
+        saveNumberingSettings,
         backfillRegs,
         addVenue,
         removeVenue,

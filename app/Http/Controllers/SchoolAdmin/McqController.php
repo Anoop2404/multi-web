@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
 
 class McqController extends SchoolAdminController
 {
-    public function hub()
+    public function hub(McqRegistrationController $registrations)
     {
         $sahodayaId = $this->school->parent_id;
         $exams = McqExam::where('tenant_id', $sahodayaId)
@@ -35,7 +35,7 @@ class McqController extends SchoolAdminController
             'total_regs'  => $registeredCount,
         ];
 
-        return app(McqRegistrationController::class)->index($hubStats);
+        return $registrations->index($hubStats);
     }
 
     public function exam(string $tenantId, McqExam $exam, string $tab = 'register')

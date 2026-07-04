@@ -6,7 +6,17 @@
         accent="indigo"
         :nav-items="navItems"
     >
-        <section v-if="mcqBanks?.length" class="card mb-4">
+        <nav v-if="jumpSections.length" class="sticky top-0 z-20 -mx-1 mb-4 px-1 py-2 bg-white/95 backdrop-blur border-b border-slate-100">
+            <div class="flex flex-wrap gap-2">
+                <a v-for="section in jumpSections" :key="section.id"
+                   :href="`#${section.id}`"
+                   class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-800 transition">
+                    {{ section.label }}
+                </a>
+            </div>
+        </nav>
+
+        <section v-if="mcqBanks?.length" id="section-mcq" class="card mb-4">
             <div class="flex items-center justify-between gap-2 mb-2">
                 <h2 class="font-semibold text-sm">MCQ question banks</h2>
                 <a :href="`/portal/teacher/${school.id}/question-banks`" class="text-xs font-semibold text-indigo-600">Manage →</a>
@@ -19,7 +29,7 @@
             </ul>
         </section>
 
-        <section v-if="training?.length" class="card mb-4">
+        <section v-if="training?.length" id="section-training" class="card mb-4">
             <h2 class="font-semibold text-sm mb-2">Training programs</h2>
             <div v-for="t in training" :key="t.id" class="border-t first:border-0 pt-3 first:pt-0 mb-3">
                 <p class="font-medium text-sm">{{ t.program?.title }}</p>
@@ -36,7 +46,7 @@
             </div>
         </section>
 
-        <section v-if="festRegistrations?.length" class="card mb-4">
+        <section v-if="festRegistrations?.length" id="section-fest-reg" class="card mb-4">
             <h2 class="font-semibold text-sm mb-2">Teacher Fest Registrations</h2>
             <ul class="text-sm divide-y">
                 <li v-for="r in festRegistrations" :key="r.id" class="py-2">
@@ -45,7 +55,7 @@
             </ul>
         </section>
 
-        <section v-if="festDaySlots?.length" class="card mb-4">
+        <section v-if="festDaySlots?.length" id="section-schedule" class="card mb-4">
             <h2 class="font-semibold text-sm mb-2">My Fest Schedule</h2>
             <ul class="text-sm divide-y">
                 <li v-for="(slot, i) in festDaySlots" :key="i" class="py-2">
@@ -59,7 +69,7 @@
             </ul>
         </section>
 
-        <section v-if="admitCardEvents?.length" class="card mb-4">
+        <section v-if="admitCardEvents?.length" id="section-admit" class="card mb-4">
             <h2 class="font-semibold text-sm mb-2">Fest Admit Cards</h2>
             <ul class="text-sm divide-y">
                 <li v-for="ev in admitCardEvents" :key="ev.id" class="py-2 flex justify-between gap-2">
@@ -69,7 +79,7 @@
             </ul>
         </section>
 
-        <section v-if="festResults?.length" class="card mb-4">
+        <section v-if="festResults?.length" id="section-results" class="card mb-4">
             <h2 class="font-semibold text-sm mb-2">Fest Results</h2>
             <ul class="text-sm divide-y">
                 <li v-for="(r, i) in festResults" :key="i" class="py-2">
@@ -79,7 +89,7 @@
             </ul>
         </section>
 
-        <section v-if="festCerts?.length" class="card mb-4">
+        <section v-if="festCerts?.length" id="section-certs" class="card mb-4">
             <h2 class="font-semibold text-sm mb-2">Fest Certificates</h2>
             <ul class="text-sm divide-y">
                 <li v-for="(c, i) in festCerts" :key="i" class="py-2 flex justify-between gap-2">
@@ -89,7 +99,7 @@
             </ul>
         </section>
 
-        <section v-if="festFees?.length" class="card mb-4">
+        <section v-if="festFees?.length" id="section-fees" class="card mb-4">
             <h2 class="font-semibold text-sm mb-2">School Fest Fees</h2>
             <ul class="text-sm divide-y">
                 <li v-for="(f, i) in festFees" :key="i" class="py-2 flex justify-between gap-2">
@@ -99,7 +109,7 @@
             </ul>
         </section>
 
-        <section v-if="festAppeals?.length || appealableParticipants?.length" class="card mb-4">
+        <section v-if="festAppeals?.length || appealableParticipants?.length" id="section-appeals" class="card mb-4">
             <h2 class="font-semibold text-sm mb-2">Appeals</h2>
             <ul v-if="festAppeals?.length" class="text-sm divide-y mb-3">
                 <li v-for="(a, i) in festAppeals" :key="i" class="py-2">
@@ -117,26 +127,7 @@
             </form>
         </section>
 
-        <section class="card mb-4">
-            <h2 class="font-semibold text-sm mb-2">Training Programs</h2>
-            <ul class="text-sm divide-y">
-                <li v-for="t in training" :key="t.id" class="py-2 flex justify-between items-center gap-2 flex-wrap">
-                    <div>
-                        <span class="font-medium">{{ t.program?.title }}</span>
-                        <span class="text-xs text-gray-400 ml-1 capitalize">({{ t.status }})</span>
-                    </div>
-                    <a v-if="t.certificate || t.status === 'confirmed'"
-                       :href="`/portal/teacher/${school.id}/training/${t.id}/certificate`"
-                       target="_blank"
-                       class="text-xs font-semibold text-indigo-600 shrink-0">
-                        Certificate ↗
-                    </a>
-                </li>
-                <li v-if="!training.length" class="text-gray-400 py-2">No training registrations</li>
-            </ul>
-        </section>
-
-        <section class="card">
+        <section id="section-notifications" class="card">
             <h2 class="font-semibold text-sm mb-2">Notifications</h2>
             <ul class="text-sm divide-y">
                 <li v-for="n in notifications" :key="n.id" class="py-2">
@@ -153,6 +144,7 @@
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';
 
 const props = defineProps({
     school: Object,
@@ -181,8 +173,20 @@ function submitAppeal() {
     });
 }
 
-const navItems = computed(() => [
-    { href: `/portal/teacher/${props.school.id}`, label: 'Dashboard' },
-    { href: `/portal/teacher/${props.school.id}/question-banks`, label: 'Question Banks' },
-]);
+const navItems = computed(() => teacherPortalNavItems(props.school.id));
+
+const jumpSections = computed(() => {
+    const sections = [];
+    if (props.mcqBanks?.length) sections.push({ id: 'section-mcq', label: 'MCQ banks' });
+    if (props.training?.length) sections.push({ id: 'section-training', label: 'Training' });
+    if (props.festRegistrations?.length) sections.push({ id: 'section-fest-reg', label: 'Fest reg' });
+    if (props.festDaySlots?.length) sections.push({ id: 'section-schedule', label: 'Schedule' });
+    if (props.admitCardEvents?.length) sections.push({ id: 'section-admit', label: 'Admit cards' });
+    if (props.festResults?.length) sections.push({ id: 'section-results', label: 'Results' });
+    if (props.festCerts?.length) sections.push({ id: 'section-certs', label: 'Certificates' });
+    if (props.festFees?.length) sections.push({ id: 'section-fees', label: 'Fees' });
+    if (props.festAppeals?.length || props.appealableParticipants?.length) sections.push({ id: 'section-appeals', label: 'Appeals' });
+    sections.push({ id: 'section-notifications', label: 'Notifications' });
+    return sections;
+});
 </script>

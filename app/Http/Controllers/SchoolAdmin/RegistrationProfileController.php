@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Mail\SahodayaMailer;
 use App\Support\SchoolApplicationForm;
+use App\Support\SchoolContactRequirements;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -58,6 +59,7 @@ class RegistrationProfileController extends SchoolAdminController
                 'email'              => $user->email,
                 'email_verified'     => (bool) $user->email_verified_at,
             ],
+            'leadershipContacts' => SchoolContactRequirements::status($this->school),
         ]);
     }
 

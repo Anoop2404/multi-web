@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Public\AdmissionEnquiryController;
 use App\Http\Controllers\Public\RegistrationLandingController;
 use App\Http\Controllers\Public\FestPortalController;
+use App\Http\Controllers\Public\McqArchiveController;
 use App\Http\Controllers\Public\EventController;
 use App\Http\Controllers\Public\GalleryAlbumController;
 use App\Http\Controllers\Public\NewsArticleController;
@@ -31,7 +32,9 @@ Route::middleware([
 
     // School membership application (always available on Sahodaya tenants)
     Route::get('/school-register', [SchoolApplicationController::class, 'create'])->name('school-register.create');
-    Route::post('/school-register', [SchoolApplicationController::class, 'store'])->name('school-register.store');
+    Route::post('/school-register', [SchoolApplicationController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('school-register.store');
 
     // Public festival portal (always available on Sahodaya tenants)
     Route::prefix('fest')->name('tenant.fest.')->group(function () {
@@ -40,11 +43,20 @@ Route::middleware([
         Route::get('/{event}/schedule', [FestPortalController::class, 'schedule'])->name('schedule');
         Route::get('/{event}/items/{item}', [FestPortalController::class, 'itemSchedule'])->name('item-schedule');
         Route::get('/{event}/items/{item}/results', [FestPortalController::class, 'itemResults'])->name('item-results');
+        Route::get('/{event}/items/{item}/results.pdf', [FestPortalController::class, 'itemResultsPdf'])->name('item-results.pdf');
+        Route::get('/{event}/items/{item}/winners/{mark}/poster.svg', [FestPortalController::class, 'winnerPoster'])->name('winner-poster');
+        Route::get('/{event}/scoreboard', [FestPortalController::class, 'scoreboard'])->name('scoreboard');
+        Route::get('/{event}/manual', [FestPortalController::class, 'manual'])->name('manual');
         Route::get('/{event}/live', [FestPortalController::class, 'live'])->name('live');
         Route::get('/{event}/live/data', [FestPortalController::class, 'liveData'])->name('live.data');
         Route::get('/{event}/records', [FestPortalController::class, 'records'])->name('records');
         Route::get('/{event}/search', [FestPortalController::class, 'search'])->name('search');
         Route::get('/{event}/participant/{ref}', [FestPortalController::class, 'participant'])->name('participant');
+    });
+
+    Route::prefix('mcq')->name('tenant.mcq.')->group(function () {
+        Route::get('/papers', [McqArchiveController::class, 'index'])->name('archive');
+        Route::get('/papers/{exam}/download', [McqArchiveController::class, 'download'])->name('archive.download');
     });
 
     // Public website pages (require global + tenant public-site setting)

@@ -29,7 +29,10 @@ class FestRegistrationCreateService
     ): FestRegistration {
         abort_if($school->parent_id !== $event->tenant_id, 403);
         abort_if($item->event_id !== $event->id, 403);
+        app(FestEventRegistrationService::class)->assertSchoolMembershipApproved($school);
         abort_if($item->is_enabled === false, 422, 'This item is not open for registration.');
+
+        app(FestItemRegistrationGate::class)->assertOpen($item);
 
         if (! $skipSchoolClosedCheck && $school->fest_registration_closed) {
             abort(422, 'Fest registration is closed for this school.');
@@ -67,6 +70,18 @@ class FestRegistrationCreateService
         $eligibilityErrors = app(FestRegistrationEligibilityService::class)
             ->validateStudents($event, $item, array_merge($performerIds, $standbyIds));
         abort_if($eligibilityErrors, 422, implode(' ', $eligibilityErrors));
+
+        $eventRegService = app(FestEventRegistrationService::class);
+        foreach (array_merge($performerIds, $standbyIds) as $studentId) {
+            if ($eventRegService->requireEventRegistration($event)) {
+                $eventRegService->assertStudentEligible($event, $studentId);
+            } else {
+                $student = Student::find($studentId);
+                if ($student) {
+                    $eventRegService->registerStudent($event, $student, $school);
+                }
+            }
+        }
 
         $registration = FestRegistration::create([
             'event_id'     => $event->id,
@@ -108,6 +123,10 @@ class FestRegistrationCreateService
         }
 
         app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
+
+        foreach ($registration->fresh(['participants'])->participants as $participant) {
+            app(FestNumberingService::class)->assignParticipantNumbers($participant);
+        }
 
         app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
 

@@ -10,6 +10,7 @@ use App\Models\FestPointRule;
 use App\Models\FestStage;
 use App\Models\FestVenue;
 use App\Models\FestVolunteer;
+use App\Models\FestSchoolVerification;
 use App\Models\Tenant;
 use App\Support\Fest\FestEventSettingsPayload;
 use App\Support\FestPageActivity;
@@ -21,6 +22,8 @@ use App\Services\Events\FestJudgeGateService;
 use App\Services\Events\FestSchoolEventFeeService;
 use App\Services\Events\FestLevelRegistrationService;
 use App\Services\Events\FestLifecycleService;
+use App\Services\Events\FestMandatoryItemService;
+use App\Support\TenantStorage;
 use App\Services\Audit\PlatformAuditLogger;
 use Illuminate\Http\Request;
 
@@ -30,7 +33,7 @@ class FestEventSettingsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $allowed = ['lifecycle', 'locks', 'venues', 'combo', 'grades', 'points', 'participation', 'eligibility', 'fees', 'volunteers', 'records', 'clone'];
+        $allowed = ['lifecycle', 'locks', 'venues', 'combo', 'grades', 'points', 'participation', 'eligibility', 'fees', 'registration', 'numbering', 'volunteers', 'records', 'clone'];
         $initialTab = ($tab && in_array($tab, $allowed, true)) ? $tab : 'lifecycle';
 
         if ($initialTab === 'eligibility' && $event->event_type !== 'sports') {
@@ -52,6 +55,7 @@ class FestEventSettingsController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/Settings', [
             'event'        => $event->load('items'),
             'feeSchedule'  => $schedule,
+            'numberingSettings' => app(\App\Services\Events\FestNumberingService::class)->settings($event),
             'feeModels'    => config('fest_fees.fee_models'),
             'classGroupScheme' => $classGroupScheme,
             'classGroupSchemeOptions' => FestClassGroupScheme::options(),
@@ -87,8 +91,65 @@ class FestEventSettingsController extends SahodayaAdminController
                 : null,
             'defaultCutoffLabel' => $this->defaultCutoffLabel($event),
             'ageGroupHelp' => $event->event_type === 'sports' ? $this->ageGroupHelp($event) : [],
+            'schoolVerifications' => $this->schoolVerificationRows($event, $schools),
+            'mandatoryGaps' => app(FestMandatoryItemService::class)->schoolsWithMissing($event),
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::settingsTab($initialTab)),
         ]);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function schoolVerificationRows(FestEvent $event, $schools): array
+    {
+        $records = FestSchoolVerification::where('event_id', $event->id)
+            ->get()
+            ->keyBy('school_id');
+
+        return $schools->map(fn (Tenant $school) => [
+            'school_id'           => $school->id,
+            'school_name'         => $school->name,
+            'documents_verified'  => (bool) ($records[$school->id]->documents_verified ?? false),
+            'verified_at'         => $records[$school->id]->verified_at?->toIso8601String(),
+            'notes'               => $records[$school->id]->notes ?? null,
+        ])->values()->all();
+    }
+
+    public function updateLifecycleSettings(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'verification_day' => 'nullable|date',
+            'manual_pdf'       => 'nullable|file|mimes:pdf|max:10240',
+            'remove_manual'    => 'nullable|boolean',
+        ]);
+
+        $updates = [
+            'verification_day' => filled($data['verification_day'] ?? null) ? $data['verification_day'] : null,
+        ];
+
+        if ($request->boolean('remove_manual')) {
+            $updates['manual_pdf_path'] = null;
+        } elseif ($request->hasFile('manual_pdf')) {
+            $updates['manual_pdf_path'] = TenantStorage::storeUploadedFile(
+                $request->file('manual_pdf'),
+                "fest-manuals/{$event->id}"
+            );
+        }
+
+        $event->update($updates);
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('lifecycle'),
+            'fest.settings.lifecycle_saved',
+            'Lifecycle settings saved',
+            [
+                'verification_day' => $event->verification_day?->format('Y-m-d'),
+                'manual_pdf'       => filled($event->manual_pdf_path),
+            ],
+        );
+
+        return back()->with('success', 'Lifecycle settings saved.');
     }
 
     public function updateEligibilitySettings(Request $request, string $tenantId, FestEvent $event)
@@ -192,7 +253,9 @@ class FestEventSettingsController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'fee_model' => 'required|in:none,cksc_tiered,item_catalog,flat_school,per_item,per_student',
+            'fee_model' => 'required|in:none,sports_composite,cksc_tiered,item_catalog,flat_school,per_item,per_student',
+            'school_registration_flat' => 'nullable|numeric|min:0',
+            'included_items_per_student' => 'nullable|integer|min:0|max:50',
             'first_item' => 'nullable|numeric|min:0',
             'additional_item' => 'nullable|numeric|min:0',
             'charge_standbys' => 'nullable|boolean',
@@ -549,6 +612,78 @@ class FestEventSettingsController extends SahodayaAdminController
 
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$clone->id}/settings")
             ->with('success', "Event cloned as \"{$clone->title}\".");
+    }
+
+    public function updateRegistrationSettings(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'require_event_registration' => 'nullable|boolean',
+            'event_reg_start' => 'nullable|date',
+            'event_reg_end' => 'nullable|date',
+            'allow_student_self_register' => 'nullable|boolean',
+        ]);
+
+        $event->update([
+            'require_event_registration' => (bool) ($data['require_event_registration'] ?? false),
+            'event_reg_start' => $data['event_reg_start'] ?? null,
+            'event_reg_end' => $data['event_reg_end'] ?? null,
+            'allow_student_self_register' => (bool) ($data['allow_student_self_register'] ?? false),
+        ]);
+
+        return back()->with('success', 'Registration settings saved.');
+    }
+
+    public function updateNumberingSettings(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'event_reg_start' => 'nullable|integer|min:1',
+            'event_reg_prefix' => 'nullable|string|max:20',
+            'chest_no_start' => 'nullable|integer|min:1',
+            'chest_no_prefix' => 'nullable|string|max:20',
+            'auto_assign_on_approve' => 'nullable|boolean',
+            'auto_assign_chest_on_create' => 'nullable|boolean',
+        ]);
+
+        $event->update([
+            'numbering_settings' => array_merge(
+                app(\App\Services\Events\FestNumberingService::class)->settings($event),
+                array_filter($data, fn ($v) => $v !== null)
+            ),
+        ]);
+
+        return back()->with('success', 'Numbering settings saved.');
+    }
+
+    public function updateItemWindows(Request $request, string $tenantId, FestEvent $event, FestEventItem $item)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($item->event_id !== $event->id, 404);
+
+        $data = $request->validate([
+            'reg_start' => 'nullable|date',
+            'reg_end' => 'nullable|date',
+            'item_reg_id_start' => 'nullable|integer|min:1',
+            'head_id' => 'nullable|exists:fest_item_heads,id',
+            'results_published_at' => 'nullable|date',
+        ]);
+
+        $item->update($data);
+
+        return back()->with('success', 'Item registration window saved.');
+    }
+
+    public function publishItemResults(string $tenantId, FestEvent $event, FestEventItem $item)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($item->event_id !== $event->id, 404);
+
+        $item->update(['results_published_at' => now()]);
+
+        return back()->with('success', 'Item results marked published.');
     }
 
     public function backfillLevelRegistrations(string $tenantId, FestEvent $event, FestLevelRegistrationService $service)

@@ -1,5 +1,16 @@
 <template>
     <AdminLayout title="State Dashboard">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div>
+                <h1 class="text-lg font-semibold text-gray-900">State dashboard</h1>
+                <p class="text-sm text-gray-500">Cross-cluster programs, remittances, and propagation.</p>
+            </div>
+            <span v-if="activeAcademicYear"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-800 text-xs font-semibold">
+                Academic year {{ activeAcademicYear }}
+            </span>
+        </div>
+
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div v-for="card in statCards" :key="card.label" class="card">
                 <p class="text-xs text-gray-500 uppercase tracking-wide">{{ card.label }}</p>
@@ -131,6 +142,7 @@ import { Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 
 const props = defineProps({
+    activeAcademicYear: String,
     stats: Object,
     recentRemittances: Array,
     recentPrograms: Array,

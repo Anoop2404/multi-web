@@ -10,6 +10,7 @@ use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestResult;
 use App\Models\Tenant;
+use App\Support\FestSportsAgeGroup;
 use Illuminate\Support\Collection;
 
 class EventContext
@@ -42,16 +43,154 @@ class EventContext
 
     public function nextChestNumber(FestEventItem $item): int
     {
-        $max = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $this->event->id)
-            ->where('item_id', $item->id))
-            ->max('chest_no');
+        return app(FestNumberingService::class)->nextChestNumber($this->event, $item);
+    }
 
-        return ($max ?? 0) + 1;
+    /** @return list<string> */
+    public function scoreboardClusters(): array
+    {
+        if ($this->event->event_type !== 'kids_fest' || $this->event->parent_event_id) {
+            return [];
+        }
+
+        return app(FestKidsFestClusterService::class)
+            ->clusters($this->event)
+            ->map(fn (FestEvent $c) => $c->cluster_key)
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    public function scoreboardClusterLabel(string $clusterKey): string
+    {
+        $cluster = FestEvent::where('parent_event_id', $this->event->id)
+            ->where('cluster_key', $clusterKey)
+            ->first();
+
+        return $cluster?->cluster_label ?? ucfirst(str_replace('-', ' ', $clusterKey));
+    }
+
+    /** @return list<array{school_id: string, school_name: string, total_points: int, rank: int}> */
+    public function scoreboardByCluster(string $clusterKey): array
+    {
+        $cluster = FestEvent::where('parent_event_id', $this->event->id)
+            ->where('cluster_key', $clusterKey)
+            ->first();
+
+        if (! $cluster) {
+            return [];
+        }
+
+        return self::for($cluster)->scoreboardBySchool();
+    }
+
+    /** @return list<string> */
+    public function scoreboardCategories(): array
+    {
+        if ($this->event->event_type === 'sports') {
+            return FestEventItem::where('event_id', $this->event->id)
+                ->where('is_enabled', true)
+                ->whereNotNull('age_group')
+                ->where('age_group', '!=', 'open')
+                ->distinct()
+                ->orderBy('age_group')
+                ->pluck('age_group')
+                ->values()
+                ->all();
+        }
+
+        return ['lp', 'up', 'hs', 'hss'];
+    }
+
+    public function scoreboardCategoryLabel(?string $category): string
+    {
+        if (! $category) {
+            return 'Overall';
+        }
+
+        if ($this->event->event_type === 'sports') {
+            return FestSportsAgeGroup::labels($this->event->tenant_id)[$category]
+                ?? strtoupper($category);
+        }
+
+        return config("fest_item_taxonomy.class_group.{$category}", strtoupper($category));
+    }
+
+    /** @return list<array{school_id: string, school_name: string, total_points: int, rank: int}> */
+    public function scoreboardByCategory(?string $category = null): array
+    {
+        if (! $category) {
+            return $this->scoreboardBySchool();
+        }
+
+        $gradePointService = app(FestGradePointService::class);
+
+        $marksQuery = FestMark::where('event_id', $this->event->id)
+            ->with(['participant.registration', 'item']);
+
+        if ($this->event->event_type === 'sports') {
+            $marksQuery->whereHas('item', fn ($q) => $q->where('age_group', $category));
+        } else {
+            $marksQuery->whereHas('item', fn ($q) => $q->where('class_group', $category));
+        }
+
+        $marks = $marksQuery->get();
+        $pointsBySchool = [];
+
+        foreach ($marks as $mark) {
+            $participant = $mark->participant;
+            if (! $participant || $participant->disqualified_at) {
+                continue;
+            }
+
+            $schoolId = $participant->registration?->school_id;
+            if (! $schoolId) {
+                continue;
+            }
+
+            $pointsBySchool[$schoolId] = ($pointsBySchool[$schoolId] ?? 0)
+                + $gradePointService->pointsForMark($this->event, $mark);
+        }
+
+        if ($pointsBySchool === []) {
+            return [];
+        }
+
+        $schools = Tenant::whereIn('id', array_keys($pointsBySchool))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->keyBy('id');
+
+        $rank = 1;
+        $previousTotal = null;
+        $position = 0;
+        $rows = [];
+
+        foreach (collect($pointsBySchool)->sortDesc() as $schoolId => $total) {
+            $position++;
+            if ($previousTotal !== null && (int) $total < (int) $previousTotal) {
+                $rank = $position;
+            }
+            $previousTotal = (int) $total;
+
+            $rows[] = [
+                'school_id'    => $schoolId,
+                'school_name'  => $schools[$schoolId]?->name ?? $schoolId,
+                'total_points' => (int) $total,
+                'rank'         => $rank,
+            ];
+        }
+
+        return $rows;
     }
 
     public function scoreboardBySchool(): array
     {
+        $clusterService = app(FestKidsFestClusterService::class);
+        if ($clusterService->isUmbrella($this->event)) {
+            return $clusterService->combinedScoreboard($this->event);
+        }
+
         $schoolIds = FestResult::where('event_id', $this->event->id)
             ->whereNull('item_id')
             ->pluck('school_id', 'school_id');

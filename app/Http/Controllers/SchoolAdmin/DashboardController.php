@@ -12,6 +12,7 @@ use App\Models\SahodayaProfile;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\TcRequest;
+use App\Models\DataChangeLog;
 use App\Support\AcademicYear;
 use App\Support\ProgramRouteMap;
 
@@ -32,7 +33,40 @@ class DashboardController extends SchoolAdminController
             'dashboardExtras'  => app(\App\Services\Events\ProgramHubDataService::class)->schoolDashboardExtras($this->school),
             'setup' => $this->setupStatus(),
             'membershipComplete' => $this->membershipComplete(),
+            'recentActivity' => $this->recentActivity(),
+            'registrationWindow' => app(\App\Services\Membership\MembershipRegistrationWindowService::class)
+                ->displayPayload(
+                    app(\App\Services\Membership\MembershipRegistrationWindowService::class)
+                        ->forSchool($this->school, AcademicYear::forSchool($this->school))
+                ),
+            'showSetupWizard' => ! $this->school->school_setup_wizard_dismissed
+                && $this->school->membership_status === 'approved',
         ]);
+    }
+
+    public function dismissSetupWizard()
+    {
+        $this->school->update(['school_setup_wizard_dismissed' => true]);
+
+        return back();
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function recentActivity(): array
+    {
+        return DataChangeLog::query()
+            ->where('school_id', $this->school->id)
+            ->latest()
+            ->limit(5)
+            ->get(['id', 'action', 'description', 'log_name', 'created_at'])
+            ->map(fn (DataChangeLog $log) => [
+                'id'          => $log->id,
+                'action'      => $log->action,
+                'description' => $log->description,
+                'log_name'    => $log->log_name,
+                'created_at'  => $log->created_at?->toIso8601String(),
+            ])
+            ->all();
     }
 
     /** @return list<array<string, mixed>> */
@@ -87,12 +121,15 @@ class DashboardController extends SchoolAdminController
 
         $classCount = $this->schoolClasses()->count();
         $studentCount = Student::where('tenant_id', $this->school->id)->where('status', 'active')->count();
+        $requiresStudents = $profile?->student_data_mode === 'full_records';
 
         return [
             'academicYear'    => $academicYear,
             'hasSchoolCode'   => filled($schoolCode),
             'schoolCode'      => $schoolCode,
             'codeLocked'      => (bool) $this->school->prefixes_locked,
+            'requiresStudents'=> $requiresStudents,
+            'studentDataMode' => $profile?->student_data_mode,
             'suggestedCode'   => strtoupper(substr(preg_replace('/[^a-z]/i', '', $this->school->name), 0, 3)) ?: 'SCH',
             'regNoExample'    => $regNoExample,
             'hasClasses'      => $classCount > 0,

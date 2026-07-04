@@ -13,13 +13,22 @@ use Illuminate\Support\Facades\Storage;
 
 class SubscriptionController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $filters = $request->validate([
+            'search' => 'nullable|string|max:100',
+        ]);
+
         $plans = SubscriptionPlan::orderBy('price_inr')->get();
 
         $subscriptions = TenantSubscription::with(['tenant', 'plan'])
+            ->when(! empty($filters['search']), function ($q) use ($filters) {
+                $term = '%'.$filters['search'].'%';
+                $q->whereHas('tenant', fn ($t) => $t->where('name', 'like', $term));
+            })
             ->latest()
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
 
         $pendingReceipts = SubscriptionReceipt::with(['invoice.tenant'])
             ->where('status', 'submitted')
@@ -33,7 +42,16 @@ class SubscriptionController extends Controller
             'pending_receipts'=> $pendingReceipts->count(),
         ];
 
-        return inertia('Billing/Index', compact('plans', 'subscriptions', 'pendingReceipts', 'stats'));
+        $tenantsForSelect = Tenant::orderBy('name')->get(['id', 'name']);
+
+        return inertia('Billing/Index', [
+            'plans'            => $plans,
+            'subscriptions'    => $subscriptions,
+            'pendingReceipts'  => $pendingReceipts,
+            'stats'            => $stats,
+            'filters'          => array_merge(['search' => ''], $filters),
+            'tenantsForSelect' => $tenantsForSelect,
+        ]);
     }
 
     public function storePlan(Request $request)

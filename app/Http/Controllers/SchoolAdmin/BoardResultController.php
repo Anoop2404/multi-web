@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Support\BoardExamSubjects;
 use App\Support\PersistDefaults;
 use App\Models\BoardResult;
 use App\Models\Topper;
@@ -60,14 +61,67 @@ class BoardResultController extends SchoolAdminController
     {
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
         $boardResult->load('toppers');
-        return $this->inertia('School/BoardResults/Toppers', compact('boardResult'));
+
+        $isClass12 = (int) $boardResult->class === 12;
+
+        return $this->inertia('School/BoardResults/Toppers', [
+            'boardResult'        => $boardResult,
+            'isClass12'          => $isClass12,
+            'streamOptions'      => $isClass12 ? BoardExamSubjects::class12StreamLabels() : [],
+            'subjectsByStream'   => $isClass12 ? collect(BoardExamSubjects::class12StreamLabels())
+                ->mapWithKeys(fn ($label, $key) => [$key => BoardExamSubjects::subjectsForStream($key)])
+                ->all() : [],
+            'subjectWiseLeaders' => $isClass12
+                ? BoardExamSubjects::subjectWiseLeaders($boardResult->toppers)
+                : [],
+        ]);
+    }
+
+    public function updateTopper(Request $request, string $tenantId, BoardResult $boardResult, Topper $topper)
+    {
+        abort_if($boardResult->tenant_id !== $this->school->id, 403);
+        abort_if($topper->board_result_id !== $boardResult->id, 403);
+
+        $data = $this->validateTopper($request, (int) $boardResult->class === 12);
+
+        if ($request->hasFile('photo')) {
+            $data['photo'] = $request->file('photo')->store(
+                'board-results/'.$this->school->id.'/'.$boardResult->id,
+                's3'
+            );
+        }
+
+        $topper->update($data);
+
+        return back()->with('success', 'Topper updated.');
     }
 
     public function storeTopper(Request $request, string $tenantId, BoardResult $boardResult)
     {
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
 
-        $data = $request->validate([
+        $isClass12 = (int) $boardResult->class === 12;
+        $data = $this->validateTopper($request, $isClass12);
+
+        $data['board_result_id'] = $boardResult->id;
+        $data['tenant_id'] = $this->school->id;
+
+        if ($request->hasFile('photo')) {
+            $data['photo'] = $request->file('photo')->store(
+                'board-results/'.$this->school->id.'/'.$boardResult->id,
+                's3'
+            );
+        }
+
+        Topper::create($data);
+
+        return back()->with('success', 'Topper added.');
+    }
+
+    /** @return array<string, mixed> */
+    private function validateTopper(Request $request, bool $isClass12): array
+    {
+        $rules = [
             'name'              => 'required|string|max:255',
             'percentage'        => 'required|numeric|min:0|max:100',
             'total_marks'       => 'nullable|integer|min:0',
@@ -76,23 +130,31 @@ class BoardResultController extends SchoolAdminController
             'rank'              => 'nullable|integer|min:1',
             'is_perfect_scorer' => 'boolean',
             'photo'             => 'nullable|image|max:4096',
-        ]);
+        ];
 
-        $data['board_result_id'] = $boardResult->id;
-        $data['tenant_id']       = $this->school->id;
-        $data = PersistDefaults::coalesce($data, [
-            'rank' => 1,
-        ]);
-
-        if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store(
-                'board-results/' . $this->school->id . '/' . $boardResult->id,
-                's3'
-            );
+        if ($isClass12) {
+            $rules['stream_key'] = 'nullable|string|max:50';
+            $rules['subject_marks'] = 'nullable|array';
+            $rules['subject_marks.*'] = 'nullable|numeric|min:0|max:100';
         }
 
-        Topper::create($data);
-        return back()->with('success', 'Topper added.');
+        $data = $request->validate($rules);
+        $data = PersistDefaults::coalesce($data, ['rank' => 1]);
+
+        if ($isClass12) {
+            $streamKey = BoardExamSubjects::normalizeStream($data['stream_key'] ?? $data['stream'] ?? null);
+            if ($streamKey) {
+                $labels = BoardExamSubjects::class12StreamLabels();
+                $data['stream'] = $labels[$streamKey] ?? $data['stream'] ?? null;
+            }
+
+            $data['subject_marks'] = BoardExamSubjects::normalizeSubjectMarks($data['subject_marks'] ?? []);
+            unset($data['stream_key']);
+        } else {
+            unset($data['subject_marks']);
+        }
+
+        return $data;
     }
 
     public function destroyTopper(string $tenantId, BoardResult $boardResult, Topper $topper)

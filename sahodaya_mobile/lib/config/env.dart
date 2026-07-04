@@ -1,10 +1,9 @@
-import 'app_branding.dart';
+import 'tenant_config.dart';
 
 class AppEnv {
   const AppEnv._();
 
-  /// Production API — used for local dev and release builds.
-  static const String apiBaseUrl = 'https://malappuramcentralsahodaya.org';
-
-  static const String appName = AppBranding.appName;
+  static const String apiBaseUrl = TenantConfig.apiBaseUrl;
+  static const String appName = TenantConfig.appName;
+  static const String tenantSlug = TenantConfig.slug;
 }

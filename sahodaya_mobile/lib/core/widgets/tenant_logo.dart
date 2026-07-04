@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_branding.dart';
 import '../../config/env.dart';
+import '../../config/tenant_config.dart';
 import '../theme/app_theme.dart';
 
 class TenantLogo extends StatelessWidget {
@@ -24,7 +25,7 @@ class TenantLogo extends StatelessWidget {
 
   static String resolveUrl(String? logoUrl) {
     if (logoUrl == null || logoUrl.isEmpty) {
-      return '${AppEnv.apiBaseUrl}/images/tenants/malappuram-logo.png';
+      return TenantConfig.defaultLogoUrl();
     }
     if (logoUrl.startsWith('http')) return logoUrl;
     return '${AppEnv.apiBaseUrl}${logoUrl.startsWith('/') ? logoUrl : '/$logoUrl'}';

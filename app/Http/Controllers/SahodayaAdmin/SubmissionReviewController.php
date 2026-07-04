@@ -86,6 +86,57 @@ class SubmissionReviewController extends SahodayaAdminController
         return back()->with('success', 'Submission track rejected. School can correct and resubmit.');
     }
 
+    public function bulkApprove(
+        Request $request,
+        SchoolYearSubmissionReviewService $reviewService,
+    ) {
+        $data = $request->validate([
+            'submission_ids'   => 'required|array|min:1|max:100',
+            'submission_ids.*' => 'integer|exists:school_year_submissions,id',
+        ]);
+
+        $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
+        $submissions = SchoolYearSubmission::whereIn('id', $data['submission_ids'])
+            ->whereIn('school_id', $schoolIds)
+            ->get();
+
+        $approved = 0;
+        $userId = $request->user()?->id;
+
+        foreach ($submissions as $submission) {
+            foreach ($this->pendingTracks($submission) as $track) {
+                $reviewService->approveTrack($submission->fresh(), $track, $userId);
+                $approved++;
+            }
+        }
+
+        return back()->with('success', $approved > 0
+            ? "Approved {$approved} submission track(s)."
+            : 'No pending tracks found on the selected submissions.');
+    }
+
+    public function approveAllPending(
+        Request $request,
+        SchoolYearSubmissionReviewService $reviewService,
+    ) {
+        $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
+        $submissions = SchoolYearSubmission::whereIn('school_id', $schoolIds)->get();
+
+        $approved = 0;
+        $userId = $request->user()?->id;
+
+        foreach ($submissions as $submission) {
+            foreach ($this->pendingTracks($submission) as $track) {
+                $reviewService->approveTrack($submission->fresh(), $track, $userId);
+                $approved++;
+            }
+        }
+
+        return back()->with('success', $approved > 0
+            ? "Approved {$approved} pending track(s) across all schools."
+            : 'No pending tracks to approve.');
+    }
+
     public function showSubmissionStudentImage(string $tenantId, SubmissionStudent $student)
     {
         $student->loadMissing('submission.school');

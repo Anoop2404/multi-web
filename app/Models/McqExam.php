@@ -12,7 +12,7 @@ class McqExam extends Model
         'tenant_id', 'academic_year_id', 'series_id', 'exam_level', 'parent_exam_id',
         'eligibility_mode', 'cutoff_score', 'top_rank_count', 'promotion_locked', 'promoted_student_ids',
         'title', 'exam_type', 'delivery_mode', 'conductor_level',
-        'scheduled_at', 'venue', 'hall_instructions', 'next_hall_ticket_no',
+        'scheduled_at', 'venue', 'hall_instructions', 'question_paper_path', 'question_paper_label', 'next_hall_ticket_no',
         'duration_minutes', 'total_questions', 'pass_mark', 'status', 'settings_json',
         'fee_type', 'fee_amount',
         'eligibility_config',
@@ -80,6 +80,11 @@ class McqExam extends Model
     public function isOfflineDelivery(): bool
     {
         return ! $this->isOnlineDelivery();
+    }
+
+    public function requiresHallTicket(): bool
+    {
+        return (bool) ($this->settings_json['requires_hall_ticket'] ?? false);
     }
 
     public function questionBanks(): BelongsToMany

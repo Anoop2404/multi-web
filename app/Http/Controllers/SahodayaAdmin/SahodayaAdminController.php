@@ -4,8 +4,10 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\FestEvent;
+use App\Models\Registration;
 use App\Models\Tenant;
 use App\Services\Audit\FestEventActivityService;
+use App\Services\Membership\SahodayaSetupService;
 use App\Support\TenancyDatabase;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
@@ -55,10 +57,22 @@ abstract class SahodayaAdminController extends Controller
                                             ->where('type', 'school')
                                             ->where('membership_status', 'pending')
                                             ->count(),
-            'pendingSubmissionsCount'=> 0,
+            'pendingSubmissionsCount'=> Registration::query()
+                ->whereIn('school_id', TenancyDatabase::schoolIdsFor($this->sahodaya->id))
+                ->where('academic_year', \App\Support\AcademicYear::forSahodaya($this->sahodaya->id))
+                ->whereIn('registration_status', ['data_pending', 'data_rejected'])
+                ->count(),
             'pendingPaymentsCount'   => \App\Models\MembershipPayment::whereIn('school_id', TenancyDatabase::schoolIdsFor($this->sahodaya->id))
                                             ->where('status', 'submitted')->count(),
+            'pendingChangeRequests'  => \App\Models\StudentEditChangeRequest::query()
+                ->where('status', 'pending')
+                ->whereIn('school_approval_status', ['school_approved', 'bypassed'])
+                ->whereHas('school', fn ($q) => $q->where('parent_id', $this->sahodaya->id))
+                ->count(),
             'activeAcademicYear'     => \App\Support\AcademicYear::forSahodaya($this->sahodaya->id),
+            'stateRemittancesEnabled' => \App\Models\FestStateProgram::where('tenant_id', $this->sahodaya->id)->exists(),
+            'setupIncompleteCount'    => $this->isStaff ? 0 : collect(app(SahodayaSetupService::class)->checklist($this->sahodaya))
+                ->where('done', false)->count(),
         ], $props));
     }
 

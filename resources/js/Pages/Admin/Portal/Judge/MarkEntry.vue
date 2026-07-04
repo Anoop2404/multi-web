@@ -6,6 +6,10 @@
         accent="amber"
         :nav-items="navItems"
     >
+        <div class="mb-4">
+            <h2 class="text-lg font-bold text-slate-900">{{ event.title }}</h2>
+            <p class="text-sm text-slate-500">Mark entry — enter grades and scores for each item below.</p>
+        </div>
         <p class="text-xs text-slate-600 bg-slate-50 border rounded-lg px-3 py-2 mb-3">
             Position / rank: same number can be used for multiple athletes (ties). Enter measurement for sports timing.
         </p>
@@ -18,7 +22,10 @@
                     <span v-if="!maskNames">{{ p.student?.name ?? p.teacher?.name }}</span>
                     <span v-else class="text-gray-400 text-xs">(anonymous)</span>
                 </div>
-                <input v-model="forms[p.id].grade" placeholder="Grade" class="field">
+                <select v-model="forms[p.id].grade" class="field">
+                    <option value="">Grade</option>
+                    <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
+                </select>
                 <input v-model.number="forms[p.id].position" type="number" min="1" placeholder="Rank (ties OK)" class="field" title="Same rank allowed for ties">
                 <input v-model.number="forms[p.id].score" type="number" min="0" step="0.01" placeholder="Score" class="field">
                 <template v-if="showMeasurement(reg.item)">
@@ -40,6 +47,8 @@ const props = defineProps({
     sahodaya: Object, event: Object, registrations: Array, marks: Object,
     maskNames: Boolean, participantLabels: Object,
 });
+
+const gradeOptions = ['A+', 'A', 'B', 'C'];
 
 const forms = reactive({});
 
@@ -75,9 +84,12 @@ function participantRegNo(participant) {
     return participant.student?.reg_no ?? participant.teacher?.reg_no ?? null;
 }
 
-const navItems = computed(() => [
-    { href: `/portal/judge/${props.sahodaya.id}`, label: 'Dashboard' },
-    { href: `/portal/judge/${props.sahodaya.id}/events/${props.event.id}/marks`, label: 'Mark entry' },
-]);
+const navItems = computed(() => {
+    const base = `/portal/judge/${props.sahodaya.id}`;
+    return [
+        { href: base, label: 'Dashboard', exact: true },
+        { href: `${base}/events/${props.event.id}/marks`, label: 'Enter marks' },
+    ];
+});
 </script>
 

@@ -20,7 +20,7 @@ class MembershipRegistrationWindowService
             ->first();
     }
 
-    /** Human-readable reason when registration cannot start, or null when allowed. */
+    /** Human-readable reason when new registration cannot start, or null when allowed. */
     public function blockReason(?SahodayaRegistrationWindow $window, ?CarbonInterface $now = null): ?string
     {
         if (! $window) {
@@ -28,16 +28,62 @@ class MembershipRegistrationWindowService
         }
 
         $now ??= now();
-        $today = $now->copy()->startOfDay();
+        $start = $window->add_open ?? $window->registration_starts_at;
+        $end = $window->add_close ?? $window->registration_ends_at;
 
-        if ($window->registration_starts_at && $today->lt($window->registration_starts_at)) {
-            return 'Registration has not opened yet. Opens on '.$window->registration_starts_at->format('d M Y').'.';
+        if ($start && $now->lt($start)) {
+            return 'Registration has not opened yet. Opens on '.$start->format('d M Y').'.';
         }
 
-        if ($window->registration_ends_at && $today->gt($window->registration_ends_at)) {
-            return 'Registration window closed on '.$window->registration_ends_at->format('d M Y').'. Contact your Sahodaya office.';
+        if ($end && $now->gt($end)) {
+            return 'Registration window closed on '.$end->format('d M Y').'. Contact your Sahodaya office.';
         }
 
         return null;
+    }
+
+    /** Human-readable reason when submission edits are blocked, or null when allowed. */
+    public function editBlockReason(?SahodayaRegistrationWindow $window, ?CarbonInterface $now = null): ?string
+    {
+        if (! $window) {
+            return null;
+        }
+
+        if (! $window->edit_open && ! $window->edit_close) {
+            return null;
+        }
+
+        $now ??= now();
+
+        if ($window->edit_open && $now->lt($window->edit_open)) {
+            return 'Registration edits are not open yet. Opens on '.$window->edit_open->format('d M Y').'.';
+        }
+
+        if ($window->edit_close && $now->gt($window->edit_close)) {
+            return 'Registration edit window closed on '.$window->edit_close->format('d M Y').'. Contact your Sahodaya office.';
+        }
+
+        return null;
+    }
+
+    public function isEditWindowOpen(?SahodayaRegistrationWindow $window, ?CarbonInterface $now = null): bool
+    {
+        return $this->editBlockReason($window, $now) === null;
+    }
+
+    /** Normalize V1/V2 window columns for school-facing UI. */
+    public function displayPayload(?SahodayaRegistrationWindow $window): ?array
+    {
+        if (! $window) {
+            return null;
+        }
+
+        $start = $window->add_open ?? $window->registration_starts_at;
+        $end = $window->add_close ?? $window->registration_ends_at;
+
+        return array_merge($window->toArray(), [
+            'display_starts_at' => $start?->toIso8601String(),
+            'display_ends_at'   => $end?->toIso8601String(),
+        ]);
     }
 }

@@ -2,16 +2,16 @@
     <SahodayaEventsLayout :title="`${event.title} — Import`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount">
         <PageHeader :title="`${event.title} — Import registrations`" eyebrow="Registrations"
-                    description="Bulk import cluster registrations from CSV." />
+                    description="Bulk import cluster registrations from Excel or CSV." />
 
         <div class="card max-w-xl space-y-4">
             <p class="text-sm text-slate-600">Each row needs school_id or school_prefix, item reference, and participant details.</p>
             <div class="flex flex-wrap gap-3 items-center">
-                <a :href="`${base}/registrations/import-template`" class="text-sm font-semibold text-[color:var(--brand-blue)]">Download template</a>
+                <a :href="`${base}/registrations/import-template`" class="text-sm font-semibold text-[color:var(--brand-blue)]">Download Excel template</a>
             </div>
             <form @submit.prevent="submitImport" class="space-y-3">
-                <input type="file" accept=".csv" class="field text-sm" @change="onFile">
-                <button type="submit" class="btn-primary" :disabled="!importFile || importForm.processing">Import CSV</button>
+                <input type="file" accept=".csv,.xls,.xlsx" class="field text-sm" @change="onFile">
+                <button type="submit" class="btn-primary" :disabled="!importFile || importForm.processing">Import spreadsheet</button>
             </form>
             <Link :href="`${base}/registrations`" class="text-sm link-brand">← Back to registrations</Link>
         </div>

@@ -22,6 +22,7 @@
             </p>
 
             <div class="card card--flush overflow-hidden">
+                <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                         <tr>
@@ -46,6 +47,7 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <p class="text-xs text-slate-500">{{ studentTotal }} active student{{ studentTotal === 1 ? '' : 's' }}</p>

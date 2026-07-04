@@ -1,5 +1,6 @@
 import '../../config/app_branding.dart';
 import '../../config/env.dart';
+import '../../config/tenant_config.dart';
 
 class LoginBranding {
   const LoginBranding({
@@ -26,7 +27,7 @@ class LoginBranding {
   final String? registerUrl;
   final bool showRegister;
 
-  static String get fallbackLogoUrl => '${AppEnv.apiBaseUrl}/images/tenants/malappuram-logo.png';
+  static String get fallbackLogoUrl => TenantConfig.defaultLogoUrl();
 
   String get resolvedLogoUrl => logoUrl ?? fallbackLogoUrl;
 

@@ -12,6 +12,7 @@
         </div>
 
         <div class="card card--flush overflow-hidden">
+            <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
@@ -33,7 +34,14 @@
                             </span>
                         </td>
                         <td class="p-3 text-xs">{{ req.reason }}</td>
-                        <td class="p-3 capitalize">{{ req.status }}</td>
+                        <td class="p-3">
+                            <span class="capitalize font-medium">{{ req.status }}</span>
+                            <span
+                                v-if="statusHint(req.status)"
+                                class="block text-xs text-slate-500 mt-0.5"
+                                :title="statusHint(req.status)"
+                            >{{ statusHint(req.status) }}</span>
+                        </td>
                         <td class="p-3 text-xs text-slate-500">{{ formatDate(req.created_at) }}</td>
                     </tr>
                     <tr v-if="!requests.data?.length">
@@ -41,6 +49,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>
@@ -58,5 +67,17 @@ defineProps({
 function formatDate(iso) {
     if (!iso) return '—';
     return new Date(iso).toLocaleString();
+}
+
+const statusHints = {
+    pending: 'Waiting for school leadership or Sahodaya review.',
+    pending_school: 'Awaiting approval from your school leadership.',
+    pending_sahodaya: 'Approved locally — Sahodaya office will review next.',
+    approved: 'Changes applied to the student record.',
+    rejected: 'Request declined — contact your school office for details.',
+};
+
+function statusHint(status) {
+    return statusHints[status] ?? null;
 }
 </script>

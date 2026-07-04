@@ -1,11 +1,19 @@
 plugins {
     id("com.android.application")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// White-label flavors — add one block per Sahodaya (see tenants/README.md).
+val tenantFlavors = mapOf(
+    "malappuram" to Pair(
+        "org.malappuramcentralsahodaya.mobile",
+        "Malappuram Central Sahodaya",
+    ),
+    // "kozhikode" to Pair("org.kozhikodesahodaya.mobile", "Kozhikode Sahodaya"),
+)
+
 android {
-    namespace = "com.sahodaya.sahodaya_mobile"
+    namespace = "com.sahodaya.mobile"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -14,11 +22,19 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    flavorDimensions += "tenant"
+
+    productFlavors {
+        tenantFlavors.forEach { (slug, config) ->
+            create(slug) {
+                dimension = "tenant"
+                applicationId = config.first
+                resValue("string", "app_name", config.second)
+            }
+        }
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.sahodaya.sahodaya_mobile"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode
@@ -27,8 +43,6 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

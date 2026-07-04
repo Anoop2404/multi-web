@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\FestEvent;
 use App\Models\FestEventStaff;
+use App\Models\FestParticipant;
 use App\Models\Tenant;
 use App\Services\Events\FestQrVerificationService;
 use Illuminate\Http\Request;
@@ -38,12 +39,12 @@ class FestGateController extends Controller
             'mark_attendance' => 'nullable|boolean',
         ]);
 
-        $result = $service->verify(
+        $result = $this->withParticipantPhoto($service->verify(
             $event,
             $data['payload'],
             (bool) ($data['mark_attendance'] ?? false),
             $request->user()->id,
-        );
+        ), $data['payload']);
 
         return back()->with('gate_scan', $result);
     }
@@ -58,12 +59,12 @@ class FestGateController extends Controller
             'mark_attendance' => 'nullable|boolean',
         ]);
 
-        return response()->json($service->verify(
+        return response()->json($this->withParticipantPhoto($service->verify(
             $event,
             $data['payload'],
             (bool) ($data['mark_attendance'] ?? false),
             $request->user()->id,
-        ));
+        ), $data['payload']));
     }
 
     private function assertCanScan(Request $request, FestEvent $event): void
@@ -78,5 +79,25 @@ class FestGateController extends Controller
             ->exists();
 
         abort_unless($assigned, 403, 'You are not assigned to scan for this event.');
+    }
+
+    /** @param  array<string, mixed>  $result */
+    private function withParticipantPhoto(array $result, string $rawPayload): array
+    {
+        if (! ($result['valid'] ?? false) || ($result['kind'] ?? null) !== 'participant') {
+            return $result;
+        }
+
+        $parts = explode('|', trim($rawPayload));
+        if (count($parts) < 4) {
+            return $result;
+        }
+
+        $participant = FestParticipant::with(['student', 'teacher'])->find((int) $parts[3]);
+        if ($participant) {
+            $result['photo_url'] = $participant->student?->photoUrl() ?? $participant->teacher?->photoUrl();
+        }
+
+        return $result;
     }
 }

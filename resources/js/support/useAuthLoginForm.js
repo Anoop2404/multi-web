@@ -10,6 +10,7 @@ export function useAuthLoginForm(initialEmail = '') {
     const form = useForm({
         email: initialEmail || page.props.old?.email || '',
         password: '',
+        remember: false,
     });
 
     const authError = computed(() => {

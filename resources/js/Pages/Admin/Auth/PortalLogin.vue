@@ -30,6 +30,13 @@
                             <li>View fest schedules and your registrations</li>
                             <li>Take online MCQ exams when scheduled</li>
                         </ol>
+
+                        <LoginRoleGuide :rows="[
+                            { label: 'Student', detail: 'View schedule, results, hall tickets' },
+                            { label: 'Teacher', detail: 'Fest duties, MCQ, appeals' },
+                            { label: 'Judge / exam staff', detail: 'Mark entry or exam ops portals' },
+                            { label: 'School office', detail: 'Use /school-login instead' },
+                        ]" />
                     </div>
 
                     <div class="login-form-panel">
@@ -86,6 +93,7 @@
 
 <script setup>
 import AuthLoginAlerts from '@/Components/auth/AuthLoginAlerts.vue';
+import LoginRoleGuide from '@/Components/auth/LoginRoleGuide.vue';
 import { useAuthLoginForm } from '@/support/useAuthLoginForm.js';
 
 defineProps({

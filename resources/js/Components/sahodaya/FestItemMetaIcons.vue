@@ -10,24 +10,19 @@
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
             <svg v-else class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M12 11v6"/><path d="M9 14h6"/>
             </svg>
         </span>
         <span
-            v-if="gender && gender !== 'open'"
+            v-if="normalizedGender && normalizedGender !== 'open'"
             class="fest-meta-icon fest-meta-icon--gender"
-            :class="genderClass"
+            :class="[genderClass, bare ? 'fest-meta-icon--bare' : '']"
             :title="genderLabelText"
+            :aria-label="genderLabelText"
         >
-            <svg v-if="gender === 'male'" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                <circle cx="10" cy="14" r="5"/><path d="M19 5l-5.5 5.5M19 5h-5M19 5v5"/>
-            </svg>
-            <svg v-else-if="gender === 'female'" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-                <circle cx="12" cy="9" r="5"/><path d="M12 14v7M9 18h6"/>
-            </svg>
-            <svg v-else class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M8 14a4 4 0 0 0-8 0v1h8v-1z" transform="translate(0 -1)"/><path d="M16 14a4 4 0 0 0-8 0" transform="translate(8 -1)"/>
-            </svg>
+            <span v-if="normalizedGender === 'male'" class="fest-gender-glyph" aria-hidden="true">♂</span>
+            <span v-else-if="normalizedGender === 'female'" class="fest-gender-glyph" aria-hidden="true">♀</span>
+            <span v-else class="fest-gender-glyph fest-gender-glyph--mixed" aria-hidden="true">⚥</span>
         </span>
         <span v-else-if="showOpenGender" class="fest-meta-icon fest-meta-icon--gender bg-slate-100 text-slate-500" title="Open gender">∅</span>
     </span>
@@ -35,14 +30,18 @@
 
 <script setup>
 import { computed } from 'vue';
-import { genderLabel } from '@/support/festItemEligibility.js';
+import { genderLabel, normalizeFestItemGender } from '@/support/festItemEligibility.js';
 
 const props = defineProps({
     gender: { type: String, default: 'open' },
     participantType: { type: String, default: 'individual' },
     showOpenGender: { type: Boolean, default: false },
     compact: { type: Boolean, default: false },
+    /** Drop the colored pill background — for use inside selected filter buttons. */
+    bare: { type: Boolean, default: false },
 });
+
+const normalizedGender = computed(() => normalizeFestItemGender(props.gender));
 
 const typeLabel = computed(() => {
     if (props.participantType === 'team') return 'Team event';
@@ -51,8 +50,8 @@ const typeLabel = computed(() => {
 });
 
 const genderLabelText = computed(() => {
-    if (props.gender === 'mixed') return 'Mixed / Boys & Girls';
-    return genderLabel(props.gender) ?? props.gender;
+    if (normalizedGender.value === 'mixed') return 'Mixed / Boys & Girls';
+    return genderLabel(normalizedGender.value) ?? normalizedGender.value;
 });
 
 const typeClass = computed(() => {
@@ -62,15 +61,16 @@ const typeClass = computed(() => {
 });
 
 const genderClass = computed(() => {
-    if (props.gender === 'male') return 'bg-sky-100 text-sky-800';
-    if (props.gender === 'female') return 'bg-pink-100 text-pink-800';
-    if (props.gender === 'mixed') return 'bg-purple-100 text-purple-800';
+    if (props.bare) return 'text-current';
+    if (normalizedGender.value === 'male') return 'bg-sky-100 text-sky-800';
+    if (normalizedGender.value === 'female') return 'bg-pink-100 text-pink-800';
+    if (normalizedGender.value === 'mixed') return 'bg-purple-100 text-purple-800';
     return 'bg-slate-100 text-slate-500';
 });
 
 const tooltip = computed(() => {
     const parts = [typeLabel.value];
-    if (props.gender && props.gender !== 'open') parts.push(genderLabelText.value);
+    if (normalizedGender.value && normalizedGender.value !== 'open') parts.push(genderLabelText.value);
     return parts.join(' · ');
 });
 </script>
@@ -83,5 +83,22 @@ const tooltip = computed(() => {
     width: 1.375rem;
     height: 1.375rem;
     border-radius: 9999px;
+}
+
+.fest-gender-glyph {
+    font-size: 0.8125rem;
+    line-height: 1;
+    font-weight: 700;
+}
+
+.fest-gender-glyph--mixed {
+    font-size: 0.75rem;
+}
+
+.fest-meta-icon--bare {
+    width: auto;
+    height: auto;
+    background: transparent !important;
+    padding: 0;
 }
 </style>

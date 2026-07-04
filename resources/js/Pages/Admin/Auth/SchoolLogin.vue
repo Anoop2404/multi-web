@@ -40,6 +40,12 @@
                             </span>
                             <a v-if="email" :href="`mailto:${email}`" class="login-contact">{{ email }}</a>
                         </div>
+
+                        <LoginRoleGuide :rows="[
+                            { label: 'School admin login', detail: 'You are here — register students and fest entries' },
+                            { label: 'Portal login', detail: 'Students & teachers use /portal/login' },
+                            { label: 'Sahodaya staff', detail: 'Cluster admin uses /login' },
+                        ]" />
                     </div>
 
                     <div class="login-form-panel">
@@ -83,6 +89,14 @@
                                     <p v-if="fieldErrors.password" class="login-error">{{ fieldErrors.password }}</p>
                                 </div>
 
+                                <div class="flex items-center justify-between gap-3 text-sm">
+                                    <label class="flex items-center gap-2 text-slate-600 cursor-pointer">
+                                        <input v-model="form.remember" type="checkbox" class="rounded border-slate-300">
+                                        Remember me
+                                    </label>
+                                    <a href="/portal/forgot-password" class="text-[#1e5aa8] hover:underline text-xs font-semibold">Forgot password?</a>
+                                </div>
+
                                 <button type="submit" :disabled="form.processing" class="login-btn">
                                     {{ form.processing ? 'Signing in…' : 'Sign in to register' }}
                                 </button>
@@ -108,6 +122,7 @@
 
 <script setup>
 import AuthLoginAlerts from '@/Components/auth/AuthLoginAlerts.vue';
+import LoginRoleGuide from '@/Components/auth/LoginRoleGuide.vue';
 import { useAuthLoginForm } from '@/support/useAuthLoginForm.js';
 
 defineProps({

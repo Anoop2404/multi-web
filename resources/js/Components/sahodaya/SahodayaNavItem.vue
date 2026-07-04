@@ -4,7 +4,7 @@
               'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition w-full border-l-2',
               active
                   ? 'sa-nav-active border-[#fbbf24] bg-white/12 text-white font-semibold'
-                  : 'border-transparent text-white/60 hover:bg-white/8 hover:text-white/90',
+                  : 'border-transparent text-white/70 hover:bg-white/8 hover:text-white/95',
           ]">
         <SahodayaSvgIcon :name="icon" class="w-4 h-4 shrink-0" />
         <span class="flex-1 truncate">{{ label }}</span>

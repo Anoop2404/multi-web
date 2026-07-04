@@ -12,17 +12,22 @@ class FestEventItem extends Model
 {
     protected $fillable = [
         'event_id', 'title', 'item_code', 'category', 'stage_type', 'venue_type',
-        'competition_format', 'sport_discipline', 'duration_minutes', 'criteria_json',
+        'competition_format', 'sport_discipline', 'ranking_direction', 'duration_minutes', 'criteria_json',
         'participant_type', 'gender', 'class_group', 'age_group', 'kids_band',
         'max_per_school', 'min_group_size', 'max_group_size', 'qualify_count',
         'owner_level', 'state_program_item_id', 'inherited_from_item_id', 'display_order',
-        'fee_amount', 'is_enabled',
+        'fee_amount', 'is_enabled', 'is_mandatory', 'head_id', 'reg_start', 'reg_end',
+        'results_published_at', 'item_reg_id_start',
     ];
 
     protected $casts = [
         'criteria_json' => 'array',
         'fee_amount' => 'decimal:2',
         'is_enabled' => 'boolean',
+        'is_mandatory' => 'boolean',
+        'reg_start' => 'date',
+        'reg_end' => 'date',
+        'results_published_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -55,6 +60,11 @@ class FestEventItem extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(FestEvent::class, 'event_id');
+    }
+
+    public function head(): BelongsTo
+    {
+        return $this->belongsTo(FestItemHead::class, 'head_id');
     }
 
     public function registrations(): HasMany

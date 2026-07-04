@@ -15,6 +15,26 @@
             </Link>
         </div>
 
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-4 p-4">
+            <form @submit.prevent="applyFilters" class="flex flex-wrap gap-3 items-end">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="text-xs font-semibold text-gray-600">Search</label>
+                    <input v-model="filterForm.search" type="search" placeholder="Name, domain, subdomain…"
+                           class="field mt-1 text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Status</label>
+                    <select v-model="filterForm.status" class="field mt-1 text-sm">
+                        <option value="all">All</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary text-sm">Apply</button>
+                <button v-if="hasFilters" type="button" @click="clearFilters" class="btn-ghost text-sm">Clear</button>
+            </form>
+        </div>
+
         <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
@@ -30,8 +50,8 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <tr v-if="!tenants.data.length">
-                        <td :colspan="tenantType === 'school' ? 6 : 6" class="px-4 py-8 text-center text-gray-400">
-                            No {{ tenantType === 'sahodaya' ? 'Sahodaya clusters' : 'schools' }} yet.
+                        <td colspan="7" class="px-4 py-8 text-center text-gray-400">
+                            No {{ tenantType === 'sahodaya' ? 'Sahodaya clusters' : 'schools' }} match your filters.
                         </td>
                     </tr>
                     <tr v-for="tenant in tenants.data" :key="tenant.id" class="hover:bg-gray-50">
@@ -67,19 +87,56 @@
                     </tr>
                 </tbody>
             </table>
+            <div v-if="tenants.links?.length > 3" class="px-4 py-3 border-t border-gray-100 flex flex-wrap gap-1">
+                <Link v-for="link in tenants.links" :key="link.label"
+                      :href="link.url || '#'"
+                      :class="['px-3 py-1 rounded-lg text-xs', link.active ? 'bg-indigo-100 text-indigo-800 font-semibold' : 'text-gray-600 hover:bg-gray-100', !link.url && 'opacity-40 pointer-events-none']"
+                      v-html="link.label" />
+            </div>
         </div>
     </AdminLayout>
 </template>
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
+import { computed, reactive, watch } from 'vue';
 
-defineProps({
+const props = defineProps({
     tenants: Object,
     tenantType: { type: String, required: true },
     pageTitle: { type: String, required: true },
     createUrl: { type: String, required: true },
     tenantBaseDomain: { type: String, default: 'sahodaya.test' },
+    filters: { type: Object, default: () => ({ search: '', status: 'all' }) },
 });
+
+const filterForm = reactive({
+    search: props.filters?.search ?? '',
+    status: props.filters?.status ?? 'all',
+});
+
+watch(() => props.filters, (f) => {
+    filterForm.search = f?.search ?? '';
+    filterForm.status = f?.status ?? 'all';
+}, { deep: true });
+
+const hasFilters = computed(() => !!filterForm.search || filterForm.status !== 'all');
+
+const listPath = computed(() =>
+    props.tenantType === 'school' ? '/admin/schools' : '/admin/sahodayas',
+);
+
+function applyFilters() {
+    router.get(listPath.value, {
+        search: filterForm.search || undefined,
+        status: filterForm.status !== 'all' ? filterForm.status : undefined,
+    }, { preserveState: true, preserveScroll: true });
+}
+
+function clearFilters() {
+    filterForm.search = '';
+    filterForm.status = 'all';
+    router.get(listPath.value, {}, { preserveState: true, preserveScroll: true });
+}
 </script>

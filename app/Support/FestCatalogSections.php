@@ -41,6 +41,20 @@ class FestCatalogSections
                 ['slug' => 'off-stage', 'label' => 'Off stage', 'description' => 'Drawing, painting, essay', 'filter' => ['stage_type' => 'off_stage']],
                 ['slug' => 'group', 'label' => 'Group items', 'description' => 'Group song, dance, mime', 'filter' => ['participant_type' => 'group']],
             ],
+            'english_fest' => [
+                ['slug' => 'cat-1', 'label' => 'Category I (LP)', 'description' => 'Classes III & IV', 'filter' => ['class_group' => 'lp']],
+                ['slug' => 'cat-2', 'label' => 'Category II (UP)', 'description' => 'Classes V–VII', 'filter' => ['class_group' => 'up']],
+                ['slug' => 'cat-3', 'label' => 'Category III (HS)', 'description' => 'Classes VIII–X', 'filter' => ['class_group' => 'hs']],
+                ['slug' => 'cat-4', 'label' => 'Category IV (HSS)', 'description' => 'Classes XI & XII', 'filter' => ['class_group' => 'hss']],
+                ['slug' => 'group', 'label' => 'Group items', 'description' => 'Group song & drama', 'filter' => ['class_group' => 'open']],
+            ],
+            'science_fest' => [
+                ['slug' => 'cat-1', 'label' => 'Category I (LP)', 'description' => 'Classes III & IV', 'filter' => ['class_group' => 'lp']],
+                ['slug' => 'cat-2', 'label' => 'Category II (UP)', 'description' => 'Classes V–VII', 'filter' => ['class_group' => 'up']],
+                ['slug' => 'cat-3', 'label' => 'Category III (HS)', 'description' => 'Classes VIII–X', 'filter' => ['class_group' => 'hs']],
+                ['slug' => 'cat-4', 'label' => 'Category IV (HSS)', 'description' => 'Classes XI & XII', 'filter' => ['class_group' => 'hss']],
+                ['slug' => 'group', 'label' => 'Group items', 'description' => 'Team quiz & exhibition', 'filter' => ['class_group' => 'open']],
+            ],
             default => [],
         };
     }
