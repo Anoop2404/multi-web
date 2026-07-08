@@ -57,7 +57,7 @@
                 </button>
             </div>
             <p v-if="selectedCount > 0" class="text-[10px] text-indigo-700 font-medium mt-1 text-right">
-                {{ selectedCount }} athlete{{ selectedCount !== 1 ? 's' : '' }} ready
+                {{ selectedCount }} {{ performerLabel }}{{ selectedCount !== 1 ? 's' : '' }} ready
             </p>
             <p v-if="selectedAgeNotes.length" class="text-[10px] text-amber-700 mt-1 text-right max-w-xs ml-auto leading-snug">
                 {{ selectedAgeNotes.join(' · ') }}

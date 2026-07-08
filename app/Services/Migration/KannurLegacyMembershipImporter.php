@@ -56,6 +56,7 @@ class KannurLegacyMembershipImporter
         ?Command $output = null,
         ?string $storageDisk = null,
         bool $proofsOnly = false,
+        bool $verifyAllPayments = false,
     ): array {
         if (! is_readable($sqlPath)) {
             throw new \InvalidArgumentException("Legacy SQL dump not found: {$sqlPath}");
@@ -97,6 +98,7 @@ class KannurLegacyMembershipImporter
             'registrations_created'=> 0,
             'registrations_updated'=> 0,
             'payments_imported'    => 0,
+            'payments_updated'     => 0,
             'payments_skipped'     => 0,
             'proofs_copied'        => 0,
             'proofs_missing'       => 0,
@@ -129,6 +131,7 @@ class KannurLegacyMembershipImporter
             &$stats,
             $output,
             $storageDisk,
+            $verifyAllPayments,
         ) {
             $this->configureMembership($sahodaya, $academicYear, $slabs, $output);
 
@@ -165,6 +168,7 @@ class KannurLegacyMembershipImporter
                     $payment,
                     $legacyUploadsPath,
                     $storageDisk,
+                    $verifyAllPayments,
                     &$stats,
                 ) {
                     $registrationExists = Registration::query()
@@ -195,11 +199,14 @@ class KannurLegacyMembershipImporter
                             $payment,
                             $legacyUploadsPath,
                             $storageDisk,
+                            $verifyAllPayments,
                             $stats,
                         );
 
-                        if ($imported) {
+                        if ($imported === 'created') {
                             $stats['payments_imported']++;
+                        } elseif ($imported === 'updated') {
+                            $stats['payments_updated']++;
                         } else {
                             $stats['payments_skipped']++;
                         }
@@ -207,13 +214,19 @@ class KannurLegacyMembershipImporter
 
                     $registration = $registration->fresh(['submission.counts']);
                     $feeAmount = (float) ($registration->membership_fee_amount ?? 0);
+                    if ($feeAmount <= 0 && $payment) {
+                        $feeAmount = (float) ($payment['amount'] ?? 0);
+                        if ($feeAmount > 0) {
+                            $registration->update(['membership_fee_amount' => $feeAmount]);
+                        }
+                    }
                     $paidAmount = (float) MembershipPayment::query()
                         ->where('school_id', $newSchool->id)
                         ->where('academic_year', $academicYear)
                         ->whereIn('status', ['verified', 'submitted'])
                         ->sum('amount');
 
-                    $status = $this->resolveRegistrationStatus($registration, $payment, $feeAmount, $paidAmount);
+                    $status = $this->resolveRegistrationStatus($registration, $payment, $feeAmount, $paidAmount, $verifyAllPayments);
                     if ($registration->registration_status !== $status) {
                         $registration->update(['registration_status' => $status]);
                     }
@@ -753,6 +766,7 @@ class KannurLegacyMembershipImporter
 
     /**
      * @param  array<string, string|null>  $payment
+     * @return 'created'|'updated'|'skipped'
      */
     private function importPayment(
         Tenant $school,
@@ -761,8 +775,9 @@ class KannurLegacyMembershipImporter
         array $payment,
         ?string $legacyUploadsPath,
         ?string $storageDisk = null,
+        bool $verifyAllPayments = false,
         ?array &$stats = null,
-    ): bool {
+    ): string {
         $legacyPaymentId = (string) ($payment['payment_id'] ?? '');
         $transactionRef = self::LEGACY_TRANSACTION_PREFIX.$legacyPaymentId
             .($payment['payment_details'] ? ': '.$payment['payment_details'] : '');
@@ -773,38 +788,53 @@ class KannurLegacyMembershipImporter
             ->where('transaction_ref', 'like', self::LEGACY_TRANSACTION_PREFIX.$legacyPaymentId.'%')
             ->first();
 
-        if ($existing) {
-            return false;
-        }
-
         $proof = $this->storeLegacyProof($school, $payment, $legacyUploadsPath, $storageDisk);
         if ($stats !== null) {
             if ($proof['copied']) {
                 $stats['proofs_copied']++;
-            } else {
+            } elseif (! $existing?->payment_proof_path) {
                 $stats['proofs_missing']++;
             }
         }
-        $status = ($payment['is_verified'] ?? 'N') === 'Y' ? 'verified' : 'submitted';
+
+        $legacyVerified = ($payment['is_verified'] ?? 'N') === 'Y' || $verifyAllPayments;
+        $status = $legacyVerified ? 'verified' : 'submitted';
         $verifiedAt = $status === 'verified'
             ? $this->parseLegacyDate($payment['created_date'] ?? $payment['payment_date'] ?? null)
             : null;
+        $proofPath = $proof['copied']
+            ? $proof['path']
+            : ($existing?->payment_proof_path ?: $proof['path']);
+
+        if ($existing) {
+            $existing->update([
+                'amount'             => (float) ($payment['amount'] ?? $existing->amount),
+                'payment_proof_path' => $proofPath,
+                'payment_method'     => $this->normalizePaymentMethod($payment) ?? $existing->payment_method,
+                'status'             => $status,
+                'verified_at'        => $verifiedAt,
+            ]);
+
+            app(FeeReceiptService::class)->syncFromMembershipPayment($existing->fresh());
+
+            return 'updated';
+        }
 
         $membershipPayment = MembershipPayment::create([
-            'school_id'        => $school->id,
-            'academic_year'    => $academicYear,
-            'registration_id'  => $registration->id,
-            'amount'           => (float) ($payment['amount'] ?? 0),
-            'payment_proof_path' => $proof['path'],
-            'payment_method'   => $this->normalizePaymentMethod($payment),
-            'transaction_ref'  => $transactionRef,
-            'status'           => $status,
-            'verified_at'      => $verifiedAt,
+            'school_id'          => $school->id,
+            'academic_year'      => $academicYear,
+            'registration_id'    => $registration->id,
+            'amount'             => (float) ($payment['amount'] ?? 0),
+            'payment_proof_path' => $proofPath,
+            'payment_method'     => $this->normalizePaymentMethod($payment),
+            'transaction_ref'    => $transactionRef,
+            'status'             => $status,
+            'verified_at'        => $verifiedAt,
         ]);
 
         app(FeeReceiptService::class)->syncFromMembershipPayment($membershipPayment->fresh());
 
-        return true;
+        return 'created';
     }
 
     /**
@@ -985,12 +1015,19 @@ class KannurLegacyMembershipImporter
         ?array $payment,
         float $feeAmount,
         float $paidAmount,
+        bool $verifyAllPayments = false,
     ): string {
-        if ($payment && ($payment['is_verified'] ?? 'N') === 'Y' && $paidAmount + 0.009 >= $feeAmount && $feeAmount > 0) {
+        $legacyVerified = $payment && (($payment['is_verified'] ?? 'N') === 'Y' || $verifyAllPayments);
+
+        if ($legacyVerified && $paidAmount > 0) {
             return 'completed';
         }
 
-        if ($payment && ($payment['is_verified'] ?? 'N') === 'N') {
+        if ($legacyVerified && $feeAmount > 0) {
+            return 'completed';
+        }
+
+        if ($payment && ($payment['is_verified'] ?? 'N') === 'N' && ! $verifyAllPayments) {
             return 'payment_submitted';
         }
 

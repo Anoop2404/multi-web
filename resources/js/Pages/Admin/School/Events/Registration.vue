@@ -277,7 +277,7 @@
                                         :status-label="itemStatusMeta(event, item).label"
                                         :status-class="itemStatusMeta(event, item).badgeClass"
                                         :status-hint="itemStatusMeta(event, item).hint"
-                                        :performer-label="isTeacherFest ? 'teachers' : 'students'"
+                                        :performer-label="isTeacherFest ? 'teachers' : (isSports ? 'participants' : 'students')"
                                         :is-teacher-fest="isTeacherFest"
                                         :event-type="eventType"
                                         :teachers="teachers"
@@ -640,7 +640,7 @@ function sportsRegistrationSummary(event) {
     const parts = [`${total} event${total === 1 ? '' : 's'}`];
     if (open) parts.push(`${open} open for registration`);
     if (registered) parts.push(`${registered} registered`);
-    if (noMatch) parts.push(`${noMatch} need matching athletes`);
+    if (noMatch) parts.push(`${noMatch} need matching ${isSports.value ? 'participants' : 'students'}`);
     return parts.join(' · ');
 }
 
@@ -769,8 +769,8 @@ function studentsForEvent(eventId) {
         ?? [];
 }
 
-function studentMatchesItem(student, event, item) {
-    if (student.is_verified === false) {
+function studentMatchesItem(student, event, item, { skipVerification = false } = {}) {
+    if (!skipVerification && student.is_verified === false) {
         return false;
     }
     if (event?.academic_year_id && student.academic_year_id && event.academic_year_id !== student.academic_year_id) {
@@ -1044,8 +1044,48 @@ function isItemBlocked(event, item) {
     return Boolean(itemBlockReason(event, item));
 }
 
-function itemEligibleAthleteCount(eventId, item) {
+function itemEligibleParticipantCount(eventId, item) {
     return eligibleStudentsForItem(eventId, item).length;
+}
+
+/** @deprecated alias */
+function itemEligibleAthleteCount(eventId, item) {
+    return itemEligibleParticipantCount(eventId, item);
+}
+
+function itemNoEligibleHint(event, item) {
+    const pool = studentsForEvent(event.id);
+    if (!pool.length) {
+        return 'No students on record — add students first.';
+    }
+
+    const pendingVerify = pool.filter((s) => s.is_verified === false);
+    const verifyBlockedMatches = pendingVerify.filter(
+        (s) => studentMatchesItem(s, event, item, { skipVerification: true }),
+    );
+
+    if (verifyBlockedMatches.length > 0) {
+        const noun = isSports.value ? 'participant' : 'student';
+        if (pendingVerify.length === pool.length) {
+            return `All ${noun}s are awaiting Sahodaya verification. Sahodaya admin: Membership → Student verification.`;
+        }
+
+        return `${verifyBlockedMatches.length} ${noun}${verifyBlockedMatches.length === 1 ? '' : 's'} match this item but need Sahodaya verification first.`;
+    }
+
+    const teamMin = Number(item.min_group_size ?? item.criteria_json?.min_playing ?? 0);
+    if (teamMin > 1 && ['group', 'team'].includes(item.participant_type)) {
+        const matching = pool.filter((s) => studentMatchesItem(s, event, item, { skipVerification: true })).length;
+        if (matching > 0 && matching < teamMin) {
+            return `This team item needs ${teamMin} students — only ${matching} eligible on record.`;
+        }
+    }
+
+    if (isSports.value) {
+        return 'No participants meet age/gender for this item.';
+    }
+
+    return 'No students match this item (class category, gender, or academic year).';
 }
 
 function itemRegistrationStatus(event, item) {
@@ -1056,7 +1096,7 @@ function itemRegistrationStatus(event, item) {
         return regs > 0 ? 'registered' : 'full';
     }
 
-    if (itemEligibleAthleteCount(event.id, item) === 0) {
+    if (itemEligibleParticipantCount(event.id, item) === 0) {
         return 'no_eligible';
     }
 
@@ -1069,7 +1109,7 @@ function itemRegistrationStatus(event, item) {
 
 function itemStatusMeta(event, item) {
     const status = itemRegistrationStatus(event, item);
-    const eligible = itemEligibleAthleteCount(event.id, item);
+    const eligible = itemEligibleParticipantCount(event.id, item);
     const regs = itemRegistrationCount(event.id, item.id);
     const max = itemMaxPerSchool(item);
 
@@ -1093,22 +1133,24 @@ function itemStatusMeta(event, item) {
         return {
             label: 'No match',
             badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
-            hint: 'No athletes meet age/gender for this event',
+            hint: itemNoEligibleHint(event, item),
         };
     }
+
+    const participantNoun = isSports.value ? 'participant' : 'student';
 
     if (status === 'partial') {
         return {
             label: 'Open',
             badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-            hint: `${regs}/${max} entries · ${eligible} ${isSports.value ? 'athlete' : 'student'}${eligible === 1 ? '' : 's'} eligible`,
+            hint: `${regs}/${max} entries · ${eligible} ${participantNoun}${eligible === 1 ? '' : 's'} eligible`,
         };
     }
 
     return {
         label: 'Open',
         badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-            hint: `${eligible} ${isSports.value ? 'athlete' : 'student'}${eligible === 1 ? '' : 's'} can register`,
+        hint: `${eligible} ${participantNoun}${eligible === 1 ? '' : 's'} can register`,
     };
 }
 

@@ -14,6 +14,7 @@ class ImportKannurLegacyMembership extends Command
                             {--legacy-uploads= : Path to old receipt uploads directory on disk}
                             {--storage-disk= : Storage disk for proofs (shared, local, s3; default: upload disk)}
                             {--proofs-only : Only copy receipt files for already-imported legacy payments}
+                            {--verify-all-payments : Treat all legacy payments as verified (including unverified uploads)}
                             {--dry-run : Preview mappings without writing}';
 
     protected $description = 'Import Kannur legacy membership fees, student counts, payments, and dues from the old Sahodaya SQL dump';
@@ -26,6 +27,7 @@ class ImportKannurLegacyMembership extends Command
         $proofsOnly = (bool) $this->option('proofs-only');
         $storageDisk = $this->option('storage-disk') ?: null;
         $legacyUploads = $this->option('legacy-uploads') ?: null;
+        $verifyAllPayments = (bool) $this->option('verify-all-payments');
 
         if ($proofsOnly && ! $legacyUploads) {
             $this->error('--legacy-uploads is required when using --proofs-only');
@@ -55,6 +57,9 @@ class ImportKannurLegacyMembership extends Command
         if ($storageDisk) {
             $this->line("Storage disk: {$storageDisk}");
         }
+        if ($verifyAllPayments) {
+            $this->line('All legacy payments will be imported as verified.');
+        }
 
         try {
             $stats = $importer->import(
@@ -65,6 +70,7 @@ class ImportKannurLegacyMembership extends Command
                 $this,
                 $storageDisk,
                 $proofsOnly,
+                $verifyAllPayments,
             );
         } catch (\Throwable $e) {
             $this->error($e->getMessage());
