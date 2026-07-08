@@ -3,6 +3,7 @@
 namespace Tests\Unit\Http\Controllers\Admin;
 
 use App\Http\Controllers\Admin\AuthController;
+use App\Models\PlatformUser;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -46,7 +47,8 @@ class AuthControllerHomeForTest extends TestCase
         config(['tenancy.database_per_sahodaya' => true]);
 
         $user = User::factory()->create(['tenant_id' => null]);
-        $user->assignRole(Role::findByName('superadmin', 'web'));
+        PlatformUser::findOrFail($user->id)->assignRole('superadmin');
+        $user = User::findOrFail($user->id);
 
         $this->assertTrue($user->isSuperAdmin());
         $this->assertSame(route('admin.dashboard'), AuthController::homeFor($user));

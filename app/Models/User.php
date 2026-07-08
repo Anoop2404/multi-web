@@ -7,6 +7,7 @@ use App\Notifications\PortalVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
@@ -56,7 +57,22 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isSuperAdmin(): bool
     {
-        return $this->tenant_id === null && $this->hasRole('superadmin');
+        if ($this->tenant_id !== null) {
+            return false;
+        }
+
+        if ($this->hasRole('superadmin')) {
+            return true;
+        }
+
+        return DB::connection(config('tenancy.database.central_connection', 'central'))
+            ->table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('roles.name', 'superadmin')
+            ->where('roles.guard_name', $this->guard_name)
+            ->where('model_has_roles.model_id', $this->id)
+            ->whereIn('model_has_roles.model_type', [self::class, PlatformUser::class])
+            ->exists();
     }
 
     public function sendEmailVerificationNotification(): void
