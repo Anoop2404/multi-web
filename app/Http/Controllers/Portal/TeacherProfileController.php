@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Teacher;
 use App\Models\Tenant;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rules\Password;
 
@@ -19,10 +20,27 @@ class TeacherProfileController extends Controller
         return inertia('Portal/Teacher/Profile', [
             'school'  => $school->only('id', 'name'),
             'teacher' => $teacher
-                ? $teacher->only('id', 'name', 'email', 'phone', 'designation', 'subject')
+                ? array_merge(
+                    $teacher->only('id', 'name', 'email', 'mobile', 'designation', 'subject', 'reg_no'),
+                    ['photo_url' => $teacher->portalPhotoUrl()],
+                )
                 : null,
             'user'    => $user->only('id', 'name', 'email'),
         ]);
+    }
+
+    public function photo(Request $request, string $tenantId)
+    {
+        $teacher = $request->attributes->get('portalTeacher');
+        abort_unless($teacher->photo, 404);
+
+        $school = Tenant::findOrFail($tenantId);
+
+        try {
+            return TenantStorage::downloadResponse($school, $teacher->photo);
+        } catch (\Throwable) {
+            abort(404, 'Photo not found.');
+        }
     }
 
     public function update(Request $request, string $tenantId)
@@ -46,7 +64,7 @@ class TeacherProfileController extends Controller
             $teacher->update([
                 'name'        => $data['name'],
                 'email'       => $data['email'],
-                'phone'       => $data['phone'] ?? $teacher->phone,
+                'mobile'      => $data['phone'] ?? $teacher->mobile,
                 'designation' => $data['designation'] ?? $teacher->designation,
             ]);
         }

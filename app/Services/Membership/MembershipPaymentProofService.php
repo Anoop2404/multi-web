@@ -34,6 +34,12 @@ class MembershipPaymentProofService
                     $backup->storage_disk,
                 );
             } catch (NotFoundHttpException) {
+                // Try tenant-aware absolute path fallbacks below.
+            }
+
+            try {
+                return TenantStorage::downloadResponse($school, $backup->storage_path);
+            } catch (NotFoundHttpException) {
                 continue;
             }
         }

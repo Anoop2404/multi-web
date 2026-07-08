@@ -21,10 +21,9 @@
                 </span>
             </div>
         </section>
-        <p v-else-if="event.require_event_registration"
-           class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-            Register athletes for the event first.
-            <a v-if="eventAthletesHref" :href="eventAthletesHref" class="link-brand font-semibold ml-1">Event registration →</a>
+        <p v-else
+           class="text-sm text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3">
+            Pick students directly under each item head. Event registration number will be created automatically when you register an item.
         </p>
 
         <div class="rounded-xl border border-emerald-200 bg-emerald-50/30 overflow-hidden">
@@ -266,9 +265,7 @@ const sportsGroups = computed(() => {
             const headName = activeHeadId.value ? (headNameById.value[Number(activeHeadId.value)] ?? null) : null;
             const label = labels[key] ?? String(key).toUpperCase();
             const itemIds = new Set(groupItems.map((i) => Number(i.id)));
-            const eligiblePool = props.event.require_event_registration
-                ? (props.students ?? []).filter((s) => eventRegisteredIds.value.has(Number(s.id)))
-                : (props.students ?? []);
+            const eligiblePool = props.students ?? [];
             const eligibleCount = eligiblePool.filter(
                 (s) => (s.eligible_sports_groups ?? []).map((g) => g.toLowerCase()).includes(key.toLowerCase()),
             ).length;
@@ -371,7 +368,6 @@ function registeredNames(reg) {
 
 function studentMatchesItem(student, item) {
     if (student.is_verified === false) return false;
-    if (props.event.require_event_registration && !eventRegisteredIds.value.has(Number(student.id))) return false;
     if (!student.dob) return false;
     if (item.age_group && item.age_group !== 'open') {
         if (!(student.eligible_sports_groups ?? []).includes(item.age_group)) return false;
@@ -387,9 +383,6 @@ function eligibleStudentsForItem(item) {
 }
 
 function studentIneligibilityReason(student, item) {
-    if (!student.event_registered && !student.event_registration_number && props.event.require_event_registration) {
-        return 'Register for the event first';
-    }
     if (student.is_verified === false) return 'Pending Sahodaya verification';
     if (!student.dob) return 'Date of birth required';
     const itemGender = String(item.gender ?? 'open').toLowerCase();

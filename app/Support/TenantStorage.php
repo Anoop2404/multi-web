@@ -150,15 +150,26 @@ class TenantStorage
     private static function candidatePaths(Tenant $tenant, string $relativePath): array
     {
         $relativePath = ltrim($relativePath, '/');
+        $tenantIds = array_values(array_unique(array_filter([
+            $tenant->id,
+            $tenant->parent_id,
+        ])));
 
-        return [
-            self::storageRoot('tenant'.$tenant->id.'/app/shared/'.$relativePath),
-            self::storageRoot('tenant'.$tenant->id.'/app/private/'.$relativePath),
-            self::storageRoot('tenant'.$tenant->id.'/app/public/'.$relativePath),
+        $paths = [
+            self::storageRoot('app/'.$relativePath),
             self::storageRoot('app/shared/'.$relativePath),
             self::storageRoot('app/private/'.$relativePath),
             self::storageRoot('app/public/'.$relativePath),
         ];
+
+        foreach ($tenantIds as $tenantId) {
+            $paths[] = self::storageRoot('tenant'.$tenantId.'/app/'.$relativePath);
+            $paths[] = self::storageRoot('tenant'.$tenantId.'/app/shared/'.$relativePath);
+            $paths[] = self::storageRoot('tenant'.$tenantId.'/app/private/'.$relativePath);
+            $paths[] = self::storageRoot('tenant'.$tenantId.'/app/public/'.$relativePath);
+        }
+
+        return $paths;
     }
 
     /** Absolute path under project storage/ — not affected by tenancy storage_path() suffix. */

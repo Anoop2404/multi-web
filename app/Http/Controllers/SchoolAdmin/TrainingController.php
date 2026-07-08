@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
-use App\Models\TrainingProgram;
-use App\Models\TrainingRegistration;
+use App\Services\Training\TeacherTrainingEligibilityService;
 
 class TrainingController extends SchoolAdminController
 {
-    public function hub()
+    public function hub(TeacherTrainingEligibilityService $eligibility)
     {
-        return app(TrainingRegistrationController::class)->index();
+        return app(TrainingRegistrationController::class)->index($eligibility);
     }
 }

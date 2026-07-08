@@ -151,8 +151,10 @@
         v-model:selected-ids="pickerModel"
         :team-name="isGroup ? form.team_name : undefined"
         :require-team-name="isGroup"
-        confirm-label="Use selection"
+        :max-selected="isGroup ? null : 1"
+        :confirm-label="layout === 'sports' ? 'Register selection' : 'Use selection'"
         @update:team-name="form.team_name = $event"
+        @confirm="handleMainPickerConfirm"
         @add-student="$emit('add-student')"
     />
 
@@ -175,6 +177,7 @@
         :entries="teacherEntries"
         v-model:selected-ids="pickerModel"
         confirm-label="Use selection"
+        :show-add-student="false"
     />
 </template>
 
@@ -208,7 +211,7 @@ const props = defineProps({
     layout: { type: String, default: 'default' },
 });
 
-defineEmits(['register', 'withdraw', 'add-student']);
+const emit = defineEmits(['register', 'withdraw', 'add-student']);
 
 const pickerOpen = ref(false);
 const standbyPickerOpen = ref(false);
@@ -367,5 +370,11 @@ function formatMoney(value) {
 
 function openPicker() {
     pickerOpen.value = true;
+}
+
+function handleMainPickerConfirm() {
+    if (props.layout === 'sports' && canSubmit.value) {
+        emit('register');
+    }
 }
 </script>

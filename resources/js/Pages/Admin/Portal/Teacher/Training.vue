@@ -5,44 +5,57 @@
         :subtitle="school.name"
         accent="indigo"
         :nav-items="navItems"
+        :avatar-url="teacher?.photo_url"
+        show-avatar-placeholder
     >
         <section v-if="openPrograms?.length" class="card mb-4">
-            <h2 class="font-semibold text-sm mb-3">Open programmes — register</h2>
-            <div v-for="p in openPrograms" :key="p.id" class="border-t first:border-0 pt-3 first:pt-0 mb-3">
-                <p class="font-medium text-sm">{{ p.title }}</p>
-                <p v-if="p.description" class="text-xs text-gray-500 mt-0.5">{{ p.description }}</p>
-                <p class="text-xs text-gray-500 mt-1">
+            <h2 class="font-semibold text-sm mb-1 text-slate-900">Open programmes</h2>
+            <p class="text-xs text-slate-500 mb-3">Register for Sahodaya teacher training events.</p>
+            <div v-for="p in openPrograms" :key="p.id" class="border-t first:border-0 pt-4 first:pt-0 mb-4 last:mb-0">
+                <p class="font-medium text-sm text-slate-900">{{ p.title }}</p>
+                <p v-if="p.description" class="text-xs text-slate-500 mt-0.5">{{ p.description }}</p>
+                <p class="text-xs text-slate-500 mt-1">
                     <span v-if="p.venue">{{ p.venue }}</span>
-                    <span v-if="p.start_date"> · {{ p.start_date }}<span v-if="p.end_date && p.end_date !== p.start_date"> – {{ p.end_date }}</span></span>
+                    <span v-if="p.start_date"> · {{ formatDate(p.start_date) }}<span v-if="p.end_date && p.end_date !== p.start_date"> – {{ formatDate(p.end_date) }}</span></span>
                     <span v-if="p.has_fee"> · Fee ₹{{ p.fee_amount }}</span>
                 </p>
-                <button type="button" class="btn-primary text-xs mt-2 !min-h-0 !py-1.5 !px-3"
+                <button v-if="p.can_register"
+                        type="button"
+                        class="btn-primary text-xs mt-2 !min-h-0 !py-1.5 !px-3"
                         :disabled="registering === p.id"
                         @click="register(p)">
                     {{ registering === p.id ? 'Registering…' : 'Register' }}
                 </button>
+                <p v-else-if="p.ineligibility_reason" class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-2">
+                    {{ p.ineligibility_reason }}
+                </p>
             </div>
         </section>
 
+        <section v-else class="card mb-4">
+            <h2 class="font-semibold text-sm mb-1 text-slate-900">Open programmes</h2>
+            <p class="text-sm text-slate-400 py-3">No training programmes are open for registration right now. Check back later or contact your school admin.</p>
+        </section>
+
         <section class="card">
-            <h2 class="font-semibold text-sm mb-2">My registrations</h2>
-            <div v-for="t in training" :key="t.id" class="border-t first:border-0 pt-3 first:pt-0 mb-3">
-                <p class="font-medium text-sm">{{ t.program?.title }}</p>
-                <p class="text-xs text-gray-500 capitalize">{{ t.status }}
+            <h2 class="font-semibold text-sm mb-2 text-slate-900">My registrations</h2>
+            <div v-for="t in training" :key="t.id" class="border-t first:border-0 pt-4 first:pt-0 mb-4 last:mb-0">
+                <p class="font-medium text-sm text-slate-900">{{ t.program?.title }}</p>
+                <p class="text-xs text-slate-500 capitalize">{{ t.status }}
                     <span v-if="t.fee_status"> · fee {{ t.fee_status.replace('_', ' ') }}</span>
                 </p>
-                <p v-if="t.program?.venue" class="text-xs text-gray-500">{{ t.program.venue }}</p>
+                <p v-if="t.program?.venue" class="text-xs text-slate-500">{{ t.program.venue }}</p>
 
                 <ul v-if="t.sessions?.length" class="mt-2 text-xs space-y-1">
-                    <li v-for="s in t.sessions" :key="s.id" class="text-gray-600">
+                    <li v-for="s in t.sessions" :key="s.id" class="text-slate-600">
                         {{ s.title }} · {{ s.scheduled_at ? new Date(s.scheduled_at).toLocaleString() : 'TBA' }}
                         <span v-if="s.venue"> · {{ s.venue }}</span>
-                        <span v-if="s.attendance" class="ml-1 capitalize font-medium">({{ s.attendance }})</span>
+                        <span v-if="s.attendance" class="ml-1 capitalize font-medium text-indigo-700">({{ s.attendance }})</span>
                     </li>
                 </ul>
 
                 <form v-if="needsPayment(t)" @submit.prevent="uploadPayment(t)" class="mt-3 space-y-2 border rounded-lg p-3 bg-slate-50">
-                    <p class="text-xs font-semibold text-gray-700">
+                    <p class="text-xs font-semibold text-slate-700">
                         Upload payment proof
                         <span v-if="t.fee_total"> · Balance ₹{{ balance(t) }}</span>
                     </p>
@@ -59,8 +72,7 @@
                 <a v-if="t.certificate_uuid" :href="`/portal/teacher/${school.id}/training/${t.id}/certificate`" target="_blank"
                    class="text-xs font-semibold text-indigo-600 mt-2 inline-block">Download certificate ↗</a>
             </div>
-            <p v-if="!training?.length && !openPrograms?.length" class="text-sm text-gray-400 py-4">No training programmes available.</p>
-            <p v-else-if="!training?.length" class="text-sm text-gray-400 py-2">No registrations yet.</p>
+            <p v-if="!training?.length" class="text-sm text-slate-400 py-3">You have not registered for any training yet.</p>
         </section>
     </PortalLayout>
 </template>
@@ -85,6 +97,11 @@ const paymentForms = reactive({});
 
 for (const t of props.training ?? []) {
     paymentForms[t.id] = { payment_proof: null, transaction_ref: '', amount: '', processing: false };
+}
+
+function formatDate(d) {
+    if (!d) return '';
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function needsPayment(t) {

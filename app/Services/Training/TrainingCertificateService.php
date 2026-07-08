@@ -6,6 +6,7 @@ use App\Models\Certificate;
 use App\Models\CertificateTemplate;
 use App\Models\Tenant;
 use App\Models\TrainingAttendance;
+use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
@@ -220,7 +221,7 @@ class TrainingCertificateService
     }
 
     /** @param  \Illuminate\Support\Collection<int, \App\Models\TrainingSession>  $presentSessions */
-    private function formatConductedDates($presentSessions, ?\App\Models\TrainingProgram $program): string
+    private function formatConductedDates($presentSessions, ?TrainingProgram $program): string
     {
         if ($presentSessions->isNotEmpty()) {
             return $presentSessions

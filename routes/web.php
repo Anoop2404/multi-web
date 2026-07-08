@@ -1123,6 +1123,9 @@ Route::middleware('web')->group(function () {
     Route::post('/portal/forgot-password', [AuthController::class, 'sendResetLink'])->name('portal.password.email');
     Route::get('/portal/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('portal.password.reset');
     Route::post('/portal/reset-password', [AuthController::class, 'resetPassword'])->name('portal.password.update');
+    // Laravel's default password reset notification expects these route names.
+    Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:20,1')
         ->name('login.post');
@@ -1220,6 +1223,7 @@ Route::prefix('portal/teacher/{tenantId}')
         Route::post('/question-banks/{bank}/questions', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'storeQuestion'])->name('questions.store');
         Route::delete('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'destroyQuestion'])->name('questions.destroy');
         Route::get('/profile', [\App\Http\Controllers\Portal\TeacherProfileController::class, 'edit'])->name('profile');
+        Route::get('/photo', [\App\Http\Controllers\Portal\TeacherProfileController::class, 'photo'])->name('photo');
         Route::put('/profile', [\App\Http\Controllers\Portal\TeacherProfileController::class, 'update'])->name('profile.update');
         Route::put('/profile/password', [\App\Http\Controllers\Portal\TeacherProfileController::class, 'updatePassword'])->name('profile.password');
         Route::post('/profile/change-request', [\App\Http\Controllers\Portal\ProfileChangeRequestController::class, 'store'])->name('profile.change-request');

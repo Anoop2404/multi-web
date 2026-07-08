@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use App\Models\PersonalAccessToken;
 use App\Observers\FeeReceiptObserver;
 use App\Observers\TenantObserver;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
 use Stancl\Tenancy\DatabaseConfig;
@@ -27,6 +28,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        ResetPassword::createUrlUsing(function (object $user, string $token) {
+            return route('portal.password.reset', [
+                'token' => $token,
+                'email' => $user->getEmailForPasswordReset(),
+            ]);
+        });
 
         Tenant::observe(TenantObserver::class);
         FeeReceipt::observe(FeeReceiptObserver::class);

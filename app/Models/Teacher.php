@@ -136,6 +136,26 @@ class Teacher extends Model
         ], absolute: false);
     }
 
+    /** Photo URL accessible from the teacher portal (own account only). */
+    public function portalPhotoUrl(): ?string
+    {
+        if (! $this->photo) {
+            return null;
+        }
+
+        if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
+            return $this->photo;
+        }
+
+        if (! $this->tenant_id) {
+            return null;
+        }
+
+        return route('portal.teacher.photo', [
+            'tenantId' => $this->tenant_id,
+        ], absolute: false);
+    }
+
     public function photoDataUri(): ?string
     {
         if (! $this->photo || ! $this->tenant_id) {

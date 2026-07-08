@@ -838,7 +838,7 @@
                 </p>
 
                 <FormSection v-if="globalSubjects.length" title="Standard Subjects"
-                             hint="Provided by the platform and available to all schools.">
+                             hint="Provided by the platform and available to all schools. Add or edit Sahodaya-specific subjects below.">
                     <div class="flex flex-wrap gap-2">
                         <span v-for="s in globalSubjects" :key="s.id"
                               class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-sm text-gray-700">
@@ -850,18 +850,50 @@
                 <FormSection title="Your Sahodaya Subjects">
                     <div v-if="customSubjects.length" class="space-y-2 mb-4">
                         <div v-for="s in customSubjects" :key="s.id"
-                             class="flex items-center justify-between p-3 rounded-xl border border-purple-100 bg-purple-50/30 text-sm">
-                            <div class="flex items-center gap-3">
-                                <span class="font-mono text-xs text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded">{{ s.code }}</span>
-                                <span class="font-medium text-gray-700">{{ s.label }}</span>
-                                <span v-if="!s.is_active" class="text-xs text-amber-600">(inactive)</span>
-                            </div>
-                            <button type="button" class="text-red-500 text-xs hover:underline" @click="removeSubject(s)">Remove</button>
+                             class="p-3 rounded-xl border border-purple-100 bg-purple-50/30 text-sm">
+                            <template v-if="editingSubjectId === s.id">
+                                <div class="flex flex-wrap gap-3 items-end">
+                                    <FormField label="Sort" hint="Lower = first">
+                                        <input v-model.number="editSubjectForm.sort_order" type="number" min="0" class="field w-20">
+                                    </FormField>
+                                    <FormField label="Code" :error="editSubjectForm.errors.code">
+                                        <input v-model="editSubjectForm.code" class="field w-28">
+                                    </FormField>
+                                    <FormField label="Subject" :error="editSubjectForm.errors.label">
+                                        <input v-model="editSubjectForm.label" class="field w-56">
+                                    </FormField>
+                                    <label class="flex items-center gap-2 text-xs text-gray-600 mb-2 cursor-pointer">
+                                        <input v-model="editSubjectForm.is_active" type="checkbox" class="rounded text-purple-600">
+                                        Active
+                                    </label>
+                                </div>
+                                <div class="flex gap-2 mt-3">
+                                    <button type="button" @click="saveSubjectEdit(s)" class="btn-secondary text-xs" :disabled="editSubjectForm.processing">Save</button>
+                                    <button type="button" @click="cancelSubjectEdit" class="text-xs text-gray-500">Cancel</button>
+                                </div>
+                            </template>
+                            <template v-else>
+                                <div class="flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <span class="text-xs font-mono text-gray-400 w-6">{{ s.sort_order ?? 0 }}</span>
+                                        <span class="font-mono text-xs text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded">{{ s.code }}</span>
+                                        <span class="font-medium text-gray-700">{{ s.label }}</span>
+                                        <span v-if="!s.is_active" class="text-xs text-amber-600">(inactive)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <button type="button" class="text-purple-600 text-xs hover:underline" @click="startSubjectEdit(s)">Edit</button>
+                                        <button type="button" class="text-red-500 text-xs hover:underline" @click="removeSubject(s)">Remove</button>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </div>
                     <p v-else class="text-sm text-gray-400 mb-4">No custom subjects yet.</p>
 
                     <form @submit.prevent="addSubject" class="flex flex-wrap gap-3 items-end">
+                        <FormField label="Sort" hint="Lower = first">
+                            <input v-model.number="subjectForm.sort_order" type="number" min="0" class="field w-20" :placeholder="String(nextSubjectSort)">
+                        </FormField>
                         <FormField label="Code" :error="subjectForm.errors.code">
                             <input v-model="subjectForm.code" class="field w-28" placeholder="MAL">
                         </FormField>
@@ -997,6 +1029,8 @@ const editClassForm = useForm({ name: '', class_category_id: '', display_order: 
 const editingClassId = ref(null);
 const typeForm     = useForm({ code: '', label: '' });
 const subjectForm  = useForm({ code: '', label: '', sort_order: null });
+const editSubjectForm = useForm({ code: '', label: '', sort_order: null, is_active: true });
+const editingSubjectId = ref(null);
 const formConfig   = useForm({
     fields: Object.fromEntries(
         Object.entries(props.applicationFormFields).map(([key, field]) => [
@@ -1149,6 +1183,11 @@ const nextCategorySort = computed(() => {
     return orders.length ? Math.max(...orders) + 1 : 0;
 });
 
+const nextSubjectSort = computed(() => {
+    if (! props.customSubjects?.length) return 1;
+    return Math.max(...props.customSubjects.map(s => s.sort_order ?? 0)) + 1;
+});
+
 function saveProfile() { profileForm.put(`/sahodaya-admin/${props.sahodaya.id}/membership/settings`); }
 function savePaymentDetails() {
     paymentForm.put(`/sahodaya-admin/${props.sahodaya.id}/membership/payment-details`);
@@ -1294,6 +1333,25 @@ function removeClass(cls) {
 function addSubject() {
     subjectForm.post(`/sahodaya-admin/${props.sahodaya.id}/membership/subjects`, {
         onSuccess: () => subjectForm.reset(),
+    });
+}
+function startSubjectEdit(subject) {
+    editingSubjectId.value = subject.id;
+    editSubjectForm.code = subject.code;
+    editSubjectForm.label = subject.label;
+    editSubjectForm.sort_order = subject.sort_order ?? 0;
+    editSubjectForm.is_active = subject.is_active !== false;
+    editSubjectForm.clearErrors();
+}
+function cancelSubjectEdit() {
+    editingSubjectId.value = null;
+    editSubjectForm.reset();
+    editSubjectForm.clearErrors();
+}
+function saveSubjectEdit(subject) {
+    editSubjectForm.put(`/sahodaya-admin/${props.sahodaya.id}/membership/subjects/${subject.id}`, {
+        preserveScroll: true,
+        onSuccess: () => cancelSubjectEdit(),
     });
 }
 function removeSubject(s) {

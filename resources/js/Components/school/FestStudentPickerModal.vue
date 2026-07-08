@@ -7,7 +7,14 @@
                     <h3 class="font-bold text-[#041525] truncate">{{ title }}</h3>
                     <p v-if="subtitle" class="text-xs text-gray-500 mt-0.5">{{ subtitle }}</p>
                 </div>
-                <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl leading-none shrink-0" @click="close">&times;</button>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button v-if="showAddStudent" type="button"
+                            class="btn-secondary text-xs !py-1.5 !px-3"
+                            @click="requestAddStudent">
+                        + Add student
+                    </button>
+                    <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl leading-none" @click="close">&times;</button>
+                </div>
             </div>
 
             <div class="px-5 py-3 border-b border-slate-100 shrink-0 space-y-3">
@@ -29,6 +36,9 @@
                     <span class="text-slate-500">
                         {{ filteredEligible.length }} eligible
                         <span v-if="!showIneligible && hasIneligible"> · {{ ineligibleCount }} hidden</span>
+                    </span>
+                    <span v-if="maxSelected" class="text-slate-400">
+                        Max {{ maxSelected }}
                     </span>
                     <span v-if="localSelected.length" class="font-semibold text-[#0f3d7a]">
                         {{ localSelected.length }} selected
@@ -125,6 +135,8 @@ const props = defineProps({
     teamName: { type: String, default: undefined },
     requireTeamName: { type: Boolean, default: false },
     confirmLabel: { type: String, default: 'Apply selection' },
+    maxSelected: { type: Number, default: null },
+    showAddStudent: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['update:modelValue', 'update:selectedIds', 'update:teamName', 'confirm', 'add-student']);
@@ -186,6 +198,10 @@ function toggleId(id) {
     if (!entry?.eligible) return;
     const idx = localSelected.value.indexOf(id);
     if (idx === -1) {
+        if (props.maxSelected && localSelected.value.length >= props.maxSelected) {
+            localSelected.value = [id];
+            return;
+        }
         localSelected.value = [...localSelected.value, id];
     } else {
         localSelected.value = localSelected.value.filter(x => x !== id);
@@ -194,6 +210,11 @@ function toggleId(id) {
 
 function close() {
     emit('update:modelValue', false);
+}
+
+function requestAddStudent() {
+    close();
+    emit('add-student');
 }
 
 function confirm() {

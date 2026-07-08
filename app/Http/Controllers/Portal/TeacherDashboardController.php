@@ -12,19 +12,63 @@ use App\Models\FestSchedule;
 use App\Models\FestSchoolEventFee;
 use App\Models\InAppNotification;
 use App\Models\McqQuestionBank;
+use App\Models\Teacher;
 use App\Models\Tenant;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
 use App\Services\Events\FestCertificateService;
 use App\Services\Events\FestReportService;
+use App\Services\Training\TeacherTrainingEligibilityService;
 use App\Services\Training\TrainingCertificateService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class TeacherDashboardController extends Controller
 {
     public function index(Request $request, string $tenantId)
     {
-        return inertia('Portal/Teacher/Dashboard', $this->teacherPortalPayload($request, $tenantId));
+        $school = Tenant::findOrFail($tenantId);
+        $teacher = $request->attributes->get('portalTeacher');
+
+        $training = $this->trainingRegistrations($teacher, 5);
+        $openPrograms = $this->openProgramsForTeacher($school, $teacher);
+
+        $festDaySlots = FestParticipant::where('teacher_id', $teacher->id)
+            ->whereHas('registration', fn ($q) => $q
+                ->where('school_id', $tenantId)
+                ->where('status', 'approved'))
+            ->whereHas('registration.event', fn ($q) => $q->whereIn('status', ['ongoing', 'registration_open', 'published']))
+            ->with(['registration.event', 'registration.item'])
+            ->get()
+            ->map(function (FestParticipant $p) {
+                $schedule = FestSchedule::where('participant_id', $p->id)->first();
+
+                return [
+                    'event_title'  => $p->registration?->event?->title,
+                    'item_title'   => $p->registration?->item?->title,
+                    'chest_no'     => $p->chest_no,
+                    'level_reg'    => $p->level_registration_number,
+                    'scheduled_at' => $schedule?->scheduled_at?->toIso8601String(),
+                    'stage'        => $schedule?->stage,
+                ];
+            })
+            ->filter(fn ($row) => $row['event_title'])
+            ->take(5)
+            ->values();
+
+        $notifications = InAppNotification::where('user_id', $request->user()->id)
+            ->latest()
+            ->limit(5)
+            ->get();
+
+        return inertia('Portal/Teacher/Dashboard', [
+            'school'       => $school->only('id', 'name'),
+            'teacher'      => $this->teacherSummary($teacher),
+            'openPrograms' => $openPrograms,
+            'training'     => $training,
+            'festDaySlots' => $festDaySlots,
+            'notifications'=> $notifications,
+        ]);
     }
 
     public function trainingPage(Request $request, string $tenantId)
@@ -32,36 +76,12 @@ class TeacherDashboardController extends Controller
         $payload = $this->teacherPortalPayload($request, $tenantId);
         $school = Tenant::findOrFail($tenantId);
         $teacher = $request->attributes->get('portalTeacher');
-        $eligibility = app(\App\Services\Training\TeacherTrainingEligibilityService::class);
-
-        $registeredProgramIds = TrainingRegistration::where('teacher_id', $teacher->id)
-            ->pluck('program_id');
-
-        $openPrograms = TrainingProgram::where('tenant_id', $school->parent_id)
-            ->whereIn('status', ['published', 'ongoing'])
-            ->where('allow_teacher_self_registration', true)
-            ->whereNotIn('id', $registeredProgramIds)
-            ->orderByDesc('registration_open')
-            ->get()
-            ->filter(fn (TrainingProgram $p) => $eligibility->isEligible($p, $teacher))
-            ->map(fn (TrainingProgram $p) => [
-                'id'          => $p->id,
-                'title'       => $p->title,
-                'description' => $p->description,
-                'venue'       => $p->venue,
-                'start_date'  => $p->start_date?->toDateString(),
-                'end_date'    => $p->end_date?->toDateString(),
-                'fee_type'    => $p->fee_type,
-                'fee_amount'  => $p->fee_amount,
-                'has_fee'     => $p->hasFee(),
-            ])
-            ->values();
 
         return inertia('Portal/Teacher/Training', [
             'school'       => $payload['school'],
             'teacher'      => $payload['teacher'],
             'training'     => $payload['training'],
-            'openPrograms' => $openPrograms,
+            'openPrograms' => $this->openProgramsForTeacher($school, $teacher),
         ]);
     }
 
@@ -171,35 +191,7 @@ class TeacherDashboardController extends Controller
         $teacher = $request->attributes->get('portalTeacher');
         $school = Tenant::findOrFail($tenantId);
 
-        $training = TrainingRegistration::where('teacher_id', $teacher->id)
-            ->with(['program.sessions', 'certificate', 'feeReceipt'])
-            ->latest()
-            ->limit(10)
-            ->get()
-            ->map(function (TrainingRegistration $reg) {
-                $sessions = $reg->program?->sessions ?? collect();
-                $attendance = \App\Models\TrainingAttendance::where('registration_id', $reg->id)
-                    ->get()
-                    ->keyBy('session_id');
-
-                return [
-                    'id'               => $reg->id,
-                    'status'           => $reg->status,
-                    'fee_status'       => $reg->fee_status,
-                    'amount_paid'      => $reg->amount_paid,
-                    'fee_total'        => $reg->feeTotalDue(),
-                    'program'          => $reg->program?->only('id', 'title', 'description', 'venue', 'fee_type', 'fee_amount'),
-                    'feeReceipt'       => $reg->feeReceipt?->only('id', 'status', 'amount'),
-                    'certificate_uuid' => $reg->certificate?->verification_uuid,
-                    'sessions'         => $sessions->map(fn ($s) => [
-                        'id'           => $s->id,
-                        'title'        => $s->title,
-                        'scheduled_at' => $s->scheduled_at?->toIso8601String(),
-                        'venue'        => $s->venue,
-                        'attendance'   => $attendance->get($s->id)?->status,
-                    ])->values(),
-                ];
-            });
+        $training = $this->trainingRegistrations($teacher);
 
         $mcqBanks = McqQuestionBank::where('school_id', $tenantId)
             ->where('created_by_user_id', $request->user()->id)
@@ -326,7 +318,7 @@ class TeacherDashboardController extends Controller
 
         return [
             'school'                 => $school->only('id', 'name'),
-            'teacher'                => $teacher->only('id', 'name', 'reg_no', 'email', 'designation'),
+            'teacher'                => $this->teacherSummary($teacher),
             'training'               => $training,
             'mcqBanks'               => $mcqBanks,
             'festRegistrations'      => $festRegistrations,
@@ -339,5 +331,89 @@ class TeacherDashboardController extends Controller
             'admitCardEvents'        => $admitCardEvents,
             'notifications'          => $notifications,
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function teacherSummary(Teacher $teacher): array
+    {
+        return array_merge(
+            $teacher->only('id', 'name', 'reg_no', 'email', 'designation'),
+            ['photo_url' => $teacher->portalPhotoUrl()],
+        );
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    private function openProgramsForTeacher(Tenant $school, Teacher $teacher): Collection
+    {
+        $eligibility = app(TeacherTrainingEligibilityService::class);
+
+        $registeredProgramIds = TrainingRegistration::where('teacher_id', $teacher->id)
+            ->pluck('program_id');
+
+        return TrainingProgram::where('tenant_id', $school->parent_id)
+            ->whereIn('status', ['published', 'ongoing'])
+            ->whereNotIn('id', $registeredProgramIds)
+            ->orderByDesc('registration_open')
+            ->get()
+            ->map(function (TrainingProgram $p) use ($eligibility, $teacher) {
+                $selfReg = (bool) ($p->allow_teacher_self_registration ?? true);
+                $eligible = $selfReg && $eligibility->isEligible($p, $teacher);
+
+                $reason = null;
+                if (! $selfReg) {
+                    $reason = 'Self-registration is disabled. Ask your school admin to nominate you.';
+                } elseif (! $eligibility->isEligible($p, $teacher)) {
+                    $reason = $eligibility->ineligibilityReason($p, $teacher);
+                }
+
+                return [
+                    'id'                   => $p->id,
+                    'title'                => $p->title,
+                    'description'          => $p->description,
+                    'venue'                => $p->venue,
+                    'start_date'           => $p->start_date?->toDateString(),
+                    'end_date'             => $p->end_date?->toDateString(),
+                    'fee_type'             => $p->fee_type,
+                    'fee_amount'           => $p->fee_amount,
+                    'has_fee'              => $p->hasFee(),
+                    'can_register'         => $eligible,
+                    'ineligibility_reason' => $reason,
+                ];
+            })
+            ->values();
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    private function trainingRegistrations(Teacher $teacher, int $limit = 10): Collection
+    {
+        return TrainingRegistration::where('teacher_id', $teacher->id)
+            ->with(['program.sessions', 'certificate', 'feeReceipt'])
+            ->latest()
+            ->limit($limit)
+            ->get()
+            ->map(function (TrainingRegistration $reg) {
+                $sessions = $reg->program?->sessions ?? collect();
+                $attendance = \App\Models\TrainingAttendance::where('registration_id', $reg->id)
+                    ->get()
+                    ->keyBy('session_id');
+
+                return [
+                    'id'               => $reg->id,
+                    'status'           => $reg->status,
+                    'fee_status'       => $reg->fee_status,
+                    'amount_paid'      => $reg->amount_paid,
+                    'fee_total'        => $reg->feeTotalDue(),
+                    'program'          => $reg->program?->only('id', 'title', 'description', 'venue', 'fee_type', 'fee_amount'),
+                    'feeReceipt'       => $reg->feeReceipt?->only('id', 'status', 'amount'),
+                    'certificate_uuid' => $reg->certificate?->verification_uuid,
+                    'sessions'         => $sessions->map(fn ($s) => [
+                        'id'           => $s->id,
+                        'title'        => $s->title,
+                        'scheduled_at' => $s->scheduled_at?->toIso8601String(),
+                        'venue'        => $s->venue,
+                        'attendance'   => $attendance->get($s->id)?->status,
+                    ])->values(),
+                ];
+            });
     }
 }
