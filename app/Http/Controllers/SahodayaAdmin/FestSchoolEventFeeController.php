@@ -29,7 +29,7 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             ?? $schoolEventFee->feeReceipt;
         abort_unless($receipt && $receipt->status === 'uploaded', 422, 'No uploaded proof to approve.');
 
-        $fullyPaid = DB::transaction(function () use ($request, $receipt, $schoolEventFee) {
+        $fullyPaid = DB::transaction(function () use ($request, $receipt, $schoolEventFee, $event) {
             $nextNo = app(SahodayaReceiptNumberAllocator::class)->next($this->sahodaya->id);
             $receiptNo = 'EF-'.str_pad((string) $nextNo, 4, '0', STR_PAD_LEFT);
 
