@@ -34,33 +34,94 @@ class StudentVerificationController extends SahodayaAdminController
             'unverified' => (clone $base)->whereNull('verified_at')->count(),
         ];
 
-        $students = (clone $base)
-            ->with(['schoolClass.classCategory', 'verifiedBy:id,name,email'])
-            ->when(! empty($filters['school_id']), fn ($q) => $q->where('tenant_id', $filters['school_id']))
-            ->when(($filters['verification'] ?? 'all') === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
-            ->when(($filters['verification'] ?? 'all') === 'unverified', fn ($q) => $q->whereNull('verified_at'))
-            ->when(! empty($filters['class_category_id']), fn ($q) => $q->whereHas(
-                'schoolClass',
-                fn ($c) => $c->where('class_category_id', $filters['class_category_id'])
-            ))
-            ->when(! empty($filters['search']), function ($q) use ($filters) {
-                $term = '%'.$filters['search'].'%';
-                $q->where(fn ($inner) => $inner
-                    ->where('name', 'like', $term)
-                    ->orWhere('reg_no', 'like', $term)
-                    ->orWhere('admission_number', 'like', $term));
-            })
-            ->orderBy('tenant_id')
-            ->orderBy('name')
-            ->paginate(50)
-            ->withQueryString();
-
         $schools = Tenant::whereIn('id', $schoolIds)->orderBy('name')->get(['id', 'name']);
 
+        $statsBySchool = (clone $base)
+            ->selectRaw('tenant_id, count(*) as total, sum(case when verified_at is null then 1 else 0 end) as unverified')
+            ->groupBy('tenant_id')
+            ->get()
+            ->keyBy('tenant_id');
+
+        $schoolSummaries = $schools->map(function (Tenant $school) use ($statsBySchool) {
+            $row = $statsBySchool->get($school->id);
+            $total = (int) ($row->total ?? 0);
+            $unverified = (int) ($row->unverified ?? 0);
+
+            return [
+                'id'         => $school->id,
+                'name'       => $school->name,
+                'total'      => $total,
+                'verified'   => $total - $unverified,
+                'unverified' => $unverified,
+            ];
+        });
+
+        $verification = $filters['verification'] ?? 'all';
+
+        if ($verification === 'unverified') {
+            $schoolSummaries = $schoolSummaries->filter(fn (array $row) => $row['unverified'] > 0);
+        } elseif ($verification === 'verified') {
+            $schoolSummaries = $schoolSummaries->filter(fn (array $row) => $row['total'] > 0 && $row['unverified'] === 0);
+        }
+
+        if (! empty($filters['search']) && empty($filters['school_id'])) {
+            $term = mb_strtolower($filters['search']);
+            $schoolSummaries = $schoolSummaries->filter(
+                fn (array $row) => str_contains(mb_strtolower($row['name']), $term)
+            );
+        }
+
+        $schoolSummaries = $schoolSummaries->sortBy([
+            ['unverified', 'desc'],
+            ['name', 'asc'],
+        ])->values();
+
+        $selectedSchool = null;
+        $students = null;
+
+        if (! empty($filters['school_id'])) {
+            $school = $schools->firstWhere('id', $filters['school_id']);
+            if ($school) {
+                $row = $statsBySchool->get($school->id);
+                $total = (int) ($row->total ?? 0);
+                $unverified = (int) ($row->unverified ?? 0);
+                $selectedSchool = [
+                    'id'         => $school->id,
+                    'name'       => $school->name,
+                    'total'      => $total,
+                    'verified'   => $total - $unverified,
+                    'unverified' => $unverified,
+                ];
+            }
+
+            $students = (clone $base)
+                ->with(['schoolClass.classCategory', 'verifiedBy:id,name,email'])
+                ->where('tenant_id', $filters['school_id'])
+                ->when($verification === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
+                ->when($verification === 'unverified', fn ($q) => $q->whereNull('verified_at'))
+                ->when(! empty($filters['class_category_id']), fn ($q) => $q->whereHas(
+                    'schoolClass',
+                    fn ($c) => $c->where('class_category_id', $filters['class_category_id'])
+                ))
+                ->when(! empty($filters['search']), function ($q) use ($filters) {
+                    $term = '%'.$filters['search'].'%';
+                    $q->where(fn ($inner) => $inner
+                        ->where('name', 'like', $term)
+                        ->orWhere('reg_no', 'like', $term)
+                        ->orWhere('admission_number', 'like', $term));
+                })
+                ->orderBy('name')
+                ->paginate(50)
+                ->withQueryString()
+                ->through(fn (Student $s) => $this->mapStudent($s));
+        }
+
         return $this->inertia('Sahodaya/Students/Verification', [
-            'students'   => $students->through(fn (Student $s) => $this->mapStudent($s)),
-            'counts'     => $counts,
-            'filters'    => array_merge([
+            'students'        => $students,
+            'schoolSummaries' => $schoolSummaries,
+            'selectedSchool'  => $selectedSchool,
+            'counts'          => $counts,
+            'filters'         => array_merge([
                 'school_id' => '',
                 'verification' => 'all',
                 'class_category_id' => null,

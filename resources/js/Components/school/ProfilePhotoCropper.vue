@@ -2,8 +2,8 @@
     <div class="space-y-3">
         <div class="flex items-center gap-4">
             <div class="w-16 h-16 rounded-full overflow-hidden border border-gray-200 bg-gray-100 shrink-0 flex items-center justify-center">
-                <img v-if="displayPreview" :src="displayPreview" alt="" class="w-full h-full object-cover">
-                <span v-else class="text-xs text-gray-400 font-semibold">Photo</span>
+                <img v-if="displayPreview" :src="displayPreview" alt="" class="w-full h-full object-cover" @error="onPreviewError">
+                <span v-else class="text-xs text-gray-400 font-semibold">{{ previewPlaceholder }}</span>
             </div>
             <div class="min-w-0 flex-1">
                 <label class="form-label mb-1.5">
@@ -14,6 +14,12 @@
                 <input ref="fileInputRef" type="file" accept="image/*" class="w-full text-sm text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#f0f9ff] file:text-[#0f3d7a]"
                        @change="onPickFile">
                 <p class="text-xs text-gray-400 mt-1">JPG or PNG, max 2 MB. Crop to a square profile photo, or use the full image.</p>
+                <p v-if="previewFailed && resolvedExistingUrl" class="text-xs text-amber-700 mt-1">
+                    Saved photo could not be loaded. Pick a new image and click <strong>Apply crop</strong> to replace it.
+                </p>
+                <p v-else-if="!modelValue && !resolvedExistingUrl" class="text-xs text-amber-700 mt-1">
+                    No profile photo on file yet.
+                </p>
                 <button v-if="modelValue" type="button" class="text-xs text-red-600 mt-1 hover:underline" @click="clearPhoto">Remove photo</button>
             </div>
         </div>
@@ -35,7 +41,7 @@
 <script setup>
 import Cropper from 'cropperjs';
 import 'cropperjs/dist/cropper.css';
-import { nextTick, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 
 const props = defineProps({
     modelValue: { type: File, default: null },
@@ -51,12 +57,33 @@ const cropOpen = ref(false);
 const sourceUrl = ref(null);
 const pickedFile = ref(null);
 const displayPreview = ref(null);
+const previewFailed = ref(false);
 const objectUrls = ref([]);
 let cropper = null;
 
+const resolvedExistingUrl = computed(() => {
+    const raw = props.existingUrl;
+    if (!raw) return null;
+    if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
+        return raw;
+    }
+    if (typeof window !== 'undefined' && raw.startsWith('/')) {
+        return `${window.location.origin}${raw}`;
+    }
+    return raw;
+});
+
+const previewPlaceholder = computed(() => {
+    if (previewFailed.value && resolvedExistingUrl.value) {
+        return 'Photo unavailable';
+    }
+    return props.existingUrl || props.modelValue ? 'Photo' : 'No photo';
+});
+
 watch(
-    () => [props.modelValue, props.existingUrl],
+    () => [props.modelValue, resolvedExistingUrl.value],
     ([file, existing]) => {
+        previewFailed.value = false;
         revokeTracked();
         if (file instanceof File) {
             displayPreview.value = trackUrl(URL.createObjectURL(file));
@@ -66,6 +93,14 @@ watch(
     },
     { immediate: true },
 );
+
+function onPreviewError() {
+    if (props.modelValue instanceof File) {
+        return;
+    }
+    previewFailed.value = true;
+    displayPreview.value = null;
+}
 
 function trackUrl(url) {
     objectUrls.value.push(url);

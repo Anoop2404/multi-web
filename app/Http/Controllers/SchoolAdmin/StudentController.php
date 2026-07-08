@@ -509,7 +509,7 @@ class StudentController extends SchoolAdminController
         $data = $this->validatedStudentBasicUpdate($request);
         $before = $student->only(array_keys($data));
 
-        if ($request->hasFile('photo')) {
+        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
             $file = $request->file('photo');
             app(UploadBackupService::class)->store(
                 $file,
@@ -1048,6 +1048,7 @@ class StudentController extends SchoolAdminController
     {
         $data = $student->toArray();
         $data['photo_url'] = $student->photoUrl();
+        $data['has_photo'] = filled($student->photo);
         $data['is_verified'] = $student->isVerified();
         $data['verified_at'] = $student->verified_at?->toIso8601String();
 
@@ -1086,6 +1087,7 @@ class StudentController extends SchoolAdminController
             'portal_username'  => $student->user?->username ?? $student->reg_no,
             'portal_password'  => $student->user?->plain_password,
             'photo_url'      => $student->photoUrl(),
+            'has_photo'      => filled($student->photo),
         ];
     }
 

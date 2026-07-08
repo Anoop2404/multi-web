@@ -128,11 +128,25 @@
 
                 <tr v-for="student in students.data" :key="student.id" class="hover:bg-gray-50/80">
                     <td class="px-4 py-3 w-14">
-                        <Link :href="profileUrl(student)"
+                        <button
+                            v-if="canEditPhoto"
+                            type="button"
+                            class="group relative w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center hover:ring-2 hover:ring-[#0f3d7a]/30 transition cursor-pointer"
+                            :title="`Change photo — ${student.name}`"
+                            @click="openPhotoModal(student)"
+                        >
+                            <img v-if="student.photo_url && !photoBroken[student.id]" :src="student.photo_url" :alt="student.name"
+                                 class="w-full h-full object-cover" @error="photoBroken[student.id] = true">
+                            <span v-else class="text-xs text-gray-400 font-semibold">{{ initials(student.name) }}</span>
+                            <span class="absolute inset-0 flex items-center justify-center bg-[#041525]/45 text-white text-[10px] font-bold uppercase tracking-wide opacity-0 group-hover:opacity-100 transition">
+                                Photo
+                            </span>
+                        </button>
+                        <Link v-else :href="profileUrl(student)"
                               class="relative w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center hover:ring-2 hover:ring-[#0f3d7a]/20 transition"
                               title="View profile">
-                            <img v-if="student.photo_url" :src="student.photo_url" :alt="student.name"
-                                 class="w-full h-full object-cover">
+                            <img v-if="student.photo_url && !photoBroken[student.id]" :src="student.photo_url" :alt="student.name"
+                                 class="w-full h-full object-cover" @error="photoBroken[student.id] = true">
                             <span v-else class="text-xs text-gray-400 font-semibold">{{ initials(student.name) }}</span>
                         </Link>
                     </td>
@@ -334,6 +348,30 @@
             </div>
         </div>
 
+        <!-- Quick photo update (click avatar in list) -->
+        <div v-if="showPhotoEdit && photoEditStudent" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closePhotoModal"></div>
+            <div class="relative modal-shell max-w-md">
+                <div class="modal-head">
+                    <div>
+                        <h3 class="font-bold text-[#041525]">Update photo</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">{{ photoEditStudent.name }} · existing photo is kept unless you save a new one</p>
+                    </div>
+                    <button type="button" @click="closePhotoModal" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                </div>
+                <form @submit.prevent="submitPhotoOnly" class="p-6 space-y-4">
+                    <ProfilePhotoCropper v-model="photoOnlyFile" :existing-url="photoEditStudent.photo_url" />
+                    <div class="flex items-center justify-end gap-3 pt-2">
+                        <button type="button" @click="closePhotoModal" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+                        <button type="submit" :disabled="photoForm.processing || !(photoOnlyFile instanceof File)"
+                                class="btn-primary disabled:opacity-50">
+                            {{ photoForm.processing ? 'Saving…' : 'Save photo' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Import CSV modal removed — use StudentBulkUploadModal -->
     </SchoolAdminLayout>
 </template>
@@ -364,6 +402,7 @@ const props = defineProps({
 
 const isLocked = computed(() => !!props.studentEditLock?.locked);
 const needsChangeRequest = computed(() => isLocked.value && !props.canManageDirectly);
+const canEditPhoto = computed(() => props.canManageDirectly || !needsChangeRequest.value);
 const canBulkUpload = computed(() =>
     props.school?.school_prefix
     && schoolClasses.value.length > 0
@@ -374,9 +413,15 @@ const showBulkUpload = ref(false);
 const bulkUploadTab = ref('csv');
 const showEdit = ref(false);
 const showCreateRequest = ref(false);
+const showPhotoEdit = ref(false);
 const editingStudent = ref(null);
+const photoEditStudent = ref(null);
 const editPhotoFile = ref(null);
+const photoOnlyFile = ref(null);
 const createPhotoFile = ref(null);
+const photoBroken = reactive({});
+
+const photoForm = useForm({});
 
 const columns = computed(() => {
     const base = [
@@ -408,7 +453,6 @@ const editForm = useForm({
     gender:          '',
     dob:             '',
     parent_email:    '',
-    photo:           null,
     reason:          '',
 });
 
@@ -578,6 +622,41 @@ function closeEditModal() {
     clearModalQuery();
 }
 
+function openPhotoModal(student) {
+    if (needsChangeRequest.value) {
+        openEditModal(student);
+        return;
+    }
+    photoEditStudent.value = student;
+    photoOnlyFile.value = null;
+    photoForm.clearErrors();
+    showPhotoEdit.value = true;
+}
+
+function closePhotoModal() {
+    showPhotoEdit.value = false;
+    photoEditStudent.value = null;
+    photoOnlyFile.value = null;
+    photoForm.reset();
+}
+
+function submitPhotoOnly() {
+    if (!photoEditStudent.value || !(photoOnlyFile.value instanceof File)) {
+        return;
+    }
+
+    photoForm
+        .transform(() => ({ photo: photoOnlyFile.value }))
+        .post(`/school-admin/${props.school.id}/students/${photoEditStudent.value.id}/photo`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                closePhotoModal();
+                router.reload({ only: ['students', 'unverifiedCount'], preserveScroll: true });
+            },
+        });
+}
+
 function openCreateRequestModal() {
     createForm.clearErrors();
     createPhotoFile.value = null;
@@ -600,10 +679,21 @@ function submitCreateRequest() {
         });
 }
 
+function buildEditPayload(data, { changeRequest = false } = {}) {
+    const payload = { ...data };
+    if (editPhotoFile.value instanceof File) {
+        payload.photo = editPhotoFile.value;
+    }
+    if (!changeRequest) {
+        payload._method = 'put';
+    }
+    return payload;
+}
+
 function submitEdit() {
     if (needsChangeRequest.value) {
         editForm
-            .transform(data => ({ ...data, photo: editPhotoFile.value }))
+            .transform((data) => buildEditPayload(data, { changeRequest: true }))
             .post(`/school-admin/${props.school.id}/students/${editingStudent.value.id}/change-request`, {
                 forceFormData: true,
                 preserveScroll: true,
@@ -613,11 +703,14 @@ function submitEdit() {
     }
 
     editForm
-        .transform(data => ({ ...data, photo: editPhotoFile.value, _method: 'put' }))
+        .transform((data) => buildEditPayload(data))
         .post(`/school-admin/${props.school.id}/students/${editingStudent.value.id}`, {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => closeEditModal(),
+            onSuccess: () => {
+                closeEditModal();
+                router.reload({ only: ['students', 'unverifiedCount'], preserveScroll: true });
+            },
         });
 }
 

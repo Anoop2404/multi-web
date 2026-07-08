@@ -387,9 +387,20 @@ function cancelEdit() {
 function submitEdit() {
     const url = `/school-admin/${props.school.id}/students/${props.student.id}`;
 
+    const buildPayload = (data, { changeRequest = false } = {}) => {
+        const payload = { ...data };
+        if (editPhotoFile.value instanceof File) {
+            payload.photo = editPhotoFile.value;
+        }
+        if (!changeRequest) {
+            payload._method = 'put';
+        }
+        return payload;
+    };
+
     if (needsChangeRequest.value) {
         editForm
-            .transform((data) => ({ ...data, photo: editPhotoFile.value }))
+            .transform((data) => buildPayload(data, { changeRequest: true }))
             .post(`${url}/change-request`, {
                 forceFormData: true,
                 preserveScroll: true,
@@ -399,7 +410,7 @@ function submitEdit() {
     }
 
     editForm
-        .transform((data) => ({ ...data, photo: editPhotoFile.value, _method: 'put' }))
+        .transform((data) => buildPayload(data))
         .post(url, {
             forceFormData: true,
             preserveScroll: true,

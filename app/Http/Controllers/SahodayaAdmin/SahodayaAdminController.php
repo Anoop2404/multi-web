@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\FestEvent;
 use App\Models\Registration;
+use App\Models\Student;
 use App\Models\Tenant;
 use App\Services\Audit\FestEventActivityService;
 use App\Services\Membership\SahodayaSetupService;
@@ -82,6 +83,11 @@ abstract class SahodayaAdminController extends Controller
                 ->forSahodaya($this->sahodaya->id)
                 ->where('status', 'pending')
                 ->whereIn('school_approval_status', ['school_approved', 'bypassed'])
+                ->count(),
+            'unverifiedStudentsCount' => Student::query()
+                ->whereIn('tenant_id', TenancyDatabase::schoolIdsFor($this->sahodaya->id))
+                ->where('status', 'active')
+                ->whereNull('verified_at')
                 ->count(),
             'pendingFestAppealsCount' => \App\Models\FestAppeal::query()
                 ->whereIn('event_id', \App\Models\FestEvent::where('tenant_id', $this->sahodaya->id)->pluck('id'))

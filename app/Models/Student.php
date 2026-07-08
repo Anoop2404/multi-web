@@ -75,10 +75,12 @@ class Student extends Model
             return null;
         }
 
-        $serveRoute = route('school.students.photo', [
+        $serveRoute = url(route('school.students.photo', [
             'tenantId' => $this->tenant_id,
             'student'  => $this->id,
-        ], absolute: false);
+        ], absolute: false));
+
+        $version = $this->updated_at?->timestamp ?? 0;
 
         if (TenantStorage::isS3Configured()) {
             try {
@@ -93,7 +95,7 @@ class Student extends Model
             }
         }
 
-        // Local / tenant-suffixed storage is served through the app route, not /storage.
-        return $serveRoute;
+        // Local / shared storage is served through the app route (works across disks).
+        return $serveRoute.($version ? '?v='.$version : '');
     }
 }
