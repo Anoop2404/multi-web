@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestRegistration;
 use App\Models\Tenant;
+use Illuminate\Validation\ValidationException;
 
 class FestBulkRegistrationService
 {
@@ -39,7 +40,7 @@ class FestBulkRegistrationService
             try {
                 $this->eventRegistrationService->registerStudents($event, $school, $studentIds);
             } catch (\Throwable $e) {
-                $errors[] = $e->getMessage();
+                $errors[] = $this->failureMessage($e);
             }
         }
 
@@ -54,7 +55,7 @@ class FestBulkRegistrationService
             try {
                 app(FestItemRegistrationGate::class)->assertOpen($item);
             } catch (\Throwable $e) {
-                $errors[] = "{$item->title}: {$e->getMessage()}";
+                $errors[] = "{$item->title}: {$this->failureMessage($e)}";
 
                 continue;
             }
@@ -73,7 +74,7 @@ class FestBulkRegistrationService
                     );
                     $created++;
                 } catch (\Throwable $e) {
-                    $errors[] = "{$item->title}: {$e->getMessage()}";
+                    $errors[] = "{$item->title}: {$this->failureMessage($e)}";
                 }
 
                 continue;
@@ -98,7 +99,7 @@ class FestBulkRegistrationService
                     );
                     $created++;
                 } catch (\Throwable $e) {
-                    $errors[] = "{$item->title} / student #{$studentId}: {$e->getMessage()}";
+                    $errors[] = "{$item->title} / student #{$studentId}: {$this->failureMessage($e)}";
                 }
             }
         }
@@ -116,5 +117,17 @@ class FestBulkRegistrationService
                 ->where('student_id', $studentId)
                 ->where('participant_role', 'performer'))
             ->exists();
+    }
+
+    private function failureMessage(\Throwable $e): string
+    {
+        if ($e instanceof ValidationException) {
+            $messages = collect($e->errors())->flatten()->filter()->values();
+            if ($messages->isNotEmpty()) {
+                return $messages->implode(' ');
+            }
+        }
+
+        return $e->getMessage();
     }
 }

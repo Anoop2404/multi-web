@@ -7,8 +7,10 @@ use App\Models\SiteSection;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\User;
+use App\Support\TenantAuth;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Tenancy\SahodayaDatabaseProvisioner;
+use App\Support\SahodayaNavVisibility;
 use App\Support\SahodayaSiteTemplate;
 use App\Support\TenancyDatabase;
 use App\Support\TenantBranding;
@@ -26,7 +28,16 @@ class TenantController extends Controller
 
     public function indexSahodayas(Request $request)
     {
-        return $this->tenantIndex('sahodaya', 'Sahodaya Clusters', route('admin.sahodayas.create'), $request);
+        $readOnly = $request->user()?->hasAnyRole(['state_admin', 'state_staff'])
+            && ! $request->user()?->hasRole('superadmin');
+
+        return $this->tenantIndex(
+            'sahodaya',
+            'Sahodaya Clusters',
+            $readOnly ? null : route('admin.sahodayas.create'),
+            $request,
+            $readOnly,
+        );
     }
 
     public function indexSchools(Request $request)
@@ -116,7 +127,37 @@ class TenantController extends Controller
             'sahodayaAdmins'   => $tenant->type === 'sahodaya' ? $this->portalAdmins($tenant, 'sahodaya_admin') : [],
             'schoolAdmins'     => $tenant->type === 'school' ? $this->portalAdmins($tenant, 'school_admin') : [],
             'loginUrl'         => $this->portalLoginUrl($tenant),
+            'navManager'       => $tenant->type === 'sahodaya' ? [
+                'programs'  => SahodayaNavVisibility::programLabels(),
+                'menus'     => SahodayaNavVisibility::menuLabels(),
+                'overrides' => SahodayaNavVisibility::applyOverride(
+                    SahodayaNavVisibility::defaults(),
+                    is_array($tenant->nav_overrides) ? $tenant->nav_overrides : null,
+                ),
+            ] : null,
         ]);
+    }
+
+    /** Super-admin hard cap on a Sahodaya's sidebar menus/programs (stored centrally). */
+    public function updateNavVisibility(Request $request, Tenant $tenant)
+    {
+        abort_unless($tenant->type === 'sahodaya', 422, 'Menu control is only available for Sahodayas.');
+
+        $request->validate([
+            'programs'   => 'array',
+            'programs.*' => 'boolean',
+            'menus'      => 'array',
+            'menus.*'    => 'boolean',
+        ]);
+
+        $tenant->update([
+            'nav_overrides' => SahodayaNavVisibility::normalizeInput([
+                'programs' => $request->input('programs', []),
+                'menus'    => $request->input('menus', []),
+            ]),
+        ]);
+
+        return back()->with('success', 'Sidebar menu access updated.');
     }
 
     public function edit(Tenant $tenant)
@@ -148,9 +189,11 @@ class TenantController extends Controller
 
         $type = $tenant->type;
 
-        User::query()->where('tenant_id', $tenant->id)->each(function (User $user) {
-            $user->syncRoles([]);
-            $user->delete();
+        TenantAuth::withTenantUsers($tenant, function () use ($tenant) {
+            User::query()->where('tenant_id', $tenant->id)->each(function (User $user) {
+                $user->syncRoles([]);
+                $user->delete();
+            });
         });
 
         $tenant->delete();
@@ -236,56 +279,62 @@ class TenantController extends Controller
         return $this->savePortalAdmin($request, $tenant, 'school_admin');
     }
 
-    public function destroySahodayaAdmin(Tenant $tenant, User $user)
+    public function destroySahodayaAdmin(Tenant $tenant, int $user)
     {
         return $this->destroyPortalAdmin($tenant, $user, 'sahodaya', 'sahodaya_admin');
     }
 
-    public function destroySchoolAdmin(Tenant $tenant, User $user)
+    public function destroySchoolAdmin(Tenant $tenant, int $user)
     {
         return $this->destroyPortalAdmin($tenant, $user, 'school', 'school_admin');
     }
 
     private function savePortalAdmin(Request $request, Tenant $tenant, string $role): \Illuminate\Http\RedirectResponse
     {
-        $existingId = $request->input('user_id');
-        $label = $role === 'sahodaya_admin' ? 'Sahodaya admin' : 'School admin';
+        return TenantAuth::withTenantUsers($tenant, function () use ($request, $tenant, $role) {
+            $existingId = $request->input('user_id');
+            $label = $role === 'sahodaya_admin' ? 'Sahodaya admin' : 'School admin';
 
-        $data = $request->validate([
-            'user_id'  => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', $tenant->id)],
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($existingId)],
-            'password' => ['required', 'string', 'min:8'],
-        ]);
+            $data = $request->validate([
+                'user_id'  => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', $tenant->id)],
+                'name'     => ['required', 'string', 'max:255'],
+                'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($existingId)],
+                'password' => ['required', 'string', 'min:8'],
+            ]);
 
-        $user = $existingId
-            ? User::query()->where('tenant_id', $tenant->id)->findOrFail($existingId)
-            : new User(['tenant_id' => $tenant->id]);
+            $user = $existingId
+                ? User::query()->where('tenant_id', $tenant->id)->findOrFail($existingId)
+                : new User(['tenant_id' => $tenant->id]);
 
-        $user->fill([
-            'name'              => $data['name'],
-            'email'             => $data['email'],
-            'password'          => Hash::make($data['password']),
-            'email_verified_at' => now(),
-        ]);
-        $user->save();
-        $user->syncRoles([$role]);
+            $user->fill([
+                'name'              => $data['name'],
+                'email'             => $data['email'],
+                'password'          => Hash::make($data['password']),
+                'email_verified_at' => now(),
+            ]);
+            $user->save();
+            $user->syncRoles([$role]);
 
-        $message = $existingId ? "{$label} login updated." : "{$label} account created.";
+            $message = $existingId ? "{$label} login updated." : "{$label} account created.";
 
-        return redirect()->route('admin.tenants.show', $tenant)->with('success', $message);
+            return redirect()->route('admin.tenants.show', $tenant)->with('success', $message);
+        });
     }
 
-    private function destroyPortalAdmin(Tenant $tenant, User $user, string $tenantType, string $role): \Illuminate\Http\RedirectResponse
+    private function destroyPortalAdmin(Tenant $tenant, int $userId, string $tenantType, string $role): \Illuminate\Http\RedirectResponse
     {
         abort_if($tenant->type !== $tenantType, 404);
-        abort_if($user->tenant_id !== $tenant->id || ! $user->hasRole($role), 404);
 
-        $user->delete();
+        return TenantAuth::withTenantUsers($tenant, function () use ($tenant, $userId, $role) {
+            $user = User::query()->where('tenant_id', $tenant->id)->findOrFail($userId);
+            abort_if(! $user->hasRole($role), 404);
 
-        $label = $role === 'sahodaya_admin' ? 'Sahodaya admin' : 'School admin';
+            $user->delete();
 
-        return redirect()->route('admin.tenants.show', $tenant)->with('success', "{$label} removed.");
+            $label = $role === 'sahodaya_admin' ? 'Sahodaya admin' : 'School admin';
+
+            return redirect()->route('admin.tenants.show', $tenant)->with('success', "{$label} removed.");
+        });
     }
 
     /** @return array<string, mixed> */
@@ -331,7 +380,7 @@ class TenantController extends Controller
         ];
     }
 
-    private function tenantIndex(string $type, string $pageTitle, string $createUrl, Request $request)
+    private function tenantIndex(string $type, string $pageTitle, ?string $createUrl, Request $request, bool $readOnly = false)
     {
         $filters = $request->validate([
             'search' => 'nullable|string|max:100',
@@ -363,6 +412,7 @@ class TenantController extends Controller
             'tenantType'       => $type,
             'pageTitle'        => $pageTitle,
             'createUrl'        => $createUrl,
+            'readOnly'         => $readOnly,
             'tenantBaseDomain' => config('tenancy.tenant_base_domain'),
             'filters'          => array_merge(['search' => '', 'status' => 'all'], $filters),
         ]);
@@ -406,17 +456,19 @@ class TenantController extends Controller
     /** @return list<array{id: int, name: string, email: string, created_at: ?string}> */
     private function portalAdmins(Tenant $tenant, string $role): array
     {
-        return User::role($role)
-            ->where('tenant_id', $tenant->id)
-            ->orderBy('name')
-            ->get(['id', 'name', 'email', 'created_at'])
-            ->map(fn (User $user) => [
-                'id'             => $user->id,
-                'name'           => $user->name,
-                'email'          => $user->email,
-                'created_at'     => $user->created_at?->toIso8601String(),
-            ])
-            ->all();
+        return TenantAuth::withTenantUsers($tenant, function () use ($tenant, $role) {
+            return User::role($role)
+                ->where('tenant_id', $tenant->id)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'created_at'])
+                ->map(fn (User $user) => [
+                    'id'         => $user->id,
+                    'name'       => $user->name,
+                    'email'      => $user->email,
+                    'created_at' => $user->created_at?->toIso8601String(),
+                ])
+                ->all();
+        }) ?? [];
     }
 
     private function portalLoginUrl(Tenant $tenant): ?string

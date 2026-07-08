@@ -80,7 +80,7 @@ class StudentApiController extends SchoolApiController
 
         $data['tenant_id'] = $this->school->id;
         $data['status'] = 'active';
-        $data['admission_number'] = app(StudentRegistrationNumberGenerator::class)->generate($this->school);
+        $data['reg_no'] = app(StudentRegistrationNumberGenerator::class)->generate($this->school);
 
         $student = Student::create($data);
 

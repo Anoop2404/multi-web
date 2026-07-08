@@ -43,6 +43,7 @@
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { houseAdminPortalNavItems } from '@/support/houseAdminPortalNav.js';
 
 const props = defineProps({
     school: Object,
@@ -53,12 +54,7 @@ const props = defineProps({
 });
 
 const eventFilter = ref(props.selectedEvent ?? '');
-const navItems = computed(() => [
-    { href: `/portal/house-admin/${props.school.id}`, label: 'Dashboard' },
-    { href: `/portal/house-admin/${props.school.id}/students`, label: 'Students' },
-    { href: `/portal/house-admin/${props.school.id}/registrations`, label: 'Registrations' },
-    { href: `/portal/house-admin/${props.school.id}/ranking`, label: 'House ranking' },
-]);
+const navItems = computed(() => houseAdminPortalNavItems(props.school.id));
 
 function applyFilter() {
     const q = eventFilter.value ? `?event_id=${eventFilter.value}` : '';

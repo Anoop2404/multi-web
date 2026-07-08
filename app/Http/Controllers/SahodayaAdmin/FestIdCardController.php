@@ -32,6 +32,7 @@ class FestIdCardController extends SahodayaAdminController
                 'count'               => $itemCounts[$item->id] ?? 0,
                 'registration_count'  => $registrationCounts[$item->id] ?? 0,
             ]),
+            'heads'  => $service->headOptions($event),
             'meta'   => $service->indexMeta($event),
             'schools'=> $service->schoolOptions($event),
         ]));
@@ -44,10 +45,14 @@ class FestIdCardController extends SahodayaAdminController
         $data = $this->validated($request);
         $filters = $this->idCardFilters($request);
 
-        if ($data['audience'] === 'student'
-            && ($filters['scope'] ?? 'item') === 'item'
-            && empty($filters['item_id'])) {
-            return response()->json(['cards' => [], 'message' => 'Select an item to preview cards.']);
+        if ($data['audience'] === 'student') {
+            $scope = $filters['scope'] ?? 'item';
+            if ($scope === 'item' && empty($filters['item_id'])) {
+                return response()->json(['cards' => [], 'message' => 'Select an item to preview cards.']);
+            }
+            if ($scope === 'head' && empty($filters['head_id'])) {
+                return response()->json(['cards' => [], 'message' => 'Select an item head to preview cards.']);
+            }
         }
 
         return response()->json([
@@ -66,7 +71,7 @@ class FestIdCardController extends SahodayaAdminController
 
         return view($this->idCardSheetView($request), $this->idCardViewData(
             $event,
-            $this->sahodaya->name,
+            $this->sahodaya,
             $cards,
             $data['audience'],
             true,
@@ -90,11 +95,15 @@ class FestIdCardController extends SahodayaAdminController
         ]);
 
         $slug = str($event->title)->slug('-');
-        $scopeSuffix = ($filters['scope'] ?? 'item') === 'event' ? 'event-pass' : $data['audience'];
+        $scopeSuffix = match ($filters['scope'] ?? 'item') {
+            'event' => 'event-pass',
+            'head'  => 'head-pass',
+            default => $data['audience'],
+        };
 
         return Pdf::loadView($this->idCardSheetView($request), $this->idCardViewData(
             $event,
-            $this->sahodaya->name,
+            $this->sahodaya,
             $cards,
             $data['audience'],
             false,
@@ -126,12 +135,52 @@ class FestIdCardController extends SahodayaAdminController
 
         return Pdf::loadView($this->idCardSheetView($request), $this->idCardViewData(
             $event,
-            $this->sahodaya->name,
+            $this->sahodaya,
             [],
             'student',
             false,
             $sections,
         ))->download("{$slug}-all-items-id-cards.pdf");
+    }
+
+    public function pdfAllHeads(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $this->validated($request);
+        abort_unless($data['audience'] === 'student', 422, 'Bulk head PDF is available for student cards only.');
+
+        $filters = $this->idCardFilters($request);
+        unset($filters['item_id'], $filters['head_id'], $filters['scope']);
+        $sections = collect($service->cardsGroupedByHead($event, $filters))
+            ->map(fn ($section) => [
+                'item_title' => $section['head_title'],
+                'cards'      => $section['cards'],
+            ])
+            ->values()
+            ->all();
+
+        abort_if($sections === [], 422, 'No approved participants found for any item head.');
+
+        $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
+
+        $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'All-head ID cards PDF generated', [
+            'audience' => 'student',
+            'count'    => $totalCards,
+            'heads'    => count($sections),
+            'template' => $request->input('template', 'standard'),
+        ]);
+
+        $slug = str($event->title)->slug('-');
+
+        return Pdf::loadView($this->idCardSheetView($request), $this->idCardViewData(
+            $event,
+            $this->sahodaya,
+            [],
+            'student',
+            false,
+            $sections,
+        ))->download("{$slug}-all-heads-id-cards.pdf");
     }
 
     /** @return array<string, mixed> */

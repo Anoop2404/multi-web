@@ -25,7 +25,10 @@
                         <td class="p-3 capitalize">{{ s.gender }}</td>
                     </tr>
                     <tr v-if="!filtered.length">
-                        <td colspan="4" class="p-6 text-center text-gray-400">No students found</td>
+                        <td colspan="4" class="p-6 text-center text-gray-400">
+                            <p>No students found{{ search ? ' for this search' : '' }}.</p>
+                            <a :href="`/portal/group/${tenantId}`" class="text-xs text-indigo-600 font-semibold mt-2 inline-block">← Dashboard</a>
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -36,6 +39,7 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { ref, computed } from 'vue';
+import { groupPortalNavItems } from '@/support/groupPortalNav.js';
 
 const props = defineProps({
     tenantId: String,
@@ -51,8 +55,5 @@ const filtered = computed(() => {
     );
 });
 
-const navItems = computed(() => [
-    { href: `/portal/group/${props.tenantId}`, label: 'Dashboard' },
-    { href: `/portal/group/${props.tenantId}/students`, label: 'Students' },
-]);
+const navItems = computed(() => groupPortalNavItems(props.tenantId));
 </script>

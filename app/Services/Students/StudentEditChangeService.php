@@ -214,13 +214,16 @@ class StudentEditChangeService
     private function createRequest(Tenant $school, array $payload, ?int $userId, ?string $submittedByRole): StudentEditChangeRequest
     {
         $state = $this->lockService->resolveWindowState($school);
+        $role = $submittedByRole ?? 'school_staff';
+        $locked = ! $state['can_add'] && ! $state['can_edit'];
+        $isLeadership = in_array($role, ['school_admin', 'school_principal', 'school_vice_principal'], true);
 
         return StudentEditChangeRequest::create(array_merge($payload, [
             'school_id'              => $school->id,
             'status'                 => 'pending',
-            'school_approval_status' => 'pending_school',
+            'school_approval_status' => ($isLeadership && $locked) ? 'bypassed' : 'pending_school',
             'requested_by_user_id'   => $userId,
-            'submitted_by_role'      => $submittedByRole ?? 'school_staff',
+            'submitted_by_role'      => $role,
             'escalation_type'        => ($state['can_add'] || $state['can_edit'])
                 ? 'direct_to_sahodaya'
                 : 'via_school_principal',
@@ -241,6 +244,8 @@ class StudentEditChangeService
             }
 
             $student->update($changes);
+
+            $student->update(['verified_at' => null, 'verified_by_user_id' => null]);
 
             app(DataChangeLogger::class)->updated(
                 $student,

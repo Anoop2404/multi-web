@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventStaff;
+use App\Models\FestItemHead;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchedule;
@@ -17,6 +18,7 @@ class FestIdCardService
     public function __construct(
         private FestIdCardQrService $qrService,
         private FestChestNumberService $chestService,
+        private FestItemWindowResolver $itemWindows,
     ) {}
 
     /** @param  array<string, mixed>  $filters */
@@ -26,11 +28,17 @@ class FestIdCardService
             return;
         }
 
-        if (($filters['scope'] ?? 'item') === 'event') {
+        $scope = $filters['scope'] ?? 'item';
+
+        if (in_array($scope, ['event', 'head_all'], true)) {
             return;
         }
 
-        if (empty($filters['item_id'])) {
+        if ($scope === 'head' && empty($filters['head_id'])) {
+            abort(422, 'Select an item head before generating student ID cards.');
+        }
+
+        if ($scope === 'item' && empty($filters['item_id'])) {
             abort(422, 'Select a fest item before generating student ID cards.');
         }
     }
@@ -41,6 +49,17 @@ class FestIdCardService
      */
     public function cardsGroupedByItem(FestEvent $event, array $filters = []): array
     {
+        if ($event->event_type === 'sports') {
+            return collect($this->cardsGroupedByHead($event, $filters))
+                ->map(fn (array $section) => [
+                    'item_title' => $section['head_title'],
+                    'item_id'    => $section['head_id'],
+                    'cards'      => $section['cards'],
+                ])
+                ->values()
+                ->all();
+        }
+
         $event->loadMissing(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')]);
 
         $layout = $filters['layout'] ?? 'individual';
@@ -78,50 +97,57 @@ class FestIdCardService
      */
     public function cardsGroupedByHead(FestEvent $event, array $filters = []): array
     {
-        $event->loadMissing(['items.head' => fn ($q) => $q->orderBy('sort_order')]);
+        $cards = $this->buildHeadParticipantCards($event, $filters);
 
-        $byStudent = [];
-        foreach ($event->items as $item) {
-            if (! $item->head_id) {
-                continue;
-            }
+        return collect($cards)
+            ->groupBy('head_id')
+            ->map(function ($headCards, $headId) {
+                $first = $headCards->first();
 
-            $itemFilters = array_merge($filters, ['item_id' => $item->id, 'scope' => 'item']);
-            foreach ($this->individualStudentCards($event, $itemFilters) as $card) {
-                $studentKey = $card['student_id'] ?? ($card['name'] ?? uniqid());
-                $headId = $item->head_id;
-                $byStudent[$headId][$studentKey]['head_title'] = $item->head?->name ?? 'General';
-                $byStudent[$headId][$studentKey]['head_id'] = $headId;
-                $byStudent[$headId][$studentKey]['card'] = array_merge($byStudent[$headId][$studentKey]['card'] ?? $card, [
-                    'student_id' => $card['student_id'] ?? null,
-                    'name' => $card['name'] ?? '',
-                    'school_name' => $card['school_name'] ?? '',
-                    'level_registration_number' => $card['level_registration_number'] ?? null,
-                    'photo_url' => $card['photo_url'] ?? null,
-                    'qr_svg' => $card['qr_svg'] ?? null,
-                ]);
-                $byStudent[$headId][$studentKey]['items'][] = $item->title;
-            }
-        }
-
-        $sections = [];
-        foreach ($byStudent as $headId => $students) {
-            $cards = [];
-            foreach ($students as $row) {
-                $card = $row['card'];
-                $card['items_list'] = implode(', ', array_unique($row['items'] ?? []));
-                $cards[] = $card;
-            }
-            if ($cards !== []) {
-                $sections[] = [
-                    'head_title' => $students[array_key_first($students)]['head_title'] ?? 'Head',
-                    'head_id' => $headId,
-                    'cards' => $cards,
+                return [
+                    'head_title' => $first['head_label'] ?? 'Item head',
+                    'head_id'    => (int) $headId,
+                    'cards'      => $headCards->values()->all(),
                 ];
-            }
+            })
+            ->sortBy('head_title')
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array{id: int, name: string, count: int}> */
+    public function headOptions(FestEvent $event, ?string $schoolId = null): array
+    {
+        $counts = $this->headParticipantCounts($event, $schoolId);
+
+        if ($counts === []) {
+            return [];
         }
 
-        return $sections;
+        return FestItemHead::query()
+            ->whereIn('id', array_keys($counts))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (FestItemHead $head) => [
+                'id'    => $head->id,
+                'name'  => $head->name,
+                'count' => $counts[$head->id] ?? 0,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @return array<int, int> head_id => card count */
+    public function headParticipantCounts(FestEvent $event, ?string $schoolId = null): array
+    {
+        return collect($this->buildHeadParticipantCards($event, array_filter([
+            'school_id'        => $schoolId,
+            'school_downloads' => $schoolId !== null,
+        ])))
+            ->groupBy('head_id')
+            ->map(fn ($group) => $group->count())
+            ->all();
     }
 
     /** @return array<string, mixed> */
@@ -129,6 +155,7 @@ class FestIdCardService
     {
         return [
             'students'   => $this->studentCount($event, $schoolId),
+            'heads'      => array_sum($this->headParticipantCounts($event, $schoolId)),
             'volunteers' => FestVolunteer::where('event_id', $event->id)->count(),
             'staff'      => FestEventStaff::where('event_id', $event->id)->count(),
             'schools'    => $this->schoolOptions($event),
@@ -136,13 +163,21 @@ class FestIdCardService
     }
 
     /** @return array<int, int> item_id => participant count */
-    public function itemParticipantCounts(FestEvent $event, ?string $schoolId = null): array
+    public function itemParticipantCounts(FestEvent $event, ?string $schoolId = null, bool $schoolDownloads = false): array
     {
+        $filters = array_filter([
+            'school_id'        => $schoolId,
+            'school_downloads' => $schoolDownloads || $schoolId !== null,
+        ]);
+
         $rows = FestParticipant::query()
-            ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
-                ->where('status', 'approved')
-                ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+            ->whereHas('registration', function ($q) use ($event, $filters) {
+                $q->where('event_id', $event->id);
+                $this->constrainRegistrationStatus($q, $filters);
+                if (! empty($filters['school_id'])) {
+                    $q->where('school_id', $filters['school_id']);
+                }
+            })
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
@@ -154,12 +189,20 @@ class FestIdCardService
     }
 
     /** @return array<int, int> item_id => approved registration count */
-    public function itemRegistrationCounts(FestEvent $event, ?string $schoolId = null): array
+    public function itemRegistrationCounts(FestEvent $event, ?string $schoolId = null, bool $schoolDownloads = false): array
     {
-        return FestRegistration::query()
-            ->where('event_id', $event->id)
-            ->where('status', 'approved')
-            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+        $filters = array_filter([
+            'school_id'        => $schoolId,
+            'school_downloads' => $schoolDownloads || $schoolId !== null,
+        ]);
+
+        $query = FestRegistration::query()->where('event_id', $event->id);
+        $this->constrainRegistrationStatus($query, $filters);
+        if (! empty($filters['school_id'])) {
+            $query->where('school_id', $filters['school_id']);
+        }
+
+        return $query
             ->selectRaw('item_id, COUNT(*) as aggregate')
             ->groupBy('item_id')
             ->pluck('aggregate', 'item_id')
@@ -195,10 +238,18 @@ class FestIdCardService
 
     private function studentCount(FestEvent $event, ?string $schoolId): int
     {
-        return FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
-            ->where('status', 'approved')
-            ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+        $filters = array_filter([
+            'school_id'        => $schoolId,
+            'school_downloads' => $schoolId !== null,
+        ]);
+
+        return FestParticipant::whereHas('registration', function ($q) use ($event, $filters) {
+            $q->where('event_id', $event->id);
+            $this->constrainRegistrationStatus($q, $filters);
+            if (! empty($filters['school_id'])) {
+                $q->where('school_id', $filters['school_id']);
+            }
+        })
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->where('participant_role', '!=', 'standby')
             ->count();
@@ -207,8 +258,14 @@ class FestIdCardService
     /** @param  array<string, mixed>  $filters */
     private function studentCards(FestEvent $event, array $filters): array
     {
-        if (($filters['scope'] ?? 'item') === 'event') {
+        $scope = $filters['scope'] ?? 'item';
+
+        if ($scope === 'event') {
             return $this->eventParticipantCards($event, $filters);
+        }
+
+        if ($scope === 'head') {
+            return $this->buildHeadParticipantCards($event, $filters);
         }
 
         $layout = $filters['layout'] ?? 'individual';
@@ -220,22 +277,147 @@ class FestIdCardService
         return $this->individualStudentCards($event, $filters);
     }
 
+    /**
+     * One card per student/teacher per item head, listing all items under that head.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<array<string, mixed>>
+     */
+    private function buildHeadParticipantCards(FestEvent $event, array $filters): array
+    {
+        $schoolId = $filters['school_id'] ?? null;
+        $headId = isset($filters['head_id']) ? (int) $filters['head_id'] : null;
+        $participantIds = $filters['participant_ids'] ?? null;
+
+        $query = FestParticipant::whereHas('registration', function ($q) use ($event, $filters) {
+            $q->where('event_id', $event->id);
+            $this->constrainRegistrationStatus($q, $filters);
+            if (! empty($filters['school_id'])) {
+                $q->where('school_id', $filters['school_id']);
+            }
+            $q->whereHas('item', fn ($q2) => $q2->whereNotNull('head_id'));
+        })
+            ->where('participant_role', '!=', 'standby')
+            ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
+            ->with([
+                'student.tenant',
+                'teacher.tenant',
+                'registration.item.head',
+                'registration.school',
+            ]);
+
+        if (is_array($participantIds) && $participantIds !== []) {
+            $query->whereIn('id', $participantIds);
+        }
+
+        if (! empty($filters['student_id'])) {
+            $query->where('student_id', (int) $filters['student_id']);
+        }
+
+        $participants = $query->orderBy('id')->get();
+
+        if ($headId) {
+            $participants = $participants->filter(
+                fn (FestParticipant $p) => (int) ($p->registration?->item?->head_id ?? 0) === $headId,
+            );
+        }
+
+        if ($participants->isEmpty()) {
+            return [];
+        }
+
+        $schedules = $this->schedulesForParticipants($event, $participants->pluck('id'));
+
+        return $participants
+            ->groupBy(function (FestParticipant $p) {
+                $head = (int) ($p->registration?->item?->head_id ?? 0);
+                $entity = $p->student_id ? 's:'.$p->student_id : 't:'.$p->teacher_id;
+
+                return $head.':'.$entity;
+            })
+            ->map(function ($group) use ($event, $schedules) {
+                /** @var \Illuminate\Support\Collection<int, FestParticipant> $group */
+                $lead = $group->sortBy('id')->first();
+                $head = $lead->registration?->item?->head;
+                $headName = $head?->name ?? 'Item head';
+                $items = $group
+                    ->map(fn (FestParticipant $p) => $p->registration?->item?->title)
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values()
+                    ->all();
+
+                $schedule = $group
+                    ->map(fn (FestParticipant $p) => $schedules->get($p->id))
+                    ->filter()
+                    ->sortBy(fn (?FestSchedule $s) => $s?->scheduled_at?->timestamp ?? PHP_INT_MAX)
+                    ->first();
+
+                $card = $this->participantCard($event, $lead, $schedule);
+                $entityKey = $lead->student_id ? 's'.$lead->student_id : 't'.$lead->teacher_id;
+
+                return array_merge($card, [
+                    'card_type'       => 'head_participant',
+                    'role_label'      => $card['role_label'],
+                    'head_label'      => $headName,
+                    'head_id'         => (int) ($head?->id ?? $lead->registration?->item?->head_id ?? 0),
+                    'detail'          => null,
+                    'item_label'      => $headName,
+                    'items'           => $items,
+                    'item_count'      => count($items),
+                    'id_label'        => 'Fest ID',
+                    'secondary_label' => null,
+                    'secondary_value' => null,
+                    'schedule'        => $this->scheduleLine($schedule),
+                    'footer'          => null,
+                    'entity_id'       => 'hp-'.($head?->id ?? 0).'-'.$entityKey,
+                ]);
+            })
+            ->values()
+            ->all();
+    }
+
+    /** @param  list<string>  $items */
+    private function itemsFooter(array $items): string
+    {
+        if ($items === []) {
+            return '';
+        }
+
+        $visible = array_slice($items, 0, 3);
+        $footer = implode(' · ', $visible);
+
+        if (count($items) > 3) {
+            $footer .= ' · +'.(count($items) - 3).' more';
+        }
+
+        return $footer;
+    }
+
     /** @param  array<string, mixed>  $filters */
     private function eventParticipantCards(FestEvent $event, array $filters): array
     {
         $schoolId = $filters['school_id'] ?? null;
         $participantIds = $filters['participant_ids'] ?? null;
 
-        $query = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
-            ->where('status', 'approved')
-            ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+        $query = FestParticipant::whereHas('registration', function ($q) use ($event, $filters) {
+            $q->where('event_id', $event->id);
+            $this->constrainRegistrationStatus($q, $filters);
+            if (! empty($filters['school_id'])) {
+                $q->where('school_id', $filters['school_id']);
+            }
+        })
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
-            ->with(['student.tenant', 'teacher.tenant', 'registration.item', 'registration.school']);
+            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school']);
 
         if (is_array($participantIds) && $participantIds !== []) {
             $query->whereIn('id', $participantIds);
+        }
+
+        if (! empty($filters['student_id'])) {
+            $query->where('student_id', (int) $filters['student_id']);
         }
 
         $participants = $query->orderBy('id')->get();
@@ -266,14 +448,15 @@ class FestIdCardService
                     'card_type'       => 'event_participant',
                     'role_label'      => 'PARTICIPANT',
                     'role_class'      => 'student',
-                    'detail'          => $event->title,
+                    'detail'          => null,
                     'items'           => $items,
                     'item_count'      => count($items),
                     'item_label'      => null,
-                    'id_label'        => 'Event pass',
-                    'secondary_label' => 'Items',
-                    'secondary_value' => (string) count($items),
-                    'footer'          => $event->title,
+                    'id_label'        => 'Fest ID',
+                    'secondary_label' => ($card['secondary_value'] ?? null) ? ($card['secondary_label'] ?? 'Chest') : null,
+                    'secondary_value' => ($card['secondary_value'] ?? '—') !== '—' ? $card['secondary_value'] : null,
+                    'schedule'        => $this->scheduleLine($schedule),
+                    'footer'          => null,
                     'entity_id'       => 'ep-'.$entityKey,
                 ]);
             })
@@ -288,16 +471,25 @@ class FestIdCardService
         $itemId = isset($filters['item_id']) ? (int) $filters['item_id'] : null;
         $participantIds = $filters['participant_ids'] ?? null;
 
-        $query = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
-            ->where('status', 'approved')
-            ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId))
-            ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId)))
+        $query = FestParticipant::whereHas('registration', function ($q) use ($event, $filters, $itemId) {
+            $q->where('event_id', $event->id);
+            $this->constrainRegistrationStatus($q, $filters);
+            if (! empty($filters['school_id'])) {
+                $q->where('school_id', $filters['school_id']);
+            }
+            if ($itemId) {
+                $q->where('item_id', $itemId);
+            }
+        })
             ->where('participant_role', '!=', 'standby')
-            ->with(['student.tenant', 'teacher.tenant', 'registration.item', 'registration.school']);
+            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school']);
 
         if (is_array($participantIds) && $participantIds !== []) {
             $query->whereIn('id', $participantIds);
+        }
+
+        if (! empty($filters['student_id'])) {
+            $query->where('student_id', (int) $filters['student_id']);
         }
 
         $participants = $query->orderBy('id')->get();
@@ -315,10 +507,17 @@ class FestIdCardService
         $itemId = isset($filters['item_id']) ? (int) $filters['item_id'] : null;
 
         $query = FestRegistration::query()
-            ->where('event_id', $event->id)
-            ->where('status', 'approved')
-            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->where('event_id', $event->id);
+        $this->constrainRegistrationStatus($query, $filters);
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
+        $query
             ->when($itemId, fn ($q) => $q->where('item_id', $itemId))
+            ->when(! empty($filters['student_id']), fn ($q) => $q->whereHas(
+                'participants',
+                fn ($p) => $p->where('student_id', (int) $filters['student_id'])->where('participant_role', '!=', 'standby'),
+            ))
             ->whereHas('item', fn ($q) => $q->whereIn('participant_type', ['group', 'team']))
             ->with([
                 'item:id,title,participant_type',
@@ -394,11 +593,12 @@ class FestIdCardService
         $isTeacher = (bool) $p->teacher_id;
         $name = $p->student?->name ?? $p->teacher?->name ?? 'Participant';
         $school = $p->registration?->school?->name ?? '—';
-        $item = $p->registration?->item?->title ?? '—';
+        $itemModel = $p->registration?->item;
+        $item = $itemModel?->title ?? '—';
+        $headName = $itemModel?->head?->name;
         $festId = $p->level_registration_number ?? '—';
-        $chest = $this->chestService->participantLabel($p);
-        $regNo = $p->student?->reg_no ?? $p->teacher?->reg_no ?? '';
-        $scheduleLine = $this->scheduleLine($schedule);
+        $scheduleLine = $this->scheduleLine($schedule)
+            ?? ($itemModel ? $this->itemWindows->competitionLine($itemModel) : null);
         $qrPayload = $this->qrPayload($event, 'participant', (string) $p->id, $festId);
 
         return [
@@ -411,15 +611,16 @@ class FestIdCardService
             'photo_url'       => $this->portraitUrl($p),
             'photo_src'       => $this->portraitDataUri($p),
             'subtitle'        => $school,
-            'detail'          => $item,
-            'item_label'      => $item !== '—' ? $item : null,
+            'detail'          => $item !== '—' ? $item : null,
+            'head_label'      => $headName,
+            'item_label'      => $item !== '—' ? $item : ($headName ?: null),
             'schedule'        => $scheduleLine,
             'id_label'        => 'Fest ID',
             'id_number'       => $festId,
-            'secondary_label' => $chest !== '—' && $chest !== $festId ? 'Chest' : 'Reg no',
-            'secondary_value' => ($chest !== '—' && $chest !== $festId) ? $chest : ($regNo ?: '—'),
+            'secondary_label' => null,
+            'secondary_value' => null,
             'qr_src'          => $this->qrService->dataUri($qrPayload),
-            'footer'          => $scheduleLine ?: $event->title,
+            'footer'          => null,
             'entity_id'       => (string) $p->id,
         ];
     }
@@ -577,5 +778,61 @@ class FestIdCardService
         $letters = collect($parts)->take(2)->map(fn ($p) => mb_strtoupper(mb_substr($p, 0, 1)))->implode('');
 
         return $letters !== '' ? $letters : '?';
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Relations\Relation  $query
+     * @param  array<string, mixed>  $filters
+     */
+    private function constrainRegistrationStatus($query, array $filters): void
+    {
+        if ($filters['school_downloads'] ?? false) {
+            $query->whereNotIn('status', ['rejected', 'withdrawn']);
+        } else {
+            $query->where('status', 'approved');
+        }
+    }
+
+    /**
+     * Demo ID card for sports catalog item heads (not tied to a live event).
+     *
+     * @param  list<string>  $itemTitles
+     * @return array<string, mixed>
+     */
+    public function sampleHeadCard(Tenant $sahodaya, FestItemHead $head, array $itemTitles = []): array
+    {
+        if ($itemTitles === []) {
+            $itemTitles = ['Sample Item A', 'Sample Item B'];
+        }
+
+        $name = 'Sample Student';
+        $festId = 'SP-2026-001';
+        $qrPayload = implode('|', ['FEST', 'sample', 'participant', 'demo', $festId]);
+
+        return [
+            'card_type'       => 'head_participant',
+            'audience'        => 'student',
+            'role_label'      => 'STUDENT',
+            'role_class'      => 'student',
+            'name'            => $name,
+            'initials'        => $this->initials($name),
+            'photo_url'       => null,
+            'photo_src'       => null,
+            'subtitle'        => 'Sample Model School',
+            'detail'          => null,
+            'head_label'      => $head->name,
+            'head_id'         => (int) $head->id,
+            'item_label'      => $head->name,
+            'items'           => $itemTitles,
+            'item_count'      => count($itemTitles),
+            'id_label'        => 'Fest ID',
+            'id_number'       => $festId,
+            'secondary_label' => null,
+            'secondary_value' => null,
+            'qr_src'          => $this->qrService->dataUri($qrPayload),
+            'schedule'        => 'Competition dates: TBA',
+            'footer'          => null,
+            'entity_id'       => 'sample-head-'.$head->id,
+        ];
     }
 }

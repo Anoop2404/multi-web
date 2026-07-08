@@ -13,7 +13,7 @@
             <p class="font-semibold">Ledger account head</p>
             <p class="mt-1 font-mono text-xs">{{ accountCode }} — {{ accountName }}</p>
             <p class="text-xs text-indigo-700 mt-2">
-                Approved school event fees credit this event’s account (separate from MEMBERSHIP and TRAINING-FEE).
+                Approved school event fees credit this event’s account (separate from membership, Talent Search exams, and training programs).
             </p>
         </div>
 

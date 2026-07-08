@@ -59,7 +59,16 @@ class FestEventRegistrationService
         abort_if($student->tenant_id !== $school->id, 403);
         abort_if($school->parent_id !== $event->tenant_id, 403);
         $this->assertSchoolMembershipApproved($school);
+        abort_if($school->fest_registration_closed, 422, 'Fest registration is closed for your school.');
         abort_if(! $this->isEventRegistrationOpen($event), 422, 'Event registration is closed.');
+
+        if ($event->event_type === 'sports') {
+            abort_if(! $student->dob, 422, 'Date of birth is required before sports event registration.');
+
+            $verifyGate = app(\App\Services\Students\StudentVerificationGate::class);
+            $verifyReason = $verifyGate->ineligibilityReason($student, $event);
+            abort_if($verifyReason !== null, 422, $verifyReason);
+        }
 
         $existing = FestLevelRegistration::where('event_id', $event->id)
             ->where('student_id', $student->id)
@@ -121,8 +130,14 @@ class FestEventRegistrationService
     /** @return list<array<string, mixed>> */
     public function studentEventRegistrations(FestEvent $event, string $schoolId): array
     {
-        return FestLevelRegistration::where('event_id', $event->id)
-            ->where('school_id', $schoolId)
+        $studentIds = Student::query()
+            ->where('tenant_id', $schoolId)
+            ->pluck('id');
+
+        return FestLevelRegistration::query()
+            ->where('event_id', $event->id)
+            ->where('status', 'active')
+            ->whereIn('student_id', $studentIds)
             ->with('student:id,name,reg_no')
             ->orderBy('registration_number')
             ->get()
@@ -160,10 +175,6 @@ class FestEventRegistrationService
 
     public function assertSchoolMembershipApproved(Tenant $school): void
     {
-        abort_if(
-            $school->membership_status !== 'approved',
-            422,
-            'Your school\'s Sahodaya membership must be approved before fest registration.',
-        );
+        app(\App\Services\Membership\SchoolMembershipGate::class)->assertPaid($school);
     }
 }

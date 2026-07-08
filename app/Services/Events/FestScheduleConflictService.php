@@ -19,7 +19,7 @@ class FestScheduleConflictService
     {
         $schedules = FestSchedule::where('event_id', $this->event->id)
             ->whereNotNull('scheduled_at')
-            ->with(['item', 'participant.student', 'participant.registration'])
+            ->with(['item.head', 'participant.student', 'participant.registration'])
             ->get();
 
         $clashes = [];
@@ -71,6 +71,10 @@ class FestScheduleConflictService
                         'school_id'    => $entrySchoolId,
                         'event1'       => $s1->item?->title ?? "Item #{$s1->item_id}",
                         'event2'       => $s2->item?->title ?? "Item #{$s2->item_id}",
+                        'item1_id'     => $s1->item_id,
+                        'item2_id'     => $s2->item_id,
+                        'head1_id'     => $s1->item?->head_id,
+                        'head2_id'     => $s2->item?->head_id,
                         'time'         => $start1->format('d M H:i').' – '.$start2->format('d M H:i'),
                         'start_time1'  => $start1->timestamp,
                     ];
@@ -86,7 +90,7 @@ class FestScheduleConflictService
     {
         $schedules = FestSchedule::where('event_id', $this->event->id)
             ->whereNotNull('scheduled_at')
-            ->with(['item', 'festStage.venue'])
+            ->with(['item.head', 'festStage.venue'])
             ->get()
             ->filter(fn (FestSchedule $schedule) => $schedule->stage_id || filled($schedule->stage));
 
@@ -125,11 +129,15 @@ class FestScheduleConflictService
                 $seen[$pairKey] = true;
 
                 $conflicts[] = [
-                    'stage'  => $s1->festStage?->name ?? $s1->stage ?? 'Stage',
-                    'venue'  => $s1->festStage?->venue?->name,
-                    'item1'  => $s1->item?->title ?? "Item #{$s1->item_id}",
-                    'item2'  => $s2->item?->title ?? "Item #{$s2->item_id}",
-                    'time'   => $start1->format('d M H:i').' – '.$start2->format('d M H:i'),
+                    'stage'    => $s1->festStage?->name ?? $s1->stage ?? 'Stage',
+                    'venue'    => $s1->festStage?->venue?->name,
+                    'item1'    => $s1->item?->title ?? "Item #{$s1->item_id}",
+                    'item2'    => $s2->item?->title ?? "Item #{$s2->item_id}",
+                    'item1_id' => $s1->item_id,
+                    'item2_id' => $s2->item_id,
+                    'head1_id' => $s1->item?->head_id,
+                    'head2_id' => $s2->item?->head_id,
+                    'time'     => $start1->format('d M H:i').' – '.$start2->format('d M H:i'),
                 ];
             }
         }

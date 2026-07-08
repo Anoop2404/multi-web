@@ -3,8 +3,9 @@
         <PageHeader :title="`Fee summary — ${event.title}`" :eyebrow="programLabel"
                     description="Your school's event fee status and receipt.">
             <template #actions>
-                <Link :href="`${programBase}/reports`" class="btn-secondary text-sm">← Reports</Link>
-                <Link v-if="paymentsUrl" :href="paymentsUrl" class="btn-primary text-sm">Payments →</Link>
+                <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
+                <ReportDownloadButtons :xls-url="xlsUrl" />
+                <Link v-if="paymentsUrl" :href="paymentsUrl" class="btn-secondary text-sm">Payments →</Link>
             </template>
         </PageHeader>
 
@@ -33,6 +34,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 
 const props = defineProps({
@@ -42,6 +44,7 @@ const props = defineProps({
     event: Object,
     fee: Object,
     paymentsUrl: String,
+    xlsUrl: String,
 });
 const { programLabel, programBase } = useSchoolProgramContext(props);
 </script>

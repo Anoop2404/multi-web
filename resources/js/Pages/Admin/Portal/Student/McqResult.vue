@@ -14,6 +14,7 @@
                 <span v-if="mark.grade"> · Grade {{ mark.grade }}</span>
             </p>
             <p v-else-if="!showResults" class="text-sm text-amber-700">Results will appear here once published by the exam coordinator.</p>
+            <a v-if="certificateUrl" :href="certificateUrl" target="_blank" class="btn-secondary inline-block text-sm">Download certificate ↗</a>
             <ul v-if="showResults && mark?.answers_json?.length" class="text-sm divide-y">
                 <li v-for="(a, i) in mark.answers_json" :key="i" class="py-2 flex justify-between gap-2">
                     <span>Question #{{ i + 1 }}</span>
@@ -38,6 +39,7 @@ const props = defineProps({
     registration: Object,
     mark: Object,
     showResults: Boolean,
+    certificateUrl: { type: String, default: null },
 });
 
 const navItems = computed(() => studentPortalNavItems(props.school.id));

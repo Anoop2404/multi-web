@@ -23,7 +23,7 @@
                 </FormField>
                 <FormField label="Publish gates">
                     <div class="space-y-2">
-                        <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <label v-if="!isSports" class="flex items-center gap-2 text-sm text-slate-700">
                             <input type="checkbox" v-model="settingsForm.require_judge_scores_before_publish"> Require judge scores before publish
                         </label>
                         <label class="flex items-center gap-2 text-sm text-slate-700">
@@ -45,7 +45,7 @@
                     </template>
                 </FormField>
                 <div class="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                    Judge gate: {{ judgeGate.complete }}/{{ judgeGate.total }} items complete
+                    {{ isSports ? 'Mark entry progress' : 'Judge gate' }}: {{ judgeGate.complete }}/{{ judgeGate.total }} items complete
                 </div>
                 <button type="submit" class="btn-primary">Save locks & gates</button>
             </form>
@@ -56,8 +56,8 @@
 </template>
 
 <script setup>
-import { inject } from 'vue';
+import { computed, inject } from 'vue';
 
-const { settingsForm, judgeGate, saveSettings, backfillRegs } = inject('eventSettings');
+const { settingsForm, judgeGate, saveSettings, backfillRegs, event } = inject('eventSettings');
+const isSports = computed(() => event?.event_type === 'sports');
 </script>
-

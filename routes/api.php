@@ -28,8 +28,12 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::get('docs', [\App\Http\Controllers\Api\V1\ApiDocsController::class, 'index']);
 
+    Route::post('state/qualifiers/intake', [\App\Http\Controllers\Api\V1\State\StateQualifierIntakeController::class, 'store'])
+        ->middleware('throttle:60,1');
+
     Route::get('auth/login-branding', [AuthController::class, 'loginBranding']);
-    Route::post('auth/login', [AuthController::class, 'login']);
+    Route::post('auth/login', [AuthController::class, 'login'])
+        ->middleware('throttle:20,1');
 
     Route::get('public/school-register', [SchoolApplicationApiController::class, 'form']);
     Route::post('public/school-register/validate', [SchoolApplicationApiController::class, 'validateField']);
@@ -39,6 +43,14 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('auth/me', [AuthController::class, 'me']);
+
+        Route::prefix('masters')->group(function () {
+            Route::get('classes', [\App\Http\Controllers\Api\V1\MastersApiController::class, 'classes']);
+            Route::get('subjects', [\App\Http\Controllers\Api\V1\MastersApiController::class, 'subjects']);
+            Route::get('designations', [\App\Http\Controllers\Api\V1\MastersApiController::class, 'designations']);
+            Route::get('age-categories', [\App\Http\Controllers\Api\V1\MastersApiController::class, 'ageCategories']);
+            Route::get('teaching-types', [\App\Http\Controllers\Api\V1\MastersApiController::class, 'teachingTypes']);
+        });
 
         Route::get('notifications', [NotificationsApiController::class, 'index']);
         Route::post('notifications/{notification}/read', [NotificationsApiController::class, 'markRead']);
@@ -60,6 +72,9 @@ Route::prefix('v1')->group(function () {
                 Route::delete('students/{student}', [StudentApiController::class, 'destroy']);
                 Route::post('students/{student}/photo', [StudentApiController::class, 'uploadPhoto']);
                 Route::get('students/{student}/photo', [StudentApiController::class, 'showPhoto']);
+
+                Route::get('documents', [\App\Http\Controllers\Api\V1\School\SchoolDocumentApiController::class, 'index']);
+                Route::post('documents', [\App\Http\Controllers\Api\V1\School\SchoolDocumentApiController::class, 'store']);
 
                 Route::get('registration', [RegistrationApiController::class, 'index']);
                 Route::post('registration/begin', [RegistrationApiController::class, 'begin']);

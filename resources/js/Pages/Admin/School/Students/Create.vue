@@ -3,7 +3,7 @@
         <PageHeader title="Add Student" eyebrow="Students"
             description="Register a student with photo, class, gender, and date of birth.">
             <template #actions>
-                <Link :href="`/school-admin/${school.id}/students/bulk`" class="btn-secondary">Bulk add</Link>
+                <Link :href="`/school-admin/${school.id}/students?bulk=1`" class="btn-secondary">Bulk upload</Link>
                 <Link :href="`/school-admin/${school.id}/students`" class="btn-ghost">Back to list</Link>
             </template>
         </PageHeader>
@@ -17,7 +17,7 @@
             <form v-else @submit.prevent="submit" class="card space-y-5">
                 <p class="text-sm text-gray-500">
                     A Sahodaya registration number
-                    (<span class="font-mono text-xs">SAHODAYA/SCHOOL/YEAR/####</span>) is assigned automatically.
+                    (<span class="font-mono text-xs">STU/YY/####</span>) is assigned automatically.
                 </p>
 
                 <ProfilePhotoCropper v-model="photoFile" required />
@@ -53,17 +53,10 @@
                     </FormField>
                 </FormGrid>
 
-                <FormField label="Portal email">
+                <FormField label="Contact email">
                     <input v-model="form.email" type="email" class="field" placeholder="student@example.com (optional)">
                     <p v-if="form.errors.email" class="form-error">{{ form.errors.email }}</p>
-                </FormField>
-
-                <label class="flex items-center gap-2 text-sm">
-                    <input v-model="form.create_login" type="checkbox"> Create student portal login
-                </label>
-                <FormField v-if="form.create_login" label="Portal password" required>
-                    <input v-model="form.password" type="password" class="field" minlength="8" placeholder="Min 8 characters">
-                    <p v-if="form.errors.password" class="form-error">{{ form.errors.password }}</p>
+                    <p class="text-xs text-gray-500 mt-1">Portal login credentials are managed by your Sahodaya after verification.</p>
                 </FormField>
 
                 <p v-if="clientError" class="form-error">{{ clientError }}</p>
@@ -109,8 +102,6 @@ const form = useForm({
     gender:          '',
     dob:             '',
     email:           '',
-    create_login:    false,
-    password:        '',
     photo:           null,
 });
 

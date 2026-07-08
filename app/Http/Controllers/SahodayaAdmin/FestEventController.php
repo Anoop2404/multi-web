@@ -15,12 +15,14 @@ use App\Support\FestPageActivity;
 use App\Support\FestSportsAgeGroup;
 use App\Support\FestTeamSquadRules;
 use App\Support\FestClassGroupScheme;
+use App\Support\ProgramRouteMap;
 use App\Services\Events\FestEventNotifier;
 use App\Services\Events\FestCatalogService;
 use App\Services\Events\FestItemCatalogService;
 use App\Services\Events\FestQualificationService;
 use App\Services\Events\FestTaxonomyRegistry;
 use App\Models\FestItemHead;
+use App\Models\Tenant;
 use Illuminate\Http\Request;
 
 class FestEventController extends SahodayaAdminController
@@ -115,6 +117,34 @@ class FestEventController extends SahodayaAdminController
         $catalogService = app(FestCatalogService::class);
         $catalogService->ensureSeeded($this->sahodaya->id, $eventType);
 
+        // Singleton fest programs (Kalotsav, Sports, Kids/Teacher/English/Science Fest)
+        // are unique per Sahodaya per year: the program IS the event. Go straight into it,
+        // creating the single yearly hub event on first visit. Custom events keep a list.
+        if (FestEvent::isSingletonType($eventType) && ! $this->isStaff) {
+            $event = app(\App\Services\Events\FestPrimaryEventResolver::class)
+                ->resolveOrCreate($this->sahodaya, $eventType, $programs[$program]['label']);
+
+            return redirect(
+                $eventType === 'sports'
+                    ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup"
+                    : "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}"
+            );
+        }
+
+        if (FestEvent::isSingletonType($eventType)) {
+            // View-only staff: open the existing hub event if one exists, else fall through
+            // to the (read-only) program hub so nothing is created on a GET.
+            $event = app(\App\Services\Events\FestPrimaryEventResolver::class)
+                ->resolve($this->sahodaya->id, $eventType);
+            if ($event) {
+                return redirect(
+                    $eventType === 'sports'
+                        ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup"
+                        : "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}"
+                );
+            }
+        }
+
         $events = FestEvent::forTenant($this->sahodaya->id)
             ->ofType($eventType)
             ->withCount(['items', 'registrations'])
@@ -161,6 +191,19 @@ class FestEventController extends SahodayaAdminController
         $levelRound = $data['level_round'] ?? 'sahodaya';
         $eventType = $data['event_type'];
 
+        // Enforce one primary hub event per Sahodaya per year for singleton fest types.
+        if ($levelRound === 'sahodaya' && FestEvent::isSingletonType($eventType)) {
+            $existing = app(\App\Services\Events\FestPrimaryEventResolver::class)
+                ->resolve($this->sahodaya->id, $eventType);
+            if ($existing) {
+                return redirect(
+                    $eventType === 'sports'
+                        ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$existing->id}/setup"
+                        : "/sahodaya-admin/{$this->sahodaya->id}/events/{$existing->id}"
+                )->with('info', "There is already a {$this->eventTypes()[$eventType]} for this year. Only one is allowed per Sahodaya each academic year.");
+            }
+        }
+
         $conductLevels = FestConductLevels::normalize(
             $data['conduct_levels'] ?? [$levelRound],
             $eventType
@@ -191,13 +234,21 @@ class FestEventController extends SahodayaAdminController
             "Event created: {$event->title}",
         );
 
-        return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}")
+        return redirect(
+            $event->event_type === 'sports'
+                ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup"
+                : "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}"
+        )
             ->with('success', "Event \"{$event->title}\" created.");
     }
 
     public function show(string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        if ($event->event_type === 'sports' && ! request()->boolean('overview')) {
+            return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup");
+        }
 
         $event->load(['academicYear', 'childEvents', 'parentEvent']);
         $ctx = $this->eventPageContext($event);
@@ -244,9 +295,28 @@ class FestEventController extends SahodayaAdminController
 
         $event->load(['childEvents', 'parentEvent']);
         $ctx = $this->eventPageContext($event);
+        $partitionService = app(\App\Services\Events\FestPartitionService::class);
+        $schoolPartitionService = app(\App\Services\Events\FestSchoolPartitionService::class);
+
+        $memberSchools = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return $this->inertia('Sahodaya/Events/Levels', $ctx + [
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::LEVELS),
+            'conductMode' => $partitionService->conductMode($event),
+            'isPartitionedHub' => $partitionService->isPartitionedHub($event),
+            'partitions' => $partitionService->partitions($event)->map(fn ($p) => [
+                'id' => $p->id,
+                'title' => $p->title,
+                'partition_key' => $p->partition_key ?? $p->cluster_key,
+                'partition_role' => $p->partition_role ?? 'cluster',
+                'cluster_label' => $p->cluster_label,
+            ])->values(),
+            'conductPresets' => array_keys(config('fest_conduct_presets', [])),
+            'memberSchools' => $memberSchools,
+            'schoolPartitions' => $schoolPartitionService->assignmentsForHub($event),
         ]);
     }
 
@@ -378,6 +448,88 @@ class FestEventController extends SahodayaAdminController
 
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$child->id}")
             ->with('success', 'Cluster event created.');
+    }
+
+    public function spawnPartition(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'title'          => 'required|string|max:255',
+            'partition_key'  => 'nullable|string|max:64',
+            'cluster_key'    => 'nullable|string|max:64',
+            'cluster_label'  => 'nullable|string|max:255',
+            'partition_role' => 'nullable|in:region,finale,cluster,digi_fest',
+            'venue'          => 'nullable|string|max:255',
+            'event_start'    => 'nullable|date',
+            'event_end'      => 'nullable|date',
+        ]);
+
+        $child = app(\App\Services\Events\FestPartitionService::class)->spawnPartition($event, $data);
+
+        $audit->festEvent($event, FestPageActivity::LEVELS, 'fest.levels.partition_spawned', "Partition created: {$child->title}", [
+            'child_event_id' => $child->id,
+            'partition_key'  => $child->partition_key ?? $child->cluster_key,
+        ]);
+
+        return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$child->id}")
+            ->with('success', 'Partition event created.');
+    }
+
+    public function applyConductPreset(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'preset' => 'required|string|in:mcs_kalotsav',
+        ]);
+
+        $created = app(\App\Services\Events\FestPartitionService::class)
+            ->spawnFromPreset($event, $data['preset']);
+
+        $audit->festEvent($event, FestPageActivity::LEVELS, 'fest.levels.preset_applied', "Conduct preset applied: {$data['preset']}", [
+            'preset' => $data['preset'],
+            'count'  => count($created),
+        ]);
+
+        return back()->with('success', count($created).' partition(s) created from preset.');
+    }
+
+    public function assignSchoolPartitions(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'assignments'               => 'required|array',
+            'assignments.*.school_id'   => 'required|string',
+            'assignments.*.partition_key' => 'required|string|max:64',
+        ]);
+
+        $service = app(\App\Services\Events\FestSchoolPartitionService::class);
+        $map = [];
+        foreach ($data['assignments'] as $row) {
+            $map[$row['school_id']] = $row['partition_key'];
+        }
+
+        $count = $service->bulkAssign($event, $map, $request->user()?->id);
+
+        $audit->festEvent($event, FestPageActivity::LEVELS, 'fest.levels.partitions_assigned', "Assigned {$count} school partition(s)");
+
+        return back()->with('success', "{$count} school region assignment(s) saved.");
+    }
+
+    public function syncRegionPartitions(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $result = app(\App\Services\Events\FestRegionPartitionService::class)
+            ->syncPartitionsFromRegions($event);
+
+        $audit->festEvent($event, FestPageActivity::LEVELS, 'fest.levels.regions_synced',
+            'Kalotsav partitions synced from membership regions', $result);
+
+        return back()->with('success',
+            "{$result['partitions_created']} region partition(s) created, {$result['schools_assigned']} school assignment(s) synced.");
     }
 
     public function spawnSchoolRounds(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
@@ -630,7 +782,7 @@ class FestEventController extends SahodayaAdminController
                 ->forEvent($event->id)
                 ->whereNull('parent_id')
                 ->orderBy('sort_order')
-                ->get(['id', 'name', 'sport_discipline'])
+                ->get(['id', 'name', 'sport_discipline', 'is_team_heading'])
                 ->all();
         }
 
@@ -643,11 +795,11 @@ class FestEventController extends SahodayaAdminController
             'classGroupScheme' => $classGroupScheme,
             'classGroupSchemeOptions' => FestClassGroupScheme::options(),
             'catalogSummary' => $catalogSummary,
-            'catalogUrl'    => "/sahodaya-admin/{$this->sahodaya->id}/programs/{$program}/catalog/assign",
+            'catalogUrl'    => ProgramRouteMap::sahodayaCatalogBase($this->sahodaya->id, $program).'/assign',
             'levelLabels'   => FestEvent::levelLabels(),
             'schoolRoundCount'=> $event->childEvents()->where('level_round', 'school')->count(),
             'academicYearOptions' => \App\Models\AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
-            'sportsAgeGroupsUrl' => "/sahodaya-admin/{$this->sahodaya->id}/sports-age-groups",
+            'sportsAgeGroupsUrl' => "/sahodaya-admin/{$this->sahodaya->id}/sports/age-groups",
             'itemsByLevel'  => [
                 'state'    => $event->items->where('owner_level', 'state')->values(),
                 'sahodaya' => $event->items->where('owner_level', 'sahodaya')->values(),
@@ -710,5 +862,19 @@ class FestEventController extends SahodayaAdminController
             'science_fest' => 'Science Fest',
             'custom'       => 'Custom',
         ];
+    }
+
+    public function toggleNavHidden(FestEvent $event)
+    {
+        abort_unless($event->tenant_id === $this->sahodaya->id, 404);
+
+        $event->update(['nav_hidden' => ! $event->nav_hidden]);
+
+        return back()->with(
+            'success',
+            $event->nav_hidden
+                ? "'{$event->title}' hidden from sidebar navigation."
+                : "'{$event->title}' shown in sidebar navigation.",
+        );
     }
 }

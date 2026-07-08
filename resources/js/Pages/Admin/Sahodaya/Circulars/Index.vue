@@ -101,14 +101,14 @@
             <EmptyState v-if="!filtered.length" title="No circulars"
                         :description="searchQuery.trim() ? 'Try another search term.' : 'Upload a circular using the form above.'"
                         icon="📄" class="p-10" />
-            <div v-else class="overflow-x-auto">
-                <table class="data-table min-w-[640px]">
+            <div v-else class="hidden md:block overflow-x-auto">
+                <table class="data-table w-full min-w-0">
                     <thead>
                         <tr>
                             <th>Title</th>
                             <th class="hidden sm:table-cell">Number</th>
                             <th>Category</th>
-                            <th class="hidden md:table-cell">Date</th>
+                            <th class="hidden lg:table-cell">Date</th>
                             <th class="hidden lg:table-cell">Ack</th>
                             <th class="w-28 text-right"></th>
                         </tr>
@@ -125,7 +125,7 @@
                                     {{ c.category || 'General' }}
                                 </span>
                             </td>
-                            <td class="hidden md:table-cell text-xs text-slate-500">
+                            <td class="hidden lg:table-cell text-xs text-slate-500">
                                 {{ c.issued_date ? new Date(c.issued_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' }}
                             </td>
                             <td class="hidden lg:table-cell text-xs">
@@ -140,6 +140,26 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div v-if="filtered.length" class="md:hidden divide-y divide-slate-100">
+                <article v-for="c in filtered" :key="`m-${c.id}`" class="p-4 space-y-2">
+                    <div class="flex items-start justify-between gap-3">
+                        <p class="font-medium text-slate-900">{{ c.title }}</p>
+                        <span class="text-[11px] font-semibold px-2 py-1 rounded-full shrink-0"
+                              :class="categoryColors[c.category] ?? 'bg-slate-100 text-slate-600'">
+                            {{ c.category || 'General' }}
+                        </span>
+                    </div>
+                    <p v-if="c.circular_number" class="text-xs font-mono text-slate-500">{{ c.circular_number }}</p>
+                    <p class="text-xs text-slate-500">
+                        {{ c.issued_date ? new Date(c.issued_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'No date' }}
+                        · Ack {{ c.ack_count ?? 0 }}/{{ c.school_count ?? 0 }}
+                    </p>
+                    <div class="flex gap-3 pt-1">
+                        <a :href="c.file_path" target="_blank" rel="noopener" class="link-brand text-xs">View</a>
+                        <button type="button" @click="remove(c)" class="text-xs text-red-600 hover:text-red-800">Delete</button>
+                    </div>
+                </article>
             </div>
         </div>
         </div>

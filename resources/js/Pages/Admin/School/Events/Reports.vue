@@ -1,42 +1,90 @@
 <template>
     <SchoolAdminLayout :title="`Event Reports`" :school="school" :show-header-title="false">
-        <PageHeader :title="`${programLabel} reports`" :eyebrow="programLabel"
-                    description="Participation, student-wise, item-wise reports and admit cards per event." />
+        <div class="reports-shell">
+            <PageHeader :title="`${programLabel} reports`" :eyebrow="programLabel"
+                        description="Pick an event, then browse every report with search and filters — preview on screen or download exports." />
 
+            <div v-if="events.length" class="space-y-4">
+                <article v-for="ev in events" :key="ev.id" class="reports-event-card">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <h3 class="text-lg font-bold text-slate-900">{{ ev.title }}</h3>
+                            <p v-if="ev.event_dates_label" class="text-sm text-slate-600 mt-0.5">{{ ev.event_dates_label }}</p>
+                            <p v-else-if="ev.event_start" class="text-sm text-slate-500 mt-0.5">{{ formatDate(ev.event_start) }}</p>
+                            <p v-else class="text-sm text-amber-600 mt-0.5">Fest dates not set</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2 shrink-0">
+                            <span class="status-pill text-[10px] capitalize">{{ ev.status?.replace(/_/g, ' ') }}</span>
+                            <span v-if="ev.results_published" class="status-pill status-pill--published text-[10px]">Results out</span>
+                            <span v-else class="status-pill text-[10px]">Results pending</span>
+                            <span v-if="ev.schedule_published" class="status-pill text-[10px] bg-sky-50 text-sky-800 border-sky-200">Schedule live</span>
+                        </div>
+                    </div>
 
-        <p class="text-sm text-gray-500 mb-4">{{ programLabel }} reports for your school</p>
-        <ul class="card-list">
-            <li v-for="ev in events" :key="ev.id" class="p-4">
-                <p class="font-medium">{{ ev.title }} <span class="text-xs text-gray-400">({{ ev.status }})</span></p>
-                <div class="flex flex-wrap gap-2 mt-2 text-xs">
-                    <a :href="`${programBase}/reports/${ev.id}/participation`" class="text-indigo-600 font-semibold">Participation</a>
-                    <a :href="`${programBase}/reports/${ev.id}/registration-register`" class="text-indigo-600 font-semibold">Reg & fees register</a>
-                    <a :href="`${programBase}/reports/${ev.id}/fee-summary`" class="text-indigo-600 font-semibold">Fee summary</a>
-                    <a :href="`${programBase}/reports/${ev.id}/id-cards`" class="text-indigo-600 font-semibold">ID cards</a>
-                    <a :href="`${programBase}/reports/${ev.id}/student-wise`" class="text-indigo-600 font-semibold">Student-wise</a>
-                    <a v-if="programSlug === 'teacher-fest'" :href="`${programBase}/reports/${ev.id}/teacher-wise`" class="text-indigo-600 font-semibold">Teacher-wise</a>
-                    <a :href="`${programBase}/reports/${ev.id}/item-wise`" class="text-indigo-600 font-semibold">Item-wise</a>
-                    <a :href="`${programBase}/reports/${ev.id}/discipline-participation`" class="text-indigo-600 font-semibold">Discipline</a>
-                    <a :href="`${programBase}/reports/${ev.id}/schedule-clashes`" class="text-indigo-600 font-semibold">Clashes</a>
-                    <a :href="`${programBase}/reports/${ev.id}/mark-entry-status`" class="text-indigo-600 font-semibold">Mark status</a>
-                    <a :href="`${programBase}/reports/${ev.id}/results-summary`" class="text-indigo-600 font-semibold">Results</a>
-                    <a :href="`${programBase}/reports/${ev.id}/group-roster`" target="_blank" class="text-indigo-600 font-semibold">Group roster PDF</a>
-                    <a :href="`${programBase}/reports/${ev.id}/attendance-sheet`" target="_blank" class="text-indigo-600 font-semibold">Attendance PDF</a>
-                    <a :href="`${programBase}/reports/${ev.id}/student-wise/export`" class="text-indigo-600 font-semibold">Student CSV</a>
-                    <a v-if="programSlug === 'teacher-fest'" :href="`${programBase}/reports/${ev.id}/teacher-wise/export`" class="text-indigo-600 font-semibold">Teacher CSV</a>
-                    <a :href="`${programBase}/reports/${ev.id}/item-wise/export`" class="text-indigo-600 font-semibold">Item CSV</a>
-                    <a :href="`${programBase}/reports/${ev.id}/admit-cards`" target="_blank" class="text-indigo-600 font-semibold">Admit cards PDF</a>
-                </div>
-            </li>
-            <li v-if="!events.length" class="p-6 text-center text-gray-400">No events yet.</li>
-        </ul>
+                    <p class="mt-3 text-sm text-slate-600">
+                        {{ reportCount }} reports available
+                        <span class="text-slate-400">·</span>
+                        {{ categoryPreview }}
+                    </p>
+
+                    <div class="mt-4 flex flex-wrap items-center gap-2">
+                        <Link :href="hubHref(ev)" class="btn-primary text-sm">
+                            View all reports →
+                        </Link>
+                        <Link v-if="isSports" :href="`${programBase}/registration?event=${ev.id}`" class="btn-secondary text-xs !min-h-0">
+                            Step 1 · Event registration
+                        </Link>
+                        <Link v-if="isSports" :href="`${programBase}/events/${ev.id}/items`" class="btn-secondary text-xs !min-h-0">
+                            Step 2 · Register by item head
+                        </Link>
+                    </div>
+                </article>
+            </div>
+
+            <EmptyState v-else title="No events yet" description="Events will appear here once Sahodaya publishes them for your program." icon="📊" />
+        </div>
     </SchoolAdminLayout>
 </template>
 
 <script setup>
+import { computed } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
+import {
+    REPORT_CATEGORIES,
+    REPORT_CATEGORY_ORDER,
+    schoolReportsForProgram,
+} from '@/support/festReportCatalog.js';
 
-const props = defineProps({ school: Object, program: [String, Object], programMeta: { type: Object, default: null }, events: Array });
+const props = defineProps({
+    school: Object,
+    program: [String, Object],
+    programMeta: { type: Object, default: null },
+    events: Array,
+});
+
 const { programSlug, programLabel, programBase } = useSchoolProgramContext(props);
+
+const isSports = computed(() => props.programMeta?.eventType === 'sports' || programSlug.value === 'sports-meet');
+
+const allReports = computed(() => schoolReportsForProgram(programSlug.value));
+
+const reportCount = computed(() => allReports.value.length);
+
+const categoryPreview = computed(() =>
+    REPORT_CATEGORY_ORDER
+        .filter((key) => allReports.value.some((r) => r.category === key))
+        .map((key) => REPORT_CATEGORIES[key]?.label ?? key)
+        .join(' · '),
+);
+
+function hubHref(ev) {
+    return `${programBase.value}/reports/${ev.id}`;
+}
+
+function formatDate(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
 </script>

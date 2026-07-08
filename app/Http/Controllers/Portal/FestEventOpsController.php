@@ -8,6 +8,7 @@ use App\Models\FestAppeal;
 use App\Models\FestAttendance;
 use App\Models\FestCateringOrder;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestEventStaff;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
@@ -26,6 +27,10 @@ use App\Services\Events\FestPublicVisibilityService;
 use App\Services\Events\FestReportService;
 use App\Services\Events\FestParticipantLookupService;
 use App\Services\Events\EventLifecycleGate;
+use App\Services\Events\FestMarkEntryScopeService;
+use App\Services\Events\FestRankPointService;
+use App\Services\Events\FestSportsAutoRankService;
+use App\Services\Events\PortalEventHeadNavService;
 use Illuminate\Http\Request;
 
 class FestEventOpsController extends Controller
@@ -98,20 +103,31 @@ class FestEventOpsController extends Controller
         $this->authorizeDuty($request, $event->id, 'registration');
 
         $registrations = FestRegistration::where('event_id', $event->id)
-            ->with(['item', 'participants.student', 'participants.teacher'])
+            ->with(['item.head', 'participants.student', 'participants.teacher'])
             ->latest()
-            ->get();
+            ->get()
+            ->filter(fn (FestRegistration $reg) => $this->registrationVisibleToUser($request, $event, $reg))
+            ->values();
+
+        $headNav = app(PortalEventHeadNavService::class);
+        $headContext = $headNav->context($event, $request);
+        $registrations = $headNav->filterRegistrations(
+            $registrations,
+            $headContext['selectedHeadId'],
+            $headContext['selectedItemId'],
+        );
 
         $schools = Tenant::where('parent_id', $tenantId)->pluck('name', 'id');
         $feeRequired = app(FestSchoolEventFeeService::class)->feeRequired($event);
 
         return inertia('Portal/FestOps/Registrations', [
             'sahodaya'      => Tenant::findOrFail($tenantId)->only('id', 'name'),
-            'event'         => $event->only('id', 'title'),
+            'event'         => $event->only('id', 'title', 'event_type'),
             'registrations' => $registrations,
             'schools'       => $schools,
             'feeRequired'   => $feeRequired,
             'duties'        => $this->userDuties($request, $tenantId, $event->id),
+            ...$headContext,
         ]);
     }
 
@@ -459,7 +475,12 @@ class FestEventOpsController extends Controller
     public function storeAttendance(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $tenantId, 403);
-        $this->authorizeDuty($request, $event->id, 'attendance');
+
+        if ($event->event_type === 'sports') {
+            $this->authorizeDutyAny($request, $event->id, ['attendance', 'marks']);
+        } else {
+            $this->authorizeDuty($request, $event->id, 'attendance');
+        }
 
         $data = $request->validate([
             'item_id'        => 'required|exists:fest_event_items,id',
@@ -563,19 +584,51 @@ class FestEventOpsController extends Controller
         $this->authorizeDuty($request, $event->id, 'marks');
 
         $event->load('items');
-        $registrations = FestRegistration::where('event_id', $event->id)
-            ->where('status', 'approved')
-            ->with(['item', 'participants.student', 'participants.teacher'])
-            ->get();
-        $marks = \App\Models\FestMark::where('event_id', $event->id)->get()->keyBy('participant_id');
+        $scope = app(FestMarkEntryScopeService::class);
+        $registrations = $scope->scopedRegistrations($event, $request->user());
+        $marks = $scope->officialMarks($event);
+
+        $headNav = app(PortalEventHeadNavService::class);
+        $headContext = $headNav->context($event, $request);
+        $registrations = $headNav->filterRegistrations(
+            $registrations,
+            $headContext['selectedHeadId'],
+            $headContext['selectedItemId'],
+        );
+
+        $attendance = FestAttendance::where('event_id', $event->id)
+            ->get()
+            ->mapWithKeys(fn (FestAttendance $row) => [
+                "{$row->item_id}-{$row->participant_id}" => ['status' => $row->status],
+            ])
+            ->all();
 
         return inertia('Portal/FestCoordinator/MarkEntry', [
             'sahodaya'      => Tenant::find($tenantId)?->only('id', 'name'),
             'event'         => $event,
             'registrations' => $registrations,
             'marks'         => $marks,
+            'attendance'    => $attendance,
+            'rankPoints'    => $event->event_type === 'sports'
+                ? app(FestRankPointService::class)->listForEvent($event)
+                : [],
             'festOpsBase'   => "/portal/fest-ops/{$tenantId}/events/{$event->id}",
+            ...$headContext,
         ]);
+    }
+
+    public function autoRankItem(Request $request, string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)
+    {
+        abort_if($event->tenant_id !== $tenantId, 403);
+        $this->authorizeDuty($request, $event->id, 'marks');
+        abort_if($item->event_id !== $event->id, 404);
+        abort_unless($event->event_type === 'sports', 422, 'Auto-rank applies to sports events only.');
+
+        app(FestMarkEntryScopeService::class)->assertCanEnterMark($request->user(), $event, $item->id);
+
+        $result = $ranker->rankItem($event, $item);
+
+        return back()->with('success', "Auto-ranked {$result['ranked']} athlete(s) for {$result['item_title']}.");
     }
 
     public function storeMark(Request $request, string $tenantId, FestEvent $event, \App\Services\Events\FestMarkSaveService $markSave)
@@ -594,6 +647,8 @@ class FestEventOpsController extends Controller
             'measurement_value' => 'nullable|string|max:50',
             'measurement_unit'  => 'nullable|string|max:20',
         ]);
+
+        app(FestMarkEntryScopeService::class)->assertCanEnterMark($request->user(), $event, (int) $data['item_id']);
 
         $result = $markSave->save($event, $data, $request->user()->id);
 
@@ -687,6 +742,22 @@ class FestEventOpsController extends Controller
         abort_unless($has, 403);
     }
 
+    /** @param  list<string>  $duties */
+    private function authorizeDutyAny(Request $request, int $eventId, array $duties): void
+    {
+        $user = $request->user();
+        if ($user->isSuperAdmin() || $user->hasRole('sahodaya_admin')) {
+            return;
+        }
+
+        $has = FestEventStaff::where('event_id', $eventId)
+            ->where('user_id', $user->id)
+            ->whereIn('duty', $duties)
+            ->exists();
+
+        abort_unless($has, 403);
+    }
+
     private function assignmentsFor($user, string $tenantId)
     {
         if ($user->isSuperAdmin() || ($user->hasRole('sahodaya_admin') && $user->tenant_id === $tenantId)) {
@@ -705,5 +776,14 @@ class FestEventOpsController extends Controller
             ->unique()
             ->values()
             ->all();
+    }
+
+    private function registrationVisibleToUser(Request $request, FestEvent $event, FestRegistration $registration): bool
+    {
+        return app(FestMarkEntryScopeService::class)->userCanAccessRegistration(
+            $request->user(),
+            $event,
+            $registration,
+        );
     }
 }

@@ -66,7 +66,7 @@ class AuditTrailTest extends TestCase
 
     public function test_upload_backup_stores_private_copy(): void
     {
-        Storage::fake('local');
+        Storage::fake('shared');
 
         ['school' => $school] = $this->schoolWithClass();
         $file = UploadedFile::fake()->create('students.csv', 10, 'text/csv');
@@ -83,7 +83,7 @@ class AuditTrailTest extends TestCase
             'purpose'      => 'student_import',
             'original_name'=> 'students.csv',
         ]);
-        Storage::disk('local')->assertExists($backup->storage_path);
+        Storage::disk($backup->storage_disk)->assertExists($backup->storage_path);
     }
 
     public function test_student_import_creates_backup_and_log(): void

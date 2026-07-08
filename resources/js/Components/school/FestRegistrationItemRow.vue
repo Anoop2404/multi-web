@@ -11,6 +11,7 @@
                 </span>
             </div>
             <p v-if="item.squad_summary" class="text-[11px] text-indigo-600 mt-0.5">{{ item.squad_summary }}</p>
+            <p v-if="item.competition_line" class="text-[11px] text-slate-500 mt-0.5">Event: {{ item.competition_line }}</p>
             <p v-if="statusHint && !blockReason" class="text-[11px] text-indigo-600 mt-0.5">{{ statusHint }}</p>
             <p v-if="blockReason" class="text-[11px] text-amber-700 mt-0.5">{{ blockReason }}</p>
             <p v-if="errorMessage" class="text-[11px] text-red-600 mt-0.5 font-medium">{{ errorMessage }}</p>
@@ -256,6 +257,8 @@ const standbyEntries = computed(() => {
             meta: props.studentLabel(student),
             eligible,
             reason: eligible ? null : (props.studentIneligibilityReason?.(student) ?? 'Not eligible'),
+            eventRegistered: !!(student.event_registered || student.event_registration_number),
+            eventRegNumber: student.event_registration_number || null,
         };
     });
 });
@@ -272,6 +275,8 @@ const rosterEntries = computed(() => {
             meta: props.studentLabel(student),
             eligible,
             reason,
+            eventRegistered: !!(student.event_registered || student.event_registration_number),
+            eventRegNumber: student.event_registration_number || null,
         };
     });
 });

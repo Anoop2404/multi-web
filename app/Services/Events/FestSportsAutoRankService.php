@@ -2,6 +2,7 @@
 
 namespace App\Services\Events;
 
+use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
@@ -15,10 +16,17 @@ class FestSportsAutoRankService
         abort_unless($event->event_type === 'sports', 422, 'Auto-rank applies to sports events only.');
         abort_if($item->event_id !== $event->id, 404);
 
+        $absentParticipantIds = FestAttendance::query()
+            ->where('event_id', $event->id)
+            ->where('item_id', $item->id)
+            ->where('status', 'absent')
+            ->pluck('participant_id');
+
         $marks = FestMark::where('event_id', $event->id)
             ->where('item_id', $item->id)
             ->whereNotNull('measurement_value')
             ->where('measurement_value', '!=', '')
+            ->when($absentParticipantIds->isNotEmpty(), fn ($q) => $q->whereNotIn('participant_id', $absentParticipantIds))
             ->get();
 
         if ($marks->isEmpty()) {
@@ -48,6 +56,8 @@ class FestSportsAutoRankService
         $position = 0;
         $lastValue = null;
         $lastAssigned = 0;
+        $rankPointService = app(FestRankPointService::class);
+        $isGroup = in_array($item->participant_type, ['group', 'team'], true);
 
         foreach ($sorted as $mark) {
             $value = $this->parseNumeric((string) $mark->measurement_value);
@@ -61,7 +71,12 @@ class FestSportsAutoRankService
                 $lastValue = $value;
             }
 
-            $mark->update(['position' => $lastAssigned]);
+            $points = $rankPointService->pointsForRank($event, $lastAssigned, $isGroup);
+
+            $mark->update([
+                'position' => $lastAssigned,
+                'score'    => $points > 0 ? $points : null,
+            ]);
         }
 
         EventContext::for($event)->recalculateSchoolPoints();

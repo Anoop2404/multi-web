@@ -1,46 +1,59 @@
 <template>
-    <nav class="mb-6 space-y-3 border-b border-slate-200 pb-4">
-        <div class="flex flex-wrap items-center gap-2">
-            <Link :href="`${base}/reports`"
-                  :class="active === 'hub' ? 'subnav-link subnav-link--active' : 'subnav-link'">
-                Overview
+    <div class="mb-6 space-y-4">
+        <nav class="reports-tabs" aria-label="Reports navigation">
+            <Link v-if="isSports" :href="`${base}/reports/by-head`"
+                  class="reports-tab"
+                  :class="{ 'reports-tab--active': active === 'by-head' }">
+                <span aria-hidden="true">📂</span> By item head
+            </Link>
+            <Link :href="`${base}/reports${isSports ? '?all=1' : ''}`"
+                  class="reports-tab"
+                  :class="{ 'reports-tab--active': active === 'hub' }">
+                <span aria-hidden="true">📊</span> {{ isSports ? 'All types' : 'Overview' }}
             </Link>
             <Link v-for="phase in phases" :key="phase.key"
                   :href="`${base}/reports/downloads/${phase.key}`"
-                  :class="active === phase.key ? 'subnav-link subnav-link--active' : 'subnav-link'">
-                {{ phase.label }}
+                  class="reports-tab"
+                  :class="{
+                      'reports-tab--active': active === phase.key,
+                      'reports-tab--locked': !isPhaseAllowed(phase.key),
+                  }"
+                  @click="!isPhaseAllowed(phase.key) && $event.preventDefault()">
+                <span aria-hidden="true">{{ phase.icon }}</span>
+                {{ phase.shortLabel }}
             </Link>
-        </div>
-        <div v-if="navItems.length" class="flex flex-wrap gap-2">
-            <Link v-for="report in navItems" :key="report.id"
-                  :href="report.href"
-                  :class="active === report.id ? 'subnav-link subnav-link--active' : 'subnav-link'">
-                {{ report.label }}
-            </Link>
-        </div>
-    </nav>
+        </nav>
+
+        <FestEventMetaBar v-if="eventMeta && active !== 'hub' && active !== 'by-head'" :meta="eventMeta" compact />
+
+        <Link v-if="active !== 'hub' && active !== 'by-head'"
+              :href="isSports ? `${base}/reports/by-head` : `${base}/reports`"
+              class="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-indigo-600">
+            ← {{ isSports ? 'Reports by item head' : 'All report types' }}
+        </Link>
+    </div>
 </template>
 
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import FestEventMetaBar from '@/Components/reports/FestEventMetaBar.vue';
+import { REPORT_PHASES } from '@/support/festReportCatalog.js';
 
 const props = defineProps({
     sahodayaId: { type: [String, Number], required: true },
     eventId: { type: [String, Number], required: true },
     active: { type: String, default: 'hub' },
-    interactiveNav: { type: Array, default: null },
 });
 
 const page = usePage();
-
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}`);
+const eventMeta = computed(() => page.props.eventMeta ?? null);
+const allowedPhases = computed(() => page.props.allowedPhases ?? ['before']);
+const isSports = computed(() => page.props.event?.event_type === 'sports');
+const phases = REPORT_PHASES.map((p) => ({ ...p, shortLabel: p.label.replace(' event', '') }));
 
-const navItems = computed(() => props.interactiveNav ?? page.props.interactiveNav ?? []);
-
-const phases = [
-    { key: 'before', label: 'Before event' },
-    { key: 'during', label: 'During event' },
-    { key: 'after', label: 'After event' },
-];
+function isPhaseAllowed(key) {
+    return allowedPhases.value.includes(key);
+}
 </script>

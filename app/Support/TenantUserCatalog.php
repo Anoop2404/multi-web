@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\User;
+
 class TenantUserCatalog
 {
     /** @return list<string> */
@@ -20,6 +22,7 @@ class TenantUserCatalog
             'exam_controller',
             'exam_staff',
             'fest_ops',
+            'school_principal',
         ];
     }
 
@@ -29,6 +32,11 @@ class TenantUserCatalog
         return [
             'school_staff',
             'school_event_coordinator',
+            'school_finance_coordinator',
+            'school_training_coordinator',
+            'school_mcq_coordinator',
+            'school_kalotsavam_coordinator',
+            'school_sports_coordinator',
             'group_admin',
             'house_admin',
         ];
@@ -38,7 +46,7 @@ class TenantUserCatalog
     /** @return list<string> */
     public static function schoolAdminCreatableRoles(): array
     {
-        return ['school_event_coordinator', 'school_staff', 'group_admin', 'house_admin'];
+        return ['school_event_coordinator', 'school_sports_coordinator', 'school_kalotsavam_coordinator', 'school_mcq_coordinator', 'school_training_coordinator', 'school_finance_coordinator', 'school_staff', 'group_admin', 'house_admin'];
     }
 
     /** Roles a vice principal may create. */
@@ -52,7 +60,7 @@ class TenantUserCatalog
     /** @return list<string> */
     public static function schoolPrincipalCreatableRoles(): array
     {
-        return ['school_admin', 'school_vice_principal', 'school_event_coordinator', 'school_staff', 'group_admin', 'house_admin'];
+        return ['school_admin', 'school_vice_principal', 'school_event_coordinator', 'school_sports_coordinator', 'school_kalotsavam_coordinator', 'school_mcq_coordinator', 'school_training_coordinator', 'school_finance_coordinator', 'school_staff', 'group_admin', 'house_admin'];
     }
 
     /** @return list<string> */
@@ -77,19 +85,33 @@ class TenantUserCatalog
         return ['school_principal', 'school_vice_principal', 'school_admin'];
     }
 
+    /** School roles subject to Spatie write-permission checks (non-leadership). */
+    /** @return list<string> */
+    public static function schoolWriteGatedRoles(): array
+    {
+        return ['school_staff', 'group_admin', 'house_admin'];
+    }
+
+    /** Event coordinators manage assigned fest/MCQ routes — not read-only staff. */
+    /** @return list<string> */
+    public static function schoolEventCoordinatorRoles(): array
+    {
+        return ['school_event_coordinator'];
+    }
+
     /** @return list<string> */
     public static function schoolPanelRoles(): array
     {
         return [
             'school_principal', 'school_vice_principal', 'school_admin',
-            'school_staff', 'school_event_coordinator', 'group_admin', 'house_admin',
+            'school_staff', 'school_event_coordinator', 'school_sports_coordinator', 'school_kalotsavam_coordinator', 'school_mcq_coordinator', 'school_training_coordinator', 'school_finance_coordinator', 'group_admin', 'house_admin',
         ];
     }
 
     /** @return list<string> */
     public static function festEventDuties(): array
     {
-        return ['coordinator', 'stage', 'registration', 'attendance', 'food', 'appeals', 'certificates', 'marks', 'discipline'];
+        return ['coordinator', 'stage', 'registration', 'attendance', 'food', 'appeals', 'certificates', 'marks', 'discipline', 'admit_cards'];
     }
 
     /** @return array<string, string> */
@@ -117,6 +139,20 @@ class TenantUserCatalog
         ];
     }
 
+    /** @return list<string> */
+    public static function sportsFestEventDuties(): array
+    {
+        return ['coordinator', 'registration', 'attendance', 'appeals', 'marks', 'certificates', 'admit_cards', 'food'];
+    }
+
+    /** @return array<string, string> */
+    public static function sportsDutyLabels(): array
+    {
+        return array_merge(self::dutyLabels(), [
+            'marks' => 'Item head coordinator',
+        ]);
+    }
+
     /** @return array<string, string> */
     public static function dutyLabels(): array
     {
@@ -130,6 +166,7 @@ class TenantUserCatalog
             'certificates' => 'Certificates',
             'marks'        => 'Mark entry coordinator',
             'discipline'   => 'Discipline / item head admin',
+            'admit_cards'  => 'Admit cards desk',
         ];
     }
 
@@ -220,6 +257,26 @@ class TenantUserCatalog
             return ['fest.view', 'fest.manage', 'mcq.view', 'mcq.manage'];
         }
 
+        if ($tenantType === 'school' && $role === 'school_sports_coordinator') {
+            return ['fest.view', 'fest.manage', 'fest.registrations'];
+        }
+
+        if ($tenantType === 'school' && $role === 'school_kalotsavam_coordinator') {
+            return ['fest.view', 'fest.manage', 'fest.registrations'];
+        }
+
+        if ($tenantType === 'school' && $role === 'school_mcq_coordinator') {
+            return ['mcq.view', 'mcq.manage'];
+        }
+
+        if ($tenantType === 'school' && $role === 'school_training_coordinator') {
+            return ['training.view'];
+        }
+
+        if ($tenantType === 'school' && $role === 'school_finance_coordinator') {
+            return ['finance.view', 'fest.finance'];
+        }
+
         return match ($role) {
             'sahodaya_staff'           => self::sahodayaStaffDefaults(),
             'registration_coordinator' => ['fest.view', 'fest.registrations'],
@@ -252,6 +309,10 @@ class TenantUserCatalog
 
         if (str_contains($path, '/ledger') || str_contains($path, '/state-remittances')) {
             return 'fest.finance';
+        }
+
+        if (str_contains($path, '/student-change-requests') || str_contains($path, '/students/verification')) {
+            return 'membership.manage';
         }
 
         if (str_contains($path, '/membership') || str_contains($path, '/circulars') || str_contains($path, '/academic-years')) {

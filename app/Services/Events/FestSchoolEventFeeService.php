@@ -279,6 +279,11 @@ class FestSchoolEventFeeService
 
         $record->save();
 
+        // Keep partial-payment status in sync if anything has already been paid.
+        if ($total > 0 && (float) $record->amount_paid > 0) {
+            $record->refreshPaidState();
+        }
+
         if ($useComposite && $this->supportsFeeLines()) {
             $this->syncFeeLines($record, $compositeLines);
         } elseif ($this->supportsFeeLines()) {
@@ -405,10 +410,16 @@ class FestSchoolEventFeeService
         int $userId,
         ?string $transactionRef = null,
         ?string $bankName = null,
+        ?float $amount = null,
     ): FestSchoolEventFee {
         $fee = $this->recalculate($event, $schoolId);
         abort_if($fee->total_due <= 0, 422, 'No fee due for this event.');
-        abort_if($fee->status === 'approved', 422, 'Fee already approved.');
+        abort_if($fee->isFullyPaid(), 422, 'Fee already fully paid.');
+
+        $outstanding = $fee->outstandingBalance();
+        $payAmount = $amount !== null ? round($amount, 2) : $outstanding;
+        abort_if($payAmount <= 0, 422, 'Payment amount must be greater than zero.');
+        abort_if($payAmount > $outstanding, 422, 'Payment cannot exceed the outstanding balance of ₹'.number_format($outstanding, 2).'.');
 
         $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
 
@@ -421,7 +432,7 @@ class FestSchoolEventFeeService
             'transaction_ref' => $transactionRef,
             'bank_name' => $bankName,
             'payment_date' => now()->toDateString(),
-            'amount' => $fee->total_due,
+            'amount' => $payAmount,
             'status' => 'uploaded',
             'uploaded_by_user_id' => $userId,
         ]);
@@ -448,11 +459,7 @@ class FestSchoolEventFeeService
             $fee = $this->recalculate($event, $schoolId);
         }
 
-        if ($fee->total_due <= 0) {
-            return true;
-        }
-
-        return $fee->status === 'approved';
+        return $fee->isFullyPaid();
     }
 
     private function applySchoolFeeCap(float $total, array $schedule): float

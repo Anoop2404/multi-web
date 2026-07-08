@@ -152,7 +152,7 @@ class FestEventFeeResolver
             $student = (float) ($schedule['per_student_amount'] ?? 300);
             $quota = (int) ($schedule['included_items_per_student'] ?? 2);
 
-            return "₹{$school} school + ₹{$student}/student + {$quota} included items, then catalog rates";
+            return "₹{$school} school + ₹{$student}/student + {$quota} free items, then ₹".((float) ($schedule['default_item_fee'] ?? 0))." extra/item";
         }
 
         return 'Fee applies per school for this event';
@@ -362,8 +362,6 @@ class FestEventFeeResolver
                     ? (int) $input['included_items_per_student'] : 2,
                 'default_item_fee' => isset($input['default_item_fee']) && $input['default_item_fee'] !== ''
                     ? (float) $input['default_item_fee'] : null,
-                'age_group_fees' => $this->normalizeAgeGroupFees($input['age_group_fees'] ?? [], $tenantId),
-                'class_group_fees' => $this->normalizeClassGroupFees($input['class_group_fees'] ?? []),
             ], $input);
         }
 

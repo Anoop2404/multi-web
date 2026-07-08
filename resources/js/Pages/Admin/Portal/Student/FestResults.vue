@@ -22,7 +22,10 @@
                     </p>
                     <p v-else class="text-xs text-gray-400 mt-0.5">Results not yet recorded</p>
                 </li>
-                <li v-if="!festResults.length" class="text-gray-400 py-2">No published fest results yet</li>
+                <li v-if="!festResults.length" class="py-4 text-center text-gray-400">
+                    <p>No published fest results yet.</p>
+                    <a :href="`/portal/student/${school.id}/sports-results`" class="text-xs text-indigo-600 font-semibold mt-2 inline-block">View sports results →</a>
+                </li>
             </ul>
         </section>
     </PortalLayout>

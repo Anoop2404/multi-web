@@ -10,8 +10,8 @@ use App\Models\NewsArticle;
 use App\Models\Registration;
 use App\Models\SahodayaProfile;
 use App\Models\SchoolClass;
+use App\Models\SchoolDocument;
 use App\Models\Student;
-use App\Models\TcRequest;
 use App\Models\DataChangeLog;
 use App\Support\AcademicYear;
 use App\Support\ProgramRouteMap;
@@ -20,6 +20,11 @@ class DashboardController extends SchoolAdminController
 {
     public function index()
     {
+        $user = request()->user();
+        if ($user && app(\App\Services\School\SchoolUserScopeService::class)->isCoordinatorOnly($user)) {
+            return redirect(app(\App\Services\School\SchoolUserScopeService::class)->homeUrlFor($user, $this->school->id));
+        }
+
         $tid = $this->school->id;
 
         return $this->inertia('School/Dashboard', [
@@ -27,8 +32,9 @@ class DashboardController extends SchoolAdminController
                 ['label' => 'Active Students',      'value' => Student::where('tenant_id', $tid)->where('status', 'active')->count()],
                 ['label' => 'Teachers',            'value' => \App\Models\Teacher::where('tenant_id', $tid)->count()],
                 ['label' => 'New Enquiries',       'value' => AdmissionEnquiry::where('tenant_id', $tid)->where('status', 'new')->count()],
-                ['label' => 'Pending TC Requests', 'value' => TcRequest::where('tenant_id', $tid)->where('status', 'pending')->count()],
+                ['label' => 'Unverified Students', 'value' => Student::where('tenant_id', $tid)->where('status', 'active')->whereNull('verified_at')->count()],
             ],
+            'documentAlerts' => $this->documentAlerts($tid),
             'programSummaries' => $this->programSummaries(),
             'dashboardExtras'  => app(\App\Services\Events\ProgramHubDataService::class)->schoolDashboardExtras($this->school),
             'setup' => $this->setupStatus(),
@@ -82,6 +88,8 @@ class DashboardController extends SchoolAdminController
             ['slug' => 'sports-meet', 'label' => 'Sports Meet', 'type' => 'sports'],
             ['slug' => 'kids-fest', 'label' => 'Kids Fest', 'type' => 'kids_fest'],
             ['slug' => 'teacher-fest', 'label' => 'Teacher Fest', 'type' => 'teacher_fest'],
+            ['slug' => 'english-fest', 'label' => 'English Fest', 'type' => 'english_fest'],
+            ['slug' => 'science-fest', 'label' => 'Science Fest', 'type' => 'science_fest'],
         ];
 
         return collect($programs)->map(function (array $p) use ($sahodayaId) {
@@ -154,6 +162,22 @@ class DashboardController extends SchoolAdminController
         return [
             'academicYear' => $academicYear,
             'regNo'        => $registration->reg_no,
+        ];
+    }
+
+    /** @return array{expired: int, expiring_soon: int, rejected: int, pending: int} */
+    private function documentAlerts(string $schoolId): array
+    {
+        $base = SchoolDocument::where('school_id', $schoolId);
+
+        return [
+            'expired'       => (clone $base)->where('status', 'expired')->count(),
+            'expiring_soon' => (clone $base)->where('status', 'approved')
+                ->whereNotNull('valid_to')
+                ->whereBetween('valid_to', [now()->toDateString(), now()->addDays(30)->toDateString()])
+                ->count(),
+            'rejected'      => (clone $base)->where('status', 'rejected')->count(),
+            'pending'       => (clone $base)->where('status', 'pending')->count(),
         ];
     }
 }

@@ -28,7 +28,7 @@
                 <p class="text-2xl font-bold text-emerald-900 mt-1">₹{{ fmt(summary?.training) }}</p>
             </div>
             <div class="card card--muted text-center !py-4">
-                <p class="text-xs uppercase font-bold text-violet-700 tracking-wide">MCQ exams</p>
+                <p class="text-xs uppercase font-bold text-violet-700 tracking-wide">Talent Search exams</p>
                 <p class="text-2xl font-bold text-violet-900 mt-1">₹{{ fmt(summary?.mcq) }}</p>
             </div>
         </div>
@@ -103,7 +103,7 @@ const tabs = computed(() => [
     { key: 'membership', label: 'Membership', count: props.payments.filter(p => p.type === 'membership').length },
     { key: 'fest', label: 'Events', count: props.payments.filter(p => p.type === 'fest').length },
     { key: 'training', label: 'Training', count: props.payments.filter(p => p.type === 'training').length },
-    { key: 'mcq', label: 'MCQ Exams', count: props.payments.filter(p => p.type === 'mcq').length },
+    { key: 'mcq', label: 'Talent Search Exams', count: props.payments.filter(p => p.type === 'mcq').length },
 ]);
 
 const filteredPayments = computed(() => {
@@ -118,7 +118,7 @@ function fmt(v) {
 }
 
 function typeLabel(type) {
-    return { membership: 'Membership', fest: 'Event fee', training: 'Training', mcq: 'MCQ Exam' }[type] ?? type;
+    return { membership: 'Membership', fest: 'Event fee', training: 'Training', mcq: 'Talent Search Exam' }[type] ?? type;
 }
 
 function typeClass(type) {

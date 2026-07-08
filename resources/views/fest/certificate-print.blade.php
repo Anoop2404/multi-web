@@ -56,6 +56,7 @@
             <p class="detail">has participated and achieved this distinction.</p>
             @endif
         </div>
+        @if(!empty($qr_src))<div style="position:absolute;bottom:2rem;right:3rem;"><img src="{{ $qr_src }}" alt="Verify QR" width="80" height="80"></div>@endif
         <div class="meta">
             <span>ID: {{ $certificate->verification_uuid }}</span>
             <span>{{ $certificate->generated_at?->format('d M Y') ?? now()->format('d M Y') }}</span>

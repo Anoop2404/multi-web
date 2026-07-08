@@ -2,27 +2,53 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
+use App\Models\FestEventItem;
 use App\Support\FestPageActivity;
 use App\Events\FestScoreboardUpdated;
 use App\Models\FestEvent;
 use App\Models\FestQualification;
-use App\Models\FestRegistration;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\EventContext;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestCmsAutoPush;
 use App\Services\Events\FestEventNotifier;
+use App\Services\Events\FestItemHeadService;
+use App\Services\Events\FestItemResultsService;
 use App\Services\Events\FestQualificationService;
-use App\Services\Events\FestRegistrationService;
 use Illuminate\Http\Request;
 
 class FestResultsController extends SahodayaAdminController
 {
-    public function show(string $tenantId, FestEvent $event)
+    use BuildsItemHeadReportContext;
+
+    public function show(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $ctx = EventContext::for($event);
+        if ($event->event_type === 'sports') {
+            app(FestItemHeadService::class)->syncEventHeads($event);
+        }
+
+        $headId = $this->resolveHeadQueryParam($request->input('head_id'));
+        $itemId = $request->integer('item_id') ?: null;
+
+        $resultsService = app(FestItemResultsService::class);
+        $itemSummaries = collect($resultsService->itemSummaries($event));
+        $summaryByItem = $itemSummaries->keyBy('item_id');
+
+        $reportCtx = $this->itemHeadReportContext($event);
+        $ctx = array_merge($reportCtx, [
+            'headItemGroups' => $this->enrichHeadGroupsWithPublishStatus(
+                $reportCtx['headItemGroups'] ?? [],
+                $summaryByItem,
+            ),
+        ]);
+
+        $selectedItem = $itemId ? $itemSummaries->firstWhere('item_id', $itemId) : null;
+        $itemResultRows = $selectedItem
+            ? $resultsService->resultRowsForItem($event, $itemId)
+            : [];
 
         $qualifications = FestQualification::where('event_id', $event->id)
             ->with(['participant.student', 'participant.teacher', 'item', 'nextLevelEvent'])
@@ -41,14 +67,91 @@ class FestResultsController extends SahodayaAdminController
                 'suggested'   => $suggestedNext?->id === $e->id,
             ]);
 
-        return $this->inertia('Sahodaya/Events/Results', $this->withEventActivity($event, FestPageActivity::RESULTS, [
+        return $this->inertia('Sahodaya/Events/Results', $this->withEventActivity($event, FestPageActivity::RESULTS, array_merge($ctx, [
             'event'             => $event,
-            'scoreboard'        => $ctx->scoreboardBySchool(),
+            'scoreboard'        => EventContext::for($event)->scoreboardBySchool(),
             'qualifications'    => $qualifications,
             'nextEvents'        => $nextEvents,
             'suggestedNextId'   => $suggestedNext?->id,
             'levelLabels'       => FestEvent::levelLabels(),
-        ]));
+            'itemSummaries'     => $itemSummaries->values()->all(),
+            'publishTotals'     => $resultsService->totals($event),
+            'filterHeadId'      => $headId === 0 ? 'other' : $headId,
+            'selectedHeadId'    => $headId === 0 ? 'other' : $headId,
+            'filterItemId'      => $itemId,
+            'selectedItemId'    => $itemId,
+            'selectedItem'      => $selectedItem,
+            'itemResultRows'    => $itemResultRows,
+            'resultsBaseUrl'    => "/sahodaya-admin/{$tenantId}/events/{$event->id}/results",
+            'marksBaseUrl'      => "/sahodaya-admin/{$tenantId}/events/{$event->id}/marks",
+        ])));
+    }
+
+    /** @param list<array<string, mixed>> $groups */
+    private function enrichHeadGroupsWithPublishStatus(array $groups, \Illuminate\Support\Collection $summaryByItem): array
+    {
+        return array_map(function (array $group) use ($summaryByItem) {
+            $items = array_map(function (array $item) use ($summaryByItem) {
+                $summary = $summaryByItem->get($item['id']);
+
+                return array_merge($item, $summary ? [
+                    'age_group'             => $summary['age_group'] ?? null,
+                    'class_group'           => $summary['class_group'] ?? null,
+                    'gender'                => $summary['gender'] ?? null,
+                    'sport_discipline'      => $summary['sport_discipline'] ?? null,
+                    'stage_type'            => $summary['stage_type'] ?? null,
+                    'performers'            => (int) ($summary['performers'] ?? 0),
+                    'registration_count'    => (int) ($summary['registration_count'] ?? 0),
+                    'marks_entered'         => (int) ($summary['marks_entered'] ?? 0),
+                    'marks_pending'         => (int) ($summary['marks_pending'] ?? 0),
+                    'marks_ready'           => (bool) ($summary['marks_ready'] ?? false),
+                    'judges_assigned'       => (int) ($summary['judges_assigned'] ?? 0),
+                    'results_published'     => (bool) ($summary['results_published'] ?? $item['results_published'] ?? false),
+                    'results_published_at'  => $summary['results_published_at'] ?? $item['results_published_at'] ?? null,
+                    'reg_start'             => $summary['reg_start'] ?? null,
+                    'reg_end'               => $summary['reg_end'] ?? null,
+                    'item_competition_start'=> $summary['item_competition_start'] ?? null,
+                    'item_competition_end'  => $summary['item_competition_end'] ?? null,
+                    'competition_start'     => $summary['competition_start'] ?? null,
+                    'competition_end'       => $summary['competition_end'] ?? null,
+                ] : []);
+            }, $group['items'] ?? []);
+
+            $group['items'] = $items;
+            $group['published_count'] = count(array_filter($items, fn ($i) => $i['results_published'] ?? false));
+            $group['pending_count'] = count($items) - $group['published_count'];
+
+            return $group;
+        }, $groups);
+    }
+
+    public function publishItem(string $tenantId, FestEvent $event, FestEventItem $item, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($item->event_id !== $event->id, 404);
+
+        app(FestItemResultsService::class)->publishItem($item);
+        EventContext::for($event)->recalculateSchoolPoints();
+
+        $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.item_published', "Results published for {$item->title}", [
+            'item_id' => $item->id,
+        ]);
+
+        return back()->with('success', "Results published for {$item->title}.");
+    }
+
+    public function unpublishItem(string $tenantId, FestEvent $event, FestEventItem $item, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($item->event_id !== $event->id, 404);
+
+        app(FestItemResultsService::class)->unpublishItem($item);
+
+        $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.item_unpublished', "Results unpublished for {$item->title}", [
+            'item_id' => $item->id,
+        ]);
+
+        return back()->with('success', "Results unpublished for {$item->title}.");
     }
 
     public function publish(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)

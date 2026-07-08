@@ -123,7 +123,6 @@ export const schoolStaticPages = (tenantId: string): PageEntry[] => [
     { path: `/school-admin/${tenantId}/board-results`, label: 'Board results', gated: true },
     { path: `/school-admin/${tenantId}/alumni`, label: 'Alumni', gated: true },
     { path: `/school-admin/${tenantId}/enquiries`, label: 'Enquiries', gated: true },
-    { path: `/school-admin/${tenantId}/tc-requests`, label: 'TC requests', gated: true },
     { path: `/school-admin/${tenantId}/settings`, label: 'Settings', gated: true },
 ];
 

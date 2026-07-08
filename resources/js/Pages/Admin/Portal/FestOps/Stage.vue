@@ -68,6 +68,7 @@
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { festOpsEventNav } from '@/support/festOpsPortalNav.js';
 
 const props = defineProps({ sahodaya: Object, event: Object, schedules: Array, duties: Array, assignedStages: Array });
 
@@ -76,11 +77,7 @@ const ordered = ref([...(props.schedules || [])]);
 const selectedId = ref(null);
 const orderDirty = ref(false);
 
-const navItems = computed(() => [
-    { href: `/portal/fest-ops/${props.sahodaya.id}`, label: 'Dashboard' },
-    { href: base.value, label: 'Event' },
-    { href: `${base.value}/stage`, label: 'Stage' },
-]);
+const navItems = computed(() => festOpsEventNav(props.sahodaya.id, props.event.id, props.duties));
 
 function toggleCalled(schedule) {
     router.post(`${base.value}/stage/${schedule.id}/called`, {

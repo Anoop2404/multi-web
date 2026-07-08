@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 
 class FestEventStudentRegistrationController extends SchoolAdminController
 {
-    public function index(string $tenantId, string $program, FestEvent $event)
+    public function index(string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
@@ -23,9 +23,13 @@ class FestEventStudentRegistrationController extends SchoolAdminController
         ]);
     }
 
-    public function store(Request $request, string $tenantId, string $program, FestEvent $event)
+    public function store(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        if ($this->school->fest_registration_closed) {
+            return back()->with('error', 'Fest registration is closed for your school.');
+        }
 
         $data = $request->validate([
             'student_ids' => 'required|array|min:1',
@@ -38,7 +42,7 @@ class FestEventStudentRegistrationController extends SchoolAdminController
         return back()->with('success', "Registered {$count} student(s) for the event.");
     }
 
-    public function bulkAssign(Request $request, string $tenantId, string $program, FestEvent $event)
+    public function bulkAssign(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 

@@ -8,6 +8,20 @@
             </p>
         </div>
 
+        <div v-if="event.event_type === 'sports' && feeSettingsForm.fee_model !== 'sports_composite'"
+             class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <p class="font-semibold">Sports meets need the composite billing model</p>
+            <p class="mt-1 text-xs text-amber-900/90">
+                <strong>Flat per item</strong> charges one rate for every registration only.
+                To combine <strong>school fee + student registration + included items + extra item fee</strong>,
+                switch billing model to
+                <button type="button" class="font-semibold underline" @click="feeSettingsForm.fee_model = 'sports_composite'">
+                    Sports composite
+                </button>.
+                Item head fees below apply only with Item catalog.
+            </p>
+        </div>
+
         <form @submit.prevent="saveFeeSettings" class="space-y-6">
             <section class="card space-y-4">
                 <div>
@@ -109,36 +123,34 @@
                 </div>
 
                 <div v-else-if="feeSettingsForm.fee_model === 'sports_composite'" class="space-y-4 border-t border-slate-100 pt-4">
-                    <p class="text-xs text-slate-600">
-                        Sports meet billing: flat school fee + per-student event registration + included item quota, then catalog rates for extra items.
-                    </p>
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700 space-y-2">
+                        <p class="font-semibold text-slate-900">How billing works</p>
+                        <ol class="list-decimal pl-4 space-y-1">
+                            <li><strong>School registration</strong> — once per school</li>
+                            <li><strong>Student registration</strong> — per student registered for the event</li>
+                            <li><strong>Free quota</strong> — how many item entries each student gets within the student fee (set <strong>0</strong> to charge every item)</li>
+                            <li><strong>Extra item fee</strong> — per item beyond the free quota (or every item when quota is 0)</li>
+                        </ol>
+                    </div>
                     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <FormField label="School registration (₹)">
+                        <FormField label="School registration (₹)" hint="Once per school">
                             <template #default="{ id }">
                                 <input :id="id" v-model.number="feeSettingsForm.school_registration_flat" type="number" min="0" class="field" placeholder="2000">
                             </template>
                         </FormField>
-                        <FormField label="Student registration (₹)">
+                        <FormField label="Student registration (₹)" hint="Per student in this event">
                             <template #default="{ id }">
                                 <input :id="id" v-model.number="feeSettingsForm.per_student_amount" type="number" min="0" class="field" placeholder="300">
                             </template>
                         </FormField>
-                        <FormField label="Included items / student">
+                        <FormField label="Free quota (items per student)" hint="0 = no free items; each item billed at extra item fee">
                             <template #default="{ id }">
                                 <input :id="id" v-model.number="feeSettingsForm.included_items_per_student" type="number" min="0" class="field" placeholder="2">
                             </template>
                         </FormField>
-                        <FormField label="Default extra item fee (₹)">
+                        <FormField label="Extra item fee (₹)" hint="Per item beyond free quota (or every item when quota is 0)">
                             <template #default="{ id }">
                                 <input :id="id" v-model.number="feeSettingsForm.default_item_fee" type="number" min="0" class="field" placeholder="150">
-                            </template>
-                        </FormField>
-                    </div>
-                    <div v-if="event.event_type === 'sports'" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <FormField v-for="(label, key) in ageGroupLabels" :key="key" :label="`${label} extra item`">
-                            <template #default="{ id }">
-                                <input :id="id" v-model.number="feeSettingsForm.age_group_fees[key]" type="number" min="0"
-                                       class="field" :placeholder="placeholderAmount(defaultAgeGroupFees[key])">
                             </template>
                         </FormField>
                     </div>
@@ -152,6 +164,73 @@
                 <p v-else-if="feeSettingsForm.fee_model === 'none'" class="text-sm text-slate-600 border-t border-slate-100 pt-4">
                     No fest fee is charged for this event. Schools can register without payment.
                 </p>
+
+                <div class="space-y-3 border-t border-slate-100 pt-4">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Registration gates</p>
+                    <label class="flex items-start gap-2 text-sm">
+                        <input type="checkbox" v-model="feeSettingsForm.require_fee_before_registration" class="mt-0.5">
+                        <span>
+                            Require school fest fee verified before item registration
+                            <span class="block text-xs text-slate-500 mt-0.5">Schools cannot register students for items until Sahodaya verifies their event fee payment.</span>
+                        </span>
+                    </label>
+                    <label class="flex items-start gap-2 text-sm">
+                        <input type="checkbox" v-model="feeSettingsForm.require_verified_students" class="mt-0.5">
+                        <span>
+                            Require Sahodaya-verified students only
+                            <span class="block text-xs text-slate-500 mt-0.5">Overrides cluster default — only verified students can be registered for this event.</span>
+                        </span>
+                    </label>
+                </div>
+            </section>
+
+            <section v-if="event.event_type === 'sports' && !feeSettingsForm.head_fees.length && feeSettingsForm.fee_model !== 'sports_composite'" class="card space-y-3">
+                <div>
+                    <h3 class="section-title">Item head fees</h3>
+                    <p class="section-desc">Per-head default and extra item rates (Chess, Athletics, …).</p>
+                </div>
+                <p class="text-sm text-slate-600">
+                    No item heads on this event yet.
+                    <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/competition`" class="link-brand font-semibold">
+                        Open competition hub →
+                    </Link>
+                    then return here to set fees per head.
+                </p>
+            </section>
+
+            <section v-else-if="feeSettingsForm.head_fees.length && feeSettingsForm.fee_model !== 'sports_composite'" class="card space-y-4">
+                <div>
+                    <h3 class="section-title">Item head fees</h3>
+                    <p class="section-desc">
+                        Per-head rates for item registrations — <strong>Default</strong> applies to each billed item (or all items when included quota is 0);
+                        <strong>Extra</strong> applies only to items beyond the included count when quota is greater than 0.
+                        Per-item overrides on the event catalog take priority over head rates.
+                    </p>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-100">
+                    <table class="data-table">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="text-left px-4 py-2.5 text-xs font-semibold text-slate-600">Head</th>
+                                <th class="text-right px-4 py-2.5 text-xs font-semibold text-slate-600">Default item fee (₹)</th>
+                                <th class="text-right px-4 py-2.5 text-xs font-semibold text-slate-600">Extra item fee (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            <tr v-for="row in feeSettingsForm.head_fees" :key="row.id">
+                                <td class="px-4 py-3 font-medium text-slate-900">{{ row.name }}</td>
+                                <td class="px-4 py-3 text-right">
+                                    <input v-model.number="row.default_item_fee" type="number" min="0"
+                                           class="field w-full max-w-[8rem] ml-auto text-right" placeholder="—">
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <input v-model.number="row.extra_item_fee" type="number" min="0"
+                                           class="field w-full max-w-[8rem] ml-auto text-right" placeholder="—">
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
             <section v-if="feeSettingsForm.fee_model === 'item_catalog'" class="card space-y-4">
@@ -323,6 +402,25 @@
                 </div>
             </section>
 
+            <section class="card space-y-3">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 class="section-title">Ledger account</h3>
+                        <p class="section-desc">Income from verified school fees posts to this account head.</p>
+                    </div>
+                    <Link v-if="ledgerAccount?.ledger_url" :href="ledgerAccount.ledger_url" class="btn-secondary text-sm shrink-0">View ledger →</Link>
+                </div>
+                <p class="text-xs font-mono text-slate-500">{{ ledgerAccount?.code }}</p>
+                <form @submit.prevent="saveLedgerAccount" class="flex flex-wrap gap-2 items-end">
+                    <FormField label="Account name" class-extra="mb-0 flex-1 min-w-[14rem]">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="ledgerForm.name" class="field" required>
+                        </template>
+                    </FormField>
+                    <button type="submit" class="btn-secondary text-sm mb-0.5" :disabled="ledgerForm.processing">Save account name</button>
+                </form>
+            </section>
+
             <FormActions sticky>
                 <button type="submit" class="btn-primary" :disabled="feeSettingsForm.processing">
                     {{ feeSettingsForm.processing ? 'Saving…' : 'Save fee settings' }}
@@ -334,11 +432,19 @@
 
 <script setup>
 import { computed, inject, ref } from 'vue';
+import { Link, useForm } from '@inertiajs/vue3';
 
 const {
     feeSettingsForm, feeModels, event, classGroupSchemeOptions, classGroupScheme,
     ageGroupLabels, defaultAgeGroupFees, defaultClassGroupFees, effectiveClassGroupLabels, saveFeeSettings,
+    sahodaya, ledgerAccount,
 } = inject('eventSettings');
+
+const ledgerForm = useForm({ name: ledgerAccount?.name ?? '' });
+
+function saveLedgerAccount() {
+    ledgerForm.put(`/sahodaya-admin/${sahodaya.id}/events/${event.id}/ledger-account`, { preserveScroll: true });
+}
 
 const itemSearch = ref('');
 const itemFilter = ref('all');

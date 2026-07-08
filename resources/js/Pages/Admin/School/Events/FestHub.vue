@@ -36,7 +36,7 @@
                 :hint="`${appeals.length ? appeals.length + ' appeal(s)' : 'Submit & track appeals'}`"
             />
             <HubCard
-                :href="`/school-admin/${school.id}/programs/${programSlug}/results`"
+                :href="resultsUrl"
                 icon="📊"
                 label="Results"
                 hint="Published scores and ranks"
@@ -73,6 +73,7 @@
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { schoolProgramHref } from '@/support/schoolProgramNav.js';
 
 const props = defineProps({
     school: Object,
@@ -88,20 +89,11 @@ const programLabels = {
     'sports-meet': 'Sports Meet',
     'kids-fest': 'Kids Fest',
     'teacher-fest': 'Teacher Fest',
+    'english-fest': 'English Fest',
+    'science-fest': 'Science Fest',
+    custom: 'Custom event',
 };
 
 const programLabel = computed(() => programLabels[props.programSlug] ?? 'Fest');
-
-function participantName(a) {
-    const p = a.participant ?? a;
-    return p.student?.name ?? p.teacher?.name ?? 'Participant';
-}
-
-function statusClass(status) {
-    return {
-        pending: 'bg-amber-100 text-amber-800',
-        approved: 'bg-emerald-100 text-emerald-800',
-        rejected: 'bg-red-100 text-red-700',
-    }[status] ?? 'bg-slate-100 text-slate-600';
-}
+const resultsUrl = computed(() => schoolProgramHref(props.school.id, props.programSlug, 'results'));
 </script>

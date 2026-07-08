@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         $middleware->web(prepend: [
+            \App\Http\Middleware\ResolveAuthenticationGuard::class,
             \App\Http\Middleware\InitializeTenancyByRouteTenant::class,
         ]);
 
@@ -34,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->api(prepend: [
+            \App\Http\Middleware\ResolveAuthenticationGuard::class,
             \App\Http\Middleware\InitializeTenancyByRouteTenant::class,
         ]);
 

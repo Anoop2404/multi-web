@@ -11,22 +11,35 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
     sahodayaId: { type: [String, Number], required: true },
     eventId: { type: [String, Number], required: true },
     active: { type: String, required: true },
+    eventType: { type: String, default: null },
 });
+
+const page = usePage();
+const resolvedEventType = computed(() => props.eventType ?? page.props.event?.event_type ?? null);
 
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}`);
 
-const tabs = computed(() => [
-    { key: 'overview', label: 'Overview', href: base.value },
-    { key: 'items', label: 'Items', href: `${base.value}/items` },
-    { key: 'items-list', label: 'Item list', href: `${base.value}/items/list` },
-    { key: 'levels', label: 'Rounds & promotion', href: `${base.value}/levels` },
-    { key: 'activity', label: 'Log', href: `${base.value}/activity` },
-]);
+const tabs = computed(() => {
+    const list = [
+        { key: 'overview', label: 'Overview', href: base.value },
+        { key: 'items', label: 'Catalog & rules', href: `${base.value}/items` },
+        { key: 'items-list', label: 'All items', href: `${base.value}/items/list` },
+        { key: 'levels', label: 'Rounds & promotion', href: `${base.value}/levels` },
+    ];
+    if (resolvedEventType.value === 'sports') {
+        list.splice(1, 0,
+            { key: 'setup', label: 'Setup hub', href: `${base.value}/setup` },
+            { key: 'competition', label: 'Heads & items', href: `${base.value}/competition` },
+        );
+    }
+    list.push({ key: 'activity', label: 'Log', href: `${base.value}/activity` });
+    return list;
+});
 </script>

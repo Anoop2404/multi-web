@@ -4,12 +4,15 @@
         <PageHeader :title="`${event.title} — Items`" eyebrow="Event items setup"
                     description="Enable items, add custom entries, import from master catalog.">
             <template #actions>
+                <Link v-if="isSports" :href="`${base}/setup`" class="btn-secondary text-xs">Setup hub</Link>
                 <Link :href="`${base}/items/list`" class="btn-secondary text-xs">Item listing</Link>
                 <Link :href="catalogUrl" class="btn-secondary text-xs">Assign from catalog</Link>
             </template>
         </PageHeader>
 
-        <EventSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="items" />
+        <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
+                           :event="event" active="items" class="mb-4" />
+        <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="items" />
 
         <div class="space-y-5">
                 <div class="form-section">
@@ -18,10 +21,14 @@
                             <div>
                                 <h3 class="form-section-title">Event items</h3>
                                 <p class="form-section-hint">
-                                    Toggle items on/off for this event. Manage dropdown masters in
+                                    Create or edit items under their item heads. Manage dropdown masters in
                                     <Link :href="taxonomyMastersUrl" class="link-brand">Item category masters →</Link>
                                     or import from
                                     <Link :href="catalogUrl" class="link-brand">Items & fees catalog →</Link>
+                                </p>
+                                <p v-if="selectedHeadLabel" class="mt-2 text-xs font-semibold text-emerald-700">
+                                    Showing items under: {{ selectedHeadLabel }}
+                                    <button type="button" class="ml-2 underline" @click="setHeadFilter('')">Show all heads</button>
                                 </p>
                             </div>
                             <button v-if="catalogSummary?.enabled" type="button" @click="importCatalog" class="btn-secondary text-xs">
@@ -31,6 +38,32 @@
                     </div>
                     <div class="form-section-body">
                         <form @submit.prevent="addItem" class="grid sm:grid-cols-2 gap-3 mb-5">
+                            <div v-if="isSports && itemHeads.length" class="sm:col-span-2 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="text-xs font-bold uppercase tracking-wide text-indigo-700">Item head</span>
+                                    <button type="button"
+                                            class="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                                            :class="!selectedHeadFilter ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-200'"
+                                            @click="setHeadFilter('')">
+                                        All
+                                    </button>
+                                    <button v-for="h in itemHeads" :key="h.id" type="button"
+                                            class="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                                            :class="String(selectedHeadFilter) === String(h.id) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-200'"
+                                            @click="setHeadFilter(h.id)">
+                                        {{ h.name }}
+                                    </button>
+                                    <button type="button"
+                                            class="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                                            :class="selectedHeadFilter === 'other' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-200'"
+                                            @click="setHeadFilter('other')">
+                                        Unassigned
+                                    </button>
+                                </div>
+                                <p class="mt-2 text-xs text-indigo-800/80">
+                                    Selecting a head filters the list and preselects the head when adding a new item.
+                                </p>
+                            </div>
                             <FormField label="Item name" class-extra="sm:col-span-2">
                                 <input v-model="itemForm.title" class="field" placeholder="Item name" required>
                             </FormField>
@@ -372,10 +405,11 @@
 </template>
 
 <script setup>
-import { Link, useForm, router } from '@inertiajs/vue3';
+import { Link, useForm, router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import FestItemMetaIcons from '@/Components/sahodaya/FestItemMetaIcons.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import { festItemListingDetails, festItemSearchHaystack, festItemTagsLine } from '@/support/festItemListingMeta.js';
@@ -394,12 +428,14 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+const page = usePage();
 const isArts = computed(() => ['kalolsavam', 'kids_fest'].includes(props.event.event_type));
 const isSports = computed(() => props.event.event_type === 'sports');
 const searchQuery = ref('');
 const filterAgeGroup = ref('');
 const filterGender = ref('');
 const filterEnabled = ref('');
+const selectedHeadFilter = ref(initialHeadFilter());
 
 const flatItemCount = computed(() => Object.values(props.itemsByLevel ?? {}).flat().length);
 
@@ -424,8 +460,14 @@ const ageGroupOptions = computed(() => {
 });
 
 const hasActiveFilters = computed(() =>
-    Boolean(searchQuery.value.trim() || filterAgeGroup.value || filterGender.value || filterEnabled.value)
+    Boolean(searchQuery.value.trim() || filterAgeGroup.value || filterGender.value || filterEnabled.value || selectedHeadFilter.value)
 );
+
+const selectedHeadLabel = computed(() => {
+    if (!selectedHeadFilter.value) return '';
+    if (selectedHeadFilter.value === 'other') return 'Unassigned items';
+    return props.itemHeads.find((h) => String(h.id) === String(selectedHeadFilter.value))?.name ?? '';
+});
 
 function itemMetaOptions() {
     return { taxonomy: props.taxonomy, eventType: props.event.event_type };
@@ -452,6 +494,8 @@ function itemMatchesSearch(item, q) {
 function itemMatchesFilters(item) {
     const q = searchQuery.value.trim().toLowerCase();
     if (q && !itemMatchesSearch(item, q)) return false;
+    if (selectedHeadFilter.value === 'other' && item.head_id) return false;
+    if (selectedHeadFilter.value && selectedHeadFilter.value !== 'other' && String(item.head_id ?? '') !== String(selectedHeadFilter.value)) return false;
     if (filterAgeGroup.value && item.age_group !== filterAgeGroup.value) return false;
     if (filterGender.value && normalizeFestItemGender(item.gender) !== filterGender.value) return false;
     if (filterEnabled.value === 'on' && item.is_enabled === false) return false;
@@ -477,10 +521,11 @@ function clearFilters() {
     filterAgeGroup.value = '';
     filterGender.value = '';
     filterEnabled.value = '';
+    setHeadFilter('');
 }
 
 const itemForm = useForm({
-    title: '', participant_type: 'individual', stage_type: '', venue_type: '', head_id: '',
+    title: '', participant_type: 'individual', stage_type: '', venue_type: '', head_id: selectedHeadFilter.value === 'other' ? '' : selectedHeadFilter.value,
     competition_format: '', sport_discipline: '', class_group: '', age_group: '', kids_band: '', gender: 'open',
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
     fee_amount: null,
@@ -496,11 +541,42 @@ const editForm = useForm({
 
 function addItem() {
     itemForm.post(`${base}/items`, {
-        preserveScroll: true,         onSuccess: () => itemForm.reset({
-            gender: 'open', participant_type: 'individual', fee_amount: null,
-            min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
-        }),
+        preserveScroll: true,
+        onSuccess: () => {
+            itemForm.title = '';
+            itemForm.participant_type = 'individual';
+            itemForm.stage_type = '';
+            itemForm.venue_type = '';
+            itemForm.head_id = selectedHeadFilter.value === 'other' ? '' : selectedHeadFilter.value;
+            itemForm.competition_format = '';
+            itemForm.sport_discipline = '';
+            itemForm.class_group = '';
+            itemForm.age_group = '';
+            itemForm.kids_band = '';
+            itemForm.gender = 'open';
+            itemForm.min_playing = null;
+            itemForm.max_subs = null;
+            itemForm.max_squad = null;
+            itemForm.min_squad = null;
+            itemForm.standbys = null;
+            itemForm.fee_amount = null;
+        },
     });
+}
+
+function initialHeadFilter() {
+    const query = String(page.url ?? '').split('?')[1] ?? '';
+    const value = new URLSearchParams(query).get('head_id') ?? '';
+    return value === 'other' ? 'other' : value;
+}
+
+function setHeadFilter(value) {
+    selectedHeadFilter.value = value === null || value === undefined ? '' : String(value);
+    if (selectedHeadFilter.value !== 'other') {
+        itemForm.head_id = selectedHeadFilter.value;
+    } else {
+        itemForm.head_id = '';
+    }
 }
 function importCatalog() {
     if (!confirm(`Import ${props.catalogSummary?.enabled ?? 0} enabled item(s) from your Sahodaya catalog?`)) return;

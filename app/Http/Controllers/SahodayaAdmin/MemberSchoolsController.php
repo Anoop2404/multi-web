@@ -9,6 +9,8 @@ use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Audit\DataChangeLogger;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Membership\MembershipNotifier;
 use App\Support\AcademicYear;
 use App\Support\ExcelExport;
@@ -34,13 +36,23 @@ class MemberSchoolsController extends SahodayaAdminController
 
         $this->attachSchoolMetrics($schools->getCollection());
 
+        $approvedIds = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->pluck('id');
+
         return $this->inertia('Sahodaya/Schools/Index', [
             'schools'  => $schools,
             'filters'  => array_merge($filters, ['sort' => $sortColumn]),
-            'verifiedCount' => Tenant::where('parent_id', $this->sahodaya->id)
-                ->where('type', 'school')
-                ->where('membership_status', 'approved')
-                ->count(),
+            'verifiedCount' => $approvedIds->count(),
+            'summary' => [
+                'total_students' => $approvedIds->isEmpty()
+                    ? 0
+                    : Student::whereIn('tenant_id', $approvedIds)->where('status', 'active')->count(),
+                'total_classes' => $approvedIds->isEmpty()
+                    ? 0
+                    : SchoolClass::whereIn('tenant_id', $approvedIds)->where('is_active', true)->count(),
+            ],
         ]);
     }
 
@@ -161,6 +173,92 @@ class MemberSchoolsController extends SahodayaAdminController
         $notifier->schoolRejected($school, $data['reason']);
 
         return back()->with('success', 'School application rejected.');
+    }
+
+    public function approve(string $tenantId, Tenant $school, MembershipNotifier $notifier, PlatformAuditLogger $audit)
+    {
+        abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+        abort_unless($school->membership_status === 'pending', 422, 'School is not pending approval.');
+
+        $this->approveSchool($school, $notifier, $audit, request()->user()?->id);
+
+        return back()->with('success', "{$school->name} approved.");
+    }
+
+    public function bulkApprove(Request $request, MembershipNotifier $notifier, PlatformAuditLogger $audit)
+    {
+        $data = $request->validate([
+            'school_ids'   => 'required|array|min:1|max:50',
+            'school_ids.*' => 'uuid',
+        ]);
+
+        $schools = Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'pending')
+            ->whereIn('id', $data['school_ids'])
+            ->get();
+
+        foreach ($schools as $school) {
+            $this->approveSchool($school, $notifier, $audit, $request->user()?->id);
+        }
+
+        return back()->with('success', $schools->count().' school(s) approved.');
+    }
+
+    public function bulkReject(Request $request, MembershipNotifier $notifier)
+    {
+        $data = $request->validate([
+            'school_ids'   => 'required|array|min:1|max:50',
+            'school_ids.*' => 'uuid',
+            'reason'       => 'required|string|max:1000',
+        ]);
+
+        $schools = Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'pending')
+            ->whereIn('id', $data['school_ids'])
+            ->get();
+
+        foreach ($schools as $school) {
+            $school->update([
+                'membership_status'   => 'rejected',
+                'is_active'           => false,
+                'application_payload' => array_merge($school->application_payload ?? [], [
+                    'rejection_reason' => $data['reason'],
+                ]),
+            ]);
+            $notifier->schoolRejected($school, $data['reason']);
+        }
+
+        return back()->with('success', $schools->count().' application(s) rejected.');
+    }
+
+    private function approveSchool(Tenant $school, MembershipNotifier $notifier, PlatformAuditLogger $audit, ?int $reviewerId): void
+    {
+        $before = $school->membership_status;
+        $school->update([
+            'membership_status' => 'approved',
+            'is_active'         => true,
+        ]);
+
+        app(DataChangeLogger::class)->updated(
+            $school,
+            "School membership approved: {$school->name}",
+            ['membership_status' => ['old' => $before, 'new' => 'approved']],
+            $school->id,
+            'membership',
+        );
+
+        $notifier->schoolApproved($school);
+
+        $audit->log(
+            'membership.school.approved',
+            "School approved: {$school->name}",
+            $school,
+            ['reviewer_id' => $reviewerId],
+        );
     }
 
     public function toggleFestRegistration(string $tenantId, Tenant $school)

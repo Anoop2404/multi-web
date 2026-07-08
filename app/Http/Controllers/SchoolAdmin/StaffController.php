@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\StaffMember;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class StaffController extends SchoolAdminController
@@ -37,7 +38,7 @@ class StaffController extends SchoolAdminController
         $data['tenant_id'] = $this->school->id;
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('staff/' . $this->school->id, 's3');
+            $data['photo'] = $request->file('photo')->store('staff/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
         }
 
         StaffMember::create($data);
@@ -67,7 +68,7 @@ class StaffController extends SchoolAdminController
         ]);
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('staff/' . $this->school->id, 's3');
+            $data['photo'] = $request->file('photo')->store('staff/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
         }
 
         $staff->update($data);

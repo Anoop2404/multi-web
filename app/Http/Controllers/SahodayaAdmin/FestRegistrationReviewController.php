@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
+use App\Models\SchoolRegionAssignment;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Services\Events\EventLifecycleGate;
@@ -23,19 +25,28 @@ use App\Services\Events\FestRegistrationEligibilityService;
 use App\Services\Events\FestRegistrationService;
 use App\Services\Events\FestSchoolEventFeeService;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Support\AcademicYear;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class FestRegistrationReviewController extends SahodayaAdminController
 {
+    use BuildsItemHeadReportContext;
+
     public function index(string $tenantId, FestEvent $event, Request $request)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $event->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')]);
 
+        $headId = $this->resolveHeadQueryParam($request->query('head_id') ?? $request->query('head'));
+        $itemId = $request->integer('item_id') ?: null;
+        $itemIds = $this->itemIdsForHeadFilter($event, $headId, $itemId);
+
         $feeService = app(FestSchoolEventFeeService::class);
 
         $registrations = FestRegistration::where('event_id', $event->id)
+            ->when($itemIds !== null, fn ($q) => $q->whereIn('item_id', $itemIds))
             ->with(['item', 'participants.student', 'participants.teacher', 'participants.group'])
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%'.$request->input('search').'%';
@@ -72,15 +83,35 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 ->all();
         }
 
+        $selectedHeadId = match (true) {
+            $headId === 0 => 'other',
+            $headId !== null => $headId,
+            default => null,
+        };
+
+        $schoolRegions = [];
+        if ($event->event_type === 'kalolsavam') {
+            $schoolRegions = SchoolRegionAssignment::query()
+                ->where('school_region_assignments.tenant_id', $this->sahodaya->id)
+                ->where('school_region_assignments.academic_year', AcademicYear::forSahodaya($this->sahodaya->id))
+                ->join('regions', 'regions.id', '=', 'school_region_assignments.region_id')
+                ->pluck('regions.name', 'school_region_assignments.school_id')
+                ->all();
+        }
+
         return $this->inertia('Sahodaya/Events/Registrations', $this->withEventActivity($event, FestPageActivity::REGISTRATIONS, [
             'event'              => $event,
             'registrations'      => $registrations,
             'schools'            => $schools,
+            'schoolRegions'      => $schoolRegions,
             'feeRequired'        => $feeService->feeRequired($event),
             'registerStudents'   => $registerStudents,
             'registerSchoolId'   => $registerSchoolId,
             'eventItems'         => $event->items->values(),
             'filters'            => ['search' => $request->input('search', '')],
+            'selectedHeadId'     => $selectedHeadId,
+            'selectedItemId'     => $itemId,
+            'competitionUrl'     => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/competition",
         ]));
     }
 
@@ -106,15 +137,21 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
         $item = FestEventItem::where('id', $data['item_id'])->where('event_id', $event->id)->firstOrFail();
 
-        $registration = app(FestRegistrationCreateService::class)->createForSchool(
-            $event,
-            $item,
-            $school,
-            $data['student_ids'],
-            $data['standby_ids'] ?? [],
-            $data['team_name'] ?? null,
-            skipSchoolClosedCheck: true,
-        );
+        try {
+            $registration = app(FestRegistrationCreateService::class)->createForSchool(
+                $event,
+                $item,
+                $school,
+                $data['student_ids'],
+                $data['standby_ids'] ?? [],
+                $data['team_name'] ?? null,
+                skipSchoolClosedCheck: true,
+            );
+        } catch (ValidationException $e) {
+            return back()
+                ->withInput()
+                ->with('error', $this->validationFailureMessage($e));
+        }
 
         if ($request->boolean('auto_approve')) {
             app(FestRegistrationApprovalService::class)->approve($registration->load(['participants', 'item', 'event']));
@@ -136,6 +173,13 @@ class FestRegistrationReviewController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/Registrations/Import', $this->withEventActivity($event, FestPageActivity::REGISTRATIONS_IMPORT, [
             'event' => $event,
         ]));
+    }
+
+    private function validationFailureMessage(ValidationException $e): string
+    {
+        $messages = collect($e->errors())->flatten()->filter()->values();
+
+        return $messages->first() ?: $e->getMessage();
     }
 
     public function approve(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration, PlatformAuditLogger $audit)

@@ -43,7 +43,7 @@
                           class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
                         Edit
                     </Link>
-                    <Link :href="`/admin/builder/sections?tenant=${tenant.id}`"
+                    <Link v-if="websiteEnabled" :href="`/admin/builder/sections?tenant=${tenant.id}`"
                           class="px-4 py-2 rounded-lg text-white text-sm font-medium transition">
                         Site Builder →
                     </Link>
@@ -53,6 +53,50 @@
                         Sahodaya Admin →
                     </Link>
                 </div>
+            </div>
+
+            <!-- Sidebar menu manager (superadmin → Sahodaya) -->
+            <div v-if="navManager" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 class="font-bold text-gray-900 mb-1">Sidebar menu access</h3>
+                <p class="text-sm text-gray-500 mb-4">
+                    Turn off any menu or program to hide it for this Sahodaya <span class="font-medium">and all its schools</span>.
+                    A disabled item cannot be re-enabled by the Sahodaya admin.
+                </p>
+
+                <form @submit.prevent="saveNavVisibility" class="space-y-5">
+                    <div>
+                        <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Menus</h4>
+                        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <label v-for="(label, key) in navManager.menus" :key="key"
+                                   class="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                <input type="checkbox" class="rounded border-gray-300"
+                                       :checked="navForm.menus[key] !== false"
+                                       @change="navForm.menus[key] = $event.target.checked">
+                                <span class="text-sm text-gray-700">{{ label }}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Fest programs</h4>
+                        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <label v-for="(label, key) in navManager.programs" :key="key"
+                                   class="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                <input type="checkbox" class="rounded border-gray-300"
+                                       :checked="navForm.programs[key] !== false"
+                                       @change="navForm.programs[key] = $event.target.checked">
+                                <span class="text-sm text-gray-700">{{ label }}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button type="submit" class="btn-primary px-4 py-2 rounded-lg text-sm font-medium" :disabled="navForm.processing">
+                            {{ navForm.processing ? 'Saving…' : 'Save menu access' }}
+                        </button>
+                        <span v-if="navForm.recentlySuccessful" class="text-sm text-green-600">Saved.</span>
+                    </div>
+                </form>
             </div>
 
             <!-- School membership (superadmin) -->
@@ -319,7 +363,7 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Link, router, useForm } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -343,7 +387,19 @@ const props = defineProps({
         default: () => [],
     },
     loginUrl: { type: String, default: null },
+    navManager: { type: Object, default: null },
 });
+
+const websiteEnabled = computed(() => usePage().props.features?.website_enabled ?? false);
+
+const navForm = useForm({
+    programs: { ...(props.navManager?.overrides?.programs ?? {}) },
+    menus: { ...(props.navManager?.overrides?.menus ?? {}) },
+});
+
+function saveNavVisibility() {
+    navForm.put(`/admin/tenants/${props.tenant.id}/nav-visibility`, { preserveScroll: true });
+}
 
 const portalAdmins = computed(() =>
     props.tenant.type === 'school' ? props.schoolAdmins : props.sahodayaAdmins
@@ -466,7 +522,7 @@ const sahodayaLinks = computed(() => {
         { href: `/sahodaya-admin/${id}/membership/reports`, icon: '📊', label: 'Reports', hint: 'Summary & CSV exports' },
         { href: `/sahodaya-admin/${id}/circulars`,          icon: '📄', label: 'Circulars', hint: 'Official notices' },
         { href: `/sahodaya-admin/${id}/office-bearers`,     icon: '👥', label: 'Office Bearers', hint: 'Leadership profiles' },
-        { href: `/sahodaya-admin/${id}/programs/kalotsav`, icon: '🏆', label: 'Kalotsav', hint: 'Events & catalog' },
+        { href: `/sahodaya-admin/${id}/kalotsav`, icon: '🏆', label: 'Kalotsav', hint: 'Events & catalog' },
     ];
 });
 </script>

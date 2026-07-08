@@ -3,14 +3,20 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
+use App\Models\FestAttendance;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\Tenant;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestMarkCoordinatorAccess;
+use App\Services\Events\FestMarkEntryScopeService;
 use App\Services\Events\FestMarkSaveService;
+use App\Services\Events\FestRankPointService;
+use App\Services\Events\FestSportsAutoRankService;
+use App\Services\Events\PortalEventHeadNavService;
 use Illuminate\Http\Request;
 
 class FestMarkCoordinatorController extends Controller
@@ -66,19 +72,74 @@ class FestMarkCoordinatorController extends Controller
 
         $event->load('items');
 
-        $registrations = FestRegistration::where('event_id', $event->id)
-            ->where('status', 'approved')
-            ->with(['item', 'participants.student', 'participants.teacher'])
-            ->get();
+        $scope = app(FestMarkEntryScopeService::class);
+        $registrations = $scope->scopedRegistrations($event, $request->user());
+        $marks = $scope->officialMarks($event);
 
-        $marks = FestMark::where('event_id', $event->id)->get()->keyBy('participant_id');
+        $headNav = app(PortalEventHeadNavService::class);
+        $headContext = $headNav->context($event, $request);
+        $registrations = $headNav->filterRegistrations(
+            $registrations,
+            $headContext['selectedHeadId'],
+            $headContext['selectedItemId'],
+        );
+
+        $attendance = FestAttendance::where('event_id', $event->id)
+            ->get()
+            ->mapWithKeys(fn (FestAttendance $row) => [
+                "{$row->item_id}-{$row->participant_id}" => ['status' => $row->status],
+            ])
+            ->all();
 
         return inertia('Portal/FestCoordinator/MarkEntry', [
             'sahodaya'      => Tenant::find($tenantId)?->only('id', 'name'),
             'event'         => $event,
             'registrations' => $registrations,
             'marks'         => $marks,
+            'attendance'    => $attendance,
+            'rankPoints'    => $event->event_type === 'sports'
+                ? app(FestRankPointService::class)->listForEvent($event)
+                : [],
+            ...$headContext,
         ]);
+    }
+
+    public function storeAttendance(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $tenantId, 403);
+        abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403);
+
+        $data = $request->validate([
+            'item_id'        => 'required|exists:fest_event_items,id',
+            'participant_id' => 'required|exists:fest_participants,id',
+            'status'         => 'required|in:present,absent',
+        ]);
+
+        FestAttendance::updateOrCreate(
+            ['item_id' => $data['item_id'], 'participant_id' => $data['participant_id']],
+            [
+                'event_id'  => $event->id,
+                'status'    => $data['status'],
+                'marked_by' => $request->user()->id,
+                'marked_at' => now(),
+            ]
+        );
+
+        return back()->with('success', 'Attendance saved.');
+    }
+
+    public function autoRankItem(Request $request, string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)
+    {
+        abort_if($event->tenant_id !== $tenantId, 403);
+        abort_unless(FestMarkCoordinatorAccess::canAccessEvent($request->user(), $event), 403);
+        abort_if($item->event_id !== $event->id, 404);
+        abort_unless($event->event_type === 'sports', 422, 'Auto-rank applies to sports events only.');
+
+        app(FestMarkEntryScopeService::class)->assertCanEnterMark($request->user(), $event, $item->id);
+
+        $result = $ranker->rankItem($event, $item);
+
+        return back()->with('success', "Auto-ranked {$result['ranked']} athlete(s) for {$result['item_title']}.");
     }
 
     public function storeMark(Request $request, string $tenantId, FestEvent $event, FestMarkSaveService $markSave)
@@ -97,6 +158,8 @@ class FestMarkCoordinatorController extends Controller
             'measurement_value' => 'nullable|string|max:50',
             'measurement_unit'  => 'nullable|string|max:20',
         ]);
+
+        app(FestMarkEntryScopeService::class)->assertCanEnterMark($request->user(), $event, (int) $data['item_id']);
 
         $result = $markSave->save($event, $data, $request->user()->id);
 

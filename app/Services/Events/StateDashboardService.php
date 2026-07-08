@@ -44,8 +44,8 @@ class StateDashboardService
                         'level_round'       => $propagation->level_round,
                         'tenant_event_id'   => $propagation->tenant_event_id,
                         'event'             => $eventMeta,
-                        'manage_url'        => ($propagation->sahodaya_id && $propagation->tenant_event_id)
-                            ? "/sahodaya-admin/{$propagation->sahodaya_id}/events/{$propagation->tenant_event_id}"
+                        'manage_url'        => $propagation->state_program_id
+                            ? "/admin/state-programs/{$propagation->state_program_id}"
                             : null,
                     ];
                 });
@@ -107,7 +107,9 @@ class StateDashboardService
                 'event_title'       => $meta['title'],
                 'status'            => $meta['status'],
                 'results_published' => $meta['results_published'],
-                'manage_url'        => "/sahodaya-admin/{$propagation->sahodaya_id}/events/{$propagation->tenant_event_id}",
+                'manage_url'        => $propagation->state_program_id
+                    ? "/admin/state-programs/{$propagation->state_program_id}"
+                    : null,
             ];
         }
 
@@ -164,7 +166,9 @@ class StateDashboardService
                 'event_title'   => $counts['event_title'],
                 'total'         => $counts['total'],
                 'approved'      => $counts['approved'],
-                'manage_url'    => "/sahodaya-admin/{$propagation->sahodaya_id}/events/{$propagation->tenant_event_id}/registrations",
+                'manage_url'    => $propagation->state_program_id
+                    ? "/admin/state-programs/{$propagation->state_program_id}"
+                    : null,
             ];
         }
 

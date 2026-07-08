@@ -1,10 +1,10 @@
 <template>
-    <SahodayaAdminLayout title="MCQ Exams" :sahodaya="sahodaya" :publicUrl="publicUrl"
+    <SahodayaAdminLayout title="Talent Search Exams" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader title="All MCQ exams" eyebrow="MCQ exams"
+        <PageHeader title="All Talent Search exams" eyebrow="Talent Search exams"
                     description="Create standalone Level 1 exams or use exam series for multi-level promotion.">
             <template #actions>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq`" class="btn-secondary text-sm">← MCQ dashboard</Link>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq`" class="btn-secondary text-sm">← Talent Search dashboard</Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-series`" class="btn-secondary text-sm">Exam series</Link>
             </template>
         </PageHeader>
@@ -35,7 +35,7 @@
             </div>
             <FormGrid>
                 <FormField label="Exam title" class-extra="sm:col-span-2" required>
-                    <input v-model="form.title" class="field" placeholder="e.g. Sahodaya MCQ 2026" required>
+                    <input v-model="form.title" class="field" placeholder="e.g. Sahodaya Talent Search 2026" required>
                 </FormField>
                 <FormField label="Type">
                     <select v-model="form.exam_type" class="field">
@@ -69,7 +69,7 @@
         </form>
 
         <div class="card overflow-hidden p-0">
-            <EmptyState v-if="!exams.length" title="No MCQ exams yet" description="Create your first exam using the form above." icon="📝" />
+            <EmptyState v-if="!exams.length" title="No Talent Search exams yet" description="Create your first exam using the form above." icon="📝" />
             <table v-else class="data-table">
                 <thead>
                     <tr>

@@ -79,6 +79,7 @@ class FestItemCatalogService
             'age_group'            => $taxonomy['age_group'][$val] ?? strtoupper((string) $val),
             'kids_band'            => $taxonomy['kids_band'][$val] ?? strtoupper(str_replace('_', ' ', (string) $val)),
             'gender'               => $taxonomy['gender'][$val] ?? ucfirst((string) $val),
+            'head_key'             => FestItemHeadService::headLabel((string) $val),
             default                => (string) $val,
         };
     }

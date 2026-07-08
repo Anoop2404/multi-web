@@ -39,55 +39,54 @@ class PlatformAuditLogger
     }
 
     /** @param  array<string, mixed>  $context */
-    public function login(int $userId, string $email, array $context = []): AuditLog
+    public function login(int $userId, string $email, array $context = []): ?AuditLog
     {
-        return $this->log('login', "User logged in: {$email}", properties: array_merge([
-            'email' => $email,
-        ], $context), userId: $userId, category: 'auth');
+        return $this->dispatchAuthLog('login', $userId, $email, $context);
     }
 
     /** @param  array<string, mixed>  $context */
-    public function loginFailed(string $email, string $reason, ?int $userId = null, array $context = []): AuditLog
+    public function loginFailed(string $email, string $reason, ?int $userId = null, array $context = []): ?AuditLog
     {
-        return $this->log(
-            'login.failed',
-            'Failed login attempt',
-            properties: array_merge(['email' => $email, 'reason' => $reason], $context),
-            userId: $userId,
-            category: 'auth',
-        );
+        return $this->dispatchAuthLog('login.failed', $userId, $email, array_merge(['reason' => $reason], $context));
     }
 
     /** @param  array<string, mixed>  $context */
-    public function loginPortalRejected(int $userId, string $email, string $reason, array $context = []): AuditLog
+    public function loginPortalRejected(int $userId, string $email, string $reason, array $context = []): ?AuditLog
     {
-        return $this->log(
-            'login.portal_rejected',
-            "Login rejected (wrong portal): {$email}",
-            properties: array_merge(['email' => $email, 'reason' => $reason], $context),
-            userId: $userId,
-            category: 'auth',
-        );
+        return $this->dispatchAuthLog('login.portal_rejected', $userId, $email, array_merge(['reason' => $reason], $context));
     }
 
     /** @param  array<string, mixed>  $context */
-    public function loginNoPortal(int $userId, string $email, array $context = []): AuditLog
+    public function loginNoPortal(int $userId, string $email, array $context = []): ?AuditLog
     {
-        return $this->log(
-            'login.no_portal',
-            "Login rejected (no portal): {$email}",
-            properties: array_merge(['email' => $email], $context),
-            userId: $userId,
-            category: 'auth',
-        );
+        return $this->dispatchAuthLog('login.no_portal', $userId, $email, $context);
     }
 
     /** @param  array<string, mixed>  $context */
-    public function logout(int $userId, string $email, array $context = []): AuditLog
+    public function logout(int $userId, string $email, array $context = []): ?AuditLog
     {
-        return $this->log('logout', "User logged out: {$email}", properties: array_merge([
-            'email' => $email,
-        ], $context), userId: $userId, category: 'auth');
+        return $this->dispatchAuthLog('logout', $userId, $email, $context);
+    }
+
+    /** @param  array<string, mixed>  $context */
+    private function dispatchAuthLog(string $action, ?int $userId, string $email, array $context = []): ?AuditLog
+    {
+        $context['ip'] = $context['ip'] ?? $this->request?->ip();
+
+        if (config('erp.async_auth_audit', true) && ! app()->runningUnitTests()) {
+            dispatch(\App\Jobs\LogAuthEventJob::fromLogin($action, $userId ?? 0, $email, $context));
+
+            return null;
+        }
+
+        return match ($action) {
+            'login' => $this->log('login', "User logged in: {$email}", properties: array_merge(['email' => $email], $context), userId: $userId, category: 'auth'),
+            'login.failed' => $this->log('login.failed', 'Failed login attempt', properties: array_merge(['email' => $email, 'reason' => $context['reason'] ?? ''], $context), userId: $userId, category: 'auth'),
+            'login.portal_rejected' => $this->log('login.portal_rejected', "Login rejected (wrong portal): {$email}", properties: array_merge(['email' => $email, 'reason' => $context['reason'] ?? ''], $context), userId: $userId, category: 'auth'),
+            'login.no_portal' => $this->log('login.no_portal', "Login rejected (no portal): {$email}", properties: array_merge(['email' => $email], $context), userId: $userId, category: 'auth'),
+            'logout' => $this->log('logout', "User logged out: {$email}", properties: array_merge(['email' => $email], $context), userId: $userId, category: 'auth'),
+            default => null,
+        };
     }
 
     public function userCreated(User $user): AuditLog
@@ -316,5 +315,14 @@ class PlatformAuditLogger
             'program'   => $program,
             'page'      => $page,
         ], $properties));
+    }
+    public function reportDownloaded(string $reportName, array $filters = []): AuditLog
+    {
+        return $this->log(
+            'report.downloaded',
+            "Report downloaded: {$reportName}",
+            properties: array_merge(['report' => $reportName], $filters),
+            category: 'system',
+        );
     }
 }

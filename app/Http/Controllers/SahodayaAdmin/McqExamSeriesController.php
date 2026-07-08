@@ -43,7 +43,7 @@ class McqExamSeriesController extends SahodayaAdminController
             'status'           => 'draft',
         ]);
 
-        return back()->with('success', 'MCQ series created.');
+        return back()->with('success', 'Talent Search series created.');
     }
 
     public function show(string $tenantId, McqExamSeries $series)
@@ -120,6 +120,7 @@ class McqExamSeriesController extends SahodayaAdminController
             'levels.*.scheduled_at'          => 'nullable|date',
             'levels.*.duration_minutes'      => 'nullable|integer|min:5|max:480',
             'levels.*.fee_amount'            => 'nullable|numeric|min:0',
+            'levels.*.school_discount_amount'=> 'nullable|numeric|min:0',
             'levels.*.eligibility_mode'      => 'nullable|in:open,cutoff_marks,top_rank,manual',
             'levels.*.cutoff_score'          => 'nullable|numeric|min:0',
             'levels.*.top_rank_count'        => 'nullable|integer|min:1',
@@ -195,6 +196,7 @@ class McqExamSeriesController extends SahodayaAdminController
             'scheduled_at'       => 'nullable|date',
             'duration_minutes'   => 'nullable|integer|min:5|max:480',
             'fee_amount'         => 'nullable|numeric|min:0',
+            'school_discount_amount' => 'nullable|numeric|min:0',
             'eligibility_config' => 'nullable|array',
             'delivery_mode'      => 'nullable|in:offline,online',
         ]);
@@ -206,6 +208,12 @@ class McqExamSeriesController extends SahodayaAdminController
     private function createSeriesExam(McqExamSeries $series, array $data): McqExam
     {
         $fee = (float) ($data['fee_amount'] ?? 0);
+        $discount = (float) ($data['school_discount_amount'] ?? 0);
+        if ($discount > $fee && $fee > 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'school_discount_amount' => 'School discount cannot exceed the student fee.',
+            ]);
+        }
 
         return McqExam::create([
             'tenant_id'          => $this->sahodaya->id,
@@ -220,6 +228,7 @@ class McqExamSeriesController extends SahodayaAdminController
             'scheduled_at'       => $data['scheduled_at'] ?? null,
             'duration_minutes'   => McqExamPayload::durationMinutes($data['duration_minutes'] ?? null),
             'fee_amount'         => $fee > 0 ? $fee : null,
+            'school_discount_amount' => $fee > 0 && $discount > 0 ? $discount : null,
             'fee_type'           => $fee > 0 ? 'flat' : 'none',
             'delivery_mode'      => $data['delivery_mode'] ?? 'offline',
             'eligibility_config' => McqExamEligibilityConfig::normalize($data['eligibility_config'] ?? null),

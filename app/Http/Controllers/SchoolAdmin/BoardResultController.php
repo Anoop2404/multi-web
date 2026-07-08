@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SchoolAdmin;
 use App\Support\BoardExamSubjects;
 use App\Support\PersistDefaults;
 use App\Models\BoardResult;
+use App\Support\TenantStorage;
 use App\Models\Topper;
 use Illuminate\Http\Request;
 
@@ -87,7 +88,7 @@ class BoardResultController extends SchoolAdminController
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store(
                 'board-results/'.$this->school->id.'/'.$boardResult->id,
-                's3'
+                TenantStorage::uploadDisk()
             );
         }
 
@@ -109,7 +110,7 @@ class BoardResultController extends SchoolAdminController
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store(
                 'board-results/'.$this->school->id.'/'.$boardResult->id,
-                's3'
+                TenantStorage::uploadDisk()
             );
         }
 

@@ -33,6 +33,11 @@
         <div class="flex flex-wrap gap-2 items-end mb-4">
             <input v-model="search" type="search" class="field flex-1 min-w-[12rem] !py-1.5 text-sm"
                    placeholder="Search items…" autocomplete="off">
+            <select v-if="headOptions.length" v-model="headFilter" class="field text-sm max-w-[14rem]">
+                <option value="">All item heads</option>
+                <option v-for="h in headOptions" :key="h.id" :value="h.id">{{ h.name }}</option>
+                <option value="other">Unassigned</option>
+            </select>
             <select v-if="ageGroups.length" v-model="ageFilter" class="field text-sm max-w-[10rem]">
                 <option value="">All age groups</option>
                 <option v-for="g in ageGroups" :key="g" :value="g">{{ String(g).toUpperCase() }}</option>
@@ -69,24 +74,31 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="row in filteredRows" :key="row.item_id" class="hover:bg-slate-50/60">
-                            <td class="font-medium text-slate-900">{{ row.title }}</td>
-                            <td class="text-xs uppercase text-slate-500">{{ row.age_group || '—' }}</td>
-                            <td>
-                                <input v-model="draft[row.item_id].scheduled_date" type="date" class="field !py-1 !text-xs">
-                            </td>
-                            <td>
-                                <input v-model="draft[row.item_id].scheduled_time" type="time" class="field !py-1 !text-xs">
-                            </td>
-                            <td>
-                                <select v-if="stages.length" v-model="draft[row.item_id].stage_id" class="field !py-1 !text-xs">
-                                    <option value="">— Optional —</option>
-                                    <option v-for="s in stages" :key="s.id" :value="String(s.id)">{{ stageLabel(s) }}</option>
-                                </select>
-                                <input v-else v-model="draft[row.item_id].stage" type="text" class="field !py-1 !text-xs"
-                                       placeholder="Stage name">
-                            </td>
-                        </tr>
+                        <template v-for="group in groupedFilteredRows" :key="group.key">
+                            <tr class="bg-indigo-50/60">
+                                <td colspan="5" class="px-3 py-2 text-xs font-bold uppercase tracking-wide text-indigo-800">
+                                    {{ group.label }} · {{ group.rows.length }} item{{ group.rows.length === 1 ? '' : 's' }}
+                                </td>
+                            </tr>
+                            <tr v-for="row in group.rows" :key="row.item_id" class="hover:bg-slate-50/60">
+                                <td class="font-medium text-slate-900">{{ row.title }}</td>
+                                <td class="text-xs uppercase text-slate-500">{{ row.age_group || '—' }}</td>
+                                <td>
+                                    <input v-model="draft[row.item_id].scheduled_date" type="date" class="field !py-1 !text-xs">
+                                </td>
+                                <td>
+                                    <input v-model="draft[row.item_id].scheduled_time" type="time" class="field !py-1 !text-xs">
+                                </td>
+                                <td>
+                                    <select v-if="stages.length" v-model="draft[row.item_id].stage_id" class="field !py-1 !text-xs">
+                                        <option value="">— Optional —</option>
+                                        <option v-for="s in stages" :key="s.id" :value="String(s.id)">{{ stageLabel(s) }}</option>
+                                    </select>
+                                    <input v-else v-model="draft[row.item_id].stage" type="text" class="field !py-1 !text-xs"
+                                           placeholder="Stage name">
+                                </td>
+                            </tr>
+                        </template>
                         <tr v-if="!filteredRows.length">
                             <td colspan="5" class="p-6 text-center text-slate-400">No items match your filters.</td>
                         </tr>
@@ -123,6 +135,7 @@ const props = defineProps({
 });
 
 const search = ref('');
+const headFilter = ref('');
 const ageFilter = ref('');
 const statusFilter = ref('');
 const importFile = ref(null);
@@ -153,6 +166,8 @@ const importTemplateUrl = computed(() => `${base.value}/schedule/items/import-te
 const filteredRows = computed(() => {
     const q = search.value.trim().toLowerCase();
     return (props.rows ?? []).filter((row) => {
+        if (headFilter.value === 'other' && row.head_id) return false;
+        if (headFilter.value && headFilter.value !== 'other' && String(row.head_id ?? '') !== String(headFilter.value)) return false;
         if (ageFilter.value && row.age_group !== ageFilter.value) return false;
         const hasSchedule = Boolean(row.scheduled_date || row.scheduled_time || row.stage_id || row.stage);
         if (statusFilter.value === 'scheduled' && !hasSchedule) return false;
@@ -160,6 +175,35 @@ const filteredRows = computed(() => {
         if (q && !String(row.title ?? '').toLowerCase().includes(q)) return false;
         return true;
     });
+});
+
+const headOptions = computed(() => {
+    const map = new Map();
+    for (const row of props.rows ?? []) {
+        if (row.head_id && row.head_name) {
+            map.set(String(row.head_id), row.head_name);
+        }
+    }
+    return [...map.entries()].map(([id, name]) => ({ id, name }));
+});
+
+const groupedFilteredRows = computed(() => {
+    const groups = [];
+    const byKey = new Map();
+    for (const row of filteredRows.value) {
+        const key = row.head_id ? String(row.head_id) : 'other';
+        if (!byKey.has(key)) {
+            const group = {
+                key,
+                label: row.head_name || 'Unassigned items',
+                rows: [],
+            };
+            byKey.set(key, group);
+            groups.push(group);
+        }
+        byKey.get(key).rows.push(row);
+    }
+    return groups;
 });
 
 function stageLabel(stage) {

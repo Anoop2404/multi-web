@@ -18,11 +18,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Tests\Support\OpensStudentWindows;
 use Tests\TestCase;
 
 class StudentRegistrationTest extends TestCase
 {
     use RefreshDatabase;
+    use OpensStudentWindows;
 
     private function schoolWithClass(): array
     {
@@ -40,6 +42,8 @@ class StudentRegistrationTest extends TestCase
             'tenant_id' => $sahodaya->id,
             'prefix'    => 'KNR',
         ]);
+
+        $this->openStudentWindows($sahodaya);
 
         $tenant = Tenant::create([
             'id'            => (string) Str::uuid(),
@@ -93,23 +97,27 @@ class StudentRegistrationTest extends TestCase
         ]);
     }
 
-    public function test_student_gets_sahodaya_registration_number(): void
+    public function test_student_gets_sequential_registration_number(): void
     {
         ['tenant' => $tenant, 'class' => $class] = $this->schoolWithClass();
 
         $regNo = app(StudentRegistrationNumberGenerator::class)->generate($tenant->fresh());
 
-        $this->assertMatchesRegularExpression('/^KNR\/TST\/\d{2}\/0001$/', $regNo);
+        $yearSuffix = substr(explode('-', date('n') >= 4 ? date('Y').'-'.substr((string) (date('Y') + 1), -2) : (date('Y') - 1).'-'.substr(date('Y'), -2))[1], -2);
+        $this->assertSame("STU/{$yearSuffix}/0001", $regNo);
 
         $student = Student::create([
             'tenant_id'        => $tenant->id,
             'school_class_id'  => $class->id,
             'name'             => 'Rahul Kumar',
-            'admission_number' => $regNo,
+            'reg_no'           => $regNo,
             'status'           => 'active',
         ]);
 
-        $this->assertSame($regNo, $student->admission_number);
+        $this->assertSame("STU/{$yearSuffix}/0001", $student->reg_no);
+
+        $second = app(StudentRegistrationNumberGenerator::class)->generate($tenant->fresh());
+        $this->assertSame("STU/{$yearSuffix}/0002", $second);
     }
 
     public function test_school_can_register_a_student_under_a_class(): void
@@ -177,7 +185,7 @@ class StudentRegistrationTest extends TestCase
             'parent_email'    => 'rahul@example.com',
             'school_class_id' => $class->id,
         ]);
-        $this->assertNotNull(Student::where('tenant_id', $tenant->id)->where('name', 'Rahul Kumar')->value('admission_number'));
+        $this->assertNotNull(Student::where('tenant_id', $tenant->id)->where('name', 'Rahul Kumar')->value('reg_no'));
         $this->assertDatabaseHas('students', [
             'tenant_id'    => $tenant->id,
             'name'         => 'Anita Shah',
@@ -268,9 +276,8 @@ class StudentRegistrationTest extends TestCase
             ->assertOk();
     }
 
-    public function test_student_photo_upload_stores_on_s3_even_when_upload_disk_is_shared(): void
+    public function test_student_photo_upload_stores_on_shared_disk(): void
     {
-        Storage::fake('s3');
         Storage::fake('shared');
         config(['filesystems.upload_disk' => 'shared']);
 
@@ -299,7 +306,7 @@ class StudentRegistrationTest extends TestCase
 
         $student->refresh();
         $this->assertNotNull($student->photo);
-        Storage::disk('s3')->assertExists($student->photo);
+        Storage::disk('shared')->assertExists($student->photo);
 
         $this->actingAs($admin)
             ->get("/school-admin/{$school->id}/students/{$student->id}/photo")

@@ -1,6 +1,7 @@
 <template>
-    <SahodayaAdminLayout :title="`Item category masters`" :sahodaya="sahodaya" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+    <SahodayaEventsLayout :title="`Item category masters`" :sahodaya="sahodaya" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :program="program"
+                         :program-events="programEvents" :show-header-title="false">
         <PageHeader title="Item category masters" eyebrow="Catalog"
                     description="Manage dropdown values for sports and arts item forms — disciplines, venue types, formats, participant types, and more.">
             <template #actions>
@@ -10,7 +11,7 @@
 
         <div class="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-4">
             <Link v-for="(label, key) in dimensions" :key="key"
-                  :href="`/sahodaya-admin/${sahodaya.id}/taxonomy-masters?dimension=${key}`"
+                  :href="`/sahodaya-admin/${sahodaya.id}/taxonomy-masters?dimension=${key}${programQuery}`"
                   :class="dimension === key ? 'subnav-link subnav-link--active' : 'subnav-link'">
                 {{ label }}
             </Link>
@@ -74,18 +75,20 @@
                 </tbody>
             </table>
         </div>
-    </SahodayaAdminLayout>
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { reactive, watch } from 'vue';
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { computed, reactive, watch } from 'vue';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 
 const props = defineProps({
     sahodaya: Object,
     publicUrl: String,
     pendingPaymentsCount: Number,
+    program: Object,
+    programEvents: { type: Array, default: () => [] },
     dimension: String,
     dimensions: Object,
     entries: Array,
@@ -93,6 +96,7 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/taxonomy-masters`;
+const programQuery = computed(() => (props.program?.slug ? `&program=${props.program.slug}` : ''));
 const form = useForm({
     dimension: props.dimension,
     entry_key: '',

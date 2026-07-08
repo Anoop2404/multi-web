@@ -39,7 +39,8 @@ class FestRegistrationRegisterService
             ->whereNotIn('status', ['withdrawn', 'rejected'])
             ->with([
                 'school:id,name',
-                'item:id,title,participant_type,class_group,age_group,fee_amount',
+                'item:id,title,participant_type,class_group,age_group,fee_amount,head_id',
+                'item.head:id,name',
                 'participants.student:id,name,reg_no',
                 'participants.teacher:id,name,reg_no',
             ])
@@ -71,8 +72,8 @@ class FestRegistrationRegisterService
         }
 
         usort($rows, function (array $a, array $b) {
-            return [$a['school_name'], $a['student_name'], $a['item_title']]
-                <=> [$b['school_name'], $b['student_name'], $b['item_title']];
+            return [$a['school_name'], $a['participant_name'], $a['item_title']]
+                <=> [$b['school_name'], $b['participant_name'], $b['item_title']];
         });
 
         $schoolSummaries = $this->schoolSummaries($event, $schoolFees, $feeRequired, $schoolId);
@@ -113,7 +114,7 @@ class FestRegistrationRegisterService
         return response()->streamDownload(function () use ($data) {
             $out = fopen('php://output', 'w');
             fputcsv($out, [
-                'School', 'Student', 'School reg no', 'Fest ID', 'Item', 'Reg status', 'Role',
+                'School', 'Student', 'School reg no', 'Fest ID', 'Item reg no', 'Item', 'Reg status', 'Role',
                 'Chest no', 'Item fee', 'School total due', 'Fee status',
             ]);
             foreach ($data['rows'] as $row) {
@@ -122,6 +123,7 @@ class FestRegistrationRegisterService
                     $row['participant_name'],
                     $row['participant_reg_no'],
                     $row['level_reg'],
+                    $row['item_reg'],
                     $row['item_title'],
                     $row['registration_status'],
                     $row['participant_role'],
@@ -186,8 +188,11 @@ class FestRegistrationRegisterService
             'participant_name'      => $name,
             'participant_reg_no'    => $regNo,
             'level_reg'             => $participant->level_registration_number ?? '—',
+            'item_reg'              => $participant->item_registration_number ?? '—',
             'item_id'               => $registration->item_id,
             'item_title'            => $registration->item?->title ?? '—',
+            'head_id'               => $registration->item?->head_id,
+            'head_name'             => $registration->item?->head?->name,
             'registration_status'   => $registration->status,
             'participant_role'      => $participant->participant_role ?? 'performer',
             'chest_no'              => $participant->chest_no ?? '—',

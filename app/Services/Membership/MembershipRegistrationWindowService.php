@@ -28,8 +28,8 @@ class MembershipRegistrationWindowService
         }
 
         $now ??= now();
-        $start = $window->add_open ?? $window->registration_starts_at;
-        $end = $window->add_close ?? $window->registration_ends_at;
+        $start = $window->registration_starts_at ?? $window->add_open;
+        $end = $window->registration_ends_at ?? $window->add_close;
 
         if ($start && $now->lt($start)) {
             return 'Registration has not opened yet. Opens on '.$start->format('d M Y').'.';
@@ -78,12 +78,9 @@ class MembershipRegistrationWindowService
             return null;
         }
 
-        $start = $window->add_open ?? $window->registration_starts_at;
-        $end = $window->add_close ?? $window->registration_ends_at;
-
         return array_merge($window->toArray(), [
-            'display_starts_at' => $start?->toIso8601String(),
-            'display_ends_at'   => $end?->toIso8601String(),
+            'display_starts_at' => ($window->registration_starts_at ?? $window->add_open)?->toIso8601String(),
+            'display_ends_at'   => ($window->registration_ends_at ?? $window->add_close)?->toIso8601String(),
         ]);
     }
 }

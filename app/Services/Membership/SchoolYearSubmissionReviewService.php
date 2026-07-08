@@ -85,11 +85,21 @@ class SchoolYearSubmissionReviewService
 
         abort_unless($submission->{$field} === 'submitted', 422, 'Track is not awaiting review.');
 
+        $before = $submission->{$field};
         $submission->update([
             $field                 => 'approved',
             'reviewed_by_user_id'  => $reviewerId,
             'reviewed_at'          => now(),
         ]);
+
+        app(DataChangeLogger::class)->updated(
+            $submission,
+            "Annual registration track approved: {$track}",
+            [$field => ['old' => $before, 'new' => 'approved']],
+            $submission->school_id,
+            'membership',
+            ['track' => $track, 'reviewer_id' => $reviewerId],
+        );
 
         $registration = $submission->registration()->firstOrFail();
         $school = $submission->school;
@@ -114,12 +124,22 @@ class SchoolYearSubmissionReviewService
 
         abort_unless($submission->{$field} === 'submitted', 422, 'Track is not awaiting review.');
 
+        $before = $submission->{$field};
         $submission->update([
             $field                 => 'rejected',
             $reasonField           => $reason,
             'reviewed_by_user_id'  => $reviewerId,
             'reviewed_at'          => now(),
         ]);
+
+        app(DataChangeLogger::class)->updated(
+            $submission,
+            "Annual registration track rejected: {$track}",
+            [$field => ['old' => $before, 'new' => 'rejected']],
+            $submission->school_id,
+            'membership',
+            ['track' => $track, 'reason' => $reason, 'reviewer_id' => $reviewerId],
+        );
 
         $registration = $submission->registration()->firstOrFail();
         app(RegistrationStatusService::class)->markDataRejected($registration);

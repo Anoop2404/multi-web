@@ -73,6 +73,13 @@ class StudentLockAndSubmissionReviewTest extends TestCase
 
         SahodayaProfile::where('tenant_id', $sahodaya->id)->update(['student_edit_lock_enabled' => false]);
 
+        SchoolLockOverride::create([
+            'sahodaya_id'        => $sahodaya->id,
+            'school_id'          => $school->id,
+            'override_type'      => 'lock_all',
+            'created_by_user_id' => null,
+        ]);
+
         $httpRequest = Request::create('/test', 'POST', [
             'school_class_id' => $schoolClass->id,
             'name'            => 'New Student',
@@ -168,27 +175,39 @@ class StudentLockAndSubmissionReviewTest extends TestCase
         $this->assertSame('school_override', $state['source']);
     }
 
-    public function test_global_window_controls_add_and_edit(): void
+    public function test_student_records_open_when_global_window_open(): void
     {
         ['sahodaya' => $sahodaya, 'school' => $school] = $this->clusterWithFullRecords();
 
         SahodayaProfile::where('tenant_id', $sahodaya->id)->update(['student_edit_lock_enabled' => false]);
 
-        $year = AcademicYear::forSahodaya($sahodaya->id);
-
         SahodayaRegistrationWindow::create([
-            'sahodaya_id'   => $sahodaya->id,
-            'academic_year' => $year,
-            'add_open'      => now()->subDay(),
-            'add_close'     => now()->addDay(),
-            'edit_open'     => now()->subDay(),
-            'edit_close'    => now()->subDay(),
+            'sahodaya_id'    => $sahodaya->id,
+            'academic_year'  => AcademicYear::forSahodaya($sahodaya->id),
+            'add_open'       => now()->subDay(),
+            'add_close'      => now()->addMonth(),
+            'edit_open'      => now()->subDay(),
+            'edit_close'     => now()->addMonth(),
         ]);
 
         $state = app(StudentEditLockService::class)->resolveWindowState($school);
 
         $this->assertTrue($state['can_add']);
+        $this->assertTrue($state['can_edit']);
+        $this->assertSame('global_window', $state['source']);
+    }
+
+    public function test_student_records_locked_by_default_without_window(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school] = $this->clusterWithFullRecords();
+
+        SahodayaProfile::where('tenant_id', $sahodaya->id)->update(['student_edit_lock_enabled' => false]);
+
+        $state = app(StudentEditLockService::class)->resolveWindowState($school);
+
+        $this->assertFalse($state['can_add']);
         $this->assertFalse($state['can_edit']);
+        $this->assertSame('global_window', $state['source']);
     }
 
     public function test_full_records_submission_requires_students_and_sahodaya_approval(): void

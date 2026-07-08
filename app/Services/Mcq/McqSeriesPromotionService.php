@@ -46,6 +46,9 @@ class McqSeriesPromotionService
         return $this->eligibility->eligibleStudents($childExam, $students)
             ->map(function (Student $student) use ($registrations) {
                 $reg = $registrations->firstWhere('student_id', $student->id);
+                if ($reg?->attendance_status === 'absent' || $reg?->status !== 'submitted') {
+                    return null;
+                }
                 $mark = $reg?->mark;
 
                 return [
@@ -58,6 +61,7 @@ class McqSeriesPromotionService
                     'rank'         => $mark?->rank,
                 ];
             })
+            ->filter()
             ->sortBy([
                 ['rank', 'asc'],
                 ['score', 'desc'],

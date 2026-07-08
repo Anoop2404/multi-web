@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FestLevelRegistration extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = ['event_id', 'student_id', 'school_id', 'registration_number', 'status', 'registered_at'];
 
     protected $casts = [
@@ -25,6 +28,6 @@ class FestLevelRegistration extends Model
 
     public function school(): BelongsTo
     {
-        return $this->belongsTo(Tenant::class, 'school_id');
+        return $this->belongsToCentralTenant('school_id');
     }
 }

@@ -34,6 +34,10 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="UPLOAD_DISK" value="shared"/>
+        <env name="AWS_ACCESS_KEY_ID" value=""/>
+        <env name="AWS_SECRET_ACCESS_KEY" value=""/>
+        <env name="AWS_BUCKET" value=""/>
         <env name="CENTRAL_DOMAIN" value="superadmin.test"/>
         <env name="TENANT_BASE_DOMAIN" value="sahodaya.test"/>
     </php>

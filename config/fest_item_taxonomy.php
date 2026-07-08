@@ -90,7 +90,7 @@ return [
 
     'sort_order' => [
         'kalolsavam' => ['stage_type', 'category', 'class_group', 'gender', 'title'],
-        'sports'     => ['venue_type', 'sport_discipline', 'competition_format', 'age_group', 'gender', 'title'],
+        'sports'     => ['head_key', 'age_group', 'gender', 'title'],
         'kids_fest'  => ['stage_type', 'kids_band', 'category', 'title'],
     ],
 ];

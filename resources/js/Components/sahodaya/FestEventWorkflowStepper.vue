@@ -39,30 +39,67 @@ const props = defineProps({
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}`);
 const eventBase = computed(() => `${base.value}/events/${props.eventId}`);
 
-const steps = computed(() => [
-    {
-        num: 1,
-        key: 'setup',
-        label: 'Items & settings',
-        href: `${eventBase.value}/settings`,
-    },
-    {
-        num: 2,
-        key: 'registration',
-        label: 'Registrations',
-        href: `${eventBase.value}/registrations`,
-    },
-    {
-        num: 3,
-        key: 'operations',
-        label: props.eventType === 'sports' ? 'Marks & chest' : 'Marks',
-        href: `${eventBase.value}/marks`,
-    },
-    {
-        num: 4,
-        key: 'results',
-        label: 'Results',
-        href: `${eventBase.value}/results`,
-    },
-]);
+const steps = computed(() => {
+    if (props.eventType === 'sports') {
+        return [
+            {
+                num: 1,
+                key: 'setup',
+                label: 'Setup',
+                href: `${eventBase.value}/setup`,
+            },
+            {
+                num: 2,
+                key: 'competition',
+                label: 'By item head',
+                href: `${eventBase.value}/competition`,
+            },
+            {
+                num: 3,
+                key: 'registration',
+                label: 'Registrations',
+                href: `${eventBase.value}/registrations`,
+            },
+            {
+                num: 4,
+                key: 'operations',
+                label: 'Marks & results',
+                href: `${eventBase.value}/marks`,
+            },
+            {
+                num: 5,
+                key: 'reports',
+                label: 'Reports',
+                href: `${eventBase.value}/reports/by-head`,
+            },
+        ];
+    }
+
+    return [
+        {
+            num: 1,
+            key: 'setup',
+            label: 'Items & settings',
+            href: `${eventBase.value}/settings`,
+        },
+        {
+            num: 2,
+            key: 'registration',
+            label: 'Registrations',
+            href: `${eventBase.value}/registrations`,
+        },
+        {
+            num: 3,
+            key: 'operations',
+            label: 'Marks',
+            href: `${eventBase.value}/marks`,
+        },
+        {
+            num: 4,
+            key: 'results',
+            label: 'Results',
+            href: `${eventBase.value}/results`,
+        },
+    ];
+});
 </script>

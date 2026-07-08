@@ -15,6 +15,7 @@ class FestJudgeAssignmentController extends SahodayaAdminController
     public function index(string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type === 'sports', 404);
 
         $event->load('items');
 
@@ -37,6 +38,7 @@ class FestJudgeAssignmentController extends SahodayaAdminController
     public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type === 'sports', 404);
 
         $data = $request->validate([
             'item_id' => 'required|exists:fest_event_items,id',
@@ -67,6 +69,7 @@ class FestJudgeAssignmentController extends SahodayaAdminController
     public function destroy(string $tenantId, FestEvent $event, FestJudgeAssignment $assignment, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type === 'sports', 404);
         abort_if($assignment->event_id !== $event->id, 403);
         $assignment->delete();
 

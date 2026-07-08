@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Support\PersistDefaults;
+use App\Support\TenantStorage;
 use App\Models\Testimonial;
 use Illuminate\Http\Request;
 
@@ -33,7 +34,7 @@ class TestimonialController extends SchoolAdminController
         $data = PersistDefaults::coalesce($data, ['display_order' => 0]);
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('testimonials/' . $this->school->id, 's3');
+            $data['photo'] = $request->file('photo')->store('testimonials/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
         }
 
         Testimonial::create($data);
@@ -57,7 +58,7 @@ class TestimonialController extends SchoolAdminController
         $data = PersistDefaults::coalesce($data, ['display_order' => $testimonial->display_order ?? 0]);
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('testimonials/' . $this->school->id, 's3');
+            $data['photo'] = $request->file('photo')->store('testimonials/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
         }
 
         $testimonial->update($data);

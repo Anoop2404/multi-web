@@ -114,6 +114,8 @@ const stateNavGroups = computed(() => [
         label: 'State Programs',
         items: [
             { href: '/admin/state-programs', icon: '🏆', label: 'All Programs' },
+            { href: '/admin/kalotsav', icon: '🎭', label: 'Kalotsav' },
+            { href: '/admin/sports', icon: '⚽', label: 'Sports' },
         ],
     },
     {
@@ -164,6 +166,7 @@ const superNavGroups = computed(() => {
             items: [
                 { href: '/admin/state-users', icon: '👤', label: 'State Users' },
                 { href: '/admin/audit-logs', icon: '📋', label: 'Audit Log' },
+                { href: '/admin/storage-migration', icon: '☁️', label: 'S3 migration' },
             ],
         },
         {
@@ -173,6 +176,9 @@ const superNavGroups = computed(() => {
                 { href: '/admin/state-remittances',            icon: '💳', label: 'State Remittances' },
                 { href: '/admin/master-data/class-categories', icon: '📚', label: 'Class Categories' },
                 { href: '/admin/master-data/teaching-types',   icon: '👩‍🏫', label: 'Teaching Types' },
+                { href: '/admin/master-data/subjects',         icon: '📖', label: 'Subjects' },
+                { href: '/admin/master-data/designations',   icon: '🏷️', label: 'Designations' },
+                { href: '/admin/master-data/age-categories', icon: '🎂', label: 'Age Categories' },
             ],
         },
     ];

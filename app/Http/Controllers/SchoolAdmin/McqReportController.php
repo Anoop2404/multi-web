@@ -20,4 +20,12 @@ class McqReportController extends SchoolAdminController
 
         return $reports->exportAttendance($exam, $this->school->id);
     }
+
+    public function exportToppers(string $tenantId, McqExam $exam, McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_unless($exam->results_published, 422, 'Results are not published yet.');
+
+        return $reports->exportToppers($exam, $this->school->id);
+    }
 }

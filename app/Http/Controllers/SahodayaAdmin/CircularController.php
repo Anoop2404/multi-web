@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\Circular;
+use App\Support\TenantStorage;
 use App\Models\CircularAcknowledgement;
 use App\Models\Tenant;
 use App\Models\User;
@@ -43,7 +44,7 @@ class CircularController extends SahodayaAdminController
         ]);
 
         $data['tenant_id']  = $this->sahodaya->id;
-        $data['file_path']  = $request->file('file')->store('sahodaya/' . $this->sahodaya->id . '/circulars', 's3');
+        $data['file_path']  = $request->file('file')->store('sahodaya/' . $this->sahodaya->id . '/circulars', \App\Support\TenantStorage::uploadDisk());
 
         unset($data['file']);
         $circular = Circular::create($data);

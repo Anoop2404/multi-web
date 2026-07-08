@@ -5,8 +5,11 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestItemHead;
+use App\Models\FestJudgeAssignment;
+use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\FestSchedule;
 use App\Models\FestSchoolEventFee;
 use App\Models\FestVolunteer;
 use App\Models\FestCateringOrder;
@@ -117,7 +120,447 @@ class FestEventReportAnalyticsService
     }
 
     /** @return list<array<string, mixed>> */
-    public function headWiseParticipantRows(?int $headId = null): array
+    public function feeCollectionByHeadRows(): array
+    {
+        $feeService = app(FestSchoolEventFeeService::class);
+        if (! $feeService->feeRequired($this->event)) {
+            return [];
+        }
+
+        $schedule = $feeService->resolveSchedule($this->event);
+        $itemResolver = app(FestItemFeeResolver::class);
+
+        $heads = FestItemHead::forTenant($this->event->tenant_id)
+            ->forEvent($this->event->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        return $heads->map(function (FestItemHead $head) use ($itemResolver, $schedule) {
+            $items = FestEventItem::where('event_id', $this->event->id)
+                ->where('head_id', $head->id)
+                ->get();
+
+            $regCount = FestRegistration::where('event_id', $this->event->id)
+                ->whereIn('item_id', $items->pluck('id'))
+                ->whereIn('status', ['submitted', 'approved'])
+                ->count();
+
+            $estimated = $items->sum(fn (FestEventItem $item) => $itemResolver->amountForItem($item, $schedule, $this->event));
+
+            return [
+                'head_id'        => $head->id,
+                'head_name'      => $head->name,
+                'item_count'     => $items->count(),
+                'registrations'  => $regCount,
+                'default_fee'    => $head->default_item_fee !== null ? (float) $head->default_item_fee : null,
+                'extra_fee'      => $head->extra_item_fee !== null ? (float) $head->extra_item_fee : null,
+                'catalog_total'  => round($estimated, 2),
+            ];
+        })->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function headWiseSummary(?string $schoolId = null): array
+    {
+        $heads = FestItemHead::forTenant($this->event->tenant_id)
+            ->forEvent($this->event->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        return $heads->map(function (FestItemHead $head) use ($schoolId) {
+            $itemIds = FestEventItem::where('event_id', $this->event->id)
+                ->where('head_id', $head->id)
+                ->pluck('id');
+
+            $regBase = FestRegistration::query()
+                ->where('event_id', $this->event->id)
+                ->whereIn('item_id', $itemIds)
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+
+            $approved = (clone $regBase)->where('status', 'approved')->count();
+            $pending = (clone $regBase)->where('status', 'submitted')->count();
+
+            $participantCount = FestParticipant::query()
+                ->whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $this->event->id)
+                    ->whereIn('item_id', $itemIds)
+                    ->active()
+                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+                ->count();
+
+            $perItemCounts = FestRegistration::query()
+                ->where('event_id', $this->event->id)
+                ->whereIn('item_id', $itemIds)
+                ->active()
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+                ->selectRaw('item_id, count(*) as cnt')
+                ->groupBy('item_id')
+                ->pluck('cnt', 'item_id');
+
+            $maxItemReg = $perItemCounts->max() ?? 0;
+
+            return [
+                'head_id'             => $head->id,
+                'head_name'           => $head->name,
+                'item_count'          => $itemIds->count(),
+                'registration_count' => $approved + $pending,
+                'approved_count'      => $approved,
+                'pending_count'       => $pending,
+                'participant_count'   => $participantCount,
+                'max_item_reg_count'  => (int) $maxItemReg,
+                'default_item_fee'    => $head->default_item_fee !== null ? (float) $head->default_item_fee : null,
+                'extra_item_fee'      => $head->extra_item_fee !== null ? (float) $head->extra_item_fee : null,
+            ];
+        })->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function itemRegistrationRows(?string $schoolId = null): array
+    {
+        $feeService = app(FestSchoolEventFeeService::class);
+        $schedule = $feeService->resolveSchedule($this->event);
+        $feeRequired = $feeService->feeRequired($this->event);
+        $feeResolver = app(FestItemFeeResolver::class);
+
+        $items = FestEventItem::query()
+            ->where('event_id', $this->event->id)
+            ->where('is_enabled', true)
+            ->with('head:id,name,default_item_fee,extra_item_fee')
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->get();
+
+        $rows = [];
+        foreach ($items as $item) {
+            $regBase = FestRegistration::query()
+                ->where('event_id', $this->event->id)
+                ->where('item_id', $item->id)
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+
+            $approved = (clone $regBase)->where('status', 'approved')->count();
+            $pending = (clone $regBase)->where('status', 'submitted')->count();
+            $totalRegs = $approved + $pending;
+
+            $participantQuery = FestParticipant::query()
+                ->whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $this->event->id)
+                    ->where('item_id', $item->id)
+                    ->active()
+                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)));
+
+            $participants = (clone $participantQuery)->count();
+            $itemRegAssigned = (clone $participantQuery)
+                ->whereNotNull('item_registration_number')
+                ->count();
+
+            $schoolCount = $schoolId
+                ? ($totalRegs > 0 ? 1 : 0)
+                : (int) FestRegistration::query()
+                    ->where('event_id', $this->event->id)
+                    ->where('item_id', $item->id)
+                    ->active()
+                    ->distinct()
+                    ->count('school_id');
+
+            $feePerItem = $feeRequired ? $feeResolver->amountForItem($item, $schedule, $this->event) : null;
+            $lineFee = $feePerItem !== null ? round($feePerItem * $totalRegs, 2) : null;
+
+            $rows[] = [
+                'item_id'            => $item->id,
+                'head_id'            => $item->head_id,
+                'head_name'          => $item->head?->name,
+                'title'              => $item->title,
+                'item_code'          => $item->item_code,
+                'class_group'        => $item->class_group,
+                'age_group'          => $item->age_group,
+                'stage_type'         => $item->stage_type,
+                'participant_type'   => $item->participant_type,
+                'approved'           => $approved,
+                'pending'            => $pending,
+                'registration_count' => $totalRegs,
+                'participant_count'  => $participants,
+                'item_reg_assigned'  => $itemRegAssigned,
+                'school_count'       => $schoolCount,
+                'max_per_school'     => $item->max_per_school,
+                'fee_per_item'       => $feePerItem,
+                'line_fee'           => $lineFee,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    public function itemRegistrationTotals(array $rows): array
+    {
+        return [
+            'items'         => count($rows),
+            'approved'      => array_sum(array_column($rows, 'approved')),
+            'pending'       => array_sum(array_column($rows, 'pending')),
+            'registrations' => array_sum(array_column($rows, 'registration_count')),
+            'participants'  => array_sum(array_column($rows, 'participant_count')),
+            'estimated_fee' => round(collect($rows)->sum(fn ($r) => (float) ($r['line_fee'] ?? 0)), 2),
+        ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function headRegistrationSummary(?string $schoolId = null): array
+    {
+        $rows = $this->itemRegistrationRows($schoolId);
+        $byHead = collect($rows)->groupBy(fn ($r) => $r['head_id'] ?? 0);
+
+        return collect($this->headWiseSummary($schoolId))->map(function (array $head) use ($byHead) {
+            $headRows = $byHead->get($head['head_id'], collect());
+            $maxRow = $headRows->sortByDesc('registration_count')->first();
+
+            return array_merge($head, [
+                'estimated_fee'     => round($headRows->sum(fn ($r) => (float) ($r['line_fee'] ?? 0)), 2),
+                'max_item_title'    => $maxRow['title'] ?? null,
+                'busiest_item_regs' => (int) ($maxRow['registration_count'] ?? 0),
+            ]);
+        })->values()->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function assignmentCompletenessRows(?string $schoolId = null): array
+    {
+        $itemScheduleIds = FestSchedule::query()
+            ->where('event_id', $this->event->id)
+            ->whereNull('participant_id')
+            ->pluck('id', 'item_id');
+
+        $items = FestEventItem::query()
+            ->where('event_id', $this->event->id)
+            ->where('is_enabled', true)
+            ->with('head:id,name')
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->get();
+
+        $rows = [];
+        foreach ($items as $item) {
+            $regBase = FestRegistration::query()
+                ->where('event_id', $this->event->id)
+                ->where('item_id', $item->id)
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+
+            $approved = (clone $regBase)->where('status', 'approved')->count();
+            $pending = (clone $regBase)->where('status', 'submitted')->count();
+
+            $performerQuery = FestParticipant::query()
+                ->whereNull('disqualified_at')
+                ->where(function ($q) {
+                    $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby');
+                })
+                ->whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $this->event->id)
+                    ->where('item_id', $item->id)
+                    ->where('status', 'approved')
+                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)));
+
+            $performers = (clone $performerQuery)->count();
+            $chestAssigned = (clone $performerQuery)->whereNotNull('chest_no')->count();
+            $itemRegAssigned = (clone $performerQuery)->whereNotNull('item_registration_number')->count();
+
+            $scheduledParticipants = FestSchedule::query()
+                ->where('event_id', $this->event->id)
+                ->where('item_id', $item->id)
+                ->whereNotNull('participant_id')
+                ->when($schoolId, fn ($q) => $q->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId)))
+                ->distinct('participant_id')
+                ->count('participant_id');
+
+            $marksEntered = FestMark::query()
+                ->where('event_id', $this->event->id)
+                ->where('item_id', $item->id)
+                ->where(fn ($q) => $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position'))
+                ->when($schoolId, fn ($q) => $q->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId)))
+                ->distinct('participant_id')
+                ->count('participant_id');
+
+            $judges = FestJudgeAssignment::where('event_id', $this->event->id)
+                ->where('item_id', $item->id)
+                ->count();
+
+            $rows[] = [
+                'item_id'                => $item->id,
+                'head_id'                => $item->head_id,
+                'head_name'              => $item->head?->name,
+                'title'                  => $item->title,
+                'age_group'              => $item->age_group,
+                'class_group'            => $item->class_group,
+                'approved'               => $approved,
+                'pending'                => $pending,
+                'registration_count'   => $approved + $pending,
+                'performers'             => $performers,
+                'chest_assigned'         => $chestAssigned,
+                'chest_missing'          => max(0, $performers - $chestAssigned),
+                'item_reg_assigned'      => $itemRegAssigned,
+                'item_reg_missing'       => max(0, $performers - $itemRegAssigned),
+                'item_scheduled'         => $itemScheduleIds->has($item->id),
+                'participants_scheduled' => $scheduledParticipants,
+                'marks_entered'          => $marksEntered,
+                'marks_pending'          => max(0, $performers - $marksEntered),
+                'judges_assigned'        => $judges,
+                'ready_for_event'      => $performers > 0
+                    && $chestAssigned >= $performers
+                    && $itemRegAssigned >= $performers
+                    && $marksEntered >= $performers,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    public function assignmentCompletenessTotals(array $rows): array
+    {
+        return [
+            'items'            => count($rows),
+            'performers'       => array_sum(array_column($rows, 'performers')),
+            'chest_missing'    => array_sum(array_column($rows, 'chest_missing')),
+            'item_reg_missing' => array_sum(array_column($rows, 'item_reg_missing')),
+            'marks_pending'    => array_sum(array_column($rows, 'marks_pending')),
+            'pending_regs'     => array_sum(array_column($rows, 'pending')),
+            'items_scheduled'  => count(array_filter($rows, fn ($r) => $r['item_scheduled'])),
+        ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function numberingRegisterRows(?string $schoolId = null): array
+    {
+        return FestParticipant::query()
+            ->whereHas('registration', fn ($q) => $q
+                ->where('event_id', $this->event->id)
+                ->active()
+                ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+            ->with([
+                'student:id,name,reg_no',
+                'teacher:id,name,reg_no',
+                'registration:id,event_id,item_id,school_id,status',
+                'registration.school:id,name',
+                'registration.item:id,title,head_id',
+                'registration.item.head:id,name',
+            ])
+            ->get()
+            ->sortBy(fn (FestParticipant $p) => [
+                $p->registration?->item?->head?->name ?? '',
+                $p->registration?->item?->title ?? '',
+                $p->chest_no ?? 99999,
+                $p->student?->name ?? $p->teacher?->name ?? '',
+            ])
+            ->values()
+            ->map(fn (FestParticipant $p) => [
+                'participant_id' => $p->id,
+                'head_name'      => $p->registration?->item?->head?->name,
+                'item_id'        => $p->registration?->item_id,
+                'item'           => $p->registration?->item?->title,
+                'school'         => $p->registration?->school?->name,
+                'school_id'      => $p->registration?->school_id,
+                'name'           => $p->student?->name ?? $p->teacher?->name,
+                'reg_no'         => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                'reg_status'     => $p->registration?->status,
+                'role'           => $p->participant_role ?? 'performer',
+                'fest_id'        => $p->level_registration_number,
+                'item_reg'       => $p->item_registration_number,
+                'chest_no'       => $p->chest_no,
+                'disqualified'   => $p->disqualified_at !== null,
+            ])
+            ->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function pendingApprovalRows(?string $schoolId = null): array
+    {
+        return FestRegistration::query()
+            ->where('event_id', $this->event->id)
+            ->where('status', 'submitted')
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->with(['school:id,name', 'item:id,title,head_id', 'item.head:id,name', 'participants.student:id,name', 'participants.teacher:id,name'])
+            ->orderBy('school_id')
+            ->orderBy('item_id')
+            ->get()
+            ->map(fn (FestRegistration $reg) => [
+                'registration_id' => $reg->id,
+                'school_id'       => $reg->school_id,
+                'school'          => $reg->school?->name,
+                'head_name'       => $reg->item?->head?->name,
+                'item_id'         => $reg->item_id,
+                'item'            => $reg->item?->title,
+                'participant_count' => $reg->participants->count(),
+                'participants'    => $reg->participants->map(fn ($p) => $p->student?->name ?? $p->teacher?->name)->filter()->values()->all(),
+                'submitted_at'    => $reg->updated_at?->toIso8601String(),
+            ])
+            ->all();
+    }
+
+    public function exportAssignmentCompleteness(?string $schoolId = null): StreamedResponse
+    {
+        $rows = collect($this->assignmentCompletenessRows($schoolId))->map(fn ($r) => [
+            $r['head_name'] ?? '—',
+            $r['title'],
+            $r['approved'],
+            $r['pending'],
+            $r['performers'],
+            $r['chest_assigned'],
+            $r['chest_missing'],
+            $r['item_reg_assigned'],
+            $r['item_reg_missing'],
+            $r['item_scheduled'] ? 'Y' : 'N',
+            $r['participants_scheduled'],
+            $r['marks_entered'],
+            $r['marks_pending'],
+            $r['judges_assigned'],
+        ]);
+
+        return ExcelExport::download(
+            str($this->event->title)->slug()->limit(40).'-assignment-completeness',
+            ['Head', 'Item', 'Approved', 'Pending', 'Performers', 'Chest OK', 'Chest missing', 'Item reg OK', 'Item reg missing', 'Item scheduled', 'Participants scheduled', 'Marks entered', 'Marks pending', 'Judges'],
+            $rows,
+        );
+    }
+
+    public function exportNumberingRegister(?string $schoolId = null): StreamedResponse
+    {
+        $rows = collect($this->numberingRegisterRows($schoolId))->map(fn ($r) => [
+            $r['head_name'] ?? '—',
+            $r['item'] ?? '',
+            $r['school'] ?? '',
+            $r['name'] ?? '',
+            $r['reg_no'] ?? '',
+            $r['reg_status'] ?? '',
+            $r['role'] ?? '',
+            $r['fest_id'] ?? '',
+            $r['item_reg'] ?? '',
+            $r['chest_no'] ?? '',
+        ]);
+
+        return ExcelExport::download(
+            str($this->event->title)->slug()->limit(40).'-numbering-register',
+            ['Head', 'Item', 'School', 'Participant', 'Reg no', 'Reg status', 'Role', 'Fest ID', 'Item reg', 'Chest'],
+            $rows,
+        );
+    }
+
+    public function exportPendingApprovals(?string $schoolId = null): StreamedResponse
+    {
+        $rows = collect($this->pendingApprovalRows($schoolId))->map(fn ($r) => [
+            $r['school'] ?? '',
+            $r['head_name'] ?? '—',
+            $r['item'] ?? '',
+            $r['participant_count'],
+            implode(', ', $r['participants'] ?? []),
+        ]);
+
+        return ExcelExport::download(
+            str($this->event->title)->slug()->limit(40).'-pending-approvals',
+            ['School', 'Head', 'Item', 'Participants', 'Names'],
+            $rows,
+        );
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function headWiseParticipantRows(?int $headId = null, ?string $schoolId = null): array
     {
         $heads = FestItemHead::forTenant($this->event->tenant_id)
             ->forEvent($this->event->id)
@@ -135,20 +578,33 @@ class FestEventReportAnalyticsService
                 ->whereHas('registration', fn ($q) => $q
                     ->where('event_id', $this->event->id)
                     ->whereIn('item_id', $itemIds)
-                    ->where('status', 'approved'))
-                ->with(['student:id,name,reg_no', 'registration.school:id,name', 'registration.item:id,title'])
+                    ->active()
+                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+                ->with([
+                    'student:id,name,reg_no,photo,tenant_id',
+                    'student.schoolClass:id,name',
+                    'teacher:id,name,reg_no',
+                    'registration.school:id,name',
+                    'registration.item:id,title,head_id',
+                ])
                 ->get();
 
             foreach ($participants as $p) {
                 $rows[] = [
                     'head_id'    => $head->id,
                     'head_name'  => $head->name,
+                    'item_id'    => $p->registration?->item_id,
                     'school'     => $p->registration?->school?->name,
+                    'student_id' => $p->student_id,
                     'student'    => $p->student?->name ?? $p->teacher?->name,
                     'reg_no'     => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    'class'      => $p->student?->schoolClass?->name,
+                    'photo_url'  => $p->student?->photoUrl(),
                     'item'       => $p->registration?->item?->title,
+                    'item_reg'   => $p->item_registration_number,
                     'chest_no'   => $p->chest_no,
                     'fest_id'    => $p->level_registration_number,
+                    'status'     => $p->registration?->status,
                 ];
             }
         }
@@ -168,7 +624,7 @@ class FestEventReportAnalyticsService
         foreach ($teamItems as $item) {
             $regs = FestRegistration::where('event_id', $this->event->id)
                 ->where('item_id', $item->id)
-                ->where('status', 'approved')
+                ->active()
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
                 ->with(['school:id,name', 'participants.student:id,name,reg_no', 'participants.teacher:id,name'])
                 ->get();
@@ -280,15 +736,15 @@ class FestEventReportAnalyticsService
         );
     }
 
-    public function exportHeadWiseParticipants(?int $headId = null): StreamedResponse
+    public function exportHeadWiseParticipants(?int $headId = null, ?string $schoolId = null): StreamedResponse
     {
-        $rows = collect($this->headWiseParticipantRows($headId))->map(fn ($r) => [
-            $r['head_name'], $r['school'], $r['student'], $r['reg_no'], $r['item'], $r['fest_id'], $r['chest_no'],
+        $rows = collect($this->headWiseParticipantRows($headId, $schoolId))->map(fn ($r) => [
+            $r['head_name'], $r['school'], $r['student'], $r['reg_no'], $r['item'], $r['fest_id'], $r['item_reg'], $r['chest_no'],
         ]);
 
         return ExcelExport::download(
             str($this->event->title)->slug()->limit(40).'-head-wise-participants',
-            ['Head', 'School', 'Participant', 'Reg no', 'Item', 'Fest ID', 'Chest'],
+            ['Head', 'School', 'Participant', 'School reg', 'Item', 'Fest ID', 'Item reg', 'Chest'],
             $rows,
         );
     }
@@ -470,5 +926,108 @@ class FestEventReportAnalyticsService
             'audience'    => 'student',
             'showTitle'   => true,
         ])->download("{$slug}{$headSuffix}-id-cards.pdf");
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function studentWiseBrowserRows(?string $schoolId = null, ?string $search = null): array
+    {
+        $participants = FestParticipant::query()
+            ->whereHas('registration', fn ($q) => $q
+                ->where('event_id', $this->event->id)
+                ->active()
+                ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+            ->whereNotNull('student_id')
+            ->with([
+                'student:id,name,reg_no,gender',
+                'registration.school:id,name',
+                'registration.item:id,title,head_id',
+                'registration.item.head:id,name',
+            ])
+            ->get();
+
+        $marksByParticipant = FestMark::query()
+            ->where('event_id', $this->event->id)
+            ->whereIn('participant_id', $participants->pluck('id'))
+            ->get()
+            ->keyBy('participant_id');
+
+        $rows = [];
+        foreach ($participants->groupBy('student_id') as $studentId => $entries) {
+            /** @var FestParticipant $first */
+            $first = $entries->first();
+            $student = $first->student;
+            if (! $student) {
+                continue;
+            }
+
+            $name = (string) ($student->name ?? '');
+            $regNo = (string) ($student->reg_no ?? '');
+            if ($search) {
+                $q = strtolower($search);
+                if (! str_contains(strtolower($name), $q) && ! str_contains(strtolower($regNo), $q)) {
+                    continue;
+                }
+            }
+
+            $items = $entries->map(function (FestParticipant $p) use ($marksByParticipant) {
+                $mark = $marksByParticipant->get($p->id);
+
+                return [
+                    'item_id'    => $p->registration?->item_id,
+                    'item_title' => $p->registration?->item?->title,
+                    'head_name'  => $p->registration?->item?->head?->name,
+                    'status'     => $p->registration?->status,
+                    'fest_id'    => $p->level_registration_number,
+                    'item_reg'   => $p->item_registration_number,
+                    'chest_no'   => $p->chest_no,
+                    'grade'      => $mark?->grade,
+                    'position'   => $mark?->position,
+                    'score'      => $mark?->score,
+                ];
+            })->values()->all();
+
+            $rows[] = [
+                'student_id'  => (int) $studentId,
+                'school_id'   => $first->registration?->school_id,
+                'school_name' => $first->registration?->school?->name,
+                'name'        => $name,
+                'reg_no'      => $regNo,
+                'gender'      => $student->gender,
+                'item_count'  => count($items),
+                'total_score' => collect($items)->sum(fn ($i) => (float) ($i['score'] ?? 0)),
+                'items'       => $items,
+            ];
+        }
+
+        usort($rows, fn ($a, $b) => [$a['school_name'] ?? '', $a['name']] <=> [$b['school_name'] ?? '', $b['name']]);
+
+        return $rows;
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function itemWiseBrowserRows(int $itemId): array
+    {
+        return FestParticipant::query()
+            ->whereHas('registration', fn ($q) => $q
+                ->where('event_id', $this->event->id)
+                ->where('item_id', $itemId)
+                ->active())
+            ->with(['student', 'teacher', 'registration.school', 'mark'])
+            ->orderBy('chest_no')
+            ->get()
+            ->map(fn (FestParticipant $p) => [
+                'id'          => $p->id,
+                'participant' => $p->student?->name ?? $p->teacher?->name,
+                'reg_no'      => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                'school'      => $p->registration?->school?->name,
+                'fest_id'     => $p->level_registration_number,
+                'item_reg'    => $p->item_registration_number,
+                'chest_no'    => $p->chest_no,
+                'grade'       => $p->mark?->grade,
+                'position'    => $p->mark?->position,
+                'score'       => $p->mark?->score,
+                'status'      => $p->registration?->status,
+            ])
+            ->all();
     }
 }

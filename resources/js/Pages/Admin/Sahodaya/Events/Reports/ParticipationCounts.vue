@@ -3,7 +3,7 @@
         <PageHeader :title="`${event.title} — Participation`" eyebrow="Reports"
                     description="Participation usage against policy limits.">
             <template #actions>
-                <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/reports/export/student-participation`" class="btn-primary text-sm">Export CSV ↓</a>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/reports/export/student-participation`" class="btn-primary text-sm">Export spreadsheet ↓</a>
             </template>
         </PageHeader>
 

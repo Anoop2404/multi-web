@@ -7,40 +7,44 @@ use App\Services\Portal\StudentPortalProvisioner;
 
 class McqRegistrationPortalService
 {
-    /** @param  iterable<int, Student>  $students
-     * @return list<array{name: string, username: string, password: string|null, created: bool}>
-     */
+    /** @return list<array{student_id: int, student_name: string, username: string, password: string}> */
     public function provisionForStudents(iterable $students): array
     {
-        $provisioner = app(StudentPortalProvisioner::class);
-        $credentials = [];
-
+        $created = [];
         foreach ($students as $student) {
-            if (! $student instanceof Student || ! filled($student->reg_no)) {
-                continue;
+            $credential = $this->provisionOne($student);
+            if ($credential) {
+                $created[] = $credential;
             }
-
-            try {
-                $result = $provisioner->ensureRegNoLogin($student);
-            } catch (\Throwable) {
-                continue;
-            }
-
-            $credentials[] = [
-                'name'     => $student->name,
-                'reg_no'   => $student->reg_no,
-                'username' => $result['user']->username,
-                'password' => $result['password'],
-                'created'  => $result['created'],
-            ];
         }
 
-        return $credentials;
+        return $created;
     }
 
-    /** @return list<array{name: string, username: string, password: string|null, created: bool}> */
-    public function provisionOne(Student $student): array
+    /** @return array{student_id: int, student_name: string, username: string, password: string}|null */
+    public function provisionOne(Student $student): ?array
     {
-        return $this->provisionForStudents(collect([$student]));
+        if (! filled($student->reg_no)) {
+            return null;
+        }
+
+        try {
+            $result = app(StudentPortalProvisioner::class)->ensureRegNoLogin($student);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (! $result['password']) {
+            return null;
+        }
+
+        $student = $student->fresh(['user']);
+
+        return [
+            'student_id'   => $student->id,
+            'student_name' => $student->name,
+            'username'     => $student->reg_no ?? $result['user']->username,
+            'password'     => $result['password'],
+        ];
     }
 }

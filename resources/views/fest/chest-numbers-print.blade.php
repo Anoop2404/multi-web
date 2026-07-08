@@ -14,17 +14,19 @@
 </head>
 <body>
     <button onclick="window.print()">Print</button>
-    <h1>{{ $event->title }} — Chest Numbers</h1>
+    <h1>{{ $event->title }}@if(!empty($item)) — {{ $item->title }}@endif — Chest Numbers</h1>
     <table>
         <thead>
-            <tr><th>Chest No</th><th>Name</th><th>Item</th><th>School</th></tr>
+            <tr><th>Chest No</th><th>Fest ID</th><th>Item reg</th><th>Name</th>@if(empty($item))<th>Item</th>@endif<th>School</th></tr>
         </thead>
         <tbody>
             @foreach($rows as $row)
             <tr>
                 <td><strong>{{ $row['chest_no'] }}</strong></td>
+                <td>{{ $row['fest_id'] ?? '—' }}</td>
+                <td>{{ $row['item_reg'] ?? '—' }}</td>
                 <td>{{ $row['name'] }}</td>
-                <td>{{ $row['item'] }}</td>
+                @if(empty($item))<td>{{ $row['item'] }}</td>@endif
                 <td>{{ $row['school'] }}</td>
             </tr>
             @endforeach

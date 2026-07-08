@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\GalleryAlbum;
+use App\Support\TenantStorage;
 use App\Models\GalleryItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -32,7 +33,7 @@ class GalleryController extends SchoolAdminController
         $data['slug']      = Str::slug($data['title']) . '-' . Str::random(4);
 
         if ($request->hasFile('cover_image')) {
-            $data['cover_image'] = $request->file('cover_image')->store('gallery/' . $this->school->id, 's3');
+            $data['cover_image'] = $request->file('cover_image')->store('gallery/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
         }
 
         $album = GalleryAlbum::create($data);
@@ -52,7 +53,7 @@ class GalleryController extends SchoolAdminController
         $order = $album->items()->max('display_order') + 1;
 
         foreach ($request->file('photos') as $photo) {
-            $path = $photo->store('gallery/' . $this->school->id . '/' . $album->id, 's3');
+            $path = $photo->store('gallery/' . $this->school->id . '/' . $album->id, \App\Support\TenantStorage::uploadDisk());
             GalleryItem::create([
                 'album_id'      => $album->id,
                 'tenant_id'     => $this->school->id,

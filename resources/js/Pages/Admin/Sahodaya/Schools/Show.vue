@@ -11,11 +11,15 @@
             </Link>
 
             <div v-if="school.membership_status === 'pending'"
-                 class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-                This school is <strong>pending approval</strong>. Membership is approved when you
-                <strong>verify their payment</strong> on the
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`" class="font-semibold text-[#0f3d7a] hover:underline">Payments</Link>
-                page.
+                 class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <span>
+                    This school is <strong>pending approval</strong>. You can approve directly, or verify payment on
+                    <Link :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`" class="font-semibold text-[#0f3d7a] hover:underline">Payments</Link>.
+                </span>
+                <div class="flex gap-2 shrink-0">
+                    <button type="button" class="btn-primary text-sm" @click="approveSchool">Approve school</button>
+                    <button type="button" class="btn-secondary text-sm text-red-700 border-red-200" @click="rejectSchool">Reject</button>
+                </div>
             </div>
 
             <!-- Header -->
@@ -31,9 +35,18 @@
                             Registered {{ formatDate(school.created_at) }}
                         </p>
                     </div>
-                    <div class="text-right text-sm">
-                        <p><strong class="text-[#0f3d7a]">{{ school.student_count }}</strong> students</p>
+                    <div class="text-right text-sm space-y-1">
+                        <p>
+                            <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/${school.id}/students`"
+                                  class="font-semibold text-[#0f3d7a] hover:underline">
+                                {{ school.student_count }} students →
+                            </Link>
+                        </p>
                         <p class="text-gray-500"><strong>{{ school.classes_count }}</strong> classes</p>
+                        <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/${school.id}/lock-overrides`"
+                              class="text-xs text-[#0f3d7a] hover:underline">
+                            Lock overrides →
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -146,6 +159,17 @@ function toggleFestRegistration() {
     const action = props.school.fest_registration_closed ? 'reopen' : 'close';
     if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} fest registration for this school?`)) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/toggle-fest-registration`, {}, { preserveScroll: true });
+}
+
+function approveSchool() {
+    if (!confirm(`Approve ${props.school.name}?`)) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/approve`, {}, { preserveScroll: true });
+}
+
+function rejectSchool() {
+    const reason = prompt('Rejection reason:');
+    if (!reason?.trim()) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/reject`, { reason }, { preserveScroll: true });
 }
 
 function formatDate(d) {

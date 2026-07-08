@@ -409,11 +409,34 @@ class SchoolApplicationForm
     public static function editableFieldKeys(): array
     {
         return [
+            'school_prefix', 'cbse_affiliation',
             'phone', 'website', 'address', 'district', 'highest_class',
             'principal_name', 'principal_email', 'principal_phone',
             'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
             'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
         ];
+    }
+
+    /** @return array<string, list<string>> */
+    public static function profileSectionFieldKeys(): array
+    {
+        return [
+            'school' => ['school_prefix', 'cbse_affiliation', 'phone', 'website', 'address', 'district', 'highest_class'],
+            'principal' => ['principal_name', 'principal_email', 'principal_phone'],
+            'leadership' => [
+                'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
+                'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public static function schoolProfileValidationRulesForSection(Tenant $school, array $fields, string $section): array
+    {
+        $allowed = self::profileSectionFieldKeys()[$section] ?? [];
+        $all = self::schoolProfileValidationRules($school, $fields);
+
+        return array_intersect_key($all, array_flip($allowed));
     }
 
     /** @return array<string, mixed> */
@@ -427,6 +450,57 @@ class SchoolApplicationForm
             }
 
             $required = ($fields[$key]['required'] ?? false) ? 'required' : 'nullable';
+
+            if ($key === 'school_prefix') {
+                $rules[$key] = $school->prefixes_locked && filled($school->school_prefix)
+                    ? [
+                        'nullable',
+                        'string',
+                        function (string $attribute, mixed $value, \Closure $fail) use ($school): void {
+                            if ($value === null || $value === '') {
+                                return;
+                            }
+                            if (strtoupper(trim((string) $value)) !== strtoupper((string) $school->school_prefix)) {
+                                $fail('School code is locked because student registration numbers depend on it. Contact Sahodaya admin to change it.');
+                            }
+                        },
+                    ]
+                    : [
+                        'nullable',
+                        'string',
+                        'alpha_num',
+                        'max:10',
+                        function (string $attribute, mixed $value, \Closure $fail) use ($school): void {
+                            if (! is_string($value) || $value === '') {
+                                return;
+                            }
+                            if ($school->parent && self::prefixIsTaken($school->parent, $value, $school->id)) {
+                                $fail('This school code is already in use within this Sahodaya.');
+                            }
+                        },
+                    ];
+
+                continue;
+            }
+
+            if ($key === 'cbse_affiliation') {
+                $rules[$key] = [
+                    'nullable',
+                    'string',
+                    'max:100',
+                    function (string $attribute, mixed $value, \Closure $fail) use ($school): void {
+                        if (! is_string($value) || $value === '') {
+                            return;
+                        }
+
+                        if ($school->parent && self::affiliationIsTaken($school->parent, $value, $school->id)) {
+                            $fail('This CBSE affiliation number is already registered.');
+                        }
+                    },
+                ];
+
+                continue;
+            }
 
             $rules[$key] = $required.'|'.match ($key) {
                 'phone', 'principal_phone' => 'string|max:30',
@@ -459,16 +533,29 @@ class SchoolApplicationForm
 
             $value = $data[$key];
             if ($value === null || $value === '') {
+                if ($key === 'school_prefix') {
+                    continue;
+                }
                 unset($payload[$key]);
                 if ($key === 'phone') {
                     unset($payload['contact_phone']);
                 }
+                if ($key === 'cbse_affiliation') {
+                    unset($payload['affiliation_number']);
+                }
                 continue;
             }
 
-            $payload[$key] = $value;
+            $payload[$key] = match ($key) {
+                'school_prefix'    => strtoupper(trim((string) $value)),
+                'cbse_affiliation' => self::normalizeAffiliation((string) $value),
+                default            => $value,
+            };
             if ($key === 'phone') {
                 $payload['contact_phone'] = $value;
+            }
+            if ($key === 'cbse_affiliation') {
+                $payload['affiliation_number'] = self::normalizeAffiliation((string) $value);
             }
         }
 

@@ -4,7 +4,7 @@
             description="Fest programs, exams, training, and Sahodaya circulars." />
 
 
-        <div class="space-y-3">
+        <div class="max-w-full overflow-x-hidden space-y-3">
             <p class="text-sm text-gray-500">Acknowledge circulars from your Sahodaya.</p>
             <div v-for="c in circulars" :key="c.id" class="card flex flex-wrap items-start justify-between gap-3">
                 <div>

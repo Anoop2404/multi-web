@@ -82,6 +82,10 @@
                                     <span class="font-medium text-sm text-gray-900">{{ entry.name }}</span>
                                 </span>
                                 <span v-if="entry.meta" class="block text-xs text-gray-500 mt-0.5">{{ entry.meta }}</span>
+                                <span v-if="entry.eventRegistered"
+                                      class="inline-flex mt-0.5 text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                                    Event{{ entry.eventRegNumber ? `: ${entry.eventRegNumber}` : ' registered' }}
+                                </span>
                                 <span v-if="entry.reason" class="block text-xs text-amber-700 mt-0.5">{{ entry.reason }}</span>
                             </span>
                         </label>

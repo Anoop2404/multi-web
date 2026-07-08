@@ -29,15 +29,12 @@
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { festOpsEventNav } from '@/support/festOpsPortalNav.js';
 
 const props = defineProps({ sahodaya: Object, event: Object, query: String, results: Array, duties: Array });
 const queryLocal = ref(props.query ?? '');
 const base = computed(() => `/portal/fest-ops/${props.sahodaya.id}/events/${props.event.id}`);
-const navItems = computed(() => [
-    { href: `/portal/fest-ops/${props.sahodaya.id}`, label: 'Dashboard' },
-    { href: base.value, label: 'Event' },
-    { href: `${base.value}/participants/search`, label: 'Search' },
-]);
+const navItems = computed(() => festOpsEventNav(props.sahodaya.id, props.event.id, props.duties));
 
 function search() {
     router.get(`${base.value}/participants/search`, { q: queryLocal.value }, { preserveState: true });

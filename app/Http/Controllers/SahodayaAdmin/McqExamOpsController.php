@@ -20,11 +20,21 @@ class McqExamOpsController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         $registrations = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student', 'school'])
+            ->with(['student', 'school', 'mark'])
             ->orderBy('hall_ticket_no')
             ->get();
 
-        return $this->inertia('Sahodaya/Mcq/Attendance', compact('exam', 'registrations'));
+        $summary = [
+            'total'        => $registrations->count(),
+            'pending'      => $registrations->whereNull('attendance_status')->count()
+                + $registrations->where('attendance_status', 'pending')->count(),
+            'present'      => $registrations->where('attendance_status', 'present')->count(),
+            'absent'       => $registrations->where('attendance_status', 'absent')->count(),
+            'marks_entered'=> $registrations->filter(fn ($r) => $r->mark !== null)->count(),
+            'not_marked'   => $registrations->where('attendance_status', 'present')->filter(fn ($r) => $r->mark === null)->count(),
+        ];
+
+        return $this->inertia('Sahodaya/Mcq/Attendance', compact('exam', 'registrations', 'summary'));
     }
 
     public function storeAttendance(Request $request, string $tenantId, McqExam $exam)
@@ -43,7 +53,63 @@ class McqExamOpsController extends SahodayaAdminController
             'attendance_marked_by' => $request->user()->id,
         ]);
 
+        if ($data['attendance_status'] === 'absent' && $registration->mark) {
+            $registration->mark()->delete();
+            $registration->update(['status' => 'registered', 'submitted_at' => null]);
+        }
+
         return back()->with('success', 'Attendance saved.');
+    }
+
+    public function importAttendance(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+        $handle = fopen($request->file('file')->getRealPath(), 'r');
+        fgetcsv($handle);
+        $imported = 0;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            if (count($row) < 2) {
+                continue;
+            }
+            [$ticket, $status] = $row;
+            $status = strtolower(trim((string) $status));
+            if (! in_array($status, ['present', 'absent'], true)) {
+                continue;
+            }
+
+            $registration = McqRegistration::where('exam_id', $exam->id)
+                ->where('hall_ticket_no', trim((string) $ticket))
+                ->first();
+            if (! $registration) {
+                continue;
+            }
+
+            $registration->update([
+                'attendance_status'    => $status,
+                'attendance_marked_at' => now(),
+                'attendance_marked_by' => $request->user()->id,
+            ]);
+
+            if ($status === 'absent' && $registration->mark) {
+                $registration->mark()->delete();
+                $registration->update(['status' => 'registered', 'submitted_at' => null]);
+            }
+
+            $imported++;
+        }
+        fclose($handle);
+
+        return back()->with('success', "Imported attendance for {$imported} registration(s).");
+    }
+
+    public function exportAttendance(string $tenantId, McqExam $exam, \App\Services\Mcq\McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportAttendance($exam);
     }
 
     public function results(string $tenantId, McqExam $exam)
@@ -55,7 +121,9 @@ class McqExamOpsController extends SahodayaAdminController
             ->orderBy('hall_ticket_no')
             ->get();
 
-        return $this->inertia('Sahodaya/Mcq/Results', compact('exam', 'registrations'));
+        $gradeBands = app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam);
+
+        return $this->inertia('Sahodaya/Mcq/Results', compact('exam', 'registrations', 'gradeBands'));
     }
 
     public function hallTickets(string $tenantId, McqExam $exam)
@@ -213,7 +281,63 @@ class McqExamOpsController extends SahodayaAdminController
             ['role' => $data['role']],
         );
 
+        app(\App\Services\Audit\PlatformAuditLogger::class)->mcq(
+            $exam,
+            'mcq.staff.assigned',
+            "Exam staff assigned to {$exam->title}",
+            ['user_id' => $data['user_id'], 'role' => $data['role']],
+        );
+
         return back()->with('success', 'Staff assigned.');
+    }
+
+    public function generateCertificates(string $tenantId, McqExam $exam, \App\Services\Mcq\McqCertificateService $certificates)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $count = $certificates->issueBulk($exam);
+
+        app(\App\Services\Audit\PlatformAuditLogger::class)->mcq(
+            $exam,
+            'mcq.certificates.generated',
+            "Generated {$count} Talent Search certificate(s) for {$exam->title}",
+            ['count' => $count],
+        );
+
+        return back()->with('success', "{$count} certificate(s) generated.");
+    }
+
+    public function printCertificate(string $tenantId, McqExam $exam, McqRegistration $registration)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->exam_id !== $exam->id, 403);
+
+        $certificate = app(\App\Services\Mcq\McqCertificateService::class)->issue($registration->load(['exam', 'student', 'school', 'mark']));
+
+        return view('mcq.certificate', [
+            'registration' => $registration,
+            'certificate'  => $certificate,
+            'sahodaya'     => $this->sahodaya,
+            'fields'       => app(\App\Services\Mcq\McqCertificateService::class)->fieldValues($registration, $this->sahodaya),
+            'design'       => $certificate->design_snapshot_json ?? [],
+        ]);
+    }
+
+    public function previewCertificate(string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $service = app(\App\Services\Mcq\McqCertificateService::class);
+        $exam->loadMissing('series');
+
+        return view('mcq.certificate', [
+            'registration' => null,
+            'certificate'  => (object) ['verification_uuid' => 'SAMPLE-DEMO-0000'],
+            'sahodaya'     => $this->sahodaya,
+            'fields'       => $service->previewSampleFields($exam, $this->sahodaya),
+            'design'       => $service->previewDesign($exam),
+            'isSample'     => true,
+        ]);
     }
 
     public function destroyStaff(string $tenantId, McqExam $exam, McqExamStaff $staff)
@@ -274,6 +398,7 @@ class McqExamOpsController extends SahodayaAdminController
                 'hall_ticket_no'    => $r->hall_ticket_no,
                 'status'            => $r->status,
                 'attendance_status' => $r->attendance_status,
+                'session_status'    => \App\Support\Mcq\McqSessionStatusPresenter::forRegistration($r, $exam),
                 'started_at'        => $r->started_at?->toDateTimeString(),
                 'submitted_at'      => $r->submitted_at?->toDateTimeString(),
                 'score'             => $r->mark?->score,
@@ -304,12 +429,17 @@ class McqExamOpsController extends SahodayaAdminController
                 continue;
             }
 
+            if ($registration->attendance_status === 'absent') {
+                continue;
+            }
+
             $correct = (int) $correct;
             $wrong = (int) $wrong;
             $unanswered = (int) $unanswered;
             $total = $correct + $wrong + $unanswered;
             $score = $correct;
             $percentage = $total > 0 ? round(($correct / $total) * 100, 2) : 0;
+            $grade = app(\App\Services\Mcq\McqGradeService::class)->gradeForPercentage($exam, $percentage);
 
             \App\Models\McqMark::updateOrCreate(
                 ['registration_id' => $registration->id],
@@ -319,6 +449,7 @@ class McqExamOpsController extends SahodayaAdminController
                     'unanswered_count' => $unanswered,
                     'score'            => $score,
                     'percentage'       => $percentage,
+                    'grade'            => $grade,
                     'locked_at'        => now(),
                 ]
             );
@@ -341,7 +472,7 @@ class McqExamOpsController extends SahodayaAdminController
         app(\App\Services\Audit\PlatformAuditLogger::class)->mcq(
             $exam,
             'mcq.ranking.computed',
-            "MCQ ranking computed for {$exam->title}",
+            "Talent Search ranking computed for {$exam->title}",
             ['count' => $count],
         );
 

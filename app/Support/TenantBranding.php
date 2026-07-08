@@ -71,6 +71,42 @@ class TenantBranding
         return null;
     }
 
+    /** Logo as data URI or absolute URL for PDF / print embeds. */
+    public static function logoEmbedSrc(Tenant $tenant): ?string
+    {
+        $stored = TenancyDatabase::whenDatabaseReady(
+            $tenant,
+            fn () => $tenant->getSetting('logo'),
+        );
+
+        if ($stored) {
+            $embedded = TenantStorage::photoDataUri($tenant, $stored);
+            if ($embedded) {
+                return $embedded;
+            }
+        }
+
+        if ($tenant->subdomain && isset(self::DEFAULT_LOGOS[$tenant->subdomain])) {
+            $path = public_path(ltrim(self::DEFAULT_LOGOS[$tenant->subdomain], '/'));
+            if (is_file($path)) {
+                $mime = mime_content_type($path) ?: 'image/png';
+
+                return 'data:'.$mime.';base64,'.base64_encode((string) file_get_contents($path));
+            }
+        }
+
+        $url = self::logoUrl($tenant);
+        if (! $url) {
+            return null;
+        }
+
+        if (str_starts_with($url, '/')) {
+            return url($url);
+        }
+
+        return $url;
+    }
+
     /** Root-relative URL so logos work on tenant subdomains and dev ports (e.g. :8000). */
     private static function publicPath(string $path): string
     {

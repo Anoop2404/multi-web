@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\FestStateProgram;
 use App\Models\FestStateProgramItem;
+use App\Models\StateDomain;
 use App\Services\Events\FestEventFeeResolver;
 use App\Services\Events\FestItemSyncService;
 use App\Services\Events\FestStateProgramService;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestConductLevels;
 use App\Support\FestSportsAgeGroup;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -33,6 +36,7 @@ class StateFestProgramController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateProgram($request);
+        $data = $this->attachStateDomainConfig($request, $data);
         $data['created_by_user_id'] = $request->user()->id;
         $data['status'] = 'draft';
 
@@ -44,7 +48,7 @@ class StateFestProgramController extends Controller
 
     public function show(FestStateProgram $stateProgram)
     {
-        $stateProgram->load(['propagations.sahodaya:id,name', 'items']);
+        $stateProgram->load(['propagations.sahodaya:id,name', 'items', 'stateDomain']);
 
         return inertia('StatePrograms/Show', [
             'program'    => $stateProgram,
@@ -58,17 +62,27 @@ class StateFestProgramController extends Controller
             'defaultAgeGroupFees' => FestSportsAgeGroup::defaultFees(),
             'participationPresets' => config('fest_participation_presets'),
             'taxonomy'   => config('fest_item_taxonomy'),
+            'stateDomains' => StateDomain::query()
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(['id', 'name', 'domain', 'api_base_url', 'api_client_id']),
+            'defaultQualifierPolicy' => config('fest_conduct_presets.mcs_kalotsav.qualifier_policy', [
+                'regional' => ['positions' => [1]],
+                'district' => ['positions' => [1, 2]],
+                'skip_item_flags' => ['mcs_only'],
+            ]),
         ]);
     }
 
     public function update(Request $request, FestStateProgram $stateProgram)
     {
         if ($stateProgram->status === 'published') {
-            $data = $request->validate([
-                'description' => 'nullable|string',
-            ]);
+            $data = $this->validateProgram($request);
+            unset($data['title'], $data['event_type'], $data['conduct_levels']);
+            $data = $this->attachStateDomainConfig($request, $data);
         } else {
             $data = $this->validateProgram($request);
+            $data = $this->attachStateDomainConfig($request, $data);
         }
 
         $stateProgram->update($data);
@@ -89,6 +103,17 @@ class StateFestProgramController extends Controller
     public function publish(FestStateProgram $stateProgram, FestStateProgramService $service)
     {
         $result = $service->publish($stateProgram);
+
+        app(\App\Services\Audit\PlatformAuditLogger::class)->log(
+            'state_program.published',
+            "State program published: {$stateProgram->title}",
+            $stateProgram,
+            [
+                'propagated' => $result['propagated'],
+                'skipped'    => $result['skipped'],
+                'errors'     => $result['errors'],
+            ],
+        );
 
         $message = "Published to {$result['propagated']} Sahodaya event(s).";
         if ($result['skipped'] > 0) {
@@ -185,6 +210,21 @@ class StateFestProgramController extends Controller
             'level_policies.*.max_onstage_per_student' => 'nullable|integer|min:0',
             'level_policies.*.max_offstage_per_student' => 'nullable|integer|min:0',
             'level_policies.*.max_group_per_student' => 'nullable|integer|min:0',
+            'state_domain_id'    => 'nullable|uuid|exists:state_domains,id',
+            'state_flow_mode'    => 'nullable|in:state_domain_event,read_only_aggregation',
+            'qualifier_policy'   => 'nullable|array',
+            'qualifier_policy.regional.positions' => 'nullable|array',
+            'qualifier_policy.regional.positions.*' => 'integer|min:1|max:10',
+            'qualifier_policy.district.positions' => 'nullable|array',
+            'qualifier_policy.district.positions.*' => 'integer|min:1|max:10',
+            'qualifier_policy.skip_item_flags' => 'nullable|array',
+            'qualifier_policy.skip_item_flags.*' => 'string|max:80',
+            'state_domain'       => 'nullable|array',
+            'state_domain.name'  => 'nullable|string|max:255',
+            'state_domain.domain'=> 'nullable|string|max:255',
+            'state_domain.api_base_url' => 'nullable|url|max:255',
+            'state_domain.api_client_id' => 'nullable|string|max:64',
+            'state_domain.api_client_secret' => 'nullable|string|max:255',
             'description'        => 'nullable|string',
         ]);
 
@@ -219,6 +259,64 @@ class StateFestProgramController extends Controller
             }
             $data['level_policies'] = $normalized;
         }
+
+        return $data;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function attachStateDomainConfig(Request $request, array $data): array
+    {
+        $domainData = $data['state_domain'] ?? [];
+        unset($data['state_domain']);
+
+        $data['state_flow_mode'] = $data['state_flow_mode'] ?? 'state_domain_event';
+
+        if (! is_array($domainData) || $domainData === []) {
+            return $data;
+        }
+
+        $hasInlineDomain = collect($domainData)
+            ->except(['api_client_secret'])
+            ->filter(fn ($value) => filled($value))
+            ->isNotEmpty();
+
+        if (! $hasInlineDomain && blank($domainData['api_client_secret'] ?? null)) {
+            return $data;
+        }
+
+        $domain = ! empty($data['state_domain_id'])
+            ? StateDomain::find($data['state_domain_id'])
+            : null;
+
+        $attributes = array_filter([
+            'name'          => $domainData['name'] ?? null,
+            'domain'        => $domainData['domain'] ?? null,
+            'api_base_url'  => $domainData['api_base_url'] ?? null,
+            'api_client_id' => $domainData['api_client_id'] ?? null,
+            'status'        => 'active',
+        ], fn ($value) => filled($value));
+
+        if (! $domain) {
+            abort_unless($hasInlineDomain, 422, 'Select an existing state domain or enter state domain details.');
+            $domain = StateDomain::create(array_merge([
+                'name'          => $attributes['name'] ?? $request->input('title').' State',
+                'api_client_id' => $attributes['api_client_id'] ?? str()->uuid()->toString(),
+                'status'        => 'active',
+            ], $attributes));
+        } elseif ($attributes !== []) {
+            $domain->update($attributes);
+        }
+
+        if (filled($domainData['api_client_secret'] ?? null)) {
+            $meta = $domain->meta ?? [];
+            $meta['api_client_secret'] = Crypt::encryptString($domainData['api_client_secret']);
+            $domain->update([
+                'api_client_secret_hash' => Hash::make($domainData['api_client_secret']),
+                'meta' => $meta,
+            ]);
+        }
+
+        $data['state_domain_id'] = $domain->id;
 
         return $data;
     }

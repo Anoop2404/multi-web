@@ -1,15 +1,15 @@
 /** Resolve registration window start/end for display (V2 columns with V1 fallback). */
 export function windowDisplayStart(window) {
     return window?.display_starts_at
-        ?? window?.add_open
         ?? window?.registration_starts_at
+        ?? window?.add_open
         ?? null;
 }
 
 export function windowDisplayEnd(window) {
     return window?.display_ends_at
-        ?? window?.add_close
         ?? window?.registration_ends_at
+        ?? window?.add_close
         ?? null;
 }
 

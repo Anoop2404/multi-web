@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\UsesTenantConnectionWhenIsolated;
 use Spatie\Permission\Models\Role as SpatieRole;
-use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class Role extends SpatieRole
 {
-    use CentralConnection;
+    use UsesTenantConnectionWhenIsolated;
 }

@@ -26,14 +26,14 @@ class ProgramFeeReceiptService
         $sahodaya = Tenant::find($schoolFee->school?->parent_id);
         abort_unless($sahodaya, 422, 'School Sahodaya not found.');
 
-        return $this->issueOnApprove($receipt, $sahodaya, 'MCQ', function (string $receiptNo) use ($schoolFee, $receipt, $sahodaya) {
+        return $this->issueOnApprove($receipt, $sahodaya, 'Talent Search', function (string $receiptNo) use ($schoolFee, $receipt, $sahodaya) {
             return View::make('receipts.program-fee-official', $this->buildViewData(
                 receipt: $receipt,
                 sahodaya: $sahodaya,
                 school: $schoolFee->school,
                 receiptNo: $receiptNo,
-                receiptTitle: 'MCQ Exam Fee Receipt',
-                contextLabel: $schoolFee->exam?->title ?? 'MCQ Exam',
+                receiptTitle: 'Talent Search Exam Fee Receipt',
+                contextLabel: $schoolFee->exam?->title ?? 'Talent Search Exam',
                 detailLines: $this->filterDetailLines([
                     ['label' => 'Exam level', 'value' => $schoolFee->exam?->exam_level ? 'Level '.$schoolFee->exam->exam_level : null],
                     ['label' => 'Students covered', 'value' => (string) $schoolFee->student_count],
@@ -49,14 +49,14 @@ class ProgramFeeReceiptService
         $sahodaya = Tenant::find($registration->school?->parent_id);
         abort_unless($sahodaya, 422, 'School Sahodaya not found.');
 
-        return $this->issueOnApprove($receipt, $sahodaya, 'MCQ', function (string $receiptNo) use ($registration, $receipt, $sahodaya) {
+        return $this->issueOnApprove($receipt, $sahodaya, 'Talent Search', function (string $receiptNo) use ($registration, $receipt, $sahodaya) {
             return View::make('receipts.program-fee-official', $this->buildViewData(
                 receipt: $receipt,
                 sahodaya: $sahodaya,
                 school: $registration->school,
                 receiptNo: $receiptNo,
-                receiptTitle: 'MCQ Exam Fee Receipt',
-                contextLabel: $registration->exam?->title ?? 'MCQ Exam',
+                receiptTitle: 'Talent Search Exam Fee Receipt',
+                contextLabel: $registration->exam?->title ?? 'Talent Search Exam',
                 detailLines: $this->filterDetailLines([
                     ['label' => 'Student', 'value' => $registration->student?->name],
                     ['label' => 'Reg. No.', 'value' => $registration->student?->reg_no],

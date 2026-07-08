@@ -61,17 +61,17 @@ class PortalWelcomeController extends Controller
 
         return match ($role) {
             'student' => [
-                'text' => 'Your student portal shows fest registrations, MCQ exams, schedule, and results.',
+                'text' => 'Your student portal shows fest registrations, Talent Search exams, schedule, and results.',
                 'actions' => [
                     ['label' => 'View registrations', 'href' => "/portal/student/{$tid}/fest-registrations"],
-                    ['label' => 'MCQ exams', 'href' => "/portal/student/{$tid}/mcq"],
+                    ['label' => 'Talent Search exams', 'href' => "/portal/student/{$tid}/mcq"],
                     ['label' => 'My profile', 'href' => "/portal/student/{$tid}/profile"],
                 ],
             ],
             'teacher' => [
-                'text' => 'Manage MCQ question banks, training programs, fest assignments, and download admit cards.',
+                'text' => 'Manage Talent Search question banks, training programs, fest assignments, and download admit cards.',
                 'actions' => [
-                    ['label' => 'MCQ hub', 'href' => "/portal/teacher/{$tid}/mcq"],
+                    ['label' => 'Talent Search question banks', 'href' => "/portal/teacher/{$tid}/question-banks"],
                     ['label' => 'Fest', 'href' => "/portal/teacher/{$tid}/fest"],
                     ['label' => 'Training', 'href' => "/portal/teacher/{$tid}/training"],
                 ],
@@ -93,13 +93,12 @@ class PortalWelcomeController extends Controller
                 'text' => 'You coordinate mark entry for assigned fest items.',
                 'actions' => [
                     ['label' => 'Dashboard', 'href' => "/portal/fest-coordinator/{$tid}"],
-                    ['label' => 'Mark entry', 'href' => "/portal/fest-coordinator/{$tid}/marks"],
                 ],
             ],
             'group_admin' => [
                 'text' => 'View student registrations, schedules, and admit cards for your group\'s schools.',
                 'actions' => [
-                    ['label' => 'Registrations', 'href' => "/portal/group/{$tid}/registrations"],
+                    ['label' => 'Registrations', 'href' => "/portal/group/{$tid}/fest/registrations"],
                     ['label' => 'Students', 'href' => "/portal/group/{$tid}/students"],
                 ],
             ],
@@ -111,10 +110,9 @@ class PortalWelcomeController extends Controller
                 ],
             ],
             'exam_controller', 'exam_staff' => [
-                'text' => 'Manage MCQ exam supervision, attendance, and mark recording for offline exams.',
+                'text' => 'Manage Talent Search exam supervision, attendance, and mark recording for offline exams.',
                 'actions' => [
                     ['label' => 'Dashboard', 'href' => "/portal/exam/{$tid}"],
-                    ['label' => 'Attendance', 'href' => "/portal/exam/{$tid}/attendance"],
                 ],
             ],
             default => [

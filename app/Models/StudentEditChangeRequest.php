@@ -2,11 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
+use App\Support\TenancyDatabase;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StudentEditChangeRequest extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = [
         'school_id', 'student_id', 'change_type', 'status', 'changes_json', 'photo_path',
         'reason', 'resolution_note', 'requested_by_user_id', 'reviewed_by_user_id', 'reviewed_at',
@@ -27,6 +32,18 @@ class StudentEditChangeRequest extends Model
 
     public function school(): BelongsTo
     {
-        return $this->belongsTo(Tenant::class, 'school_id');
+        return $this->belongsToCentralTenant('school_id');
+    }
+
+    /** @param  Builder<self>  $query */
+    public function scopeForSahodaya(Builder $query, string $sahodayaId): Builder
+    {
+        $schoolIds = TenancyDatabase::schoolIdsFor($sahodayaId);
+
+        if ($schoolIds === []) {
+            return $query->whereRaw('0 = 1');
+        }
+
+        return $query->whereIn('school_id', $schoolIds);
     }
 }

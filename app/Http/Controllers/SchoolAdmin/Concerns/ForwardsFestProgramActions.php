@@ -32,14 +32,14 @@ trait ForwardsFestProgramActions
         return app(FestRegistrationController::class)->index($request, $tenantId, $this->festProgramSlug(), 'results');
     }
 
-    public function reports(string $tenantId)
+    public function reports(Request $request, string $tenantId)
     {
-        return app(FestSchoolReportController::class)->index($tenantId, $this->festProgramSlug());
+        return app(FestSchoolReportController::class)->index($request, $tenantId, $this->festProgramSlug());
     }
 
-    public function qualifiers(string $tenantId)
+    public function qualifiers(Request $request, string $tenantId)
     {
-        return app(FestSchoolReportController::class)->qualifiers($tenantId, $this->festProgramSlug());
+        return app(FestSchoolReportController::class)->qualifiers($request, $tenantId, $this->festProgramSlug());
     }
 
     public function myEvents(string $tenantId)

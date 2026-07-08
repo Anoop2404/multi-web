@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\Download;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class DownloadController extends SchoolAdminController
@@ -28,7 +29,7 @@ class DownloadController extends SchoolAdminController
         ]);
 
         $file = $request->file('file');
-        $path = $file->store('downloads/' . $this->school->id, 's3');
+        $path = $file->store('downloads/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
 
         Download::create([
             'tenant_id'     => $this->school->id,

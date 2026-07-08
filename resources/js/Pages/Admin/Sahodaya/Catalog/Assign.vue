@@ -1,7 +1,7 @@
 <template>
     <SahodayaEventsLayout :title="pageTitle" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :program="program"
-                         :show-header-title="false">
+                         :program-events="events" :show-header-title="false">
         <PageHeader
             :title="pageTitle"
             eyebrow="Assign to event"
@@ -12,7 +12,7 @@
             </template>
         </PageHeader>
 
-        <CatalogSubNav :sahodaya-id="sahodaya.id" :program-slug="program.slug" active="assign" />
+        <CatalogSubNav :sahodaya-id="sahodaya.id" :program-slug="program.slug" :event-type="program.eventType" active="assign" />
 
         <div class="grid lg:grid-cols-2 gap-8 items-start">
             <FormSection title="Import items" :hint="`${summary.enabled} enabled items in master catalog.`">
@@ -65,6 +65,7 @@ import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import CatalogSubNav from '@/Components/sahodaya/CatalogSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { sahodayaCatalogHref } from '@/support/sahodayaPrograms.js';
 
 const props = defineProps({
     sahodaya: Object,
@@ -81,7 +82,7 @@ const page = usePage();
 
 const eventQuery = computed(() => (page.props.event?.id ? `?event_id=${page.props.event.id}` : ''));
 
-const catalogBase = `/sahodaya-admin/${props.sahodaya.id}/programs/${props.program.slug}/catalog`;
+const catalogBase = computed(() => sahodayaCatalogHref(props.sahodaya.id, props.program.slug));
 const pageTitle = computed(() => `${props.program.label} — Assign to event`);
 
 const importForm = useForm({
@@ -94,7 +95,7 @@ function eventUrl(eventId) {
 }
 
 function importToEvent() {
-    router.post(`${catalogBase}/import/${importForm.event_id}${eventQuery.value}`, {
+    router.post(`${catalogBase.value}/import/${importForm.event_id}${eventQuery.value}`, {
         catalog_section: importForm.catalog_section === 'all' ? null : importForm.catalog_section,
     }, {
         preserveScroll: true,

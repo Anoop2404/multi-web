@@ -20,7 +20,7 @@
             </button>
         </div>
 
-        <form class="card mb-4 flex flex-wrap gap-2 items-end" @submit.prevent="applyFilters">
+        <div class="card mb-4 flex flex-wrap gap-2 items-end">
             <div>
                 <label class="form-label">Sahodaya</label>
                 <select v-model="localFilters.tenant_id" class="field text-sm min-w-[10rem]">
@@ -51,9 +51,8 @@
                 <label class="form-label">Search</label>
                 <input v-model="localFilters.q" class="field text-sm w-full" placeholder="Email, IP, description…">
             </div>
-            <button type="submit" class="btn-primary text-sm">Filter</button>
             <button type="button" class="btn-secondary text-sm" @click="clearFilters">Clear</button>
-        </form>
+        </div>
 
         <div v-if="Object.keys(actionSummary).length" class="flex flex-wrap gap-2 mb-4">
             <span class="text-xs font-semibold text-slate-500 self-center">Top actions:</span>
@@ -107,6 +106,7 @@
 <script setup>
 import { computed, reactive } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 
 const props = defineProps({
@@ -140,6 +140,8 @@ const exportUrl = computed(() => {
 function applyFilters() {
     router.get('/admin/audit-logs', { ...localFilters }, { preserveState: true, replace: true });
 }
+
+useDebouncedInertiaFilters(localFilters, applyFilters, () => props.filters);
 
 function clearFilters() {
     Object.keys(localFilters).forEach((k) => { localFilters[k] = ''; });

@@ -30,6 +30,34 @@
             </div>
         </div>
 
+        <section v-if="byHead?.length" class="mb-8">
+            <h3 class="section-title mb-3">Fee catalog by item head</h3>
+            <div class="card overflow-hidden p-0">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Head</th>
+                            <th>Items</th>
+                            <th>Registrations</th>
+                            <th>Default fee</th>
+                            <th>Extra item fee</th>
+                            <th>Catalog total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in byHead" :key="row.head_id">
+                            <td class="font-medium">{{ row.head_name }}</td>
+                            <td>{{ row.item_count }}</td>
+                            <td>{{ row.registrations }}</td>
+                            <td>{{ row.default_fee != null ? `₹${row.default_fee}` : '—' }}</td>
+                            <td>{{ row.extra_fee != null ? `₹${row.extra_fee}` : '—' }}</td>
+                            <td>₹{{ row.catalog_total }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <div class="card overflow-hidden p-0">
             <table class="data-table">
                 <thead>
@@ -74,6 +102,7 @@ defineProps({
     pendingPaymentsCount: Number,
     event: Object,
     rows: Array,
+    byHead: { type: Array, default: () => [] },
     totals: Object,
     xlsUrl: String,
     feesUrl: String,

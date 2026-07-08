@@ -16,11 +16,12 @@ use App\Support\Fest\FestEventSettingsPayload;
 use App\Support\FestPageActivity;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestSportsAgeGroup;
+use App\Services\Events\EventContext;
 use App\Services\Events\FestCloneService;
 use App\Services\Events\FestEventFeeResolver;
 use App\Services\Events\FestJudgeGateService;
 use App\Services\Events\FestSchoolEventFeeService;
-use App\Services\Events\FestLevelRegistrationService;
+use App\Services\Events\FestRankPointService;
 use App\Services\Events\FestLifecycleService;
 use App\Services\Events\FestMandatoryItemService;
 use App\Support\TenantStorage;
@@ -52,8 +53,23 @@ class FestEventSettingsController extends SahodayaAdminController
         $schedule = $feeService->resolveSchedule($event);
         $classGroupScheme = FestClassGroupScheme::resolveForEvent($event, $schedule);
 
+        $itemHeads = \App\Models\FestItemHead::where('event_id', $event->id)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'default_item_fee', 'extra_item_fee']);
+
+        $ledgerAccount = app(\App\Services\Ledger\LedgerAccountSetupService::class)
+            ->festLedgerMeta($event, $this->sahodaya->id);
+
         return $this->inertia('Sahodaya/Events/Settings', [
-            'event'        => $event->load('items'),
+            'event'        => $event->load(['items.head']),
+            'itemHeads'    => $itemHeads,
+            'ledgerAccount'=> [
+                'code'       => $ledgerAccount['code'],
+                'name'       => $ledgerAccount['name'],
+                'head_id'    => $ledgerAccount['head_id'],
+                'ledger_url' => $ledgerAccount['ledger_url'],
+            ],
             'feeSchedule'  => $schedule,
             'numberingSettings' => app(\App\Services\Events\FestNumberingService::class)->settings($event),
             'feeModels'    => config('fest_fees.fee_models'),
@@ -76,6 +92,8 @@ class FestEventSettingsController extends SahodayaAdminController
             ]),
             'gradeConfigs' => FestGradeConfig::where('event_id', $event->id)->with('item')->get(),
             'pointRules'   => FestPointRule::where('event_id', $event->id)->orderBy('grade')->orderBy('position')->get(),
+            'rankPoints'   => app(FestRankPointService::class)->listForEvent($event),
+            'groupRankPoints' => app(FestRankPointService::class)->listForEvent($event, true),
             'volunteers'   => FestVolunteer::where('event_id', $event->id)->orderBy('name')->get(),
             'schools'      => $schools,
             'judgeGate'    => app(FestJudgeGateService::class)->status($event),
@@ -104,13 +122,17 @@ class FestEventSettingsController extends SahodayaAdminController
             ->get()
             ->keyBy('school_id');
 
-        return $schools->map(fn (Tenant $school) => [
-            'school_id'           => $school->id,
-            'school_name'         => $school->name,
-            'documents_verified'  => (bool) ($records[$school->id]->documents_verified ?? false),
-            'verified_at'         => $records[$school->id]->verified_at?->toIso8601String(),
-            'notes'               => $records[$school->id]->notes ?? null,
-        ])->values()->all();
+        return $schools->map(function (Tenant $school) use ($records) {
+            $record = $records->get($school->id);
+
+            return [
+                'school_id'           => $school->id,
+                'school_name'         => $school->name,
+                'documents_verified'  => (bool) ($record?->documents_verified ?? false),
+                'verified_at'         => $record?->verified_at?->toIso8601String(),
+                'notes'               => $record?->notes ?? null,
+            ];
+        })->values()->all();
     }
 
     public function updateLifecycleSettings(Request $request, string $tenantId, FestEvent $event)
@@ -276,12 +298,26 @@ class FestEventSettingsController extends SahodayaAdminController
             'participant_type_fees.group' => 'nullable|numeric|min:0',
             'participant_type_fees.team' => 'nullable|numeric|min:0',
             'default_item_fee' => 'nullable|numeric|min:0',
+            'require_fee_before_registration' => 'nullable|boolean',
+            'require_verified_students' => 'nullable|boolean',
+            'head_fees' => 'nullable|array',
+            'head_fees.*.id' => 'required|exists:fest_item_heads,id',
+            'head_fees.*.default_item_fee' => 'nullable|numeric|min:0',
+            'head_fees.*.extra_item_fee' => 'nullable|numeric|min:0',
             'item_fees' => 'nullable|array',
             'item_fees.*.id' => 'required|exists:fest_event_items,id',
             'item_fees.*.fee_amount' => 'nullable|numeric|min:0',
         ]);
 
-        $feeSettings = app(FestEventFeeResolver::class)->normalizeEventFeeSettings($data, $this->sahodaya->id);
+        $feeSettings = array_merge(
+            app(FestEventFeeResolver::class)->normalizeEventFeeSettings($data, $this->sahodaya->id),
+            array_filter([
+                'require_fee_before_registration' => array_key_exists('require_fee_before_registration', $data)
+                    ? (bool) $data['require_fee_before_registration'] : null,
+                'require_verified_students' => array_key_exists('require_verified_students', $data)
+                    ? (bool) $data['require_verified_students'] : null,
+            ], fn ($v) => $v !== null),
+        );
 
         $event->update(['fee_settings' => $feeSettings]);
 
@@ -298,6 +334,17 @@ class FestEventSettingsController extends SahodayaAdminController
             ]);
         }
 
+        foreach ($data['head_fees'] ?? [] as $row) {
+            \App\Models\FestItemHead::where('event_id', $event->id)
+                ->where('id', $row['id'])
+                ->update([
+                    'default_item_fee' => isset($row['default_item_fee']) && $row['default_item_fee'] !== ''
+                        ? (float) $row['default_item_fee'] : null,
+                    'extra_item_fee' => isset($row['extra_item_fee']) && $row['extra_item_fee'] !== ''
+                        ? (float) $row['extra_item_fee'] : null,
+                ]);
+        }
+
         app(PlatformAuditLogger::class)->festEvent(
             $event,
             FestPageActivity::settingsTab('fees'),
@@ -306,6 +353,21 @@ class FestEventSettingsController extends SahodayaAdminController
         );
 
         return back()->with('success', 'Fee settings saved.');
+    }
+
+    public function updateLedgerAccount(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $setup = app(\App\Services\Ledger\LedgerAccountSetupService::class);
+        $head = $setup->ensureFestEventHead($event);
+        $setup->updateHeadName($head, $data['name']);
+
+        return back()->with('success', 'Ledger account name saved.');
     }
 
     public function updateItemFee(Request $request, string $tenantId, FestEvent $event, FestEventItem $item)
@@ -554,6 +616,55 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', 'Point rule removed.');
     }
 
+    public function updateRankPoints(Request $request, string $tenantId, FestEvent $event, FestRankPointService $rankPoints)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless($event->event_type === 'sports', 422, 'Rank points apply to sports events only.');
+
+        $data = $request->validate([
+            'ranks'             => 'required|array|min:1',
+            'ranks.*.rank'      => 'required|integer|min:1|max:255',
+            'ranks.*.points'    => 'required|integer|min:0',
+            'ranks.*.is_group'  => 'nullable|boolean',
+            'is_group'          => 'nullable|boolean',
+        ]);
+
+        $isGroup = (bool) ($data['is_group'] ?? false);
+        $count = $rankPoints->replaceForEvent($event, $data['ranks'], $isGroup);
+
+        EventContext::for($event)->recalculateSchoolPoints();
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('points'),
+            'fest.settings.rank_points_updated',
+            "Rank points master saved ({$count} rank(s))",
+            ['count' => $count, 'is_group' => $isGroup],
+        );
+
+        return back()->with('success', "Rank points saved ({$count} rank(s)).");
+    }
+
+    public function seedRankPoints(string $tenantId, FestEvent $event, FestRankPointService $rankPoints)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless($event->event_type === 'sports', 422, 'Rank points apply to sports events only.');
+
+        $count = $rankPoints->seedAthleticsStandard($event);
+
+        EventContext::for($event)->recalculateSchoolPoints();
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('points'),
+            'fest.settings.rank_points_seeded',
+            'Athletics standard rank points loaded',
+            ['count' => $count],
+        );
+
+        return back()->with('success', "Loaded athletics standard ({$count} ranks).");
+    }
+
     public function storeVolunteer(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -658,6 +769,40 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', 'Numbering settings saved.');
     }
 
+    public function updateItemNumbering(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'items' => 'required|array',
+            'items.*.id' => 'required|integer|exists:fest_event_items,id',
+            'items.*.chest_no_start' => 'nullable|integer|min:1',
+            'items.*.item_reg_id_start' => 'nullable|integer|min:1',
+        ]);
+
+        $itemIds = FestEventItem::where('event_id', $event->id)->pluck('id')->all();
+
+        foreach ($data['items'] as $row) {
+            if (! in_array((int) $row['id'], $itemIds, true)) {
+                continue;
+            }
+            FestEventItem::where('id', $row['id'])->update([
+                'chest_no_start'      => $row['chest_no_start'] ?? null,
+                'item_reg_id_start'   => $row['item_reg_id_start'] ?? null,
+            ]);
+        }
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('numbering'),
+            'fest.settings.item_numbering_updated',
+            'Per-item chest and registration starts updated',
+            ['count' => count($data['items'])],
+        );
+
+        return back()->with('success', 'Per-item numbering saved.');
+    }
+
     public function updateItemWindows(Request $request, string $tenantId, FestEvent $event, FestEventItem $item)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -666,10 +811,22 @@ class FestEventSettingsController extends SahodayaAdminController
         $data = $request->validate([
             'reg_start' => 'nullable|date',
             'reg_end' => 'nullable|date',
+            'competition_start' => 'nullable|date',
+            'competition_end' => 'nullable|date|after_or_equal:competition_start',
+            'competition_time' => 'nullable|date_format:H:i',
             'item_reg_id_start' => 'nullable|integer|min:1',
+            'chest_no_start' => 'nullable|integer|min:1',
             'head_id' => 'nullable|exists:fest_item_heads,id',
             'results_published_at' => 'nullable|date',
+            'is_enabled' => 'nullable|boolean',
+            'fee_amount' => 'nullable|numeric|min:0',
         ]);
+
+        if (array_key_exists('fee_amount', $data)) {
+            $data['fee_amount'] = isset($data['fee_amount']) && $data['fee_amount'] !== ''
+                ? (float) $data['fee_amount']
+                : null;
+        }
 
         $item->update($data);
 

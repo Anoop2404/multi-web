@@ -29,7 +29,7 @@
                         <td class="p-3">
                             <select v-model="forms[r.id].grade" class="field w-14">
                                 <option value="">—</option>
-                                <option v-for="g in ['A','B','C','D','F']" :key="g" :value="g">{{ g }}</option>
+                                <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
                             </select>
                         </td>
                         <td class="p-3">
@@ -47,10 +47,12 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive } from 'vue';
 import { router } from '@inertiajs/vue3';
 
-const props = defineProps({ sahodaya: Object, exam: Object, registrations: Array });
+const props = defineProps({ sahodaya: Object, exam: Object, registrations: Array, gradeBands: { type: Array, default: () => [] } });
+const gradeOptions = computed(() => props.gradeBands?.length ? props.gradeBands.map((b) => b.label) : ['A+', 'A', 'B', 'C', 'D', 'F']);
 const forms = reactive({});
 for (const r of props.registrations) {
     forms[r.id] = {
@@ -66,9 +68,6 @@ function save(r) {
     router.post(`/portal/exam/${props.sahodaya.id}/exams/${props.exam.id}/registrations/${r.id}/marks`, forms[r.id], { preserveScroll: true });
 }
 
-const navItems = computed(() => [
-    { href: `/portal/exam/${props.sahodaya.id}`, label: 'Exams' },
-    { href: `/portal/exam/${props.sahodaya.id}/exams/${props.exam.id}/marks`, label: 'Mark entry' },
-]);
+const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id));
 </script>
 

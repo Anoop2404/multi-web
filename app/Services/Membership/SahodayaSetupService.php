@@ -24,8 +24,7 @@ class SahodayaSetupService
         $settings = "{$base}/membership/settings";
 
         $feeOk = $profile && $profile->membershipFeeConfigured($year);
-        $windowOk = $window && ($window->add_open || $window->registration_starts_at)
-            && ($window->add_close || $window->registration_ends_at);
+        $windowOk = $window && $window->registration_starts_at && $window->registration_ends_at;
         $hasPayment = $profile && (
             filled($profile->payment_bank_name)
             || filled($profile->payment_account_no)

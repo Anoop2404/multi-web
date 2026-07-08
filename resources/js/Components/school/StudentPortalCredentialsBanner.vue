@@ -3,8 +3,8 @@
         <div>
             <p class="text-sm font-semibold text-emerald-900">Student portal logins</p>
             <p class="text-xs text-emerald-800 mt-1">
-                Students sign in at the portal with <strong>username</strong> (their reg. no.) and the temp password below.
-                Passwords are shown once — share with students or parents.
+                Students sign in at the portal with their <strong>Student ID</strong> (reg. no.) and the temp password below.
+                No Gmail is required. Passwords are shown once — share with students or parents.
             </p>
         </div>
         <div class="overflow-x-auto rounded-lg border border-emerald-200 bg-white">
@@ -12,7 +12,7 @@
                 <thead>
                     <tr>
                         <th>Student</th>
-                        <th>Username</th>
+                        <th>Student ID</th>
                         <th>Temp password</th>
                     </tr>
                 </thead>

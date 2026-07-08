@@ -2,20 +2,24 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use App\Models\MembershipFeeSlab;
 use App\Support\AcademicYear;
 use Illuminate\Database\Eloquent\Model;
 
 class SahodayaProfile extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = [
         'tenant_id', 'slug', 'prefix', 'cbse_region', 'address',
         'contact_email', 'contact_phone',
         'student_data_mode', 'membership_fee_type', 'fixed_membership_fee_amount',
-        'teacher_registration_enabled', 'student_edit_lock_enabled', 'student_edit_lock_at', 'payment_instructions', 'prefixes_locked',
+        'teacher_registration_enabled', 'student_edit_lock_enabled', 'student_edit_lock_at',
+        'require_student_verification', 'payment_instructions', 'prefixes_locked',
         'setup_wizard_complete', 'setup_wizard_dismissed_at',
         'payment_bank_name', 'payment_account_no', 'payment_ifsc', 'payment_upi',
-        'application_form_config', 'active_academic_year', 'fest_class_group_scheme',
+        'application_form_config', 'active_academic_year', 'fest_class_group_scheme', 'nav_visibility',
         'receipt_template_json', 'receipt_next_number',
         'mail_host', 'mail_port', 'mail_encryption', 'mail_username', 'mail_password',
         'mail_from_address', 'mail_from_name', 'mail_transport', 'zeptomail_region',
@@ -30,10 +34,12 @@ class SahodayaProfile extends Model
         'teacher_registration_enabled' => 'boolean',
         'student_edit_lock_enabled'    => 'boolean',
         'student_edit_lock_at'         => 'datetime',
+        'require_student_verification' => 'boolean',
         'prefixes_locked'              => 'boolean',
         'setup_wizard_complete'        => 'boolean',
         'setup_wizard_dismissed_at'    => 'datetime',
         'application_form_config'      => 'array',
+        'nav_visibility'               => 'array',
         'receipt_template_json'        => 'array',
         'mail_password'                => 'encrypted',
         'mail_port'                    => 'integer',
@@ -44,7 +50,7 @@ class SahodayaProfile extends Model
         return $this->active_academic_year ?: AcademicYear::calendarCurrent();
     }
 
-    public function tenant() { return $this->belongsTo(Tenant::class); }
+    public function tenant() { return $this->belongsToCentralTenant(); }
 
     public function feeSlabs() {
         return $this->hasMany(MembershipFeeSlab::class, 'sahodaya_id', 'tenant_id');

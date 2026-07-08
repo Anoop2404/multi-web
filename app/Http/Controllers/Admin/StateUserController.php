@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Models\PlatformUser;
 use App\Services\Audit\PlatformAuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -15,13 +15,13 @@ class StateUserController extends Controller
     {
         $roles = ['state_admin', 'state_staff'];
 
-        $users = User::query()
+        $users = PlatformUser::query()
             ->whereNull('tenant_id')
             ->whereHas('roles', fn ($q) => $q->whereIn('name', $roles))
             ->with('roles', 'permissions')
             ->orderBy('name')
             ->get()
-            ->map(fn (User $u) => [
+            ->map(fn (PlatformUser $u) => [
                 'id'    => $u->id,
                 'name'  => $u->name,
                 'email' => $u->email,
@@ -49,7 +49,7 @@ class StateUserController extends Controller
             'roles.*'  => ['string', Rule::in($roles)],
         ]);
 
-        $user = User::create([
+        $user = PlatformUser::create([
             'name'              => $data['name'],
             'email'             => strtolower(trim($data['email'])),
             'password'          => Hash::make($data['password']),
@@ -63,7 +63,7 @@ class StateUserController extends Controller
         return back()->with('success', 'State user created.');
     }
 
-    public function update(Request $request, User $user, PlatformAuditLogger $audit)
+    public function update(Request $request, PlatformUser $user, PlatformAuditLogger $audit)
     {
         abort_unless($user->tenant_id === null && $user->hasAnyRole(['state_admin', 'state_staff']), 404);
 
@@ -94,7 +94,7 @@ class StateUserController extends Controller
         return back()->with('success', 'State user updated.');
     }
 
-    public function destroy(User $user, PlatformAuditLogger $audit)
+    public function destroy(PlatformUser $user, PlatformAuditLogger $audit)
     {
         abort_unless($user->tenant_id === null && $user->hasAnyRole(['state_admin', 'state_staff']), 404);
         abort_if($user->id === auth()->id(), 403, 'You cannot delete your own account.');

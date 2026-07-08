@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\Achievement;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class AchievementController extends SchoolAdminController
@@ -29,7 +30,7 @@ class AchievementController extends SchoolAdminController
         $data['tenant_id'] = $this->school->id;
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('achievements/' . $this->school->id, 's3');
+            $data['image'] = $request->file('image')->store('achievements/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
         }
 
         Achievement::create($data);
@@ -50,7 +51,7 @@ class AchievementController extends SchoolAdminController
         ]);
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('achievements/' . $this->school->id, 's3');
+            $data['image'] = $request->file('image')->store('achievements/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
         }
 
         $achievement->update($data);

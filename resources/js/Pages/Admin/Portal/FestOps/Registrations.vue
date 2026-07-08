@@ -6,6 +6,13 @@
         accent="emerald"
         :nav-items="navItems"
     >
+        <ReportHeadSubNav v-if="hasItemHeads && event.event_type === 'sports'"
+                          :head-item-groups="headItemGroups"
+                          :base-url="`${base}/registrations`"
+                          :selected-head-id="selectedHeadId"
+                          :selected-item-id="selectedItemId"
+                          :show-item-links="true" />
+
         <p v-if="feeRequired" class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
             School event fees must be approved before registrations can be approved.
         </p>
@@ -37,7 +44,7 @@
                     <tr v-for="reg in registrations" :key="reg.id">
                         <td><input v-if="reg.status === 'submitted'" type="checkbox" :value="reg.id" v-model="selectedIds"></td>
                         <td>{{ schools[reg.school_id] ?? reg.school_id }}</td>
-                        <td>{{ reg.item?.title ?? '—' }}</td>
+                        <td>{{ reg.item?.head?.name ? `${reg.item.head.name} · ` : '' }}{{ reg.item?.title ?? '—' }}</td>
                         <td>
                             <span :class="statusClass(reg.status)" class="status-pill">
                                 {{ reg.status }}
@@ -62,21 +69,23 @@
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
+import { festOpsEventNav } from '@/support/festOpsPortalNav.js';
 
 const props = defineProps({
     sahodaya: Object, event: Object, registrations: Array,
     schools: Object, feeRequired: Boolean, duties: Array,
+    headItemGroups: { type: Array, default: () => [] },
+    hasItemHeads: { type: Boolean, default: false },
+    selectedHeadId: { type: [String, Number], default: null },
+    selectedItemId: { type: [String, Number], default: null },
 });
 
 const selectedIds = ref([]);
 
 const base = computed(() => `/portal/fest-ops/${props.sahodaya.id}/events/${props.event.id}`);
 
-const navItems = computed(() => [
-    { href: `/portal/fest-ops/${props.sahodaya.id}`, label: 'Dashboard' },
-    { href: base.value, label: 'Event' },
-    { href: `${base.value}/registrations`, label: 'Registrations' },
-]);
+const navItems = computed(() => festOpsEventNav(props.sahodaya.id, props.event.id, props.duties));
 
 function statusClass(status) {
     return {

@@ -16,6 +16,55 @@ class FestItemHeadService
         return require app_path('Support/data/cksc_sports_heads.php');
     }
 
+    /** Resolve main item head (Chess, Athletics, …) for a catalog row. */
+    public static function resolveCatalogHeadKey(array $row): ?string
+    {
+        $title = strtolower((string) ($row['title'] ?? ''));
+
+        if (str_contains($title, 'chess')) {
+            return 'chess';
+        }
+
+        if (str_contains($title, 'carrom')) {
+            return 'carrom';
+        }
+
+        $discipline = $row['sport_discipline'] ?? null;
+        if (! $discipline) {
+            return null;
+        }
+
+        foreach (self::catalogHeadDefinitions() as $def) {
+            if (($def['sport_discipline'] ?? null) !== $discipline) {
+                continue;
+            }
+
+            // board_game is split by title above (chess vs carrom).
+            if ($discipline === 'board_game') {
+                continue;
+            }
+
+            return $def['key'];
+        }
+
+        return null;
+    }
+
+    public static function headLabel(?string $headKey): string
+    {
+        if (! $headKey) {
+            return 'Other';
+        }
+
+        foreach (self::catalogHeadDefinitions() as $def) {
+            if ($def['key'] === $headKey) {
+                return $def['name'];
+            }
+        }
+
+        return ucfirst(str_replace('_', ' ', $headKey));
+    }
+
     public function ensureCatalogHeads(string $tenantId, string $eventType = 'sports'): int
     {
         if ($eventType !== 'sports') {
@@ -56,19 +105,33 @@ class FestItemHeadService
             $created++;
         }
 
-        FestCatalogItem::forProgram($tenantId, $eventType)
-            ->whereNotNull('head_key')
-            ->each(function (FestCatalogItem $item) use ($tenantId) {
-                if (! $item->head_key) {
-                    return;
-                }
-                FestItemHead::forTenant($tenantId)
-                    ->whereNull('event_id')
-                    ->where('catalog_key', $item->head_key)
-                    ->exists();
-            });
-
         return $created;
+    }
+
+    /** Assign head_key on all sports master catalog rows (Chess items → chess head, etc.). */
+    public function syncCatalogItemHeadKeys(string $tenantId, string $eventType = 'sports'): int
+    {
+        if ($eventType !== 'sports') {
+            return 0;
+        }
+
+        $updated = 0;
+
+        FestCatalogItem::forProgram($tenantId, $eventType)->each(function (FestCatalogItem $item) use (&$updated) {
+            $headKey = self::resolveCatalogHeadKey([
+                'title' => $item->title,
+                'sport_discipline' => $item->sport_discipline,
+            ]);
+
+            if ($headKey === $item->head_key) {
+                return;
+            }
+
+            $item->update(['head_key' => $headKey]);
+            $updated++;
+        });
+
+        return $updated;
     }
 
     public function syncEventHeads(FestEvent $event): int
@@ -89,7 +152,15 @@ class FestItemHeadService
                 ->where('catalog_key', $catalogHead->catalog_key)
                 ->first();
 
-            if (! $eventHead) {
+            if ($eventHead) {
+                $eventHead->update([
+                    'name' => $catalogHead->name,
+                    'slug' => $catalogHead->slug,
+                    'sport_discipline' => $catalogHead->sport_discipline,
+                    'is_team_heading' => $catalogHead->is_team_heading,
+                    'sort_order' => $catalogHead->sort_order,
+                ]);
+            } else {
                 $eventHead = FestItemHead::create([
                     'tenant_id' => $tenantId,
                     'event_id' => $event->id,
@@ -105,49 +176,58 @@ class FestItemHeadService
             }
 
             $map[$catalogHead->catalog_key] = $eventHead->id;
-            if ($catalogHead->sport_discipline) {
-                $map[$catalogHead->sport_discipline] = $eventHead->id;
-            }
         }
 
         FestEventItem::where('event_id', $event->id)
-            ->whereNull('head_id')
-            ->each(function (FestEventItem $item) use ($map, $tenantId) {
-                $headKey = $this->resolveHeadKeyForItem($item, $tenantId);
-                if ($headKey && isset($map[$headKey])) {
-                    $item->update(['head_id' => $map[$headKey]]);
+            ->each(function (FestEventItem $item) use ($map) {
+                $headKey = self::resolveCatalogHeadKey([
+                    'title' => $item->title,
+                    'sport_discipline' => $item->sport_discipline,
+                ]);
 
+                if (! $headKey || ! isset($map[$headKey])) {
                     return;
                 }
-                if ($item->sport_discipline && isset($map[$item->sport_discipline])) {
-                    $item->update(['head_id' => $map[$item->sport_discipline]]);
+
+                $headId = (int) $map[$headKey];
+                if ((int) $item->head_id === $headId) {
+                    return;
                 }
+
+                $item->update(['head_id' => $headId]);
             });
 
         return $created;
     }
 
-    private function resolveHeadKeyForItem(FestEventItem $item, string $tenantId): ?string
+    /** Re-seed master catalogs and relink sports item heads for an existing tenant DB. */
+    public function backfillTenant(string $tenantId, array $eventTypes, bool $linkEventHeads = true): array
     {
-        if ($item->sport_discipline) {
-            $head = FestItemHead::forTenant($tenantId)
-                ->whereNull('event_id')
-                ->where('sport_discipline', $item->sport_discipline)
-                ->first();
-            if ($head?->catalog_key) {
-                return $head->catalog_key;
+        $totals = [
+            'created' => 0,
+            'updated' => 0,
+            'heads_created' => 0,
+            'head_links' => 0,
+            'events_synced' => 0,
+        ];
+
+        foreach ($eventTypes as $eventType) {
+            $sync = app(FestCatalogService::class)->ensureSeeded($tenantId, $eventType);
+            foreach (['created', 'updated', 'heads_created', 'head_links'] as $key) {
+                $totals[$key] += (int) ($sync[$key] ?? 0);
             }
         }
 
-        $title = strtolower($item->title ?? '');
-        if (str_contains($title, 'chess')) {
-            return 'chess';
-        }
-        if (str_contains($title, 'carrom')) {
-            return 'carrom';
+        if ($linkEventHeads) {
+            FestEvent::forTenant($tenantId)
+                ->ofType('sports')
+                ->each(function (FestEvent $event) use (&$totals) {
+                    app(self::class)->syncEventHeads($event);
+                    $totals['events_synced']++;
+                });
         }
 
-        return null;
+        return $totals;
     }
 
     /** @return list<FestItemHead> */
@@ -176,7 +256,34 @@ class FestItemHeadService
             return true;
         }
 
-        return $assigned->contains(fn ($row) => $row->duty === 'discipline' && (int) $row->head_id === (int) $headId)
-            || $assigned->contains(fn ($row) => $row->duty !== 'discipline' && $row->head_id === null);
+        return $assigned->contains(fn ($row) => $row->head_id === null || (int) $row->head_id === (int) $headId);
+    }
+
+    /** @param  array<string, mixed>  $dates */
+    public function applyWindowToItems(FestItemHead $head, FestEvent $event, array $dates, bool $overwriteItemDates = true): int
+    {
+        $payload = array_filter([
+            'reg_start'          => $dates['reg_start'] ?? null,
+            'reg_end'            => $dates['reg_end'] ?? null,
+            'competition_start'  => $dates['competition_start'] ?? null,
+            'competition_end'    => $dates['competition_end'] ?? null,
+            'competition_time'   => $dates['competition_time'] ?? null,
+        ], fn ($v) => $v !== null && $v !== '');
+
+        if ($payload === []) {
+            return 0;
+        }
+
+        $query = FestEventItem::query()
+            ->where('event_id', $event->id)
+            ->where('head_id', $head->id);
+
+        if (! $overwriteItemDates) {
+            foreach (array_keys($payload) as $column) {
+                $query->whereNull($column);
+            }
+        }
+
+        return $query->update($payload);
     }
 }

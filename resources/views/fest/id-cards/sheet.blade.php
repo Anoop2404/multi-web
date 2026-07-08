@@ -11,8 +11,9 @@
         .grid { width: 100%; border-collapse: separate; border-spacing: 3mm 3mm; }
         .grid td { width: 50%; vertical-align: top; padding: 0; }
         .card {
-            width: 85.6mm;
-            height: 54mm;
+            width: 96mm;
+            height: 72mm;
+            aspect-ratio: 4 / 3;
             border: 1px solid #cbd5e1;
             border-radius: 2.5mm;
             overflow: hidden;
@@ -33,27 +34,27 @@
         .card__role { display: table-cell; font-size: 7px; font-weight: bold; text-align: right; vertical-align: middle; letter-spacing: 0.08em; }
         .card__qr-head { display: table-cell; width: 12mm; vertical-align: middle; text-align: right; }
         .card__qr-head img { width: 10mm; height: 10mm; }
-        .card__body { display: table; width: 100%; padding: 2mm 2.5mm 1mm; }
+        .card__body { display: table; width: 100%; padding: 2.5mm 2.5mm 1.5mm; min-height: 28mm; }
         .card__avatar {
             display: table-cell;
-            width: 14mm;
-            height: 14mm;
+            width: 18mm;
+            height: 18mm;
             vertical-align: top;
         }
         .card__avatar-inner {
-            width: 14mm;
-            height: 14mm;
+            width: 18mm;
+            height: 18mm;
             border-radius: 50%;
             background: #e2e8f0;
             color: #0f3d7a;
             font-size: 11px;
             font-weight: bold;
             text-align: center;
-            line-height: 14mm;
+            line-height: 18mm;
         }
         .card__photo {
-            width: 14mm;
-            height: 14mm;
+            width: 18mm;
+            height: 18mm;
             border-radius: 50%;
             object-fit: cover;
         }
@@ -92,7 +93,7 @@
 @endif
 
 @php
-    $chunks = array_chunk($cards, 10);
+    $chunks = array_chunk($cards, 6);
 @endphp
 
 @foreach($chunks as $pageIndex => $pageCards)

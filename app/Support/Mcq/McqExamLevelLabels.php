@@ -30,13 +30,18 @@ class McqExamLevelLabels
 
     public static function feeLabel(?string $feeType, mixed $feeAmount): string
     {
-        if (($feeType ?? 'none') === 'none' || (float) ($feeAmount ?? 0) <= 0) {
+        return self::rupeeLabel($feeAmount, ($feeType ?? 'none') === 'none' ? 0 : null);
+    }
+
+    public static function rupeeLabel(mixed $amount, ?float $emptyBelow = 0): string
+    {
+        if ($emptyBelow !== null && (float) ($amount ?? 0) <= $emptyBelow) {
             return 'Not set';
         }
 
-        $amount = (float) $feeAmount;
+        $value = (float) $amount;
 
-        return '₹'.($amount == floor($amount) ? number_format($amount, 0) : number_format($amount, 2));
+        return '₹'.($value == floor($value) ? number_format($value, 0) : number_format($value, 2));
     }
 
     public static function statusLabel(?string $status): string

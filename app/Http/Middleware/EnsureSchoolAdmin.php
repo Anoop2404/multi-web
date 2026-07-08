@@ -36,12 +36,12 @@ class EnsureSchoolAdmin
             abort(403);
         }
 
-        if ($user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal', 'school_event_coordinator', 'school_staff']) && ! $user->hasVerifiedEmail()) {
+        if ($user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal', 'school_event_coordinator', 'school_sports_coordinator', 'school_kalotsavam_coordinator', 'school_mcq_coordinator', 'school_training_coordinator', 'school_finance_coordinator', 'school_staff']) && ! $user->hasVerifiedEmail()) {
             return \App\Support\InertiaAuth::redirectTo($request, route('verification.notice'));
         }
 
         $tenantId = $request->route('tenantId');
-        if ($tenantId && $user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal', 'school_event_coordinator', 'school_staff'])) {
+        if ($tenantId && $user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal', 'school_event_coordinator', 'school_sports_coordinator', 'school_kalotsavam_coordinator', 'school_mcq_coordinator', 'school_training_coordinator', 'school_finance_coordinator', 'school_staff'])) {
             $school = \App\Models\Tenant::find($tenantId);
             if ($school && ! $school->is_active) {
                 abort(403, 'This school account is inactive.');
@@ -51,7 +51,17 @@ class EnsureSchoolAdmin
             }
         }
 
-        $request->attributes->set('isSchoolStaff', $user->hasRole('school_staff') && ! $user->isSuperAdmin());
+        $request->attributes->set('isSchoolStaff',
+            ! $user->isSuperAdmin()
+            && ! $user->hasAnyRole(TenantUserCatalog::schoolManagementRoles())
+            && $user->hasAnyRole(TenantUserCatalog::schoolWriteGatedRoles())
+        );
+
+        $request->attributes->set('isEventCoordinator',
+            ! $user->isSuperAdmin()
+            && ! $user->hasAnyRole(TenantUserCatalog::schoolManagementRoles())
+            && $user->hasRole('school_event_coordinator')
+        );
 
         return $next($request);
     }

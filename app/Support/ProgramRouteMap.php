@@ -30,6 +30,18 @@ class ProgramRouteMap
             'event_type' => 'teacher_fest',
             'icon'       => 'users',
         ],
+        'english-fest' => [
+            'slug'       => 'english-fest',
+            'label'      => 'English Fest',
+            'event_type' => 'english_fest',
+            'icon'       => 'file-text',
+        ],
+        'science-fest' => [
+            'slug'       => 'science-fest',
+            'label'      => 'Science Fest',
+            'event_type' => 'science_fest',
+            'icon'       => 'layers',
+        ],
     ];
 
     public static function slugFromPrefix(string $prefix): string
@@ -103,8 +115,29 @@ class ProgramRouteMap
         return "/school-admin/{$schoolId}/{$prefix}";
     }
 
+    /** School registration page for a fest program slug. */
+    public static function schoolRegistrationUrl(string $schoolId, string $programSlug): string
+    {
+        if ($programSlug === 'custom') {
+            return "/school-admin/{$schoolId}/fest-programs";
+        }
+
+        return self::schoolBase($schoolId, self::prefixFromSlug($programSlug)).'/registration';
+    }
+
     public static function sahodayaBase(string $sahodayaId, string $prefix): string
     {
         return "/sahodaya-admin/{$sahodayaId}/{$prefix}";
+    }
+
+    public static function sahodayaCatalogBase(string $sahodayaId, string $slug): string
+    {
+        $prefix = self::prefixFromSlug($slug);
+
+        if ($slug === 'custom') {
+            return "/sahodaya-admin/{$sahodayaId}/programs/custom/catalog";
+        }
+
+        return self::sahodayaBase($sahodayaId, $prefix).'/catalog';
     }
 }

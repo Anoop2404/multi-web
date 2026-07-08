@@ -4,9 +4,11 @@ export function studentPortalNavItems(schoolId) {
 
     return [
         { href: base, label: 'Home', exact: true },
-        { href: `${base}/mcq`, label: 'MCQ Exams' },
+        { href: `${base}/mcq`, label: 'Talent Search Exams' },
+        { href: `${base}/fest-registrations`, label: 'Registrations' },
         { href: `${base}/fest/schedule`, label: 'Fest schedule' },
-        { href: `${base}/results`, label: 'Results' },
+        { href: `${base}/results`, label: 'Fest results' },
+        { href: `${base}/sports-results`, label: 'Sports results' },
         { href: `${base}/certificates`, label: 'Certificates' },
         { href: `${base}/profile`, label: 'Profile' },
     ];

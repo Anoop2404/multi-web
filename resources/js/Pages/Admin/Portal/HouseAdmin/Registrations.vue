@@ -62,6 +62,7 @@
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { router } from '@inertiajs/vue3';
 import { computed, reactive } from 'vue';
+import { houseAdminPortalNavItems } from '@/support/houseAdminPortalNav.js';
 
 const props = defineProps({
     school: Object,
@@ -77,12 +78,7 @@ const filterForm = reactive({
     status: props.filters?.status ?? '',
 });
 
-const navItems = computed(() => [
-    { href: `/portal/house-admin/${props.school.id}`, label: 'Dashboard' },
-    { href: `/portal/house-admin/${props.school.id}/students`, label: 'Students' },
-    { href: `/portal/house-admin/${props.school.id}/registrations`, label: 'Registrations' },
-    { href: `/portal/house-admin/${props.school.id}/ranking`, label: 'House ranking' },
-]);
+const navItems = computed(() => houseAdminPortalNavItems(props.school.id));
 
 function applyFilters() {
     const params = {};

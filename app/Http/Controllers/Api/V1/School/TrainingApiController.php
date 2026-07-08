@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\School;
 use App\Models\Teacher;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
+use App\Services\Training\TeacherTrainingEligibilityService;
 use Illuminate\Http\Request;
 
 class TrainingApiController extends SchoolApiController
@@ -24,7 +25,7 @@ class TrainingApiController extends SchoolApiController
         return response()->json(['data' => ['programs' => $programs, 'registrations' => $registrations]]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, TeacherTrainingEligibilityService $eligibility)
     {
         $data = $request->validate([
             'program_id' => 'required|exists:training_programs,id',
@@ -36,6 +37,8 @@ class TrainingApiController extends SchoolApiController
 
         $teacher = Teacher::findOrFail($data['teacher_id']);
         abort_if($teacher->tenant_id !== $this->school->id, 403);
+
+        abort_unless($eligibility->isEligible($program, $teacher), 422, $eligibility->ineligibilityReason($program, $teacher) ?? 'Teacher not eligible');
 
         $registration = TrainingRegistration::firstOrCreate(
             ['program_id' => $program->id, 'teacher_id' => $teacher->id],

@@ -10,14 +10,17 @@ class FeeReceipt extends Model
 {
     protected $fillable = [
         'feeable_type', 'feeable_id', 'receipt_number', 'file_path', 'generated_receipt_path', 'transaction_ref', 'bank_name',
-        'payment_date', 'amount', 'status', 'rejection_reason',
+        'payment_date', 'amount', 'waiver_amount', 'waiver_reason', 'waived_by_user_id', 'status', 'rejection_reason',
         'uploaded_by_user_id', 'reviewed_by', 'reviewed_at',
+        'receipt_emailed_at', 'receipt_email_status', 'receipt_email_error', 'receipt_email_resend_count',
     ];
 
     protected $casts = [
         'amount'       => 'decimal:2',
+        'waiver_amount'=> 'decimal:2',
         'payment_date' => 'date',
         'reviewed_at'  => 'datetime',
+        'receipt_emailed_at' => 'datetime',
     ];
 
     public function feeable(): MorphTo

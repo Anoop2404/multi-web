@@ -5,7 +5,9 @@ namespace App\Services\Events;
 use App\Models\Certificate;
 use App\Models\FestEvent;
 use App\Models\FestMark;
+use App\Models\FestEventStaff;
 use App\Models\FestParticipant;
+use App\Models\FestVolunteer;
 use App\Models\FestRecordBreak;
 use Illuminate\Support\Str;
 
@@ -88,6 +90,23 @@ class FestCertificateService
                 'verification_uuid' => (string) Str::uuid(),
                 'generated_at'      => now(),
             ]
+        );
+    }
+
+
+    public function issueVolunteerCertificate(FestVolunteer $volunteer): Certificate
+    {
+        return Certificate::firstOrCreate(
+            ['entity_type' => FestVolunteer::class, 'entity_id' => $volunteer->id, 'cert_type' => 'volunteer'],
+            ['verification_uuid' => (string) Str::uuid(), 'generated_at' => now()]
+        );
+    }
+
+    public function issueStaffCertificate(FestEventStaff $staff): Certificate
+    {
+        return Certificate::firstOrCreate(
+            ['entity_type' => FestEventStaff::class, 'entity_id' => $staff->id, 'cert_type' => 'organizer'],
+            ['verification_uuid' => (string) Str::uuid(), 'generated_at' => now()]
         );
     }
 

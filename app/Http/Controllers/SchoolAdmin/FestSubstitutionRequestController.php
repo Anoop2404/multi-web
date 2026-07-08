@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 class FestSubstitutionRequestController extends SchoolAdminController
 {
-    public function index(FestEvent $event, string $program)
+    public function index(string $tenantId, FestEvent $event, string $program)
     {
         $meta = SchoolFestProgram::meta($program);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);

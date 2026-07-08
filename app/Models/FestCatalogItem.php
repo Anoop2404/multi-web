@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 class FestCatalogItem extends Model
 {
     protected $fillable = [
-        'tenant_id', 'event_type', 'catalog_key', 'source', 'is_enabled', 'is_mandatory', 'fee_enabled',
+        'tenant_id', 'event_type', 'catalog_key', 'head_key', 'source', 'is_enabled', 'is_mandatory', 'fee_enabled',
         'title', 'item_code', 'category', 'stage_type', 'venue_type', 'competition_format',
         'sport_discipline', 'duration_minutes', 'criteria_json', 'participant_type', 'gender',
         'class_group', 'age_group', 'kids_band', 'max_per_school', 'min_group_size',

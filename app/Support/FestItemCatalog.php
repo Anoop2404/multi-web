@@ -31,6 +31,21 @@ class FestItemCatalog
     }
 
     /** @return list<array<string, mixed>> */
+    public static function mcsKalotsavItems(): array
+    {
+        return self::loadCatalogRows(
+            require __DIR__.'/data/mcs_kalotsav_items.php',
+            enrichGroups: true,
+            defaults: [
+                'owner_level' => 'sahodaya',
+                'max_per_school' => 1,
+                'qualify_count' => 1,
+                'source' => 'mcs',
+            ],
+        );
+    }
+
+    /** @return list<array<string, mixed>> */
     public static function kalolsavItems(): array
     {
         return self::loadCatalogRows(

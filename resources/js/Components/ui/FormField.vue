@@ -1,6 +1,6 @@
 <template>
     <div class="form-field" :class="classExtra">
-        <label v-if="label" :for="inputId" class="form-label">
+        <label v-if="label" :id="labelId" :for="inputId" class="form-label">
             {{ label }}
             <span v-if="required" class="text-red-500" aria-hidden="true">*</span>
         </label>
@@ -13,7 +13,7 @@
 </template>
 
 <script setup>
-import { computed, useId, ref, onMounted, nextTick } from 'vue';
+import { computed, useId, ref, onMounted, onUpdated, nextTick } from 'vue';
 
 const props = defineProps({
     label: { type: String, default: '' },
@@ -26,6 +26,7 @@ const props = defineProps({
 
 const fallbackId = useId();
 const inputId = computed(() => props.id || fallbackId);
+const labelId = computed(() => `${inputId.value}-label`);
 const controlRef = ref(null);
 
 function bindControlIds() {
@@ -34,6 +35,9 @@ function bindControlIds() {
     controls.forEach((el, index) => {
         if (!el.id) {
             el.id = index === 0 ? inputId.value : `${inputId.value}-${index}`;
+        }
+        if (props.label) {
+            el.setAttribute('aria-labelledby', labelId.value);
         }
         if (!el.getAttribute('aria-label') && !el.labels?.length) {
             const labelText = props.label || props.hint || el.getAttribute('placeholder');
@@ -45,4 +49,5 @@ function bindControlIds() {
 }
 
 onMounted(() => nextTick(bindControlIds));
+onUpdated(() => nextTick(bindControlIds));
 </script>

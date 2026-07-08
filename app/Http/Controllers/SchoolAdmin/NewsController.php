@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\NewsArticle;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -38,7 +39,7 @@ class NewsController extends SchoolAdminController
         $data['slug']      = Str::slug($data['title']) . '-' . Str::random(5);
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('news/' . $this->school->id, 's3');
+            $data['image'] = $request->file('image')->store('news/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
         }
 
         NewsArticle::create($data);
@@ -67,7 +68,7 @@ class NewsController extends SchoolAdminController
         ]);
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('news/' . $this->school->id, 's3');
+            $data['image'] = $request->file('image')->store('news/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
         }
 
         $news->update($data);

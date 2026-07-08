@@ -5,18 +5,21 @@
                 <h3 class="text-lg font-semibold text-gray-700">{{ pageTitle }}</h3>
                 <p class="text-sm text-gray-400 mt-0.5">
                     {{ tenantType === 'sahodaya'
-                        ? 'Manage Sahodaya clusters, custom domains, and portal access.'
+                        ? (readOnly
+                            ? 'View Sahodaya clusters in your state (read-only).'
+                            : 'Manage Sahodaya clusters, custom domains, and portal access.')
                         : 'Manage member schools, domains, and parent Sahodaya assignment.' }}
                 </p>
             </div>
-            <Link :href="createUrl"
+            <Link v-if="createUrl && !readOnly"
+                  :href="createUrl"
                   class="btn-primary">
                 + {{ tenantType === 'sahodaya' ? 'Add Sahodaya' : 'Add School' }}
             </Link>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-4 p-4">
-            <form @submit.prevent="applyFilters" class="flex flex-wrap gap-3 items-end">
+            <div class="flex flex-wrap gap-3 items-end">
                 <div class="flex-1 min-w-[200px]">
                     <label class="text-xs font-semibold text-gray-600">Search</label>
                     <input v-model="filterForm.search" type="search" placeholder="Name, domain, subdomain…"
@@ -30,9 +33,8 @@
                         <option value="inactive">Inactive</option>
                     </select>
                 </div>
-                <button type="submit" class="btn-primary text-sm">Apply</button>
                 <button v-if="hasFilters" type="button" @click="clearFilters" class="btn-ghost text-sm">Clear</button>
-            </form>
+            </div>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
@@ -63,16 +65,17 @@
                             {{ tenant.children_count ?? 0 }}
                         </td>
                         <td class="px-4 py-3">
-                            <a v-if="tenant.domain" :href="`https://${tenant.domain}`" target="_blank" rel="noopener"
+                            <a v-if="tenant.domain" :href="tenantPublicUrl(tenant)" target="_blank" rel="noopener"
                                class="font-mono text-xs text-indigo-600 hover:underline">
                                 {{ tenant.domain }}
                             </a>
                             <span v-else class="text-xs text-gray-300">—</span>
                         </td>
                         <td class="px-4 py-3">
-                            <span v-if="tenant.subdomain" class="font-mono text-xs text-gray-500">
+                            <a v-if="tenant.subdomain" :href="tenantSubdomainUrl(tenant)" target="_blank" rel="noopener"
+                               class="font-mono text-xs text-gray-500 hover:text-indigo-600">
                                 {{ tenant.subdomain }}.{{ tenantBaseDomain }}
-                            </span>
+                            </a>
                             <span v-else class="text-xs text-gray-300">—</span>
                         </td>
                         <td class="px-4 py-3">
@@ -81,8 +84,16 @@
                             </span>
                         </td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
-                            <Link :href="`/admin/tenants/${tenant.id}/edit`" class="text-gray-500 hover:text-gray-700 text-xs mr-3">Edit</Link>
-                            <Link :href="`/admin/tenants/${tenant.id}`" class="text-indigo-600 hover:underline text-xs">View</Link>
+                            <template v-if="readOnly">
+                                <a v-if="tenantPublicUrl(tenant) || tenantSubdomainUrl(tenant)"
+                                   :href="tenantPublicUrl(tenant) || tenantSubdomainUrl(tenant)"
+                                   target="_blank" rel="noopener"
+                                   class="text-indigo-600 hover:underline text-xs">Open portal ↗</a>
+                            </template>
+                            <template v-else>
+                                <Link :href="`/admin/tenants/${tenant.id}/edit`" class="text-gray-500 hover:text-gray-700 text-xs mr-3">Edit</Link>
+                                <Link :href="`/admin/tenants/${tenant.id}`" class="text-indigo-600 hover:underline text-xs">View</Link>
+                            </template>
                         </td>
                     </tr>
                 </tbody>
@@ -101,12 +112,14 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, reactive, watch } from 'vue';
+import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 
 const props = defineProps({
     tenants: Object,
     tenantType: { type: String, required: true },
     pageTitle: { type: String, required: true },
-    createUrl: { type: String, required: true },
+    createUrl: { type: String, default: null },
+    readOnly: { type: Boolean, default: false },
     tenantBaseDomain: { type: String, default: 'sahodaya.test' },
     filters: { type: Object, default: () => ({ search: '', status: 'all' }) },
 });
@@ -127,12 +140,26 @@ const listPath = computed(() =>
     props.tenantType === 'school' ? '/admin/schools' : '/admin/sahodayas',
 );
 
+function tenantPublicUrl(tenant) {
+    if (!tenant.domain) return null;
+    const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https:' : 'http:';
+    return `${proto}//${tenant.domain}`;
+}
+
+function tenantSubdomainUrl(tenant) {
+    if (!tenant.subdomain) return null;
+    const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https:' : 'http:';
+    return `${proto}//${tenant.subdomain}.${props.tenantBaseDomain}`;
+}
+
 function applyFilters() {
     router.get(listPath.value, {
         search: filterForm.search || undefined,
         status: filterForm.status !== 'all' ? filterForm.status : undefined,
     }, { preserveState: true, preserveScroll: true });
 }
+
+useDebouncedInertiaFilters(filterForm, applyFilters, () => props.filters);
 
 function clearFilters() {
     filterForm.search = '';

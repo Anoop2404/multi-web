@@ -12,7 +12,6 @@ use App\Http\Controllers\Public\NewsArticleController;
 use App\Http\Controllers\Public\SchoolApplicationController;
 use App\Http\Controllers\Public\SahodayaCmsPageController;
 use App\Http\Controllers\Public\SeoController;
-use App\Http\Controllers\Public\TcRequestController;
 use App\Http\Middleware\InitializeTenancyByRequestHost;
 use App\Http\Middleware\SetPublicCacheHeaders;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +40,7 @@ Route::middleware([
         Route::get('/', [FestPortalController::class, 'index'])->name('index');
         Route::get('/{event}', [FestPortalController::class, 'show'])->name('show');
         Route::get('/{event}/schedule', [FestPortalController::class, 'schedule'])->name('schedule');
+        Route::get('/{event}/results', [FestPortalController::class, 'results'])->name('results');
         Route::get('/{event}/items/{item}', [FestPortalController::class, 'itemSchedule'])->name('item-schedule');
         Route::get('/{event}/items/{item}/results', [FestPortalController::class, 'itemResults'])->name('item-results');
         Route::get('/{event}/items/{item}/results.pdf', [FestPortalController::class, 'itemResultsPdf'])->name('item-results.pdf');
@@ -86,7 +86,6 @@ Route::middleware([
         Route::get('/gallery/{slug}', [GalleryAlbumController::class, 'show'])->name('tenant.gallery.show');
 
         Route::post('/admission-enquiry', [AdmissionEnquiryController::class, 'store'])->name('admission-enquiry.store');
-        Route::post('/tc-request', [TcRequestController::class, 'store'])->name('tc-request.store');
 
         Route::get('/sitemap.xml', [SeoController::class, 'sitemap']);
         Route::get('/robots.txt', [SeoController::class, 'robots']);

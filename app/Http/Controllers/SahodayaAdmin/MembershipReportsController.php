@@ -104,6 +104,7 @@ class MembershipReportsController extends SahodayaAdminController
             ];
         });
 
+        app(\App\Services\Audit\PlatformAuditLogger::class)->reportDownloaded('membership_report', ['type' => __FUNCTION__]);
         return ExcelExport::download('membership-schools', [
             'School', 'Membership Status', 'Payment Status', 'Amount', 'Prefix', 'Students', 'Classes', 'Joined',
         ], $rows);
@@ -137,6 +138,7 @@ class MembershipReportsController extends SahodayaAdminController
                 $s->teacher_status,
             ]);
 
+        app(\App\Services\Audit\PlatformAuditLogger::class)->reportDownloaded('membership_report', ['type' => __FUNCTION__]);
         return ExcelExport::download('membership-submissions-'.$year, [
             'School', 'Year', 'Records', 'Counts', 'Teachers',
         ], $rows);
@@ -159,6 +161,7 @@ class MembershipReportsController extends SahodayaAdminController
             isset($item['updated_at']) ? date('Y-m-d H:i', strtotime($item['updated_at'])) : '',
         ]);
 
+        app(\App\Services\Audit\PlatformAuditLogger::class)->reportDownloaded('membership_report', ['type' => __FUNCTION__]);
         return ExcelExport::download('membership-payment-due-'.$year, [
             'School', 'Code', 'Year', 'Reg No', 'Status', 'Fee Due', 'Updated',
         ], $rows);
@@ -172,7 +175,7 @@ class MembershipReportsController extends SahodayaAdminController
         }
 
         $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->pluck('id');
-        $payments = $this->paymentsQuery($schoolIds, $filters)->get();
+        $payments = $this->paymentsQuery($this->sahodaya->id, $schoolIds->all(), $filters)->get();
 
         $rows = $payments->map(fn (MembershipPayment $p) => [
             $p->school?->name ?? '',
@@ -189,6 +192,7 @@ class MembershipReportsController extends SahodayaAdminController
 
         $name = $filename ?? 'membership-payments-'.$filters['status'];
 
+        app(\App\Services\Audit\PlatformAuditLogger::class)->reportDownloaded('membership_report', ['type' => __FUNCTION__]);
         return ExcelExport::download($name, [
             'School', 'Code', 'Year', 'Amount', 'Status', 'Method', 'Reference', 'Submitted', 'Verified', 'Proof Path',
         ], $rows);
@@ -276,7 +280,7 @@ class MembershipReportsController extends SahodayaAdminController
             'status'    => $status,
         ];
 
-        return $this->paymentsQuery($schoolIds, $filters)->paginate(20)->withQueryString();
+        return $this->paymentsQuery($this->sahodaya->id, $schoolIds->all(), $filters)->paginate(20)->withQueryString();
     }
 
     private function categoryBreakdown($schoolIds, EffectiveMasterDataResolver $resolver)

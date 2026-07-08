@@ -3,8 +3,11 @@
         <PageHeader title="Student records for membership" eyebrow="Membership"
                     description="Your school student list (same records used for fest registration). Submit when ready for Sahodaya review." />
 
-        <div class="max-w-4xl space-y-4">
-            <Link :href="`/school-admin/${school.id}/registration`" class="text-sm text-blue-600">← Annual registration</Link>
+        <div class="max-w-4xl space-y-5">
+            <MembershipWorkflowNav :school="school"
+                                   :profile="profile"
+                                   :registration="registration"
+                                   current="students" />
 
             <div class="notice-banner notice-banner--info text-sm">
                 Student data is maintained under
@@ -13,13 +16,14 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
-                <span class="text-sm capitalize">Status: <strong>{{ statusLabel(submission.full_records_status) }}</strong></span>
+                <TrackStatusPill :status="submission.full_records_status" />
                 <Link :href="`/school-admin/${school.id}/students`" class="btn-secondary text-sm">Manage students →</Link>
             </div>
 
-            <p v-if="submission.full_records_rejection_reason" class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-3">
-                Rejected: {{ submission.full_records_rejection_reason }}
-            </p>
+            <div v-if="submission.full_records_rejection_reason" class="notice-banner notice-banner--warning text-sm">
+                <p class="font-semibold">Submission rejected</p>
+                <p class="mt-1">{{ submission.full_records_rejection_reason }}</p>
+            </div>
 
             <div class="card card--flush overflow-hidden">
                 <div class="overflow-x-auto">
@@ -71,6 +75,9 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import PageHeader from '@/Components/ui/PageHeader.vue';
+import MembershipWorkflowNav from '@/Components/school/MembershipWorkflowNav.vue';
+import TrackStatusPill from '@/Components/ui/TrackStatusPill.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
@@ -78,6 +85,7 @@ const props = defineProps({
     school: Object,
     registration: Object,
     submission: Object,
+    profile: { type: Object, default: null },
     students: { type: Array, default: () => [] },
     studentTotal: { type: Number, default: 0 },
 });
@@ -85,16 +93,6 @@ const props = defineProps({
 const canSubmit = computed(() =>
     ['pending', 'rejected'].includes(props.submission?.full_records_status),
 );
-
-function statusLabel(status) {
-    return {
-        pending: 'Not submitted',
-        submitted: 'Awaiting review',
-        approved: 'Approved',
-        rejected: 'Rejected',
-        not_applicable: 'Not required',
-    }[status] ?? status;
-}
 
 function submit() {
     if (!confirm(`Submit ${props.studentTotal} student record(s) for Sahodaya review?`)) return;

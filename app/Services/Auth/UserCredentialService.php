@@ -3,7 +3,6 @@
 namespace App\Services\Auth;
 
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class UserCredentialService
@@ -14,6 +13,29 @@ class UserCredentialService
         $rest = Str::lower(Str::random(7));
 
         return $first.$rest;
+    }
+
+    /** Persist hashed password and a copy for admin credential lookup. */
+    public function storePassword(User $user, string $plain, bool $mustChange = true): User
+    {
+        $user->forceFill([
+            'password'             => $plain,
+            'plain_password'       => $plain,
+            'must_change_password' => $mustChange,
+        ])->save();
+
+        return $user->fresh();
+    }
+
+    public function clearStoredPlainPassword(User $user): User
+    {
+        if ($user->plain_password === null) {
+            return $user;
+        }
+
+        $user->forceFill(['plain_password' => null])->save();
+
+        return $user->fresh();
     }
 
     /** @return array{password: string, user: User} */
@@ -27,7 +49,8 @@ class UserCredentialService
         $plain = $password ?? $this->generateTemporaryPassword();
 
         $updates = [
-            'password'             => Hash::make($plain),
+            'password'             => $plain,
+            'plain_password'       => $plain,
             'must_change_password' => $mustChange,
         ];
 
@@ -39,7 +62,7 @@ class UserCredentialService
             $updates['created_by_user_id'] = $createdByUserId;
         }
 
-        $user->update($updates);
+        $user->forceFill($updates)->save();
 
         return ['password' => $plain, 'user' => $user->fresh()];
     }

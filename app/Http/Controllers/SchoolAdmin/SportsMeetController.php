@@ -93,7 +93,7 @@ class SportsMeetController extends SchoolAdminController
     {
         $this->assertSahodayaSportsEvent($event);
 
-        return redirect("/school-admin/{$tenantId}/sports/registration?event={$event->id}");
+        return redirect("/school-admin/{$tenantId}/sports/events/{$event->id}/overview");
     }
 
     public function linkParent(Request $request, string $tenantId, FestEvent $event)

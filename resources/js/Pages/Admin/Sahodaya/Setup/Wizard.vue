@@ -46,11 +46,8 @@
                 </form>
             </div>
 
-            <div class="flex flex-wrap justify-between gap-3 pt-2">
-                <Link :href="`/sahodaya-admin/${sahodaya.id}`" class="btn-secondary text-sm">Go to dashboard</Link>
-                <button type="button" class="text-sm text-slate-500 hover:text-slate-700" @click="dismissWizard">
-                    Skip for now — I'll finish later
-                </button>
+            <div class="flex flex-wrap justify-end gap-3 pt-2">
+                <Link :href="`/sahodaya-admin/${sahodaya.id}`" class="btn-secondary text-sm">← Back to dashboard</Link>
             </div>
         </div>
     </SahodayaAdminLayout>
@@ -73,13 +70,8 @@ const props = defineProps({
 });
 
 const completeForm = useForm({});
-const dismissForm = useForm({});
 
 function completeSetup() {
     completeForm.post(`/sahodaya-admin/${props.sahodaya.id}/setup/complete`);
-}
-
-function dismissWizard() {
-    dismissForm.post(`/sahodaya-admin/${props.sahodaya.id}/setup/dismiss`);
 }
 </script>

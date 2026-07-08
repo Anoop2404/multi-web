@@ -12,7 +12,14 @@ use Illuminate\Support\Facades\Mail;
 
 class NotificationService
 {
-    public function notify(User $user, string $title, string $body, ?string $actionUrl = null, array $channels = ['in_app']): ?InAppNotification
+    public function __construct(
+        private NotificationLogWriter $logWriter,
+    ) {}
+
+    /**
+     * Deliver notifications by channel. FCM push is sent only when `in_app` is included.
+     */
+    public function notify(User $user, string $title, string $body, ?string $actionUrl = null, array $channels = ['in_app'], ?string $templateKey = null): ?InAppNotification
     {
         $notification = null;
 
@@ -24,14 +31,21 @@ class NotificationService
                 'action_url' => $actionUrl,
             ]);
 
-            app(FcmPushService::class)->sendToUser($user, $title, $body, $actionUrl);
+            if (config('erp.fcm_in_app_only', true)) {
+                app(FcmPushService::class)->sendToUser($user, $title, $body, $actionUrl);
+            }
         }
 
         if (in_array('email', $channels, true)) {
-            $this->sendEmail($user, $title, $body);
+            $this->sendEmail($user, $title, $body, $templateKey);
         }
 
         return $notification;
+    }
+
+    public function notifyEmailOnly(User $user, string $title, string $body, ?string $templateKey = null): void
+    {
+        $this->sendEmail($user, $title, $body, $templateKey);
     }
 
     public function notifyFromTemplate(User $user, string $slug, array $replacements = [], ?string $actionUrl = null): ?InAppNotification
@@ -50,7 +64,7 @@ class NotificationService
 
         $channels = $template->channels_json ?? ['in_app'];
 
-        return $this->notify($user, $template->title, $body, $actionUrl, $channels);
+        return $this->notify($user, $template->title, $body, $actionUrl, $channels, $slug);
     }
 
     public function unreadCount(User $user): int
@@ -58,11 +72,15 @@ class NotificationService
         return InAppNotification::where('user_id', $user->id)->whereNull('read_at')->count();
     }
 
-    private function sendEmail(User $user, string $title, string $body): void
+    private function sendEmail(User $user, string $title, string $body, ?string $templateKey = null): void
     {
         if (! $user->email) {
+            $this->logWriter->skipped($user, $title, 'No recipient email', $templateKey);
+
             return;
         }
+
+        $log = $this->logWriter->queued($user, $title, $templateKey, $user->email);
 
         try {
             $sahodayaId = $this->resolveSahodayaId($user);
@@ -74,6 +92,7 @@ class NotificationService
                         'title' => $title,
                         'body'  => $body,
                     ]);
+                    $this->logWriter->sent($log);
 
                     return;
                 }
@@ -82,7 +101,10 @@ class NotificationService
             Mail::raw($body, function ($message) use ($user, $title) {
                 $message->to($user->email)->subject($title);
             });
+
+            $this->logWriter->sent($log);
         } catch (\Throwable $e) {
+            $this->logWriter->failed($log, $e->getMessage());
             Log::warning('Notification email failed', [
                 'user_id' => $user->id,
                 'error'   => $e->getMessage(),

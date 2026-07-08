@@ -7,6 +7,7 @@ use App\Models\Registration;
 use App\Models\Tenant;
 use App\Services\Membership\PaymentDueResolver;
 use App\Services\Membership\SchoolPaymentStatusResolver;
+use App\Support\TenancyDatabase;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -66,8 +67,17 @@ trait BuildsMembershipExports
         return $query;
     }
 
-    protected function paymentsQuery(array $schoolIds, array $filters): Builder
+    protected function paymentsQuery(string $sahodayaId, array $schoolIds, array $filters): Builder
     {
+        if ($filters['search'] !== '') {
+            $matchingIds = TenancyDatabase::schoolIdsMatchingSearch($sahodayaId, $filters['search']);
+            $schoolIds = array_values(array_intersect($schoolIds, $matchingIds));
+
+            if ($schoolIds === []) {
+                return MembershipPayment::query()->whereRaw('0 = 1');
+            }
+        }
+
         $query = MembershipPayment::whereIn('school_id', $schoolIds)
             ->where('status', '!=', 'superseded')
             ->with('school:id,name,school_prefix,parent_id')
@@ -75,13 +85,6 @@ trait BuildsMembershipExports
 
         if ($filters['status'] !== 'all') {
             $query->where('status', $filters['status']);
-        }
-
-        if ($filters['search'] !== '') {
-            $search = $filters['search'];
-            $query->whereHas('school', fn ($q) => $q
-                ->where('name', 'like', "%{$search}%")
-                ->orWhere('school_prefix', 'like', "%{$search}%"));
         }
 
         if ($filters['date_from']) {

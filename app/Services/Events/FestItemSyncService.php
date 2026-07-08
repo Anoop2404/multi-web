@@ -109,6 +109,71 @@ class FestItemSyncService
     }
 
     /**
+     * Copy items from hub to partition child, filtering by partition role when configured.
+     */
+    public function copyItemsToPartition(FestEvent $hub, FestEvent $child, string $partitionRole): int
+    {
+        $hub->loadMissing('items');
+        $count = 0;
+
+        foreach ($hub->items as $item) {
+            if (! $this->itemEnabledForPartition($item, $partitionRole)) {
+                continue;
+            }
+
+            FestEventItem::updateOrCreate(
+                [
+                    'event_id'               => $child->id,
+                    'inherited_from_item_id' => $item->id,
+                ],
+                array_merge($this->attributesFromItem($item), [
+                    'owner_level'            => $item->owner_level,
+                    'state_program_item_id'  => $item->state_program_item_id,
+                    'inherited_from_item_id' => $item->id,
+                    'max_per_school'         => $this->maxPerSchoolForPartition($item, $partitionRole),
+                ])
+            );
+            $count++;
+        }
+
+        return $count;
+    }
+
+    private function itemEnabledForPartition(FestEventItem $item, string $partitionRole): bool
+    {
+        $criteria = $item->criteria_json ?? [];
+        $roles = $criteria['partition_roles'] ?? null;
+
+        if ($roles === null) {
+            return match ($partitionRole) {
+                'region', 'cluster' => ($item->stage_type ?? '') === 'off_stage'
+                    && ! in_array($item->participant_type, ['group', 'team'], true),
+                'finale' => ($item->stage_type ?? '') === 'on_stage'
+                    || in_array($item->participant_type, ['group', 'team'], true),
+                default => true,
+            };
+        }
+
+        return in_array($partitionRole, (array) $roles, true);
+    }
+
+    private function maxPerSchoolForPartition(FestEventItem $item, string $partitionRole): int
+    {
+        $base = (int) ($item->max_per_school ?? 1);
+        $criteria = $item->criteria_json ?? [];
+
+        if ($partitionRole === 'region' && isset($criteria['regional_max_per_item'])) {
+            return (int) $criteria['regional_max_per_item'];
+        }
+
+        if ($partitionRole === 'finale' && isset($criteria['district_max_per_item_per_school'])) {
+            return (int) $criteria['district_max_per_item_per_school'];
+        }
+
+        return $base;
+    }
+
+    /**
      * Copy every item from parent event to child (cascade / school rounds).
      */
     public function copyAllItemsToChild(FestEvent $parent, FestEvent $child): void

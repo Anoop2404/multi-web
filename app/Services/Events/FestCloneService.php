@@ -8,6 +8,7 @@ use App\Models\FestEventItem;
 use App\Models\FestGradeConfig;
 use App\Models\FestParticipationPolicy;
 use App\Models\FestPointRule;
+use App\Models\FestRankPoint;
 use App\Models\FestVolunteer;
 use Illuminate\Support\Facades\DB;
 
@@ -55,6 +56,12 @@ class FestCloneService
                 $r = $rule->replicate();
                 $r->event_id = $clone->id;
                 $r->save();
+            }
+
+            foreach (FestRankPoint::where('event_id', $source->id)->get() as $rankPoint) {
+                $rp = $rankPoint->replicate();
+                $rp->event_id = $clone->id;
+                $rp->save();
             }
 
             return $clone->fresh('items');

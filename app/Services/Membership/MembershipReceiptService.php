@@ -139,6 +139,12 @@ class MembershipReceiptService
     public function renderPreview(Tenant $sahodaya, ?SahodayaProfile $profile): string
     {
         $template = MembershipReceiptTemplate::resolve($profile, $sahodaya);
+        $template = array_merge($template, array_filter([
+            'header_title'         => $template['header_title'] ?? strtoupper($sahodaya->name).' (MCS)',
+            'registered_office'    => $template['registered_office'] ?? 'Registered office : Anchamile, Pookkottumpadam',
+            'society_registration' => $template['society_registration'] ?? 'Reg. Under Societies Registration Act 2025 No. MPM/109/2026',
+        ]));
+
         $samplePayment = new MembershipPayment([
             'academic_year'   => $profile?->resolvedAcademicYear() ?? '2026-27',
             'amount'          => 5000,
@@ -154,7 +160,7 @@ class MembershipReceiptService
         ]);
 
         $registration = new \App\Models\Registration([
-            'reg_no' => ($profile?->prefix ?? 'MCS').'/GHS/0001',
+            'reg_no' => ($profile?->prefix ?? 'MCS').'/26/1',
         ]);
         $samplePayment->setRelation('registration', $registration);
 
@@ -179,8 +185,15 @@ class MembershipReceiptService
 
         $disk = TenantStorage::uploadDisk();
 
-        if (Storage::disk($disk)->exists($path)) {
-            return Storage::disk($disk)->get($path);
+        try {
+            if (Storage::disk($disk)->exists($path)) {
+                return Storage::disk($disk)->get($path);
+            }
+        } catch (\Throwable) {
+            $local = TenantStorage::findLocalDisk($path);
+            if ($local) {
+                return Storage::disk($local)->get($path);
+            }
         }
 
         return null;

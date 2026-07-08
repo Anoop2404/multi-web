@@ -22,6 +22,7 @@ class FestItemScheduleService
         return FestEventItem::query()
             ->where('event_id', $event->id)
             ->where('is_enabled', true)
+            ->with('head:id,name')
             ->orderBy('display_order')
             ->orderBy('title')
             ->get()
@@ -38,6 +39,8 @@ class FestItemScheduleService
         return [
             'item_id'        => $item->id,
             'title'          => $item->title,
+            'head_id'        => $item->head_id,
+            'head_name'      => $item->head?->name,
             'age_group'      => $item->age_group,
             'gender'         => $item->gender,
             'schedule_id'    => $schedule?->id,

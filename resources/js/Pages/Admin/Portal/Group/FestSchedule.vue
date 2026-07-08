@@ -35,16 +35,12 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { computed } from 'vue';
+import { groupPortalNavItems } from '@/support/groupPortalNav.js';
 
 const props = defineProps({
     school: Object,
     rows: { type: Array, default: () => [] },
 });
 
-const navItems = computed(() => [
-    { href: `/portal/group/${props.school.id}`, label: 'Dashboard' },
-    { href: `/portal/group/${props.school.id}/students`, label: 'Students' },
-    { href: `/portal/group/${props.school.id}/fest/registrations`, label: 'Fest registrations' },
-    { href: `/portal/group/${props.school.id}/fest/schedule`, label: 'Fest schedule' },
-]);
+const navItems = computed(() => groupPortalNavItems(props.school.id));
 </script>

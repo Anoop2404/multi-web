@@ -37,7 +37,11 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success'      => fn () => $request->session()->get('success'),
                 'error'        => fn () => $request->session()->get('error'),
+                'warning'      => fn () => $request->session()->get('warning'),
+                'info'         => fn () => $request->session()->get('info'),
                 'importResult' => fn () => $request->session()->get('importResult'),
+                'newCredentials' => fn () => $request->session()->get('newCredentials'),
+                'mcqNewCredentials' => fn () => $request->session()->get('mcqNewCredentials'),
                 'studentPortalCredentials' => fn () => $request->session()->get('studentPortalCredentials'),
             ],
             'old' => fn () => $request->old(),

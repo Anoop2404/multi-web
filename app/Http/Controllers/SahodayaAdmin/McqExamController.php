@@ -8,7 +8,7 @@ use App\Models\McqMark;
 use App\Models\McqRegistration;
 use App\Models\McqSchoolFee;
 use App\Models\Tenant;
-use App\Services\Fees\ProgramFeeReceiptMailer;
+use App\Services\Fees\OfflineProgramFeeOrchestrator;
 use App\Services\Fees\ProgramFeeReceiptService;
 use App\Services\Mcq\McqExamNotifier;
 use App\Services\Mcq\McqRankingService;
@@ -81,11 +81,16 @@ class McqExamController extends SahodayaAdminController
             'total_questions'   => 'nullable|integer|min:1',
             'pass_mark'         => 'nullable|integer|min:0',
             'fee_amount'        => 'nullable|numeric|min:0',
+            'school_discount_amount' => 'nullable|numeric|min:0',
             'eligibility_config'=> 'nullable|array',
             'delivery_mode'     => 'nullable|in:offline,online',
         ]);
 
         $fee = (float) ($data['fee_amount'] ?? 0);
+        $discount = (float) ($data['school_discount_amount'] ?? 0);
+        if ($discount > $fee && $fee > 0) {
+            return back()->withErrors(['school_discount_amount' => 'School discount cannot exceed the student fee.']);
+        }
 
         $data['tenant_id'] = $this->sahodaya->id;
         $data['conductor_level'] = 'sahodaya';
@@ -95,6 +100,7 @@ class McqExamController extends SahodayaAdminController
         $data['academic_year_id'] = AcademicYear::activeId();
         $data['fee_type'] = $fee > 0 ? 'flat' : 'none';
         $data['fee_amount'] = $fee > 0 ? $fee : null;
+        $data['school_discount_amount'] = $fee > 0 && $discount > 0 ? $discount : null;
         $data['next_hall_ticket_no'] = 100;
         $data = McqExamPayload::applyDefaults($data);
 
@@ -104,7 +110,7 @@ class McqExamController extends SahodayaAdminController
 
         $exam = McqExam::create($data);
 
-        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.created', "MCQ exam created: {$exam->title}");
+        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.created', "Talent Search exam created: {$exam->title}");
 
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/mcq-exams/{$exam->id}")
             ->with('success', 'Exam created.');
@@ -147,11 +153,20 @@ class McqExamController extends SahodayaAdminController
             fn ($sf) => $sf->feeReceipt?->status === 'uploaded' || $sf->status === 'proof_uploaded'
         )->count();
 
+        $ledgerAccount = app(\App\Services\Ledger\LedgerAccountSetupService::class)
+            ->mcqLedgerMeta($exam, $this->sahodaya->id);
+
         return $this->inertia('Sahodaya/Mcq/Show', [
             'exam'              => $examPayload,
             'registrations'     => $registrations,
             'schoolFees'        => $schoolFees,
             'pendingPaymentApprovals' => $pendingPaymentApprovals,
+            'ledgerAccount'     => [
+                'code'       => $ledgerAccount['code'],
+                'name'       => $ledgerAccount['name'],
+                'head_id'    => $ledgerAccount['head_id'],
+                'ledger_url' => $ledgerAccount['ledger_url'],
+            ],
             'classCategories'   => $masterData->classCategories($this->sahodaya->id)->values(),
             'masterClasses'     => $masterData->masterClasses($this->sahodaya->id)->map(fn ($c) => [
                 'id'                  => $c->id,
@@ -162,6 +177,10 @@ class McqExamController extends SahodayaAdminController
             'classGroupOptions' => collect(FestClassGroupScheme::labelsForSahodaya($this->sahodaya->id))
                 ->map(fn ($label, $key) => ['value' => $key, 'label' => $label])
                 ->values(),
+            'gradeMasters' => \App\Models\McqGradeMaster::where('tenant_id', $this->sahodaya->id)->where('is_active', true)->orderBy('title')->get(['id', 'title', 'is_default']),
+            'hallTicketTemplates' => \App\Models\McqHallTicketTemplate::where('tenant_id', $this->sahodaya->id)->where('is_active', true)->orderBy('title')->get(['id', 'title', 'is_default']),
+            'certificateTemplates' => \App\Models\McqCertificateTemplate::where('tenant_id', $this->sahodaya->id)->where('is_active', true)->orderBy('title')->get(['id', 'title', 'is_default']),
+            'gradeBands' => app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam),
         ]);
     }
 
@@ -185,6 +204,7 @@ class McqExamController extends SahodayaAdminController
             'total_questions'  => 'nullable|integer|min:1',
             'pass_mark'        => 'nullable|integer|min:0',
             'fee_amount'       => 'nullable|numeric|min:0',
+            'school_discount_amount' => 'nullable|numeric|min:0',
             'eligibility_config'=> 'nullable|array',
             'eligibility_config.assignment_type' => 'nullable|in:all,category,class',
             'eligibility_config.scope' => 'nullable|in:all,filtered',
@@ -198,11 +218,19 @@ class McqExamController extends SahodayaAdminController
             'delivery_mode'    => 'nullable|in:offline,online',
             'status'           => 'required|in:draft,published,ongoing,completed,cancelled',
             'requires_hall_ticket' => 'nullable|boolean',
+            'grade_master_id' => 'nullable|integer|exists:mcq_grade_masters,id',
+            'hall_ticket_template_id' => 'nullable|integer|exists:mcq_hall_ticket_templates,id',
+            'certificate_template_id' => 'nullable|integer|exists:mcq_certificate_templates,id',
         ]);
 
         $fee = (float) ($data['fee_amount'] ?? 0);
+        $discount = (float) ($data['school_discount_amount'] ?? 0);
+        if ($discount > $fee && $fee > 0) {
+            return back()->withErrors(['school_discount_amount' => 'School discount cannot exceed the student fee.']);
+        }
         $data['fee_type'] = $fee > 0 ? 'flat' : 'none';
         $data['fee_amount'] = $fee > 0 ? $fee : null;
+        $data['school_discount_amount'] = $fee > 0 && $discount > 0 ? $discount : null;
 
         if (array_key_exists('next_hall_ticket_no', $data) && $data['next_hall_ticket_no'] === null) {
             unset($data['next_hall_ticket_no']);
@@ -241,7 +269,7 @@ class McqExamController extends SahodayaAdminController
 
         $exam->update($data);
 
-        if (array_key_exists('fee_amount', $data) || array_key_exists('fee_type', $data)) {
+        if (array_key_exists('fee_amount', $data) || array_key_exists('fee_type', $data) || array_key_exists('school_discount_amount', $data)) {
             $exam->refresh();
             $feeService = app(McqSchoolFeeService::class);
             McqRegistration::where('exam_id', $exam->id)
@@ -255,7 +283,7 @@ class McqExamController extends SahodayaAdminController
                 });
         }
 
-        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.updated', "MCQ exam updated: {$exam->title}", [
+        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.updated', "Talent Search exam updated: {$exam->title}", [
             'status' => $data['status'] ?? $exam->status,
         ]);
 
@@ -278,7 +306,7 @@ class McqExamController extends SahodayaAdminController
         app(PlatformAuditLogger::class)->mcq(
             $exam,
             'mcq.results.published',
-            "MCQ results published for {$exam->title}",
+            "Talent Search results published for {$exam->title}",
             ['ranked' => $ranked],
         );
 
@@ -304,16 +332,10 @@ class McqExamController extends SahodayaAdminController
             'wrong_count'       => 'required|integer|min:0',
             'unanswered_count'  => 'required|integer|min:0',
             'score'             => 'required|numeric|min:0',
-            'grade'             => 'nullable|in:A,B,C,D,F',
+            'grade'             => 'nullable|string|max:20',
         ]);
 
-        $total = $data['correct_count'] + $data['wrong_count'] + $data['unanswered_count'];
-        $data['percentage'] = $total > 0 ? round(($data['score'] / max($exam->total_questions, 1)) * 100, 2) : 0;
-        $data['locked_by'] = $request->user()->id;
-        $data['locked_at'] = now();
-
-        McqMark::updateOrCreate(['registration_id' => $registration->id], $data);
-        $registration->update(['status' => 'submitted', 'submitted_at' => now()]);
+        app(\App\Services\Mcq\McqMarkSaveService::class)->save($exam, $registration, $data, $request->user()->id);
 
         app(\App\Services\Audit\PlatformAuditLogger::class)->mcqRegistration(
             $registration->fresh(['exam']),
@@ -353,17 +375,17 @@ class McqExamController extends SahodayaAdminController
 
         app(McqRegistrationApprovalService::class)->approve($registration->fresh(['exam', 'student', 'feeReceipt']), $request->user()->id);
 
-        app(ProgramFeeReceiptMailer::class)->sendApproved(
+        app(OfflineProgramFeeOrchestrator::class)->notifyApproved(
             $registration->school,
             $issued,
-            'MCQ exam fee',
-            ($registration->exam?->title ?? 'MCQ Exam').' — '.($registration->student?->name ?? 'Student'),
+            'Talent Search exam fee',
+            ($registration->exam?->title ?? 'Talent Search Exam').' — '.($registration->student?->name ?? 'Student'),
             adminPath: 'payments',
         );
 
         app(McqExamNotifier::class)->feeApproved($registration);
 
-        return back()->with('success', 'MCQ fee approved. Registration confirmed and hall ticket issued.');
+        return back()->with('success', 'Talent Search fee approved. Registration confirmed and hall ticket issued.');
     }
 
     public function rejectFee(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)
@@ -387,7 +409,7 @@ class McqExamController extends SahodayaAdminController
 
         app(\App\Services\Mcq\McqExamNotifier::class)->feeRejected($registration, $data['rejection_reason'] ?? null);
 
-        return back()->with('success', 'MCQ fee rejected. School can re-upload.');
+        return back()->with('success', 'Talent Search fee rejected. School can re-upload.');
     }
 
     public function approveRegistration(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)
@@ -480,7 +502,7 @@ class McqExamController extends SahodayaAdminController
 
         $approvedCount = app(McqSchoolFeeService::class)->approve($schoolFee, $request->user()->id);
 
-        return back()->with('success', "School MCQ fee approved. {$approvedCount} registration(s) confirmed with hall tickets.");
+        return back()->with('success', "School Talent Search fee approved. {$approvedCount} registration(s) confirmed with hall tickets.");
     }
 
     public function uploadQuestionPaper(Request $request, string $tenantId, McqExam $exam)
@@ -525,5 +547,38 @@ class McqExamController extends SahodayaAdminController
         ]);
 
         return back()->with('success', 'Question paper removed from archive.');
+    }
+
+    public function ledger(string $tenantId, McqExam $exam, \App\Services\Ledger\LedgerReportingService $reporting)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        app(\App\Services\Ledger\LedgerAccountSetupService::class)->ensureMcqExamHead($exam);
+
+        $ledger = $reporting->mcqExamPaymentLedger($exam);
+
+        return $this->inertia('Sahodaya/Mcq/FeeLedger', [
+            'exam'           => $exam->only('id', 'title', 'status', 'fee_type', 'fee_amount'),
+            'accountCode'    => $ledger['account_code'],
+            'accountName'    => $ledger['account_name'],
+            'transactions'   => $ledger['transactions'],
+            'schoolPayments' => $ledger['school_payments'],
+            'summary'        => $ledger['summary'],
+        ]);
+    }
+
+    public function updateLedgerAccount(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $setup = app(\App\Services\Ledger\LedgerAccountSetupService::class);
+        $head = $setup->ensureMcqExamHead($exam);
+        $setup->updateHeadName($head, $data['name']);
+
+        return back()->with('success', 'Ledger account name saved.');
     }
 }

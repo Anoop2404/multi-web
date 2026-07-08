@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Models\Registration;
 use App\Models\SahodayaProfile;
 use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Mail\SahodayaMailer;
+use App\Support\AcademicYear;
 use App\Support\SchoolApplicationForm;
 use App\Support\SchoolContactRequirements;
 use Illuminate\Http\Request;
@@ -29,11 +31,33 @@ class RegistrationProfileController extends SchoolAdminController
                 'key'         => $key,
                 'label'       => $fields[$key]['label'],
                 'placeholder' => $fields[$key]['placeholder'] ?? null,
-                'required'    => $fields[$key]['required'] ?? false,
+                'hint'        => $this->profileFieldHint($key),
+                'required'    => in_array($key, ['school_prefix', 'cbse_affiliation'], true)
+                    ? false
+                    : ($fields[$key]['required'] ?? false),
                 'group'       => $fields[$key]['group'],
+                'disabled'    => $key === 'school_prefix' && $this->school->prefixes_locked && filled($this->school->school_prefix),
             ])
             ->values()
             ->all();
+
+        $profileSections = [
+            [
+                'key'   => 'school',
+                'title' => 'School contact',
+                'hint'  => 'Phone, address, and class range visible to Sahodaya admins.',
+            ],
+            [
+                'key'   => 'principal',
+                'title' => 'Principal',
+                'hint'  => 'Primary school leadership contact for Sahodaya correspondence.',
+            ],
+            [
+                'key'   => 'leadership',
+                'title' => 'Other leadership contacts',
+                'hint'  => 'Vice principal and events coordinator — required for fest operations.',
+            ],
+        ];
 
         $readOnly = [
             ['label' => 'School Name', 'value' => $this->school->name],
@@ -45,15 +69,27 @@ class RegistrationProfileController extends SchoolAdminController
         $profileData = [];
         foreach (SchoolApplicationForm::editableFieldKeys() as $key) {
             if ($fields[$key]['enabled'] ?? false) {
-                $profileData[$key] = $payload[$key] ?? '';
+                $profileData[$key] = match ($key) {
+                    'school_prefix'    => $this->school->school_prefix ?? '',
+                    'cbse_affiliation' => SchoolApplicationForm::schoolAffiliation($this->school) ?? '',
+                    default            => $payload[$key] ?? '',
+                };
             }
         }
 
         return $this->inertia('School/Registration/Profile', [
             'profileData'        => $profileData,
             'editableFields'     => $editableFields,
+            'profileSections'    => $profileSections,
             'readOnlyFields'     => $readOnly,
             'highestClassOptions'=> SchoolApplicationForm::highestClassOptions(),
+            'registration'       => Registration::where('school_id', $this->school->id)
+                ->where('academic_year', AcademicYear::forSchool($this->school))
+                ->with('submission')
+                ->first(),
+            'profile'            => $profile ? array_merge($profile->toArray(), [
+                'payment_details_text' => $profile->paymentDetailsText(),
+            ]) : null,
             'account'            => [
                 'name'               => $user->name,
                 'email'              => $user->email,
@@ -71,22 +107,54 @@ class RegistrationProfileController extends SchoolAdminController
         $profile = SahodayaProfile::where('tenant_id', $sahodaya->id)->first();
         $fields = SchoolApplicationForm::resolve($profile);
 
-        $data = $request->validate(SchoolApplicationForm::schoolProfileValidationRules($this->school, $fields));
+        $section = $request->validate([
+            'section' => 'required|in:school,principal,leadership',
+        ])['section'];
+
+        $data = $request->validate(
+            SchoolApplicationForm::schoolProfileValidationRulesForSection($this->school, $fields, $section)
+        );
 
         $before = $this->school->application_payload ?? [];
         $payload = SchoolApplicationForm::mergeProfileUpdate($before, $data, $fields);
 
-        $this->school->update(['application_payload' => $payload]);
+        $updates = ['application_payload' => $payload];
+        if (
+            array_key_exists('school_prefix', $data)
+            && filled($data['school_prefix'])
+            && ! ($this->school->prefixes_locked && filled($this->school->school_prefix))
+        ) {
+            $updates['school_prefix'] = strtoupper(trim((string) $data['school_prefix']));
+        }
+
+        $this->school->update($updates);
+
+        $labels = [
+            'school'     => 'School contact details',
+            'principal'  => 'Principal details',
+            'leadership' => 'Leadership contacts',
+        ];
 
         app(DataChangeLogger::class)->updated(
             $this->school,
-            'School registration details updated',
+            'School registration details updated ('.$section.')',
             DataChangeLogger::diff($before, $payload),
             $this->school->id,
             'school_registration',
         );
 
-        return back()->with('success', 'Registration details saved.');
+        return back()->with('success', ($labels[$section] ?? 'Details').' saved.');
+    }
+
+    private function profileFieldHint(string $key): ?string
+    {
+        return match ($key) {
+            'school_prefix' => $this->school->prefixes_locked && filled($this->school->school_prefix)
+                ? 'Locked because student registration numbers already use this code.'
+                : 'Used as the short school code in student registration numbers.',
+            'cbse_affiliation' => 'Edit if the school affiliation number is corrected or updated.',
+            default => null,
+        };
     }
 
     public function updateAccount(Request $request)

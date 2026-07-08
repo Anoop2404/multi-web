@@ -1,7 +1,7 @@
 <template>
-    <SahodayaAdminLayout title="MCQ payments" :sahodaya="sahodaya" :publicUrl="publicUrl"
+    <SahodayaAdminLayout title="Talent Search payments" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader title="MCQ payments queue" eyebrow="MCQ exams"
+        <PageHeader title="Talent Search payments queue" eyebrow="Talent Search exams"
                     description="Approve school batch fee proofs across all exams without opening each exam workspace." />
 
         <div class="flex flex-wrap gap-2 mb-6">
@@ -40,6 +40,8 @@
                             <td class="text-xs whitespace-nowrap text-right space-x-2">
                                 <a v-if="fee.fee_receipt?.proof_url" :href="fee.fee_receipt.proof_url" target="_blank" rel="noopener" class="link-brand">Proof</a>
                                 <button v-if="fee.fee_receipt?.status === 'uploaded'" type="button" @click="approve(fee.id)" class="text-green-700 font-semibold">Approve</button>
+                                <button v-if="fee.fee_receipt?.status === 'uploaded'" type="button" @click="reject(fee.id)" class="text-red-700 font-semibold">Reject</button>
+                                <span v-else-if="fee.fee_receipt?.status === 'rejected'" class="text-red-700" :title="fee.fee_receipt?.rejection_reason">Rejected</span>
                                 <span v-else-if="fee.status === 'approved'" class="text-green-700 font-semibold">Approved</span>
                             </td>
                         </tr>
@@ -71,11 +73,20 @@ const props = defineProps({
 const statusTabs = [
     { key: 'pending', label: 'Pending' },
     { key: 'approved', label: 'Approved' },
+    { key: 'rejected', label: 'Rejected' },
     { key: 'all', label: 'All' },
 ];
 
 function approve(schoolFeeId) {
     if (!confirm('Approve this batch fee and issue hall tickets for all registered students from this school?')) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq/payments/${schoolFeeId}/approve`, {}, { preserveScroll: true });
+}
+
+function reject(schoolFeeId) {
+    const reason = prompt('Rejection reason for the school:');
+    if (!reason?.trim()) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq/payments/${schoolFeeId}/reject`, {
+        rejection_reason: reason.trim(),
+    }, { preserveScroll: true });
 }
 </script>

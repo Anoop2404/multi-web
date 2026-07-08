@@ -19,13 +19,12 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import PortalAssignmentsHub from '@/Components/portal/PortalAssignmentsHub.vue';
+import { festCoordinatorPortalNavItems } from '@/support/festCoordinatorPortalNav.js';
 import { computed } from 'vue';
 
 const props = defineProps({ sahodaya: Object, events: Array });
 
-const navItems = computed(() => [
-    { href: `/portal/fest-coordinator/${props.sahodaya.id}`, label: 'Dashboard' },
-]);
+const navItems = computed(() => festCoordinatorPortalNavItems(props.sahodaya.id));
 
 const pendingTotal = computed(() =>
     props.events.reduce((sum, event) => sum + (event.pending ?? 0), 0),

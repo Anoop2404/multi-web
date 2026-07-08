@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Portal;
 
+use App\Http\Controllers\Concerns\DownloadsStudentFestIdCard;
 use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Models\FestAppeal;
@@ -18,10 +19,13 @@ use App\Services\Events\FestCertificateService;
 use App\Services\Events\FestReportService;
 use App\Support\Mcq\McqResultPresenter;
 use App\Support\TenantBranding;
+use App\Services\Students\StudentSportsProfileService;
 use Illuminate\Http\Request;
 
 class StudentDashboardController extends Controller
 {
+    use DownloadsStudentFestIdCard;
+
     public function festSchedule(Request $request, string $tenantId)
     {
         [$student, $school] = $this->portalContext($request, $tenantId);
@@ -142,11 +146,14 @@ class StudentDashboardController extends Controller
                 'status'      => $e->status,
             ]);
 
+        $sportsProfile = app(StudentSportsProfileService::class)->forStudent($student, $tenantId, 'portal');
+
         return inertia('Portal/Student/Dashboard', [
             'school'        => $school->only('id', 'name'),
             'student'       => $student->only('id', 'name', 'reg_no', 'email'),
             'logoUrl'       => TenantBranding::logoUrl($school),
             'registrations' => $registrations,
+            'sportsProfile' => $sportsProfile,
             'upcomingEvents'=> $upcomingEvents,
             'festResults'   => $festResults,
             'festDaySlots'  => $festDaySlots,
@@ -169,7 +176,7 @@ class StudentDashboardController extends Controller
             ->whereHas('registration.event', fn ($q) => $q
                 ->where('event_type', 'sports')
                 ->where('results_published', true))
-            ->with(['registration.event', 'registration.item', 'mark'])
+            ->with(['registration.event', 'registration.item.head', 'mark'])
             ->latest()
             ->get()
             ->map(function (FestParticipant $p) {
@@ -180,6 +187,7 @@ class StudentDashboardController extends Controller
 
                 return [
                     'event_title' => $p->registration?->event?->title,
+                    'head_name'   => $p->registration?->item?->head?->name,
                     'item_title'  => $p->registration?->item?->title,
                     'grade'       => $mark?->grade,
                     'position'    => $mark?->position,
@@ -224,6 +232,14 @@ class StudentDashboardController extends Controller
         );
     }
 
+    public function festIdCard(Request $request, string $tenantId, FestEvent $event)
+    {
+        $student = $request->attributes->get('portalStudent');
+        $school = Tenant::findOrFail($tenantId);
+
+        return $this->studentFestIdCardResponse($request, $event, $student, $school);
+    }
+
     /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
     private function mcqExamsFor($student)
     {
@@ -241,7 +257,21 @@ class StudentDashboardController extends Controller
                 return array_merge(
                     McqResultPresenter::forExamList($exam, $reg),
                     [
+                        'id'               => $reg->id,
+                        'exam'             => $exam->only('id', 'title'),
+                        'lifecycle_status' => \App\Support\Mcq\McqRegistrationStatusPresenter::forRegistration($reg, $exam),
+                        'show_results'     => (bool) $exam->results_published,
                         'show_hall_ticket' => (bool) $reg->hall_ticket_no,
+                        'show_certificate' => (bool) $exam->results_published
+                            && $reg->status === 'submitted'
+                            && $reg->attendance_status !== 'absent'
+                            && $reg->mark,
+                        'certificate_url'  => (bool) $exam->results_published
+                            && $reg->status === 'submitted'
+                            && $reg->attendance_status !== 'absent'
+                            && $reg->mark
+                            ? "/portal/student/{$reg->school_id}/mcq/{$reg->id}/certificate"
+                            : null,
                         'can_take_online'  => $exam->isOnlineDelivery()
                             && in_array($exam->status, ['published', 'ongoing'], true)
                             && $reg->status !== 'submitted'

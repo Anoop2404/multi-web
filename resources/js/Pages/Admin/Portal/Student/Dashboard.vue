@@ -16,6 +16,13 @@
             </ul>
         </section>
 
+        <StudentSportsProfileSection
+            v-if="showSportsSection"
+            :sports-profile="sportsProfile"
+            context="portal"
+            :school-id="school.id"
+        />
+
         <section class="card mb-4">
             <div class="flex items-center justify-between gap-2 mb-2">
                 <h2 class="font-semibold text-sm">My registrations</h2>
@@ -32,11 +39,11 @@
         </section>
 
         <section class="card mb-4">
-            <h2 class="font-semibold text-sm mb-2">MCQ Exams</h2>
+            <h2 class="font-semibold text-sm mb-2">Talent Search Exams</h2>
             <ul class="text-sm divide-y">
-                <li v-for="r in mcqExams" :key="r.id" class="py-2 flex justify-between items-center gap-2 flex-wrap">
+                <li v-for="r in mcqExams" :key="r.registration_route_id ?? r.id" class="py-2 flex justify-between items-center gap-2 flex-wrap">
                     <div>
-                        <span class="font-medium">{{ r.exam?.title }}</span>
+                        <span class="font-medium">{{ r.exam?.title ?? r.title }}</span>
                         <span class="text-xs text-gray-400 ml-1">({{ r.status }})</span>
                         <span v-if="r.delivery_mode === 'offline'" class="text-xs text-slate-500 ml-1">· offline</span>
                         <p v-if="r.show_results && r.mark" class="text-xs text-indigo-700 mt-0.5">
@@ -48,10 +55,10 @@
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <a v-if="r.can_take_online"
-                           :href="`/portal/student/${school.id}/mcq/${r.id}/exam`"
+                           :href="`/portal/student/${school.id}/mcq/${r.registration_route_id ?? r.id}/exam`"
                            class="text-xs font-semibold text-indigo-600">Take exam →</a>
                         <a v-if="r.show_hall_ticket"
-                           :href="`/portal/student/${school.id}/mcq/${r.id}/hall-ticket`"
+                           :href="`/portal/student/${school.id}/mcq/${r.registration_route_id ?? r.id}/hall-ticket`"
                            target="_blank"
                            class="text-xs font-semibold text-indigo-600">Hall ticket ↗</a>
                         <span v-if="r.status === 'submitted' && !r.show_results" class="text-xs text-gray-400">Submitted</span>
@@ -59,7 +66,7 @@
                         <span v-else-if="!r.show_hall_ticket && !r.can_take_online" class="text-xs text-gray-400">Ticket pending</span>
                     </div>
                 </li>
-                <li v-if="!mcqExams.length" class="text-gray-400 py-2">No MCQ registrations</li>
+                <li v-if="!mcqExams.length" class="text-gray-400 py-2">No Talent Search registrations</li>
             </ul>
         </section>
 
@@ -163,6 +170,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import StudentSportsProfileSection from '@/Components/students/StudentSportsProfileSection.vue';
 import { studentPortalNavItems } from '@/support/studentPortalNav.js';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
@@ -171,6 +179,7 @@ const props = defineProps({
     school: Object,
     student: Object,
     registrations: Array,
+    sportsProfile: { type: Object, default: () => ({ sports_events: [], other_fest: [] }) },
     upcomingEvents: { type: Array, default: () => [] },
     festResults: Array,
     festDaySlots: Array,
@@ -181,6 +190,12 @@ const props = defineProps({
     notifications: Array,
     admitCardEvents: { type: Array, default: () => [] },
 });
+
+const showSportsSection = computed(() =>
+    (props.sportsProfile?.sports_events ?? []).length > 0
+    || (props.sportsProfile?.other_fest ?? []).length > 0
+    || props.sportsProfile?.has_open_sports_events,
+);
 
 const appealForm = ref({ participant_id: '', reason: '' });
 

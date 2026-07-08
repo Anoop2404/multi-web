@@ -42,10 +42,20 @@ class FestChestNumberService
             return;
         }
 
-        if (! $participant->chest_no && $participant->registration?->item) {
-            $participant->update([
-                'chest_no' => EventContext::for($event)->nextChestNumber($participant->registration->item),
-            ]);
+        $numbering = app(FestNumberingService::class);
+        if (! $numbering->persistedChestNumber($participant) && $participant->registration?->item) {
+            $item = $participant->registration->item;
+            ['chest' => $chest, 'persist' => $persist, 'chest_head_id' => $chestHeadId] = $numbering->resolveChestAssignment(
+                $event,
+                $item,
+                $participant
+            );
+            if ($persist) {
+                $participant->update([
+                    'chest_no'      => $chest,
+                    'chest_head_id' => $chestHeadId,
+                ]);
+            }
         }
 
         $participant->update(['chest_revealed_at' => now()]);
@@ -73,7 +83,27 @@ class FestChestNumberService
 
     public function clearChest(FestParticipant $participant): void
     {
-        $participant->update([
+        $participant->loadMissing('registration.event', 'registration.item');
+        $eventId = $participant->event_id ?? $participant->registration?->event_id;
+        $event = $participant->registration?->event;
+        $item = $participant->registration?->item;
+        $headScope = ($event && $item)
+            ? app(FestNumberingService::class)->chestHeadScope($event, $item)
+            : (int) ($participant->chest_head_id ?? FestNumberingService::CHEST_SCOPE_EVENT);
+
+        $query = FestParticipant::query()
+            ->where('event_id', $eventId)
+            ->where('chest_head_id', $headScope);
+
+        if ($participant->student_id) {
+            $query->where('student_id', $participant->student_id);
+        } elseif ($participant->teacher_id) {
+            $query->where('teacher_id', $participant->teacher_id);
+        } else {
+            $query->where('id', $participant->id);
+        }
+
+        $query->update([
             'chest_no'          => null,
             'chest_revealed_at' => null,
         ]);

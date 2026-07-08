@@ -103,7 +103,7 @@ class McqExamSessionService
 
         if ($gradable->isEmpty()) {
             throw ValidationException::withMessages([
-                'exam' => 'No gradable MCQ questions are attached to this exam.',
+                'exam' => 'No gradable Talent Search questions are attached to this exam.',
             ]);
         }
     }
@@ -233,7 +233,13 @@ class McqExamSessionService
         $score = $correct;
         $percentage = $totalGradable > 0 ? round(($correct / $totalGradable) * 100, 2) : 0;
         $passMark = (int) ($registration->exam->pass_mark ?? 0);
-        $grade = $this->gradeForPercentage($percentage, $passMark, $totalGradable);
+        $gradeService = app(\App\Services\Mcq\McqGradeService::class);
+        $grade = $gradeService->gradeForPercentage($registration->exam, $percentage);
+        if ($passMark > 0 && $percentage < $passMark && $grade !== 'F') {
+            $bands = $gradeService->bandsForExam($registration->exam);
+            $failBand = collect($bands)->first(fn ($b) => ! $b['is_pass']);
+            $grade = $failBand['label'] ?? 'F';
+        }
 
         $mark = McqMark::updateOrCreate(
             ['registration_id' => $registration->id],
@@ -281,25 +287,5 @@ class McqExamSessionService
         return filled($question->correct_option_key)
             && is_array($question->options_json)
             && count($question->options_json) >= 2;
-    }
-
-    private function gradeForPercentage(float $percentage, int $passMark, int $totalGradable): string
-    {
-        if ($totalGradable === 0) {
-            return 'F';
-        }
-
-        if ($passMark > 0 && $percentage < $passMark) {
-            return 'F';
-        }
-
-        return match (true) {
-            $percentage >= 95 => 'A+',
-            $percentage >= 90 => 'A',
-            $percentage >= 75 => 'B',
-            $percentage >= 60 => 'C',
-            $percentage >= 40 => 'D',
-            default             => 'F',
-        };
     }
 }

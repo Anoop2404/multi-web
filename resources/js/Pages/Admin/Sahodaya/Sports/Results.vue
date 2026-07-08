@@ -1,5 +1,7 @@
 <template>
-    <SahodayaAdminLayout title="Sports results" :sahodaya="sahodaya">
+    <SahodayaEventsLayout title="Sports results" :sahodaya="sahodaya" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :program="program"
+                         :program-events="programEvents" :show-header-title="false">
         <PageHeader
             title="Sports results"
             eyebrow="Sports Meet"
@@ -36,15 +38,19 @@
             </div>
             <p v-if="!results.length" class="p-6 text-sm text-slate-500">No published sports results yet.</p>
         </section>
-    </SahodayaAdminLayout>
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 
 defineProps({
     sahodaya: Object,
+    publicUrl: String,
+    pendingPaymentsCount: Number,
+    program: Object,
+    programEvents: { type: Array, default: () => [] },
     events: { type: Array, default: () => [] },
     results: { type: Array, default: () => [] },
 });

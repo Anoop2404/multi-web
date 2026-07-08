@@ -10,34 +10,93 @@ use App\Services\Events\FestRegistrationRegisterService;
 use App\Services\Events\FestReportService;
 use App\Support\FestPageActivity;
 use App\Support\FestReportCatalog;
+use App\Support\FestEventMeta;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
 use Illuminate\Http\Request;
 
 class FestReportController extends SahodayaAdminController
 {
+    use BuildsItemHeadReportContext;
     /** @return array<string, mixed> */
     protected function reportProps(string $tenantId, FestEvent $event, array $extra = []): array
     {
+        $base = "/sahodaya-admin/{$tenantId}/events/{$event->id}";
+
+        $headContext = $event->event_type === 'sports'
+            ? $this->itemHeadReportContext($event, null, $tenantId)
+            : [
+                'headItemGroups'  => [],
+                'headsForFilter'  => [],
+                'hasItemHeads'    => false,
+                'headSummary'     => [],
+            ];
+
         return array_merge([
-            'event'          => $event->only('id', 'title', 'event_type', 'status'),
+            'event'          => $event->only([
+                'id', 'title', 'event_type', 'status', 'event_start', 'event_end',
+                'registration_open', 'registration_close', 'venue', 'results_published',
+                'schedule_published', 'level_round',
+            ]),
+            'eventMeta'      => FestEventMeta::reportSnapshot($event, $base, "{$base}/settings"),
             'interactiveNav' => FestReportCatalog::interactivePages($tenantId, $event->id, $event->event_type),
-        ], $extra);
+            'currentPhase'   => EventLifecycleGate::currentReportPhase($event),
+            'allowedPhases'  => EventLifecycleGate::allowedReportPhases($event),
+        ], $headContext, $extra);
     }
 
     public function index(string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        if ($event->event_type === 'sports' && ! request()->boolean('all')) {
+            return redirect()->route('sahodaya.events.reports.by-head', [
+                'tenantId' => $tenantId,
+                'event'    => $event->id,
+            ]);
+        }
+
         $service = new FestReportService($event);
         $allowedPhases = EventLifecycleGate::allowedReportPhases($event);
         $currentPhase = EventLifecycleGate::currentReportPhase($event);
 
         return $this->inertia('Sahodaya/Events/Reports/Hub', $this->reportProps($tenantId, $event, [
-            'interactive' => FestReportCatalog::interactivePages($tenantId, $event->id, $event->event_type),
-            'currentPhase'=> $currentPhase,
+            'interactive'   => FestReportCatalog::interactivePages($tenantId, $event->id, $event->event_type),
+            'currentPhase'  => $currentPhase,
             'allowedPhases' => $allowedPhases,
-            'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::REPORTS),
+            'activityLogs'  => $this->pageActivityLogs($event, FestPageActivity::REPORTS),
         ]));
+    }
+
+    public function byHead(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless($event->event_type === 'sports', 404);
+
+        $navService = app(\App\Services\Events\FestHeadItemNavigationService::class);
+        $nav = $navService->navigationForEvent($event);
+
+        $headId = $this->resolveHeadQueryParam($request->query('head_id'));
+        $itemId = $request->integer('item_id') ?: null;
+        $selectedItem = null;
+
+        if ($itemId) {
+            $selectedItem = $navService->findItemInGroups($nav['headItemGroups'], $itemId);
+            abort_unless($selectedItem, 404);
+        }
+
+        $selectedHeadId = match (true) {
+            $headId === 0 => 'other',
+            $headId !== null => $headId,
+            default => null,
+        };
+
+        return $this->inertia('Sahodaya/Events/Reports/ByHead', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'selectedHeadId' => $selectedHeadId,
+            'selectedItemId' => $itemId,
+            'selectedItem'   => $selectedItem,
+            'activityLogs'   => $this->pageActivityLogs($event, FestPageActivity::REPORTS),
+        ])));
     }
 
     public function downloads(string $tenantId, FestEvent $event, string $phase)
@@ -50,7 +109,7 @@ class FestReportController extends SahodayaAdminController
         $currentPhase = EventLifecycleGate::currentReportPhase($event);
 
         $exports = array_values(array_filter(
-            FestReportCatalog::exports($tenantId, $event->id),
+            FestReportCatalog::exportsWithPreview($tenantId, $event->id),
             fn ($exp) => ($exp['phase'] ?? 'before') === $phase
                 && in_array($exp['phase'] ?? 'before', $allowedPhases, true)
         ));
@@ -138,7 +197,7 @@ class FestReportController extends SahodayaAdminController
         $service = new FestReportService($event);
         $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event);
 
-        $regs = $service->approvedRegistrations();
+        $regs = $service->activeRegistrations();
         $used = [
             'total'      => $regs->count(),
             'on_stage'   => $regs->filter(fn ($r) => ($r->item?->stage_type ?? '') === 'on_stage')->count(),
@@ -221,17 +280,14 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($event);
-        $rows = $service->itemRegistrationCountRows();
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $rows = $analytics->itemRegistrationRows();
 
         return $this->inertia('Sahodaya/Events/Reports/ItemCounts', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
-            'rows'   => $rows,
-            'totals' => [
-                'items'    => count($rows),
-                'approved' => array_sum(array_column($rows, 'approved')),
-                'pending'  => array_sum(array_column($rows, 'pending')),
-            ],
-            'pdfUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/item-list",
+            'rows'        => $rows,
+            'headSummary' => $analytics->headRegistrationSummary(),
+            'totals'      => $analytics->itemRegistrationTotals($rows),
+            'pdfUrl'      => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/item-list",
         ])));
     }
 
@@ -244,6 +300,35 @@ class FestReportController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/Reports/DisciplineRegistration', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'   => $analytics->disciplineRegistrationRows(),
             'xlsUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/discipline-registration",
+        ])));
+    }
+
+    public function headWiseParticipants(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        if ($event->event_type === 'sports') {
+            app(\App\Services\Events\FestItemHeadService::class)->syncEventHeads($event);
+        }
+
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $headId = $request->input('head_id') !== null && $request->input('head_id') !== ''
+            ? ($request->input('head_id') === 'other' ? 0 : $request->integer('head_id'))
+            : null;
+        $schoolId = $request->input('school_id') ?: null;
+        $itemId = $request->integer('item_id') ?: null;
+
+        return $this->inertia('Sahodaya/Events/Reports/HeadWiseParticipants', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'summary'        => $analytics->headRegistrationSummary($schoolId),
+            'rows'           => $analytics->headWiseParticipantRows($headId ?: null, $schoolId),
+            'schools'        => (new FestReportService($event))->schools(),
+            'filterHeadId'   => $request->input('head_id') ?: null,
+            'filterItemId'   => $itemId,
+            'filterSchoolId' => $schoolId,
+            'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/head-wise-participants?'.http_build_query(array_filter([
+                'head_id'   => $request->input('head_id'),
+                'school_id' => $schoolId,
+            ])),
         ])));
     }
 
@@ -272,6 +357,7 @@ class FestReportController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Events/Reports/FeeCollection', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'   => $rows,
+            'byHead' => $analytics->feeCollectionByHeadRows(),
             'totals' => [
                 'schools'  => count($rows),
                 'due'      => round(collect($rows)->sum('total_due'), 2),
@@ -306,6 +392,121 @@ class FestReportController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         return $register->exportCsv($event, $request->input('school_id'));
+    }
+
+    public function assignmentCompleteness(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $rows = $analytics->assignmentCompletenessRows();
+
+        return $this->inertia('Sahodaya/Events/Reports/AssignmentCompleteness', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'rows'    => $rows,
+            'totals'  => $analytics->assignmentCompletenessTotals($rows),
+            'xlsUrl'  => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/assignment-completeness/export",
+        ])));
+    }
+
+    public function exportAssignmentCompleteness(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        return (new \App\Services\Events\FestEventReportAnalyticsService($event))->exportAssignmentCompleteness();
+    }
+
+    public function numberingRegister(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+
+        return $this->inertia('Sahodaya/Events/Reports/NumberingRegister', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'rows'   => $analytics->numberingRegisterRows(),
+            'xlsUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/numbering-register/export",
+        ])));
+    }
+
+    public function exportNumberingRegister(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        return (new \App\Services\Events\FestEventReportAnalyticsService($event))->exportNumberingRegister();
+    }
+
+    public function pendingApprovals(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $schoolId = $request->input('school_id');
+
+        return $this->inertia('Sahodaya/Events/Reports/PendingApprovals', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'rows'           => $analytics->pendingApprovalRows($schoolId ?: null),
+            'schools'        => (new FestReportService($event))->schools(),
+            'filterSchoolId' => $schoolId,
+            'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/pending-approvals/export?'.http_build_query(array_filter(['school_id' => $schoolId])),
+        ])));
+    }
+
+    public function exportPendingApprovals(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        return (new \App\Services\Events\FestEventReportAnalyticsService($event))
+            ->exportPendingApprovals($request->input('school_id'));
+    }
+
+    public function studentWise(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $service = new FestReportService($event);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $schoolId = $request->input('school_id');
+        $search = $request->input('search');
+        $studentId = $request->integer('student_id') ?: null;
+        $rows = $analytics->studentWiseBrowserRows($schoolId, $search);
+        $selectedStudent = $studentId
+            ? collect($rows)->firstWhere('student_id', $studentId)
+            : null;
+
+        return $this->inertia('Sahodaya/Events/Reports/StudentWise', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'rows'            => $rows,
+            'selectedStudent' => $selectedStudent,
+            'filters'         => [
+                'school_id'  => $schoolId,
+                'search'     => $search,
+                'student_id' => $studentId,
+            ],
+            'schools' => collect($service->schools())->map(fn ($name, $id) => ['id' => $id, 'name' => $name])->values(),
+            'xlsUrl'  => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/student-wise-report?'.http_build_query(array_filter(['school_id' => $schoolId])),
+        ])));
+    }
+
+    public function itemWise(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        if ($event->event_type === 'sports') {
+            app(\App\Services\Events\FestItemHeadService::class)->syncEventHeads($event);
+        }
+
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $itemId = $request->integer('item_id') ?: null;
+        $participants = $itemId ? $analytics->itemWiseBrowserRows($itemId) : [];
+
+        $headId = $request->input('head_id') !== null && $request->input('head_id') !== ''
+            ? ($request->input('head_id') === 'other' ? 'other' : (string) $request->integer('head_id'))
+            : null;
+
+        return $this->inertia('Sahodaya/Events/Reports/ItemWise', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'participants'   => $participants,
+            'filterHeadId'   => $headId,
+            'filterItemId'   => $itemId,
+            'pdfUrl'         => $itemId ? '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/item-wise?'.http_build_query(['item_id' => $itemId]) : null,
+            'xlsUrl'         => $itemId ? '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/item-participants?'.http_build_query(['item_id' => $itemId]) : null,
+        ])));
     }
 
     public function export(Request $request, string $tenantId, FestEvent $event, string $exportType, PlatformAuditLogger $audit)

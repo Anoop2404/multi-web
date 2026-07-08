@@ -27,6 +27,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { festOpsEventNav } from '@/support/festOpsPortalNav.js';
 import { computed } from 'vue';
 
 const props = defineProps({ sahodaya: Object, event: Object, duties: Array });
@@ -67,8 +68,5 @@ const dutyLinks = computed(() => {
     return links;
 });
 
-const navItems = computed(() => [
-    { href: `/portal/fest-ops/${props.sahodaya.id}`, label: 'Dashboard' },
-    { href: `/portal/fest-ops/${props.sahodaya.id}/events/${props.event.id}`, label: 'Event' },
-]);
+const navItems = computed(() => festOpsEventNav(props.sahodaya.id, props.event.id, props.duties));
 </script>

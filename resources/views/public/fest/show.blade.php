@@ -16,6 +16,9 @@
             @endif
             <a href="{{ route('tenant.fest.live', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🔴 Live Scoreboard</a>
             <a href="{{ route('tenant.fest.scoreboard', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🏆 Category Scoreboard</a>
+            @if($event->results_published)
+            <a href="{{ route('tenant.fest.results', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">🥇 Published Results</a>
+            @endif
             @if($event->manual_pdf_path)
             <a href="{{ route('tenant.fest.manual', $event->id) }}" class="p-4 bg-white border rounded-xl hover:border-amber-400">📄 Event Manual (PDF)</a>
             @endif

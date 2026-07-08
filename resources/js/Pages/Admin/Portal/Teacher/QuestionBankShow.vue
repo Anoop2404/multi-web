@@ -7,7 +7,7 @@
         :nav-items="navItems"
     >
         <form @submit.prevent="addQuestion" class="bg-white border rounded-xl p-4 mb-4 space-y-3" enctype="multipart/form-data">
-            <h2 class="font-semibold text-sm">Add MCQ question</h2>
+            <h2 class="font-semibold text-sm">Add Talent Search question</h2>
             <input v-model="qForm.title" class="field" placeholder="Short title (optional)" aria-label="Question title">
             <textarea v-model="qForm.body_text" class="field" rows="3" placeholder="Question text" aria-label="Question text"></textarea>
 
@@ -54,6 +54,7 @@
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';
 
 const props = defineProps({ school: Object, teacher: Object, bank: Object });
 
@@ -72,11 +73,10 @@ const qForm = useForm({
 
 const bankLabel = computed(() => props.bank.title?.slice(0, 24) || 'Bank');
 
-const navItems = computed(() => [
-    { href: `/portal/teacher/${props.school.id}`, label: 'Dashboard' },
-    { href: `/portal/teacher/${props.school.id}/question-banks`, label: 'Question Banks' },
-    { href: `/portal/teacher/${props.school.id}/question-banks/${props.bank.id}`, label: bankLabel.value },
-]);
+const navItems = computed(() => teacherPortalNavItems(props.school.id, {
+    bankId: props.bank.id,
+    bankLabel: bankLabel.value,
+}));
 
 function onFile(e) {
     qForm.document = e.target.files[0] ?? null;

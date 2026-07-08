@@ -1,6 +1,6 @@
 <template>
-    <SahodayaAdminLayout title="MCQ series" :sahodaya="sahodaya">
-        <PageHeader title="MCQ exam series" eyebrow="MCQ"
+    <SahodayaAdminLayout title="Talent Search series" :sahodaya="sahodaya">
+        <PageHeader title="Talent Search exam series" eyebrow="Talent Search"
                     description="Group multi-level exams (Level 1, 2, 3…) with promotion rules.">
         </PageHeader>
 

@@ -11,12 +11,15 @@ use Illuminate\Support\Facades\DB;
 
 class FestNumberingService
 {
+    /** Event-wide chest scope for non-sports (or items without a head). */
+    public const CHEST_SCOPE_EVENT = 0;
+
     /** @return array<string, mixed> */
     public function settings(FestEvent $event): array
     {
         $defaults = [
             'event_reg_start' => 1,
-            'event_reg_prefix' => strtoupper(substr($event->level_round ?? 'S', 0, 1)).'-',
+            'event_reg_prefix' => '',
             'chest_no_start' => 1,
             'chest_no_prefix' => '',
             'auto_assign_on_approve' => true,
@@ -31,24 +34,39 @@ class FestNumberingService
     public function nextEventRegNumber(FestEvent $event): string
     {
         $settings = $this->settings($event);
-        $prefix = (string) ($settings['event_reg_prefix'] ?? 'S-');
+        $prefix = (string) ($settings['event_reg_prefix'] ?? '');
         $start = (int) ($settings['event_reg_start'] ?? 1);
 
-        $maxSeq = FestLevelRegistration::where('event_id', $event->id)
+        $fromLevelRegs = FestLevelRegistration::where('event_id', $event->id)
             ->pluck('registration_number')
-            ->map(function (?string $num) use ($prefix) {
-                if (! $num || ! str_starts_with($num, $prefix)) {
-                    return 0;
-                }
-                $tail = substr($num, strlen($prefix));
+            ->map(fn (?string $num) => $this->parseSequence($num, $prefix));
 
-                return is_numeric($tail) ? (int) $tail : 0;
-            })
-            ->max();
+        $fromParticipants = FestParticipant::where('event_id', $event->id)
+            ->whereNotNull('level_registration_number')
+            ->pluck('level_registration_number')
+            ->map(fn (?string $num) => $this->parseSequence($num, $prefix));
 
+        $maxSeq = $fromLevelRegs->merge($fromParticipants)->max();
         $next = max($start, ($maxSeq ?? 0) + 1);
 
-        return sprintf('%s%04d', $prefix, $next);
+        if ($prefix === '') {
+            return (string) $next;
+        }
+
+        return $prefix.sprintf('%04d', $next);
+    }
+
+    /**
+     * Chest scope: per item head in sports events; event-wide otherwise.
+     * Stored as chest_head_id (0 = event-wide).
+     */
+    public function chestHeadScope(FestEvent $event, FestEventItem $item): int
+    {
+        if ($event->event_type === 'sports' && $item->head_id) {
+            return (int) $item->head_id;
+        }
+
+        return self::CHEST_SCOPE_EVENT;
     }
 
     public function nextChestNumber(FestEvent $event, FestEventItem $item): int
@@ -57,15 +75,93 @@ class FestNumberingService
             FestEvent::where('id', $event->id)->lockForUpdate()->first();
 
             $settings = $this->settings($event);
-            $start = (int) ($settings['chest_no_start'] ?? 1);
+            $start = (int) ($item->chest_no_start ?? $settings['chest_no_start'] ?? 1);
+            $headScope = $this->chestHeadScope($event, $item);
 
-            $max = FestParticipant::whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
-                ->where('item_id', $item->id))
+            $max = FestParticipant::where('event_id', $event->id)
+                ->where('chest_head_id', $headScope)
+                ->whereNotNull('chest_no')
                 ->max('chest_no');
 
             return max($start, ($max ?? 0) + 1);
         });
+    }
+
+    public function persistedChestNumber(FestParticipant $participant): ?int
+    {
+        $raw = $participant->getAttributes()['chest_no'] ?? null;
+
+        return $raw !== null ? (int) $raw : null;
+    }
+
+    /** Chest number already assigned to this person in the event for the item's head scope. */
+    public function existingChestNumber(FestEvent $event, FestEventItem $item, FestParticipant $participant): ?int
+    {
+        $persisted = $this->persistedChestNumber($participant);
+        if ($persisted !== null) {
+            return $persisted;
+        }
+
+        $headScope = $this->chestHeadScope($event, $item);
+
+        $query = FestParticipant::where('event_id', $event->id)
+            ->where('chest_head_id', $headScope)
+            ->whereNotNull('chest_no');
+
+        if ($participant->student_id) {
+            $value = (clone $query)->where('student_id', $participant->student_id)->value('chest_no');
+
+            return $value !== null ? (int) $value : null;
+        }
+
+        if ($participant->teacher_id) {
+            $value = (clone $query)->where('teacher_id', $participant->teacher_id)->value('chest_no');
+
+            return $value !== null ? (int) $value : null;
+        }
+
+        return null;
+    }
+
+    /** Resolved chest for display — includes sibling registrations under the same item head. */
+    public function effectiveChestNumber(FestParticipant $participant): ?int
+    {
+        $persisted = $this->persistedChestNumber($participant);
+        if ($persisted !== null) {
+            return $persisted;
+        }
+
+        $participant->loadMissing('registration.event', 'registration.item');
+        $event = $participant->registration?->event;
+        $item = $participant->registration?->item;
+
+        if (! $event || ! $item) {
+            return null;
+        }
+
+        return $this->existingChestNumber($event, $item, $participant);
+    }
+
+    /**
+     * Resolve chest for assignment. Same student/teacher keeps one chest per item head (sports)
+     * or per event (other fest types).
+     *
+     * @return array{chest: int, persist: bool, chest_head_id: int}
+     */
+    public function resolveChestAssignment(FestEvent $event, FestEventItem $item, FestParticipant $participant): array
+    {
+        $headScope = $this->chestHeadScope($event, $item);
+        $existing = $this->existingChestNumber($event, $item, $participant);
+
+        if ($existing !== null) {
+            return ['chest' => $existing, 'persist' => false, 'chest_head_id' => $headScope];
+        }
+
+        return [
+            'chest'          => $this->nextChestNumber($event, $item),
+            'persist'        => true,
+            'chest_head_id'  => $headScope,
+        ];
     }
 
     public function nextItemRegistrationNumber(FestEvent $event, FestEventItem $item): string
@@ -77,19 +173,23 @@ class FestNumberingService
             ->where('item_id', $item->id))
             ->whereNotNull('item_registration_number')
             ->pluck('item_registration_number')
-            ->map(function (?string $num) {
-                if (! $num || ! preg_match('/(\d+)$/', $num, $m)) {
-                    return 0;
-                }
-
-                return (int) $m[1];
-            })
+            ->map(fn (?string $num) => $this->parseSequence($num, ''))
             ->max();
 
         $next = max($start, ($maxSeq ?? 0) + 1);
-        $code = $item->item_code ?: ('I'.$item->id);
 
-        return sprintf('%s-%04d', strtoupper($code), $next);
+        return (string) $next;
+    }
+
+    public function shouldAutoAssignChestOnCreate(FestEvent $event, FestEventItem $item): bool
+    {
+        $settings = $this->settings($event);
+
+        if ($settings['auto_assign_chest_on_create'] ?? false) {
+            return true;
+        }
+
+        return $event->event_type === 'sports' && (bool) $item->head_id;
     }
 
     public function assignParticipantNumbers(FestParticipant $participant): void
@@ -99,46 +199,74 @@ class FestNumberingService
         $event = $registration?->event;
         $item = $registration?->item;
 
-        if (! $event || ! $item || ! $participant->student_id) {
+        if (! $event || ! $item) {
             return;
         }
 
-        $updates = ['event_id' => $event->id];
+        $headScope = $this->chestHeadScope($event, $item);
+        $updates = [
+            'event_id'      => $event->id,
+            'chest_head_id' => $headScope,
+        ];
 
-        if (! $participant->level_registration_number && $participant->student) {
-            $updates['level_registration_number'] = app(FestLevelRegistrationService::class)
-                ->issueForStudent($event, $participant->student);
+        if (! $participant->level_registration_number) {
+            if ($participant->student) {
+                $updates['level_registration_number'] = app(FestLevelRegistrationService::class)
+                    ->issueForStudent($event, $participant->student);
+            } elseif ($participant->teacher) {
+                $updates['level_registration_number'] = app(FestLevelRegistrationService::class)
+                    ->issueForTeacher($event, $participant->teacher);
+            }
         }
 
         if (! $participant->item_registration_number) {
             $updates['item_registration_number'] = $this->nextItemRegistrationNumber($event, $item);
         }
 
-        $settings = $this->settings($event);
-        if (! $participant->chest_no && ($settings['auto_assign_chest_on_create'] ?? false)) {
-            $updates['chest_no'] = $this->nextChestNumber($event, $item);
+        if (! $this->persistedChestNumber($participant) && $this->shouldAutoAssignChestOnCreate($event, $item)) {
+            ['chest' => $chest, 'persist' => $persist, 'chest_head_id' => $chestHeadId] = $this->resolveChestAssignment($event, $item, $participant);
+            if ($persist) {
+                $updates['chest_no'] = $chest;
+                $updates['chest_head_id'] = $chestHeadId;
+            }
         }
 
-        $participant->update($updates);
+        if (count($updates) > 1) {
+            $participant->update($updates);
+        }
     }
 
-    /** Assign chest numbers to approved participants missing them. */
-    public function assignMissingChestNumbers(FestEvent $event): int
+    /** Assign chest numbers to participants missing them. */
+    public function assignMissingChestNumbers(FestEvent $event, ?FestEventItem $item = null): int
     {
         $count = 0;
 
         FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
-            ->where('status', 'approved'))
+            ->whereIn('status', ['submitted', 'approved'])
+            ->when($item, fn ($q2) => $q2->where('item_id', $item->id)))
             ->with('registration.item')
             ->whereNull('chest_no')
             ->each(function (FestParticipant $p) use ($event, &$count) {
-                if (! $p->registration?->item_id) {
+                if (! $p->registration?->item) {
                     return;
                 }
+
+                $item = $p->registration->item;
+                ['chest' => $chest, 'persist' => $persist, 'chest_head_id' => $chestHeadId] = $this->resolveChestAssignment(
+                    $event,
+                    $item,
+                    $p
+                );
+
+                if (! $persist) {
+                    return;
+                }
+
                 $p->update([
-                    'event_id' => $event->id,
-                    'chest_no' => $this->nextChestNumber($event, $p->registration->item),
+                    'event_id'      => $event->id,
+                    'chest_head_id' => $chestHeadId,
+                    'chest_no'      => $chest,
                 ]);
                 $count++;
             });
@@ -147,13 +275,14 @@ class FestNumberingService
     }
 
     /** Assign item reg numbers to participants missing them. */
-    public function assignMissingItemRegNumbers(FestEvent $event): int
+    public function assignMissingItemRegNumbers(FestEvent $event, ?FestEventItem $item = null): int
     {
         $count = 0;
 
         FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
-            ->whereIn('status', ['submitted', 'approved']))
+            ->whereIn('status', ['submitted', 'approved'])
+            ->when($item, fn ($q2) => $q2->where('item_id', $item->id)))
             ->with('registration.item')
             ->whereNull('item_registration_number')
             ->each(function (FestParticipant $p) use ($event, &$count) {
@@ -165,5 +294,28 @@ class FestNumberingService
             });
 
         return $count;
+    }
+
+    private function parseSequence(?string $value, string $prefix): int
+    {
+        if ($value === null || $value === '') {
+            return 0;
+        }
+
+        if ($prefix !== '' && str_starts_with($value, $prefix)) {
+            $tail = substr($value, strlen($prefix));
+
+            return ctype_digit($tail) ? (int) $tail : 0;
+        }
+
+        if ($prefix === '' && ctype_digit($value)) {
+            return (int) $value;
+        }
+
+        if (preg_match('/(\d+)$/', $value, $matches)) {
+            return (int) $matches[1];
+        }
+
+        return 0;
     }
 }

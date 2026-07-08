@@ -16,7 +16,8 @@ return [
     'defaults' => [
         'header_title'       => null, // falls back to Sahodaya name
         'header_subtitle'    => 'An academic forum initiated and guided by the Central Board of Secondary Education, New Delhi.',
-        'registered_office'  => null, // falls back to profile address
+        'registered_office'  => null, // falls back to profile address with "Registered office :" prefix
+        'society_registration' => null, // e.g. Reg. Under Societies Registration Act 2025 No. MPM/109/2026
         'purpose_template'   => 'Annual Sahodaya membership fee for {{academic_year}} (Membership No. {{membership_no}})',
         'receiver_label'     => 'Receiver Signature',
         'counter_label'      => 'Counter Signature',

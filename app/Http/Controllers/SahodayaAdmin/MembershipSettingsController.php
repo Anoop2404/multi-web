@@ -8,6 +8,7 @@ use App\Models\MasterClass;
 use App\Models\MembershipFeeSlab;
 use App\Models\SahodayaProfile;
 use App\Models\SahodayaRegistrationWindow;
+use App\Models\Subject;
 use App\Models\TeachingType;
 use App\Models\TeachingTypeOverride;
 use App\Services\Membership\EffectiveMasterDataResolver;
@@ -42,16 +43,15 @@ class MembershipSettingsController extends SahodayaAdminController
 
         $window = SahodayaRegistrationWindow::where('sahodaya_id', $this->sahodaya->id)->where('academic_year', $academicYear)->first();
         $registrationWindow = $window ? array_merge($window->toArray(), [
-            'add_open_local'  => $window->add_open?->format('Y-m-d\TH:i'),
-            'add_close_local' => $window->add_close?->format('Y-m-d\TH:i'),
-            'edit_open_local' => $window->edit_open?->format('Y-m-d\TH:i'),
-            'edit_close_local'=> $window->edit_close?->format('Y-m-d\TH:i'),
+            'registration_starts_local' => $window->registration_starts_at?->format('Y-m-d\TH:i'),
+            'registration_ends_local'   => $window->registration_ends_at?->format('Y-m-d\TH:i'),
+            'edit_open_local'           => $window->edit_open?->format('Y-m-d\TH:i'),
+            'edit_close_local'          => $window->edit_close?->format('Y-m-d\TH:i'),
         ]) : null;
 
         return $this->inertia('Sahodaya/Membership/Settings', [
             'profile'            => array_merge($profile->toArray(), [
                 'mail_configured' => $profile->mailIsConfigured(),
-                'student_edit_lock_at' => $profile->student_edit_lock_at?->format('Y-m-d\TH:i'),
             ]),
             'feeSlabs'           => MembershipFeeSlab::where('sahodaya_id', $this->sahodaya->id)->where('academic_year', $academicYear)->orderBy('min_students')->get(),
             'registrationWindow' => $registrationWindow,
@@ -74,6 +74,9 @@ class MembershipSettingsController extends SahodayaAdminController
             'hiddenTypeIds'      => TeachingTypeOverride::where('sahodaya_id', $this->sahodaya->id)->where('is_hidden', true)->pluck('teaching_type_id'),
             'effectiveCategories'=> $resolver->classCategories($this->sahodaya->id),
             'effectiveTypes'     => $resolver->teachingTypes($this->sahodaya->id),
+            'globalSubjects'     => Subject::global()->orderBy('sort_order')->orderBy('label')->get(),
+            'customSubjects'     => Subject::where('sahodaya_id', $this->sahodaya->id)->orderBy('sort_order')->orderBy('label')->get(),
+            'effectiveSubjects'  => $resolver->subjects($this->sahodaya->id),
             'applicationFormFields' => SchoolApplicationForm::resolve($profile),
             'applicationFormGroups' => [
                 'school'    => 'School Details',
@@ -104,7 +107,7 @@ class MembershipSettingsController extends SahodayaAdminController
             'fixed_membership_fee_amount'  => 'nullable|numeric|min:0',
             'teacher_registration_enabled' => 'boolean',
             'student_edit_lock_enabled'    => 'boolean',
-            'student_edit_lock_at'         => 'nullable|date',
+            'require_student_verification' => 'boolean',
             'payment_instructions'         => 'nullable|string|max:5000',
             'payment_bank_name'            => 'nullable|string|max:150',
             'payment_account_no'           => 'nullable|string|max:50',
@@ -124,7 +127,7 @@ class MembershipSettingsController extends SahodayaAdminController
         unset($data['name']);
 
         $before = $profile->only(array_keys($data));
-        $profile->update($data);
+        $profile->update(array_merge($data, ['student_edit_lock_at' => null]));
 
         app(DataChangeLogger::class)->updated(
             $profile,
@@ -337,22 +340,28 @@ class MembershipSettingsController extends SahodayaAdminController
             'academic_year'          => 'required|string|max:10',
             'registration_starts_at' => 'nullable|date',
             'registration_ends_at'   => 'nullable|date|after_or_equal:registration_starts_at',
-            'add_open'               => 'nullable|date',
-            'add_close'              => 'nullable|date|after_or_equal:add_open',
             'edit_open'              => 'nullable|date',
             'edit_close'             => 'nullable|date|after_or_equal:edit_open',
         ]);
 
+        $existing = SahodayaRegistrationWindow::where('sahodaya_id', $this->sahodaya->id)
+            ->where('academic_year', $data['academic_year'])
+            ->first();
+
         SahodayaRegistrationWindow::updateOrCreate(
             ['sahodaya_id' => $this->sahodaya->id, 'academic_year' => $data['academic_year']],
-            array_merge($data, [
-                'academic_year_id' => AcademicYear::recordIdForLabel($data['academic_year']),
-                'registration_starts_at' => $data['add_open'] ?? $data['registration_starts_at'] ?? null,
-                'registration_ends_at'   => $data['add_close'] ?? $data['registration_ends_at'] ?? null,
-            ])
+            [
+                'academic_year_id'       => AcademicYear::recordIdForLabel($data['academic_year']),
+                'registration_starts_at' => $data['registration_starts_at'],
+                'registration_ends_at'   => $data['registration_ends_at'],
+                'edit_open'              => $data['edit_open'],
+                'edit_close'             => $data['edit_close'],
+                'add_open'               => $existing?->add_open,
+                'add_close'              => $existing?->add_close,
+            ],
         );
 
-        return back()->with('success', 'Registration and student edit windows saved.');
+        return back()->with('success', 'Membership registration windows saved.');
     }
 
     public function storeCustomCategory(Request $request)
@@ -528,6 +537,64 @@ class MembershipSettingsController extends SahodayaAdminController
         );
 
         return back()->with('success', 'Teaching type visibility updated.');
+    }
+
+    public function storeSubject(Request $request)
+    {
+        $data = $request->validate([
+            'code'       => 'required|string|max:20',
+            'label'      => 'required|string|max:100',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+
+        $exists = Subject::where('sahodaya_id', $this->sahodaya->id)
+            ->whereRaw('LOWER(code) = ?', [strtolower($data['code'])])
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages(['code' => 'A subject with this code already exists.']);
+        }
+
+        Subject::create([
+            'sahodaya_id' => $this->sahodaya->id,
+            'code'        => strtoupper($data['code']),
+            'label'       => $data['label'],
+            'is_active'   => true,
+            'sort_order'  => $data['sort_order']
+                ?? ((int) Subject::where('sahodaya_id', $this->sahodaya->id)->max('sort_order') + 1),
+        ]);
+
+        return back()->with('success', 'Subject added.');
+    }
+
+    public function updateSubject(Request $request, string $tenantId, Subject $subject)
+    {
+        abort_if($subject->sahodaya_id !== $this->sahodaya->id, 403, 'Global subjects are managed by the platform team.');
+
+        $data = $request->validate([
+            'code'       => 'required|string|max:20',
+            'label'      => 'required|string|max:100',
+            'sort_order' => 'nullable|integer|min:0',
+            'is_active'  => 'boolean',
+        ]);
+
+        $subject->update([
+            'code'       => strtoupper($data['code']),
+            'label'      => $data['label'],
+            'sort_order' => $data['sort_order'] ?? $subject->sort_order ?? 0,
+            'is_active'  => $request->boolean('is_active', $subject->is_active),
+        ]);
+
+        return back()->with('success', 'Subject updated.');
+    }
+
+    public function destroySubject(string $tenantId, Subject $subject)
+    {
+        abort_if($subject->sahodaya_id !== $this->sahodaya->id, 403, 'Global subjects are managed by the platform team.');
+
+        $subject->delete();
+
+        return back()->with('success', 'Subject removed.');
     }
 
     public function updateApplicationForm(Request $request)

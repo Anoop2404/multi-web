@@ -3,7 +3,8 @@
         <PageHeader :title="`Results summary — ${event.title}`" :eyebrow="programLabel"
                     description="Medals and scored results for your school in this event.">
             <template #actions>
-                <Link :href="`${programBase}/reports`" class="btn-secondary text-sm">← Reports</Link>
+                <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← All reports</Link>
+                <ReportDownloadButtons v-if="pdfUrl" :pdf-url="pdfUrl" />
             </template>
         </PageHeader>
 
@@ -57,6 +58,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 
 const props = defineProps({
@@ -65,6 +67,7 @@ const props = defineProps({
     programMeta: { type: Object, default: null },
     event: Object,
     results: Object,
+    pdfUrl: String,
 });
 const { programLabel, programBase } = useSchoolProgramContext(props);
 </script>

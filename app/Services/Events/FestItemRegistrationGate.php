@@ -3,10 +3,13 @@
 namespace App\Services\Events;
 
 use App\Models\FestEventItem;
-use Illuminate\Support\Carbon;
 
 class FestItemRegistrationGate
 {
+    public function __construct(
+        private FestItemWindowResolver $windows,
+    ) {}
+
     public function isOpen(FestEventItem $item): bool
     {
         $event = $item->event ?? $item->event()->first();
@@ -14,17 +17,7 @@ class FestItemRegistrationGate
             return false;
         }
 
-        $today = now()->startOfDay();
-
-        if ($item->reg_start && $today->lt(Carbon::parse($item->reg_start)->startOfDay())) {
-            return false;
-        }
-
-        if ($item->reg_end && $today->gt(Carbon::parse($item->reg_end)->startOfDay())) {
-            return false;
-        }
-
-        return true;
+        return $this->windows->isRegistrationOpen($item);
     }
 
     public function resultsPublished(FestEventItem $item): bool

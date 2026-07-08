@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FestClashRequest extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = [
         'event_id', 'school_id', 'participant_id', 'schedule_id_a', 'schedule_id_b',
         'description', 'requested_resolution', 'status', 'resolution_note',
@@ -24,7 +27,7 @@ class FestClashRequest extends Model
 
     public function school(): BelongsTo
     {
-        return $this->belongsTo(Tenant::class, 'school_id');
+        return $this->belongsToCentralTenant('school_id');
     }
 
     public function participant(): BelongsTo

@@ -12,7 +12,7 @@ class AuditLogCatalog
             'users'      => 'Users & roles',
             'membership' => 'Membership & payments',
             'fest'       => 'Fest & events',
-            'mcq'        => 'MCQ exams',
+            'mcq'        => 'Talent Search exams',
             'training'   => 'Training programs',
             'sports'     => 'Sports meet',
             'finance'    => 'Finance & ledger',

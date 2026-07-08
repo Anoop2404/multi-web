@@ -13,15 +13,15 @@ class StudentEditChangeRequestController extends SahodayaAdminController
         $status = $request->input('status', 'pending');
 
         $requests = StudentEditChangeRequest::query()
+            ->forSahodaya($this->sahodaya->id)
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
             ->when($status === 'pending', fn ($q) => $q->whereIn('school_approval_status', ['school_approved', 'bypassed']))
-            ->whereHas('school', fn ($q) => $q->where('parent_id', $this->sahodaya->id))
             ->with(['student.schoolClass', 'school:id,name'])
             ->latest()
             ->paginate(25)
             ->withQueryString();
 
-        $base = StudentEditChangeRequest::whereHas('school', fn ($q) => $q->where('parent_id', $this->sahodaya->id));
+        $base = StudentEditChangeRequest::forSahodaya($this->sahodaya->id);
 
         $counts = [
             'pending'  => (clone $base)->where('status', 'pending')

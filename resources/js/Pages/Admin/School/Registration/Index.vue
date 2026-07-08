@@ -7,21 +7,34 @@
         />
 
         <div class="max-w-3xl space-y-6">
-            <div v-if="registration && registrationSteps.length" class="card !py-4">
-                <ol class="flex flex-wrap gap-2 sm:gap-0 sm:flex-nowrap items-center text-xs sm:text-sm">
-                    <li v-for="(step, index) in registrationSteps" :key="step.key"
-                        class="flex items-center gap-2 sm:flex-1 min-w-0">
-                        <span class="step-badge shrink-0"
-                              :class="step.state === 'done' ? 'step-badge--done' : step.state === 'current' ? 'step-badge--active' : 'step-badge--pending'">
-                            {{ index + 1 }}
-                        </span>
-                        <span class="truncate font-medium"
-                              :class="step.state === 'current' ? 'text-slate-900' : 'text-slate-500'">
-                            {{ step.label }}
-                        </span>
-                        <span v-if="index < registrationSteps.length - 1" class="hidden sm:inline text-slate-300 mx-2">→</span>
-                    </li>
-                </ol>
+            <MembershipWorkflowNav v-if="registration"
+                                   :school="school"
+                                   :profile="profile"
+                                   :registration="registration"
+                                   current="overview" />
+
+            <div v-if="regions.length" class="card space-y-3">
+                <div>
+                    <h2 class="section-title text-base">Kalotsav region</h2>
+                    <p class="text-sm text-slate-600">
+                        Choose the region your school competes in for Kalotsav ({{ academicYear }}).
+                        Your Sahodaya can also assign this for you.
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-end gap-3">
+                    <div class="min-w-[220px] flex-1 max-w-sm">
+                        <label class="label-xs">Region</label>
+                        <select v-model="regionChoice" class="field">
+                            <option :value="null">— Select region —</option>
+                            <option v-for="region in regions" :key="region.id" :value="region.id">
+                                {{ region.name }}
+                            </option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn-primary text-sm" :disabled="savingRegion" @click="saveRegion">
+                        Save region
+                    </button>
+                </div>
             </div>
 
             <div v-if="registrationClosingSoon" class="notice-banner notice-banner--warning text-sm">
@@ -230,8 +243,10 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import PageHeader from '@/Components/ui/PageHeader.vue';
+import MembershipWorkflowNav from '@/Components/school/MembershipWorkflowNav.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import {
     windowClosingDays,
     windowClosingSoon,
@@ -244,6 +259,8 @@ const props = defineProps({
     academicYear: String,
     registration: Object,
     profile: Object,
+    regions: { type: Array, default: () => [] },
+    selectedRegionId: { type: [Number, String, null], default: null },
     registrationWindow: Object,
     payments: { type: Array, default: () => [] },
     canBegin: Boolean,
@@ -260,43 +277,6 @@ const hasDataTracks = computed(() =>
     || props.profile?.student_data_mode === 'counts_only'
     || props.profile?.teacher_registration_enabled
 );
-
-const registrationSteps = computed(() => {
-    if (!props.registration) return [];
-
-    const reg = props.registration;
-    const steps = [];
-
-    if (hasDataTracks.value) {
-        const dataDone = ['payment_pending', 'payment_submitted', 'payment_rejected', 'completed', 'approved'].includes(reg.registration_status)
-            || (reg.submission && (
-                (props.profile?.student_data_mode !== 'full_records' || ['submitted', 'approved'].includes(reg.submission.full_records_status))
-                && (props.profile?.student_data_mode !== 'counts_only' || ['submitted', 'approved'].includes(reg.submission.counts_status))
-                && (!props.profile?.teacher_registration_enabled || ['submitted', 'approved'].includes(reg.submission.teacher_status))
-            ));
-        steps.push({
-            key: 'data',
-            label: 'Submit data',
-            state: reg.registration_status === 'completed' || dataDone ? 'done' : 'current',
-        });
-    }
-
-    const paymentDone = ['completed', 'approved'].includes(reg.registration_status);
-    const paymentCurrent = ['payment_pending', 'payment_submitted', 'payment_rejected'].includes(reg.registration_status);
-    steps.push({
-        key: 'payment',
-        label: 'Pay & upload proof',
-        state: paymentDone ? 'done' : paymentCurrent ? 'current' : 'pending',
-    });
-
-    steps.push({
-        key: 'complete',
-        label: 'Sahodaya approval',
-        state: paymentDone ? 'done' : paymentCurrent && reg.registration_status === 'payment_submitted' ? 'current' : 'pending',
-    });
-
-    return steps;
-});
 
 const paymentForm = useForm({
     payment_proof: null,
@@ -327,6 +307,20 @@ function formatDate(value) {
 
 function begin() {
     router.post(`/school-admin/${props.school.id}/registration/begin`);
+}
+
+const regionChoice = ref(props.selectedRegionId ?? null);
+const savingRegion = ref(false);
+
+function saveRegion() {
+    savingRegion.value = true;
+    router.post(`/school-admin/${props.school.id}/registration/region`,
+        { region_id: regionChoice.value || null },
+        {
+            preserveScroll: true,
+            onFinish: () => { savingRegion.value = false; },
+        },
+    );
 }
 
 function uploadPayment() {

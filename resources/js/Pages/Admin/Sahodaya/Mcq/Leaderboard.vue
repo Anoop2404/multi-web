@@ -1,6 +1,6 @@
 <template>
     <SahodayaAdminLayout :title="`Leaderboard — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="MCQ exam" description="Top scorers across all schools">
+        <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Top scorers across all schools">
             <template #actions>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/leaderboard/export`" class="btn-secondary text-sm">Export CSV</a>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}`" class="btn-secondary text-sm">← Exam overview</Link>

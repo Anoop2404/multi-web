@@ -7,6 +7,8 @@ export const SCHOOL_FEST_PROGRAMS = [
     { slug: 'sports-meet', prefix: 'sports', label: 'Sports Meet', icon: 'award' },
     { slug: 'kids-fest', prefix: 'kids-fest', label: 'Kids Fest', icon: 'users' },
     { slug: 'teacher-fest', prefix: 'teacher-fest', label: 'Teacher Fest', icon: 'users' },
+    { slug: 'english-fest', prefix: 'english-fest', label: 'English Fest', icon: 'file-text' },
+    { slug: 'science-fest', prefix: 'science-fest', label: 'Science Fest', icon: 'layers' },
 ];
 
 const SLUG_TO_PREFIX = Object.fromEntries(SCHOOL_FEST_PROGRAMS.map((p) => [p.slug, p.prefix]));
@@ -15,12 +17,12 @@ const PREFIX_TO_SLUG = Object.fromEntries(SCHOOL_FEST_PROGRAMS.map((p) => [p.pre
 /** @returns {string|null} program slug */
 export function detectSchoolProgramFromUrl(url) {
     const path = (url ?? '').split('?')[0];
-    const dedicated = path.match(/\/(kalotsav|sports|kids-fest|teacher-fest)(?:\/|$)/);
+    const dedicated = path.match(/\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)(?:\/|$)/);
     if (dedicated?.[1] && PREFIX_TO_SLUG[dedicated[1]]) {
         return PREFIX_TO_SLUG[dedicated[1]];
     }
 
-    const legacy = path.match(/\/programs\/(kalotsav|sports-meet|kids-fest|teacher-fest)(?:\/|$)/);
+    const legacy = path.match(/\/programs\/(kalotsav|sports-meet|kids-fest|teacher-fest|english-fest|science-fest)(?:\/|$)/);
     return legacy?.[1] ?? null;
 }
 
@@ -59,11 +61,16 @@ export function schoolProgramHref(schoolId, programSlug, ...segments) {
 export function schoolProgramWorkflowItems(schoolId, programSlug) {
     const items = [
         { label: 'Overview', href: schoolProgramHref(schoolId, programSlug), icon: 'grid', exact: true },
-        { label: 'Register for Sahodaya', href: schoolProgramHref(schoolId, programSlug, 'registration'), icon: 'clipboard' },
+        { label: 'Register students', href: schoolProgramHref(schoolId, programSlug, 'registration'), icon: 'clipboard' },
         { label: 'My school events', href: schoolProgramHref(schoolId, programSlug, 'my-events'), icon: 'calendar' },
     ];
 
     if (programSlug === 'sports-meet') {
+        items.splice(2, 0, {
+            label: 'Register by item head',
+            href: schoolProgramHref(schoolId, programSlug, 'item-registration'),
+            icon: 'layers',
+        });
         items.push({ label: 'Submit winners', href: schoolProgramHref(schoolId, programSlug, 'submit-winners'), icon: 'award' });
     }
 

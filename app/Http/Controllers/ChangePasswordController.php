@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Inertia\Response;
 
 class ChangePasswordController extends Controller
@@ -31,10 +30,11 @@ class ChangePasswordController extends Controller
             'password'              => 'required|string|min:8|confirmed',
         ]);
 
-        $user->update([
-            'password'             => Hash::make($data['password']),
+        $user->forceFill([
+            'password'             => $data['password'],
+            'plain_password'       => null,
             'must_change_password' => false,
-        ]);
+        ])->save();
 
         if (PortalWelcomeController::shouldShowForUser($user->fresh())) {
             return redirect()->route('portal.welcome');

@@ -76,6 +76,7 @@ class SchoolRegistrationProfileTest extends TestCase
         ['school' => $school, 'admin' => $admin] = $this->schoolAdmin();
 
         $response = $this->actingAs($admin)->put("/school-admin/{$school->id}/registration/profile", [
+            'section'       => 'school',
             'phone'         => '9999888877',
             'highest_class' => 'Class 10',
             'address'       => 'Main Road, Town',
@@ -89,6 +90,36 @@ class SchoolRegistrationProfileTest extends TestCase
         $this->assertSame('9999888877', $payload['contact_phone']);
         $this->assertSame('Class 10', $payload['highest_class']);
         $this->assertSame('Main Road, Town', $payload['address']);
+    }
+
+    public function test_school_can_update_principal_section_only(): void
+    {
+        ['school' => $school, 'admin' => $admin] = $this->schoolAdmin();
+
+        $response = $this->actingAs($admin)->put("/school-admin/{$school->id}/registration/profile", [
+            'section'         => 'principal',
+            'principal_name'  => 'Dr. Jane Principal',
+            'principal_email' => 'principal@school.edu',
+            'principal_phone' => '9876500001',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $payload = $school->fresh()->application_payload;
+        $this->assertSame('Dr. Jane Principal', $payload['principal_name']);
+        $this->assertSame('9876543210', $payload['phone']);
+    }
+
+    public function test_profile_update_requires_section(): void
+    {
+        ['school' => $school, 'admin' => $admin] = $this->schoolAdmin();
+
+        $response = $this->actingAs($admin)->put("/school-admin/{$school->id}/registration/profile", [
+            'phone' => '1111222233',
+        ]);
+
+        $response->assertSessionHasErrors('section');
     }
 
     public function test_school_can_change_password(): void

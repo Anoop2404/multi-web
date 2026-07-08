@@ -1,7 +1,7 @@
 <template>
     <SchoolAdminLayout title="Bulk Add Students" :school="school" :show-header-title="false">
         <PageHeader title="Bulk Add Students" eyebrow="Students"
-            description="Add up to 25 students — photo, name, class, gender, and date of birth required per row.">
+            description="Add up to 25 students at once. Each new record starts unverified — your Sahodaya admin verifies students centrally.">
             <template #actions>
                 <Link :href="`/school-admin/${school.id}/students/create`" class="btn-secondary">Add one student</Link>
                 <Link :href="`/school-admin/${school.id}/students`" class="btn-ghost">Back to list</Link>

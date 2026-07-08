@@ -18,6 +18,7 @@ class SchoolStudentsController extends SahodayaAdminController
             'class_category_id' => 'nullable|integer',
             'school_class_id'   => 'nullable|integer',
             'search'            => 'nullable|string|max:100',
+            'verification'      => 'nullable|in:all,verified,unverified',
         ]);
 
         $categories = $resolver->classCategories($this->sahodaya->id);
@@ -28,8 +29,8 @@ class SchoolStudentsController extends SahodayaAdminController
             ->get();
 
         $categoryCounts = Student::query()
-            ->where('tenant_id', $school->id)
-            ->where('status', 'active')
+            ->where('students.tenant_id', $school->id)
+            ->where('students.status', 'active')
             ->whereHas('schoolClass')
             ->join('school_classes', 'students.school_class_id', '=', 'school_classes.id')
             ->selectRaw('school_classes.class_category_id, count(*) as total')
@@ -47,13 +48,19 @@ class SchoolStudentsController extends SahodayaAdminController
                 $q->where(function ($inner) use ($term) {
                     $inner->where('name', 'like', $term)
                         ->orWhere('admission_number', 'like', $term)
-                        ->orWhere('roll_number', 'like', $term);
+                        ->orWhere('roll_number', 'like', $term)
+                        ->orWhere('reg_no', 'like', $term);
                 });
             })
+            ->when(($filters['verification'] ?? 'all') === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
+            ->when(($filters['verification'] ?? 'all') === 'unverified', fn ($q) => $q->whereNull('verified_at'))
             ->orderBy('school_class_id')
             ->orderBy('name')
             ->paginate(50)
             ->withQueryString();
+
+        $verifiedCount = Student::where('tenant_id', $school->id)->where('status', 'active')->whereNotNull('verified_at')->count();
+        $unverifiedCount = Student::where('tenant_id', $school->id)->where('status', 'active')->whereNull('verified_at')->count();
 
         return $this->inertia('Sahodaya/Schools/Students', [
             'school'         => $school->only('id', 'name', 'school_prefix', 'membership_status'),
@@ -67,8 +74,10 @@ class SchoolStudentsController extends SahodayaAdminController
             ])->values(),
             'classes'        => $classes,
             'students'       => $students,
-            'filters'        => $filters,
+            'filters'        => array_merge(['verification' => 'all'], $filters),
             'totalStudents'  => Student::where('tenant_id', $school->id)->where('status', 'active')->count(),
+            'verifiedCount'  => $verifiedCount,
+            'unverifiedCount'=> $unverifiedCount,
             'classesCount'   => $classes->where('is_active', true)->count(),
         ]);
     }

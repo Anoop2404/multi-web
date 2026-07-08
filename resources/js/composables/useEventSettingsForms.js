@@ -1,4 +1,4 @@
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import { settingsDescriptionForEvent } from '@/support/sahodayaEventCapabilities.js';
 
@@ -18,6 +18,33 @@ const schemeLabelMap = {
         open: 'Open / All Classes',
     },
 };
+
+const ATHLETICS_RANK_DEFAULTS = { 1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3 };
+
+function initRankRows(source, fallbackCount = 6) {
+    const rows = (source ?? []).map((row, index) => ({
+        _key: `rank-${row.rank}-${index}`,
+        rank: row.rank,
+        points: row.points,
+    }));
+
+    if (rows.length) {
+        return rows;
+    }
+
+    if (fallbackCount <= 0) {
+        return [];
+    }
+
+    return Array.from({ length: fallbackCount }, (_, index) => {
+        const rank = index + 1;
+        return {
+            _key: `default-${rank}`,
+            rank,
+            points: ATHLETICS_RANK_DEFAULTS[rank] ?? 0,
+        };
+    });
+}
 
 export function useEventSettingsForms(props) {
     const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
@@ -62,6 +89,11 @@ export function useEventSettingsForms(props) {
     const comboForm = useForm({ school_id: '', class_group: '', max_arts_events: null, max_sports_events: null, max_on_stage: null, max_off_stage: null });
     const gradeForm = useForm({ item_id: '', grade: 'A', min_score: null, max_score: null });
     const pointForm = useForm({ grade: '', position: null, points: null, is_group: false });
+    const rankRows = ref(initRankRows(props.rankPoints));
+    const groupRankRows = ref(initRankRows(props.groupRankPoints, 0));
+    const savingRanks = ref(false);
+    const savingGroupRanks = ref(false);
+    const seedingRanks = ref(false);
     const volunteerForm = useForm({ name: '', phone: '', duty: '', notes: '' });
     const cloneForm = useForm({ title: '' });
 
@@ -84,17 +116,32 @@ export function useEventSettingsForms(props) {
 
     const numberingSettingsForm = useForm({
         event_reg_start: props.numberingSettings?.event_reg_start ?? 1,
-        event_reg_prefix: props.numberingSettings?.event_reg_prefix ?? 'S-',
+        event_reg_prefix: props.numberingSettings?.event_reg_prefix ?? '',
         chest_no_start: props.numberingSettings?.chest_no_start ?? 1,
         chest_no_prefix: props.numberingSettings?.chest_no_prefix ?? '',
         auto_assign_on_approve: props.numberingSettings?.auto_assign_on_approve ?? true,
         auto_assign_chest_on_create: props.numberingSettings?.auto_assign_chest_on_create ?? false,
     });
 
+    const itemNumberingForm = useForm({
+        items: (props.event.items ?? [])
+            .filter((i) => i.is_enabled !== false)
+            .sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''))
+            .map((i) => ({
+                id: i.id,
+                title: i.title,
+                item_code: i.item_code ?? '',
+                chest_no_start: i.chest_no_start ?? '',
+                item_reg_id_start: i.item_reg_id_start ?? '',
+            })),
+    });
+
     const existingFeeSettings = props.event.fee_settings ?? {};
     const schedule = props.feeSchedule ?? {};
     const feeSettingsForm = useForm({
-        fee_model: existingFeeSettings.fee_model ?? schedule.fee_model ?? 'none',
+        fee_model: existingFeeSettings.fee_model
+            ?? schedule.fee_model
+            ?? (props.event?.event_type === 'sports' ? 'sports_composite' : 'none'),
         first_item: existingFeeSettings.first_item ?? schedule.first_item ?? '',
         additional_item: existingFeeSettings.additional_item ?? schedule.additional_item ?? '',
         charge_standbys: existingFeeSettings.charge_standbys ?? schedule.charge_standbys ?? false,
@@ -132,6 +179,18 @@ export function useEventSettingsForms(props) {
             team: existingFeeSettings.participant_type_fees?.team ?? schedule.participant_type_fees?.team ?? props.defaultParticipantTypeFees?.team ?? '',
         },
         default_item_fee: existingFeeSettings.default_item_fee ?? schedule.default_item_fee ?? '',
+        require_fee_before_registration: existingFeeSettings.require_fee_before_registration
+            ?? schedule.require_fee_before_registration
+            ?? (props.event?.event_type === 'sports'),
+        require_verified_students: existingFeeSettings.require_verified_students
+            ?? schedule.require_verified_students
+            ?? false,
+        head_fees: (props.itemHeads ?? []).map((head) => ({
+            id: head.id,
+            name: head.name,
+            default_item_fee: head.default_item_fee ?? '',
+            extra_item_fee: head.extra_item_fee ?? '',
+        })),
         item_fees: (props.event.items ?? []).map((item) => ({
             id: item.id,
             title: item.title,
@@ -176,8 +235,32 @@ export function useEventSettingsForms(props) {
         registrationSettingsForm.put(`${base}/registration-settings`, { preserveScroll: true });
     }
 
+    function saveItemWindow(itemId, row) {
+        router.patch(`${base}/items/${itemId}/windows`, {
+            reg_start: row.reg_start || null,
+            reg_end: row.reg_end || null,
+            competition_start: row.competition_start || null,
+            competition_end: row.competition_end || null,
+            head_id: row.head_id || null,
+        }, { preserveScroll: true });
+    }
+
+    function saveHeadWindow(headId, row) {
+        router.patch(`${base}/item-heads/${headId}/windows`, {
+            reg_start: row.reg_start || null,
+            reg_end: row.reg_end || null,
+            competition_start: row.competition_start || null,
+            competition_end: row.competition_end || null,
+            apply_to_items: row.apply_to_items ?? true,
+        }, { preserveScroll: true });
+    }
+
     function saveNumberingSettings() {
         numberingSettingsForm.put(`${base}/numbering-settings`, { preserveScroll: true });
+    }
+
+    function saveItemNumbering() {
+        itemNumberingForm.put(`${base}/item-numbering`, { preserveScroll: true });
     }
 
     function backfillRegs() {
@@ -224,6 +307,46 @@ export function useEventSettingsForms(props) {
         router.delete(`${base}/point-rules/${id}`, { preserveScroll: true });
     }
 
+    function rankLabel(rank) {
+        const labels = { 1: '1st', 2: '2nd', 3: '3rd' };
+        return labels[rank] ?? `#${rank}`;
+    }
+
+    function addRankRow() {
+        const next = (rankRows.value.at(-1)?.rank ?? 0) + 1;
+        rankRows.value.push({ _key: `new-${Date.now()}`, rank: next, points: 0 });
+    }
+
+    function removeRankRow(index) {
+        rankRows.value.splice(index, 1);
+    }
+
+    function addGroupRankRow() {
+        const next = (groupRankRows.value.at(-1)?.rank ?? 0) + 1;
+        groupRankRows.value.push({ _key: `g-${Date.now()}`, rank: next, points: 0 });
+    }
+
+    function saveRankPoints(isGroup = false) {
+        const rows = isGroup ? groupRankRows.value : rankRows.value;
+        const loading = isGroup ? savingGroupRanks : savingRanks;
+        loading.value = true;
+        router.put(`${base}/rank-points`, {
+            ranks: rows.map((row) => ({ rank: row.rank, points: row.points, is_group: isGroup })),
+            is_group: isGroup,
+        }, {
+            preserveScroll: true,
+            onFinish: () => { loading.value = false; },
+        });
+    }
+
+    function seedAthletics() {
+        seedingRanks.value = true;
+        router.post(`${base}/rank-points/seed-athletics`, {}, {
+            preserveScroll: true,
+            onFinish: () => { seedingRanks.value = false; },
+        });
+    }
+
     function addVolunteer() {
         volunteerForm.post(`${base}/volunteers`, { preserveScroll: true, onSuccess: () => volunteerForm.reset() });
     }
@@ -254,6 +377,7 @@ export function useEventSettingsForms(props) {
         lifecycleForm,
         registrationSettingsForm,
         numberingSettingsForm,
+        itemNumberingForm,
         feeSettingsForm,
         effectiveClassGroupLabels,
         ageRuleSummary: computed(() => props.ageRuleSummary ?? ''),
@@ -266,7 +390,10 @@ export function useEventSettingsForms(props) {
         saveEligibility,
         saveLifecycle,
         saveRegistrationSettings,
+        saveItemWindow,
+        saveHeadWindow,
         saveNumberingSettings,
+        saveItemNumbering,
         backfillRegs,
         addVenue,
         removeVenue,
@@ -278,6 +405,17 @@ export function useEventSettingsForms(props) {
         removeGradeConfig,
         addPointRule,
         removePointRule,
+        rankRows,
+        groupRankRows,
+        saveRankPoints,
+        seedAthletics,
+        addRankRow,
+        removeRankRow,
+        addGroupRankRow,
+        rankLabel,
+        savingRanks,
+        savingGroupRanks,
+        seeding: seedingRanks,
         addVolunteer,
         removeVolunteer,
         cloneEvent,

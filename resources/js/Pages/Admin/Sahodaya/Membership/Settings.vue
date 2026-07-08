@@ -72,7 +72,7 @@
                         <FormField label="Sahodaya Name" class-extra="sm:col-span-2">
                             <input v-model="profileForm.name" class="field" placeholder="Malappuram Sahodaya">
                         </FormField>
-                        <FormField label="Registration Prefix" :required="!profile.prefixes_locked" hint="Sahodaya code used in numbers. School membership: MLM/GHS/0001. Student: MLM/GHS/26/0001. Locked after first number is issued.">
+                        <FormField label="Registration Prefix" :required="!profile.prefixes_locked" hint="Sahodaya code used in numbers. School membership restarts each year: KNR/26/1, KNR/26/2. Student: STU/26/0001. Locked after first number is issued.">
                             <input v-model="profileForm.prefix" :disabled="profile.prefixes_locked"
                                    class="field" :class="profile.prefixes_locked ? 'bg-gray-50 cursor-not-allowed' : ''"
                                    placeholder="MLM">
@@ -171,19 +171,23 @@
                     </FormGrid>
                 </FormSection>
 
-                <FormSection title="Student record lock" hint="After the lock time (or when toggled on), schools cannot edit students directly — they must submit change requests for your approval.">
+                <FormSection title="Student record lock" hint="Instantly freeze student add/edit for all member schools. School leadership can still verify records; use change requests only when this is on.">
                     <FormGrid>
                         <FormField label="">
                             <label class="flex items-center gap-3 cursor-pointer mt-2">
                                 <input v-model="profileForm.student_edit_lock_enabled" type="checkbox"
                                        class="w-4 h-4 text-purple-600 rounded">
-                                <span class="text-sm font-medium text-gray-700">Lock student edits now (manual)</span>
+                                <span class="text-sm font-medium text-gray-700">Lock student edits now (emergency freeze)</span>
                             </label>
-                            <p class="text-xs text-gray-500 mt-1">When checked, all member schools are locked immediately regardless of the date below.</p>
+                            <p class="text-xs text-gray-500 mt-1">When checked, schools cannot add or edit students until you turn this off. No date schedule — toggle only.</p>
                         </FormField>
-                        <FormField label="Auto-lock after date & time">
-                            <input v-model="profileForm.student_edit_lock_at" type="datetime-local" class="field">
-                            <p class="text-xs text-gray-500 mt-1">Schools can edit freely until this moment, then must request changes.</p>
+                        <FormField label="">
+                            <label class="flex items-center gap-3 cursor-pointer mt-2">
+                                <input v-model="profileForm.require_student_verification" type="checkbox"
+                                       class="w-4 h-4 text-purple-600 rounded">
+                                <span class="text-sm font-medium text-gray-700">Require Sahodaya verification before fest / Talent Search registration</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1">When on, only students verified by Sahodaya (or school leadership) can be registered for events and Talent Search exams cluster-wide.</p>
                         </FormField>
                     </FormGrid>
                     <p class="text-xs text-gray-500">
@@ -321,8 +325,14 @@
                             <textarea v-model="receiptForm.header_subtitle" rows="2" class="field"></textarea>
                         </FormField>
                         <FormField label="Registered office line" class-extra="sm:col-span-2"
-                                   hint="Defaults to office address from Profile tab if empty">
-                            <textarea v-model="receiptForm.registered_office" rows="2" class="field"></textarea>
+                                   hint="Shown below the subtitle. Defaults to Profile address if empty.">
+                            <textarea v-model="receiptForm.registered_office" rows="2" class="field"
+                                      placeholder="Registered office : Anchamile, Pookkottumpadam"></textarea>
+                        </FormField>
+                        <FormField label="Society registration line" class-extra="sm:col-span-2"
+                                   hint="Legal registration details printed under the office line">
+                            <input v-model="receiptForm.society_registration" class="field"
+                                   placeholder="Reg. Under Societies Registration Act 2025 No. MPM/109/2026">
                         </FormField>
                         <FormField label="Purpose template" class-extra="sm:col-span-2">
                             <input v-model="receiptForm.purpose_template" class="field"
@@ -498,35 +508,35 @@
             <!-- Tab: Registration Window -->
             <div v-show="activeTab === 'window'" class="space-y-5">
                 <p class="text-sm text-gray-500">
-                    Windows apply to the <strong class="text-gray-700">active academic year</strong>
-                    (<span class="font-mono">{{ academicYear }}</span>).
+                    These windows apply to <strong class="text-gray-700">annual membership registration</strong> for
+                    <span class="font-mono">{{ academicYear }}</span> — not day-to-day student record edits (those use admin verify).
                 </p>
-                <div v-if="!registrationWindow || (!registrationWindow.add_open && !registrationWindow.add_close && !registrationWindow.registration_starts_at)"
+                <div v-if="!registrationWindow || (!registrationWindow.registration_starts_at && !registrationWindow.registration_ends_at)"
                      class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-                    ⚠️ No window is configured for <strong>{{ academicYear }}</strong>. Until you save dates below, schools can register and add students at any time.
+                    ⚠️ No membership window configured for <strong>{{ academicYear }}</strong>. Schools can submit annual registration at any time until you set dates below.
                 </div>
                 <FormSection :title="`Annual membership registration — ${academicYear}`"
-                             hint="When member schools can begin annual registration and add new students.">
+                             hint="When member schools can start and finish their annual Sahodaya membership submission.">
                     <FormGrid>
-                        <FormField label="Registration opens" hint="Schools can start annual membership from this date/time">
-                            <input v-model="windowForm.add_open" type="datetime-local" class="field">
+                        <FormField label="Registration opens" hint="Schools can begin annual registration from this date/time">
+                            <input v-model="windowForm.registration_starts_at" type="datetime-local" class="field">
                         </FormField>
-                        <FormField label="Registration closes" hint="No new registrations after this date/time">
-                            <input v-model="windowForm.add_close" type="datetime-local" class="field">
+                        <FormField label="Registration closes" hint="No new annual registrations after this date/time">
+                            <input v-model="windowForm.registration_ends_at" type="datetime-local" class="field">
                         </FormField>
                     </FormGrid>
                 </FormSection>
-                <FormSection :title="`Amendment window — ${academicYear}`"
-                             hint="After initial submission, schools can correct data only during this window.">
+                <FormSection :title="`Membership amendment window — ${academicYear}`"
+                             hint="Optional: after a school submits, they can amend their membership data only during this period.">
                     <FormGrid>
-                        <FormField label="Edits open" hint="Corrections allowed from">
+                        <FormField label="Amendments open" hint="Corrections to submitted registration allowed from">
                             <input v-model="windowForm.edit_open" type="datetime-local" class="field">
                         </FormField>
-                        <FormField label="Edits close" hint="Registration locked for edits after">
+                        <FormField label="Amendments close" hint="Membership data locked for edits after">
                             <input v-model="windowForm.edit_close" type="datetime-local" class="field">
                         </FormField>
                     </FormGrid>
-                    <button type="button" @click="saveWindow" class="btn-primary mt-4">Save Windows</button>
+                    <button type="button" @click="saveWindow" class="btn-primary mt-4">Save membership windows</button>
                 </FormSection>
             </div>
 
@@ -748,6 +758,48 @@
                     </form>
                 </FormSection>
             </div>
+
+            <!-- Tab: Subject Master -->
+            <div v-show="activeTab === 'subjects'" class="space-y-5">
+                <p class="text-sm text-gray-500">
+                    Subjects defined here are used when schools register their teachers. Schools pick from this list instead of typing subject names.
+                </p>
+
+                <FormSection v-if="globalSubjects.length" title="Standard Subjects"
+                             hint="Provided by the platform and available to all schools.">
+                    <div class="flex flex-wrap gap-2">
+                        <span v-for="s in globalSubjects" :key="s.id"
+                              class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-sm text-gray-700">
+                            <span class="font-mono text-xs text-gray-500">{{ s.code }}</span>{{ s.label }}
+                        </span>
+                    </div>
+                </FormSection>
+
+                <FormSection title="Your Sahodaya Subjects">
+                    <div v-if="customSubjects.length" class="space-y-2 mb-4">
+                        <div v-for="s in customSubjects" :key="s.id"
+                             class="flex items-center justify-between p-3 rounded-xl border border-purple-100 bg-purple-50/30 text-sm">
+                            <div class="flex items-center gap-3">
+                                <span class="font-mono text-xs text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded">{{ s.code }}</span>
+                                <span class="font-medium text-gray-700">{{ s.label }}</span>
+                                <span v-if="!s.is_active" class="text-xs text-amber-600">(inactive)</span>
+                            </div>
+                            <button type="button" class="text-red-500 text-xs hover:underline" @click="removeSubject(s)">Remove</button>
+                        </div>
+                    </div>
+                    <p v-else class="text-sm text-gray-400 mb-4">No custom subjects yet.</p>
+
+                    <form @submit.prevent="addSubject" class="flex flex-wrap gap-3 items-end">
+                        <FormField label="Code" :error="subjectForm.errors.code">
+                            <input v-model="subjectForm.code" class="field w-28" placeholder="MAL">
+                        </FormField>
+                        <FormField label="Subject" :error="subjectForm.errors.label">
+                            <input v-model="subjectForm.label" class="field w-56" placeholder="Malayalam">
+                        </FormField>
+                        <button type="submit" class="btn-secondary mb-0.5" :disabled="subjectForm.processing">Add Subject</button>
+                    </form>
+                </FormSection>
+            </div>
         </div>
     </SahodayaAdminLayout>
 </template>
@@ -778,6 +830,8 @@ const props = defineProps({
     globalTypes:             { type: Array, default: () => [] },
     customTypes:             { type: Array, default: () => [] },
     hiddenTypeIds:           { type: Array, default: () => [] },
+    globalSubjects:          { type: Array, default: () => [] },
+    customSubjects:          { type: Array, default: () => [] },
     applicationFormFields:   { type: Object, default: () => ({}) },
     applicationFormGroups:   { type: Object, default: () => ({}) },
     receiptTemplate:         { type: Object, default: () => ({}) },
@@ -796,6 +850,7 @@ const tabs = [
     { key: 'fees',       label: 'Membership Fees' },
     { key: 'categories', label: 'Class Master' },
     { key: 'types',      label: 'Teaching Types' },
+    { key: 'subjects',   label: 'Subject Master' },
 ];
 
 const tabKeys = tabs.map((t) => t.key);
@@ -844,10 +899,8 @@ const receiptForm = useForm({
 const logoForm    = useForm({ logo: null });
 const windowForm  = useForm({
     academic_year:          props.academicYear,
-    registration_starts_at: props.registrationWindow?.registration_starts_at?.slice(0, 10) || '',
-    registration_ends_at:   props.registrationWindow?.registration_ends_at?.slice(0, 10) || '',
-    add_open:               props.registrationWindow?.add_open_local || '',
-    add_close:              props.registrationWindow?.add_close_local || '',
+    registration_starts_at: props.registrationWindow?.registration_starts_local || '',
+    registration_ends_at:   props.registrationWindow?.registration_ends_local || '',
     edit_open:              props.registrationWindow?.edit_open_local || '',
     edit_close:             props.registrationWindow?.edit_close_local || '',
 });
@@ -861,6 +914,7 @@ const classForm = useForm({ name: '', class_category_id: '', display_order: null
 const editClassForm = useForm({ name: '', class_category_id: '', display_order: null });
 const editingClassId = ref(null);
 const typeForm     = useForm({ code: '', label: '' });
+const subjectForm  = useForm({ code: '', label: '', sort_order: null });
 const formConfig   = useForm({
     fields: Object.fromEntries(
         Object.entries(props.applicationFormFields).map(([key, field]) => [
@@ -915,7 +969,7 @@ const setupChecklist = computed(() => {
         : (feeForm.membership_fee_type === 'variable_by_student_count'
         ? (props.feeSlabs?.length > 0)
         : ((feeForm.fixed_membership_fee_amount ?? 0) > 0));
-    const windowOk = !!(regWin?.add_open && regWin?.add_close);
+    const windowOk = !!(regWin?.registration_starts_at && regWin?.registration_ends_at);
 
     return [
         {
@@ -945,7 +999,7 @@ const setupChecklist = computed(() => {
         },
         {
             key: 'window',
-            label: 'Set the student add/close window dates for the active academic year.',
+            label: 'Set annual membership registration open/close dates for the active academic year.',
             tab: 'window',
             tabLabel: 'Registration Window',
             done: windowOk,
@@ -1097,6 +1151,15 @@ function saveClassEdit(cls) {
 function removeClass(cls) {
     if (! confirm(`Remove class "${cls.name}"?`)) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/membership/classes/${cls.id}`);
+}
+function addSubject() {
+    subjectForm.post(`/sahodaya-admin/${props.sahodaya.id}/membership/subjects`, {
+        onSuccess: () => subjectForm.reset(),
+    });
+}
+function removeSubject(s) {
+    if (!confirm(`Remove subject "${s.label}"?`)) return;
+    router.delete(`/sahodaya-admin/${props.sahodaya.id}/membership/subjects/${s.id}`);
 }
 function addType() {
     typeForm.post(`/sahodaya-admin/${props.sahodaya.id}/membership/custom-teaching-types`, {

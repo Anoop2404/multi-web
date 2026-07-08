@@ -1,7 +1,7 @@
 <template>
     <SahodayaAdminLayout title="Question banks" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader title="Question banks" eyebrow="MCQ exams"
+        <PageHeader title="Question banks" eyebrow="Talent Search exams"
                     description="All question banks created by teachers across member schools. Attach banks to online exams from each exam workspace.">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams`" class="btn-secondary text-sm">All exams</Link>

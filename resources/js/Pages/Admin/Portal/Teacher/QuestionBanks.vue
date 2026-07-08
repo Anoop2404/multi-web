@@ -35,6 +35,7 @@
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { teacherPortalNavItems } from '@/support/teacherPortalNav.js';
 
 const props = defineProps({ school: Object, teacher: Object, banks: Array, classGroups: Object });
 const form = useForm({ title: '', subject: props.teacher.subject || '', class_group: '', description: '' });
@@ -43,9 +44,6 @@ function createBank() {
     form.post(`/portal/teacher/${props.school.id}/question-banks`, { preserveScroll: true, onSuccess: () => form.reset('title', 'description') });
 }
 
-const navItems = computed(() => [
-    { href: `/portal/teacher/${props.school.id}`, label: 'Dashboard' },
-    { href: `/portal/teacher/${props.school.id}/question-banks`, label: 'Question Banks' },
-]);
+const navItems = computed(() => teacherPortalNavItems(props.school.id));
 </script>
 

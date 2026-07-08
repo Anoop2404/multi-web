@@ -2,7 +2,7 @@
     <SahodayaEventsLayout :title="`${event.title} — Registration Register`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Registration & Fees Register`" eyebrow="Reports"
-                    description="Fest ID per student, linked item registrations, chest numbers, and school fee status.">
+                    description="Grouped by item head — Fest ID, item reg, and chest numbers per item row.">
             <template #actions>
                 <a :href="exportUrl" class="btn-primary text-sm">Export CSV ↓</a>
                 <Link :href="feesUrl" class="btn-secondary text-sm">Event fees →</Link>
@@ -14,23 +14,35 @@
         <div class="notice-banner notice-banner--info mb-4 text-sm max-w-3xl">
             <p class="font-semibold text-[#0f3d7a] mb-1">How IDs work</p>
             <ul class="list-disc pl-4 space-y-0.5 text-slate-700">
-                <li><strong>Fest ID</strong> — one number per student per event (e.g. S-0001), shared across all their items.</li>
-                <li><strong>Chest no</strong> — assigned per on-stage item when Sahodaya approves (hidden until reveal if configured).</li>
-                <li><strong>Fees</strong> — billed per school (school registration + item fees); not per student line item payment.</li>
+                <li><strong>Fest ID</strong> — one unique number per student for the whole event.</li>
+                <li><strong>Item reg no.</strong> — per item registration, sequence starts from item settings.</li>
+                <li><strong>Chest no</strong> — per item when approved; each item has its own chest sequence.</li>
             </ul>
         </div>
 
-        <div class="card !p-4 mb-4 flex flex-wrap gap-3 items-end">
-            <FormField label="Filter by school" class-extra="mb-0">
+        <ReportHeadFilter v-if="hasItemHeads"
+                          v-model="headFilter"
+                          v-model:item-id="itemFilter"
+                          :heads="headsForFilter"
+                          :head-item-groups="headItemGroups"
+                          @apply="applyFilter">
+            <template #extra>
+                <FormField label="School" class-extra="mb-0 min-w-[12rem]">
+                    <select v-model="schoolFilter" class="field text-sm">
+                        <option value="">All schools</option>
+                        <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
+                    </select>
+                </FormField>
+            </template>
+        </ReportHeadFilter>
+
+        <div v-else class="card !p-4 mb-4 flex flex-wrap gap-3 items-end">
+            <FormField label="School" class-extra="mb-0">
                 <select v-model="schoolFilter" class="field text-sm w-56" @change="applyFilter">
                     <option value="">All schools</option>
                     <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
                 </select>
             </FormField>
-            <div class="text-xs text-slate-500 ml-auto">
-                {{ totals.participants }} participant line(s) · {{ totals.registrations }} registration(s)
-                <span v-if="totals.fee_required"> · ₹{{ totals.total_due }} due · ₹{{ totals.total_collected }} collected</span>
-            </div>
         </div>
 
         <div v-if="schoolSummaries.length && !schoolFilter" class="card card--flush mb-6 overflow-hidden">
@@ -40,11 +52,8 @@
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="p-3">School</th>
-                        <th class="p-3">Items</th>
-                        <th class="p-3">Total due</th>
-                        <th class="p-3">Status</th>
-                        <th class="p-3">Receipt</th>
+                        <th class="p-3">School</th><th class="p-3">Items</th><th class="p-3">Total due</th>
+                        <th class="p-3">Status</th><th class="p-3">Receipt</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -63,33 +72,39 @@
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
+                        <th class="p-3">Head</th>
                         <th class="p-3">School</th>
                         <th class="p-3">Participant</th>
                         <th class="p-3">Fest ID</th>
+                        <th class="p-3">Item reg</th>
                         <th class="p-3">Item</th>
-                        <th class="p-3">Status</th>
                         <th class="p-3">Chest</th>
-                        <th class="p-3">Item fee</th>
+                        <th class="p-3">Fee</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="row in rows" :key="row.participant_id" class="border-t align-top">
-                        <td class="p-3 text-xs">{{ row.school_name }}</td>
-                        <td class="p-3">
-                            <span class="font-medium">{{ row.participant_name }}</span>
-                            <p class="text-xs font-mono text-[#0f3d7a]">{{ row.participant_reg_no }}</p>
-                        </td>
-                        <td class="p-3 font-mono text-xs font-semibold text-[#0f3d7a]">{{ row.level_reg }}</td>
-                        <td class="p-3 text-xs">{{ row.item_title }}</td>
-                        <td class="p-3 text-xs capitalize">
-                            {{ row.registration_status }}
-                            <span v-if="row.participant_role === 'standby'" class="text-slate-500"> · standby</span>
-                        </td>
-                        <td class="p-3 font-mono text-xs">{{ row.chest_no }}</td>
-                        <td class="p-3 text-xs whitespace-nowrap">{{ row.item_fee != null ? `₹${row.item_fee}` : '—' }}</td>
-                    </tr>
-                    <tr v-if="!rows.length">
-                        <td colspan="7" class="p-8 text-center text-gray-400">No registrations yet.</td>
+                    <template v-for="(row, idx) in displayRows" :key="row.participant_id">
+                        <tr v-if="idx === 0 || row.head_name !== displayRows[idx - 1]?.head_name" class="bg-slate-50/80">
+                            <td colspan="8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                {{ row.head_name ?? 'Other items' }}
+                            </td>
+                        </tr>
+                        <tr class="border-t align-top">
+                            <td class="p-3 text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
+                            <td class="p-3 text-xs">{{ row.school_name }}</td>
+                            <td class="p-3">
+                                <span class="font-medium">{{ row.participant_name }}</span>
+                                <p class="text-xs font-mono text-[#0f3d7a]">{{ row.participant_reg_no }}</p>
+                            </td>
+                            <td class="p-3 font-mono text-xs font-semibold text-[#0f3d7a]">{{ row.level_reg }}</td>
+                            <td class="p-3 font-mono text-xs">{{ row.item_reg }}</td>
+                            <td class="p-3 text-xs">{{ row.item_title }}</td>
+                            <td class="p-3 font-mono text-xs">{{ row.chest_no }}</td>
+                            <td class="p-3 text-xs">{{ row.item_fee != null ? `₹${row.item_fee}` : '—' }}</td>
+                        </tr>
+                    </template>
+                    <tr v-if="!displayRows.length">
+                        <td colspan="8" class="p-8 text-center text-gray-400">No registrations match filters.</td>
                     </tr>
                 </tbody>
             </table>
@@ -101,10 +116,11 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import ReportHeadFilter from '@/Components/reports/ReportHeadFilter.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -113,19 +129,43 @@ const props = defineProps({
     feesUrl: String, activityLogs: { type: Array, default: () => [] },
 });
 
+const page = usePage();
+const headItemGroups = computed(() => page.props.headItemGroups ?? []);
+const headsForFilter = computed(() => page.props.headsForFilter ?? []);
+const hasItemHeads = computed(() => page.props.hasItemHeads ?? false);
+
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/registration-register`;
-const schoolFilter = ref(props.filterSchoolId || '');
+const params = new URLSearchParams(window.location.search);
+const schoolFilter = ref(props.filterSchoolId || params.get('school_id') || '');
+const headFilter = ref(params.get('head_id') ?? '');
+const itemFilter = ref(params.get('item_id') ?? '');
+
+const displayRows = computed(() => {
+    let list = props.rows ?? [];
+    if (headFilter.value) {
+        list = list.filter((r) => String(r.head_id) === String(headFilter.value));
+    }
+    if (itemFilter.value) {
+        list = list.filter((r) => String(r.item_id) === String(itemFilter.value));
+    }
+    return list;
+});
 
 const exportUrl = computed(() => {
-    const q = schoolFilter.value ? `?school_id=${schoolFilter.value}` : '';
-    return `${base}/export${q}`;
+    const q = new URLSearchParams();
+    if (schoolFilter.value) q.set('school_id', schoolFilter.value);
+    if (headFilter.value) q.set('head_id', headFilter.value);
+    if (itemFilter.value) q.set('item_id', itemFilter.value);
+    const qs = q.toString();
+    return `${base}/export${qs ? `?${qs}` : ''}`;
 });
 
 function applyFilter() {
-    router.get(base, schoolFilter.value ? { school_id: schoolFilter.value } : {}, {
-        preserveScroll: true,
-        preserveState: true,
-    });
+    router.get(base, {
+        school_id: schoolFilter.value || undefined,
+        head_id: headFilter.value || undefined,
+        item_id: itemFilter.value || undefined,
+    }, { preserveScroll: true, preserveState: true });
 }
 
 function feeStatusClass(status) {

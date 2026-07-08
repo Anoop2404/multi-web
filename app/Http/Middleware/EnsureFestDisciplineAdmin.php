@@ -43,10 +43,6 @@ class EnsureFestDisciplineAdmin
             return $next($request);
         }
 
-        if ($user->hasRole('fest_ops') && $user->tenant_id === $tenantId) {
-            return $next($request);
-        }
-
         abort(403, 'Sports discipline admin access required.');
     }
 }

@@ -123,6 +123,58 @@
                     </table>
                 </div>
             </div>
+
+            <div v-if="mcqHeads?.length" class="form-section overflow-hidden !p-0 md:col-span-2">
+                <h3 class="section-title p-4 border-b border-slate-100 !mb-0">Talent Search account heads</h3>
+                <div class="overflow-x-auto max-h-64">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Exam account</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="h in mcqHeads" :key="h.id">
+                                <td class="font-mono text-xs">{{ h.code }}</td>
+                                <td>{{ h.name }}</td>
+                                <td class="text-right">
+                                    <Link v-if="h.mcq_exam_id"
+                                          :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${h.mcq_exam_id}/ledger`"
+                                          class="text-indigo-600 text-xs font-semibold">Ledger →</Link>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div v-if="trainingHeads?.length" class="form-section overflow-hidden !p-0 md:col-span-2">
+                <h3 class="section-title p-4 border-b border-slate-100 !mb-0">Training program account heads</h3>
+                <div class="overflow-x-auto max-h-64">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Program account</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="h in trainingHeads" :key="h.id">
+                                <td class="font-mono text-xs">{{ h.code }}</td>
+                                <td>{{ h.name }}</td>
+                                <td class="text-right">
+                                    <Link v-if="h.training_program_id"
+                                          :href="`/sahodaya-admin/${sahodaya.id}/training/${h.training_program_id}/ledger`"
+                                          class="text-indigo-600 text-xs font-semibold">Ledger →</Link>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <div class="grid md:grid-cols-2 gap-4">
@@ -194,6 +246,8 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     byHead: Array, byCategory: Array, monthly: Array, eventHeads: Array, sportsHeads: { type: Array, default: () => [] },
+    mcqHeads: { type: Array, default: () => [] },
+    trainingHeads: { type: Array, default: () => [] },
     filterFrom: String, filterTo: String, filterCategory: String,
     categoryLabels: { type: Object, default: () => ({}) },
     academicYears: { type: Array, default: () => [] },

@@ -1,42 +1,127 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Reports`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Reports`" eyebrow="Analytics"
-                    description="Interactive reports and downloadable exports by event phase.">
-            <template #actions>
-                <span v-if="currentPhase" class="status-pill status-pill--published capitalize">{{ currentPhase }} phase</span>
-            </template>
-        </PageHeader>
+        <div class="reports-shell">
+            <PageHeader :title="`${event.title} — Reports`" eyebrow="Analytics"
+                        description="Browse reports by item head, download phase packs, or explore all report types.">
+                <template #actions>
+                    <Link v-if="event.event_type === 'sports'" :href="`${reportsBase}/by-head`" class="btn-primary text-sm">
+                        By item head →
+                    </Link>
+                    <span v-if="currentPhase" class="status-pill status-pill--published capitalize">{{ currentPhase }} phase</span>
+                </template>
+            </PageHeader>
 
-        <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="hub" />
+            <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="hub" />
 
-        <p v-if="allowedPhases?.length" class="mb-6 text-sm text-slate-600">
-            Download packs available for:
-            <span v-for="(phase, i) in allowedPhases" :key="phase" class="font-medium capitalize">
-                {{ phase }}<span v-if="i < allowedPhases.length - 1"> · </span>
-            </span>
-            event phases.
-        </p>
+            <FestEventMetaBar v-if="eventMeta" :meta="eventMeta" />
 
-        <section class="mb-8">
-            <h3 class="section-title mb-3">Interactive reports</h3>
-            <div v-if="interactive.length" class="hub-grid">
-                <HubCard v-for="p in interactive" :key="p.id" :href="p.href" :label="p.label" icon="📊" />
-            </div>
-            <EmptyState v-else title="No interactive reports" description="Publish results or add registrations to unlock live report views." icon="📈" />
-        </section>
+            <ReportPhasePackCards :reports-base="reportsBase"
+                                  :current-phase="currentPhase"
+                                  :allowed-phases="allowedPhases" />
 
-        <EventPageActivityLog :logs="activityLogs" />
+            <section v-if="orderedGroups.length" class="space-y-8 mb-10">
+                <div>
+                    <h3 class="section-title mb-1">Interactive reports</h3>
+                    <p class="text-sm text-slate-600 mb-4">On-screen views with filters — open any report to explore data before exporting.</p>
+                    <ReportToolbar v-model:query="searchQuery"
+                                   v-model:category="activeCategory"
+                                   :categories="categoryOptions"
+                                   placeholder="Search reports by name…" />
+                </div>
+
+                <section v-for="{ catKey, items } in orderedGroups" :key="catKey">
+                    <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                        <span aria-hidden="true">{{ categoryMeta[catKey]?.icon }}</span>
+                        {{ categoryMeta[catKey]?.label ?? catKey }}
+                        <span class="text-xs font-normal text-slate-400">({{ items.length }})</span>
+                    </h4>
+                    <div class="reports-tile-grid">
+                        <ReportInteractiveTile v-for="p in items" :key="p.id" :report="p" />
+                    </div>
+                </section>
+            </section>
+
+            <EmptyState v-else-if="searchQuery || activeCategory"
+                        title="No matching reports"
+                        description="Try a different search term or clear filters."
+                        icon="🔍"
+                        class="mb-8" />
+
+            <ReportHeadHubSection v-if="hasItemHeads"
+                                  compact
+                                  :heads="headSummary"
+                                  :head-item-groups="headItemGroups"
+                                  :head-report-base="headWiseReportBase"
+                                  :export-base-url="headWiseExportUrl"
+                                  :manage-url="itemHeadsManageUrl" />
+
+            <EmptyState v-else-if="event.event_type === 'sports'" title="No item heads yet" icon="📂" class="mb-2"
+                        description="Sync item heads from the competition hub, then reports will group by Athletics, Chess, etc.">
+                <Link :href="itemHeadsManageUrl" class="btn-primary text-sm mt-4 inline-flex">Open competition hub</Link>
+            </EmptyState>
+
+            <EventPageActivityLog :logs="activityLogs" />
+        </div>
     </SahodayaEventsLayout>
 </template>
 
 <script setup>
+import { computed, ref } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import ReportHeadHubSection from '@/Components/reports/ReportHeadHubSection.vue';
+import FestEventMetaBar from '@/Components/reports/FestEventMetaBar.vue';
+import ReportToolbar from '@/Components/reports/ReportToolbar.vue';
+import ReportPhasePackCards from '@/Components/reports/ReportPhasePackCards.vue';
+import ReportInteractiveTile from '@/Components/reports/ReportInteractiveTile.vue';
+import {
+    REPORT_CATEGORIES,
+    INTERACTIVE_CATEGORY_MAP,
+    groupInteractiveReports,
+    REPORT_CATEGORY_ORDER,
+    enrichInteractiveReport,
+    filterReportsByQuery,
+} from '@/support/festReportCatalog.js';
 
-defineProps({
+const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, interactive: Array, currentPhase: String, allowedPhases: Array,
+    eventMeta: Object,
+    headSummary: { type: Array, default: () => [] },
+    headItemGroups: { type: Array, default: () => [] },
+    hasItemHeads: Boolean,
+    itemHeadsManageUrl: String,
+    headWiseReportBase: String,
+    headWiseExportUrl: String,
     activityLogs: { type: Array, default: () => [] },
+});
+
+const categoryMeta = REPORT_CATEGORIES;
+const searchQuery = ref('');
+const activeCategory = ref(null);
+
+const reportsBase = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports`);
+
+const categoryOptions = computed(() =>
+    REPORT_CATEGORY_ORDER
+        .filter((key) => key !== 'heads' && categoryMeta[key])
+        .map((key) => ({ key, ...categoryMeta[key] })),
+);
+
+const orderedGroups = computed(() => {
+    let list = (props.interactive ?? []).map(enrichInteractiveReport);
+    if (props.hasItemHeads) {
+        list = list.filter((p) => p.id !== 'head-wise-participants');
+    }
+    list = filterReportsByQuery(list, searchQuery.value);
+    if (activeCategory.value) {
+        list = list.filter((p) => (INTERACTIVE_CATEGORY_MAP[p.id] ?? 'ops') === activeCategory.value);
+    }
+    const grouped = groupInteractiveReports(list);
+    return REPORT_CATEGORY_ORDER
+        .filter((key) => grouped[key]?.length)
+        .map((catKey) => ({ catKey, items: grouped[catKey] }));
 });
 </script>

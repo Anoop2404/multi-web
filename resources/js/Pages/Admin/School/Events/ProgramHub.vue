@@ -56,6 +56,8 @@
             <HubCard :href="`${programBase}/results`" icon="📊" label="Results" hint="Published scores" />
             <HubCard :href="`${programBase}/qualifiers`" icon="🎯" label="Qualifiers" hint="Promoted students" />
             <HubCard :href="`${programBase}/reports`" icon="📋" label="Reports" hint="Admit cards & exports" />
+            <HubCard v-if="canManageCoordinators" :href="`/school-admin/${school.id}/users?coordinators=1`" icon="👥"
+                     label="Assign coordinator" :hint="`Give a teacher access to ${programLabel} only`" />
         </div>
 
         <section v-if="schoolEvents?.length" class="card card--flush overflow-hidden mb-6">
@@ -86,7 +88,9 @@
                         <td class="font-medium">{{ ev.title }}</td>
                         <td class="text-xs">{{ ev.level_label }}</td>
                         <td>{{ ev.registrations_count }}</td>
-                        <td class="text-right"><Link :href="`${programBase}/registration?event=${ev.id}`" class="link-brand text-xs">Register →</Link></td>
+                        <td class="text-right">
+                            <Link :href="`${programBase}/events/${ev.id}/overview`" class="link-brand text-xs">Open event →</Link>
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -96,7 +100,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 
@@ -109,7 +113,9 @@ const props = defineProps({
 });
 
 const { programLabel, programBase } = useSchoolProgramContext(props);
+const page = usePage();
 const isSports = computed(() => props.eventType === 'sports');
 const isTeacherFest = computed(() => props.eventType === 'teacher_fest');
+const canManageCoordinators = computed(() => !page.props.isStaff && !page.props.isEventCoordinator);
 function fmt(v) { return Number(v ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 }); }
 </script>

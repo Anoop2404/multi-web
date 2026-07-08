@@ -3,7 +3,7 @@
         <PageHeader title="Profile change requests" eyebrow="Review"
                     description="Review and approve or reject profile update requests submitted by teachers and staff.">
             <template #actions>
-                <Link :href="`/school-admin/${school.id}/portal-users`" class="btn-secondary text-sm">← Portal users</Link>
+                <Link :href="`/school-admin/${school.id}/users`" class="btn-secondary text-sm">← Portal users</Link>
             </template>
         </PageHeader>
 

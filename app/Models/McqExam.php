@@ -14,8 +14,9 @@ class McqExam extends Model
         'title', 'exam_type', 'delivery_mode', 'conductor_level',
         'scheduled_at', 'venue', 'hall_instructions', 'question_paper_path', 'question_paper_label', 'next_hall_ticket_no',
         'duration_minutes', 'total_questions', 'pass_mark', 'status', 'settings_json',
-        'fee_type', 'fee_amount',
+        'fee_type', 'fee_amount', 'school_discount_amount',
         'eligibility_config',
+        'grade_master_id', 'hall_ticket_template_id', 'certificate_template_id',
         'results_published', 'results_published_at',
     ];
 
@@ -46,6 +47,7 @@ class McqExam extends Model
         'eligibility_config'    => 'array',
         'promoted_student_ids'  => 'array',
         'fee_amount'            => 'decimal:2',
+        'school_discount_amount'=> 'decimal:2',
         'cutoff_score'          => 'decimal:2',
         'promotion_locked'      => 'boolean',
         'results_published'     => 'boolean',
@@ -70,6 +72,27 @@ class McqExam extends Model
     public function hasFee(): bool
     {
         return ($this->fee_type ?? 'none') !== 'none' && (float) $this->fee_amount > 0;
+    }
+
+    public function schoolDiscountAmount(): float
+    {
+        if (! $this->hasFee()) {
+            return 0.0;
+        }
+
+        $fee = (float) $this->fee_amount;
+
+        return round(min($fee, max(0, (float) ($this->school_discount_amount ?? 0))), 2);
+    }
+
+    /** Amount the school remits to Sahodaya per registered student. */
+    public function schoolPayablePerStudent(): float
+    {
+        if (! $this->hasFee()) {
+            return 0.0;
+        }
+
+        return round((float) $this->fee_amount - $this->schoolDiscountAmount(), 2);
     }
 
     public function isOnlineDelivery(): bool

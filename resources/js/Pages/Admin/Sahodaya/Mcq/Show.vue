@@ -1,10 +1,14 @@
 <template>
     <SahodayaAdminLayout :title="exam.title" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="MCQ exam"
+        <PageHeader :title="exam.title" eyebrow="Talent Search exam"
                     :description="`${registrations.length} registrations · ${exam.status}`">
             <template #actions>
                 <span v-if="exam.series_title" class="text-xs text-slate-500 mr-2">{{ exam.series_title }}</span>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/preview`"
+                   target="_blank" rel="noopener" class="btn-secondary text-sm">Sample hall ticket ↗</a>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/certificates/preview`"
+                   target="_blank" rel="noopener" class="btn-secondary text-sm">Sample certificate ↗</a>
                 <a :href="`/portal/exam/${sahodaya.id}`" target="_blank" rel="noopener" class="btn-secondary text-sm">Exam portal ↗</a>
             </template>
         </PageHeader>
@@ -66,6 +70,24 @@
             </a>
         </p>
 
+        <form @submit.prevent="saveLedgerAccount" class="card mb-6 space-y-3">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h3 class="section-title">Ledger account</h3>
+                    <p class="section-desc text-xs">Verified Talent Search fees credit this exam’s own income head (code: {{ ledgerAccount?.code }}).</p>
+                </div>
+                <Link v-if="ledgerAccount?.ledger_url" :href="ledgerAccount.ledger_url" class="btn-secondary text-sm">View ledger →</Link>
+            </div>
+            <div class="flex flex-wrap gap-2 items-end">
+                <FormField label="Account name" class-extra="mb-0 flex-1 min-w-[14rem]">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="ledgerForm.name" class="field" required>
+                    </template>
+                </FormField>
+                <button type="submit" class="btn-secondary text-sm mb-0.5" :disabled="ledgerForm.processing">Save account name</button>
+            </div>
+        </form>
+
         <form @submit.prevent="save" class="card mb-6 space-y-4">
             <h3 class="section-title">Exam details</h3>
             <FormGrid>
@@ -115,7 +137,12 @@
                         <input :id="id" v-model.number="form.fee_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
                     </template>
                 </FormField>
-                <p class="text-xs text-slate-500 sm:col-span-2">Schools pay this amount per registered student. Hall tickets are issued after Sahodaya verifies payment.</p>
+                <FormField label="School discount (₹)" hint="Amount Sahodaya discounts per student — school remits fee minus discount">
+                    <template #default="{ id }">
+                        <input :id="id" v-model.number="form.school_discount_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
+                    </template>
+                </FormField>
+                <p class="text-xs text-slate-500 sm:col-span-2">Example: ₹150 student fee with ₹30 discount → school pays ₹120 per student to Sahodaya.</p>
                 <FormField label="Reg. no. starts at" hint="First hall-ticket number when tickets are issued. Use presets or enter any number from 1. Locked after any ticket is issued.">
                     <template #default="{ id }">
                         <McqRegNoStartField :input-id="id" v-model="form.next_hall_ticket_no" :disabled="exam.tickets_issued" />
@@ -126,6 +153,35 @@
             <div class="border-t border-slate-100 pt-4">
                 <McqEligibilityPicker v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
             </div>
+
+            <h3 class="section-title pt-2">Templates & grading</h3>
+            <FormGrid>
+                <FormField label="Grade master">
+                    <template #default="{ id }">
+                        <select :id="id" v-model="form.grade_master_id" class="field">
+                            <option value="">Default Sahodaya grade master</option>
+                            <option v-for="m in gradeMasters" :key="m.id" :value="m.id">{{ m.title }}<template v-if="m.is_default"> (default)</template></option>
+                        </select>
+                    </template>
+                </FormField>
+                <FormField label="Hall ticket template">
+                    <template #default="{ id }">
+                        <select :id="id" v-model="form.hall_ticket_template_id" class="field">
+                            <option value="">Default / per-exam design</option>
+                            <option v-for="t in hallTicketTemplates" :key="t.id" :value="t.id">{{ t.title }}</option>
+                        </select>
+                    </template>
+                </FormField>
+                <FormField label="Certificate template">
+                    <template #default="{ id }">
+                        <select :id="id" v-model="form.certificate_template_id" class="field">
+                            <option value="">Default certificate template</option>
+                            <option v-for="t in certificateTemplates" :key="t.id" :value="t.id">{{ t.title }}</option>
+                        </select>
+                    </template>
+                </FormField>
+            </FormGrid>
+            <p v-if="gradeBands?.length" class="text-xs text-slate-500">Active grade bands: {{ gradeBands.map(b => b.label).join(', ') }}</p>
 
             <h3 class="section-title pt-2">Hall tickets</h3>
             <p class="section-desc mb-3">
@@ -142,7 +198,7 @@
             <h3 class="section-title">Question paper archive</h3>
             <p class="text-sm text-slate-600">
                 Upload a PDF for the public
-                <a href="/mcq/papers" target="_blank" rel="noopener" class="link-brand">question paper archive ↗</a>.
+                <a :href="publicMcqPapersUrl" target="_blank" rel="noopener" class="link-brand">question paper archive ↗</a>.
             </p>
             <p v-if="exam.question_paper_path" class="text-sm text-emerald-700">
                 Published: {{ exam.question_paper_label || exam.title }}
@@ -165,7 +221,7 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import { router, useForm } from '@inertiajs/vue3';
+import { router, useForm, Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
@@ -183,9 +239,25 @@ const props = defineProps({
     classCategories: { type: Array, default: () => [] },
     masterClasses: { type: Array, default: () => [] },
     classGroupOptions: { type: Array, default: () => [] },
+    ledgerAccount: { type: Object, default: () => ({}) },
+    gradeMasters: { type: Array, default: () => [] },
+    hallTicketTemplates: { type: Array, default: () => [] },
+    certificateTemplates: { type: Array, default: () => [] },
+    gradeBands: { type: Array, default: () => [] },
 });
 
+const ledgerForm = useForm({ name: props.ledgerAccount?.name ?? '' });
+
+function saveLedgerAccount() {
+    ledgerForm.put(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/ledger-account`, { preserveScroll: true });
+}
+
 const eligibilityDefaults = props.exam.eligibility_config ?? {};
+
+const publicMcqPapersUrl = computed(() => {
+    const root = (props.publicUrl ?? '').replace(/\/$/, '');
+    return root ? `${root}/mcq/papers` : '/mcq/papers';
+});
 
 const form = useForm({
     title: props.exam.title,
@@ -194,6 +266,7 @@ const form = useForm({
     requires_hall_ticket: !!(props.exam.settings_json?.requires_hall_ticket),
     scheduled_at: props.exam.scheduled_at ? props.exam.scheduled_at.slice(0, 16) : '',
     fee_amount: props.exam.fee_amount ?? '',
+    school_discount_amount: props.exam.school_discount_amount ?? '',
     next_hall_ticket_no: props.exam.next_hall_ticket_no ?? 100,
     eligibility_config: {
         scope: eligibilityDefaults.scope ?? 'all',
@@ -205,6 +278,9 @@ const form = useForm({
         class_groups: [...(eligibilityDefaults.class_groups ?? [])],
         gender: eligibilityDefaults.gender ?? 'open',
     },
+    grade_master_id: props.exam.grade_master_id ?? '',
+    hall_ticket_template_id: props.exam.hall_ticket_template_id ?? '',
+    certificate_template_id: props.exam.certificate_template_id ?? '',
 });
 
 const presentCount = computed(() => props.registrations.filter((r) => r.attendance_status === 'present').length);

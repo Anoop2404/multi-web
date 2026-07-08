@@ -333,8 +333,76 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $service = app(FestIdCardService::class);
 
         $service->requireStudentItem('student', ['scope' => 'event']);
+        $service->requireStudentItem('student', ['scope' => 'head_all']);
 
         $this->assertTrue(true);
+    }
+
+    public function test_id_cards_head_scope_requires_head_id(): void
+    {
+        $service = app(FestIdCardService::class);
+
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->expectExceptionMessage('Select an item head before generating student ID cards.');
+
+        $service->requireStudentItem('student', ['scope' => 'head']);
+    }
+
+    public function test_cards_grouped_by_head_lists_items_on_one_card(): void
+    {
+        ['school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();
+
+        $head = \App\Models\FestItemHead::create([
+            'tenant_id'  => $event->tenant_id,
+            'event_id'   => $event->id,
+            'event_type' => $event->event_type,
+            'name'       => 'Literary',
+            'slug'       => 'literary',
+            'sort_order' => 1,
+        ]);
+
+        $item->update(['head_id' => $head->id]);
+
+        $itemTwo = FestEventItem::create([
+            'event_id'         => $event->id,
+            'title'            => 'Mime',
+            'participant_type' => 'individual',
+            'class_group'      => 'hs',
+            'is_enabled'       => true,
+            'head_id'          => $head->id,
+        ]);
+
+        $schoolClass = SchoolClass::where('tenant_id', $school->id)->first()
+            ?? SchoolClass::create([
+                'tenant_id'         => $school->id,
+                'name'              => '10',
+                'class_category_id' => 1,
+                'is_active'         => true,
+            ]);
+
+        $student = Student::create([
+            'tenant_id'       => $school->id,
+            'school_class_id' => $schoolClass->id,
+            'name'            => 'Head Card Student',
+            'gender'          => 'male',
+            'dob'             => '2012-01-01',
+            'status'          => 'active',
+        ]);
+
+        $this->approvedRegistration($event, $item, $school, $student);
+        $this->approvedRegistration($event, $itemTwo, $school, $student);
+
+        $sections = app(FestIdCardService::class)->cardsGroupedByHead($event, [
+            'school_id' => $school->id,
+        ]);
+
+        $this->assertCount(1, $sections);
+        $this->assertSame('Literary', $sections[0]['head_title']);
+        $this->assertCount(1, $sections[0]['cards']);
+        $this->assertSame('head_participant', $sections[0]['cards'][0]['card_type']);
+        $this->assertSame(2, $sections[0]['cards'][0]['item_count']);
+        $this->assertContains('Mono Act', $sections[0]['cards'][0]['items']);
+        $this->assertContains('Mime', $sections[0]['cards'][0]['items']);
     }
 
     public function test_event_participant_cards_dedupe_by_student(): void
@@ -427,6 +495,26 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertCount(1, $cards);
         $this->assertSame('Mono Act', $cards[0]['detail']);
         $this->assertNotEmpty($cards[0]['qr_src']);
+    }
+
+    public function test_head_window_inherited_for_item_registration(): void
+    {
+        ['school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();
+
+        $head = \App\Models\FestItemHead::create([
+            'tenant_id'  => $event->tenant_id,
+            'event_id'   => $event->id,
+            'event_type' => $event->event_type,
+            'name'       => 'Athletics',
+            'slug'       => 'athletics',
+            'sort_order' => 1,
+            'reg_start'  => now()->subDay()->toDateString(),
+            'reg_end'    => now()->addWeek()->toDateString(),
+        ]);
+
+        $item->update(['head_id' => $head->id, 'reg_start' => null, 'reg_end' => null]);
+
+        $this->assertTrue(app(\App\Services\Events\FestItemRegistrationGate::class)->isOpen($item->fresh(['head'])));
     }
 
     public function test_team_cards_group_registrations(): void

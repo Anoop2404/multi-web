@@ -28,8 +28,12 @@ class ProfileApiController extends SchoolApiController
                 'key'         => $key,
                 'label'       => $fields[$key]['label'],
                 'placeholder' => $fields[$key]['placeholder'] ?? null,
-                'required'    => $fields[$key]['required'] ?? false,
+                'hint'        => $this->profileFieldHint($key),
+                'required'    => in_array($key, ['school_prefix', 'cbse_affiliation'], true)
+                    ? false
+                    : ($fields[$key]['required'] ?? false),
                 'group'       => $fields[$key]['group'],
+                'disabled'    => $key === 'school_prefix' && $this->school->prefixes_locked && filled($this->school->school_prefix),
             ])
             ->values()
             ->all();
@@ -44,7 +48,11 @@ class ProfileApiController extends SchoolApiController
         $profileData = [];
         foreach (SchoolApplicationForm::editableFieldKeys() as $key) {
             if ($fields[$key]['enabled'] ?? false) {
-                $profileData[$key] = $payload[$key] ?? '';
+                $profileData[$key] = match ($key) {
+                    'school_prefix'    => $this->school->school_prefix ?? '',
+                    'cbse_affiliation' => SchoolApplicationForm::schoolAffiliation($this->school) ?? '',
+                    default            => $payload[$key] ?? '',
+                };
             }
         }
 
@@ -74,7 +82,16 @@ class ProfileApiController extends SchoolApiController
         $before = $this->school->application_payload ?? [];
         $payload = SchoolApplicationForm::mergeProfileUpdate($before, $data, $fields);
 
-        $this->school->update(['application_payload' => $payload]);
+        $updates = ['application_payload' => $payload];
+        if (
+            array_key_exists('school_prefix', $data)
+            && filled($data['school_prefix'])
+            && ! ($this->school->prefixes_locked && filled($this->school->school_prefix))
+        ) {
+            $updates['school_prefix'] = strtoupper(trim((string) $data['school_prefix']));
+        }
+
+        $this->school->update($updates);
 
         app(DataChangeLogger::class)->updated(
             $this->school,
@@ -85,6 +102,17 @@ class ProfileApiController extends SchoolApiController
         );
 
         return $this->message('Registration details saved.');
+    }
+
+    private function profileFieldHint(string $key): ?string
+    {
+        return match ($key) {
+            'school_prefix' => $this->school->prefixes_locked && filled($this->school->school_prefix)
+                ? 'Locked because student registration numbers already use this code.'
+                : 'Used as the short school code in student registration numbers.',
+            'cbse_affiliation' => 'Edit if the school affiliation number is corrected or updated.',
+            default => null,
+        };
     }
 
     public function updateAccount(Request $request)

@@ -65,7 +65,7 @@ export function settingsTabsForEvent(event) {
         tabs.push({ id: 'grades', label: 'Grades' });
     }
 
-    tabs.push({ id: 'points', label: 'Points' });
+    tabs.push({ id: 'points', label: caps.isSports ? 'Rank points' : 'Points' });
     if (caps.isSports) {
         tabs.push({ id: 'eligibility', label: 'Age cutoff' });
     }
@@ -73,12 +73,12 @@ export function settingsTabsForEvent(event) {
     tabs.push({ id: 'participation', label: 'Participation' });
 
     if (caps.hasEventFees) {
-        tabs.push({ id: 'fees', label: 'Event fees' });
+        tabs.push({ id: 'fees', label: caps.isSports ? 'Fee settings' : 'Event fees' });
     }
 
     if (caps.isSports) {
         tabs.push({ id: 'registration', label: 'Registration windows' });
-        tabs.push({ id: 'numbering', label: 'Numbering' });
+        tabs.push({ id: 'numbering', label: 'Chest numbering' });
     }
 
     tabs.push({ id: 'volunteers', label: 'Volunteers' });
@@ -99,7 +99,7 @@ export function settingsDescriptionForEvent(event) {
         : 'no fest fees for this round';
 
     if (caps.isSports) {
-        return `Locks, venues, grading, ${feeNote}, lifecycle, and athletic records. Not membership fees.`;
+        return `Setup hub, heads, items, rank points, ${feeNote}, registration windows, and athletic records. Not membership fees.`;
     }
     if (caps.isKalolsavam) {
         return `Locks, stages, combo rules, grades, points, ${feeNote}, and lifecycle. Not annual membership.`;

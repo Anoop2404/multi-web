@@ -8,7 +8,7 @@ class FestSportsAgeGroupConfig extends Model
 {
     protected $fillable = [
         'tenant_id',
-        'group_key',
+        'group_key', 'age_category_id',
         'label',
         'under_age',
         'sort_order',

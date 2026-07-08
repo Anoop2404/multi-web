@@ -389,7 +389,7 @@ class ProgramHubDataService
                 'type'     => 'mcq_fee',
                 'priority' => 1,
                 'count'    => $mcqFeesPending,
-                'label'    => 'MCQ fees awaiting payment proof',
+                'label'    => 'Talent Search fees awaiting payment proof',
                 'url'      => "/school-admin/{$school->id}/mcq",
             ];
         }
@@ -403,7 +403,7 @@ class ProgramHubDataService
                 'type'     => 'mcq_fee_review',
                 'priority' => 2,
                 'count'    => $mcqProofsAwaiting,
-                'label'    => 'MCQ fee proofs awaiting Sahodaya approval',
+                'label'    => 'Talent Search fee proofs awaiting Sahodaya approval',
                 'url'      => "/school-admin/{$school->id}/mcq",
             ];
         }
@@ -431,7 +431,7 @@ class ProgramHubDataService
                 'type'     => 'mcq_register',
                 'priority' => 1,
                 'count'    => $openMcq,
-                'label'    => 'MCQ exams open for registration',
+                'label'    => 'Talent Search exams open for registration',
                 'url'      => "/school-admin/{$school->id}/mcq",
             ];
         }

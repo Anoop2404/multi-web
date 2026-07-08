@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Http\Controllers\Concerns\ManagesStudentPortalCredentials;
 use App\Models\FeeReceipt;
 use App\Models\McqExam;
 use App\Models\McqExamSeries;
@@ -11,8 +12,10 @@ use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Services\Mcq\McqEligibilityService;
 use App\Services\Mcq\McqRegistrationApprovalService;
+use App\Services\Mcq\McqRegistrationGateService;
 use App\Services\Mcq\McqRegistrationPortalService;
 use App\Services\Mcq\McqSchoolFeeService;
+use App\Services\School\SchoolDocumentDownloadGateService;
 use App\Support\Mcq\McqExamEligibilityConfig;
 use App\Support\Mcq\McqExamLevelLabels;
 use App\Support\Mcq\McqResultPresenter;
@@ -23,8 +26,11 @@ use Illuminate\Http\Request;
 
 class McqRegistrationController extends SchoolAdminController
 {
+    use ManagesStudentPortalCredentials;
+
     public function index(array $hubStats = [])
     {
+        $registrationGate = app(McqRegistrationGateService::class)->schoolGatePayload($this->school);
         $sahodayaId = $this->school->parent_id;
 
         $examModels = McqExam::where('tenant_id', $sahodayaId)
@@ -35,8 +41,9 @@ class McqRegistrationController extends SchoolAdminController
 
         $students = Student::where('tenant_id', $this->school->id)
             ->active()
+            ->with('schoolClass:id,name,class_category_id')
             ->orderBy('name')
-            ->get(['id', 'name', 'reg_no', 'school_class_id', 'gender']);
+            ->get(['id', 'name', 'reg_no', 'school_class_id', 'gender', 'verified_at']);
 
         $eligibility = app(McqEligibilityService::class);
 
@@ -131,7 +138,7 @@ class McqRegistrationController extends SchoolAdminController
             })->values());
 
         return $this->inertia('School/Mcq/Index', compact(
-            'seriesGroups', 'standaloneExams', 'registrations', 'hubStats'
+            'seriesGroups', 'standaloneExams', 'registrations', 'hubStats', 'registrationGate'
         ));
     }
 
@@ -144,28 +151,43 @@ class McqRegistrationController extends SchoolAdminController
 
         $exam = McqExam::findOrFail($data['exam_id']);
         abort_if($exam->tenant_id !== $this->school->parent_id, 403);
-        abort_if(! in_array($exam->status, ['published', 'ongoing'], true), 422, 'Registration is closed for this exam.');
 
         $student = Student::findOrFail($data['student_id']);
         abort_if($student->tenant_id !== $this->school->id, 403);
-        $this->assertEligible($exam, $student);
+
+        app(McqRegistrationGateService::class)->assertCanRegister($exam, $this->school, $student);
 
         $approvalStatus = app(McqRegistrationApprovalService::class)->initialApprovalStatus($exam);
 
-        $registration = McqRegistration::firstOrCreate(
-            ['exam_id' => $exam->id, 'student_id' => $student->id],
-            [
-                'school_id'       => $this->school->id,
-                'status'          => 'registered',
-                'approval_status' => $approvalStatus,
-            ]
-        );
+        $existing = McqRegistration::where('exam_id', $exam->id)
+            ->where('student_id', $student->id)
+            ->first();
 
-        if (! $registration->wasRecentlyCreated) {
+        if ($existing && ! $existing->isCancelled()) {
             return back()->with('success', 'Student is already registered for this exam.');
         }
 
-        $portalCredentials = app(McqRegistrationPortalService::class)->provisionOne($student);
+        if ($existing) {
+            // Re-register a previously cancelled student, reusing the same registration id.
+            $existing->update([
+                'school_id'            => $this->school->id,
+                'status'               => 'registered',
+                'approval_status'      => $approvalStatus,
+                'cancelled_at'         => null,
+                'cancelled_by_user_id' => null,
+            ]);
+            $registration = $existing->fresh();
+        } else {
+            $registration = McqRegistration::create([
+                'exam_id'         => $exam->id,
+                'student_id'      => $student->id,
+                'school_id'       => $this->school->id,
+                'status'          => 'registered',
+                'approval_status' => $approvalStatus,
+            ]);
+        }
+
+        $credential = app(McqRegistrationPortalService::class)->provisionOne($student);
 
         app(McqSchoolFeeService::class)->syncForSchool($exam, $this->school);
 
@@ -178,7 +200,7 @@ class McqRegistrationController extends SchoolAdminController
 
         return $this->registrationResponse(
             'Student registered for exam. Upload batch fee proof after Sahodaya sets the fee (or once calculated on the Fee tab).',
-            $portalCredentials,
+            $credential ? [$credential] : [],
         );
     }
 
@@ -187,13 +209,13 @@ class McqRegistrationController extends SchoolAdminController
         $data = $request->validate([
             'exam_id'         => 'required|exists:mcq_exams,id',
             'school_class_id' => 'nullable|exists:school_classes,id',
-            'student_ids'     => 'nullable|array',
+            'student_ids'     => 'nullable|array|max:2000',
             'student_ids.*'   => 'integer|exists:students,id',
         ]);
 
         $exam = McqExam::findOrFail($data['exam_id']);
         abort_if($exam->tenant_id !== $this->school->parent_id, 403);
-        abort_if(! in_array($exam->status, ['published', 'ongoing'], true), 422, 'Registration is closed for this exam.');
+        app(McqRegistrationGateService::class)->assertSchoolCanAccess($this->school);
 
         $studentIds = collect($data['student_ids'] ?? []);
 
@@ -212,13 +234,24 @@ class McqRegistrationController extends SchoolAdminController
 
         abort_if($studentIds->isEmpty(), 422, 'Select at least one student or a class.');
 
+        $studentsById = Student::where('tenant_id', $this->school->id)
+            ->whereIn('id', $studentIds)
+            ->active()
+            ->get()
+            ->keyBy('id');
+
+        $existingByStudent = McqRegistration::where('exam_id', $exam->id)
+            ->whereIn('student_id', $studentIds)
+            ->get()
+            ->keyBy('student_id');
+
         $registered = 0;
         $approvalStatus = app(McqRegistrationApprovalService::class)->initialApprovalStatus($exam);
         $newlyRegisteredStudents = collect();
 
         foreach ($studentIds as $studentId) {
-            $student = Student::find($studentId);
-            if (! $student || $student->tenant_id !== $this->school->id) {
+            $student = $studentsById->get($studentId);
+            if (! $student) {
                 continue;
             }
 
@@ -226,24 +259,37 @@ class McqRegistrationController extends SchoolAdminController
                 continue;
             }
 
-            $registration = McqRegistration::firstOrCreate(
-                ['exam_id' => $exam->id, 'student_id' => $student->id],
-                [
+            $existing = $existingByStudent->get($student->id);
+
+            if ($existing && ! $existing->isCancelled()) {
+                continue;
+            }
+
+            if ($existing) {
+                $existing->update([
+                    'school_id'            => $this->school->id,
+                    'status'               => 'registered',
+                    'approval_status'      => $approvalStatus,
+                    'cancelled_at'         => null,
+                    'cancelled_by_user_id' => null,
+                ]);
+            } else {
+                McqRegistration::create([
+                    'exam_id'         => $exam->id,
+                    'student_id'      => $student->id,
                     'school_id'       => $this->school->id,
                     'status'          => 'registered',
                     'approval_status' => $approvalStatus,
-                ]
-            );
-
-            if ($registration->wasRecentlyCreated) {
-                $registered++;
-                $newlyRegisteredStudents->push($student);
+                ]);
             }
+
+            $registered++;
+            $newlyRegisteredStudents->push($student);
         }
 
         app(McqSchoolFeeService::class)->syncForSchool($exam, $this->school);
 
-        $portalCredentials = app(McqRegistrationPortalService::class)->provisionForStudents($newlyRegisteredStudents);
+        $newCredentials = app(McqRegistrationPortalService::class)->provisionForStudents($newlyRegisteredStudents);
 
         app(PlatformAuditLogger::class)->mcq(
             $exam,
@@ -254,19 +300,101 @@ class McqRegistrationController extends SchoolAdminController
 
         return $this->registrationResponse(
             "{$registered} student(s) registered. Upload batch fee proof on the Fee tab once Sahodaya sets the per-student amount.",
-            $portalCredentials,
+            $newCredentials,
         );
     }
 
-    /** @param  list<array<string, mixed>>  $portalCredentials */
-    private function registrationResponse(string $message, array $portalCredentials)
+    public function cancel(Request $request, string $tenantId, McqExam $exam)
     {
-        $payload = ['success' => $message];
-        if ($portalCredentials !== []) {
-            $payload['studentPortalCredentials'] = $portalCredentials;
+        $data = $request->validate([
+            'student_id' => 'required|integer|exists:students,id',
+        ]);
+
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+
+        $registration = McqRegistration::where('exam_id', $exam->id)
+            ->where('student_id', $data['student_id'])
+            ->where('school_id', $this->school->id)
+            ->first();
+
+        abort_unless($registration, 422, 'Student is not registered for this exam.');
+
+        if ($registration->isCancelled()) {
+            return back()->with('success', 'Registration is already cancelled.');
         }
 
-        return back()->with($payload);
+        abort_unless(
+            $registration->canBeCancelledBySchool(),
+            422,
+            'This registration can no longer be cancelled. Approved registrations, issued hall tickets, or started exams must be handled by Sahodaya.',
+        );
+
+        $registration->update([
+            'status'               => 'cancelled',
+            'cancelled_at'         => now(),
+            'cancelled_by_user_id' => $request->user()->id,
+        ]);
+
+        // Recalculate the batch fee so the cancelled student is no longer billed.
+        app(McqSchoolFeeService::class)->syncForSchool($exam, $this->school);
+
+        app(PlatformAuditLogger::class)->mcqRegistration(
+            $registration->fresh(['exam', 'student']),
+            'mcq.registration.cancelled',
+            "School cancelled registration for {$registration->student?->name} in {$exam->title}",
+        );
+
+        return back()->with('success', 'Registration cancelled. You can re-register this student later if needed.');
+    }
+
+    public function resetPortalPassword(Request $request, string $tenantId, McqExam $exam, Student $student)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_if($student->tenant_id !== $this->school->id, 403);
+
+        abort_unless(
+            McqRegistration::where('exam_id', $exam->id)->where('student_id', $student->id)->where('school_id', $this->school->id)->exists(),
+            422,
+            'Student is not registered for this exam.',
+        );
+
+        return $this->resetStudentPortalPassword($student, $request->user()->id);
+    }
+
+    public function exportCredentials(string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+
+        app(SchoolDocumentDownloadGateService::class)->assertMcqExamFeeForDownloads($exam, $this->school);
+
+        $rows = McqRegistration::where('exam_id', $exam->id)
+            ->where('school_id', $this->school->id)
+            ->with(['student.user:id,username'])
+            ->orderBy('hall_ticket_no')
+            ->get()
+            ->map(fn (McqRegistration $reg) => [
+                $reg->student?->name,
+                $reg->student?->reg_no,
+                $reg->student?->user?->username ?? $reg->student?->reg_no,
+                $reg->hall_ticket_no,
+            ]);
+
+        return \App\Support\ExcelExport::download(
+            'mcq-portal-logins-'.$exam->id,
+            ['Student', 'Reg. no', 'Portal username', 'Hall ticket'],
+            $rows,
+        );
+    }
+
+    /** @param  list<array{student_id: int, student_name: string, username: string, password: string}>  $newCredentials */
+    private function registrationResponse(string $message, array $newCredentials = [])
+    {
+        $flash = ['success' => $message];
+        if ($newCredentials !== []) {
+            $flash['mcqNewCredentials'] = $newCredentials;
+        }
+
+        return back()->with($flash);
     }
 
     public function uploadSchoolPayment(Request $request, string $tenantId, McqExam $exam, McqSchoolFeeService $feeService)
@@ -277,10 +405,16 @@ class McqRegistrationController extends SchoolAdminController
         $schoolFee = $feeService->syncForSchool($exam, $this->school);
         abort_if($schoolFee->total_due <= 0, 422, 'No fee due for this exam.');
 
+        $outstanding = $schoolFee->outstandingBalance();
+        abort_if($outstanding <= 0, 422, 'This batch fee is already fully paid.');
+
         $data = $request->validate([
             'payment_proof'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'transaction_ref' => 'nullable|string|max:100',
+            'amount'          => 'nullable|numeric|min:1|max:'.$outstanding,
         ]);
+
+        $amount = round((float) ($data['amount'] ?? $outstanding), 2);
 
         $path = TenantStorage::storeUploadedFile(
             $request->file('payment_proof'),
@@ -295,7 +429,7 @@ class McqRegistrationController extends SchoolAdminController
             'file_path'           => $path,
             'transaction_ref'     => $data['transaction_ref'] ?? null,
             'payment_date'        => now()->toDateString(),
-            'amount'              => $schoolFee->total_due,
+            'amount'              => $amount,
             'status'              => 'uploaded',
             'uploaded_by_user_id' => $request->user()->id,
         ]);
@@ -305,18 +439,18 @@ class McqRegistrationController extends SchoolAdminController
         app(SahodayaAdminNotifier::class)->notifyAdmins(
             $this->school->parent_id,
             'payment.proof.uploaded',
-            ['school_name' => $this->school->name, 'context_label' => $exam->title.' MCQ batch fee'],
+            ['school_name' => $this->school->name, 'context_label' => $exam->title.' Talent Search batch fee'],
             "/sahodaya-admin/{$this->school->parent_id}/mcq-exams/{$exam->id}"
         );
 
         app(PlatformAuditLogger::class)->mcq(
             $exam,
             'mcq.fee.proof_uploaded',
-            "School {$this->school->name} uploaded MCQ batch fee proof for {$exam->title}",
+            "School {$this->school->name} uploaded Talent Search batch fee proof for {$exam->title}",
             ['school_id' => $this->school->id],
         );
 
-        return back()->with('success', 'Batch MCQ fee proof uploaded.');
+        return back()->with('success', 'Batch Talent Search fee proof uploaded.');
     }
 
     private function assertEligible(McqExam $exam, Student $student): void
@@ -326,17 +460,7 @@ class McqRegistrationController extends SchoolAdminController
             return;
         }
 
-        $level = (int) ($exam->exam_level ?? 1);
-        if ($level > 1) {
-            $modeLabel = McqExamLevelLabels::eligibilityModeLabel(
-                $exam->eligibility_mode,
-                $exam->cutoff_score !== null ? (float) $exam->cutoff_score : null,
-                $exam->top_rank_count,
-            );
-            abort(422, "{$student->name} did not qualify for Level {$level} ({$modeLabel}).");
-        }
-
-        abort(422, "{$student->name} is not eligible for this exam (class/gender rules).");
+        abort(422, $service->ineligibilityReason($exam, $student) ?? 'Student is not eligible for this exam.');
     }
 
     private function studentEligible(McqExam $exam, Student $student): bool
@@ -382,11 +506,11 @@ class McqRegistrationController extends SchoolAdminController
             'payment.proof.uploaded',
             [
                 'school_name'   => $this->school->name,
-                'context_label' => $exam->title.' MCQ fee',
+                'context_label' => $exam->title.' Talent Search fee',
             ],
             "/sahodaya-admin/{$this->school->parent_id}/mcq-exams/{$exam->id}"
         );
 
-        return back()->with('success', 'MCQ fee proof uploaded.');
+        return back()->with('success', 'Talent Search fee proof uploaded.');
     }
 }

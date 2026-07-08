@@ -20,7 +20,7 @@ class SportsAgeGroupController extends SahodayaAdminController
             ->orderBy('group_key')
             ->get();
 
-        return $this->inertia('Sahodaya/SportsAgeGroups/Index', [
+        return $this->inertia('Sahodaya/SportsAgeGroups/Index', $this->programNavProps('sports-meet') + [
             'groups'           => $groups,
             'activeAcademicYear' => \App\Support\AcademicYear::activeRecord(),
         ]);

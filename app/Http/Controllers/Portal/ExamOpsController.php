@@ -72,6 +72,11 @@ class ExamOpsController extends Controller
             'attendance_marked_by'   => $request->user()->id,
         ]);
 
+        if ($data['attendance_status'] === 'absent' && $registration->mark) {
+            $registration->mark()->delete();
+            $registration->update(['status' => 'registered', 'submitted_at' => null]);
+        }
+
         app(PlatformAuditLogger::class)->mcqRegistration(
             $registration->fresh(['exam']),
             'mcq.attendance.marked',
@@ -98,6 +103,7 @@ class ExamOpsController extends Controller
             'sahodaya'      => Tenant::findOrFail($tenantId)->only('id', 'name'),
             'exam'          => $exam,
             'registrations' => $registrations,
+            'gradeBands'    => app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam),
         ]);
     }
 
@@ -113,15 +119,10 @@ class ExamOpsController extends Controller
             'wrong_count'      => 'required|integer|min:0',
             'unanswered_count' => 'required|integer|min:0',
             'score'            => 'required|numeric|min:0',
-            'grade'            => 'nullable|in:A,B,C,D,F',
+            'grade'            => 'nullable|string|max:20',
         ]);
 
-        McqMark::updateOrCreate(['registration_id' => $registration->id], array_merge($data, [
-            'locked_by' => $user->id,
-            'locked_at' => now(),
-        ]));
-
-        $registration->update(['status' => 'submitted', 'submitted_at' => now()]);
+        app(\App\Services\Mcq\McqMarkSaveService::class)->save($exam, $registration, $data, $user->id);
 
         app(PlatformAuditLogger::class)->mcqRegistration(
             $registration->fresh(['exam']),

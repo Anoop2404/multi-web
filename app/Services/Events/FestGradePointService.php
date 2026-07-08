@@ -23,6 +23,14 @@ class FestGradePointService
     {
         $isGroup = in_array($mark->participant?->registration?->item?->participant_type, ['group', 'team'], true);
 
+        if ($event->scoring_preset === 'mcs_kalotsav') {
+            return $this->mcsPointsForMark($mark, $isGroup);
+        }
+
+        if ($event->event_type === 'sports' && $mark->position) {
+            return app(FestRankPointService::class)->pointsForRank($event, (int) $mark->position, $isGroup);
+        }
+
         $rule = FestPointRule::where('event_id', $event->id)
             ->where('is_group', $isGroup)
             ->when($mark->grade, fn ($q) => $q->where('grade', $this->normalizeGrade($mark->grade)))
@@ -45,6 +53,10 @@ class FestGradePointService
 
     public function resolveGradeFromScore(FestEvent $event, ?int $itemId, float $score): ?string
     {
+        if ($event->scoring_preset === 'mcs_kalotsav') {
+            return $this->resolveMcsGradeFromScore($score);
+        }
+
         $configs = FestGradeConfig::where('event_id', $event->id)
             ->where(function ($q) use ($itemId) {
                 $q->where('item_id', $itemId)->orWhereNull('item_id');
@@ -63,6 +75,32 @@ class FestGradePointService
         return null;
     }
 
+    private function mcsPointsForMark(FestMark $mark, bool $isGroup): int
+    {
+        $table = $isGroup
+            ? config('fest_mcs_scoring.group_points', [])
+            : config('fest_mcs_scoring.individual_points', []);
+
+        $grade = $this->normalizeMcsGrade($mark->grade);
+        $pos = (string) ($mark->position ?? '');
+
+        return (int) ($table[$grade][$pos] ?? 0);
+    }
+
+    public function resolveMcsGradeFromScore(float $score): ?string
+    {
+        $grades = config('fest_mcs_scoring.grades', []);
+        $matched = null;
+
+        foreach ($grades as $key => $band) {
+            if ($score >= (float) ($band['min'] ?? 0)) {
+                $matched = $band['label'] ?? $key;
+            }
+        }
+
+        return $matched;
+    }
+
     private function normalizeGrade(?string $grade): string
     {
         return match (strtoupper((string) $grade)) {
@@ -70,6 +108,15 @@ class FestGradePointService
             'A' => 'A',
             'B' => 'B',
             'C' => 'C',
+            default => 'C',
+        };
+    }
+
+    private function normalizeMcsGrade(?string $grade): string
+    {
+        return match (strtoupper((string) $grade)) {
+            'A+', 'A_PLUS', 'A' => 'A',
+            'B' => 'B',
             default => 'C',
         };
     }

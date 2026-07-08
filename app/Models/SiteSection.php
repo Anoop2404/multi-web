@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 
 class SiteSection extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = [
         'tenant_id',
         'section_type',
@@ -44,7 +47,7 @@ class SiteSection extends Model
 
     public function tenant()
     {
-        return $this->belongsTo(Tenant::class);
+        return $this->belongsToCentralTenant();
     }
 
     public function scopeActive($query)

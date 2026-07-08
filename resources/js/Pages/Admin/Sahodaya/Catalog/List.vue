@@ -1,7 +1,7 @@
 <template>
     <SahodayaEventsLayout :title="pageTitle" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :program="program"
-                         :show-header-title="false">
+                         :program-events="events" :show-header-title="false">
         <PageHeader
             :title="pageTitle"
             eyebrow="Item listing"
@@ -12,10 +12,10 @@
             </template>
         </PageHeader>
 
-        <CatalogSubNav :sahodaya-id="sahodaya.id" :program-slug="program.slug" active="list" />
+        <CatalogSubNav :sahodaya-id="sahodaya.id" :program-slug="program.slug" :event-type="program.eventType" active="list" />
 
         <div class="card card--muted !p-4 mb-4">
-            <CatalogSectionNav :base="catalogBase" mode="list" :sections="sections" :section="section" />
+            <CatalogSectionNav :sahodaya-id="sahodaya.id" :program-slug="program" mode="list" :sections="sections" :section="section" />
         </div>
 
         <form @submit.prevent="applyFilters" class="flex flex-wrap gap-3 items-end mb-4">
@@ -38,6 +38,7 @@
                     <thead>
                         <tr>
                             <th class="w-16 text-center">Type</th>
+                            <th v-if="isSports" class="w-32">Head</th>
                             <th>Item</th>
                             <th class="w-24">Status</th>
                             <th class="w-24 text-right">Fee</th>
@@ -47,6 +48,10 @@
                         <tr v-for="item in flatItems" :key="item.id">
                             <td class="text-center">
                                 <FestItemMetaIcons :gender="item.gender" :participant-type="item.participant_type" />
+                            </td>
+                            <td v-if="isSports">
+                                <span v-if="item.head_key" class="text-xs font-medium text-slate-700">{{ headLabel(item.head_key) }}</span>
+                                <span v-else class="text-xs text-amber-600 font-medium">Unassigned</span>
                             </td>
                             <td>
                                 <p :class="item.is_enabled ? 'font-medium text-slate-900' : 'text-slate-400 line-through'">{{ item.title }}</p>
@@ -79,6 +84,7 @@ import CatalogSubNav from '@/Components/sahodaya/CatalogSubNav.vue';
 import CatalogSectionNav from '@/Components/sahodaya/CatalogSectionNav.vue';
 import FestItemMetaIcons from '@/Components/sahodaya/FestItemMetaIcons.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { sahodayaCatalogHref, sahodayaCatalogSectionHref } from '@/support/sahodayaPrograms.js';
 
 const props = defineProps({
     sahodaya: Object,
@@ -92,16 +98,30 @@ const props = defineProps({
     taxonomy: Object,
     ageGroupLabels: Object,
     groupedItems: Object,
+    itemHeads: { type: Array, default: () => [] },
+    events: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
 });
 
-const catalogBase = `/sahodaya-admin/${props.sahodaya.id}/programs/${props.program.slug}/catalog`;
-const masterUrl = computed(() => {
-    if (!props.section?.slug || props.section.slug === 'all') return `${catalogBase}/master`;
-    return `${catalogBase}/master/${props.section.slug}`;
-});
-const pageBase = computed(() => `${catalogBase}/list${props.section?.slug && props.section.slug !== 'all' ? `/${props.section.slug}` : ''}`);
+const catalogBase = computed(() => sahodayaCatalogHref(props.sahodaya.id, props.program.slug));
+const masterUrl = computed(() => sahodayaCatalogSectionHref(
+    props.sahodaya.id,
+    props.program.slug,
+    'master',
+    props.section?.slug && props.section.slug !== 'all' ? props.section.slug : null,
+));
+const pageBase = computed(() => sahodayaCatalogSectionHref(
+    props.sahodaya.id,
+    props.program.slug,
+    'list',
+    props.section?.slug && props.section.slug !== 'all' ? props.section.slug : null,
+));
 const isSports = computed(() => props.program.eventType === 'sports');
+const headLabelMap = computed(() => Object.fromEntries(props.itemHeads.map((h) => [h.key, h.name])));
+
+function headLabel(key) {
+    return headLabelMap.value[key] ?? key;
+}
 
 const pageTitle = computed(() =>
     `${props.program.label} — ${props.section?.label ?? 'Listing'}`,

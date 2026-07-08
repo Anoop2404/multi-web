@@ -1,6 +1,6 @@
 <template>
     <SahodayaAdminLayout :title="series.title" :sahodaya="sahodaya">
-        <PageHeader :title="series.title" eyebrow="MCQ series"
+        <PageHeader :title="series.title" eyebrow="Talent Search series"
                     description="Create level-based exams with class/category assignment, dates, and direct links to manage each level.">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-series`" class="btn-secondary text-sm">← Series list</Link>
@@ -119,14 +119,16 @@
                     <input v-model="bulkForm.level1.title" class="field" placeholder="Exam title" required>
                     <input v-model="bulkForm.level1.scheduled_at" type="datetime-local" class="field">
                     <input v-model.number="bulkForm.level1.duration_minutes" type="number" min="5" class="field" placeholder="Duration (min)">
-                    <input v-model.number="bulkForm.level1.fee_amount" type="number" min="0" step="0.01" class="field" placeholder="Fee per student (₹)">
+                    <input v-model.number="bulkForm.level1.fee_amount" type="number" min="0" step="0.01" class="field" placeholder="Student fee (₹)">
+                    <input v-model.number="bulkForm.level1.school_discount_amount" type="number" min="0" step="0.01" class="field" placeholder="School discount (₹)">
                 </div>
                 <div class="rounded-lg border border-slate-200 p-4 space-y-3">
                     <h3 class="text-sm font-semibold">Level 2</h3>
                     <input v-model="bulkForm.level2.title" class="field" placeholder="Exam title" required>
                     <input v-model="bulkForm.level2.scheduled_at" type="datetime-local" class="field">
                     <input v-model.number="bulkForm.level2.duration_minutes" type="number" min="5" class="field" placeholder="Duration (min)">
-                    <input v-model.number="bulkForm.level2.fee_amount" type="number" min="0" step="0.01" class="field" placeholder="Fee per student (₹)">
+                    <input v-model.number="bulkForm.level2.fee_amount" type="number" min="0" step="0.01" class="field" placeholder="Student fee (₹)">
+                    <input v-model.number="bulkForm.level2.school_discount_amount" type="number" min="0" step="0.01" class="field" placeholder="School discount (₹)">
                     <input v-model.number="bulkForm.level2.cutoff_score" type="number" min="0" step="0.01" class="field" placeholder="Min score from Level 1">
                 </div>
             </div>
@@ -138,7 +140,7 @@
             <h2 class="section-title">Add one level</h2>
             <FormGrid>
                 <FormField label="Exam title" class-extra="sm:col-span-2" required>
-                    <input v-model="levelForm.title" class="field" placeholder="e.g. Sahodaya MCQ Level 1" required>
+                    <input v-model="levelForm.title" class="field" placeholder="e.g. Sahodaya Talent Search Level 1" required>
                 </FormField>
                 <FormField label="Level">
                     <input v-model.number="levelForm.exam_level" type="number" min="1" max="10" class="field">
@@ -149,8 +151,11 @@
                 <FormField label="Duration (min)">
                     <input v-model.number="levelForm.duration_minutes" type="number" min="5" max="480" class="field">
                 </FormField>
-                <FormField label="Per-student fee (₹)" hint="Optional while draft">
+                <FormField label="Per-student fee (₹)" hint="Student fee collected by the school">
                     <input v-model.number="levelForm.fee_amount" type="number" min="0" step="0.01" class="field">
+                </FormField>
+                <FormField label="School discount (₹)" hint="Sahodaya discount — school remits student fee minus this amount">
+                    <input v-model.number="levelForm.school_discount_amount" type="number" min="0" step="0.01" class="field">
                 </FormField>
                 <FormField v-if="levelForm.exam_level > 1" label="Parent exam" class-extra="sm:col-span-2">
                     <select v-model="levelForm.parent_exam_id" class="field" :required="levelForm.exam_level > 1">
@@ -225,14 +230,15 @@ const levelForm = useForm({
     scheduled_at: '',
     duration_minutes: 60,
     fee_amount: null,
+    school_discount_amount: null,
     delivery_mode: 'offline',
     eligibility_config: defaultEligibility(),
 });
 
 const bulkForm = useForm({
     shared_eligibility_config: defaultEligibility(),
-    level1: { title: '', scheduled_at: '', duration_minutes: 60, fee_amount: null },
-    level2: { title: '', scheduled_at: '', duration_minutes: 60, fee_amount: null, cutoff_score: 60 },
+    level1: { title: '', scheduled_at: '', duration_minutes: 60, fee_amount: null, school_discount_amount: null },
+    level2: { title: '', scheduled_at: '', duration_minutes: 60, fee_amount: null, school_discount_amount: null, cutoff_score: 60 },
 });
 
 const parentOptions = computed(() => {
@@ -278,6 +284,7 @@ function createTwoLevels() {
                 scheduled_at: data.level1.scheduled_at || null,
                 duration_minutes: data.level1.duration_minutes || 60,
                 fee_amount: data.level1.fee_amount,
+                school_discount_amount: data.level1.school_discount_amount,
                 eligibility_mode: 'open',
                 delivery_mode: 'offline',
             },
@@ -287,6 +294,7 @@ function createTwoLevels() {
                 scheduled_at: data.level2.scheduled_at || null,
                 duration_minutes: data.level2.duration_minutes || 60,
                 fee_amount: data.level2.fee_amount,
+                school_discount_amount: data.level2.school_discount_amount,
                 eligibility_mode: 'cutoff_marks',
                 cutoff_score: data.level2.cutoff_score,
                 delivery_mode: 'offline',

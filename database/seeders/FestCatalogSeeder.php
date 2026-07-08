@@ -14,11 +14,15 @@ class FestCatalogSeeder extends Seeder
         $service = app(FestCatalogService::class);
 
         foreach ($eventTypes as $eventType) {
-            $added = $service->ensureSeeded($tenantId, $eventType);
-            $this->command?->line("  {$eventType}: {$added} new master catalog items");
-            if ($eventType === 'sports') {
-                app(\App\Services\Events\FestItemHeadService::class)->ensureCatalogHeads($tenantId, $eventType);
-            }
+            $sync = $service->ensureSeeded($tenantId, $eventType);
+            $this->command?->line(sprintf(
+                '  %s: %d new, %d updated, %d heads, %d head links',
+                $eventType,
+                $sync['created'],
+                $sync['updated'],
+                $sync['heads_created'] ?? 0,
+                $sync['head_links'] ?? 0,
+            ));
         }
     }
 }

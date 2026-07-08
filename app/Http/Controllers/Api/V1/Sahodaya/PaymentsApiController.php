@@ -8,10 +8,9 @@ use App\Http\Resources\PaymentDueItemResource;
 use App\Models\MembershipPayment;
 use App\Support\AcademicYear;
 use App\Services\Audit\DataChangeLogger;
-use App\Services\Membership\FeeReceiptService;
-use App\Services\Membership\MembershipReceiptService;
+use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Membership\MembershipPaymentApprovalService;
 use App\Services\Membership\MembershipNotifier;
-use App\Services\Membership\RegistrationStatusService;
 use App\Support\TenancyDatabase;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
@@ -54,7 +53,7 @@ class PaymentsApiController extends SahodayaApiController
             ]);
         }
 
-        $payments = $this->paymentsQuery($schoolIds, $filters)
+        $payments = $this->paymentsQuery($this->sahodaya->id, $schoolIds, $filters)
             ->with('registration')
             ->paginate($request->integer('per_page', 15));
 
@@ -79,66 +78,24 @@ class PaymentsApiController extends SahodayaApiController
         ]);
 
         if ($data['action'] === 'verify') {
-            $payment->update([
-                'status'              => 'verified',
-                'verified_by_user_id' => $request->user()->id,
-                'verified_at'         => now(),
-            ]);
-
-            app(FeeReceiptService::class)->syncFromMembershipPayment($payment->fresh());
-
-            $receiptService = app(MembershipReceiptService::class);
-            $receiptService->issueForPayment($payment->fresh());
-            $freshReceipt = $payment->fresh()->feeReceipt;
-            $receiptNo = $freshReceipt?->receipt_number;
-            $receiptHtml = $freshReceipt
-                ? $receiptService->readGeneratedReceipt($freshReceipt)
-                : null;
-
-            $school = $payment->school;
-            $firstApproval = $school && $school->membership_status === 'pending';
-            if ($firstApproval) {
-                $school->update(['membership_status' => 'approved', 'is_active' => true]);
-            }
-
-            $registration = $payment->registration;
-            if ($registration) {
-                $registration = app(RegistrationStatusService::class)
-                    ->ensureMembershipNumber($registration->load('school'));
-                $registration->update(['registration_status' => 'completed']);
-                $registration->refresh();
-                $notifier->paymentVerified($payment->school, $payment->academic_year, $registration->reg_no);
-                $notifier->registrationCompleted(
-                    $payment->school,
-                    $payment->academic_year,
-                    $registration->reg_no,
-                    $firstApproval,
-                    $receiptHtml,
-                    $receiptNo,
-                );
-            } elseif ($firstApproval) {
-                $notifier->schoolApproved($school);
-            }
+            app(MembershipPaymentApprovalService::class)->verify(
+                $payment,
+                $request->user(),
+                $notifier,
+                app(PlatformAuditLogger::class),
+            );
         } else {
-            $payment->update([
-                'status'              => 'rejected',
-                'rejection_reason'    => $data['reason'],
-                'verified_by_user_id' => $request->user()->id,
-                'verified_at'         => now(),
-            ]);
-
-            app(FeeReceiptService::class)->syncFromMembershipPayment($payment->fresh());
-
-            $registration = $payment->registration;
-            if ($registration) {
-                $registration->update(['registration_status' => 'payment_rejected']);
-            }
-
-            $notifier->paymentRejected($payment->school, $payment->academic_year, $data['reason']);
+            app(MembershipPaymentApprovalService::class)->reject(
+                $payment,
+                $request->user(),
+                $data['reason'],
+                $notifier,
+                app(PlatformAuditLogger::class),
+            );
         }
 
         app(DataChangeLogger::class)->updated(
-            $payment,
+            $payment->fresh(),
             "Payment {$data['action']} via mobile API",
             ['status' => ['new' => $payment->fresh()->status]],
             $payment->school_id,

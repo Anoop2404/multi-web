@@ -30,6 +30,10 @@ class McqRegistrationApprovalService
 
     public function canApprove(McqRegistration $registration): bool
     {
+        if ($registration->status === 'cancelled') {
+            return false;
+        }
+
         if (in_array($registration->approval_status, ['approved', 'rejected'], true)) {
             return false;
         }
@@ -97,6 +101,7 @@ class McqRegistrationApprovalService
         McqRegistration::where('exam_id', $schoolFee->exam_id)
             ->where('school_id', $schoolFee->school_id)
             ->where('approval_status', 'pending_payment')
+            ->where('status', '!=', 'cancelled')
             ->orderBy('id')
             ->each(function (McqRegistration $registration) use ($userId, &$count) {
                 if (! $this->canApprove($registration)) {

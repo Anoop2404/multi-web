@@ -25,7 +25,7 @@ return [
     |
     */
 
-    'upload_disk' => env('UPLOAD_DISK', env('FILESYSTEM_DISK', 'shared')),
+    'upload_disk' => env('UPLOAD_DISK', env('AWS_BUCKET') ? 's3' : 'shared'),
 
     /*
     |--------------------------------------------------------------------------

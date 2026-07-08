@@ -101,6 +101,7 @@
             <main class="sa-main flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isStaffUser }">
                 <StaffReadOnlyBanner v-if="isStaffUser" />
                 <FlashBanner />
+                <ValidationBanner />
                 <slot />
             </main>
         </div>
@@ -112,6 +113,7 @@ import { Head, Link, usePage } from '@inertiajs/vue3';
 import SignOutButton from '@/Components/SignOutButton.vue';
 import StaffReadOnlyBanner from '@/Components/StaffReadOnlyBanner.vue';
 import FlashBanner from '@/Components/ui/FlashBanner.vue';
+import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import SahodayaNavItem from '@/Components/sahodaya/SahodayaNavItem.vue';
 import SahodayaSidebarNavSearch from '@/Components/sahodaya/SahodayaSidebarNavSearch.vue';
 import { filterNavGroups } from '@/support/filterNavGroups.js';
@@ -120,10 +122,16 @@ import {
     detectSahodayaMcqExamIdFromUrl,
     detectSahodayaMcqHubFromUrl,
     detectSahodayaMcqSeriesIdFromUrl,
+    detectSahodayaMembershipFromUrl,
+    detectSahodayaTrainingHubFromUrl,
+    detectSahodayaTrainingProgramIdFromUrl,
     sahodayaAdminNav,
     sahodayaMcqExamScopedNav,
     sahodayaMcqHubNav,
     sahodayaMcqSeriesScopedNav,
+    sahodayaMembershipScopedNav,
+    sahodayaTrainingHubNav,
+    sahodayaTrainingProgramScopedNav,
 } from '@/support/sahodayaAdminNav.js';
 import { computed, defineComponent, h, ref, watch } from 'vue';
 
@@ -137,6 +145,7 @@ const props = defineProps({
     pendingPaymentsCount:   { type: Number, default: 0 },
     setupIncompleteCount:    { type: Number, default: 0 },
     pendingChangeRequests:  { type: Number, default: 0 },
+    pendingFestAppealsCount:{ type: Number, default: 0 },
     isStaff:                { type: Boolean, default: false },
     showHeaderTitle:        { type: Boolean, default: true },
 });
@@ -180,7 +189,9 @@ const navGroups = computed(() => {
         pendingSchoolsCount: props.pendingSchoolsCount || page.props.pendingSchoolsCount || 0,
         setupIncompleteCount: props.setupIncompleteCount ?? page.props.setupIncompleteCount ?? 0,
         pendingChangeRequests: props.pendingChangeRequests || page.props.pendingChangeRequests || 0,
+        pendingFestAppealsCount: props.pendingFestAppealsCount || page.props.pendingFestAppealsCount || 0,
         stateRemittancesEnabled: page.props.stateRemittancesEnabled !== false,
+        navVisibility: page.props.navVisibility ?? null,
     };
 
     const examId = detectSahodayaMcqExamIdFromUrl(page.url);
@@ -195,6 +206,19 @@ const navGroups = computed(() => {
 
     if (detectSahodayaMcqHubFromUrl(page.url)) {
         return sahodayaMcqHubNav(props.sahodaya.id, options);
+    }
+
+    const trainingProgramId = detectSahodayaTrainingProgramIdFromUrl(page.url);
+    if (trainingProgramId) {
+        return sahodayaTrainingProgramScopedNav(props.sahodaya.id, trainingProgramId, options);
+    }
+
+    if (detectSahodayaTrainingHubFromUrl(page.url)) {
+        return sahodayaTrainingHubNav(props.sahodaya.id, options);
+    }
+
+    if (detectSahodayaMembershipFromUrl(page.url)) {
+        return sahodayaMembershipScopedNav(props.sahodaya.id, options);
     }
 
     return sahodayaAdminNav(props.sahodaya.id, options);

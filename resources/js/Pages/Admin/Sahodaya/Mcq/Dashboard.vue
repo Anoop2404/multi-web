@@ -1,7 +1,7 @@
 <template>
-    <SahodayaAdminLayout title="MCQ dashboard" :sahodaya="sahodaya" :publicUrl="publicUrl"
+    <SahodayaAdminLayout title="Talent Search dashboard" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader title="MCQ dashboard" eyebrow="MCQ exams"
+        <PageHeader title="Talent Search dashboard" eyebrow="Talent Search exams"
                     description="Overview of exams, registrations, and multi-level series.">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams`" class="btn-primary text-sm">Manage all exams</Link>
@@ -39,7 +39,7 @@
             </Link>
             <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq/payments`" class="card hover:border-indigo-200 transition group">
                 <p class="text-sm font-semibold text-slate-900 group-hover:text-indigo-700">Payments queue</p>
-                <p class="text-xs text-slate-500 mt-1">Approve school batch MCQ fees from one inbox.</p>
+                <p class="text-xs text-slate-500 mt-1">Approve school batch Talent Search fees from one inbox.</p>
             </Link>
             <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq/question-banks`" class="card hover:border-indigo-200 transition group">
                 <p class="text-sm font-semibold text-slate-900 group-hover:text-indigo-700">Question banks</p>

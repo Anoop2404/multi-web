@@ -6,6 +6,7 @@ use App\Http\Middleware\Concerns\RedirectsUnauthenticated;
 use App\Models\McqExam;
 use App\Models\SchoolUserEventScope;
 use App\Services\School\SchoolUserScopeService;
+use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,7 +23,7 @@ class EventCoordinatorScope
             return $next($request);
         }
 
-        if ($user->isSuperAdmin() || $user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal', 'sahodaya_admin'])) {
+        if ($user->isSuperAdmin() || $user->hasAnyRole(TenantUserCatalog::schoolManagementRoles()) || $user->hasRole('sahodaya_admin')) {
             return $next($request);
         }
 
@@ -30,6 +31,11 @@ class EventCoordinatorScope
         $path = $request->path();
         $programSlug = $this->inferProgramSlug($path);
         [$eventId, $scopeTypeHint] = $this->resolveEventContext($request, $path, $programSlug);
+
+        if ($request->filled('event')) {
+            $eventId ??= (int) $request->query('event');
+            $scopeTypeHint ??= 'fest_event';
+        }
 
         $scopes = SchoolUserEventScope::where('user_id', $user->id)
             ->when($tenantId, fn ($q) => $q->where('school_id', $tenantId))
@@ -40,6 +46,12 @@ class EventCoordinatorScope
         }
 
         if ($programSlug === null) {
+            abort_unless(
+                $this->pathAllowedWithoutProgram($path, $scopes),
+                403,
+                'Event coordinators can only access assigned programs and events.',
+            );
+
             return $next($request);
         }
 
@@ -51,6 +63,16 @@ class EventCoordinatorScope
         abort_unless($allowed, 403, 'You are not assigned to this program or event.');
 
         return $next($request);
+    }
+
+    /** @param  \Illuminate\Support\Collection<int, SchoolUserEventScope>  $scopes */
+    private function pathAllowedWithoutProgram(string $path, $scopes): bool
+    {
+        if (preg_match('#/fest/hub(?:/|$)#', $path) || preg_match('#/fest/reports(?:/|$)#', $path)) {
+            return $scopes->contains(fn (SchoolUserEventScope $s) => ! in_array($s->program_slug, ['mcq', 'training'], true));
+        }
+
+        return false;
     }
 
     /** @return array{0: ?int, 1: ?string} */
@@ -77,6 +99,9 @@ class EventCoordinatorScope
         if (is_object($event) && isset($event->id)) {
             return [$event->id, 'fest_event'];
         }
+        if (is_numeric($event)) {
+            return [(int) $event, 'fest_event'];
+        }
 
         return [null, null];
     }
@@ -90,7 +115,7 @@ class EventCoordinatorScope
             return 'training';
         }
 
-        foreach (['kalotsav', 'kids-fest', 'teacher-fest', 'custom'] as $slug) {
+        foreach (['kalotsav', 'kids-fest', 'teacher-fest', 'english-fest', 'science-fest', 'custom'] as $slug) {
             if (str_contains($path, "/{$slug}")) {
                 return $slug;
             }
@@ -98,10 +123,6 @@ class EventCoordinatorScope
 
         if (str_contains($path, '/sports/') || str_contains($path, '/sports-meet')) {
             return 'sports-meet';
-        }
-
-        if (str_contains($path, '/fest/')) {
-            return null;
         }
 
         return null;

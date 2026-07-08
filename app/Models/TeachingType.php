@@ -8,7 +8,7 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
 class TeachingType extends Model
 {
     use CentralConnection;
-    protected $fillable = ['sahodaya_id', 'code', 'label', 'is_active', 'sort_order'];
+    protected $fillable = ['sahodaya_id', 'code', 'label', 'min_class', 'max_class', 'is_active', 'sort_order'];
 
     protected $casts = ['is_active' => 'boolean'];
 

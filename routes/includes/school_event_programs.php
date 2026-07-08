@@ -32,12 +32,35 @@ foreach ($festPrograms as $cfg) {
     $slug = $cfg['slug'];
     $controller = $cfg['controller'];
 
-    Route::prefix($prefix)->name("{$prefix}.")->group(function () use ($controller, $slug) {
+    Route::prefix($prefix)->name("{$prefix}.")->group(function () use ($controller, $slug, $prefix) {
         Route::get('/', [$controller, 'hub'])->name('hub');
         Route::get('/my-events', [$controller, 'myEvents'])->name('my-events');
         Route::get('/registration', [$controller, 'registration'])->name('registration');
+        Route::get('/events/{event}/overview', [FestRegistrationController::class, 'eventOverview'])
+            ->defaults('program', $slug)
+            ->name('event.overview');
+        Route::get('/events/{event}/registration', [FestRegistrationController::class, 'eventRegistration'])
+            ->defaults('program', $slug)
+            ->name('event.registration');
+        Route::get('/events/{event}/eligible-students', [FestRegistrationController::class, 'eligibleStudents'])
+            ->defaults('program', $slug)
+            ->name('event.eligible-students');
+        if ($prefix === 'sports') {
+            Route::get('/item-registration', [FestRegistrationController::class, 'itemRegistrationEntry'])
+                ->defaults('program', $slug)
+                ->name('item-registration');
+            Route::get('/events/{event}/items', [FestRegistrationController::class, 'eventItemRegistration'])
+                ->defaults('program', $slug)
+                ->name('event.items');
+        }
         Route::get('/results', [$controller, 'results'])->name('results');
         Route::get('/reports', [$controller, 'reports'])->name('reports.index');
+        Route::get('/reports/{event}', [FestSchoolReportController::class, 'eventHub'])
+            ->defaults('program', $slug)
+            ->name('reports.event');
+        Route::get('/reports/{event}/export/{exportType}', [FestSchoolReportController::class, 'export'])
+            ->defaults('program', $slug)
+            ->name('reports.export');
         Route::get('/qualifiers', [$controller, 'qualifiers'])->name('qualifiers');
         Route::get('/qualifiers/export', [FestSchoolReportController::class, 'exportQualifiers'])
             ->defaults('program', $slug)
@@ -78,6 +101,9 @@ foreach ($festPrograms as $cfg) {
         Route::get('/reports/{event}/participation/export', [FestSchoolReportController::class, 'exportParticipation'])
             ->defaults('program', $slug)
             ->name('reports.participation.export');
+        Route::get('/reports/{event}/participation/pdf', [FestSchoolReportController::class, 'exportParticipationPdf'])
+            ->defaults('program', $slug)
+            ->name('reports.participation.pdf');
         Route::get('/reports/{event}/student-wise', [FestSchoolReportController::class, 'studentWise'])
             ->defaults('program', $slug)
             ->name('reports.student-wise');
@@ -96,6 +122,9 @@ foreach ($festPrograms as $cfg) {
         Route::get('/reports/{event}/item-wise/export', [FestSchoolReportController::class, 'exportItemWise'])
             ->defaults('program', $slug)
             ->name('reports.item-wise.export');
+        Route::get('/reports/{event}/item-wise/pdf', [FestSchoolReportController::class, 'exportItemWisePdf'])
+            ->defaults('program', $slug)
+            ->name('reports.item-wise.pdf');
         Route::get('/reports/{event}/admit-cards', [FestSchoolReportController::class, 'admitCards'])
             ->defaults('program', $slug)
             ->name('reports.admit-cards');
@@ -105,6 +134,9 @@ foreach ($festPrograms as $cfg) {
         Route::get('/reports/{event}/registration-register/export', [FestSchoolReportController::class, 'exportRegistrationRegister'])
             ->defaults('program', $slug)
             ->name('reports.registration-register.export');
+        Route::get('/reports/{event}/registration-register/pdf', [FestSchoolReportController::class, 'exportRegistrationRegisterPdf'])
+            ->defaults('program', $slug)
+            ->name('reports.registration-register.pdf');
         Route::get('/reports/{event}/id-cards', [FestSchoolReportController::class, 'idCards'])
             ->defaults('program', $slug)
             ->name('reports.id-cards');
@@ -114,21 +146,90 @@ foreach ($festPrograms as $cfg) {
         Route::get('/reports/{event}/id-cards/pdf', [FestSchoolReportController::class, 'idCardsPdf'])
             ->defaults('program', $slug)
             ->name('reports.id-cards.pdf');
+        Route::get('/reports/{event}/id-cards/pdf-all-heads', [FestSchoolReportController::class, 'idCardsPdfAllHeads'])
+            ->defaults('program', $slug)
+            ->name('reports.id-cards.pdf-all-heads');
         Route::get('/reports/{event}/fee-summary', [FestSchoolReportController::class, 'feeSummary'])
             ->defaults('program', $slug)
             ->name('reports.fee-summary');
         Route::get('/reports/{event}/discipline-participation', [FestSchoolReportController::class, 'disciplineParticipation'])
             ->defaults('program', $slug)
             ->name('reports.discipline-participation');
+        Route::get('/reports/{event}/discipline-participation/pdf', [FestSchoolReportController::class, 'exportDisciplinePdf'])
+            ->defaults('program', $slug)
+            ->name('reports.discipline-participation.pdf');
+        Route::get('/reports/{event}/head-wise', [FestSchoolReportController::class, 'headWise'])
+            ->defaults('program', $slug)
+            ->name('reports.head-wise');
+        Route::get('/reports/{event}/head-wise/pdf', [FestSchoolReportController::class, 'exportHeadWisePdf'])
+            ->defaults('program', $slug)
+            ->name('reports.head-wise.pdf');
+        Route::get('/reports/{event}/item-counts', [FestSchoolReportController::class, 'itemCounts'])
+            ->defaults('program', $slug)
+            ->name('reports.item-counts');
+        Route::get('/reports/{event}/item-counts/pdf', [FestSchoolReportController::class, 'exportItemCountsPdf'])
+            ->defaults('program', $slug)
+            ->name('reports.item-counts.pdf');
+        Route::get('/reports/{event}/item-counts/export', [FestSchoolReportController::class, 'exportItemCountsExcel'])
+            ->defaults('program', $slug)
+            ->name('reports.item-counts.export');
+        Route::get('/reports/{event}/items/{item}/participants', [FestSchoolReportController::class, 'itemParticipantsJson'])
+            ->defaults('program', $slug)
+            ->whereNumber('item')
+            ->name('reports.item-participants');
+        Route::get('/reports/{event}/items/{item}/participants/pdf', [FestSchoolReportController::class, 'exportItemParticipantsPdf'])
+            ->defaults('program', $slug)
+            ->whereNumber('item')
+            ->name('reports.item-participants.pdf');
+        Route::get('/reports/{event}/items/{item}/participants/export', [FestSchoolReportController::class, 'exportItemParticipantsExcel'])
+            ->defaults('program', $slug)
+            ->whereNumber('item')
+            ->name('reports.item-participants.export');
+        Route::get('/reports/{event}/assignment-completeness', [FestSchoolReportController::class, 'assignmentCompleteness'])
+            ->defaults('program', $slug)
+            ->name('reports.assignment-completeness');
+        Route::get('/reports/{event}/assignment-completeness/export', [FestSchoolReportController::class, 'exportAssignmentCompleteness'])
+            ->defaults('program', $slug)
+            ->name('reports.assignment-completeness.export');
+        Route::get('/reports/{event}/numbering-register', [FestSchoolReportController::class, 'numberingRegister'])
+            ->defaults('program', $slug)
+            ->name('reports.numbering-register');
+        Route::get('/reports/{event}/numbering-register/export', [FestSchoolReportController::class, 'exportNumberingRegister'])
+            ->defaults('program', $slug)
+            ->name('reports.numbering-register.export');
+        Route::get('/reports/{event}/pending-approvals', [FestSchoolReportController::class, 'pendingApprovals'])
+            ->defaults('program', $slug)
+            ->name('reports.pending-approvals');
+        Route::get('/reports/{event}/pending-approvals/export', [FestSchoolReportController::class, 'exportPendingApprovals'])
+            ->defaults('program', $slug)
+            ->name('reports.pending-approvals.export');
         Route::get('/reports/{event}/schedule-clashes', [FestSchoolReportController::class, 'scheduleClashes'])
             ->defaults('program', $slug)
             ->name('reports.schedule-clashes');
+        Route::get('/reports/{event}/item-schedule', [FestSchoolReportController::class, 'itemSchedule'])
+            ->defaults('program', $slug)
+            ->name('reports.item-schedule');
         Route::get('/reports/{event}/mark-entry-status', [FestSchoolReportController::class, 'markEntryStatus'])
             ->defaults('program', $slug)
             ->name('reports.mark-entry-status');
+        Route::get('/reports/{event}/mark-entry-status/export', [FestSchoolReportController::class, 'exportMarkEntryStatus'])
+            ->defaults('program', $slug)
+            ->name('reports.mark-entry-status.export');
+        Route::get('/reports/{event}/mark-entry-status/pdf', [FestSchoolReportController::class, 'exportMarkEntryStatusPdf'])
+            ->defaults('program', $slug)
+            ->name('reports.mark-entry-status.pdf');
         Route::get('/reports/{event}/results-summary', [FestSchoolReportController::class, 'resultsSummary'])
             ->defaults('program', $slug)
             ->name('reports.results-summary');
+        Route::get('/reports/{event}/published-results', [FestSchoolReportController::class, 'publishedResults'])
+            ->defaults('program', $slug)
+            ->name('reports.published-results');
+        Route::get('/reports/{event}/results-publish-status', [FestSchoolReportController::class, 'resultsPublishStatus'])
+            ->defaults('program', $slug)
+            ->name('reports.results-publish-status');
+        Route::get('/reports/{event}/attendance', [FestSchoolReportController::class, 'attendance'])
+            ->defaults('program', $slug)
+            ->name('reports.attendance');
         Route::get('/reports/{event}/group-roster', [FestSchoolReportController::class, 'groupRoster'])
             ->defaults('program', $slug)
             ->name('reports.group-roster');
@@ -166,12 +267,17 @@ Route::prefix('mcq')->name('mcq.')->group(function () {
     Route::get('/', [McqController::class, 'hub'])->name('index');
     Route::get('/{exam}/reports/registration/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportRegistration'])->name('reports.registration.export');
     Route::get('/{exam}/reports/attendance/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportAttendance'])->name('reports.attendance.export');
-    Route::get('/{exam}/{tab?}', [McqController::class, 'exam'])->name('exam')->where('tab', 'register|students|hall-tickets|fee|results|toppers|reports');
+    Route::get('/{exam}/reports/toppers/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportToppers'])->name('reports.toppers.export');
+    Route::get('/{exam}/{tab?}', [McqController::class, 'exam'])->name('exam')->where('tab', 'register|students|hall-tickets|fee|results|toppers|reports|attendance');
+    Route::post('/{exam}/attendance', [McqController::class, 'storeAttendance'])->name('attendance.store');
     Route::post('/{exam}/register', [McqController::class, 'register']);
+    Route::post('/{exam}/cancel', [McqController::class, 'cancelRegistration'])->name('cancel');
     Route::post('/{exam}/register-by-class', [McqController::class, 'bulkRegister'])->name('register-by-class');
     Route::post('/{exam}/register-bulk', [McqController::class, 'bulkRegister']);
     Route::post('/{exam}/fee', [McqController::class, 'uploadFee']);
     Route::get('/{exam}/hall-tickets/pdf', [McqController::class, 'hallTicketsPdf']);
+    Route::get('/{exam}/credentials/export', [McqRegistrationController::class, 'exportCredentials'])->name('credentials.export');
+    Route::post('/{exam}/students/{student}/reset-portal-password', [McqRegistrationController::class, 'resetPortalPassword'])->name('students.reset-portal-password');
     Route::post('/', [McqRegistrationController::class, 'store']);
     Route::post('/bulk', [McqRegistrationController::class, 'bulkStore']);
     Route::post('/{exam}/school-payment', [McqRegistrationController::class, 'uploadSchoolPayment']);
@@ -191,7 +297,7 @@ Route::get("/programs/{program}", function (string $tenantId, string $program) u
         return redirect("/school-admin/{$tenantId}/{$map[$program]}", 301);
     }
 
-    return redirect("/school-admin/{$tenantId}/programs/{$program}/hub");
+    return redirect("/school-admin/{$tenantId}/fest-programs", 301);
 })->where('program', $festProgramSlugs);
 
 Route::get("/programs/{program}/{path}", function (string $tenantId, string $program, string $path) {
@@ -200,5 +306,5 @@ Route::get("/programs/{program}/{path}", function (string $tenantId, string $pro
         return redirect("/school-admin/{$tenantId}/{$map[$program]}/{$path}", 301);
     }
 
-    return redirect("/school-admin/{$tenantId}/programs/{$program}/{$path}", 301);
+    return redirect("/school-admin/{$tenantId}/fest-programs", 301);
 })->where('program', $festProgramSlugs)->where('path', '.*');

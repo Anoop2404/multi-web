@@ -23,7 +23,10 @@
                         <td class="p-3">{{ s.fest_entries }}</td>
                     </tr>
                     <tr v-if="!students.length">
-                        <td colspan="4" class="p-8 text-center text-gray-400">No students in this house.</td>
+                        <td colspan="4" class="p-8 text-center text-gray-400">
+                            <p>No students in this house.</p>
+                            <a :href="`/portal/house-admin/${tenantId}`" class="text-xs text-emerald-700 font-semibold mt-2 inline-block">← Dashboard</a>
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -34,6 +37,7 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { computed } from 'vue';
+import { houseAdminPortalNavItems } from '@/support/houseAdminPortalNav.js';
 
 const props = defineProps({
     tenantId: String,
@@ -41,10 +45,5 @@ const props = defineProps({
     students: Array,
 });
 
-const navItems = computed(() => [
-    { href: `/portal/house-admin/${props.tenantId}`, label: 'Dashboard' },
-    { href: `/portal/house-admin/${props.tenantId}/students`, label: 'Students' },
-    { href: `/portal/house-admin/${props.tenantId}/registrations`, label: 'Registrations' },
-    { href: `/portal/house-admin/${props.tenantId}/ranking`, label: 'House ranking' },
-]);
+const navItems = computed(() => houseAdminPortalNavItems(props.tenantId));
 </script>

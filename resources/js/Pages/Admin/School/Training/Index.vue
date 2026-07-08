@@ -1,7 +1,7 @@
 <template>
     <SchoolAdminLayout title="Teacher Training" :school="school" :show-header-title="false">
-        <PageHeader title="Teacher Training" eyebrow="Programs"
-            description="Fest programs, exams, training, and Sahodaya circulars." />
+        <PageHeader title="Teacher Training" eyebrow="Teacher training"
+            description="Register teachers for Sahodaya training programs." />
 
 
         <div class="space-y-4">
@@ -51,7 +51,7 @@
                       @submit.prevent="register(program)" class="flex flex-wrap gap-2 items-end">
                     <select v-model="forms[program.id]" class="field max-w-xs" required>
                         <option value="">Select teacher</option>
-                        <option v-for="t in teachers" :key="t.id" :value="t.id">{{ t.name }}</option>
+                        <option v-for="t in (eligibleByProgram[program.id] || [])" :key="t.id" :value="t.id">{{ t.name }}<template v-if="t.category"> ({{ t.category }})</template></option>
                     </select>
                     <button class="btn-primary">Register</button>
                 </form>
@@ -66,7 +66,7 @@ import { reactive } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 
-const props = defineProps({ school: Object, programs: Array, registrations: Object, teachers: Array });
+const props = defineProps({ school: Object, programs: Array, registrations: Object, eligibleByProgram: Object });
 const forms    = reactive({});
 const feeFiles = reactive({});
 const feeRefs  = reactive({});

@@ -90,6 +90,13 @@
                                      :label="item.label"
                                      :active="navItemActive(page.url, item.href, item.exact)" />
                 </template>
+                <EventHeadSidebarSection v-if="showEventHeadNav"
+                                         portal="sahodaya"
+                                         :sahodaya-id="sahodaya.id"
+                                         :event-id="eventContext.id"
+                                         :groups="eventHeadNav.headItemGroups"
+                                         :is-sports="eventContext.event_type === 'sports'"
+                                         class="mx-2 mt-2" />
             </nav>
 
             <div class="sa-sidebar-foot p-3 border-t border-white/10 shrink-0 bg-[#041525]/40">
@@ -143,7 +150,8 @@ import FlashBanner from '@/Components/ui/FlashBanner.vue';
 import SahodayaNavItem from '@/Components/sahodaya/SahodayaNavItem.vue';
 import SahodayaSidebarNavSearch from '@/Components/sahodaya/SahodayaSidebarNavSearch.vue';
 import SahodayaSvgIcon from '@/Components/sahodaya/SahodayaSvgIcon.vue';
-import { eventsModuleNav, eventScopedNav, navItemActive } from '@/support/sahodayaEventNav.js';
+import EventHeadSidebarSection from '@/Components/fest/EventHeadSidebarSection.vue';
+import { eventsModuleNav, eventScopedNav, navItemActive, shouldShowSportsHeadSidebar } from '@/support/sahodayaEventNav.js';
 import { filterNavByPermissions, staffCanSeeNavItem } from '@/support/sahodayaEventNavPermissions.js';
 import { filterNavGroups } from '@/support/filterNavGroups.js';
 import { programForEventType, programScopedNav, sahodayaProgramHref } from '@/support/sahodayaPrograms.js';
@@ -194,6 +202,14 @@ const programHubHref = computed(() => {
     return slug ? sahodayaProgramHref(props.sahodaya.id, slug) : `/sahodaya-admin/${props.sahodaya.id}/events`;
 });
 
+/** Stay on program sidebar for catalog / program setup even when ?event_id= is present. */
+const isProgramWorkspace = computed(() => {
+    const path = page.url.split('?')[0];
+    return /\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)(?:\/(?:catalog|age-groups|records|championship|results|rankings|school-rounds))?(?:\/|$)/.test(path)
+        || /\/programs\/custom(?:\/catalog)?/.test(path)
+        || /\/taxonomy-masters(?:\/|$)/.test(path);
+});
+
 const sidebarEyebrow = computed(() => programContext.value?.label ?? 'Event');
 
 const sidebarTitle = computed(() => eventContext.value?.title ?? 'Event');
@@ -213,13 +229,14 @@ watch(() => page.url, () => {
 
 const navGroups = computed(() => {
     const sid = props.sahodaya.id;
+    const navOptions = { navVisibility: page.props.navVisibility ?? null };
     let groups;
-    if (eventContext.value?.id) {
+    if (eventContext.value?.id && !isProgramWorkspace.value) {
         groups = eventScopedNav(sid, eventContext.value.id, eventContext.value, programEventsList.value);
     } else if (programContext.value?.slug) {
-        groups = programScopedNav(sid, programContext.value.slug, programEventsList.value);
+        groups = programScopedNav(sid, programContext.value.slug, programEventsList.value, navOptions);
     } else {
-        groups = eventsModuleNav(sid);
+        groups = eventsModuleNav(sid, navOptions);
     }
 
     if (!isStaffUser.value) {
@@ -231,6 +248,25 @@ const navGroups = computed(() => {
 });
 
 const filteredNavGroups = computed(() => filterNavGroups(navGroups.value, navSearch.value));
+
+const eventHeadNav = computed(() => page.props.eventHeadNav ?? { headItemGroups: [] });
+
+const showEventHeadNav = computed(() => {
+    if (!eventContext.value?.id || isProgramWorkspace.value) {
+        return false;
+    }
+
+    const groups = eventHeadNav.value.headItemGroups ?? [];
+    if (!groups.length) {
+        return false;
+    }
+
+    if (eventContext.value.event_type === 'sports') {
+        return shouldShowSportsHeadSidebar(page.url, true);
+    }
+
+    return page.url.split('?')[0].includes('/competition');
+});
 </script>
 
 <style scoped>

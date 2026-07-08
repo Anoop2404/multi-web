@@ -7,6 +7,8 @@
             description="Combined accounts ledger with separate heads for membership, each event, training, and expenses."
         >
             <template #actions>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/ledger/opening-balances`" class="btn-secondary text-sm">Opening balances</Link>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/finance/payables`" class="btn-secondary text-sm">Payables</Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/ledger/reports`" class="btn-secondary text-sm">Reports →</Link>
             </template>
         </PageHeader>

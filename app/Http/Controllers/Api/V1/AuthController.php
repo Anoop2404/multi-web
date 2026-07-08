@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\ApiController;
 use App\Models\PersonalAccessToken;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Auth\LoginLockoutService;
 use App\Support\MobileAuthPayload;
 use App\Support\SahodayaHomepageContent;
 use App\Support\TenantBranding;
@@ -45,26 +46,41 @@ class AuthController extends ApiController
     public function login(Request $request)
     {
         $data = $request->validate([
-            'email'       => 'required|email',
+            'email'       => 'required|string',
             'password'    => 'required|string',
             'device_name' => 'required|string|max:255',
         ]);
 
-        $email = strtolower(trim($data['email']));
+        $identifier = trim($data['email']);
+        $field = str_contains($identifier, '@') ? 'email' : 'username';
+        if ($field === 'email') {
+            $identifier = strtolower($identifier);
+        }
+
         $auditContext = [
             'portal'     => 'mobile_api',
             'host'       => $request->getHost(),
             'device'     => $data['device_name'],
             'user_agent' => substr((string) $request->userAgent(), 0, 255),
         ];
+        $lockout = app(\App\Services\Auth\LoginLockoutService::class);
 
-        if (! Auth::attempt(['email' => $email, 'password' => $data['password']])) {
-            app(PlatformAuditLogger::class)->loginFailed($email, 'invalid_credentials', context: $auditContext);
+        if ($lockout->isLocked($identifier)) {
+            throw ValidationException::withMessages([
+                'email' => [$lockout->lockoutMessage($identifier)],
+            ]);
+        }
+
+        if (! Auth::attempt([$field => $identifier, 'password' => $data['password']])) {
+            $lockout->recordFailedAttempt($identifier);
+            app(PlatformAuditLogger::class)->loginFailed($identifier, 'invalid_credentials', context: $auditContext);
 
             throw ValidationException::withMessages([
                 'email' => ['Invalid email or password. Please check your credentials and try again.'],
             ]);
         }
+
+        $lockout->clear($identifier);
 
         $user = $request->user()->fresh();
 

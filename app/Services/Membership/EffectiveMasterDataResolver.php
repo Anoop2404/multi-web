@@ -5,6 +5,8 @@ namespace App\Services\Membership;
 use App\Models\ClassCategory;
 use App\Models\ClassCategoryOverride;
 use App\Models\MasterClass;
+use App\Models\Designation;
+use App\Models\Subject;
 use App\Models\TeachingType;
 use App\Models\TeachingTypeOverride;
 use Illuminate\Support\Collection;
@@ -66,5 +68,20 @@ class EffectiveMasterDataResolver
             ->orderBy('sort_order')
             ->orderBy('label')
             ->get();
+    }
+
+    public function subjects(string $sahodayaId): Collection
+    {
+        return Subject::active()->forSahodaya($sahodayaId)->orderBy('sort_order')->orderBy('label')->get();
+    }
+
+    public function designations(string $sahodayaId): Collection
+    {
+        return Designation::active()->forSahodaya($sahodayaId)->orderBy('sort_order')->orderBy('label')->get();
+    }
+
+    public function ageCategories(string $sahodayaId): Collection
+    {
+        return \App\Models\AgeCategory::active()->forSahodaya($sahodayaId)->orderBy('sort_order')->orderBy('label')->get();
     }
 }

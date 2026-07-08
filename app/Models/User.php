@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\UsesTenantConnectionWhenIsolated;
 use App\Notifications\PortalVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,11 +10,12 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
-use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use CentralConnection, HasApiTokens, HasFactory, Notifiable, HasRoles;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles, UsesTenantConnectionWhenIsolated;
+
+    protected $guard_name = 'web';
 
     protected $fillable = [
         'tenant_id',
@@ -31,6 +33,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $hidden = [
         'password',
+        'plain_password',
         'remember_token',
     ];
 
@@ -53,7 +56,11 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isSuperAdmin(): bool
     {
-        return $this->tenant_id === null && $this->hasRole('superadmin');
+        if (! config('tenancy.database_per_sahodaya', true)) {
+            return $this->tenant_id === null && $this->hasRole('superadmin');
+        }
+
+        return false;
     }
 
     public function sendEmailVerificationNotification(): void

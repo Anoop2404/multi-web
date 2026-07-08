@@ -2,7 +2,7 @@
     <SahodayaAdminLayout :title="`${exam.title} — Activity`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${exam.title} — Activity log`" eyebrow="Audit trail"
-                    description="All actions on this MCQ exam, newest first." />
+                    description="All actions on this Talent Search exam, newest first." />
 
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="activity" />
 

@@ -16,11 +16,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Tests\Support\OpensStudentWindows;
 use Tests\TestCase;
 
 class SchoolApiTest extends TestCase
 {
     use RefreshDatabase;
+    use OpensStudentWindows;
 
     private function schoolContext(): array
     {
@@ -38,6 +40,8 @@ class SchoolApiTest extends TestCase
             'tenant_id' => $sahodaya->id,
             'prefix'    => 'KNR',
         ]);
+
+        $this->openStudentWindows($sahodaya);
 
         $school = Tenant::create([
             'id'                => (string) Str::uuid(),

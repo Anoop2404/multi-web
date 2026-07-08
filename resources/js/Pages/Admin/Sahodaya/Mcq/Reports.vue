@@ -1,7 +1,7 @@
 <template>
     <SahodayaAdminLayout :title="`Reports — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="MCQ exam" description="Registration register, fee summary, and attendance exports." />
+        <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Registration register, fee summary, and attendance exports." />
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" active="reports" />
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -33,11 +33,31 @@
                 <h3 class="section-title">Fee summary</h3>
                 <p class="section-desc">Per-school batch fees and payment status.</p>
                 <a :href="exportBase + '/fees/export'" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
+                <a :href="exportBase + '/fees-pending/export'" class="btn-secondary text-sm mt-2 inline-block">Pending fees ↓</a>
+                <a :href="exportBase + '/fees-rejected/export'" class="btn-secondary text-sm mt-2 inline-block">Rejected fees ↓</a>
             </div>
             <div class="card">
                 <h3 class="section-title">Attendance sheet</h3>
                 <p class="section-desc">Hall ticket list for exam-day attendance marking.</p>
                 <a :href="exportBase + '/attendance/export'" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
+                <a :href="exportBase + '/absent/export'" class="btn-secondary text-sm mt-2 inline-block">Absent list ↓</a>
+            </div>
+            <div class="card">
+                <h3 class="section-title">Marks & results</h3>
+                <p class="section-desc">Present students without marks, toppers, and grade bands.</p>
+                <a :href="exportBase + '/marks-pending/export'" class="btn-secondary text-sm mt-3 inline-block">Marks pending ↓</a>
+                <a v-if="exam.results_published" :href="exportBase + '/toppers/export'" class="btn-secondary text-sm mt-2 inline-block">Toppers ↓</a>
+                <a :href="exportBase + '/grade-bands/export'" class="btn-secondary text-sm mt-2 inline-block">Grade bands ↓</a>
+            </div>
+            <div v-if="exam.delivery_mode === 'online'" class="card">
+                <h3 class="section-title">Online session status</h3>
+                <p class="section-desc">Started, submitted, expired, and not-started counts.</p>
+                <a :href="exportBase + '/session-status/export'" class="btn-secondary text-sm mt-3 inline-block">Session status ↓</a>
+            </div>
+            <div v-if="(exam.exam_level ?? 1) > 1" class="card">
+                <h3 class="section-title">Level 2 qualifiers</h3>
+                <p class="section-desc">Eligible and not-eligible students from Level 1 promotion rules.</p>
+                <a :href="exportBase + '/level2-qualifiers/export'" class="btn-secondary text-sm mt-3 inline-block">Qualifier list ↓</a>
             </div>
         </div>
 

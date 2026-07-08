@@ -55,6 +55,7 @@ class NavConfigDefaults
                 ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
                 ['label' => 'About', 'url' => '/#about-sahodaya', 'external' => false, 'children' => []],
                 ['label' => 'Programmes', 'url' => '/#programmes', 'external' => false, 'children' => []],
+                ['label' => 'Live Results', 'url' => '/fest', 'external' => false, 'children' => []],
                 ['label' => 'Office Bearers', 'url' => '/#office-bearers', 'external' => false, 'children' => []],
                 ['label' => 'Member Schools', 'url' => '/#member-schools', 'external' => false, 'children' => []],
                 [

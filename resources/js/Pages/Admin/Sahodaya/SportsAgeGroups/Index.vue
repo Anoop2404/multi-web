@@ -1,8 +1,7 @@
 <template>
-    <SahodayaAdminLayout title="Sports age categories" :sahodaya="sahodaya" :publicUrl="publicUrl"
-                         :pendingSchoolsCount="pendingSchoolsCount"
-                         :pendingSubmissionsCount="pendingSubmissionsCount"
-                         :pendingPaymentsCount="pendingPaymentsCount">
+    <SahodayaEventsLayout title="Sports age categories" :sahodaya="sahodaya" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :program="program"
+                         :program-events="programEvents" :show-header-title="false">
         <PageHeader
             title="Sports age categories"
             eyebrow="Sports Meet"
@@ -114,25 +113,25 @@
                 </table>
             </div>
         </div>
-    </SahodayaAdminLayout>
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
 import { reactive, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 
 const props = defineProps({
     sahodaya: Object,
     publicUrl: String,
-    pendingSchoolsCount: Number,
-    pendingSubmissionsCount: Number,
     pendingPaymentsCount: Number,
+    program: Object,
+    programEvents: { type: Array, default: () => [] },
     groups: Array,
     activeAcademicYear: Object,
 });
 
-const base = `/sahodaya-admin/${props.sahodaya.id}/sports-age-groups`;
+const base = `/sahodaya-admin/${props.sahodaya.id}/sports/age-groups`;
 const showAdd = ref(false);
 const editId = ref(null);
 const addRouter = reactive({ processing: false });

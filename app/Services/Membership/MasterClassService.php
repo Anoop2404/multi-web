@@ -9,7 +9,7 @@ class MasterClassService
 {
     /** @var array<string, list<int|string>> */
     private const TEMPLATE_CLASSES = [
-        'PRE'   => ['LKG', 'UKG'],
+        'PRE'   => ['Nursery', 'LKG', 'UKG'],
         'PRY'   => [1, 2, 3, 4, 5],
         'UP'    => [6, 7, 8],
         'SEC'   => [9, 10],

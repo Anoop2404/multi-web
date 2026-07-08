@@ -146,7 +146,9 @@ class LedgerPostingTest extends TestCase
         app(FeeReceiptLedgerDispatcher::class)->postApproved($receipt, $sahodayaId);
 
         $this->assertSame(2, LedgerTransaction::count());
-        $mcqHead = AccountHead::where('tenant_id', $sahodayaId)->where('code', 'MCQ-FEE')->first();
+        $mcqHead = AccountHead::where('tenant_id', $sahodayaId)
+            ->where('code', LedgerAccountCatalog::mcqExamFeeCode($exam->id))
+            ->first();
         $this->assertNotNull($mcqHead);
         $this->assertSame('mcq', $mcqHead->category);
         $this->assertEquals(150, (float) LedgerTransaction::where('entry_type', 'credit')->sum('amount'));
@@ -198,7 +200,9 @@ class LedgerPostingTest extends TestCase
         $receipt->update(['status' => 'approved']);
 
         $this->assertSame(2, LedgerTransaction::count());
-        $mcqHead = AccountHead::where('tenant_id', $sahodayaId)->where('code', 'MCQ-FEE')->first();
+        $mcqHead = AccountHead::where('tenant_id', $sahodayaId)
+            ->where('code', LedgerAccountCatalog::mcqExamFeeCode($exam->id))
+            ->first();
         $this->assertNotNull($mcqHead);
         $this->assertSame('mcq', $mcqHead->category);
         $this->assertEquals(600, (float) LedgerTransaction::where('entry_type', 'credit')->sum('amount'));

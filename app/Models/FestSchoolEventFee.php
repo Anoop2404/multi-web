@@ -2,16 +2,21 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
+use App\Models\Concerns\TracksPartialPayments;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FestSchoolEventFee extends Model
 {
+    use BelongsToCentralTenant;
+    use TracksPartialPayments;
+
     protected $fillable = [
         'event_id', 'school_id', 'school_registration_fee', 'student_registration_fee',
         'participation_item_count', 'participation_fee', 'extra_item_fee', 'total_due',
-        'override_amount', 'fee_receipt_id', 'status',
+        'amount_paid', 'override_amount', 'fee_receipt_id', 'status',
     ];
 
     protected $casts = [
@@ -20,6 +25,7 @@ class FestSchoolEventFee extends Model
         'participation_fee' => 'decimal:2',
         'extra_item_fee' => 'decimal:2',
         'total_due' => 'decimal:2',
+        'amount_paid' => 'decimal:2',
         'override_amount' => 'decimal:2',
     ];
 
@@ -30,7 +36,7 @@ class FestSchoolEventFee extends Model
 
     public function school(): BelongsTo
     {
-        return $this->belongsTo(Tenant::class, 'school_id');
+        return $this->belongsToCentralTenant('school_id');
     }
 
     public function feeReceipt(): BelongsTo

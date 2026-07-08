@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\UsesTenantConnectionWhenIsolated;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
-use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class PersonalAccessToken extends SanctumPersonalAccessToken
 {
-    use CentralConnection;
+    use UsesTenantConnectionWhenIsolated;
 }

@@ -20,16 +20,44 @@ return new class extends Migration
         });
 
         if (Schema::hasColumn('fest_participants', 'event_id') && Schema::hasTable('fest_registrations')) {
-            DB::table('fest_participants')
-                ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
-                ->whereNull('fest_participants.event_id')
-                ->update(['fest_participants.event_id' => DB::raw('fest_registrations.event_id')]);
+            DB::statement('
+                UPDATE fest_participants
+                SET event_id = fest_registrations.event_id
+                FROM fest_registrations
+                WHERE fest_registrations.id = fest_participants.registration_id
+                  AND fest_participants.event_id IS NULL
+            ');
         }
 
         if (Schema::hasColumn('fest_participants', 'event_id')) {
-            Schema::table('fest_participants', function (Blueprint $table) {
-                $table->unique(['event_id', 'chest_no'], 'fest_participants_event_chest_unique');
-            });
+            $duplicateGroups = DB::table('fest_participants')
+                ->select('event_id', 'chest_no')
+                ->whereNotNull('event_id')
+                ->whereNotNull('chest_no')
+                ->groupBy('event_id', 'chest_no')
+                ->havingRaw('count(*) > 1')
+                ->get();
+
+            foreach ($duplicateGroups as $group) {
+                $duplicateIds = DB::table('fest_participants')
+                    ->where('event_id', $group->event_id)
+                    ->where('chest_no', $group->chest_no)
+                    ->orderBy('id')
+                    ->pluck('id')
+                    ->slice(1);
+
+                if ($duplicateIds->isNotEmpty()) {
+                    DB::table('fest_participants')
+                        ->whereIn('id', $duplicateIds)
+                        ->update(['chest_no' => null]);
+                }
+            }
+
+            if (! Schema::hasIndex('fest_participants', 'fest_participants_event_chest_unique')) {
+                Schema::table('fest_participants', function (Blueprint $table) {
+                    $table->unique(['event_id', 'chest_no'], 'fest_participants_event_chest_unique');
+                });
+            }
         }
 
         if (Schema::hasTable('fest_event_items') && ! Schema::hasColumn('fest_event_items', 'ranking_direction')) {

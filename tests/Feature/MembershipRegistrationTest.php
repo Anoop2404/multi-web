@@ -16,11 +16,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Tests\Support\OpensStudentWindows;
 use Tests\TestCase;
 
 class MembershipRegistrationTest extends TestCase
 {
     use RefreshDatabase;
+    use OpensStudentWindows;
 
     private function cluster(): array
     {
@@ -60,6 +62,8 @@ class MembershipRegistrationTest extends TestCase
             'is_active'         => true,
         ]);
 
+        $this->openStudentWindows($sahodaya);
+
         return compact('sahodaya', 'school');
     }
 
@@ -87,7 +91,49 @@ class MembershipRegistrationTest extends TestCase
 
         $registration = app(RegistrationStatusService::class)->beginAnnualRegistration($school);
 
-        $this->assertMatchesRegularExpression('/^KNR\/GHS\/\d{4}$/', $registration->reg_no);
+        $this->assertMatchesRegularExpression('/^KNR\/\d{2}\/\d+$/', $registration->reg_no);
+    }
+
+    public function test_membership_number_is_stable_per_school_and_sequences_across_schools(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school] = $this->cluster();
+        $yy = AcademicYear::yearSuffix(AcademicYear::current());
+
+        $first = app(RegistrationStatusService::class)->beginAnnualRegistration($school);
+        $this->assertSame("KNR/{$yy}/1", $first->reg_no);
+
+        $schoolTwo = Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'Second School',
+            'parent_id'         => $sahodaya->id,
+            'school_prefix'     => 'SEC',
+            'membership_status' => 'approved',
+            'is_active'         => true,
+        ]);
+
+        $second = app(RegistrationStatusService::class)->beginAnnualRegistration($schoolTwo);
+        $this->assertSame("KNR/{$yy}/2", $second->reg_no);
+
+        $renewal = app(RegistrationStatusService::class)->beginAnnualRegistration($school);
+        $this->assertSame("KNR/{$yy}/1", $renewal->reg_no);
+    }
+
+    public function test_membership_number_restarts_each_academic_year(): void
+    {
+        ['school' => $school] = $this->cluster();
+        $generator = app(\App\Services\Membership\SchoolMembershipNumberGenerator::class);
+
+        $this->assertSame('KNR/26/1', $generator->generate($school, '2025-26'));
+
+        Registration::create([
+            'school_id'     => $school->id,
+            'academic_year' => '2025-26',
+            'reg_no'        => 'KNR/26/1',
+        ]);
+
+        // A different school year restarts the sequence at 1.
+        $this->assertSame('KNR/27/1', $generator->generate($school, '2026-27'));
     }
 
     public function test_begin_registration_creates_submission_tracks(): void
@@ -215,7 +261,6 @@ class MembershipRegistrationTest extends TestCase
 
     public function test_student_photo_upload_stores_on_s3(): void
     {
-        Storage::fake('s3');
         Storage::fake('shared');
         config(['filesystems.upload_disk' => 'shared']);
 
@@ -248,7 +293,7 @@ class MembershipRegistrationTest extends TestCase
 
         $student->refresh();
         $this->assertNotNull($student->photo);
-        Storage::disk('s3')->assertExists($student->photo);
+        Storage::disk('shared')->assertExists($student->photo);
 
         $this->actingAs($admin)
             ->get("/school-admin/{$school->id}/students/{$student->id}/photo")

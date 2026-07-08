@@ -21,6 +21,7 @@ class McqPaymentsController extends SahodayaAdminController
         $counts = [
             'pending'  => (clone $base)->whereIn('status', ['proof_uploaded'])->whereHas('feeReceipt', fn ($q) => $q->where('status', 'uploaded'))->count(),
             'approved' => (clone $base)->where('status', 'approved')->count(),
+            'rejected' => (clone $base)->whereHas('feeReceipt', fn ($q) => $q->where('status', 'rejected'))->count(),
             'all'      => (clone $base)->count(),
         ];
 
@@ -30,6 +31,8 @@ class McqPaymentsController extends SahodayaAdminController
                 ->whereHas('feeReceipt', fn ($q) => $q->where('status', 'uploaded'));
         } elseif ($status === 'approved') {
             $query->where('status', 'approved');
+        } elseif ($status === 'rejected') {
+            $query->whereHas('feeReceipt', fn ($q) => $q->where('status', 'rejected'));
         }
 
         $fees = $query->orderByDesc('updated_at')->paginate(20)->withQueryString();
@@ -74,7 +77,31 @@ class McqPaymentsController extends SahodayaAdminController
             return response()->json(['message' => "{$approvedCount} registration(s) confirmed."]);
         }
 
-        return back()->with('success', "School MCQ fee approved. {$approvedCount} registration(s) confirmed with hall tickets.");
+        return back()->with('success', "School Talent Search fee approved. {$approvedCount} registration(s) confirmed with hall tickets.");
+    }
+
+    public function reject(Request $request, string $tenantId, McqSchoolFee $schoolFee)
+    {
+        abort_if($schoolFee->exam?->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'rejection_reason' => 'required|string|max:500',
+        ]);
+
+        app(McqSchoolFeeService::class)->reject($schoolFee, $request->user()->id, $data['rejection_reason']);
+
+        app(\App\Services\Audit\PlatformAuditLogger::class)->mcq(
+            $schoolFee->exam,
+            'mcq.fee.rejected',
+            "Talent Search batch fee rejected for {$schoolFee->school?->name}",
+            ['school_id' => $schoolFee->school_id, 'reason' => $data['rejection_reason']],
+        );
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Payment proof rejected. School can re-upload.']);
+        }
+
+        return back()->with('success', 'Payment proof rejected. School can re-upload.');
     }
 
     public function proof(string $tenantId, McqSchoolFee $schoolFee)
@@ -106,6 +133,7 @@ class McqPaymentsController extends SahodayaAdminController
                 'receipt_number'  => $sf->feeReceipt->receipt_number,
                 'payment_date'    => $sf->feeReceipt->payment_date?->format('Y-m-d'),
                 'transaction_ref' => $sf->feeReceipt->transaction_ref,
+                'rejection_reason'=> $sf->feeReceipt->rejection_reason,
                 'proof_url'       => $sf->feeReceipt->file_path
                     ? "/sahodaya-admin/{$this->sahodaya->id}/mcq/payments/{$sf->id}/proof"
                     : null,

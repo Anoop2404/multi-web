@@ -2,6 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\PlatformPermission;
+use App\Models\PlatformRole;
+use App\Models\PlatformUser;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -14,13 +17,23 @@ class RolesAndPermissionsSeeder extends Seeder
     {
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Original roles — never rename or remove (hardcoded in 30+ files)
+        // Platform roles (central database only)
+        PlatformRole::firstOrCreate(['name' => 'superadmin',    'guard_name' => 'web']);
+        PlatformRole::firstOrCreate(['name' => 'state_admin',   'guard_name' => 'web']);
+        PlatformRole::firstOrCreate(['name' => 'state_staff',   'guard_name' => 'web']);
+
+        // Tenant roles (single-DB test/local setups still seed on the default connection)
         Role::firstOrCreate(['name' => 'superadmin',    'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'sahodaya_admin','guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'school_admin',  'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'school_principal', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'school_vice_principal', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'school_event_coordinator', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'school_finance_coordinator', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'school_training_coordinator', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'school_mcq_coordinator', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'school_kalotsavam_coordinator', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'school_sports_coordinator', 'guard_name' => 'web']);
 
         // Phase 8 — operational module roles (additive)
         Role::firstOrCreate(['name' => 'state_admin',            'guard_name' => 'web']);
@@ -44,10 +57,11 @@ class RolesAndPermissionsSeeder extends Seeder
         Role::firstOrCreate(['name' => 'event_coordinator',        'guard_name' => 'web']);
 
         foreach (TenantUserCatalog::allPermissions() as $permission) {
+            PlatformPermission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
 
-        $superadmin = User::firstOrCreate(
+        $superadmin = PlatformUser::firstOrCreate(
             ['email' => 'admin@sahodaya.test'],
             [
                 'name' => 'Super Admin',

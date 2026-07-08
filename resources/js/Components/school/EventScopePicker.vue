@@ -2,7 +2,7 @@
     <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-4">
         <div>
             <p class="form-label mb-1">Event assignments</p>
-            <p class="text-xs text-slate-600">Pick whole programs or specific events (fest, MCQ exam, training).</p>
+            <p class="text-xs text-slate-600">Pick whole programs or specific events (fest, Talent Search exam, training).</p>
             <p v-if="error" class="text-xs text-red-600 mt-1">{{ error }}</p>
         </div>
 
@@ -13,7 +13,7 @@
             </label>
 
             <div v-if="prog.slug === 'mcq' && scopeOptions.mcq_exams?.length" class="ml-6 space-y-1">
-                <p class="text-xs text-slate-500 uppercase tracking-wide">Or specific MCQ exams</p>
+                <p class="text-xs text-slate-500 uppercase tracking-wide">Or specific Talent Search exams</p>
                 <label v-for="exam in scopeOptions.mcq_exams" :key="'mcq-'+exam.id"
                        class="flex items-center gap-2 text-xs">
                     <input type="checkbox" :checked="hasScope('mcq', 'mcq_exam', exam.id)"

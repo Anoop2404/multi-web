@@ -26,14 +26,14 @@
                         <p v-if="motto" class="login-motto">"{{ motto }}"</p>
 
                         <ol class="login-steps">
-                            <li>Use the email and password from your school</li>
-                            <li>View fest schedules and your registrations</li>
-                            <li>Take online MCQ exams when scheduled</li>
+                            <li>Students: use your Student ID and password from school</li>
+                            <li>Teachers &amp; staff: use your login code or email</li>
+                            <li>View fest schedules, results, and hall tickets</li>
                         </ol>
 
                         <LoginRoleGuide :rows="[
                             { label: 'Student', detail: 'View schedule, results, hall tickets' },
-                            { label: 'Teacher', detail: 'Fest duties, MCQ, appeals' },
+                            { label: 'Teacher', detail: 'Fest duties, Talent Search, appeals' },
                             { label: 'Judge / exam staff', detail: 'Mark entry or exam ops portals' },
                             { label: 'School office', detail: 'Use /school-login instead' },
                         ]" />
@@ -51,11 +51,12 @@
                                 <AuthLoginAlerts :session-expired="sessionExpired" :auth-error="authError" />
 
                                 <div>
-                                    <label class="login-label" for="email">Email</label>
-                                    <input id="email" v-model="form.email" type="email" required autocomplete="email"
+                                    <label class="login-label" for="email">Student ID or username</label>
+                                    <input id="email" v-model="form.email" type="text" required autocomplete="username"
                                            class="login-input" :class="{ 'login-input-error': fieldErrors.email }"
-                                           placeholder="you@school.edu" />
+                                           placeholder="STU/26/0001 or T/26/0001" />
                                     <p v-if="fieldErrors.email" class="login-error">{{ fieldErrors.email }}</p>
+                                    <p class="text-xs text-slate-500 mt-1">Students sign in with their Student ID (reg. no.), not Gmail.</p>
                                 </div>
 
                                 <div>
@@ -74,6 +75,10 @@
 
                             <p class="login-alt mt-4 text-center text-sm text-slate-500">
                                 <a href="/portal/forgot-password" class="text-[#1e5aa8] hover:underline">Forgot password?</a>
+                                <span class="text-slate-400"> (teachers with email)</span>
+                            </p>
+                            <p class="text-xs text-center text-slate-400 mt-2">
+                                Students: ask your school office to reset your password.
                             </p>
                             <p class="login-alt mt-3 text-center text-xs text-slate-400">
                                 School admin?

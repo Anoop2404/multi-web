@@ -71,6 +71,14 @@
             margin-top: 4px;
             color: #475569;
             font-style: italic;
+            line-height: 1.4;
+        }
+        .org-registration {
+            font-size: 10px;
+            margin-top: 2px;
+            color: #475569;
+            font-style: italic;
+            line-height: 1.4;
         }
         .meta-row {
             display: flex;
@@ -167,6 +175,9 @@
                 @endif
                 @if(!empty($template['registered_office']))
                     <div class="org-office">{{ $template['registered_office'] }}</div>
+                @endif
+                @if(!empty($template['society_registration']))
+                    <div class="org-registration">{{ $template['society_registration'] }}</div>
                 @endif
             </div>
         </div>

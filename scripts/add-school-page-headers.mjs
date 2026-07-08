@@ -7,7 +7,7 @@ const eyebrowRules = [
     { test: /^(Students|Teachers|Houses|Setup|Users)\//, eyebrow: 'Students', desc: 'Student records, teachers, and portal access.' },
     { test: /^Registration\//, eyebrow: 'Membership', desc: 'Annual Sahodaya membership registration and school profile.' },
     { test: /^(Events|Fest|Mcq|Training|Circulars|Payments|Notifications)\//, eyebrow: 'Programs', desc: 'Fest programs, exams, training, and Sahodaya circulars.' },
-    { test: /^(News|Gallery|Staff|Achievements|Downloads|JobVacancies|BoardResults|Alumni|Testimonials|Contact|SiteBuilder|Enquiries|TcRequests)\//, eyebrow: 'Website', desc: 'School website content and public pages.' },
+    { test: /^(News|Gallery|Staff|Achievements|Downloads|JobVacancies|BoardResults|Alumni|Testimonials|Contact|SiteBuilder|Enquiries)\//, eyebrow: 'Website', desc: 'School website content and public pages.' },
     { test: /^Settings\//, eyebrow: 'School', desc: 'School profile and configuration.' },
     { test: /^Dashboard\.vue$/, eyebrow: 'Dashboard', desc: 'Manage students and complete annual Sahodaya membership registration.' },
 ];

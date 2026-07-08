@@ -19,17 +19,21 @@ class LedgerPostingService
         ?string $nameOverride = null,
         ?string $category = null,
         int|string|null $eventId = null,
+        int|string|null $mcqExamId = null,
+        int|string|null $trainingProgramId = null,
     ): AccountHead {
         $def = LedgerAccountCatalog::definition($code);
 
         $head = AccountHead::firstOrCreate(
             ['tenant_id' => $tenantId, 'code' => $code],
             [
-                'name'      => $nameOverride ?? $def['name'],
-                'type'      => $def['type'],
-                'category'  => $category ?? $def['category'],
-                'event_id'  => $eventId,
-                'is_active' => true,
+                'name'                 => $nameOverride ?? $def['name'],
+                'type'                 => $def['type'],
+                'category'             => $category ?? $def['category'],
+                'event_id'             => $eventId,
+                'mcq_exam_id'          => $mcqExamId,
+                'training_program_id'  => $trainingProgramId,
+                'is_active'            => true,
             ]
         );
 
@@ -42,6 +46,12 @@ class LedgerPostingService
         }
         if ($eventId && $head->event_id !== $eventId) {
             $updates['event_id'] = $eventId;
+        }
+        if ($mcqExamId && $head->mcq_exam_id !== $mcqExamId) {
+            $updates['mcq_exam_id'] = $mcqExamId;
+        }
+        if ($trainingProgramId && $head->training_program_id != $trainingProgramId) {
+            $updates['training_program_id'] = $trainingProgramId;
         }
         if ($updates !== []) {
             $head->update($updates);
@@ -70,6 +80,7 @@ class LedgerPostingService
         ?string $transactionDate = null,
         ?int $postedBy = null,
         bool $forceRepost = false,
+        ?int $financialYearId = null,
     ): array {
         if ($referenceType && $referenceId) {
             $existing = LedgerTransaction::where('reference_type', $referenceType)
@@ -90,9 +101,9 @@ class LedgerPostingService
 
         $journalId = (string) Str::uuid();
         $date = $transactionDate ?? now()->toDateString();
-        $financialYearId = FinancialYear::currentId();
+        $yearId = $financialYearId ?? FinancialYear::currentId();
 
-        return DB::transaction(function () use ($tenantId, $lines, $journalId, $referenceType, $referenceId, $date, $postedBy, $financialYearId) {
+        return DB::transaction(function () use ($tenantId, $lines, $journalId, $referenceType, $referenceId, $date, $postedBy, $financialYearId, $yearId) {
             $created = [];
 
             foreach ($lines as $line) {
@@ -101,7 +112,7 @@ class LedgerPostingService
                 $created[] = LedgerTransaction::create([
                     'tenant_id'         => $tenantId,
                     'journal_id'        => $journalId,
-                    'financial_year_id' => $financialYearId,
+                    'financial_year_id' => $yearId,
                     'account_head_id'   => $head->id,
                     'reference_type'    => $referenceType,
                     'reference_id'      => $referenceId,

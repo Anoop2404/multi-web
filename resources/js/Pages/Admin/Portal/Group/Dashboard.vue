@@ -43,6 +43,7 @@
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { groupPortalNavItems } from '@/support/groupPortalNav.js';
 
 const props = defineProps({
     school: Object,
@@ -51,12 +52,5 @@ const props = defineProps({
     studentCount: Number,
 });
 
-const navItems = computed(() => [
-    { href: `/portal/group/${props.school.id}`, label: 'Dashboard' },
-    { href: `/portal/group/${props.school.id}/students`, label: 'Students' },
-    { href: `/portal/group/${props.school.id}/fest/registrations`, label: 'Fest registrations' },
-    { href: `/portal/group/${props.school.id}/fest/schedule`, label: 'Fest schedule' },
-    { href: `/portal/group/${props.school.id}/fest/clashes`, label: 'Clashes' },
-    { href: `/portal/group/${props.school.id}/fest/admit-cards`, label: 'Admit cards' },
-]);
+const navItems = computed(() => groupPortalNavItems(props.school.id));
 </script>

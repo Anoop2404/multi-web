@@ -2,7 +2,7 @@
     <PortalLayout
         role-label="Exam Portal"
         :title="sahodaya.name"
-        subtitle="Attendance, hall supervision — offline MCQ"
+        subtitle="Attendance, hall supervision — offline Talent Search"
         accent="emerald"
         :nav-items="navItems"
     >
@@ -19,7 +19,7 @@
         <PortalAssignmentsHub
             title="My exam assignments"
             eyebrow="Exam portal"
-            description="MCQ exams where you are assigned hall supervision or mark entry."
+            description="Talent Search exams where you are assigned hall supervision or mark entry."
             empty-message="No assigned exams."
             :stats="stats"
             :assignments="assignmentCards"
@@ -30,13 +30,12 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import PortalAssignmentsHub from '@/Components/portal/PortalAssignmentsHub.vue';
+import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, onMounted, onUnmounted, reactive } from 'vue';
 
 const props = defineProps({ sahodaya: Object, exams: Array, canMark: Boolean });
 
-const navItems = computed(() => [
-    { href: `/portal/exam/${props.sahodaya.id}`, label: 'Exams' },
-]);
+const navItems = computed(() => examPortalNavItems(props.sahodaya.id));
 
 const stats = computed(() => [
     { label: 'Exams', value: props.exams.length },

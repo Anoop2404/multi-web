@@ -34,7 +34,10 @@ class EnsureFestEventOps
             return $next($request);
         }
 
-        if ($tenantId && FestEventStaff::where('user_id', $user->id)->exists()) {
+        if ($tenantId && FestEventStaff::query()
+            ->where('user_id', $user->id)
+            ->whereHas('event', fn ($q) => $q->where('tenant_id', $tenantId))
+            ->exists()) {
             return $next($request);
         }
 

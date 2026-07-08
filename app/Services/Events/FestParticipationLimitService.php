@@ -94,6 +94,8 @@ class FestParticipationLimitService
             $errors = array_merge($errors, $this->validateStudent($sid, $item, $schoolId, $policy));
         }
 
+        $errors = array_merge($errors, $this->validateComboProfiles($performerIds, $item, $schoolId, $policy));
+
         $errors = array_merge(
             $errors,
             app(FestComboRuleService::class)->validate($this->event, $item, $schoolId, $performerIds)
@@ -101,6 +103,59 @@ class FestParticipationLimitService
 
         if ($isGroup && count($standbyIds) > 2) {
             $errors[] = 'Maximum 2 standby participants allowed per group item.';
+        }
+
+        return $errors;
+    }
+
+    /** @return list<string> */
+    private function validateComboProfiles(array $performerIds, FestEventItem $item, string $schoolId, array $policy): array
+    {
+        $profiles = $policy['combo_profiles'] ?? null;
+        if (! is_array($profiles) || $profiles === []) {
+            return [];
+        }
+
+        $errors = [];
+        foreach ($performerIds as $studentId) {
+            $studentRegs = $this->studentRegistrations($studentId, $schoolId, $policy);
+            $counts = [
+                'onstage' => $this->filterRegs($studentRegs, 'on_stage')->count(),
+                'offstage' => $this->filterRegs($studentRegs, 'off_stage')->count(),
+                'group' => $this->filterRegs($studentRegs, 'group')->count(),
+            ];
+
+            $isOnStage = ($item->stage_type ?? '') === 'on_stage';
+            $isOffStage = ($item->stage_type ?? '') === 'off_stage';
+            $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+
+            if ($isOnStage) {
+                $counts['onstage']++;
+            }
+            if ($isOffStage) {
+                $counts['offstage']++;
+            }
+            if ($isGroup) {
+                $counts['group']++;
+            }
+
+            $satisfied = false;
+            foreach ($profiles as $profile) {
+                if ($counts['onstage'] <= (int) ($profile['onstage'] ?? 99)
+                    && $counts['offstage'] <= (int) ($profile['offstage'] ?? 99)
+                    && $counts['group'] <= (int) ($profile['group'] ?? 99)
+                    && ($counts['onstage'] + $counts['offstage'] + $counts['group']) <=
+                        ((int) ($profile['onstage'] ?? 0) + (int) ($profile['offstage'] ?? 0) + (int) ($profile['group'] ?? 0))
+                ) {
+                    $satisfied = true;
+                    break;
+                }
+            }
+
+            if (! $satisfied) {
+                $name = Student::where('id', $studentId)->value('name') ?? 'Student';
+                $errors[] = "{$name} does not satisfy any allowed MCS item combination profile.";
+            }
         }
 
         return $errors;

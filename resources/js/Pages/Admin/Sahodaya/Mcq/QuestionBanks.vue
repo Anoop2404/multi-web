@@ -1,14 +1,14 @@
 <template>
     <SahodayaAdminLayout :title="`Question Banks — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="MCQ exam" description="Link teacher question banks to this exam." />
+        <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Link teacher question banks to this exam." />
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="question-banks" />
 
         <div v-if="(exam.delivery_mode || 'offline') === 'offline'" class="card card--muted mb-4 !py-3 px-4 text-sm text-slate-700">
             This exam is <strong>offline</strong>. Question banks are optional — link them only if you switch delivery to online on the Overview tab.
         </div>
         <div v-else-if="!exam.question_banks?.length" class="card card--accent !border-amber-200 mb-4 !py-3 px-4 text-sm text-amber-900">
-            Online exam: attach at least one question bank with gradable MCQ items before students can start.
+            Online exam: attach at least one question bank with gradable Talent Search items before students can start.
         </div>
 
         <input v-model="searchQuery" type="search" class="field max-w-md mb-4" placeholder="Search banks…">

@@ -4,11 +4,23 @@ namespace App\Services\Ledger;
 
 use App\Models\FeeReceipt;
 use App\Models\LedgerTransaction;
+use App\Models\McqExam;
 use App\Models\McqRegistration;
 use App\Models\McqSchoolFee;
+use App\Support\LedgerAccountCatalog;
 
 class McqFeeLedgerService
 {
+    private function incomeCodeForExam(McqExam $exam): string
+    {
+        return LedgerAccountCatalog::mcqExamFeeCode($exam->id);
+    }
+
+    private function ensureExamHead(McqExam $exam): void
+    {
+        app(LedgerAccountSetupService::class)->ensureMcqExamHead($exam);
+    }
+
     public function postApprovedReceipt(FeeReceipt $receipt, bool $forceRepost = false): ?LedgerTransaction
     {
         if ($receipt->status !== 'approved') {
@@ -25,21 +37,22 @@ class McqFeeLedgerService
     private function postRegistrationReceipt(FeeReceipt $receipt, bool $forceRepost): ?LedgerTransaction
     {
         $registration = McqRegistration::with(['exam', 'student'])->find($receipt->feeable_id);
-        $sahodayaId = $registration?->exam?->tenant_id;
-        if (! $sahodayaId) {
+        $exam = $registration?->exam;
+        $sahodayaId = $exam?->tenant_id;
+        if (! $sahodayaId || ! $exam) {
             return null;
         }
 
-        app(LedgerPostingService::class)->ensureHead($sahodayaId, 'MCQ-FEE', null, 'mcq');
+        $this->ensureExamHead($exam);
+        $incomeCode = $this->incomeCodeForExam($exam);
 
         $student = $registration->student?->name ?? 'Student';
-        $exam = $registration->exam?->title ?? 'MCQ Exam';
-        $description = "MCQ fee — {$student} — {$exam}";
+        $description = "Talent Search fee — {$student} — {$exam->title}";
 
         $rows = app(LedgerPostingService::class)->postIncomeReceipt(
             $receipt,
             $sahodayaId,
-            'MCQ-FEE',
+            $incomeCode,
             $description,
             $forceRepost
         );
@@ -50,21 +63,22 @@ class McqFeeLedgerService
     private function postSchoolBatchReceipt(FeeReceipt $receipt, bool $forceRepost): ?LedgerTransaction
     {
         $schoolFee = McqSchoolFee::with(['exam', 'school'])->find($receipt->feeable_id);
-        $sahodayaId = $schoolFee?->exam?->tenant_id;
-        if (! $sahodayaId) {
+        $exam = $schoolFee?->exam;
+        $sahodayaId = $exam?->tenant_id;
+        if (! $sahodayaId || ! $exam) {
             return null;
         }
 
-        app(LedgerPostingService::class)->ensureHead($sahodayaId, 'MCQ-FEE', null, 'mcq');
+        $this->ensureExamHead($exam);
+        $incomeCode = $this->incomeCodeForExam($exam);
 
         $school = $schoolFee->school?->name ?? 'School';
-        $exam = $schoolFee->exam?->title ?? 'MCQ Exam';
-        $description = "MCQ batch fee — {$school} — {$exam} ({$schoolFee->student_count} students)";
+        $description = "Talent Search batch fee — {$school} — {$exam->title} ({$schoolFee->student_count} students)";
 
         $rows = app(LedgerPostingService::class)->postIncomeReceipt(
             $receipt,
             $sahodayaId,
-            'MCQ-FEE',
+            $incomeCode,
             $description,
             $forceRepost
         );

@@ -23,7 +23,10 @@
                        rel="noopener"
                        class="text-xs font-semibold text-indigo-600 shrink-0">Download ↗</a>
                 </li>
-                <li v-if="!festCerts?.length" class="text-gray-400 py-2">No certificates yet</li>
+                <li v-if="!festCerts?.length" class="py-4 text-center text-gray-400">
+                    <p>No certificates yet.</p>
+                    <a :href="`/portal/student/${school.id}/results`" class="text-xs text-indigo-600 font-semibold mt-2 inline-block">Check results →</a>
+                </li>
             </ul>
         </section>
     </PortalLayout>

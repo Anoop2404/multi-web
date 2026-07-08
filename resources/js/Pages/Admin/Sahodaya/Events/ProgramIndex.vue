@@ -1,7 +1,7 @@
 <template>
     <SahodayaEventsLayout :title="program.label" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :program="program"
-                         :program-events="events" :show-header-title="false">
+                         :program-events="sidebarEvents" :show-header-title="false">
         <PageHeader
             :title="program.label"
             eyebrow="Programs"
@@ -62,6 +62,16 @@
                       class="card card--muted !py-4 hover:border-[color:var(--brand-blue)]/30 transition">
                     <p class="text-sm font-semibold text-slate-900">Assign items to event</p>
                     <p class="text-xs text-slate-500 mt-1">Load items into a sports event</p>
+                </Link>
+                <Link :href="sahodayaProgramHref(sahodaya.id, program.slug, 'results')"
+                      class="card card--muted !py-4 hover:border-[color:var(--brand-blue)]/30 transition">
+                    <p class="text-sm font-semibold text-slate-900">Cluster results</p>
+                    <p class="text-xs text-slate-500 mt-1">Published marks across events</p>
+                </Link>
+                <Link :href="sahodayaProgramHref(sahodaya.id, program.slug, 'rankings')"
+                      class="card card--muted !py-4 hover:border-[color:var(--brand-blue)]/30 transition">
+                    <p class="text-sm font-semibold text-slate-900">School rankings</p>
+                    <p class="text-xs text-slate-500 mt-1">House & school points standings</p>
                 </Link>
             </template>
             <template v-else>
@@ -222,8 +232,10 @@
                             <th>Title</th>
                             <th>Level</th>
                             <th>Status</th>
+                            <th>Sidebar</th>
                             <th>Items</th>
                             <th>Registrations</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -236,8 +248,21 @@
                             <td>
                                 <span class="status-pill" :class="statusClass(event.status)">{{ event.status }}</span>
                             </td>
+                            <td>
+                                <button type="button"
+                                        class="text-xs font-medium"
+                                        :class="event.nav_hidden ? 'text-slate-400' : 'text-emerald-700'"
+                                        @click="toggleNavHidden(event)">
+                                    {{ event.nav_hidden ? 'Hidden' : 'Visible' }}
+                                </button>
+                            </td>
                             <td>{{ event.items_count }}</td>
                             <td>{{ event.registrations_count }}</td>
+                            <td class="text-right">
+                                <Link :href="eventManageUrl(event.id)" class="link-brand">
+                                    Manage →
+                                </Link>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -250,7 +275,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
@@ -273,6 +298,13 @@ const props = defineProps({
 });
 
 const isSports = computed(() => props.program.eventType === 'sports');
+
+function eventManageUrl(eventId) {
+    const base = `/sahodaya-admin/${props.sahodaya.id}/events/${eventId}`;
+    return isSports.value ? `${base}/setup` : base;
+}
+
+const sidebarEvents = computed(() => (props.events ?? []).filter((ev) => !ev.nav_hidden));
 
 const eventQuery = computed(() => (props.event?.id ? `?event_id=${props.event.id}` : ''));
 
@@ -310,6 +342,10 @@ function createEvent() {
         preserveScroll: true,
         onSuccess: () => form.reset('title'),
     });
+}
+
+function toggleNavHidden(event) {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}/toggle-nav-hidden`, {}, { preserveScroll: true });
 }
 
 function fmt(v) {

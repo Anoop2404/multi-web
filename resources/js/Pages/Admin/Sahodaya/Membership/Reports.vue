@@ -42,7 +42,6 @@
                     <template #default="{ id }">
                         <input :id="id" v-model="searchForm.search" type="search"
                                :placeholder="searchPlaceholder"
-                               @keyup.enter="applySearch"
                                class="field">
                     </template>
                 </FormField>
@@ -56,7 +55,6 @@
                         <input :id="id" v-model="searchForm.date_to" type="date" class="field">
                     </template>
                 </FormField>
-                <button type="button" @click="applySearch" class="btn-primary">Apply filters</button>
                 <a :href="exportUrl()" class="btn-secondary ml-auto">Download Excel ↓</a>
             </div>
 
@@ -91,9 +89,13 @@
                                 <td class="td text-right font-semibold text-[#0f3d7a]">{{ s.student_count.toLocaleString('en-IN') }}</td>
                                 <td class="td text-right text-gray-600">{{ s.classes_count }}</td>
                                 <td class="td text-gray-500 text-xs">{{ formatDate(s.created_at) }}</td>
-                                <td class="td text-right">
+                                <td class="td text-right whitespace-nowrap">
+                                    <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/${s.id}/students`"
+                                          class="text-xs font-semibold text-[#0f3d7a] hover:underline mr-3">
+                                        Students →
+                                    </Link>
                                     <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/${s.id}`"
-                                          class="text-xs font-semibold text-[#0f3d7a] hover:underline">Details →</Link>
+                                          class="text-xs font-semibold text-slate-500 hover:underline">Details</Link>
                                 </td>
                             </tr>
                         </tbody>
@@ -178,6 +180,7 @@
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { reactive, computed, defineComponent, h } from 'vue';
+import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String,
@@ -233,6 +236,12 @@ function applySearch() {
         date_to: searchForm.date_to,
     }), { preserveState: true, replace: true });
 }
+
+useDebouncedInertiaFilters(searchForm, applySearch, () => ({
+    search: props.search ?? '',
+    date_from: props.dateFrom ?? '',
+    date_to: props.dateTo ?? '',
+}));
 
 function exportUrl() {
     const type = {

@@ -18,7 +18,7 @@
 
         <section v-if="mcqBanks?.length" id="section-mcq" class="card mb-4">
             <div class="flex items-center justify-between gap-2 mb-2">
-                <h2 class="font-semibold text-sm">MCQ question banks</h2>
+                <h2 class="font-semibold text-sm">Talent Search question banks</h2>
                 <a :href="`/portal/teacher/${school.id}/question-banks`" class="text-xs font-semibold text-indigo-600">Manage →</a>
             </div>
             <ul class="text-sm divide-y">
@@ -177,7 +177,7 @@ const navItems = computed(() => teacherPortalNavItems(props.school.id));
 
 const jumpSections = computed(() => {
     const sections = [];
-    if (props.mcqBanks?.length) sections.push({ id: 'section-mcq', label: 'MCQ banks' });
+    if (props.mcqBanks?.length) sections.push({ id: 'section-mcq', label: 'Talent Search banks' });
     if (props.training?.length) sections.push({ id: 'section-training', label: 'Training' });
     if (props.festRegistrations?.length) sections.push({ id: 'section-fest-reg', label: 'Fest reg' });
     if (props.festDaySlots?.length) sections.push({ id: 'section-schedule', label: 'Schedule' });

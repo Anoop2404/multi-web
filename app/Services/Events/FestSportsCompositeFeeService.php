@@ -86,14 +86,25 @@ class FestSportsCompositeFeeService
                 $position = ($chargedRegistrations[$studentId] ?? 0) + 1;
                 $chargedRegistrations[$studentId] = $position;
 
-                if ($position <= $includedQuota) {
+                // Items within quota are covered by the student registration fee.
+                if ($includedQuota > 0 && $position <= $includedQuota) {
                     continue;
                 }
 
-                $amount = $this->itemFeeResolver->amountForItem($registration->item, $schedule, $event);
-                $label = ($registration->item?->title ?? 'Item').' (extra)';
+                // Quota 0 → every item billed separately at default item/head rates.
+                // Quota N → items after N use extra item/head rates.
+                $beyondQuota = $includedQuota > 0 && $position > $includedQuota;
+                $amount = $this->itemFeeResolver->amountForItem(
+                    $registration->item,
+                    $schedule,
+                    $event,
+                    extraQuotaItem: $beyondQuota,
+                );
+                $suffix = $beyondQuota ? ' (extra)' : '';
+                $lineType = $beyondQuota ? 'extra_item' : 'item_fee';
+                $label = ($registration->item?->title ?? 'Item').$suffix;
                 $extraLines[] = [
-                    'line_type' => 'extra_item',
+                    'line_type' => $lineType,
                     'label' => $label,
                     'quantity' => 1,
                     'unit_amount' => $amount,
@@ -102,6 +113,8 @@ class FestSportsCompositeFeeService
                         'student_id' => $studentId,
                         'item_id' => $registration->item_id,
                         'registration_id' => $registration->id,
+                        'item_position' => $position,
+                        'included_quota' => $includedQuota,
                     ],
                 ];
                 $extraTotal += $amount;

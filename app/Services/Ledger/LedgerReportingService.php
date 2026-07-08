@@ -6,6 +6,8 @@ use App\Models\AccountHead;
 use App\Models\FestEvent;
 use App\Models\FestSchoolEventFee;
 use App\Models\LedgerTransaction;
+use App\Models\TrainingProgram;
+use App\Models\TrainingRegistration;
 use App\Support\LedgerAccountCatalog;
 use Illuminate\Support\Collection;
 
@@ -48,6 +50,129 @@ class LedgerReportingService
             ->whereNotNull('event_id')
             ->orderBy('name')
             ->get(['id', 'code', 'name', 'event_id']);
+    }
+
+    /** @return Collection<int, object> */
+    public function mcqExamIncomeHeads(string $tenantId): Collection
+    {
+        return AccountHead::query()
+            ->where('tenant_id', $tenantId)
+            ->where('category', 'mcq')
+            ->whereNotNull('mcq_exam_id')
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'mcq_exam_id']);
+    }
+
+    /** @return Collection<int, object> */
+    public function trainingProgramIncomeHeads(string $tenantId): Collection
+    {
+        return AccountHead::query()
+            ->where('tenant_id', $tenantId)
+            ->where('category', 'training')
+            ->whereNotNull('training_program_id')
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'training_program_id']);
+    }
+
+    /** @return array<string, mixed> */
+    public function trainingProgramPaymentLedger(TrainingProgram $program): array
+    {
+        $code = LedgerAccountCatalog::trainingProgramFeeCode($program->id);
+        $head = AccountHead::where('tenant_id', $program->tenant_id)->where('code', $code)->first();
+
+        $transactions = $head
+            ? LedgerTransaction::where('tenant_id', $program->tenant_id)
+                ->where('account_head_id', $head->id)
+                ->orderByDesc('transaction_date')
+                ->limit(200)
+                ->get()
+            : collect();
+
+        $registrations = TrainingRegistration::where('program_id', $program->id)
+            ->with(['teacher', 'school', 'feeReceipt'])
+            ->orderBy('school_id')
+            ->get()
+            ->map(function (TrainingRegistration $registration) use ($program) {
+                $receipt = $registration->feeReceipt;
+                $amount = $receipt
+                    ? (float) $receipt->amount
+                    : (($program->fee_type !== 'none' && $program->fee_amount) ? (float) $program->fee_amount : 0.0);
+
+                return [
+                    'teacher'         => $registration->teacher?->name ?? "Registration #{$registration->id}",
+                    'school'          => $registration->school?->name,
+                    'status'          => $receipt?->status ?? $registration->status,
+                    'amount'          => $amount,
+                    'receipt_number'  => $receipt?->receipt_number,
+                    'payment_date'    => $receipt?->payment_date?->toDateString(),
+                    'ledger_posted'   => $receipt?->status === 'approved',
+                ];
+            });
+
+        $collected = (float) $registrations
+            ->filter(fn (array $row) => ($row['status'] ?? '') === 'approved')
+            ->sum('amount');
+
+        return [
+            'head'            => $head,
+            'account_code'    => $code,
+            'account_name'    => $head?->name ?? LedgerAccountCatalog::trainingProgramIncomeHeadName($program),
+            'transactions'    => $transactions,
+            'registrations'   => $registrations,
+            'summary'         => [
+                'total_due'      => (float) $registrations->sum('amount'),
+                'collected'      => $collected,
+                'pending'        => $registrations->whereIn('status', ['registered', 'pending'])->count(),
+                'awaiting'       => $registrations->where('status', 'uploaded')->count(),
+                'ledger_credits' => (float) $transactions->where('entry_type', 'credit')->sum('amount'),
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function mcqExamPaymentLedger(\App\Models\McqExam $exam): array
+    {
+        $code = LedgerAccountCatalog::mcqExamFeeCode($exam->id);
+        $head = AccountHead::where('tenant_id', $exam->tenant_id)->where('code', $code)->first();
+
+        $transactions = $head
+            ? LedgerTransaction::where('tenant_id', $exam->tenant_id)
+                ->where('account_head_id', $head->id)
+                ->orderByDesc('transaction_date')
+                ->limit(200)
+                ->get()
+            : collect();
+
+        $schoolFees = \App\Models\McqSchoolFee::where('exam_id', $exam->id)
+            ->with(['school', 'feeReceipt'])
+            ->orderBy('school_id')
+            ->get()
+            ->map(fn (\App\Models\McqSchoolFee $fee) => [
+                'school'          => $fee->school?->name ?? $fee->school_id,
+                'status'          => $fee->status,
+                'total_due'       => (float) $fee->total_due,
+                'student_count'   => (int) $fee->student_count,
+                'receipt_number'  => $fee->feeReceipt?->receipt_number,
+                'payment_date'    => $fee->feeReceipt?->payment_date?->toDateString(),
+                'ledger_posted'   => $fee->status === 'approved' && $fee->feeReceipt?->status === 'approved',
+            ]);
+
+        $collected = (float) $schoolFees->where('status', 'approved')->sum('total_due');
+
+        return [
+            'head'             => $head,
+            'account_code'     => $code,
+            'account_name'     => $head?->name ?? LedgerAccountCatalog::mcqExamIncomeHeadName($exam),
+            'transactions'     => $transactions,
+            'school_payments'  => $schoolFees,
+            'summary'          => [
+                'total_due'      => (float) $schoolFees->sum('total_due'),
+                'collected'      => $collected,
+                'pending'        => $schoolFees->where('status', 'pending')->count(),
+                'awaiting'       => $schoolFees->whereIn('status', ['proof_uploaded', 'submitted'])->count(),
+                'ledger_credits' => (float) $transactions->where('entry_type', 'credit')->sum('amount'),
+            ],
+        ];
     }
 
     /** @return array{head: ?AccountHead, transactions: Collection, school_payments: Collection, summary: array<string, mixed>} */

@@ -2,8 +2,9 @@
     <SahodayaEventsLayout :title="`${event.title} — Registrations`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Registrations`" eyebrow="Review"
-                    description="Approve or reject school registrations. Register on behalf of a school when needed.">
+                    :description="filterDescription">
             <template #actions>
+                <Link v-if="competitionUrl" :href="competitionUrl" class="btn-secondary text-xs">← By item head</Link>
                 <button type="button" class="btn-primary text-xs" @click="openOnBehalf">Register on behalf</button>
                 <Link :href="`${base}/registrations/import`" class="btn-secondary text-xs">Import CSV</Link>
                 <Link v-if="feeRequired" :href="`${base}/fees`" class="btn-secondary text-xs">Event fees</Link>
@@ -12,6 +13,11 @@
 
         <FestEventWorkflowStepper :sahodaya-id="sahodaya.id" :event-id="event.id"
                                   :event-type="event.event_type" :current-step="'registration'" />
+
+        <p v-if="selectedItemId" class="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+            Showing registrations for one item.
+            <Link :href="competitionUrl" class="font-semibold underline ml-1">Back to item listing</Link>
+        </p>
 
         <div class="card mb-4 space-y-3">
             <div class="flex flex-wrap gap-2 items-end">
@@ -196,6 +202,17 @@
                             <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
                         </select>
                     </FormField>
+                    <div v-if="event.event_type === 'kalolsavam' && onBehalfForm.school_id"
+                         class="rounded-lg border px-3 py-2 text-xs"
+                         :class="selectedSchoolRegion ? 'border-emerald-100 bg-emerald-50 text-emerald-900' : 'border-amber-100 bg-amber-50 text-amber-900'">
+                        <p v-if="selectedSchoolRegion">
+                            Kalotsav region: <strong>{{ selectedSchoolRegion }}</strong>
+                        </p>
+                        <p v-else>
+                            This school has no Kalotsav region for the active year.
+                            <Link :href="`/sahodaya-admin/${sahodaya.id}/regions`" class="font-semibold underline">Assign region first</Link>.
+                        </p>
+                    </div>
                     <FormField label="Event item" required>
                         <select v-model="onBehalfForm.item_id" class="field text-sm" required>
                             <option value="">Select item</option>
@@ -295,7 +312,21 @@ const props = defineProps({
     registerStudents: { type: Array, default: () => [] },
     registerSchoolId: { type: [String, Number], default: '' },
     eventItems: { type: Array, default: () => [] },
+    schoolRegions: { type: Object, default: () => ({}) },
     filters: { type: Object, default: () => ({ search: '' }) },
+    selectedHeadId: { type: [String, Number], default: null },
+    selectedItemId: { type: [Number, String], default: null },
+    competitionUrl: { type: String, default: null },
+});
+
+const filterDescription = computed(() => {
+    if (props.selectedItemId) {
+        return 'Review and approve registrations for a single competition item.';
+    }
+    if (props.selectedHeadId) {
+        return 'Filtered by item head — approve, reject, or register on behalf of schools.';
+    }
+    return 'Approve or reject school registrations. Register on behalf of a school when needed.';
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
@@ -316,6 +347,12 @@ const onBehalfForm = reactive({
     student_ids: [],
     standby_ids: [],
     auto_approve: true,
+});
+const selectedSchoolRegion = computed(() => {
+    if (!onBehalfForm.school_id) return null;
+    return props.schoolRegions?.[onBehalfForm.school_id]
+        ?? props.schoolRegions?.[String(onBehalfForm.school_id)]
+        ?? null;
 });
 
 watch(() => props.registerStudents, () => {

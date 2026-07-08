@@ -47,7 +47,7 @@ class RegistrationStatusService
         $registration = Registration::create([
             'school_id'                 => $school->id,
             'academic_year'             => $academicYear,
-            'reg_no'                    => $this->membershipNumberGenerator->generate($school),
+            'reg_no'                    => $this->membershipNumberGenerator->generate($school, $academicYear),
             'registration_status'       => 'data_pending',
             'school_year_submission_id' => $submission->id,
             'membership_fee_amount'     => null,
@@ -123,7 +123,7 @@ class RegistrationStatusService
 
         $school = $registration->school;
         $registration->update([
-            'reg_no' => $this->membershipNumberGenerator->generate($school),
+            'reg_no' => $this->membershipNumberGenerator->generate($school, $registration->academic_year),
         ]);
 
         return $registration->fresh();

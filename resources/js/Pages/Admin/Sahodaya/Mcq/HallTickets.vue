@@ -1,8 +1,12 @@
 <template>
     <SahodayaAdminLayout :title="`Hall Tickets — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="MCQ exam" description="Design admit cards, issue reg. numbers, and print hall tickets.">
+        <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Design admit cards, issue reg. numbers, and print hall tickets.">
             <template #actions>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/preview`"
+                   target="_blank" rel="noopener" class="btn-secondary text-sm">Sample hall ticket ↗</a>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/certificates/preview`"
+                   target="_blank" rel="noopener" class="btn-secondary text-sm">Sample certificate ↗</a>
                 <button type="button" @click="generate" class="btn-primary text-sm">Issue missing (approved only)</button>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/print-all`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Print all ↗</a>
@@ -19,7 +23,7 @@
 
                 <FormGrid>
                     <FormField label="Ticket header title" class-extra="sm:col-span-2">
-                        <input v-model="designForm.header_title" class="field" placeholder="MCQ Examination — Hall Ticket">
+                        <input v-model="designForm.header_title" class="field" placeholder="Talent Search Examination — Hall Ticket">
                     </FormField>
                     <FormField label="Footer note" class-extra="sm:col-span-2">
                         <input v-model="designForm.footer_note" class="field" placeholder="Optional note on admit card">

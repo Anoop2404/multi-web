@@ -6,7 +6,7 @@
             description="Per-teacher registrations and scores for this event."
         >
             <template #actions>
-                <Link :href="`${programBase}/reports`" class="btn-secondary text-sm">← Reports</Link>
+                <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
                 <a :href="exportUrl" class="btn-primary text-sm">Export CSV ↓</a>
             </template>
         </PageHeader>

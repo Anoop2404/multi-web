@@ -7,6 +7,7 @@ use App\Models\SahodayaRegistrationWindow;
 use App\Models\SchoolLockOverride;
 use App\Models\Tenant;
 use App\Support\AcademicYear;
+use Carbon\CarbonInterface;
 
 class StudentEditLockService
 {
@@ -34,7 +35,7 @@ class StudentEditLockService
 
         return [
             'locked'              => ! $state['can_add'] && ! $state['can_edit'],
-            'lock_at'             => $profile?->student_edit_lock_at?->toIso8601String(),
+            'lock_at'             => null,
             'manual_lock'         => (bool) ($profile?->student_edit_lock_enabled ?? false),
             'message'             => $state['message'],
             'can_add'             => $state['can_add'],
@@ -70,26 +71,16 @@ class StudentEditLockService
             return $this->stateFromOverride($override);
         }
 
-        $window = $this->registrationWindowForSchool($school);
-        if ($window) {
-            return $this->stateFromGlobalWindow($window);
-        }
-
-        if ($profile?->student_edit_lock_at && now()->gte($profile->student_edit_lock_at)) {
-            return [
-                'can_add'             => false,
-                'can_edit'            => false,
-                'source'              => 'global_window',
-                'message'             => 'Student edit window closed on '.$profile->student_edit_lock_at->timezone(config('app.timezone'))->format('d M Y, h:i A').'. Submit a change request for approval.',
-                'override_expires_at' => null,
-            ];
+        $global = $this->stateFromGlobalWindow($school->parent_id);
+        if ($global) {
+            return $global;
         }
 
         return [
             'can_add'             => false,
             'can_edit'            => false,
             'source'              => 'global_window',
-            'message'             => 'Student registration and edit windows are closed. Submit a change request for approval.',
+            'message'             => 'Student add/edit windows are closed. Submit a change request or contact Sahodaya.',
             'override_expires_at' => null,
         ];
     }
@@ -119,19 +110,6 @@ class StudentEditLockService
         }
     }
 
-    private function registrationWindowForSchool(Tenant $school): ?SahodayaRegistrationWindow
-    {
-        if (! $school->parent_id) {
-            return null;
-        }
-
-        $year = AcademicYear::forSahodaya($school->parent_id);
-
-        return SahodayaRegistrationWindow::where('sahodaya_id', $school->parent_id)
-            ->where('academic_year', $year)
-            ->first();
-    }
-
     /** @return array{can_add: bool, can_edit: bool, source: string, message: ?string, override_expires_at: ?string} */
     private function stateFromOverride(SchoolLockOverride $override): array
     {
@@ -158,31 +136,38 @@ class StudentEditLockService
         ];
     }
 
-    /** @return array{can_add: bool, can_edit: bool, source: string, message: ?string, override_expires_at: ?string} */
-    private function stateFromGlobalWindow(SahodayaRegistrationWindow $window): array
+    /** @return array{can_add: bool, can_edit: bool, source: string, message: ?string, override_expires_at: ?string}|null */
+    private function stateFromGlobalWindow(?string $sahodayaId): ?array
     {
-        $now = now();
-
-        $addOpen = $window->add_open ?? $window->registration_starts_at;
-        $addClose = $window->add_close ?? $window->registration_ends_at;
-        $editOpen = $window->edit_open;
-        $editClose = $window->edit_close;
-
-        $canAdd = $this->isWithinWindow($addOpen, $addClose, $now);
-        $canEdit = $this->isWithinWindow($editOpen, $editClose, $now);
-
-        if (! $canAdd && ! $canEdit && $addOpen === null && $addClose === null && $editOpen === null && $editClose === null) {
-            $canAdd = $this->isWithinWindow($window->registration_starts_at, $window->registration_ends_at, $now);
-            $canEdit = $canAdd;
+        if (! $sahodayaId) {
+            return null;
         }
+
+        $year = AcademicYear::forSahodaya($sahodayaId);
+        $window = SahodayaRegistrationWindow::where('sahodaya_id', $sahodayaId)
+            ->where('academic_year', $year)
+            ->first();
+
+        if (! $window) {
+            return null;
+        }
+
+        $hasStudentWindow = $window->add_open || $window->add_close || $window->edit_open || $window->edit_close;
+        if (! $hasStudentWindow) {
+            return null;
+        }
+
+        $now = now();
+        $canAdd = $this->withinWindow($window->add_open, $window->add_close, $now);
+        $canEdit = $this->withinWindow($window->edit_open, $window->edit_close, $now);
 
         $message = null;
         if (! $canAdd && ! $canEdit) {
-            $message = 'Student registration and edit windows are closed. Submit a change request for approval.';
+            $message = 'Student add/edit windows are closed for '.$year.'. Submit a change request or contact Sahodaya.';
         } elseif (! $canAdd) {
-            $message = 'Adding new students is closed. You may still edit existing records or submit change requests.';
+            $message = 'Adding new students is closed for '.$year.'.';
         } elseif (! $canEdit) {
-            $message = 'Editing existing students is closed. You may still add new students or submit change requests.';
+            $message = 'Editing existing students is closed for '.$year.'.';
         }
 
         return [
@@ -194,17 +179,17 @@ class StudentEditLockService
         ];
     }
 
-    private function isWithinWindow(mixed $open, mixed $close, \Carbon\Carbon $now): bool
+    private function withinWindow(?CarbonInterface $open, ?CarbonInterface $close, CarbonInterface $now): bool
     {
-        if ($open === null && $close === null) {
+        if (! $open && ! $close) {
             return false;
         }
 
-        if ($open !== null && $now->lt($open)) {
+        if ($open && $now->lt($open)) {
             return false;
         }
 
-        if ($close !== null && $now->gt($close)) {
+        if ($close && $now->gt($close)) {
             return false;
         }
 

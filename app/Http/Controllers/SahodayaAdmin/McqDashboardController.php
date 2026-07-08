@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Models\McqExam;
+use App\Models\McqExamSeries;
 use App\Models\McqQuestionBank;
+use App\Models\McqSchoolFee;
 use App\Support\FestClassGroupScheme;
 
 class McqDashboardController extends SahodayaAdminController
@@ -37,9 +40,23 @@ class McqDashboardController extends SahodayaAdminController
                 'fee_label'          => \App\Support\Mcq\McqExamLevelLabels::feeLabel($exam->fee_type, $exam->fee_amount),
             ]);
 
-        $seriesCount = \App\Models\McqExamSeries::where('tenant_id', $sahodayaId)->count();
+        $seriesCount = McqExamSeries::where('tenant_id', $sahodayaId)->count();
 
-        return $this->inertia('Sahodaya/Mcq/Dashboard', compact('stats', 'recentExams', 'seriesCount'));
+        $pendingPayments = McqSchoolFee::query()
+            ->whereHas('exam', fn ($q) => $q->where('tenant_id', $sahodayaId))
+            ->whereIn('status', ['proof_uploaded'])
+            ->whereHas('feeReceipt', fn ($q) => $q->where('status', 'uploaded'))
+            ->count();
+
+        return $this->inertia('Sahodaya/Mcq/Dashboard', [
+            'stats' => array_merge($stats, [
+                'series'           => $seriesCount,
+                'pending_payments' => $pendingPayments,
+            ]),
+            'recentExams' => $recentExams,
+            'seriesCount' => $seriesCount,
+            'pendingPaymentsCount' => $pendingPayments,
+        ]);
     }
 
     public function questionBanks()

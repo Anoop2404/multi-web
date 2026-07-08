@@ -47,6 +47,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -56,8 +57,5 @@ const props = defineProps({
     summary: Object,
 });
 
-const navItems = computed(() => [
-    { href: `/portal/exam/${props.sahodaya.id}`, label: 'Exams' },
-    { href: `/portal/exam/${props.sahodaya.id}/exams/${props.exam.id}/supervision`, label: 'Supervision' },
-]);
+const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id));
 </script>

@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\FestEvent;
 use App\Models\FestJudgeAssignment;
-use App\Models\FestMark;
+use App\Models\FestJudgeScore;
 use App\Models\FestParticipant;
-use App\Models\FestRegistration;
 use App\Models\Tenant;
 use App\Services\Events\EventLifecycleGate;
-use App\Services\Events\FestMarkSaveService;
+use App\Services\Events\FestJudgeScoreService;
+use App\Services\Events\PortalEventHeadNavService;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestPublicVisibilityService;
 use Illuminate\Http\Request;
@@ -43,11 +43,12 @@ class JudgeDashboardController extends Controller
                 ->pluck('id');
 
             $total = $participantIds->count();
-            $marked = FestMark::where('event_id', $eventId)
+            $marked = FestJudgeScore::where('event_id', $eventId)
                 ->where('item_id', $item?->id)
+                ->where('judge_user_id', $user->id)
                 ->whereIn('participant_id', $participantIds)
                 ->where(function ($q) {
-                    $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position');
+                    $q->whereNotNull('grade')->orWhereNotNull('score');
                 })
                 ->count();
 
@@ -71,24 +72,26 @@ class JudgeDashboardController extends Controller
     public function marks(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $tenantId, 403);
+        abort_if($event->event_type === 'sports', 404, 'Sports events use item head coordinators — sign in at the mark coordinator portal.');
 
         $user = $request->user();
-        $itemIds = $this->assignedItemIds($user->id, $event->id);
+        $scope = app(\App\Services\Events\FestMarkEntryScopeService::class);
+        $itemIds = $scope->judgeItemIds($user, $event);
 
-        if ($itemIds->isEmpty() && ! $user->hasAnyRole(['sahodaya_admin', 'mark_entry_admin']) && ! $user->isSuperAdmin()) {
+        if ($itemIds === [] && ! $user->hasAnyRole(['sahodaya_admin', 'mark_entry_admin']) && ! $user->isSuperAdmin()) {
             abort(403, 'No items assigned to you for this event.');
         }
 
-        $registrations = FestRegistration::where('event_id', $event->id)
-            ->where('status', 'approved')
-            ->when($itemIds->isNotEmpty(), fn ($q) => $q->whereIn('item_id', $itemIds))
-            ->with(['item', 'participants.student', 'participants.teacher'])
-            ->get();
+        $registrations = $scope->scopedRegistrations($event, $user, $itemIds ?: null);
+        $marks = collect(app(FestJudgeScoreService::class)->scoresForJudge($event, $user->id, $itemIds ?: null));
 
-        $marks = FestMark::where('event_id', $event->id)
-            ->when($itemIds->isNotEmpty(), fn ($q) => $q->whereIn('item_id', $itemIds))
-            ->get()
-            ->keyBy('participant_id');
+        $headNav = app(PortalEventHeadNavService::class);
+        $headContext = $headNav->contextForAssignedItems($event, $request, $itemIds ?: []);
+        $registrations = $headNav->filterRegistrations(
+            $registrations,
+            $headContext['selectedHeadId'],
+            $headContext['selectedItemId'],
+        );
 
         $visibility = app(FestPublicVisibilityService::class);
         $maskNames = $visibility->strictAnonymity($event) && ! $event->results_published;
@@ -105,18 +108,21 @@ class JudgeDashboardController extends Controller
             'event'             => $event->load('items'),
             'registrations'     => $registrations,
             'marks'             => $marks,
-            'assignedItems'     => $itemIds->values(),
+            'assignedItems'     => collect($itemIds)->values(),
             'maskNames'         => $maskNames,
             'participantLabels' => $participantLabels,
+            'judgeMode'         => true,
+            ...$headContext,
         ]);
     }
 
-    public function storeMark(Request $request, string $tenantId, FestEvent $event, FestMarkSaveService $markSave)
+    public function storeMark(Request $request, string $tenantId, FestEvent $event, FestJudgeScoreService $judgeScores)
     {
         abort_if($event->tenant_id !== $tenantId, 403);
+        abort_if($event->event_type === 'sports', 404);
 
         $user = $request->user();
-        $itemIds = $this->assignedItemIds($user->id, $event->id);
+        $itemIds = app(\App\Services\Events\FestMarkEntryScopeService::class)->judgeItemIds($user, $event);
 
         $data = $request->validate([
             'participant_id'    => 'required|exists:fest_participants,id',
@@ -128,14 +134,14 @@ class JudgeDashboardController extends Controller
             'measurement_unit'  => 'nullable|string|max:20',
         ]);
 
-        if ($itemIds->isNotEmpty() && ! $itemIds->contains($data['item_id'])
+        if ($itemIds !== [] && ! in_array((int) $data['item_id'], $itemIds, true)
             && ! $user->hasAnyRole(['sahodaya_admin', 'mark_entry_admin']) && ! $user->isSuperAdmin()) {
             abort(403, 'You are not assigned to this item.');
         }
 
         EventLifecycleGate::allowMarkEntry($event);
 
-        $result = $markSave->save($event, $data, $user->id);
+        $result = $judgeScores->save($event, $data, $user->id);
 
         app(PlatformAuditLogger::class)->judgeMarkEntered(
             $event,
@@ -144,12 +150,5 @@ class JudgeDashboardController extends Controller
         );
 
         return back()->with('success', $result['message']);
-    }
-
-    private function assignedItemIds(int $userId, int $eventId)
-    {
-        return FestJudgeAssignment::where('event_id', $eventId)
-            ->where('user_id', $userId)
-            ->pluck('item_id');
     }
 }

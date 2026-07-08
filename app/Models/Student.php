@@ -2,30 +2,52 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use App\Support\TenantStorage;
 use Illuminate\Database\Eloquent\Model;
 
 class Student extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = [
         'tenant_id', 'user_id', 'academic_year_id', 'school_class_id', 'school_house_id',
         'admission_number', 'reg_no', 'roll_number', 'name', 'email', 'dob', 'gender', 'blood_group',
         'parent_name', 'parent_phone', 'parent_email', 'address',
         'admission_date', 'status', 'photo', 'notes',
+        'verified_at', 'verified_by_user_id',
     ];
 
     protected $casts = [
         'dob'            => 'date',
         'admission_date' => 'date',
+        'verified_at'      => 'datetime',
     ];
 
-    public function tenant()       { return $this->belongsTo(Tenant::class); }
+    public function tenant()       { return $this->belongsToCentralTenant(); }
     public function user()         { return $this->belongsTo(User::class); }
     public function schoolClass()  { return $this->belongsTo(SchoolClass::class); }
     public function schoolHouse()  { return $this->belongsTo(SchoolHouse::class, 'school_house_id'); }
     public function academicYear() { return $this->belongsTo(AcademicYearRecord::class, 'academic_year_id'); }
 
     public function scopeActive($q) { return $q->where('status', 'active'); }
+
+    public function scopeVerified($q) { return $q->whereNotNull('verified_at'); }
+
+    public function scopeUnverified($q) { return $q->whereNull('verified_at'); }
+
+    public function isVerified(): bool
+    {
+        return $this->verified_at !== null;
+    }
+
+    /** Single student identifier — used for records, fest, and portal login username. */
+    public function portalLoginId(): ?string
+    {
+        return filled($this->reg_no) ? $this->reg_no : null;
+    }
+
+    public function verifiedBy() { return $this->belongsTo(User::class, 'verified_by_user_id'); }
 
     public function getClassLabelAttribute(): string
     {

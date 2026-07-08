@@ -4,6 +4,7 @@
  */
 
 import { FEST_FINANCE, FEST_MANAGE, FEST_VIEW } from './sahodayaEventNavPermissions.js';
+import { isNavProgramVisible } from './sahodayaAdminNav.js';
 
 export const SAHODAYA_PROGRAMS = {
     kalotsav: {
@@ -38,6 +39,22 @@ export const SAHODAYA_PROGRAMS = {
         icon: 'users',
         description: 'Teacher fest programs — registrations, scheduling, marks, and results.',
     },
+    'english-fest': {
+        slug: 'english-fest',
+        prefix: 'english-fest',
+        eventType: 'english_fest',
+        label: 'English Fest',
+        icon: 'file-text',
+        description: 'English fest items, registrations, and results.',
+    },
+    'science-fest': {
+        slug: 'science-fest',
+        prefix: 'science-fest',
+        eventType: 'science_fest',
+        label: 'Science Fest',
+        icon: 'layers',
+        description: 'Science fest items, registrations, and results.',
+    },
     custom: {
         slug: 'custom',
         prefix: 'programs/custom',
@@ -55,7 +72,36 @@ const EVENT_TYPE_TO_SLUG = Object.fromEntries(
 );
 
 export function programBySlug(slug) {
-    return SAHODAYA_PROGRAMS[slug] ?? null;
+    if (!slug) {
+        return null;
+    }
+
+    if (SAHODAYA_PROGRAMS[slug]) {
+        return SAHODAYA_PROGRAMS[slug];
+    }
+
+    return Object.values(SAHODAYA_PROGRAMS).find((p) => p.prefix === slug) ?? null;
+}
+
+/** Resolve canonical program slug from slug, prefix, or program object. */
+export function resolveCatalogProgramSlug(programOrSlug) {
+    if (typeof programOrSlug === 'string') {
+        return programBySlug(programOrSlug)?.slug ?? programOrSlug;
+    }
+
+    if (programOrSlug?.slug) {
+        return programBySlug(programOrSlug.slug)?.slug ?? programOrSlug.slug;
+    }
+
+    if (programOrSlug?.prefix) {
+        return programBySlug(programOrSlug.prefix)?.slug ?? null;
+    }
+
+    if (programOrSlug?.eventType) {
+        return programForEventType(programOrSlug.eventType)?.slug ?? null;
+    }
+
+    return null;
 }
 
 export function programForEventType(eventType) {
@@ -80,6 +126,24 @@ export function sahodayaProgramHref(sahodayaId, programSlug, ...segments) {
     return program.prefix.startsWith('programs/')
         ? `${base}/${program.prefix}${tail ? `/${tail}` : ''}`
         : `${base}/${program.prefix}${tail ? `/${tail}` : ''}`;
+}
+
+/** Catalog hub and mutation URLs (`/sports/catalog/…`, not `/programs/sports-meet/catalog/…`). */
+export function sahodayaCatalogHref(sahodayaId, programSlug, ...segments) {
+    const slug = resolveCatalogProgramSlug(programSlug);
+
+    return sahodayaProgramHref(sahodayaId, slug, 'catalog', ...segments);
+}
+
+/** Section browse URLs for master/list tabs (`…/catalog/master/track`, etc.). */
+export function sahodayaCatalogSectionHref(sahodayaId, programSlug, mode, sectionSlug = null) {
+    const slug = resolveCatalogProgramSlug(programSlug);
+    const base = sahodayaCatalogHref(sahodayaId, slug, mode);
+    if (!sectionSlug || sectionSlug === 'all') {
+        return base;
+    }
+
+    return `${base}/${sectionSlug}`;
 }
 
 /** Links to leave fest/event pages (dashboard, program hub, event directory). */
@@ -113,7 +177,7 @@ export function festMainMenuNavItems(sahodayaId, program = null) {
 export function programEventSidebarGroups(sahodayaId, events, options = {}) {
     const { maxEvents = 8, overflowHref = null } = options;
     const base = `/sahodaya-admin/${sahodayaId}`;
-    const visible = (events ?? []).slice(0, maxEvents);
+    const visible = (events ?? []).filter((ev) => !ev.nav_hidden).slice(0, maxEvents);
 
     const groups = visible.map((ev) => ({
         section: ev.title,
@@ -144,7 +208,13 @@ export function programEventSidebarGroups(sahodayaId, events, options = {}) {
 }
 
 /** Sidebar when viewing a program hub (Kalotsav, Sports, Kids Fest). */
-export function programScopedNav(sahodayaId, programSlug, events = []) {
+export function programScopedNav(sahodayaId, programSlug, events = [], options = {}) {
+    const { navVisibility = null } = options;
+
+    if (!isNavProgramVisible(navVisibility, programSlug)) {
+        return eventsModuleNav(sahodayaId, options);
+    }
+
     const program = programBySlug(programSlug);
     const base = `/sahodaya-admin/${sahodayaId}`;
 
@@ -157,7 +227,7 @@ export function programScopedNav(sahodayaId, programSlug, events = []) {
     const setupItems = [
         { label: 'Overview', href: programBase, icon: 'grid', exact: true, permissions: FEST_VIEW },
         { label: 'Item catalog', href: sahodayaProgramHref(sahodayaId, programSlug, 'catalog'), icon: 'file-text', permissions: FEST_MANAGE },
-        { label: 'Category masters', href: `${base}/taxonomy-masters`, icon: 'settings', permissions: FEST_MANAGE },
+        { label: 'Category masters', href: `${base}/taxonomy-masters?program=${programSlug}`, icon: 'settings', permissions: FEST_MANAGE },
     ];
 
     if (programSlug === 'sports-meet') {
@@ -189,6 +259,8 @@ export function programScopedNav(sahodayaId, programSlug, events = []) {
             items: [
                 { label: 'Athletic records', href: sahodayaProgramHref(sahodayaId, programSlug, 'records'), icon: 'award', permissions: FEST_VIEW },
                 { label: 'House championship', href: sahodayaProgramHref(sahodayaId, programSlug, 'championship'), icon: 'bar-chart', permissions: FEST_VIEW },
+                { label: 'Cluster results', href: sahodayaProgramHref(sahodayaId, programSlug, 'results'), icon: 'bar-chart', permissions: FEST_VIEW },
+                { label: 'School rankings', href: sahodayaProgramHref(sahodayaId, programSlug, 'rankings'), icon: 'star', permissions: FEST_VIEW },
             ],
         });
     }

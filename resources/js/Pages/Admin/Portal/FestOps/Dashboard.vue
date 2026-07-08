@@ -20,14 +20,12 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import PortalAssignmentsHub from '@/Components/portal/PortalAssignmentsHub.vue';
+import { festOpsDashboardNav } from '@/support/festOpsPortalNav.js';
 import { computed } from 'vue';
 
 const props = defineProps({ sahodaya: Object, events: Array, dutiesByEvent: Object });
 
-const navItems = computed(() => [
-    { href: `/portal/fest-ops/${props.sahodaya.id}`, label: 'Dashboard' },
-    { href: `/portal/fest-ops/${props.sahodaya.id}/gate-check`, label: 'Gate Check' },
-]);
+const navItems = computed(() => festOpsDashboardNav(props.sahodaya.id));
 
 const dutyCount = computed(() =>
     props.events.reduce((sum, event) => sum + (props.dutiesByEvent[event.id]?.length ?? 0), 0),

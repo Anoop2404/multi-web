@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 
 class GalleryItem extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = ['album_id','tenant_id','image_path','caption','display_order'];
 
     public function album() { return $this->belongsTo(GalleryAlbum::class); }
-    public function tenant() { return $this->belongsTo(Tenant::class); }
+    public function tenant() { return $this->belongsToCentralTenant(); }
 }

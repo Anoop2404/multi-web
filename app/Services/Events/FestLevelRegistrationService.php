@@ -11,23 +11,24 @@ use App\Models\Teacher;
 
 class FestLevelRegistrationService
 {
-    public function issueForStudent(FestEvent $event, Student $student): string
+    public function issueForStudent(FestEvent $event, Student $student, ?string $schoolId = null): string
     {
         $existing = FestLevelRegistration::where('event_id', $event->id)
             ->where('student_id', $student->id)
+            ->where('status', 'active')
             ->value('registration_number');
 
         if ($existing) {
             return $existing;
         }
 
-        $prefix = strtoupper(substr($event->level_round ?? 'S', 0, 1));
         $number = app(FestNumberingService::class)->nextEventRegNumber($event);
+        $resolvedSchoolId = $schoolId ?? $student->tenant_id;
 
         FestLevelRegistration::create([
             'event_id'             => $event->id,
             'student_id'           => $student->id,
-            'school_id'            => $student->tenant_id,
+            'school_id'            => $resolvedSchoolId,
             'registration_number'  => $number,
             'status'               => 'active',
             'registered_at'        => now(),
@@ -38,6 +39,7 @@ class FestLevelRegistrationService
 
     public function syncParticipant(FestParticipant $participant): void
     {
+        $participant->loadMissing('student', 'registration.event');
         $student = $participant->student;
         $event = $participant->registration?->event;
 
@@ -45,7 +47,8 @@ class FestLevelRegistrationService
             return;
         }
 
-        $number = $this->issueForStudent($event, $student);
+        $schoolId = $participant->registration?->school_id;
+        $number = $this->issueForStudent($event, $student, $schoolId);
 
         $participant->update(['level_registration_number' => $number]);
     }
@@ -80,12 +83,7 @@ class FestLevelRegistrationService
             return $existing;
         }
 
-        $prefix = strtoupper(substr($event->level_round ?? 'S', 0, 1));
-        $seq = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $event->id))
-            ->whereNotNull('teacher_id')
-            ->count() + 1;
-
-        return sprintf('%s-T%04d', $prefix, $seq);
+        return app(FestNumberingService::class)->nextEventRegNumber($event);
     }
 
     public function syncTeacherParticipant(FestParticipant $participant): void
@@ -104,7 +102,7 @@ class FestLevelRegistrationService
 
     public function syncRegistration(FestRegistration $registration): void
     {
-        $registration->loadMissing('participants.student', 'participants.teacher');
+        $registration->loadMissing('participants.student', 'participants.teacher', 'event');
         foreach ($registration->participants as $participant) {
             if ($participant->student_id) {
                 $this->syncParticipant($participant);

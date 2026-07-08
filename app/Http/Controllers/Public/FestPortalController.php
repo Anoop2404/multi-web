@@ -7,10 +7,13 @@ use App\Http\Controllers\Public\Concerns\RendersPublicPages;
 use App\Models\FestAthleticRecord;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRecordBreak;
+use App\Models\FestResult;
 use App\Models\FestSchedule;
+use App\Models\Tenant;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\EventContext;
 use App\Services\Events\FestPublicVisibilityService;
@@ -52,6 +55,97 @@ class FestPortalController extends Controller
             'event' => $event,
             'items' => $items,
             'pageSeo' => ['title' => $event->title.' — '.$tenant->name],
+        ]);
+    }
+
+    public function results(Request $request, int $eventId)
+    {
+        $tenant = $this->resolveTenant();
+        $event = $this->findEvent($tenant->id, $eventId);
+        abort_unless($event->results_published, 404);
+
+        $ctx = EventContext::for($event);
+        $tab = $request->query('tab', 'school');
+        if (! in_array($tab, ['school', 'category', 'item', 'individual', 'championship'], true)) {
+            $tab = 'school';
+        }
+
+        $publishedAt = FestResult::where('event_id', $event->id)
+            ->whereNull('item_id')
+            ->max('published_at');
+
+        $championship = FestIndividualChampionshipPoint::where('event_id', $event->id)
+            ->with(['student'])
+            ->orderByDesc('points')
+            ->orderBy('student_id')
+            ->get()
+            ->map(function (FestIndividualChampionshipPoint $row, int $index) {
+                $school = Tenant::find($row->student?->tenant_id);
+
+                return [
+                    'rank'     => $index + 1,
+                    'points'   => $row->points,
+                    'category' => $row->category,
+                    'gender'   => $row->gender,
+                    'student'  => $row->student?->name,
+                    'reg_no'   => $row->student?->reg_no,
+                    'school'   => $school?->name,
+                ];
+            })
+            ->values()
+            ->all();
+
+        $categories = $ctx->scoreboardCategories();
+        $categoryBoards = collect($categories)
+            ->map(fn (string $key) => [
+                'key'   => $key,
+                'label' => $ctx->scoreboardCategoryLabel($key),
+                'rows'  => $ctx->scoreboardByCategory($key),
+            ])
+            ->all();
+
+        $marks = FestMark::where('event_id', $event->id)
+            ->whereIn('position', [1, 2, 3])
+            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->orderBy('item_id')
+            ->orderBy('position')
+            ->get();
+
+        $itemResults = $marks
+            ->groupBy('item_id')
+            ->map(function ($group) {
+                /** @var FestMark $first */
+                $first = $group->first();
+
+                return [
+                    'item_id'   => $first->item_id,
+                    'item'      => $first->item?->title,
+                    'head'      => $first->item?->head?->name,
+                    'winners'   => $group->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event))->values()->all(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $individualResults = $marks
+            ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event) + [
+                'item' => $mark->item?->title,
+                'head' => $mark->item?->head?->name,
+            ])
+            ->sortBy(fn (array $row) => [$row['participant'] ?? '', $row['item'] ?? ''])
+            ->values()
+            ->all();
+
+        return $this->renderPublic('public.fest.results', $tenant, [
+            'event'             => $event,
+            'tab'               => $tab,
+            'schoolBoard'       => $ctx->scoreboardBySchool(),
+            'categoryBoards'    => $categoryBoards,
+            'itemResults'       => $itemResults,
+            'individualResults' => $individualResults,
+            'championship'      => $championship,
+            'publishedAt'       => $publishedAt,
+            'pageSeo'           => ['title' => $event->title.' — Results'],
         ]);
     }
 
@@ -155,6 +249,8 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
+        abort_unless($event->results_published, 404);
+
         $ctx = EventContext::for($event);
 
         $clusters = $ctx->scoreboardClusters();
@@ -189,6 +285,19 @@ class FestPortalController extends Controller
             $scoreboardTitle = $category ? ($categoryLabels[$category] ?? strtoupper($category)) : 'Overall';
         }
 
+        $latestWinners = FestMark::where('event_id', $event->id)
+            ->whereIn('position', [1, 2, 3])
+            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->latest('updated_at')
+            ->limit(12)
+            ->get()
+            ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event) + [
+                'item' => $mark->item?->title,
+                'head' => $mark->item?->head?->name,
+            ])
+            ->values()
+            ->all();
+
         return $this->renderPublic('public.fest.scoreboard', $tenant, [
             'event'           => $event,
             'clusters'        => $clusters,
@@ -199,6 +308,7 @@ class FestPortalController extends Controller
             'categoryLabels'  => $categoryLabels,
             'scoreboard'      => $scoreboard,
             'scoreboardTitle' => $scoreboardTitle,
+            'latestWinners'   => $latestWinners,
             'pageSeo'         => ['title' => $event->title.' — Scoreboard'],
         ]);
     }
@@ -264,6 +374,20 @@ class FestPortalController extends Controller
             'athleticRecords' => $this->publicAthleticRecords($event),
             'recentBreaks'    => $this->recentRecordBreaks($event),
             'refreshedAt'     => now()->toIso8601String(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function publicWinnerRow(FestMark $mark, FestEvent $event): array
+    {
+        return [
+            'position'    => $mark->position,
+            'grade'       => $mark->grade,
+            'score'       => $mark->score,
+            'measurement' => trim(($mark->measurement_value ?? '').' '.($mark->measurement_unit ?? '')),
+            'participant' => $mark->participant?->student?->name ?? $mark->participant?->teacher?->name,
+            'reference'   => $mark->participant ? $this->visibility->publicReference($event, $mark->participant) : null,
+            'school'      => $mark->participant?->registration?->school?->name,
         ];
     }
 

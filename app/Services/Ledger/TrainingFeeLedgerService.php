@@ -5,31 +5,48 @@ namespace App\Services\Ledger;
 use App\Models\FeeReceipt;
 use App\Models\LedgerTransaction;
 use App\Models\TrainingRegistration;
+use App\Support\LedgerAccountCatalog;
 
 class TrainingFeeLedgerService
 {
+    private function incomeCodeForProgram(int $programId): string
+    {
+        return LedgerAccountCatalog::trainingProgramFeeCode($programId);
+    }
+
+    private function ensureProgramHead(TrainingRegistration $registration): void
+    {
+        $program = $registration->program;
+        if (! $program) {
+            return;
+        }
+
+        app(LedgerAccountSetupService::class)->ensureTrainingProgramHead($program);
+    }
+
     public function postApprovedReceipt(FeeReceipt $receipt, bool $forceRepost = false): ?LedgerTransaction
     {
         if ($receipt->status !== 'approved' || $receipt->feeable_type !== TrainingRegistration::class) {
             return null;
         }
 
-        $registration = TrainingRegistration::with('program', 'teacher', 'teacher.tenant')->find($receipt->feeable_id);
-        $sahodayaId = $registration?->program?->tenant_id;
-        if (! $sahodayaId) {
+        $registration = TrainingRegistration::with(['program', 'teacher', 'school'])->find($receipt->feeable_id);
+        $program = $registration?->program;
+        $sahodayaId = $program?->tenant_id;
+        if (! $sahodayaId || ! $program) {
             return null;
         }
 
-        $teacher = $registration->teacher?->name ?? 'Teacher';
-        $program = $registration->program?->title ?? 'Training';
-        $description = "Training fee — {$teacher} — {$program}";
+        $this->ensureProgramHead($registration);
+        $incomeCode = $this->incomeCodeForProgram($program->id);
 
-        app(LedgerPostingService::class)->ensureHead($sahodayaId, 'TRAINING-FEE', null, 'training');
+        $teacher = $registration->teacher?->name ?? 'Teacher';
+        $description = "Training fee — {$teacher} — {$program->title}";
 
         $rows = app(LedgerPostingService::class)->postIncomeReceipt(
             $receipt,
             $sahodayaId,
-            'TRAINING-FEE',
+            $incomeCode,
             $description,
             $forceRepost
         );

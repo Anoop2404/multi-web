@@ -52,6 +52,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 
@@ -78,9 +79,6 @@ function importCsv() {
     }, { forceFormData: true, preserveScroll: true });
 }
 
-const navItems = computed(() => [
-    { href: `/portal/exam/${props.sahodaya.id}`, label: 'Exams' },
-    { href: `/portal/exam/${props.sahodaya.id}/exams/${props.exam.id}/attendance`, label: 'Attendance' },
-]);
+const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id));
 </script>
 

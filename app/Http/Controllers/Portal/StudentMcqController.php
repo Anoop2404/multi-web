@@ -26,6 +26,24 @@ class StudentMcqController extends Controller
         ]);
     }
 
+    public function certificate(Request $request, string $tenantId, McqRegistration $registration)
+    {
+        $student = $request->attributes->get('portalStudent');
+        abort_if($registration->school_id !== $tenantId || $registration->student_id !== $student->id, 403);
+
+        $registration->load(['exam', 'student', 'school', 'mark']);
+        $sahodaya = Tenant::findOrFail($registration->exam->tenant_id);
+        $certificate = app(\App\Services\Mcq\McqCertificateService::class)->issue($registration);
+
+        return view('mcq.certificate', [
+            'registration' => $registration,
+            'certificate'  => $certificate,
+            'sahodaya'     => $sahodaya,
+            'fields'       => app(\App\Services\Mcq\McqCertificateService::class)->fieldValues($registration, $sahodaya),
+            'design'       => $certificate->design_snapshot_json ?? [],
+        ]);
+    }
+
     public function showExam(Request $request, string $tenantId, McqRegistration $registration, McqExamSessionService $sessions)
     {
         $student = $request->attributes->get('portalStudent');
@@ -43,9 +61,17 @@ class StudentMcqController extends Controller
             return inertia('Portal/Student/McqResult', [
                 'school'       => Tenant::findOrFail($tenantId)->only('id', 'name'),
                 'student'      => $student->only('id', 'name', 'reg_no'),
-                'registration' => $registration->only('id', 'status', 'submitted_at'),
+                'registration' => array_merge(
+                    $registration->only('id', 'status', 'submitted_at', 'attendance_status'),
+                    ['exam' => $registration->exam?->only('id', 'title')],
+                ),
                 'mark'         => McqResultPresenter::forRegistration($registration, $registration->mark),
                 'showResults'  => (bool) $registration->exam?->results_published,
+                'certificateUrl' => $registration->exam?->results_published
+                    && $registration->attendance_status !== 'absent'
+                    && $registration->mark
+                    ? route('portal.student.mcq.certificate', ['tenantId' => $tenantId, 'registration' => $registration->id])
+                    : null,
             ]);
         }
 
@@ -85,7 +111,7 @@ class StudentMcqController extends Controller
         app(PlatformAuditLogger::class)->mcqRegistration(
             $registration->fresh(['exam']),
             'mcq.exam.started',
-            "Student started online MCQ exam #{$registration->exam_id}",
+            "Student started online Talent Search exam #{$registration->exam_id}",
         );
 
         return redirect()->route('portal.student.mcq.exam', [
@@ -128,8 +154,8 @@ class StudentMcqController extends Controller
             $registration->fresh(['exam']),
             $autoSubmitted ? 'mcq.exam.auto_submitted' : 'mcq.exam.submitted',
             $autoSubmitted
-                ? "Student auto-submitted online MCQ exam (time expired) with score {$mark->score}"
-                : "Student submitted online MCQ exam with score {$mark->score}",
+                ? "Student auto-submitted online Talent Search exam (time expired) with score {$mark->score}"
+                : "Student submitted online Talent Search exam with score {$mark->score}",
         );
 
         $message = $autoSubmitted

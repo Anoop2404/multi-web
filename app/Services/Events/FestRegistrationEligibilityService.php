@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestLevelRegistration;
 use App\Models\FestParticipationPolicy;
 use App\Models\FestQualification;
 use App\Models\Student;
@@ -28,6 +29,12 @@ class FestRegistrationEligibilityService
         $genderError = $this->validateGender($student, $item, $event);
         if ($genderError) {
             $errors[] = "{$student->name}: {$genderError}";
+        }
+
+        $verifyError = app(\App\Services\Students\StudentVerificationGate::class)
+            ->ineligibilityReason($student, $event);
+        if ($verifyError) {
+            $errors[] = "{$student->name}: {$verifyError}";
         }
 
         $categoryError = $this->validateCategory($student, $event, $item);
@@ -69,14 +76,30 @@ class FestRegistrationEligibilityService
      * @param  Collection<int, Student>  $students
      * @return Collection<int, array<string, mixed>>
      */
-    public function annotateStudents(Collection $students, FestEvent $event): Collection
+    public function annotateStudents(Collection $students, FestEvent $event, ?string $schoolId = null): Collection
     {
-        return $students->map(function (Student $student) use ($event) {
+        $eventRegByStudent = [];
+        if ($schoolId) {
+            $studentIds = $students->pluck('id');
+            $eventRegByStudent = FestLevelRegistration::query()
+                ->where('event_id', $event->id)
+                ->where('status', 'active')
+                ->whereIn('student_id', $studentIds)
+                ->pluck('registration_number', 'student_id')
+                ->all();
+        }
+
+        return $students->map(function (Student $student) use ($event, $eventRegByStudent) {
             $classNum = FestStudentClassResolver::classNumberFromStudent($student);
+            $eventRegNo = $eventRegByStudent[$student->id] ?? null;
 
             return array_merge($student->only(['id', 'name', 'reg_no', 'gender', 'dob', 'academic_year_id']), [
                 'class_name' => $student->schoolClass?->name,
                 'class_number' => $classNum,
+                'is_verified' => $student->isVerified(),
+                'verified_at' => $student->verified_at?->toIso8601String(),
+                'event_registered' => $eventRegNo !== null,
+                'event_registration_number' => $eventRegNo,
                 'kalolsav_class_group' => FestStudentClassResolver::kalolsavClassGroupForStudent($student),
                 'kids_fest_band' => FestStudentClassResolver::kidsFestBandForStudent($student),
                 'sports_age_group' => FestSportsAgeGroup::primaryAgeGroupForStudent($student, $event),

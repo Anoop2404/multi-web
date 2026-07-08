@@ -63,12 +63,11 @@ use App\Http\Controllers\SchoolAdmin\StaffController;
 use App\Http\Controllers\SchoolAdmin\SiteBuilderController;
 use App\Http\Controllers\SchoolAdmin\SiteBuilderApiController;
 use App\Http\Controllers\SchoolAdmin\StudentController;
-use App\Http\Controllers\SchoolAdmin\TcRequestController as SchoolTcRequestController;
 use App\Models\SkinPreset;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.change'])->group(function () {
 
     // ── State-level routes (state admin + superadmin bypass) ────────────────
     Route::middleware('state.admin')->group(function () {
@@ -99,6 +98,15 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(funct
             Route::get('/{stateProgram}/results', [\App\Http\Controllers\Admin\KalotsavStateController::class, 'results'])->name('results');
             Route::get('/{stateProgram}/winners', [\App\Http\Controllers\Admin\KalotsavStateController::class, 'winners'])->name('winners');
             Route::get('/{stateProgram}/winners/export', [\App\Http\Controllers\Admin\KalotsavStateController::class, 'exportWinners'])->name('winners.export');
+        });
+
+        Route::prefix('state-workspace')->name('state.')->group(function () {
+            Route::get('/qualifiers', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'index'])->name('qualifiers.index');
+            Route::get('/qualifiers/{intake}', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'show'])->name('qualifiers.show');
+            Route::post('/qualifiers/{intake}/approve', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'approve'])->name('qualifiers.approve');
+            Route::get('/fest', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'index'])->name('fest.index');
+            Route::post('/fest', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'store'])->name('fest.store');
+            Route::get('/fest/{event}', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'show'])->name('fest.show');
         });
 
         Route::get('/sports', [\App\Http\Controllers\Admin\SportsResultsController::class, 'index'])->name('sports.index');
@@ -142,6 +150,12 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(funct
     Route::post('tenants/{tenant}/school-admin', [TenantController::class, 'saveSchoolAdmin'])->name('tenants.school-admin.store');
     Route::delete('tenants/{tenant}/school-admin/{user}', [TenantController::class, 'destroySchoolAdmin'])->name('tenants.school-admin.destroy');
     Route::post('tenants/{tenant}/reject-membership', [TenantController::class, 'rejectMembership'])->name('tenants.reject-membership');
+    Route::put('tenants/{tenant}/nav-visibility', [TenantController::class, 'updateNavVisibility'])->name('tenants.nav-visibility.update');
+
+    Route::get('/storage-migration', [\App\Http\Controllers\Admin\StorageMigrationController::class, 'index'])->name('storage-migration');
+    Route::get('/storage-migration/scan', [\App\Http\Controllers\Admin\StorageMigrationController::class, 'scan'])->name('storage-migration.scan');
+    Route::post('/storage-migration/migrate', [\App\Http\Controllers\Admin\StorageMigrationController::class, 'migrate'])->name('storage-migration.migrate');
+    Route::get('/storage-migration/progress', [\App\Http\Controllers\Admin\StorageMigrationController::class, 'progress'])->name('storage-migration.progress');
 
     // ── Builder Inertia pages (superadmin only, website phase) ────────────────
     Route::middleware(['website.enabled'])->prefix('builder')->name('builder.')->group(function () {
@@ -218,6 +232,15 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth'])->group(funct
         Route::get('/teaching-types', [MasterDataController::class, 'teachingTypes'])->name('teaching-types');
         Route::post('/teaching-types', [MasterDataController::class, 'storeTeachingType'])->name('teaching-types.store');
         Route::put('/teaching-types/{teachingType}', [MasterDataController::class, 'updateTeachingType'])->name('teaching-types.update');
+        Route::get('/subjects', [MasterDataController::class, 'subjects'])->name('subjects');
+        Route::post('/subjects', [MasterDataController::class, 'storeSubject'])->name('subjects.store');
+        Route::put('/subjects/{subject}', [MasterDataController::class, 'updateSubject'])->name('subjects.update');
+        Route::get('/designations', [MasterDataController::class, 'designations'])->name('designations');
+        Route::post('/designations', [MasterDataController::class, 'storeDesignation'])->name('designations.store');
+        Route::put('/designations/{designation}', [MasterDataController::class, 'updateDesignation'])->name('designations.update');
+        Route::get('/age-categories', [MasterDataController::class, 'ageCategories'])->name('age-categories');
+        Route::post('/age-categories', [MasterDataController::class, 'storeAgeCategory'])->name('age-categories.store');
+        Route::put('/age-categories/{ageCategory}', [MasterDataController::class, 'updateAgeCategory'])->name('age-categories.update');
     });
 
     // ── Skin presets management (website phase) ──────────────────────────────
@@ -265,29 +288,49 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/setup/code', [SchoolSetupController::class, 'saveCode'])->name('setup.code.save');
 
     // Students & annual registration (always available)
+        Route::get('/calendar', [\App\Http\Controllers\SchoolAdmin\CalendarController::class, 'index'])->name('calendar');
+        Route::get('/calendar/export.ics', [\App\Http\Controllers\SchoolAdmin\CalendarController::class, 'exportIcal'])->name('calendar.ical');
+
+    Route::get('/documents', [\App\Http\Controllers\SchoolAdmin\SchoolDocumentController::class, 'index'])->name('documents.index');
+    Route::post('/documents', [\App\Http\Controllers\SchoolAdmin\SchoolDocumentController::class, 'store'])->name('documents.store');
+    Route::get('/documents/{document}/download', [\App\Http\Controllers\SchoolAdmin\SchoolDocumentController::class, 'download'])->name('documents.download');
+
     Route::get('/students/setup', [SchoolClassController::class, 'index'])->name('students.setup');
 
     Route::get('/students',                    [StudentController::class, 'index'])->name('students.index');
     Route::get('/students/import',             [StudentController::class, 'importForm'])->name('students.import');
     Route::get('/students/import/template',    [StudentController::class, 'importTemplate'])->name('students.import.template');
+    Route::post('/students/import/preview',    [StudentController::class, 'importPreview'])->name('students.import.preview');
     Route::post('/students/import',            [StudentController::class, 'importStore'])->name('students.import.store');
     Route::get('/students/create',                             [StudentController::class, 'create'])->name('students.create');
     Route::get('/students/bulk',                               [StudentController::class, 'createBulk'])->name('students.create.bulk');
     Route::post('/students',                                   [StudentController::class, 'store'])->name('students.store');
     Route::post('/students/bulk',                              [StudentController::class, 'storeBulk'])->name('students.store.bulk');
+    Route::post('/students/backfill-reg-numbers',             [StudentController::class, 'backfillRegNumbers'])->name('students.backfill-reg-numbers');
     Route::post('/students/change-request', [StudentController::class, 'submitCreateChangeRequest'])->name('students.change-request.create');
     Route::post('/students/{student}/change-request', [StudentController::class, 'submitChangeRequest'])->name('students.change-request');
     Route::get('/students/change-requests', [StudentController::class, 'changeRequests'])->name('students.change-requests');
     Route::get('/students/pending-change-requests', [\App\Http\Controllers\SchoolAdmin\StudentChangeRequestController::class, 'index'])->name('students.pending-change-requests');
     Route::post('/students/pending-change-requests/{changeRequest}/approve', [\App\Http\Controllers\SchoolAdmin\StudentChangeRequestController::class, 'approve'])->name('students.pending-change-requests.approve');
     Route::post('/students/pending-change-requests/{changeRequest}/reject', [\App\Http\Controllers\SchoolAdmin\StudentChangeRequestController::class, 'reject'])->name('students.pending-change-requests.reject');
+    Route::get('/students/{student}',                          [StudentController::class, 'show'])->name('students.show');
+    Route::post('/students/{student}/sports/events/{event}/register', [StudentController::class, 'registerSportsEvent'])->name('students.sports.register-event');
+    Route::post('/students/{student}/sports/events/{event}/items', [StudentController::class, 'registerSportsItems'])->name('students.sports.register-items');
+    Route::get('/students/{student}/sports/events/{event}/eligible-items', [StudentController::class, 'eligibleSportsItems'])->name('students.sports.eligible-items');
+    Route::get('/students/{student}/fest/{event}/id-card', [StudentController::class, 'festIdCard'])->name('students.fest.id-card');
     Route::get('/students/{student}/edit',                     [StudentController::class, 'edit'])->name('students.edit');
     Route::put('/students/{student}',                          [StudentController::class, 'update'])->name('students.update');
+    Route::delete('/students/{student}',                      [StudentController::class, 'destroy'])->name('students.destroy');
     Route::get('/students/{student}/photo',                   [StudentController::class, 'showPhoto'])->name('students.photo');
     Route::post('/students/{student}/photo',                   [StudentController::class, 'updatePhoto'])->name('students.photo.upload');
     Route::post('/students/photos-zip',                        [StudentController::class, 'uploadPhotosZip'])->name('students.photos-zip');
     Route::post('/students/{student}/portal-login', [StudentController::class, 'provisionPortal'])->name('students.portal-login');
+    Route::post('/students/{student}/reset-portal-password', [StudentController::class, 'resetPortalPassword'])->name('students.reset-portal-password');
     Route::post('/students/bulk-portal-provision', [StudentController::class, 'bulkProvisionPortal'])->name('students.bulk-portal-provision');
+    Route::post('/students/bulk-verify', [StudentController::class, 'bulkVerify'])->name('students.bulk-verify');
+    Route::get('/students/verification-report', [StudentController::class, 'verificationReport'])->name('students.verification-report');
+    Route::get('/students/verification-report/export', [StudentController::class, 'verificationExport'])->name('students.verification-report.export');
+    Route::post('/students/{student}/verify', [StudentController::class, 'verify'])->name('students.verify');
 
     Route::get('/users/profile-change-requests', [\App\Http\Controllers\SchoolAdmin\UserProfileChangeRequestController::class, 'index'])->name('users.profile-change-requests');
     Route::post('/users/profile-change-requests/{changeRequest}/approve', [\App\Http\Controllers\SchoolAdmin\UserProfileChangeRequestController::class, 'approve'])->name('users.profile-change-requests.approve');
@@ -299,6 +342,7 @@ Route::prefix('school-admin/{tenantId}')
 
     Route::get('/registration', [AnnualRegistrationController::class, 'index'])->name('registration.index');
     Route::post('/registration/begin', [AnnualRegistrationController::class, 'begin'])->name('registration.begin');
+    Route::post('/registration/region', [AnnualRegistrationController::class, 'saveRegion'])->name('registration.region.save');
     Route::get('/registration/students', [AnnualRegistrationController::class, 'students'])->name('registration.students');
     Route::post('/registration/students', [AnnualRegistrationController::class, 'storeStudent'])->name('registration.students.store');
     Route::get('/registration/students/{student}/image', [AnnualRegistrationController::class, 'showSubmissionStudentImage'])->name('registration.students.image');
@@ -307,6 +351,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/registration/counts', [AnnualRegistrationController::class, 'saveCounts'])->name('registration.counts.save');
     Route::get('/registration/teachers', [AnnualRegistrationController::class, 'teachers'])->name('registration.teachers');
     Route::post('/registration/teachers', [AnnualRegistrationController::class, 'storeTeacher'])->name('registration.teachers.store');
+    Route::post('/registration/teachers/bulk', [AnnualRegistrationController::class, 'bulkStoreTeachers'])->name('registration.teachers.bulk');
     Route::delete('/registration/teachers/{teacher}', [AnnualRegistrationController::class, 'destroyTeacher'])->name('registration.teachers.destroy');
     Route::post('/registration/submit-track', [AnnualRegistrationController::class, 'submitTrack'])->name('registration.submit-track');
     Route::get('/registration/payment', [AnnualRegistrationController::class, 'payment'])->name('registration.payment');
@@ -353,11 +398,22 @@ Route::prefix('school-admin/{tenantId}')
 
     Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');
     Route::post('/teachers', [TeacherController::class, 'store'])->name('teachers.store');
+    Route::post('/teachers/bulk', [TeacherController::class, 'storeBulk'])->name('teachers.store.bulk');
+    Route::get('/teachers/import/template', [TeacherController::class, 'importTemplate'])->name('teachers.import.template');
+    Route::post('/teachers/import', [TeacherController::class, 'importStore'])->name('teachers.import.store');
+    Route::put('/teachers/{teacher}', [TeacherController::class, 'update'])->name('teachers.update');
+    Route::post('/teachers/{teacher}/provision-portal', [TeacherController::class, 'provisionPortal'])->name('teachers.provision-portal');
+    Route::post('/teachers/{teacher}/reset-portal-password', [TeacherController::class, 'resetPortalPassword'])->name('teachers.reset-portal-password');
     Route::get('/teachers/{teacher}/photo', [TeacherController::class, 'showPhoto'])->name('teachers.photo');
     Route::post('/teachers/{teacher}/photo', [TeacherController::class, 'updatePhoto'])->name('teachers.photo.upload');
+    Route::post('/teachers/photos-zip', [TeacherController::class, 'uploadPhotosZip'])->name('teachers.photos-zip');
     Route::delete('/teachers/{teacher}', [TeacherController::class, 'destroy'])->name('teachers.destroy');
 
     Route::get('/users', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'index'])->name('users.index');
+    Route::put('/users/coordinator-contact', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'updateCoordinatorContact'])->name('users.coordinator-contact.update');
+    Route::post('/users/coordinator-login', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'provisionCoordinatorFromContact'])->name('users.coordinator-login');
+    Route::put('/users/leadership-contact/{roleKey}', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'updateLeadershipContact'])->name('users.leadership-contact.update');
+    Route::post('/users/leadership-login/{roleKey}', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'provisionLeadershipLogin'])->name('users.leadership-login');
     Route::post('/users', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'store'])->name('users.store');
     Route::put('/users/{user}', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'update'])->name('users.update');
     Route::post('/users/{user}/reset-password', [\App\Http\Controllers\SchoolAdmin\TenantUserController::class, 'resetPassword'])->name('users.reset-password');
@@ -443,10 +499,6 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/enquiries',                        [EnquiryController::class, 'index'])->name('enquiries.index');
     Route::patch('/enquiries/{enquiry}',            [EnquiryController::class, 'update'])->name('enquiries.update');
 
-    // TC Requests
-    Route::get('/tc-requests',                      [SchoolTcRequestController::class, 'index'])->name('tc-requests.index');
-    Route::patch('/tc-requests/{tcRequest}',        [SchoolTcRequestController::class, 'update'])->name('tc-requests.update');
-
     // Job Vacancies
     Route::get('/job-vacancies',                    [JobVacancyController::class, 'index'])->name('job-vacancies.index');
     Route::post('/job-vacancies',                   [JobVacancyController::class, 'store'])->name('job-vacancies.store');
@@ -503,6 +555,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/users', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'store'])->name('users.store');
         Route::put('/users/{user}', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'update'])->name('users.update');
         Route::delete('/users/{user}', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'destroy'])->name('users.destroy');
+
+        Route::get('/settings/nav-visibility', [\App\Http\Controllers\SahodayaAdmin\NavVisibilityController::class, 'edit'])->name('settings.nav-visibility');
+        Route::put('/settings/nav-visibility', [\App\Http\Controllers\SahodayaAdmin\NavVisibilityController::class, 'update'])->name('settings.nav-visibility.update');
 
         // ── Academic Year Management (Phase 8) ────────────────────────────────
         Route::prefix('academic-years')->name('academic-years.')->group(function () {
@@ -580,20 +635,73 @@ Route::prefix('sahodaya-admin/{tenantId}')
 
         Route::get('/schools', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'index'])->name('schools.index');
         Route::get('/schools/applications', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'applications'])->name('schools.applications');
+        Route::post('/schools/applications/bulk-approve', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkApprove'])->name('schools.applications.bulk-approve');
+        Route::post('/schools/applications/bulk-reject', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkReject'])->name('schools.applications.bulk-reject');
         Route::get('/schools/export', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'export'])->name('schools.export');
         Route::get('/schools/{school}/students', [\App\Http\Controllers\SahodayaAdmin\SchoolStudentsController::class, 'show'])->name('schools.students');
         Route::get('/schools/{school}', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'show'])->name('schools.show');
         Route::get('/schools/{school}/lock-overrides', [\App\Http\Controllers\SahodayaAdmin\SchoolLockOverrideController::class, 'index'])->name('schools.lock-overrides');
         Route::post('/schools/{school}/lock-overrides', [\App\Http\Controllers\SahodayaAdmin\SchoolLockOverrideController::class, 'store'])->name('schools.lock-overrides.store');
+        Route::post('/schools/{school}/approve', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'approve'])->name('schools.approve');
         Route::post('/schools/{school}/reject', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'reject'])->name('schools.reject');
         Route::post('/schools/{school}/toggle-fest-registration', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'toggleFestRegistration'])->name('schools.toggle-fest-registration');
+
+        // Regions (Kalotsav) — State → Sahodaya → Region → School
+        Route::get('/regions', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'index'])->name('regions.index');
+        Route::post('/regions', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'store'])->name('regions.store');
+        Route::post('/regions/assign', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'assign'])->name('regions.assign');
+        Route::put('/regions/{region}', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'update'])->name('regions.update');
+        Route::delete('/regions/{region}', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'destroy'])->name('regions.destroy');
 
         // Membership settings
         Route::get('/membership/settings', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'index'])->name('membership.settings');
         Route::put('/membership/settings', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateProfile'])->name('membership.settings.update');
+        Route::get('/settings/storage-migration', [\App\Http\Controllers\SahodayaAdmin\StorageMigrationController::class, 'index'])->name('settings.storage-migration');
+        Route::get('/settings/storage-migration/scan', [\App\Http\Controllers\SahodayaAdmin\StorageMigrationController::class, 'scan'])->name('settings.storage-migration.scan');
+        Route::post('/settings/storage-migration/migrate', [\App\Http\Controllers\SahodayaAdmin\StorageMigrationController::class, 'migrate'])->name('settings.storage-migration.migrate');
+        Route::get('/settings/storage-migration/progress', [\App\Http\Controllers\SahodayaAdmin\StorageMigrationController::class, 'progress'])->name('settings.storage-migration.progress');
         Route::get('/student-change-requests', [\App\Http\Controllers\SahodayaAdmin\StudentEditChangeRequestController::class, 'index'])->name('student-change-requests.index');
         Route::post('/student-change-requests/{changeRequest}/approve', [\App\Http\Controllers\SahodayaAdmin\StudentEditChangeRequestController::class, 'approve'])->name('student-change-requests.approve');
         Route::post('/student-change-requests/{changeRequest}/reject', [\App\Http\Controllers\SahodayaAdmin\StudentEditChangeRequestController::class, 'reject'])->name('student-change-requests.reject');
+        Route::get('/students/registration-windows', [\App\Http\Controllers\SahodayaAdmin\StudentRegistrationWindowController::class, 'index'])->name('students.registration-windows');
+        Route::post('/students/registration-windows', [\App\Http\Controllers\SahodayaAdmin\StudentRegistrationWindowController::class, 'update'])->name('students.registration-windows.update');
+        Route::get('/users/profile-change-requests', [\App\Http\Controllers\SahodayaAdmin\UserProfileChangeRequestController::class, 'index'])->name('users.profile-change-requests');
+        Route::post('/users/profile-change-requests/{changeRequest}/approve', [\App\Http\Controllers\SahodayaAdmin\UserProfileChangeRequestController::class, 'approve'])->name('users.profile-change-requests.approve');
+        Route::post('/users/profile-change-requests/{changeRequest}/reject', [\App\Http\Controllers\SahodayaAdmin\UserProfileChangeRequestController::class, 'reject'])->name('users.profile-change-requests.reject');
+
+        Route::get('/students/verification', [\App\Http\Controllers\SahodayaAdmin\StudentVerificationController::class, 'index'])->name('students.verification.index');
+        Route::post('/students/verification/bulk-verify', [\App\Http\Controllers\SahodayaAdmin\StudentVerificationController::class, 'bulkVerify'])->name('students.verification.bulk');
+        Route::get('/students/{student}', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'show'])->name('students.show');
+        Route::get('/students/{student}/photo', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'showPhoto'])->name('students.photo');
+        Route::post('/students/{student}/portal-login', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'provisionPortal'])->name('students.portal-login');
+        Route::post('/students/{student}/reset-portal-password', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'resetPortalPassword'])->name('students.reset-portal-password');
+        Route::post('/students/{student}/verify', [\App\Http\Controllers\SahodayaAdmin\StudentVerificationController::class, 'verify'])->name('students.verification.verify');
+
+        Route::get('/teachers/verification', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'index'])->name('teachers.verification.index');
+        Route::post('/teachers/verification/bulk-verify', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'bulkVerify'])->name('teachers.verification.bulk');
+        Route::post('/teachers/{teacher}/verify', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'verify'])->name('teachers.verification.verify');
+        Route::post('/teachers/{teacher}/reject', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'reject'])->name('teachers.verification.reject');
+
+        Route::prefix('finance')->name('finance.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\SahodayaAdmin\FinanceHubController::class, 'index'])->name('hub');
+            Route::get('/payments', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'index'])->name('payments.index');
+            Route::get('/payments/export', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'export'])->name('payments.export');
+            Route::get('/payments/receipts/{feeReceipt}', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'programReceipt'])->name('payments.receipt');
+            Route::post('/payments/resend-receipt', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'resendReceipt'])->name('payments.resend-receipt');
+            Route::get('/receipt-emails', [\App\Http\Controllers\SahodayaAdmin\ReceiptEmailReportController::class, 'index'])->name('receipt-emails');
+            Route::get('/email-delivery', [\App\Http\Controllers\SahodayaAdmin\EmailDeliveryReportController::class, 'index'])->name('email-delivery');
+            Route::post('/email-delivery/{notificationLog}/retry', [\App\Http\Controllers\SahodayaAdmin\EmailDeliveryReportController::class, 'retry'])->name('email-delivery.retry');
+            Route::post('/receipt-emails/{feeReceipt}/resend', [\App\Http\Controllers\SahodayaAdmin\ReceiptEmailReportController::class, 'resend'])->name('receipt-emails.resend');
+            Route::get('/receivables', [\App\Http\Controllers\SahodayaAdmin\FinanceHubController::class, 'receivables'])->name('receivables');
+            Route::get('/financial-statements', [\App\Http\Controllers\SahodayaAdmin\LedgerController::class, 'financialStatements'])->name('financial-statements');
+            Route::post('/fee-waiver', [\App\Http\Controllers\SahodayaAdmin\LedgerController::class, 'waiveFee'])->name('fee-waiver');
+            Route::get('/bank-reconciliation', [\App\Http\Controllers\SahodayaAdmin\BankReconciliationController::class, 'index'])->name('bank-reconciliation');
+            Route::post('/bank-reconciliation/{transaction}/reconcile', [\App\Http\Controllers\SahodayaAdmin\BankReconciliationController::class, 'reconcile'])->name('bank-reconciliation.reconcile');
+            Route::get('/payables', [\App\Http\Controllers\SahodayaAdmin\PayableController::class, 'index'])->name('payables.index');
+            Route::post('/payables', [\App\Http\Controllers\SahodayaAdmin\PayableController::class, 'store'])->name('payables.store');
+            Route::post('/payables/{payable}/pay', [\App\Http\Controllers\SahodayaAdmin\PayableController::class, 'markPaid'])->name('payables.pay');
+            Route::post('/payables/{payable}/cancel', [\App\Http\Controllers\SahodayaAdmin\PayableController::class, 'cancel'])->name('payables.cancel');
+        });
         Route::put('/membership/fees', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateMembershipFees'])->name('membership.fees.update');
         Route::put('/membership/payment-details', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updatePaymentDetails'])->name('membership.payment-details.update');
         Route::put('/membership/mail-settings', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateMailSettings'])->name('membership.mail-settings.update');
@@ -611,6 +719,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::put('/membership/global-categories/{classCategory}/sort', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateGlobalCategorySort'])->name('membership.global-categories.sort');
         Route::post('/membership/custom-teaching-types', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'storeCustomTeachingType'])->name('membership.custom-types.store');
         Route::post('/membership/type-overrides', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'toggleTypeOverride'])->name('membership.type-overrides.toggle');
+        Route::post('/membership/subjects', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'storeSubject'])->name('membership.subjects.store');
+        Route::put('/membership/subjects/{subject}', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateSubject'])->name('membership.subjects.update');
+        Route::delete('/membership/subjects/{subject}', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'destroySubject'])->name('membership.subjects.destroy');
         Route::put('/membership/receipt-template', [\App\Http\Controllers\SahodayaAdmin\MembershipReceiptController::class, 'updateTemplate'])->name('membership.receipt-template.update');
         Route::get('/membership/receipt-template/preview', [\App\Http\Controllers\SahodayaAdmin\MembershipReceiptController::class, 'preview'])->name('membership.receipt-template.preview');
         Route::get('/membership/payments/{payment}/receipt', [\App\Http\Controllers\SahodayaAdmin\MembershipReceiptController::class, 'show'])->name('membership.payments.receipt');
@@ -631,6 +742,26 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/membership/payments/{payment}/verify', [\App\Http\Controllers\SahodayaAdmin\PaymentVerificationController::class, 'verify'])->name('membership.payments.verify');
 
         Route::get('/membership/reports', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'index'])->name('membership.reports');
+        Route::get('/reports/hub', [\App\Http\Controllers\SahodayaAdmin\ReportsHubController::class, 'index'])->name('reports.hub');
+        Route::get('/reports/{reportId}', [\App\Http\Controllers\SahodayaAdmin\ErpReportController::class, 'show'])->name('reports.run');
+        Route::get('/reports/{reportId}/export', [\App\Http\Controllers\SahodayaAdmin\ErpReportController::class, 'export'])->name('reports.export');
+
+        Route::get('/auth/login-audit', [\App\Http\Controllers\SahodayaAdmin\LoginAuditController::class, 'index'])->name('auth.login-audit');
+        Route::get('/auth/login-audit/export', [\App\Http\Controllers\SahodayaAdmin\LoginAuditController::class, 'export'])->name('auth.login-audit.export');
+
+        Route::get('/calendar', [\App\Http\Controllers\SahodayaAdmin\CalendarController::class, 'index'])->name('calendar');
+        Route::get('/calendar/export.ics', [\App\Http\Controllers\SahodayaAdmin\CalendarController::class, 'exportIcal'])->name('calendar.ical');
+
+        Route::prefix('documents')->name('documents.')->group(function () {
+            Route::get('/review', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentReviewController::class, 'index'])->name('review');
+            Route::get('/types', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentTypeController::class, 'index'])->name('types');
+            Route::post('/types', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentTypeController::class, 'store'])->name('types.store');
+            Route::put('/types/{documentType}', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentTypeController::class, 'update'])->name('types.update');
+            Route::delete('/types/{documentType}', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentTypeController::class, 'destroy'])->name('types.destroy');
+            Route::post('/{document}/approve', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentReviewController::class, 'approve'])->name('approve');
+            Route::post('/{document}/reject', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentReviewController::class, 'reject'])->name('reject');
+            Route::get('/{document}/download', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentReviewController::class, 'download'])->name('download');
+        });
         Route::get('/membership/reports/export/schools', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportSchools'])->name('membership.reports.export.schools');
         Route::get('/membership/reports/export/payments-pending', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPaymentsPending'])->name('membership.reports.export.payments-pending');
         Route::get('/membership/reports/export/payment-due', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPaymentDue'])->name('membership.reports.export.payment-due');
@@ -648,11 +779,17 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/items', [FestEventController::class, 'items'])->name('items.index');
             Route::get('/{event}/levels', [FestEventController::class, 'levels'])->name('levels');
             Route::get('/{event}/activity', [\App\Http\Controllers\SahodayaAdmin\FestEventActivityController::class, 'index'])->name('activity');
+            Route::post('/{event}/toggle-nav-hidden', [FestEventController::class, 'toggleNavHidden'])->name('toggle-nav-hidden');
             Route::get('/{event}', [FestEventController::class, 'show'])->name('show');
             Route::put('/{event}', [FestEventController::class, 'update'])->name('update');
             Route::delete('/{event}', [FestEventController::class, 'destroy'])->name('destroy');
             Route::post('/{event}/spawn', [FestEventController::class, 'spawnCascade'])->name('spawn');
             Route::post('/{event}/spawn-cluster', [FestEventController::class, 'spawnCluster'])->name('spawn-cluster');
+            Route::post('/{event}/spawn-partition', [FestEventController::class, 'spawnPartition'])->name('spawn-partition');
+            Route::post('/{event}/apply-conduct-preset', [FestEventController::class, 'applyConductPreset'])->name('apply-conduct-preset');
+            Route::post('/{event}/assign-school-partitions', [FestEventController::class, 'assignSchoolPartitions'])->name('assign-school-partitions');
+            Route::post('/{event}/sync-region-partitions', [FestEventController::class, 'syncRegionPartitions'])->name('sync-region-partitions');
+            Route::post('/{event}/submit-state-qualifiers', [\App\Http\Controllers\SahodayaAdmin\StateQualifierSubmissionController::class, 'store'])->name('submit-state-qualifiers');
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');
             Route::post('/{event}/promote-all-school-rounds', [FestEventController::class, 'promoteAllSchoolRounds'])->name('promote-all-school-rounds');
@@ -707,6 +844,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/results', [FestResultsController::class, 'show'])->name('results.show');
             Route::post('/{event}/results/publish', [FestResultsController::class, 'publish'])->name('results.publish');
             Route::post('/{event}/results/unpublish', [FestResultsController::class, 'unpublish'])->name('results.unpublish');
+            Route::post('/{event}/results/items/{item}/publish', [FestResultsController::class, 'publishItem'])->name('results.items.publish');
+            Route::post('/{event}/results/items/{item}/unpublish', [FestResultsController::class, 'unpublishItem'])->name('results.items.unpublish');
             Route::post('/{event}/results/promote', [FestResultsController::class, 'promote'])->name('results.promote');
             Route::post('/{event}/results/promote-auto', [FestResultsController::class, 'promoteAuto'])->name('results.promote-auto');
             Route::post('/{event}/results/qualifications/{qualification}/revoke', [FestResultsController::class, 'revokePromotion'])->name('results.qualifications.revoke');
@@ -744,25 +883,34 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/chest-numbers/{participant}/clear', [FestChestNumberController::class, 'clearChest'])->name('chest-numbers.clear');
             Route::post('/{event}/chest-numbers/{participant}/reveal', [FestChestNumberController::class, 'revealChest'])->name('chest-numbers.reveal');
             Route::get('/{event}/chest-numbers/print', [FestChestNumberController::class, 'print'])->name('chest-numbers.print');
+            Route::get('/{event}/chest-numbers/cards', [FestChestNumberController::class, 'cards'])->name('chest-numbers.cards');
+            Route::get('/{event}/chest-numbers/csv', [FestChestNumberController::class, 'csv'])->name('chest-numbers.csv');
             Route::get('/{event}/id-cards', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'index'])->name('id-cards.index');
             Route::get('/{event}/id-cards/cards', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'cardsJson'])->name('id-cards.cards');
             Route::get('/{event}/id-cards/preview', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'preview'])->name('id-cards.preview');
             Route::get('/{event}/id-cards/pdf', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'pdf'])->name('id-cards.pdf');
             Route::get('/{event}/id-cards/pdf-all-items', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'pdfAllItems'])->name('id-cards.pdf-all-items');
+            Route::get('/{event}/id-cards/pdf-all-heads', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'pdfAllHeads'])->name('id-cards.pdf-all-heads');
             Route::get('/{event}/settings/{tab?}', [FestEventSettingsController::class, 'settings'])
                 ->where('tab', 'lifecycle|locks|venues|combo|grades|points|participation|eligibility|fees|registration|numbering|volunteers|records|clone')
                 ->name('settings');
             Route::put('/{event}/settings', [FestEventSettingsController::class, 'updateSettings'])->name('settings.update');
             Route::put('/{event}/registration-settings', [FestEventSettingsController::class, 'updateRegistrationSettings'])->name('registration-settings.update');
             Route::put('/{event}/numbering-settings', [FestEventSettingsController::class, 'updateNumberingSettings'])->name('numbering-settings.update');
+            Route::put('/{event}/item-numbering', [FestEventSettingsController::class, 'updateItemNumbering'])->name('item-numbering.update');
             Route::patch('/{event}/items/{item}/windows', [FestEventSettingsController::class, 'updateItemWindows'])->name('items.windows.update');
             Route::post('/{event}/items/{item}/publish-results', [FestEventSettingsController::class, 'publishItemResults'])->name('items.publish-results');
+            Route::get('/{event}/setup', [\App\Http\Controllers\SahodayaAdmin\FestSportsSetupController::class, 'index'])->name('setup.index');
+            Route::get('/{event}/competition', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadOpsController::class, 'index'])->name('competition.index');
             Route::get('/{event}/item-heads', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'index'])->name('item-heads.index');
             Route::post('/{event}/item-heads', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'store'])->name('item-heads.store');
             Route::post('/{event}/item-heads/sync', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'sync'])->name('item-heads.sync');
+            Route::patch('/{event}/item-heads/{head}/windows', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'updateWindows'])->name('item-heads.windows.update');
+            Route::delete('/{event}/item-heads/{head}', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'destroy'])->name('item-heads.destroy');
             Route::put('/{event}/eligibility-settings', [FestEventSettingsController::class, 'updateEligibilitySettings'])->name('eligibility-settings.update');
             Route::post('/{event}/lifecycle-settings', [FestEventSettingsController::class, 'updateLifecycleSettings'])->name('lifecycle-settings.update');
             Route::put('/{event}/fee-settings', [FestEventSettingsController::class, 'updateFeeSettings'])->name('fee-settings.update');
+            Route::put('/{event}/ledger-account', [FestEventSettingsController::class, 'updateLedgerAccount'])->name('ledger-account.update');
             Route::patch('/{event}/items/{item}/fee', [FestEventSettingsController::class, 'updateItemFee'])->name('items.fee.update');
             Route::post('/{event}/venues', [FestEventSettingsController::class, 'storeVenue'])->name('venues.store');
             Route::delete('/{event}/venues/{venue}', [FestEventSettingsController::class, 'destroyVenue'])->name('venues.destroy');
@@ -774,6 +922,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/grade-configs/{gradeConfig}', [FestEventSettingsController::class, 'destroyGradeConfig'])->name('grade-configs.destroy');
             Route::post('/{event}/point-rules', [FestEventSettingsController::class, 'storePointRule'])->name('point-rules.store');
             Route::delete('/{event}/point-rules/{pointRule}', [FestEventSettingsController::class, 'destroyPointRule'])->name('point-rules.destroy');
+            Route::put('/{event}/rank-points', [FestEventSettingsController::class, 'updateRankPoints'])->name('rank-points.update');
+            Route::post('/{event}/rank-points/seed-athletics', [FestEventSettingsController::class, 'seedRankPoints'])->name('rank-points.seed-athletics');
             Route::post('/{event}/volunteers', [FestEventSettingsController::class, 'storeVolunteer'])->name('volunteers.store');
             Route::delete('/{event}/volunteers/{volunteer}', [FestEventSettingsController::class, 'destroyVolunteer'])->name('volunteers.destroy');
             Route::post('/{event}/clone', [FestEventSettingsController::class, 'cloneEvent'])->name('clone');
@@ -805,6 +955,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 ->where('phase', 'before|during|after')
                 ->name('reports.downloads');
             Route::get('/{event}/reports', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'index'])->name('reports.index');
+            Route::get('/{event}/reports/by-head', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'byHead'])->name('reports.by-head');
             Route::post('/{event}/reports/participation-rules', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'storeRule'])->name('reports.rules.store');
             Route::get('/{event}/reports/school-detailed', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'schoolDetailed'])->name('reports.school-detailed');
             Route::get('/{event}/reports/overall-ranking', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'overallRanking'])->name('reports.overall-ranking');
@@ -815,10 +966,19 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/reports/item-schedule', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemSchedule'])->name('reports.item-schedule');
             Route::get('/{event}/reports/item-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemCounts'])->name('reports.item-counts');
             Route::get('/{event}/reports/discipline-registration', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'disciplineRegistration'])->name('reports.discipline-registration');
+            Route::get('/{event}/reports/head-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'headWiseParticipants'])->name('reports.head-wise-participants');
             Route::get('/{event}/reports/age-group-matrix', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'ageGroupMatrix'])->name('reports.age-group-matrix');
             Route::get('/{event}/reports/fee-collection', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'feeCollection'])->name('reports.fee-collection');
             Route::get('/{event}/reports/registration-register', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'registrationRegister'])->name('reports.registration-register');
             Route::get('/{event}/reports/registration-register/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportRegistrationRegister'])->name('reports.registration-register.export');
+            Route::get('/{event}/reports/assignment-completeness', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'assignmentCompleteness'])->name('reports.assignment-completeness');
+            Route::get('/{event}/reports/assignment-completeness/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportAssignmentCompleteness'])->name('reports.assignment-completeness.export');
+            Route::get('/{event}/reports/numbering-register', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'numberingRegister'])->name('reports.numbering-register');
+            Route::get('/{event}/reports/numbering-register/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportNumberingRegister'])->name('reports.numbering-register.export');
+            Route::get('/{event}/reports/pending-approvals', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'pendingApprovals'])->name('reports.pending-approvals');
+            Route::get('/{event}/reports/pending-approvals/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportPendingApprovals'])->name('reports.pending-approvals.export');
+            Route::get('/{event}/reports/student-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'studentWise'])->name('reports.student-wise');
+            Route::get('/{event}/reports/item-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemWise'])->name('reports.item-wise');
             Route::get('/{event}/reports/export/{exportType}', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'export'])->name('reports.export');
         });
 
@@ -857,13 +1017,26 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/leaderboard/export', [McqExamController::class, 'exportLeaderboard'])->name('leaderboard.export');
             Route::post('/{exam}/school-fees/{schoolFee}/approve', [McqExamController::class, 'approveSchoolFee'])->name('school-fees.approve');
             Route::get('/{exam}/payments', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'exam'])->name('payments');
+            Route::get('/{exam}/ledger', [McqExamController::class, 'ledger'])->name('ledger');
+            Route::put('/{exam}/ledger-account', [McqExamController::class, 'updateLedgerAccount'])->name('ledger-account.update');
             Route::post('/{exam}/payments/{schoolFee}/approve', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'approve'])->name('payments.approve');
+            Route::post('/{exam}/payments/{schoolFee}/reject', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'reject'])->name('payments.reject');
             Route::get('/{exam}/reports', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'show'])->name('reports');
             Route::get('/{exam}/reports/registration/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRegistration'])->name('reports.registration.export');
             Route::get('/{exam}/reports/fees/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportFees'])->name('reports.fees.export');
             Route::get('/{exam}/reports/attendance/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportAttendance'])->name('reports.attendance.export');
+            Route::get('/{exam}/reports/toppers/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportToppers'])->name('reports.toppers.export');
+            Route::get('/{exam}/reports/level2-qualifiers/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportLevel2Qualifiers'])->name('reports.level2-qualifiers.export');
+            Route::get('/{exam}/reports/absent/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportAbsent'])->name('reports.absent.export');
+            Route::get('/{exam}/reports/marks-pending/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportMarksPending'])->name('reports.marks-pending.export');
+            Route::get('/{exam}/reports/fees-pending/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportPendingFees'])->name('reports.fees-pending.export');
+            Route::get('/{exam}/reports/fees-rejected/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRejectedFees'])->name('reports.fees-rejected.export');
+            Route::get('/{exam}/reports/grade-bands/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportGradeBands'])->name('reports.grade-bands.export');
+            Route::get('/{exam}/reports/session-status/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportSessionStatus'])->name('reports.session-status.export');
             Route::get('/{exam}/attendance', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'attendance'])->name('attendance');
             Route::post('/{exam}/attendance', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'storeAttendance'])->name('attendance.store');
+            Route::post('/{exam}/attendance/import', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'importAttendance'])->name('attendance.import');
+            Route::get('/{exam}/attendance/export', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'exportAttendance'])->name('attendance.export');
             Route::get('/{exam}/results', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'results'])->name('results');
             Route::get('/{exam}/hall-tickets', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'hallTickets'])->name('hall-tickets');
             Route::get('/{exam}/hall-tickets/preview', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'previewHallTicket'])->name('hall-tickets.preview');
@@ -880,6 +1053,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/activity', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'activity'])->name('activity');
             Route::post('/{exam}/marks/bulk-import', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'bulkImportMarks'])->name('marks.bulk-import');
             Route::post('/{exam}/ranking/compute', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'computeRanking'])->name('ranking.compute');
+            Route::get('/{exam}/certificates/preview', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'previewCertificate'])->name('certificates.preview');
+            Route::post('/{exam}/certificates/generate', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'generateCertificates'])->name('certificates.generate');
+            Route::get('/{exam}/registrations/{registration}/certificate', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'printCertificate'])->name('certificates.print');
         });
 
         Route::prefix('training')->name('training.')->group(function () {
@@ -890,18 +1066,27 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{program}/sessions', [TrainingProgramController::class, 'storeSession'])->name('sessions.store');
             Route::post('/{program}/sessions/{session}/attendance', [TrainingProgramController::class, 'storeSessionAttendance'])->name('sessions.attendance');
             Route::post('/{program}/sessions/{session}/attendance/{registration}', [TrainingProgramController::class, 'updateAttendance'])->name('sessions.attendance.update');
+            Route::get('/{program}/attendance', [TrainingProgramController::class, 'attendance'])->name('attendance');
+            Route::get('/{program}/attendance/export', [TrainingProgramController::class, 'exportAttendance'])->name('attendance.export');
             Route::post('/{program}/registrations/{registration}/confirm', [TrainingProgramController::class, 'confirmRegistration'])->name('registrations.confirm');
             Route::post('/{program}/registrations/{registration}/fee/approve', [TrainingProgramController::class, 'approveFee'])->name('registrations.fee.approve');
             Route::post('/{program}/registrations/{registration}/fee/reject', [TrainingProgramController::class, 'rejectFee'])->name('registrations.fee.reject');
             Route::get('/{program}/registrations/{registration}/fee/proof', [TrainingProgramController::class, 'feeProof'])->name('registrations.fee.proof');
+            Route::get('/{program}/certificate/preview', [TrainingProgramController::class, 'previewCertificate'])->name('certificate.preview');
             Route::post('/{program}/registrations/{registration}/certificate', [TrainingProgramController::class, 'issueCertificate'])->name('registrations.certificate');
             Route::get('/{program}/registrations/{registration}/certificate/print', [TrainingProgramController::class, 'printCertificate'])->name('registrations.certificate.print');
             Route::get('/{program}/certificates/export', [TrainingProgramController::class, 'exportCertificatesZip'])->name('certificates.export');
+            Route::get('/{program}/ledger', [TrainingProgramController::class, 'ledger'])->name('ledger');
+            Route::put('/{program}/ledger-account', [TrainingProgramController::class, 'updateLedgerAccount'])->name('ledger-account.update');
         });
 
         Route::prefix('ledger')->name('ledger.')->group(function () {
             Route::get('/', [LedgerController::class, 'index'])->name('index');
             Route::get('/reports', [LedgerController::class, 'reports'])->name('reports');
+            Route::get('/opening-balances', [LedgerController::class, 'openingBalances'])->name('opening-balances');
+            Route::post('/opening-balances', [LedgerController::class, 'storeOpeningBalance'])->name('opening-balances.store');
+            Route::delete('/opening-balances/{openingBalance}', [LedgerController::class, 'destroyOpeningBalance'])->name('opening-balances.destroy');
+            Route::patch('/heads/{head}', [LedgerController::class, 'updateAccountHead'])->name('heads.update');
             Route::get('/export', [LedgerController::class, 'export'])->name('export');
             Route::post('/heads', [LedgerController::class, 'storeHead'])->name('heads.store');
             Route::delete('/heads/{head}', [LedgerController::class, 'destroyHead'])->name('heads.destroy');
@@ -912,6 +1097,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::prefix('certificate-templates')->name('certificate-templates.')->group(function () {
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'index'])->name('index');
             Route::post('/', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'store'])->name('store');
+            Route::put('/{template}', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'update'])->name('update');
             Route::delete('/{template}', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'destroy'])->name('destroy');
         });
 
@@ -934,10 +1120,13 @@ Route::middleware('web')->group(function () {
     Route::post('/portal/forgot-password', [AuthController::class, 'sendResetLink'])->name('portal.password.email');
     Route::get('/portal/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('portal.password.reset');
     Route::post('/portal/reset-password', [AuthController::class, 'resetPassword'])->name('portal.password.update');
-    Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+    Route::post('/login', [AuthController::class, 'login'])
+        ->middleware('throttle:20,1')
+        ->name('login.post');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::middleware('auth')->group(function () {
+        Route::get('/exports/{exportJob}/download', \App\Http\Controllers\ExportJobDownloadController::class)->name('exports.download');
         Route::get('/change-password', [\App\Http\Controllers\ChangePasswordController::class, 'show'])->name('password.change');
         Route::post('/change-password', [\App\Http\Controllers\ChangePasswordController::class, 'store'])->name('password.change.store');
         Route::get('/portal/welcome', [\App\Http\Controllers\PortalWelcomeController::class, 'show'])->name('portal.welcome');
@@ -970,6 +1159,7 @@ Route::prefix('portal/fest-ops/{tenantId}')
         Route::get('/events/{event}/participants/search', [\App\Http\Controllers\Portal\FestEventOpsController::class, 'participantSearch'])->name('participants.search');
         Route::get('/events/{event}/marks', [\App\Http\Controllers\Portal\FestEventOpsController::class, 'marks'])->name('marks');
         Route::post('/events/{event}/marks', [\App\Http\Controllers\Portal\FestEventOpsController::class, 'storeMark'])->name('marks.store');
+        Route::post('/events/{event}/items/{item}/auto-rank', [\App\Http\Controllers\Portal\FestEventOpsController::class, 'autoRankItem'])->name('items.auto-rank');
         Route::get('/events/{event}/admit-card', [\App\Http\Controllers\Portal\FestEventOpsController::class, 'admitCard'])->name('admit-card');
         Route::get('/events/{event}/appeals', [\App\Http\Controllers\Portal\FestEventOpsController::class, 'appeals'])->name('appeals');
         Route::post('/events/{event}/appeals/{appeal}/resolve', [\App\Http\Controllers\Portal\FestEventOpsController::class, 'resolveAppeal'])->name('appeals.resolve');
@@ -1002,6 +1192,8 @@ Route::prefix('portal/fest-coordinator/{tenantId}')
         Route::get('/', [\App\Http\Controllers\Portal\FestMarkCoordinatorController::class, 'index'])->name('dashboard');
         Route::get('/events/{event}/marks', [\App\Http\Controllers\Portal\FestMarkCoordinatorController::class, 'marks'])->name('marks');
         Route::post('/events/{event}/marks', [\App\Http\Controllers\Portal\FestMarkCoordinatorController::class, 'storeMark'])->name('marks.store');
+        Route::post('/events/{event}/attendance', [\App\Http\Controllers\Portal\FestMarkCoordinatorController::class, 'storeAttendance'])->name('attendance.store');
+        Route::post('/events/{event}/items/{item}/auto-rank', [\App\Http\Controllers\Portal\FestMarkCoordinatorController::class, 'autoRankItem'])->name('items.auto-rank');
     });
 
 Route::prefix('portal/teacher/{tenantId}')
@@ -1010,6 +1202,8 @@ Route::prefix('portal/teacher/{tenantId}')
     ->group(function () {
         Route::get('/', [TeacherDashboardController::class, 'index'])->name('dashboard');
         Route::get('/training', [TeacherDashboardController::class, 'trainingPage'])->name('training');
+        Route::post('/training/programs/{program}/register', [\App\Http\Controllers\Portal\TeacherTrainingRegistrationController::class, 'register'])->name('training.register');
+        Route::post('/training/registrations/{registration}/payment', [\App\Http\Controllers\Portal\TeacherTrainingRegistrationController::class, 'uploadPayment'])->name('training.payment');
         Route::get('/fest', [TeacherDashboardController::class, 'festPage'])->name('fest');
         Route::get('/fest/schedule', [TeacherDashboardController::class, 'festSchedulePage'])->name('fest.schedule');
         Route::get('/results', [TeacherDashboardController::class, 'resultsPage'])->name('results');
@@ -1075,8 +1269,10 @@ Route::prefix('portal/student/{tenantId}')
         Route::get('/certificates', [StudentDashboardController::class, 'festCertificates'])->name('certificates');
         Route::get('/sports-results', [StudentDashboardController::class, 'sportsResults'])->name('sports-results');
         Route::get('/fest/{event}/admit-card', [StudentDashboardController::class, 'admitCard'])->name('fest.admit-card');
+        Route::get('/fest/{event}/id-card', [StudentDashboardController::class, 'festIdCard'])->name('fest.id-card');
         Route::post('/fest/{event}/appeals', [\App\Http\Controllers\Portal\PortalFestAppealController::class, 'storeStudent'])->name('fest.appeals.store');
         Route::get('/mcq/{registration}/hall-ticket', [\App\Http\Controllers\Portal\StudentMcqController::class, 'hallTicket'])->name('mcq.hall-ticket');
+        Route::get('/mcq/{registration}/certificate', [\App\Http\Controllers\Portal\StudentMcqController::class, 'certificate'])->name('mcq.certificate');
         Route::get('/mcq/{registration}/exam', [\App\Http\Controllers\Portal\StudentMcqController::class, 'showExam'])->name('mcq.exam');
         Route::post('/mcq/{registration}/start', [\App\Http\Controllers\Portal\StudentMcqController::class, 'startExam'])->name('mcq.start');
         Route::post('/mcq/{registration}/save-answers', [\App\Http\Controllers\Portal\StudentMcqController::class, 'saveAnswer'])->name('mcq.save-answers');
@@ -1085,6 +1281,7 @@ Route::prefix('portal/student/{tenantId}')
         Route::put('/profile', [\App\Http\Controllers\Portal\StudentProfileController::class, 'update'])->name('profile.update');
         Route::put('/profile/password', [\App\Http\Controllers\Portal\StudentProfileController::class, 'updatePassword'])->name('profile.password');
         Route::get('/fest-registrations', [\App\Http\Controllers\Portal\FestStudentRegistrationController::class, 'index'])->name('fest-registrations');
+        Route::get('/fest/{event}/eligible-items', [\App\Http\Controllers\Portal\FestStudentRegistrationController::class, 'eligibleItems'])->name('fest.eligible-items');
         Route::post('/fest/{event}/register', [\App\Http\Controllers\Portal\FestStudentRegistrationController::class, 'registerEvent'])->name('fest.register-event');
         Route::post('/fest/{event}/items/{item}/register', [\App\Http\Controllers\Portal\FestStudentRegistrationController::class, 'registerItem'])->name('fest.register-item');
     });

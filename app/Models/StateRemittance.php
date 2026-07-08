@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class StateRemittance extends Model
 {
+    use BelongsToCentralTenant;
+
     use CentralConnection;
     protected $fillable = [
         'sahodaya_id', 'title', 'description', 'amount', 'due_date', 'academic_year',
@@ -25,7 +28,7 @@ class StateRemittance extends Model
 
     public function sahodaya(): BelongsTo
     {
-        return $this->belongsTo(Tenant::class, 'sahodaya_id');
+        return $this->belongsToCentralTenant('sahodaya_id');
     }
 
     public function createdBy(): BelongsTo

@@ -47,6 +47,7 @@ class FestSportsCompositeFeeTest extends TestCase
             'name' => 'Sports School',
             'parent_id' => $sahodaya->id,
             'school_prefix' => 'SS',
+            'membership_status' => 'approved',
             'is_active' => true,
         ]);
 
@@ -81,6 +82,7 @@ class FestSportsCompositeFeeTest extends TestCase
                 'gender' => 'male',
                 'dob' => now()->subYears(12)->toDateString(),
                 'status' => 'active',
+                'verified_at' => now(),
             ]);
         })->all();
 
@@ -133,6 +135,55 @@ class FestSportsCompositeFeeTest extends TestCase
         $this->assertEquals(200.0, (float) $fee->extra_item_fee);
         $this->assertEquals(2800.0, (float) $fee->total_due);
         $this->assertCount(4, $fee->fresh('lines')->lines);
+    }
+
+    public function test_sports_composite_zero_included_quota_charges_every_item(): void
+    {
+        ['school' => $school, 'event' => $event, 'students' => $students] = $this->sportsContext();
+
+        $event->update([
+            'fee_settings' => array_merge($event->fee_settings ?? [], [
+                'included_items_per_student' => 0,
+            ]),
+        ]);
+
+        $item = FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => '100m',
+            'participant_type' => 'individual',
+            'class_group' => 'open',
+            'age_group' => 'u14',
+            'is_enabled' => true,
+            'fee_amount' => 100,
+        ]);
+
+        $regService = app(FestEventRegistrationService::class);
+        foreach ($students as $student) {
+            $regService->registerStudent($event, $student, $school);
+            $registration = FestRegistration::create([
+                'event_id' => $event->id,
+                'item_id' => $item->id,
+                'school_id' => $school->id,
+                'status' => 'approved',
+                'submitted_at' => now(),
+            ]);
+            FestParticipant::create([
+                'registration_id' => $registration->id,
+                'student_id' => $student->id,
+                'participant_type' => 'student',
+                'participant_role' => 'performer',
+            ]);
+        }
+
+        $fee = app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+
+        $this->assertEquals(2000.0, (float) $fee->school_registration_fee);
+        $this->assertEquals(600.0, (float) $fee->student_registration_fee);
+        $this->assertEquals(200.0, (float) $fee->extra_item_fee);
+        $this->assertEquals(2800.0, (float) $fee->total_due);
+
+        $itemLines = $fee->fresh('lines')->lines->where('line_type', 'item_fee');
+        $this->assertCount(2, $itemLines);
     }
 
     public function test_event_registration_required_before_items(): void

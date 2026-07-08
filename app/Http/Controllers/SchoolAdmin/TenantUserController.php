@@ -8,7 +8,9 @@ use App\Models\User;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Auth\TenantUserProvisioner;
 use App\Services\Auth\UserCredentialService;
+use App\Services\Notifications\NotificationService;
 use App\Services\School\SchoolUserScopeService;
+use App\Support\TenantDomainSync;
 use App\Support\TenantUserCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -50,6 +52,8 @@ class TenantUserController extends SchoolAdminController
             'houses'            => SchoolHouse::forSchool($this->school->id)->orderBy('name')->get(['id', 'name']),
             'assignableRoles'   => $this->roleOptions($assignable),
             'scopeOptions'      => $scopes->scopeOptionsForSchool($this->school->id, $this->school->parent_id),
+            'coordinatorContact'=> $this->coordinatorContactPayload($scopes),
+            'leadershipContacts'=> $this->leadershipContactsPayload($scopes),
             'canManageAdmins'   => $actor->hasRole('school_principal'),
             'permissions'       => TenantUserCatalog::allPermissions(),
             'permissionLabels'  => $this->permissionLabels(),
@@ -124,6 +128,142 @@ class TenantUserController extends SchoolAdminController
         }
 
         return back()->with($flash);
+    }
+
+    public function updateCoordinatorContact(Request $request)
+    {
+        return $this->updateLeadershipContact($request, 'event_coordinator');
+    }
+
+    public function updateLeadershipContact(Request $request, string $roleKey)
+    {
+        $assignable = TenantUserCatalog::assignableRolesFor($request->user());
+        abort_if($assignable === [], 403);
+        $config = $this->leadershipRoleConfig($roleKey);
+
+        $data = $request->validate([
+            'name'  => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'phone' => 'nullable|string|max:30',
+        ]);
+
+        $payload = $this->school->application_payload ?? [];
+        $payload[$config['prefix'].'_name'] = $data['name'];
+        $payload[$config['prefix'].'_email'] = strtolower(trim($data['email']));
+        $payload[$config['prefix'].'_phone'] = $data['phone'] ?? null;
+
+        $this->school->update(['application_payload' => $payload]);
+
+        return back()->with('success', "{$config['label']} contact updated.");
+    }
+
+    public function provisionCoordinatorFromContact(
+        Request $request,
+        TenantUserProvisioner $provisioner,
+        UserCredentialService $credentials,
+        NotificationService $notifications,
+        SchoolUserScopeService $scopes,
+        PlatformAuditLogger $audit,
+    ) {
+        return $this->provisionLeadershipLogin($request, 'event_coordinator', $provisioner, $credentials, $notifications, $scopes, $audit);
+    }
+
+    public function provisionLeadershipLogin(
+        Request $request,
+        string $roleKey,
+        TenantUserProvisioner $provisioner,
+        UserCredentialService $credentials,
+        NotificationService $notifications,
+        SchoolUserScopeService $scopes,
+        PlatformAuditLogger $audit,
+    ) {
+        $assignable = TenantUserCatalog::assignableRolesFor($request->user());
+        $config = $this->leadershipRoleConfig($roleKey);
+        $role = $config['role'];
+        $canProvision = in_array($role, $assignable, true)
+            || (in_array($role, ['school_principal', 'school_vice_principal'], true) && $assignable !== []);
+        abort_unless($canProvision, 403);
+
+        $rules = [
+            'event_scopes' => $config['scoped'] ? 'required|array|min:1' : 'nullable|array',
+            'event_scopes.*.program_slug' => 'required_with:event_scopes|string|max:50',
+            'event_scopes.*.scope_type'   => 'required_with:event_scopes|in:program,fest_event,mcq_exam,training_program',
+            'event_scopes.*.event_id'     => 'nullable|integer',
+        ];
+        if (! $config['scoped']) {
+            $rules['event_scopes'] = 'nullable|array';
+        }
+
+        $data = $request->validate($rules);
+
+        $payload = $this->school->application_payload ?? [];
+        $name = trim((string) ($payload[$config['prefix'].'_name'] ?? ''));
+        $email = strtolower(trim((string) ($payload[$config['prefix'].'_email'] ?? '')));
+
+        if ($name === '' || $email === '') {
+            return back()->withErrors([
+                'leadership' => "Add the {$config['label']} name and email before creating the login.",
+            ]);
+        }
+
+        $existing = User::query()
+            ->where('tenant_id', $this->school->id)
+            ->where('email', $email)
+            ->first();
+
+        if ($existing && $config['scoped'] && ! $existing->hasRole($role)) {
+            return back()->withErrors([
+                'leadership' => 'A non-coordinator user already uses this email. Edit that user or choose another email.',
+            ]);
+        }
+
+        if (! $existing) {
+            $emailTaken = User::query()->where('email', $email)->exists();
+            if ($emailTaken) {
+                return back()->withErrors([
+                    'leadership' => 'This email is already used by another account.',
+                ]);
+            }
+        }
+
+        $result = $provisioner->upsert(
+            $this->school->id,
+            [$role],
+            $provisioner->defaultPermissionsForRoles([$role], 'school'),
+            $name,
+            $email,
+            null,
+            $existing?->id,
+            null,
+            null,
+            $request->user()?->id,
+        );
+
+        $user = $result['user'];
+        $password = $result['password'];
+        if ($existing || ! $password) {
+            $reset = $credentials->resetPassword($user, $request->user()?->id);
+            $user = $reset['user'];
+            $password = $reset['password'];
+        }
+
+        if ($config['scoped']) {
+            $scopes->sync($user, $this->school->id, $data['event_scopes'] ?? [], $request->user()?->id);
+        } else {
+            $scopes->sync($user, $this->school->id, [], $request->user()?->id);
+        }
+
+        $this->sendLeadershipCredentials($notifications, $user, $password, $config['label']);
+
+        $audit->userUpdated($user);
+
+        return back()->with([
+            'success' => "{$config['label']} login created/updated and credentials emailed.",
+            'newCredentials' => [
+                'username' => $user->username,
+                'password' => $password,
+            ],
+        ]);
     }
 
     public function update(Request $request, string $tenantId, User $user, TenantUserProvisioner $provisioner, PlatformAuditLogger $audit, SchoolUserScopeService $scopes)
@@ -254,12 +394,112 @@ class TenantUserController extends SchoolAdminController
             'fest.view' => 'Fest — view',
             'fest.manage' => 'Fest — register students',
             'fest.catering' => 'Fest — meal requests',
-            'mcq.view' => 'MCQ — view',
-            'mcq.manage' => 'MCQ — register students',
+            'mcq.view' => 'Talent Search — view',
+            'mcq.manage' => 'Talent Search — register students',
             'website.view' => 'Website — view',
             'website.news' => 'Website — news',
             'website.manage' => 'Website — manage content',
             'users.manage' => 'Users — manage',
         ];
+    }
+
+    private function coordinatorContactPayload(SchoolUserScopeService $scopes): array
+    {
+        return $this->leadershipContactPayload('event_coordinator', $scopes);
+    }
+
+    private function leadershipContactsPayload(SchoolUserScopeService $scopes): array
+    {
+        return [
+            'principal' => $this->leadershipContactPayload('principal', $scopes),
+            'vice_principal' => $this->leadershipContactPayload('vice_principal', $scopes),
+            'event_coordinator' => $this->leadershipContactPayload('event_coordinator', $scopes),
+        ];
+    }
+
+    private function leadershipContactPayload(string $roleKey, SchoolUserScopeService $scopes): array
+    {
+        $config = $this->leadershipRoleConfig($roleKey);
+        $payload = $this->school->application_payload ?? [];
+        $email = strtolower(trim((string) ($payload[$config['prefix'].'_email'] ?? '')));
+        $user = $email !== ''
+            ? User::role($config['role'])
+                ->where('tenant_id', $this->school->id)
+                ->where('email', $email)
+                ->first()
+            : null;
+
+        return [
+            'key' => $roleKey,
+            'label' => $config['label'],
+            'role' => $config['role'],
+            'scoped' => $config['scoped'],
+            'name' => $payload[$config['prefix'].'_name'] ?? '',
+            'email' => $payload[$config['prefix'].'_email'] ?? '',
+            'phone' => $payload[$config['prefix'].'_phone'] ?? '',
+            'loginUser' => $user ? [
+                'id' => $user->id,
+                'username' => $user->username,
+                'last_login_at' => $user->last_login_at?->toIso8601String(),
+                'event_scopes' => $scopes->scopesForUser($user->id, $this->school->id),
+            ] : null,
+        ];
+    }
+
+    /** @return array{prefix: string, label: string, role: string, scoped: bool} */
+    private function leadershipRoleConfig(string $roleKey): array
+    {
+        return match ($roleKey) {
+            'principal' => [
+                'prefix' => 'principal',
+                'label' => 'Principal',
+                'role' => 'school_principal',
+                'scoped' => false,
+            ],
+            'vice_principal' => [
+                'prefix' => 'vice_principal',
+                'label' => 'Vice Principal',
+                'role' => 'school_vice_principal',
+                'scoped' => false,
+            ],
+            'event_coordinator' => [
+                'prefix' => 'event_coordinator',
+                'label' => 'Events Coordinator',
+                'role' => 'school_event_coordinator',
+                'scoped' => true,
+            ],
+            default => abort(404),
+        };
+    }
+
+    private function sendLeadershipCredentials(NotificationService $notifications, User $user, string $password, string $label): void
+    {
+        $loginUrl = $this->schoolLoginUrl();
+        $body = implode("\n", [
+            "Dear {$user->name},",
+            '',
+            "Your {$label} login has been created for {$this->school->name}.",
+            '',
+            "Use the existing school login page: {$loginUrl}",
+            "Username: {$user->username}",
+            "Temporary password: {$password}",
+            '',
+            'Please sign in and change this password when prompted.',
+        ]);
+
+        $notifications->notifyEmailOnly(
+            $user,
+            "Your school {$label} login",
+            $body,
+            'school.leadership.credentials',
+        );
+    }
+
+    private function schoolLoginUrl(): string
+    {
+        $sahodaya = $this->school->parent;
+        $base = $sahodaya ? TenantDomainSync::publicUrl($sahodaya) : url('/');
+
+        return rtrim($base, '/').'/school-login';
     }
 }

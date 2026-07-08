@@ -10,6 +10,8 @@ import {
     schoolProgramHref,
     schoolProgramWorkflowItems,
 } from './schoolProgramNav.js';
+import { isNavMenuVisible, isNavProgramVisible } from './sahodayaAdminNav.js';
+import { TALENT_SEARCH_EXAMS_LABEL, TALENT_SEARCH_LABEL } from './mcqSchoolLabels.js';
 
 const SLUG_TO_PREFIX = Object.fromEntries(SCHOOL_FEST_PROGRAMS.map((p) => [p.slug, p.prefix]));
 
@@ -34,13 +36,91 @@ export function detectSchoolMcqHubFromUrl(url) {
 function examsTrainingItems(schoolId, canNav) {
     const items = [];
     if (canNav('mcq')) {
-        items.push({ label: 'MCQ exams', href: schoolAdminHref(schoolId, 'mcq'), icon: 'book-open' });
+        items.push({ label: TALENT_SEARCH_EXAMS_LABEL, href: schoolAdminHref(schoolId, 'mcq'), icon: 'book-open' });
     }
     if (canNav('training')) {
         items.push({ label: 'Teacher training', href: schoolAdminHref(schoolId, 'training'), icon: 'award' });
     }
 
     return items;
+}
+
+/** @returns {boolean} */
+export function detectSchoolMembershipFromUrl(url) {
+    const path = (url ?? '').split('?')[0];
+
+    if (/\/school-admin\/[^/]+\/registration(?:\/|$)/.test(path)) {
+        return true;
+    }
+    if (/\/school-admin\/[^/]+\/payments(?:\/|$)/.test(path) && !path.includes('/mcq')) {
+        return true;
+    }
+    if (/\/school-admin\/[^/]+\/documents(?:\/|$)/.test(path)) {
+        return true;
+    }
+
+    return /\/school-admin\/[^/]+\/calendar(?:\/|$)/.test(path);
+}
+
+/** @returns {boolean} */
+export function detectSchoolTrainingFromUrl(url) {
+    const path = (url ?? '').split('?')[0];
+
+    return /\/school-admin\/[^/]+\/training(?:\/|$)/.test(path);
+}
+
+/** Sidebar when managing annual membership / registration. */
+export function schoolMembershipScopedNav(schoolId, options = {}) {
+    const { canNav = () => true } = options;
+    const base = schoolAdminHref(schoolId);
+
+    if (!canNav('membership')) {
+        return [];
+    }
+
+    return [
+        {
+            section: 'School home',
+            items: [{ label: 'Dashboard', href: base, icon: 'grid', exact: true }],
+        },
+        {
+            section: 'Membership',
+            items: [
+                { label: 'Annual registration', href: schoolAdminHref(schoolId, 'registration'), icon: 'clipboard', exact: true },
+                { label: 'Profile & account', href: schoolAdminHref(schoolId, 'registration', 'profile'), icon: 'user' },
+                { label: 'Student records', href: schoolAdminHref(schoolId, 'registration', 'students'), icon: 'users' },
+                { label: 'Student counts', href: schoolAdminHref(schoolId, 'registration', 'counts'), icon: 'layers' },
+                { label: 'Teacher records', href: schoolAdminHref(schoolId, 'registration', 'teachers'), icon: 'user-check' },
+                { label: 'Membership payment', href: schoolAdminHref(schoolId, 'registration', 'payment'), icon: 'credit-card' },
+                { label: 'Payments & receipts', href: schoolAdminHref(schoolId, 'payments'), icon: 'inbox' },
+                { label: 'Compliance documents', href: schoolAdminHref(schoolId, 'documents'), icon: 'file-text' },
+                { label: 'Program calendar', href: schoolAdminHref(schoolId, 'calendar'), icon: 'calendar' },
+            ],
+        },
+    ];
+}
+
+/** Sidebar on teacher training hub (/training). */
+export function schoolTrainingHubNav(schoolId, options = {}) {
+    const { canNav = () => true } = options;
+    const base = schoolAdminHref(schoolId);
+
+    if (!canNav('training')) {
+        return [];
+    }
+
+    return [
+        {
+            section: 'School home',
+            items: [{ label: 'Dashboard', href: base, icon: 'grid', exact: true }],
+        },
+        {
+            section: 'Teacher training',
+            items: [
+                { label: 'Available programs', href: schoolAdminHref(schoolId, 'training'), icon: 'award', exact: true },
+            ],
+        },
+    ];
 }
 
 /** Sidebar on MCQ hub (/mcq). */
@@ -54,7 +134,7 @@ export function schoolMcqHubNav(schoolId, options = {}) {
             items: [{ label: 'Dashboard', href: base, icon: 'grid', exact: true }],
         },
         {
-            section: 'MCQ exams',
+            section: TALENT_SEARCH_LABEL,
             items: [{ label: 'Available exams', href: schoolAdminHref(schoolId, 'mcq'), icon: 'clipboard' }],
         },
     ];
@@ -87,7 +167,7 @@ export function schoolMcqExamScopedNav(schoolId, examId, options = {}) {
             items: [{ label: 'Dashboard', href: base, icon: 'grid', exact: true }],
         },
         {
-            section: 'MCQ exams',
+            section: TALENT_SEARCH_LABEL,
             items: [{ label: 'Available exams', href: schoolAdminHref(schoolId, 'mcq'), icon: 'clipboard' }],
         },
         {
@@ -110,9 +190,9 @@ export function detectSchoolFestContextFromUrl(url) {
     return null;
 }
 
-function programLinks(schoolId, excludeSlug = null) {
+function programLinks(schoolId, excludeSlug = null, navVisibility = null) {
     return SCHOOL_FEST_PROGRAMS
-        .filter((p) => p.slug !== excludeSlug)
+        .filter((p) => p.slug !== excludeSlug && isNavProgramVisible(navVisibility, p.slug))
         .map((p) => ({
             label: p.label,
             href: schoolProgramHref(schoolId, p.slug),
@@ -133,7 +213,7 @@ function festToolItems(schoolId) {
 
 /** Sidebar when viewing a fest program (Kalotsav, Sports Meet, …). */
 export function schoolProgramScopedNav(schoolId, programSlug, options = {}) {
-    const { canNav = () => true } = options;
+    const { canNav = () => true, coordinatorMode = false } = options;
     const program = schoolProgramBySlug(programSlug);
     const base = schoolAdminHref(schoolId);
 
@@ -141,34 +221,18 @@ export function schoolProgramScopedNav(schoolId, programSlug, options = {}) {
         return [];
     }
 
-    const groups = [
+    return [
         {
-            section: 'School home',
-            items: [
-                { label: 'Dashboard', href: base, icon: 'grid', exact: true },
-            ],
+            section: coordinatorMode ? 'Assigned program' : 'School home',
+            items: coordinatorMode
+                ? [{ label: '← My assignments', href: base, icon: 'grid', exact: true }]
+                : [{ label: 'Dashboard', href: base, icon: 'grid', exact: true }],
         },
         {
             section: program.label,
             items: schoolProgramWorkflowItems(schoolId, programSlug),
         },
     ];
-
-    const otherPrograms = programLinks(schoolId, programSlug);
-    if (otherPrograms.length) {
-        groups.push({ section: 'Other programs', items: otherPrograms });
-    }
-
-    groups.push({ section: 'Fest & tools', items: festToolItems(schoolId) });
-
-    if (canNav('mcq') || canNav('training')) {
-        const items = examsTrainingItems(schoolId, canNav);
-        if (items.length) {
-            groups.push({ section: 'Exams & training', items });
-        }
-    }
-
-    return groups;
 }
 
 /** Sidebar when viewing fest hub or a specific fest event page. */
@@ -200,6 +264,8 @@ export function schoolAdminNav(schoolId, options = {}) {
         websiteEnabled = false,
         schoolHasPrefix = true,
         pendingChangeRequests = 0,
+        navVisibility = null,
+        membershipPaid = true,
     } = options;
 
     const base = schoolAdminHref(schoolId);
@@ -221,11 +287,13 @@ export function schoolAdminNav(schoolId, options = {}) {
             { label: 'Students', href: schoolAdminHref(schoolId, 'students'), icon: 'users', badge: pendingChangeRequests },
             { label: 'Teachers', href: schoolAdminHref(schoolId, 'teachers'), icon: 'user-check' },
             { label: 'School houses', href: schoolAdminHref(schoolId, 'houses'), icon: 'layers' },
+            { label: 'Payment history', href: schoolAdminHref(schoolId, 'payments'), icon: 'credit-card' },
             { label: 'Settings', href: schoolAdminHref(schoolId, 'settings'), icon: 'settings' },
         );
         // Hidden — accessible from Settings page
         if (canNav('users')) {
             schoolItems.push({ label: 'Portal users', href: schoolAdminHref(schoolId, 'users'), icon: 'shield', hidden: true });
+            schoolItems.push({ label: 'Event coordinators', href: `${schoolAdminHref(schoolId, 'users')}?coordinators=1`, icon: 'users' });
         }
         groups.push({ section: 'School', items: schoolItems });
     }
@@ -237,39 +305,57 @@ export function schoolAdminNav(schoolId, options = {}) {
             items: [
                 { label: 'Annual Registration', href: schoolAdminHref(schoolId, 'registration'), icon: 'clipboard' },
                 { label: 'Payments & Receipts', href: schoolAdminHref(schoolId, 'payments'), icon: 'credit-card' },
+                { label: 'Compliance documents', href: schoolAdminHref(schoolId, 'documents'), icon: 'file-text' },
+                { label: 'Program calendar', href: schoolAdminHref(schoolId, 'calendar'), icon: 'calendar' },
                 // Hidden — tab on Annual Registration page
                 { label: 'Registration Details', href: schoolAdminHref(schoolId, 'registration', 'profile'), icon: 'user', hidden: true },
             ],
         });
     }
 
-    // ── Fest ──────────────────────────────────────────────────────────
-    if (canNav('fest')) {
+    // Programs (Fest / Talent Search / Training) unlock only after membership payment.
+    if (!membershipPaid && (canNav('fest') || canNav('mcq') || canNav('training'))) {
         groups.push({
-            section: 'Fest',
-            items: [
-                ...SCHOOL_FEST_PROGRAMS.map((p) => ({
-                    label: p.label,
-                    href: schoolProgramHref(schoolId, p.slug),
-                    icon: p.icon,
-                })),
-                { label: 'Reports', href: schoolAdminHref(schoolId, 'fest', 'reports'), icon: 'file-text', exact: true },
-                // Hidden — accessible from program pages and dashboard
-                { label: 'Fest Hub', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'star', hidden: true },
-                { label: 'School events', href: schoolAdminHref(schoolId, 'fest-programs'), icon: 'calendar', hidden: true },
-                { label: 'Food Coupons', href: schoolAdminHref(schoolId, 'food-coupons'), icon: 'clipboard', hidden: true },
-                { label: 'Circulars', href: schoolAdminHref(schoolId, 'circulars'), icon: 'file-text', hidden: true },
-                { label: 'Notifications', href: schoolAdminHref(schoolId, 'notifications'), icon: 'bell', hidden: true },
-            ],
+            section: 'Programs',
+            items: [{
+                label: 'Complete membership to unlock',
+                href: schoolAdminHref(schoolId, 'registration', 'payment'),
+                icon: 'lock',
+            }],
         });
+    }
+
+    // ── Fest ──────────────────────────────────────────────────────────
+    if (membershipPaid && canNav('fest')) {
+        const festProgramItems = SCHOOL_FEST_PROGRAMS
+            .filter((p) => isNavProgramVisible(navVisibility, p.slug))
+            .map((p) => ({
+                label: p.label,
+                href: schoolProgramHref(schoolId, p.slug),
+                icon: p.icon,
+            }));
+
+        const festItems = [
+            ...festProgramItems,
+            { label: 'Fest Hub', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'star' },
+            { label: 'Reports', href: schoolAdminHref(schoolId, 'fest', 'reports'), icon: 'file-text', exact: true },
+            { label: 'School events', href: schoolAdminHref(schoolId, 'fest-programs'), icon: 'calendar' },
+            { label: 'Food coupons', href: schoolAdminHref(schoolId, 'food-coupons'), icon: 'clipboard' },
+            { label: 'Circulars', href: schoolAdminHref(schoolId, 'circulars'), icon: 'file-text' },
+            { label: 'Notifications', href: schoolAdminHref(schoolId, 'notifications'), icon: 'bell' },
+        ];
+
+        if (festItems.length) {
+            groups.push({ section: 'Fest', items: festItems });
+        }
     }
 
     // ── Exams & training ──────────────────────────────────────────────
     const examItems = [];
-    if (canNav('mcq')) {
-        examItems.push({ label: 'MCQ exams', href: schoolAdminHref(schoolId, 'mcq'), icon: 'book-open' });
+    if (membershipPaid && canNav('mcq') && isNavMenuVisible(navVisibility, 'mcq')) {
+        examItems.push({ label: TALENT_SEARCH_EXAMS_LABEL, href: schoolAdminHref(schoolId, 'mcq'), icon: 'book-open' });
     }
-    if (canNav('training')) {
+    if (membershipPaid && canNav('training') && isNavMenuVisible(navVisibility, 'training')) {
         examItems.push({ label: 'Teacher training', href: schoolAdminHref(schoolId, 'training'), icon: 'award' });
     }
     if (examItems.length) {
@@ -295,7 +381,6 @@ export function schoolAdminNav(schoolId, options = {}) {
                 { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star', hidden: true },
                 { label: 'Contact Page', href: `${base}/contact`, icon: 'file-text', hidden: true },
                 { label: 'Enquiries', href: `${base}/enquiries`, icon: 'inbox', hidden: true },
-                { label: 'TC Requests', href: `${base}/tc-requests`, icon: 'file-text', hidden: true },
             ],
         });
     }
@@ -303,10 +388,112 @@ export function schoolAdminNav(schoolId, options = {}) {
     return groups;
 }
 
+const PROGRAM_ICONS = {
+    kalotsav: 'star',
+    'sports-meet': 'award',
+    'kids-fest': 'users',
+    'teacher-fest': 'users',
+    'english-fest': 'file-text',
+    'science-fest': 'layers',
+    mcq: 'book-open',
+    training: 'award',
+};
+
+/** Build href for a coordinator scope row from the API. */
+export function schoolCoordinatorScopeHref(schoolId, scope) {
+    const slug = scope?.program_slug;
+    if (!slug) {
+        return schoolAdminHref(schoolId);
+    }
+
+    if (slug === 'mcq') {
+        if (scope.scope_type === 'mcq_exam' && scope.event_id) {
+            return schoolAdminHref(schoolId, 'mcq', scope.event_id, 'register');
+        }
+
+        return schoolAdminHref(schoolId, 'mcq');
+    }
+
+    if (slug === 'training') {
+        return schoolAdminHref(schoolId, 'training');
+    }
+
+    const prefix = SLUG_TO_PREFIX[slug] ?? slug;
+    if (scope.scope_type === 'fest_event' && scope.event_id) {
+        return `${schoolAdminHref(schoolId, prefix)}/events/${scope.event_id}/overview`;
+    }
+
+    return `${schoolAdminHref(schoolId, prefix)}/registration`;
+}
+
+/** Sidebar for school_event_coordinator — only assigned programs/events. */
+export function schoolEventCoordinatorNav(schoolId, eventScopes = []) {
+    const scopes = Array.isArray(eventScopes) ? eventScopes : [];
+
+    const items = scopes.map((scope) => ({
+        label: scope.label ?? scope.program_slug,
+        href: schoolCoordinatorScopeHref(schoolId, scope),
+        icon: PROGRAM_ICONS[scope.program_slug] ?? 'calendar',
+    }));
+
+    if (!items.length) {
+        items.push({
+            label: 'No assignments yet',
+            href: schoolAdminHref(schoolId),
+            icon: 'alert-circle',
+        });
+    }
+
+    return [
+        {
+            section: 'My assignments',
+            items,
+        },
+    ];
+}
+
 /** Resolve active state for school nav href. */
-export function schoolNavItemActive(pageUrl, href, exact = false) {
-    const path = pageUrl.split('?')[0];
-    const target = href.split('?')[0];
+export function schoolNavItemActive(pageUrl, href, exact = false, matchQuery = null) {
+    const pageHash = pageUrl.includes('#') ? pageUrl.split('#')[1]?.split('?')[0] ?? '' : '';
+    const hrefHash = href.includes('#') ? href.split('#')[1]?.split('?')[0] ?? '' : '';
+    const [path, queryString = ''] = pageUrl.split('#')[0].split('?');
+    const [target, targetQuery = ''] = href.split('#')[0].split('?');
+    const params = new URLSearchParams(queryString);
+
+    if (hrefHash) {
+        const pathMatches = exact
+            ? (path === target || path === `${target}/`)
+            : (path === target || path.startsWith(`${target}/`));
+
+        return pathMatches && pageHash === hrefHash;
+    }
+
+    if (pageHash && (path === target || path.startsWith(`${target}/`))) {
+        return false;
+    }
+
+    if (matchQuery) {
+        const pathMatches = exact
+            ? (path === target || path === `${target}/`)
+            : (path === target || path.startsWith(`${target}/`));
+
+        if (!pathMatches) {
+            return false;
+        }
+
+        for (const [key, expected] of Object.entries(matchQuery)) {
+            const actual = params.get(key) ?? '';
+            if (expected === '' || expected == null) {
+                if (actual !== '') {
+                    return false;
+                }
+            } else if (String(actual) !== String(expected)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     if (exact) {
         return path === target || path === `${target}/`;
@@ -316,14 +503,18 @@ export function schoolNavItemActive(pageUrl, href, exact = false) {
         return true;
     }
 
+    if (target.endsWith('/item-registration') && path.includes('/events/') && path.includes('/items')) {
+        return true;
+    }
+
     // Highlight program entry when anywhere in that program's routes.
-    const dedicatedMatch = target.match(/\/(kalotsav|sports|kids-fest|teacher-fest)(?:\/|$)/);
+    const dedicatedMatch = target.match(/\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)(?:\/|$)/);
     if (dedicatedMatch) {
         const prefix = dedicatedMatch[1];
         return path.includes(`/${prefix}/`) || path.endsWith(`/${prefix}`);
     }
 
-    const programMatch = target.match(/\/programs\/(kalotsav|sports-meet|kids-fest|teacher-fest)\//);
+    const programMatch = target.match(/\/programs\/(kalotsav|sports-meet|kids-fest|teacher-fest|english-fest|science-fest)\//);
     if (programMatch) {
         const slug = programMatch[1];
         return path.includes(`/programs/${slug}/`) || path.includes(`/${SLUG_TO_PREFIX?.[slug] ?? slug}/`);

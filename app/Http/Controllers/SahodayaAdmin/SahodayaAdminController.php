@@ -8,6 +8,9 @@ use App\Models\Registration;
 use App\Models\Tenant;
 use App\Services\Audit\FestEventActivityService;
 use App\Services\Membership\SahodayaSetupService;
+use App\Support\ProgramRouteMap;
+use App\Models\SahodayaProfile;
+use App\Support\SahodayaNavVisibility;
 use App\Support\TenancyDatabase;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
@@ -32,6 +35,13 @@ abstract class SahodayaAdminController extends Controller
         }
     }
 
+    protected function assertStaffCan(string $permission): void
+    {
+        if ($this->isStaff && ! request()->user()?->can($permission)) {
+            abort(403, 'You do not have permission for this action.');
+        }
+    }
+
     protected function inertia(string $component, array $props = [])
     {
         $props = $this->withFestNavContext($props);
@@ -44,6 +54,10 @@ abstract class SahodayaAdminController extends Controller
         return inertia($component, array_merge([
             'isStaff' => $this->isStaff,
             'staffPermissions' => $staffPermissions,
+            'navVisibility' => SahodayaNavVisibility::forProfile(
+                SahodayaProfile::where('tenant_id', $this->sahodaya->id)->first(),
+                $this->sahodaya->nav_overrides,
+            ),
             'sahodaya'               => array_merge(
                 $this->sahodaya->only('id', 'name', 'type'),
                 ['logo_url' => TenantBranding::logoUrl($this->sahodaya)]
@@ -65,56 +79,117 @@ abstract class SahodayaAdminController extends Controller
             'pendingPaymentsCount'   => \App\Models\MembershipPayment::whereIn('school_id', TenancyDatabase::schoolIdsFor($this->sahodaya->id))
                                             ->where('status', 'submitted')->count(),
             'pendingChangeRequests'  => \App\Models\StudentEditChangeRequest::query()
+                ->forSahodaya($this->sahodaya->id)
                 ->where('status', 'pending')
                 ->whereIn('school_approval_status', ['school_approved', 'bypassed'])
-                ->whereHas('school', fn ($q) => $q->where('parent_id', $this->sahodaya->id))
+                ->count(),
+            'pendingFestAppealsCount' => \App\Models\FestAppeal::query()
+                ->whereIn('event_id', \App\Models\FestEvent::where('tenant_id', $this->sahodaya->id)->pluck('id'))
+                ->where('status', 'pending')
                 ->count(),
             'activeAcademicYear'     => \App\Support\AcademicYear::forSahodaya($this->sahodaya->id),
-            'stateRemittancesEnabled' => \App\Models\FestStateProgram::where('tenant_id', $this->sahodaya->id)->exists(),
+            'stateRemittancesEnabled' => \App\Models\FestStateProgramPropagation::where('sahodaya_id', $this->sahodaya->id)->exists(),
             'setupIncompleteCount'    => $this->isStaff ? 0 : collect(app(SahodayaSetupService::class)->checklist($this->sahodaya))
                 ->where('done', false)->count(),
         ], $props));
+    }
+
+    /** Program hub / catalog paths should keep program sidebar — ignore ?event_id= there. */
+    protected function isProgramWorkspaceRequest(): bool
+    {
+        $path = parse_url(request()->getRequestUri(), PHP_URL_PATH) ?? '';
+
+        return (bool) preg_match(
+            '#/sahodaya-admin/[^/]+/(?:kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)(?:/(?:catalog|age-groups|records|championship|results|rankings|school-rounds)(?:/|$)|(?:/|$)|$)#',
+            $path,
+        ) || str_contains($path, '/taxonomy-masters') || str_contains($path, '/programs/custom');
+    }
+
+    /** @return array{program: array<string, mixed>, programEvents: list<\App\Models\FestEvent>} */
+    protected function programNavProps(string $slug): array
+    {
+        $prefix = ProgramRouteMap::prefixFromSlug($slug);
+        $meta = ProgramRouteMap::FEST_PROGRAMS[$prefix] ?? null;
+        abort_unless($meta !== null, 404);
+
+        $eventType = $meta['event_type'];
+
+        return [
+            'program' => [
+                'slug'      => $meta['slug'],
+                'eventType' => $eventType,
+                'label'     => $meta['label'],
+                'icon'      => $meta['icon'],
+                'prefix'    => $prefix,
+            ],
+            'programEvents' => FestEvent::forTenant($this->sahodaya->id)
+                ->ofType($eventType)
+                ->visibleInNav()
+                ->orderByDesc('event_start')
+                ->get(['id', 'title', 'status'])
+                ->all(),
+        ];
     }
 
     /** @param  array<string, mixed>  $props */
     protected function withFestNavContext(array $props): array
     {
         $event = $props['event'] ?? null;
-        if ((! is_array($event) || empty($event['id'])) && request()->filled('event_id')) {
+        $hasEvent = is_array($event) || $event instanceof FestEvent;
+        $eventId = $hasEvent ? ($event['id'] ?? null) : null;
+
+        if ((! $hasEvent || empty($eventId)) && request()->filled('event_id') && ! $this->isProgramWorkspaceRequest()) {
             $festEvent = FestEvent::forTenant($this->sahodaya->id)
                 ->whereKey(request('event_id'))
                 ->first(['id', 'title', 'event_type', 'status', 'level_round']);
             if ($festEvent) {
                 $props['event'] = $festEvent->only(['id', 'title', 'event_type', 'status', 'level_round']);
                 $event = $props['event'];
+                $hasEvent = true;
+                $eventId = $event['id'];
             }
         }
 
-        if (! is_array($event) || empty($event['id'])) {
+        if (! $hasEvent || empty($eventId)) {
             return $props;
         }
 
+        $eventType = $event['event_type'] ?? null;
+
         if (! isset($props['programEvents'])) {
-            $eventType = $event['event_type'] ?? FestEvent::query()->whereKey($event['id'])->value('event_type');
+            $eventType ??= FestEvent::query()->whereKey($eventId)->value('event_type');
             if ($eventType) {
                 $props['programEvents'] = FestEvent::forTenant($this->sahodaya->id)
                     ->ofType($eventType)
+                    ->visibleInNav()
                     ->orderByDesc('event_start')
                     ->get(['id', 'title', 'status', 'event_start'])
                     ->all();
             }
         }
 
-        if (! isset($props['program']) && ! empty($event['event_type'])) {
+        if (! isset($props['program']) && ! empty($eventType)) {
             $slugMap = [
                 'kalolsavam'   => ['slug' => 'kalotsav', 'label' => 'Kalotsav', 'icon' => 'star'],
                 'sports'       => ['slug' => 'sports-meet', 'label' => 'Sports Meet', 'icon' => 'award'],
                 'kids_fest'    => ['slug' => 'kids-fest', 'label' => 'Kids Fest', 'icon' => 'users'],
                 'teacher_fest' => ['slug' => 'teacher-fest', 'label' => 'Teacher Fest', 'icon' => 'users'],
+                'english_fest' => ['slug' => 'english-fest', 'label' => 'English Fest', 'icon' => 'book'],
+                'science_fest' => ['slug' => 'science-fest', 'label' => 'Science Fest', 'icon' => 'flask'],
                 'custom'       => ['slug' => 'custom', 'label' => 'Custom Events', 'icon' => 'layers'],
             ];
-            if (isset($slugMap[$event['event_type']])) {
-                $props['program'] = array_merge($slugMap[$event['event_type']], ['eventType' => $event['event_type']]);
+            if (isset($slugMap[$eventType])) {
+                $props['program'] = array_merge($slugMap[$eventType], ['eventType' => $eventType]);
+            }
+        }
+
+        if (! isset($props['eventHeadNav'])) {
+            $festEvent = $event instanceof FestEvent
+                ? $event
+                : FestEvent::query()->whereKey($eventId)->where('tenant_id', $this->sahodaya->id)->first();
+            if ($festEvent) {
+                $nav = app(\App\Services\Events\FestHeadItemNavigationService::class);
+                $props['eventHeadNav'] = $nav->slimNavigation($nav->navigationForEvent($festEvent));
             }
         }
 

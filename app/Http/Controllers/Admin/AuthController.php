@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\PlatformUser;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Mail\SahodayaMailer;
@@ -11,6 +12,7 @@ use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
 use App\Support\TenantUserCatalog;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Auth\LoginLockoutService;
 use App\Support\InertiaAuth;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
@@ -136,7 +138,11 @@ class AuthController extends Controller
         $status = \Illuminate\Support\Facades\Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function (User $user, string $password): void {
-                $user->forceFill(['password' => \Illuminate\Support\Facades\Hash::make($password)])->save();
+                $user->forceFill([
+                    'password'             => $password,
+                    'plain_password'       => null,
+                    'must_change_password' => false,
+                ])->save();
             },
         );
 
@@ -160,8 +166,14 @@ class AuthController extends Controller
 
         $credentials = [$field => $identifier, 'password' => $data['password']];
         $auditContext = self::auditContext($request);
+        $lockout = app(LoginLockoutService::class);
+
+        if ($lockout->isLocked($identifier)) {
+            return self::authErrorResponse($request, $lockout->lockoutMessage($identifier));
+        }
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            $lockout->recordFailedAttempt($identifier);
             app(PlatformAuditLogger::class)->loginFailed(
                 $identifier,
                 'invalid_credentials',
@@ -173,6 +185,8 @@ class AuthController extends Controller
                 'Invalid username/email or password. Please check your credentials and try again.',
             );
         }
+
+        $lockout->clear($identifier);
 
         $user = $request->user()->fresh();
 
@@ -331,7 +345,9 @@ class AuthController extends Controller
             abort(403, 'This verification link is invalid or has expired.');
         }
 
-        $user = User::query()->findOrFail($id);
+        $user = TenantDomainSync::isCentralHost($request->getHost())
+            ? PlatformUser::query()->findOrFail($id)
+            : User::query()->findOrFail($id);
 
         if (! hash_equals($hash, sha1($user->getEmailForVerification()))) {
             abort(403, 'This verification link is invalid.');
@@ -350,7 +366,7 @@ class AuthController extends Controller
             ->with('success', 'Gmail verified successfully. Welcome!');
     }
 
-    public static function homeFor(User $user): ?string
+    public static function homeFor(User|PlatformUser $user): ?string
     {
         if ($user->isSuperAdmin()) {
             return route('admin.dashboard');
@@ -383,7 +399,31 @@ class AuthController extends Controller
             return "/school-admin/{$user->tenant_id}";
         }
 
-        if ($user->hasAnyRole(['school_staff', 'school_event_coordinator']) && $user->tenant_id) {
+        if ($user->hasRole('school_event_coordinator') && $user->tenant_id) {
+            return app(\App\Services\School\SchoolUserScopeService::class)->homeUrlFor($user, $user->tenant_id);
+        }
+
+        if ($user->hasRole('school_sports_coordinator') && $user->tenant_id) {
+            return "/school-admin/{$user->tenant_id}/sports";
+        }
+
+        if ($user->hasRole('school_kalotsavam_coordinator') && $user->tenant_id) {
+            return "/school-admin/{$user->tenant_id}/kalotsav";
+        }
+
+        if ($user->hasRole('school_mcq_coordinator') && $user->tenant_id) {
+            return "/school-admin/{$user->tenant_id}/mcq";
+        }
+
+        if ($user->hasRole('school_training_coordinator') && $user->tenant_id) {
+            return "/school-admin/{$user->tenant_id}/training";
+        }
+
+        if ($user->hasRole('school_finance_coordinator') && $user->tenant_id) {
+            return "/school-admin/{$user->tenant_id}/payments";
+        }
+
+        if ($user->hasRole('school_staff') && $user->tenant_id) {
             return "/school-admin/{$user->tenant_id}";
         }
 
@@ -422,7 +462,7 @@ class AuthController extends Controller
         return null;
     }
 
-    private static function sendVerificationFor(User $user): void
+    private static function sendVerificationFor(User|PlatformUser $user): void
     {
         if ($user->hasRole('school_admin') && $user->tenant_id) {
             $school = \App\Models\Tenant::find($user->tenant_id);
@@ -436,7 +476,7 @@ class AuthController extends Controller
         $user->sendEmailVerificationNotification();
     }
 
-    private static function portalMismatchMessage(User $user, Request $request): ?string
+    private static function portalMismatchMessage(User|PlatformUser $user, Request $request): ?string
     {
         $host = strtolower($request->getHost());
 

@@ -17,7 +17,8 @@ class FestEventItem extends Model
         'max_per_school', 'min_group_size', 'max_group_size', 'qualify_count',
         'owner_level', 'state_program_item_id', 'inherited_from_item_id', 'display_order',
         'fee_amount', 'is_enabled', 'is_mandatory', 'head_id', 'reg_start', 'reg_end',
-        'results_published_at', 'item_reg_id_start',
+        'competition_start', 'competition_end', 'competition_time',
+        'results_published_at', 'item_reg_id_start', 'chest_no_start',
     ];
 
     protected $casts = [
@@ -27,6 +28,8 @@ class FestEventItem extends Model
         'is_mandatory' => 'boolean',
         'reg_start' => 'date',
         'reg_end' => 'date',
+        'competition_start' => 'date',
+        'competition_end' => 'date',
         'results_published_at' => 'datetime',
     ];
 

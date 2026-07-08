@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 
 class TenantSetting extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = ['tenant_id', 'key', 'value'];
 
     protected $casts = [
@@ -14,6 +17,6 @@ class TenantSetting extends Model
 
     public function tenant()
     {
-        return $this->belongsTo(Tenant::class);
+        return $this->belongsToCentralTenant();
     }
 }

@@ -1,7 +1,7 @@
 <template>
     <SahodayaEventsLayout :title="pageTitle" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :program="program"
-                         :show-header-title="false">
+                         :program-events="events" :show-header-title="false">
         <PageHeader
             :title="pageTitle"
             eyebrow="Items & fees"
@@ -9,7 +9,7 @@
         >
             <template #actions>
                 <Link :href="`${catalogBase}/assign`" class="btn-secondary text-xs">Assign to event →</Link>
-                <button type="button" class="btn-secondary text-xs" @click="seedCatalog">Sync CKSC items</button>
+                <button v-if="canReseed" type="button" class="btn-secondary text-xs" @click="seedCatalog">Resync from CKSC master</button>
             </template>
         </PageHeader>
 
@@ -25,10 +25,10 @@
             </span>
         </div>
 
-        <CatalogSubNav :sahodaya-id="sahodaya.id" :program-slug="program.slug" active="master" />
+        <CatalogSubNav :sahodaya-id="sahodaya.id" :program-slug="program.slug" :event-type="program.eventType" active="master" />
 
         <div class="card card--muted !p-4 mb-4">
-            <CatalogSectionNav :base="catalogBase" mode="master" :sections="sections" :section="section" />
+            <CatalogSectionNav :sahodaya-id="sahodaya.id" :program-slug="program" mode="master" :sections="sections" :section="section" />
         </div>
 
         <div class="grid xl:grid-cols-[1fr_18rem] gap-8 items-start">
@@ -36,6 +36,11 @@
                 <div class="card !p-4 space-y-3">
                     <form @submit.prevent="applyFilters" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <input v-model="filterForm.q" class="field sm:col-span-2 lg:col-span-4" placeholder="Search name or code">
+                        <select v-if="isSports" v-model="filterForm.head_key" class="field">
+                            <option value="">All heads</option>
+                            <option value="__none__">No head assigned</option>
+                            <option v-for="head in itemHeads" :key="head.key" :value="head.key">{{ head.name }}</option>
+                        </select>
                         <select v-if="isSports" v-model="filterForm.age_group" class="field">
                             <option value="">All ages</option>
                             <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
@@ -77,6 +82,7 @@
                                 <tr>
                                     <th class="w-10"><input type="checkbox" :checked="allVisibleSelected" @change="toggleAllVisible"></th>
                                     <th class="w-16 text-center">Type</th>
+                                    <th v-if="isSports" class="w-32">Head</th>
                                     <th>Item</th>
                                     <th class="w-16 text-center">On</th>
                                     <th class="w-28 text-right">Fee ₹</th>
@@ -88,6 +94,10 @@
                                     <td><input type="checkbox" :value="item.id" v-model="selectedIds"></td>
                                     <td class="text-center">
                                         <FestItemMetaIcons :gender="item.gender" :participant-type="item.participant_type" />
+                                    </td>
+                                    <td v-if="isSports">
+                                        <span v-if="item.head_key" class="text-xs font-medium text-slate-700">{{ headLabel(item.head_key) }}</span>
+                                        <span v-else class="text-xs text-amber-600 font-medium">Unassigned</span>
                                     </td>
                                     <td>
                                         <p :class="item.is_enabled ? 'font-medium text-slate-900' : 'text-slate-400 line-through'">{{ item.title }}</p>
@@ -128,6 +138,10 @@
                 <FormSection title="Add custom item" hint="Saved to master catalog for all years.">
                     <form @submit.prevent="addCustom" class="space-y-3">
                         <input v-model="customForm.title" class="field text-sm" placeholder="Item name *" required>
+                        <select v-if="isSports" v-model="customForm.head_key" class="field text-sm" required>
+                            <option disabled value="">Main head *</option>
+                            <option v-for="head in itemHeads" :key="head.key" :value="head.key">{{ head.name }}</option>
+                        </select>
                         <select v-if="isSports" v-model="customForm.age_group" class="field text-sm">
                             <option value="">Age group</option>
                             <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
@@ -200,6 +214,10 @@
                             <option value="team">Team</option>
                         </select>
                     </div>
+                    <select v-if="isSports" v-model="editForm.head_key" class="field text-sm" required>
+                        <option disabled value="">Main head *</option>
+                        <option v-for="head in itemHeads" :key="head.key" :value="head.key">{{ head.name }}</option>
+                    </select>
                     <select v-if="isSports" v-model="editForm.age_group" class="field text-sm">
                         <option value="">Age group</option>
                         <option v-for="(label, key) in ageGroupLabels" :key="key" :value="key">{{ label }}</option>
@@ -252,6 +270,8 @@ import CatalogSubNav from '@/Components/sahodaya/CatalogSubNav.vue';
 import CatalogSectionNav from '@/Components/sahodaya/CatalogSectionNav.vue';
 import FestItemMetaIcons from '@/Components/sahodaya/FestItemMetaIcons.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { useConfirm } from '@/composables/useConfirm';
+import { sahodayaCatalogHref, sahodayaCatalogSectionHref } from '@/support/sahodayaPrograms.js';
 
 const props = defineProps({
     sahodaya: Object,
@@ -267,16 +287,25 @@ const props = defineProps({
     taxonomyMastersUrl: String,
     ageGroupLabels: Object,
     groupedItems: Object,
+    itemHeads: { type: Array, default: () => [] },
+    events: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
 });
 
-const catalogBase = `/sahodaya-admin/${props.sahodaya.id}/programs/${props.program.slug}/catalog`;
+const catalogBase = computed(() => sahodayaCatalogHref(props.sahodaya.id, props.program.slug));
 const listUrl = computed(() => {
-    if (!props.section?.slug || props.section.slug === 'all') return `${catalogBase}/list`;
-    return `${catalogBase}/list/${props.section.slug}`;
+    if (!props.section?.slug || props.section.slug === 'all') return `${catalogBase.value}/list`;
+    return `${catalogBase.value}/list/${props.section.slug}`;
 });
-const pageBase = computed(() => `${catalogBase}/master${props.section?.slug && props.section.slug !== 'all' ? `/${props.section.slug}` : ''}`);
+const pageBase = computed(() => sahodayaCatalogSectionHref(
+    props.sahodaya.id,
+    props.program.slug,
+    'master',
+    props.section?.slug && props.section.slug !== 'all' ? props.section.slug : null,
+));
 const isSports = computed(() => props.program.eventType === 'sports');
+const canReseed = computed(() => props.program.slug !== 'custom');
+const { confirm } = useConfirm();
 const selectedIds = ref([]);
 const editingItem = ref(null);
 const showBulkFee = ref(false);
@@ -292,6 +321,7 @@ const editForm = reactive({
     venue_type: '',
     competition_format: '',
     sport_discipline: '',
+    head_key: '',
     fee_amount: null,
 });
 
@@ -310,6 +340,7 @@ const filterForm = useForm({
     gender: props.filters?.gender ?? '',
     participant_type: props.filters?.participant_type ?? '',
     enabled: props.filters?.enabled ?? '',
+    head_key: props.filters?.head_key ?? '',
 });
 
 const customForm = useForm({
@@ -320,8 +351,15 @@ const customForm = useForm({
     venue_type: '',
     competition_format: '',
     sport_discipline: '',
+    head_key: '',
     fee_amount: null,
 });
+
+const headLabelMap = computed(() => Object.fromEntries(props.itemHeads.map((h) => [h.key, h.name])));
+
+function headLabel(key) {
+    return headLabelMap.value[key] ?? key;
+}
 
 const allVisibleSelected = computed(() =>
     flatItems.value.length > 0 && flatItems.value.every((i) => selectedIds.value.includes(i.id)),
@@ -351,7 +389,7 @@ function toggleAllVisible(e) {
 }
 
 function toggleItem(item, field, value) {
-    router.put(`${catalogBase}/items/${item.id}`, { [field]: value }, { preserveScroll: true, preserveState: true });
+    router.put(`${catalogBase.value}/items/${item.id}`, { [field]: value }, { preserveScroll: true, preserveState: true });
 }
 
 function enableFee(item) {
@@ -360,7 +398,7 @@ function enableFee(item) {
 }
 
 function updateFee(item, value) {
-    router.put(`${catalogBase}/items/${item.id}`, {
+    router.put(`${catalogBase.value}/items/${item.id}`, {
         fee_enabled: true,
         fee_amount: value === '' ? null : Number(value),
     }, { preserveScroll: true, preserveState: true });
@@ -368,7 +406,7 @@ function updateFee(item, value) {
 
 function bulk(payload) {
     if (!selectedIds.value.length) return;
-    router.post(`${catalogBase}/bulk`, { item_ids: selectedIds.value, ...payload }, { preserveScroll: true });
+    router.post(`${catalogBase.value}/bulk`, { item_ids: selectedIds.value, ...payload }, { preserveScroll: true });
 }
 
 function applyBulkFee() {
@@ -378,12 +416,22 @@ function applyBulkFee() {
     bulkFeeAmount.value = null;
 }
 
-function seedCatalog() {
-    router.post(`${catalogBase}/seed`, {}, { preserveScroll: true });
+async function seedCatalog() {
+    const sportsNote = isSports.value
+        ? ' Sports event item heads will also be relinked.'
+        : '';
+    const ok = await confirm({
+        title: 'Resync master catalog',
+        message: `Pull the latest CKSC standard items into this ${props.program.label} master catalog? Existing custom items are kept; CKSC rows are added or updated.${sportsNote}`,
+        confirmLabel: 'Resync',
+        destructive: false,
+    });
+    if (!ok) return;
+    router.post(`${catalogBase.value}/seed`, {}, { preserveScroll: true });
 }
 
 function addCustom() {
-    customForm.post(`${catalogBase}/items`, {
+    customForm.post(`${catalogBase.value}/items`, {
         preserveScroll: true,
         onSuccess: () => customForm.reset(),
     });
@@ -400,12 +448,13 @@ function openEdit(item) {
         venue_type: item.venue_type ?? '',
         competition_format: item.competition_format ?? '',
         sport_discipline: item.sport_discipline ?? '',
+        head_key: item.head_key ?? '',
         fee_amount: item.fee_amount,
     });
 }
 
 function saveEdit() {
-    router.put(`${catalogBase}/items/${editingItem.value.id}`, {
+    router.put(`${catalogBase.value}/items/${editingItem.value.id}`, {
         title: editForm.title,
         is_enabled: editForm.is_enabled,
         gender: editForm.gender,
@@ -414,6 +463,7 @@ function saveEdit() {
         venue_type: editForm.venue_type || null,
         competition_format: editForm.competition_format || null,
         sport_discipline: editForm.sport_discipline || null,
+        head_key: isSports.value ? editForm.head_key : null,
         fee_enabled: editForm.fee_amount != null,
         fee_amount: editForm.fee_amount,
     }, {
@@ -424,6 +474,6 @@ function saveEdit() {
 
 function removeItem(item) {
     if (!confirm(`Delete "${item.title}" from the master catalog?`)) return;
-    router.delete(`${catalogBase}/items/${item.id}`, { preserveScroll: true });
+    router.delete(`${catalogBase.value}/items/${item.id}`, { preserveScroll: true });
 }
 </script>

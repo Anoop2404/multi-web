@@ -3,11 +3,15 @@
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Settings`" eyebrow="Event settings" :description="settingsDescription">
             <template #actions>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}`" class="btn-secondary shrink-0 text-sm">← Event overview</Link>
+                <Link :href="backHref" class="btn-secondary shrink-0 text-sm">{{ backLabel }}</Link>
             </template>
         </PageHeader>
 
         <EventSettingsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event" :active-tab="activeTab" />
+
+        <SportsSetupSubNav v-if="event.event_type === 'sports'"
+                           :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event"
+                           :active="sportsSetupActive" class="mb-4" />
 
         <ParticipationTab v-if="activeTab === 'participation'" />
         <EligibilityTab v-else-if="activeTab === 'eligibility'" />
@@ -49,6 +53,8 @@ import FeesTab from './Settings/Tabs/FeesTab.vue';
 import RegistrationTab from './Settings/Tabs/RegistrationTab.vue';
 import NumberingTab from './Settings/Tabs/NumberingTab.vue';
 import CloneTab from './Settings/Tabs/CloneTab.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
+import { computed } from 'vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -60,6 +66,8 @@ const props = defineProps({
     comboRules: Array,
     gradeConfigs: Array,
     pointRules: Array,
+    rankPoints: { type: Array, default: () => [] },
+    groupRankPoints: { type: Array, default: () => [] },
     volunteers: Array,
     schools: Array,
     judgeGate: Object,
@@ -86,10 +94,30 @@ const props = defineProps({
     schoolVerifications: { type: Array, default: () => [] },
     mandatoryGaps: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
+    itemHeads: { type: Array, default: () => [] },
+    ledgerAccount: { type: Object, default: () => ({}) },
 });
 
 const ctx = useEventSettingsForms(props);
 const { settingsDescription, activeTab } = ctx;
+
+const sportsSetupActive = computed(() => {
+    const map = {
+        fees: 'fees',
+        points: 'rank-points',
+        registration: 'registration',
+        numbering: 'numbering',
+    };
+    return map[activeTab.value] ?? 'settings';
+});
+
+const isSports = computed(() => props.event.event_type === 'sports');
+const backHref = computed(() => (
+    isSports.value
+        ? `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/setup`
+        : `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`
+));
+const backLabel = computed(() => (isSports.value ? '← Setup hub' : '← Event overview'));
 
 provide('eventSettings', {
     ...props,

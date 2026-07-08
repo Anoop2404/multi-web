@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Tenant;
 use App\Models\User;
 use App\Support\TenantUserCatalog;
+use App\Support\TenancyDatabase;
 use Illuminate\Console\Command;
 
 class SyncStaffPermissions extends Command
@@ -22,26 +24,36 @@ class SyncStaffPermissions extends Command
             TenantUserCatalog::sahodayaPermissionRoles(),
         );
 
-        User::query()
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', $rolesToSync))
-            ->each(function (User $user) use ($force, &$updated) {
-                if (! $force && $user->permissions()->exists()) {
-                    return;
-                }
+        $syncInContext = function () use ($force, $rolesToSync, &$updated) {
+            User::query()
+                ->whereHas('roles', fn ($q) => $q->whereIn('name', $rolesToSync))
+                ->each(function (User $user) use ($force, &$updated) {
+                    if (! $force && $user->permissions()->exists()) {
+                        return;
+                    }
 
-                $tenantType = $user->hasRole('school_staff') ? 'school' : 'sahodaya';
-                $defaults = TenantUserCatalog::mergedDefaultPermissions(
-                    $user->getRoleNames()->all(),
-                    $tenantType,
-                );
+                    $tenantType = $user->hasRole('school_staff') ? 'school' : 'sahodaya';
+                    $defaults = TenantUserCatalog::mergedDefaultPermissions(
+                        $user->getRoleNames()->all(),
+                        $tenantType,
+                    );
 
-                if ($defaults === []) {
-                    return;
-                }
+                    if ($defaults === []) {
+                        return;
+                    }
 
-                $user->syncPermissions($defaults);
-                $updated++;
+                    $user->syncPermissions($defaults);
+                    $updated++;
+                });
+        };
+
+        if (! config('tenancy.database_per_sahodaya', true)) {
+            $syncInContext();
+        } else {
+            Tenant::query()->where('type', 'sahodaya')->orderBy('name')->each(function (Tenant $sahodaya) use ($syncInContext) {
+                TenancyDatabase::withTenantDatabase($sahodaya, $syncInContext);
             });
+        }
 
         $this->info("Synced permissions on {$updated} staff user(s).");
 

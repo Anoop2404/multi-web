@@ -10,10 +10,15 @@ use App\Models\FestRegistration;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\Tenant;
+use App\Services\Events\Concerns\HandlesFestRegistrationDuplicates;
 use App\Services\Events\EventLifecycleGate;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 class FestRegistrationCreateService
 {
+    use HandlesFestRegistrationDuplicates;
+
     /**
      * @param  list<int>  $performerIds
      * @param  list<int>  $standbyIds
@@ -29,10 +34,26 @@ class FestRegistrationCreateService
     ): FestRegistration {
         abort_if($school->parent_id !== $event->tenant_id, 403);
         abort_if($item->event_id !== $event->id, 403);
+
+        app(FestRegionPartitionService::class)->assertRegionSelected($event, $school);
+
+        $router = app(FestRegistrationRouterService::class);
+        $targetEvent = $router->resolveTargetEvent($event, $item, $school->id);
+        if ($targetEvent->id !== $event->id) {
+            $item = FestEventItem::where('event_id', $targetEvent->id)
+                ->where(function ($q) use ($item) {
+                    $q->where('inherited_from_item_id', $item->id)
+                        ->orWhere('item_code', $item->item_code);
+                })
+                ->firstOrFail();
+            $event = $targetEvent;
+        }
+
         app(FestEventRegistrationService::class)->assertSchoolMembershipApproved($school);
         abort_if($item->is_enabled === false, 422, 'This item is not open for registration.');
 
         app(FestItemRegistrationGate::class)->assertOpen($item);
+        app(FestRegistrationFeeGate::class)->assertCanRegister($event, $school);
 
         if (! $skipSchoolClosedCheck && $school->fest_registration_closed) {
             abort(422, 'Fest registration is closed for this school.');
@@ -71,66 +92,74 @@ class FestRegistrationCreateService
             ->validateStudents($event, $item, array_merge($performerIds, $standbyIds));
         abort_if($eligibilityErrors, 422, implode(' ', $eligibilityErrors));
 
-        $eventRegService = app(FestEventRegistrationService::class);
-        foreach (array_merge($performerIds, $standbyIds) as $studentId) {
-            if ($eventRegService->requireEventRegistration($event)) {
-                $eventRegService->assertStudentEligible($event, $studentId);
-            } else {
-                $student = Student::find($studentId);
-                if ($student) {
-                    $eventRegService->registerStudent($event, $student, $school);
+        try {
+            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup) {
+                $eventRegService = app(FestEventRegistrationService::class);
+                foreach (array_merge($performerIds, $standbyIds) as $studentId) {
+                    if ($eventRegService->requireEventRegistration($event)) {
+                        $eventRegService->assertStudentEligible($event, $studentId);
+                    } else {
+                        $student = Student::find($studentId);
+                        if ($student) {
+                            $eventRegService->registerStudent($event, $student, $school);
+                        }
+                    }
                 }
-            }
+
+                $registration = FestRegistration::create([
+                    'event_id'     => $event->id,
+                    'item_id'      => $item->id,
+                    'school_id'    => $school->id,
+                    'status'       => 'submitted',
+                    'submitted_at' => now(),
+                ]);
+
+                $groupId = null;
+                if ($isGroup) {
+                    $group = FestGroup::create([
+                        'registration_id' => $registration->id,
+                        'team_name'       => $teamName,
+                    ]);
+                    $groupId = $group->id;
+                }
+
+                foreach ($performerIds as $studentId) {
+                    abort_if(Student::where('id', $studentId)->where('tenant_id', $school->id)->doesntExist(), 403);
+                    FestParticipant::create([
+                        'registration_id'  => $registration->id,
+                        'group_id'         => $groupId,
+                        'student_id'       => $studentId,
+                        'participant_type' => 'student',
+                        'participant_role' => 'performer',
+                    ]);
+                }
+
+                foreach ($standbyIds as $studentId) {
+                    abort_if(Student::where('id', $studentId)->where('tenant_id', $school->id)->doesntExist(), 403);
+                    FestParticipant::create([
+                        'registration_id'  => $registration->id,
+                        'group_id'         => $groupId,
+                        'student_id'       => $studentId,
+                        'participant_type' => 'student',
+                        'participant_role' => 'standby',
+                    ]);
+                }
+
+                app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
+
+                foreach ($registration->fresh(['participants'])->participants as $participant) {
+                    app(FestNumberingService::class)->assignParticipantNumbers($participant);
+                }
+
+                app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+
+                return $registration->load(['participants.student', 'item']);
+            });
+        } catch (QueryException $e) {
+            $this->abortOnFestRegistrationDuplicate($e);
+
+            throw $e;
         }
-
-        $registration = FestRegistration::create([
-            'event_id'     => $event->id,
-            'item_id'      => $item->id,
-            'school_id'    => $school->id,
-            'status'       => 'submitted',
-            'submitted_at' => now(),
-        ]);
-
-        $groupId = null;
-        if ($isGroup) {
-            $group = FestGroup::create([
-                'registration_id' => $registration->id,
-                'team_name'       => $teamName,
-            ]);
-            $groupId = $group->id;
-        }
-
-        foreach ($performerIds as $studentId) {
-            abort_if(Student::where('id', $studentId)->where('tenant_id', $school->id)->doesntExist(), 403);
-            FestParticipant::create([
-                'registration_id'  => $registration->id,
-                'group_id'         => $groupId,
-                'student_id'       => $studentId,
-                'participant_type' => 'student',
-                'participant_role' => 'performer',
-            ]);
-        }
-
-        foreach ($standbyIds as $studentId) {
-            abort_if(Student::where('id', $studentId)->where('tenant_id', $school->id)->doesntExist(), 403);
-            FestParticipant::create([
-                'registration_id'  => $registration->id,
-                'group_id'         => $groupId,
-                'student_id'       => $studentId,
-                'participant_type' => 'student',
-                'participant_role' => 'standby',
-            ]);
-        }
-
-        app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
-
-        foreach ($registration->fresh(['participants'])->participants as $participant) {
-            app(FestNumberingService::class)->assignParticipantNumbers($participant);
-        }
-
-        app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
-
-        return $registration->load(['participants.student', 'item']);
     }
 
     /** @param  list<int>  $teacherIds */
@@ -147,28 +176,35 @@ class FestRegistrationCreateService
             abort(422, 'This item allows only one teacher.');
         }
 
-        $registration = FestRegistration::create([
-            'event_id'     => $event->id,
-            'item_id'      => $item->id,
-            'school_id'    => $school->id,
-            'status'       => 'submitted',
-            'submitted_at' => now(),
-        ]);
+        try {
+            return DB::transaction(function () use ($event, $item, $school, $teacherIds) {
+                $registration = FestRegistration::create([
+                    'event_id'     => $event->id,
+                    'item_id'      => $item->id,
+                    'school_id'    => $school->id,
+                    'status'       => 'submitted',
+                    'submitted_at' => now(),
+                ]);
 
-        foreach ($teacherIds as $teacherId) {
-            abort_if(Teacher::where('id', $teacherId)->where('tenant_id', $school->id)->doesntExist(), 403);
-            FestParticipant::create([
-                'registration_id'  => $registration->id,
-                'teacher_id'       => $teacherId,
-                'participant_type' => 'teacher',
-                'participant_role' => 'performer',
-            ]);
+                foreach ($teacherIds as $teacherId) {
+                    abort_if(Teacher::where('id', $teacherId)->where('tenant_id', $school->id)->doesntExist(), 403);
+                    FestParticipant::create([
+                        'registration_id'  => $registration->id,
+                        'teacher_id'       => $teacherId,
+                        'participant_type' => 'teacher',
+                        'participant_role' => 'performer',
+                    ]);
+                }
+
+                app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
+                app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+
+                return $registration->load(['participants.teacher', 'item']);
+            });
+        } catch (QueryException $e) {
+            $this->abortOnFestRegistrationDuplicate($e);
+
+            throw $e;
         }
-
-        app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
-
-        app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
-
-        return $registration->load(['participants.teacher', 'item']);
     }
 }

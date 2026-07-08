@@ -4,7 +4,7 @@
         <PageHeader :title="`${event.title} — Activity log`" eyebrow="Audit trail"
                     description="All actions across this event, grouped newest first." />
 
-        <EventSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="activity" />
+        <EventSubNav v-if="event.event_type !== 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="activity" />
 
         <div class="form-section overflow-hidden !p-0">
             <EmptyState v-if="!activityLogs.length" title="No activity yet" description="Actions on this event will appear here." icon="📋" class="p-8" />

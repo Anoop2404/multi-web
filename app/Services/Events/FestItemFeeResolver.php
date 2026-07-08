@@ -11,10 +11,30 @@ use Illuminate\Support\Collection;
 
 class FestItemFeeResolver
 {
-    public function amountForItem(?FestEventItem $item, array $schedule, ?FestEvent $event = null): float
+    public function amountForItem(?FestEventItem $item, array $schedule, ?FestEvent $event = null, bool $extraQuotaItem = false): float
     {
         if ($item?->fee_amount !== null) {
             return (float) $item->fee_amount;
+        }
+
+        if (($schedule['fee_model'] ?? null) === 'sports_composite') {
+            if (isset($schedule['default_item_fee']) && $schedule['default_item_fee'] !== '') {
+                return (float) $schedule['default_item_fee'];
+            }
+
+            return 0.0;
+        }
+
+        if ($item?->head_id) {
+            $head = $item->relationLoaded('head') ? $item->head : $item->head()->first(['id', 'default_item_fee', 'extra_item_fee']);
+            if ($head) {
+                if ($extraQuotaItem && $head->extra_item_fee !== null) {
+                    return (float) $head->extra_item_fee;
+                }
+                if (! $extraQuotaItem && $head->default_item_fee !== null) {
+                    return (float) $head->default_item_fee;
+                }
+            }
         }
 
         $participantType = $item?->participant_type ?? 'individual';

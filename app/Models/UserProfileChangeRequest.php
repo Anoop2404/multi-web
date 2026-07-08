@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserProfileChangeRequest extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = [
         'user_id', 'school_id', 'changes_json', 'reason', 'status',
         'school_approval_status', 'school_approved_by', 'school_approved_at',
@@ -26,6 +29,6 @@ class UserProfileChangeRequest extends Model
 
     public function school(): BelongsTo
     {
-        return $this->belongsTo(Tenant::class, 'school_id');
+        return $this->belongsToCentralTenant('school_id');
     }
 }

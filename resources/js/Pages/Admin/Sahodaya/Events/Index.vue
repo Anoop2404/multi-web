@@ -31,7 +31,7 @@
                 <HubCard
                     v-for="program in programs"
                     :key="program.slug"
-                    :href="`/sahodaya-admin/${sahodaya.id}/programs/${program.slug}`"
+                    :href="sahodayaProgramHref(sahodaya.id, program.slug)"
                     :icon="programIcons[program.slug]"
                     :label="program.label"
                     :hint="program.description"
@@ -100,6 +100,7 @@
                             <th>Type</th>
                             <th>Level</th>
                             <th>Status</th>
+                            <th>Sidebar</th>
                             <th>Items</th>
                             <th></th>
                         </tr>
@@ -114,6 +115,14 @@
                             <td class="text-xs">{{ levelLabels[event.level_round] ?? event.level_round }}</td>
                             <td>
                                 <span class="status-pill" :class="statusClass(event.status)">{{ event.status }}</span>
+                            </td>
+                            <td>
+                                <button type="button"
+                                        class="text-xs font-medium"
+                                        :class="event.nav_hidden ? 'text-slate-400' : 'text-emerald-700'"
+                                        @click="toggleNavHidden(event)">
+                                    {{ event.nav_hidden ? 'Hidden' : 'Visible' }}
+                                </button>
                             </td>
                             <td>{{ event.items_count }}</td>
                             <td class="text-right">
@@ -131,9 +140,12 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
-import { PROGRAM_SLUGS, SAHODAYA_PROGRAMS } from '@/support/sahodayaPrograms.js';
+import { PROGRAM_SLUGS, SAHODAYA_PROGRAMS, sahodayaProgramHref } from '@/support/sahodayaPrograms.js';
+import { isNavProgramVisible } from '@/support/sahodayaAdminNav.js';
+
+const page = usePage();
 
 const props = defineProps({
     sahodaya: Object,
@@ -155,7 +167,9 @@ const filteredEvents = computed(() => {
     );
 });
 
-const programs = computed(() => PROGRAM_SLUGS.map((slug) => SAHODAYA_PROGRAMS[slug]));
+const programs = computed(() => PROGRAM_SLUGS
+    .filter((slug) => isNavProgramVisible(page.props.navVisibility, slug))
+    .map((slug) => SAHODAYA_PROGRAMS[slug]));
 
 const programIcons = {
     kalotsav: '🏆',
@@ -192,5 +206,9 @@ function createEvent() {
         preserveScroll: true,
         onSuccess: () => form.reset('title'),
     });
+}
+
+function toggleNavHidden(event) {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}/toggle-nav-hidden`, {}, { preserveScroll: true });
 }
 </script>

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FestEventInvoice extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = [
         'event_id', 'school_id', 'invoice_number',
         'school_registration_fee', 'participation_fee', 'total_amount',
@@ -28,7 +31,7 @@ class FestEventInvoice extends Model
 
     public function school(): BelongsTo
     {
-        return $this->belongsTo(Tenant::class, 'school_id');
+        return $this->belongsToCentralTenant('school_id');
     }
 
     public static function generateNumber(FestEvent $event): string

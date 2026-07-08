@@ -4,15 +4,20 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\FestCatalogItem;
 use App\Models\FestEvent;
+use App\Models\FestItemHead;
 use App\Services\Events\FestCatalogService;
+use App\Services\Events\FestIdCardService;
 use App\Services\Events\FestItemCatalogService;
+use App\Services\Events\FestItemHeadService;
 use App\Services\Events\FestTaxonomyRegistry;
 use App\Support\FestPageActivity;
 use App\Support\FestCatalogSections;
+use App\Support\ProgramRouteMap;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Support\FestSportsAgeGroup;
 use App\Support\FestTeamSquadRules;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class FestCatalogController extends SahodayaAdminController
@@ -38,8 +43,10 @@ class FestCatalogController extends SahodayaAdminController
         ]);
     }
 
-    public function master(Request $request, string $tenantId, string $program, FestCatalogService $catalogService, ?string $section = null)
+    public function master(Request $request, string $tenantId, FestCatalogService $catalogService)
     {
+        $program = $this->catalogProgramSlug($request);
+        $section = $request->route('section');
         $ctx = $this->catalogContext($program, $catalogService);
         $sectionMeta = $this->resolveSection($ctx['meta']['eventType'], $section);
         $items = $this->buildItemQuery($ctx['meta']['eventType'], $sectionMeta, $request)->get();
@@ -47,14 +54,149 @@ class FestCatalogController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Catalog/Master', $ctx + [
             'section'      => $sectionMeta,
             'items'        => $items,
-            'filters'      => $request->only(['enabled', 'age_group', 'gender', 'venue_type', 'sport_discipline', 'participant_type', 'class_group', 'q']),
+            'filters'      => $request->only(['enabled', 'age_group', 'gender', 'venue_type', 'sport_discipline', 'participant_type', 'class_group', 'head_key', 'q']),
             'groupedItems' => app(FestItemCatalogService::class)->groupForDisplay($items, $ctx['meta']['eventType']),
+            'itemHeads'      => $this->catalogItemHeadOptions($ctx['meta']['eventType']),
+            'events'       => $this->programEvents($ctx['meta']['eventType']),
             'activityLogs' => $this->catalogActivityLogs(FestPageActivity::CATALOG_MASTER),
         ]);
     }
 
-    public function list(Request $request, string $tenantId, string $program, FestCatalogService $catalogService, ?string $section = null)
+    public function heads(string $tenantId, string $program, FestCatalogService $catalogService, FestItemHeadService $headService)
     {
+        $ctx = $this->catalogContext($program, $catalogService);
+        abort_unless($ctx['meta']['eventType'] === 'sports', 404);
+
+        $headService->ensureCatalogHeads($this->sahodaya->id, 'sports');
+        $headService->syncCatalogItemHeadKeys($this->sahodaya->id, 'sports');
+
+        $heads = FestItemHead::forTenant($this->sahodaya->id)
+            ->whereNull('event_id')
+            ->orderBy('sort_order')
+            ->get();
+
+        $itemsByHead = FestCatalogItem::forProgram($this->sahodaya->id, 'sports')
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->get(['id', 'title', 'head_key', 'is_enabled'])
+            ->groupBy('head_key');
+
+        $headsPayload = $heads->map(fn (FestItemHead $head) => [
+            'id' => $head->id,
+            'name' => $head->name,
+            'catalog_key' => $head->catalog_key,
+            'sport_discipline' => $head->sport_discipline,
+            'is_team_heading' => $head->is_team_heading,
+            'items' => ($itemsByHead->get($head->catalog_key) ?? collect())->values(),
+        ])->values();
+
+        $unassigned = ($itemsByHead->get('') ?? collect())
+            ->merge($itemsByHead->get(null) ?? collect())
+            ->values();
+
+        return $this->inertia('Sahodaya/Catalog/Heads', $ctx + [
+            'heads' => $headsPayload,
+            'unassignedItems' => $unassigned,
+            'disciplines' => app(FestTaxonomyRegistry::class)
+                ->forTenant($this->sahodaya->id)->labels('sport_discipline'),
+            'events'       => $this->programEvents($ctx['meta']['eventType']),
+            'activityLogs' => $this->catalogActivityLogs(FestPageActivity::CATALOG_MASTER),
+        ]);
+    }
+
+    public function storeHead(Request $request, string $tenantId, string $program, PlatformAuditLogger $audit)
+    {
+        $meta = $this->programMeta($program);
+        abort_unless($meta['eventType'] === 'sports', 404);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:120',
+            'sport_discipline' => 'nullable|string|max:60',
+            'is_team_heading' => 'nullable|boolean',
+        ]);
+
+        $catalogKey = Str::slug($data['name'], '_');
+        abort_if(
+            FestItemHead::forTenant($this->sahodaya->id)->whereNull('event_id')->where('catalog_key', $catalogKey)->exists(),
+            422,
+            'An item head with this name already exists.',
+        );
+
+        $order = (int) FestItemHead::forTenant($this->sahodaya->id)->whereNull('event_id')->max('sort_order') + 1;
+
+        FestItemHead::create([
+            'tenant_id' => $this->sahodaya->id,
+            'event_type' => 'sports',
+            'catalog_key' => $catalogKey,
+            'name' => $data['name'],
+            'slug' => Str::slug($data['name']),
+            'sport_discipline' => $data['sport_discipline'] ?? null,
+            'is_team_heading' => (bool) ($data['is_team_heading'] ?? true),
+            'sort_order' => $order,
+        ]);
+
+        $audit->festCatalog($this->sahodaya->id, $program, FestPageActivity::CATALOG_MASTER, 'catalog.head.created', "Item head added: {$data['name']}");
+
+        return back()->with('success', 'Item head added to master catalog.');
+    }
+
+    public function previewHeadIdCard(string $tenantId, string $program, FestItemHead $head, FestIdCardService $idCards)
+    {
+        $meta = $this->programMeta($program);
+        abort_unless($meta['eventType'] === 'sports', 404);
+        abort_if((int) $head->tenant_id !== (int) $this->sahodaya->id, 403);
+        abort_if($head->event_id !== null, 404, 'Sample ID cards are configured per catalog item head, not per event.');
+
+        $itemTitles = FestCatalogItem::forProgram($this->sahodaya->id, 'sports')
+            ->where('head_key', $head->catalog_key)
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->limit(6)
+            ->pluck('title')
+            ->all();
+
+        if ($itemTitles === []) {
+            $itemTitles = ['Sample Item A', 'Sample Item B'];
+        }
+
+        $card = $idCards->sampleHeadCard($this->sahodaya, $head, $itemTitles);
+
+        return view('fest.id-cards.premium-sheet', [
+            'cards'          => [$card],
+            'sections'       => null,
+            'clusterName'    => $this->sahodaya->name,
+            'clusterLogoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'eventTitle'     => $head->name.' — Sample head ID card',
+            'audience'       => 'student',
+            'showTitle'      => true,
+            'isSample'       => true,
+        ]);
+    }
+
+    public function syncHeads(string $tenantId, string $program, FestItemHeadService $headService, PlatformAuditLogger $audit)
+    {
+        $meta = $this->programMeta($program);
+        abort_unless($meta['eventType'] === 'sports', 404);
+
+        $headsCreated = $headService->ensureCatalogHeads($this->sahodaya->id, 'sports');
+        $headLinks = $headService->syncCatalogItemHeadKeys($this->sahodaya->id, 'sports');
+
+        $audit->festCatalog($this->sahodaya->id, $program, FestPageActivity::CATALOG_MASTER, 'catalog.heads.synced', 'Master catalog item heads synced');
+
+        $flash = match (true) {
+            $headsCreated > 0 && $headLinks > 0 => "Created {$headsCreated} head(s) and linked {$headLinks} catalog item(s).",
+            $headsCreated > 0 => "Created {$headsCreated} item head(s).",
+            $headLinks > 0 => "Linked {$headLinks} catalog item(s) to main heads.",
+            default => 'Item heads are already up to date.',
+        };
+
+        return back()->with('success', $flash);
+    }
+
+    public function list(Request $request, string $tenantId, FestCatalogService $catalogService)
+    {
+        $program = $this->catalogProgramSlug($request);
+        $section = $request->route('section');
         $ctx = $this->catalogContext($program, $catalogService);
         $sectionMeta = $this->resolveSection($ctx['meta']['eventType'], $section);
         $items = $this->buildItemQuery($ctx['meta']['eventType'], $sectionMeta, $request)->get();
@@ -64,6 +206,8 @@ class FestCatalogController extends SahodayaAdminController
             'items'        => $items,
             'filters'      => $request->only(['enabled', 'q']),
             'groupedItems' => app(FestItemCatalogService::class)->groupForDisplay($items, $ctx['meta']['eventType']),
+            'itemHeads'      => $this->catalogItemHeadOptions($ctx['meta']['eventType']),
+            'events'       => $this->programEvents($ctx['meta']['eventType']),
             'activityLogs' => $this->catalogActivityLogs(FestPageActivity::CATALOG_LIST),
         ]);
     }
@@ -84,19 +228,70 @@ class FestCatalogController extends SahodayaAdminController
     }
 
     /** @deprecated Redirect old browse URLs */
-    public function section(Request $request, string $tenantId, string $program, string $section)
+    /** @deprecated Redirect old browse URLs */
+    public function section(Request $request, string $tenantId)
     {
-        return redirect("/sahodaya-admin/{$tenantId}/programs/{$program}/catalog/master/{$section}");
+        $program = $this->catalogProgramSlug($request);
+        $section = (string) $request->route('section');
+
+        return redirect(ProgramRouteMap::sahodayaCatalogBase($tenantId, $program)."/master/{$section}");
     }
 
-    public function seed(string $tenantId, string $program, FestCatalogService $catalogService, PlatformAuditLogger $audit)
+    /** Redirect legacy `/catalog/{section}` URLs missing the `/master` segment. */
+    public function redirectLegacySection(Request $request, string $tenantId)
     {
+        $program = $this->catalogProgramSlug($request);
+        $section = (string) $request->route('section');
         $meta = $this->programMeta($program);
-        $added = $catalogService->ensureSeeded($this->sahodaya->id, $meta['eventType']);
+        abort_unless(FestCatalogSections::find($meta['eventType'], $section) !== null, 404);
 
-        $audit->festCatalog($this->sahodaya->id, $program, FestPageActivity::CATALOG_MASTER, 'catalog.seed', $added > 0 ? "Synced {$added} CKSC item(s)" : 'Catalog sync — no new items');
+        return redirect(ProgramRouteMap::sahodayaCatalogBase($tenantId, $program)."/master/{$section}");
+    }
 
-        return back()->with('success', $added > 0 ? "{$added} CKSC item(s) added to master catalog." : 'Master catalog is already up to date.');
+    public function seed(Request $request, string $tenantId, FestCatalogService $catalogService, PlatformAuditLogger $audit)
+    {
+        $program = $this->catalogProgramSlug($request);
+        $meta = $this->programMeta($program);
+        $sync = $catalogService->ensureSeeded($this->sahodaya->id, $meta['eventType']);
+        $created = $sync['created'];
+        $updated = $sync['updated'];
+        $headLinks = $sync['head_links'] ?? 0;
+        $eventsSynced = 0;
+
+        if ($meta['eventType'] === 'sports' && $request->boolean('link_events', true)) {
+            FestEvent::forTenant($this->sahodaya->id)
+                ->ofType('sports')
+                ->each(function (FestEvent $event) use (&$eventsSynced) {
+                    app(FestItemHeadService::class)->syncEventHeads($event);
+                    $eventsSynced++;
+                });
+        }
+
+        $auditMessage = match (true) {
+            $created > 0 && $updated > 0 => "Synced catalog: {$created} added, {$updated} updated",
+            $created > 0 => "Synced {$created} CKSC item(s)",
+            $updated > 0 => "Updated {$updated} CKSC item(s)",
+            $headLinks > 0 => "Linked {$headLinks} item(s) to main heads (Chess, Athletics, …)",
+            $eventsSynced > 0 => "Relinked item heads on {$eventsSynced} sports event(s)",
+            default => 'Catalog sync — already up to date',
+        };
+
+        $audit->festCatalog($this->sahodaya->id, $program, FestPageActivity::CATALOG_MASTER, 'catalog.seed', $auditMessage);
+
+        $flash = match (true) {
+            $created > 0 && $updated > 0 => "{$created} item(s) added and {$updated} updated from CKSC master.",
+            $created > 0 => "{$created} CKSC item(s) added to master catalog.",
+            $updated > 0 => "{$updated} CKSC item(s) updated from master catalog.",
+            $headLinks > 0 => "Linked {$headLinks} catalog item(s) under main heads (Chess, Carrom, Athletics, …).",
+            $eventsSynced > 0 => "Relinked item heads on {$eventsSynced} sports event(s).",
+            default => 'Master catalog is already up to date.',
+        };
+
+        if ($eventsSynced > 0 && ! str_contains($flash, 'Relinked')) {
+            $flash .= " Relinked heads on {$eventsSynced} sports event(s).";
+        }
+
+        return back()->with('success', $flash);
     }
 
     public function store(Request $request, string $tenantId, string $program, FestCatalogService $catalogService, PlatformAuditLogger $audit)
@@ -121,8 +316,9 @@ class FestCatalogController extends SahodayaAdminController
         return back()->with('success', 'Custom item added to master catalog.');
     }
 
-    public function update(Request $request, string $tenantId, string $program, FestCatalogItem $item, FestCatalogService $catalogService, PlatformAuditLogger $audit)
+    public function update(Request $request, string $tenantId, FestCatalogItem $item, FestCatalogService $catalogService, PlatformAuditLogger $audit)
     {
+        $program = $this->catalogProgramSlug($request);
         $meta = $this->programMeta($program);
         abort_if($item->tenant_id !== $this->sahodaya->id || $item->event_type !== $meta['eventType'], 403);
 
@@ -142,9 +338,10 @@ class FestCatalogController extends SahodayaAdminController
             'venue_type'         => 'nullable|in:indoor,outdoor',
             'sport_discipline'   => 'nullable|string|max:40',
             'competition_format' => 'nullable|string|max:30',
+            'head_key'           => $this->catalogHeadKeyRule($meta['eventType']),
         ]);
 
-        foreach (['gender', 'participant_type', 'age_group', 'class_group', 'kids_band', 'stage_type', 'venue_type', 'sport_discipline', 'competition_format'] as $field) {
+        foreach (['gender', 'participant_type', 'age_group', 'class_group', 'kids_band', 'stage_type', 'venue_type', 'sport_discipline', 'competition_format', 'head_key'] as $field) {
             if (array_key_exists($field, $data) && $data[$field] !== null) {
                 $item->{$field} = $data[$field] === '' ? null : $data[$field];
             }
@@ -212,8 +409,9 @@ class FestCatalogController extends SahodayaAdminController
         return back()->with('success', "{$count} catalog item(s) updated.");
     }
 
-    public function destroy(string $tenantId, string $program, FestCatalogItem $item, PlatformAuditLogger $audit)
+    public function destroy(string $tenantId, FestCatalogItem $item, PlatformAuditLogger $audit)
     {
+        $program = $this->catalogProgramSlug(request());
         $meta = $this->programMeta($program);
         abort_if($item->tenant_id !== $this->sahodaya->id || $item->event_type !== $meta['eventType'], 403);
         abort_unless($item->isCustom(), 422, 'Only custom catalog items can be removed.');
@@ -226,8 +424,9 @@ class FestCatalogController extends SahodayaAdminController
         return back()->with('success', 'Custom item removed from catalog.');
     }
 
-    public function importToEvent(Request $request, string $tenantId, string $program, FestEvent $event, FestCatalogService $catalogService, PlatformAuditLogger $audit)
+    public function importToEvent(Request $request, string $tenantId, FestEvent $event, FestCatalogService $catalogService, PlatformAuditLogger $audit)
     {
+        $program = $this->catalogProgramSlug($request);
         $meta = $this->programMeta($program);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($event->event_type !== $meta['eventType'], 422, 'Event type does not match this program.');
@@ -274,7 +473,10 @@ class FestCatalogController extends SahodayaAdminController
 
         return [
             'meta'           => $meta,
-            'program'        => array_merge($meta, ['slug' => $program]),
+            'program'        => array_merge($meta, [
+                'slug'   => $program,
+                'prefix' => ProgramRouteMap::prefixFromSlug($program),
+            ]),
             'summary'        => $catalogService->summary($this->sahodaya->id, $meta['eventType']),
             'sections'       => FestCatalogSections::summaries($this->sahodaya->id, $meta['eventType']),
             'taxonomy'       => app(FestTaxonomyRegistry::class)->forTenant($this->sahodaya->id)->allLabels(),
@@ -288,6 +490,7 @@ class FestCatalogController extends SahodayaAdminController
     {
         return FestEvent::forTenant($this->sahodaya->id)
             ->ofType($eventType)
+            ->visibleInNav()
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'status']);
     }
@@ -340,12 +543,33 @@ class FestCatalogController extends SahodayaAdminController
         if ($request->filled('class_group')) {
             $query->where('class_group', $request->string('class_group'));
         }
+        if ($request->filled('head_key')) {
+            if ($request->string('head_key') === '__none__') {
+                $query->whereNull('head_key');
+            } else {
+                $query->where('head_key', $request->string('head_key'));
+            }
+        }
         if ($request->filled('q')) {
             $term = '%'.strtolower(trim($request->string('q'))).'%';
             $query->whereRaw('LOWER(title) LIKE ?', [$term]);
         }
 
         return $query;
+    }
+
+    /** Resolve fest program slug from catalog URL path (never from route defaults — avoids param-order clashes). */
+    private function catalogProgramSlug(Request $request): string
+    {
+        $parts = explode('/', trim($request->path(), '/'));
+
+        if (($parts[2] ?? '') === 'programs') {
+            return $parts[3] ?? abort(404);
+        }
+
+        $prefix = $parts[2] ?? abort(404);
+
+        return ProgramRouteMap::slugFromPrefix($prefix);
     }
 
     /** @return array{slug: string, eventType: string, label: string} */
@@ -380,6 +604,7 @@ class FestCatalogController extends SahodayaAdminController
             'max_squad'          => 'nullable|integer|min:1',
             'min_squad'          => 'nullable|integer|min:1',
             'standbys'           => 'nullable|integer|min:0',
+            'head_key'           => $this->catalogHeadKeyRule($eventType, required: $eventType === 'sports'),
         ];
 
         $data = $request->validate($rules);
@@ -406,5 +631,43 @@ class FestCatalogController extends SahodayaAdminController
         unset($data['min_playing'], $data['max_playing'], $data['max_subs'], $data['max_squad'], $data['min_squad'], $data['standbys']);
 
         return $data;
+    }
+
+    /** @return list<array{key: string, name: string, sport_discipline: ?string}> */
+    private function catalogItemHeadOptions(string $eventType): array
+    {
+        if ($eventType !== 'sports') {
+            return [];
+        }
+
+        app(FestItemHeadService::class)->ensureCatalogHeads($this->sahodaya->id, 'sports');
+
+        return FestItemHead::forTenant($this->sahodaya->id)
+            ->whereNull('event_id')
+            ->orderBy('sort_order')
+            ->get(['catalog_key', 'name', 'sport_discipline'])
+            ->map(fn (FestItemHead $head) => [
+                'key' => $head->catalog_key,
+                'name' => $head->name,
+                'sport_discipline' => $head->sport_discipline,
+            ])
+            ->all();
+    }
+
+    /** @return array<int, mixed> */
+    private function catalogHeadKeyRule(string $eventType, bool $required = false): array
+    {
+        if ($eventType !== 'sports') {
+            return ['nullable', 'string', 'max:120'];
+        }
+
+        return [
+            $required ? 'required' : 'nullable',
+            'string',
+            'max:120',
+            Rule::exists('fest_item_heads', 'catalog_key')->where(
+                fn ($query) => $query->where('tenant_id', $this->sahodaya->id)->whereNull('event_id'),
+            ),
+        ];
     }
 }

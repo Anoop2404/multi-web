@@ -12,7 +12,7 @@ class McqHallTicketDesign
     public static function defaults(): array
     {
         return [
-            'header_title'  => 'MCQ Examination — Hall Ticket',
+            'header_title'  => 'Talent Search Examination — Hall Ticket',
             'footer_note'   => '',
             'show_reg_no'   => true,
             'show_school'   => true,
@@ -49,6 +49,21 @@ class McqHallTicketDesign
 
     public static function fromExam(McqExam $exam): array
     {
+        if ($exam->hall_ticket_template_id) {
+            $template = \App\Models\McqHallTicketTemplate::find($exam->hall_ticket_template_id);
+            if ($template?->design_json) {
+                return self::normalize($template->design_json);
+            }
+        }
+
+        $default = \App\Models\McqHallTicketTemplate::where('tenant_id', $exam->tenant_id)
+            ->where('is_default', true)
+            ->where('is_active', true)
+            ->first();
+        if ($default?->design_json) {
+            return self::normalize($default->design_json);
+        }
+
         return self::normalize($exam->settings_json['hall_ticket'] ?? null);
     }
 
@@ -76,8 +91,8 @@ class McqHallTicketDesign
             'student_reg_no'     => 'ADM-2026-001',
             'school_name'        => 'Sample Model School',
             'hall_ticket_no'     => (string) ($exam->next_hall_ticket_no ?? 100),
-            'hall_room'          => 'Hall A',
-            'seat_no'            => '12',
+            'hall_room'          => null,
+            'seat_no'            => null,
             'scheduled_at_label' => $exam->scheduled_at?->format('d M Y, h:i A') ?? 'TBA',
             'exam_title'         => $exam->title,
             'hall_instructions'  => $exam->hall_instructions,

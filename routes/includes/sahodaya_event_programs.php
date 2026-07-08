@@ -11,6 +11,7 @@ use App\Http\Controllers\SahodayaAdmin\SportsAgeGroupController;
 use App\Http\Controllers\SahodayaAdmin\ScienceFestProgramController;
 use App\Http\Controllers\SahodayaAdmin\SportsProgramController;
 use App\Http\Controllers\SahodayaAdmin\TeacherFestProgramController;
+use App\Support\FestCatalogSections;
 use Illuminate\Support\Facades\Route;
 
 $sahodayaFestPrograms = [
@@ -22,12 +23,22 @@ $sahodayaFestPrograms = [
     ['prefix' => 'science-fest', 'slug' => 'science-fest', 'controller' => ScienceFestProgramController::class],
 ];
 
+$catalogEventTypes = [
+    'kalotsav'     => 'kalolsavam',
+    'sports-meet'  => 'sports',
+    'kids-fest'    => 'kids_fest',
+    'teacher-fest' => 'teacher_fest',
+    'english-fest' => 'english_fest',
+    'science-fest' => 'science_fest',
+];
+
 foreach ($sahodayaFestPrograms as $cfg) {
     $prefix = $cfg['prefix'];
     $slug = $cfg['slug'];
     $controller = $cfg['controller'];
+    $eventType = $catalogEventTypes[$slug] ?? null;
 
-    Route::prefix($prefix)->name("{$prefix}.")->group(function () use ($controller, $slug, $prefix) {
+    Route::prefix($prefix)->name("{$prefix}.")->group(function () use ($controller, $slug, $prefix, $eventType) {
         Route::get('/', [$controller, 'dashboard'])->name('dashboard');
 
         if ($prefix === 'kalotsav') {
@@ -49,33 +60,65 @@ foreach ($sahodayaFestPrograms as $cfg) {
             });
         }
 
-        Route::prefix('catalog')->name('catalog.')->group(function () use ($slug) {
+        Route::prefix('catalog')->name('catalog.')->group(function () use ($slug, $eventType) {
             Route::get('/', [FestCatalogController::class, 'index'])->defaults('program', $slug)->name('index');
             Route::get('/master/{section?}', [FestCatalogController::class, 'master'])
                 ->where('section', '[a-z0-9\-]+')
-                ->defaults('program', $slug)
                 ->name('master');
             Route::get('/list/{section?}', [FestCatalogController::class, 'list'])
                 ->where('section', '[a-z0-9\-]+')
-                ->defaults('program', $slug)
                 ->name('list');
             Route::get('/assign', [FestCatalogController::class, 'assign'])->defaults('program', $slug)->name('assign');
+            Route::get('/heads', [FestCatalogController::class, 'heads'])->defaults('program', $slug)->name('heads');
+            Route::get('/heads/{head}/sample-id-card', [FestCatalogController::class, 'previewHeadIdCard'])->defaults('program', $slug)->name('heads.sample-id-card');
+            Route::post('/heads', [FestCatalogController::class, 'storeHead'])->defaults('program', $slug)->name('heads.store');
+            Route::post('/heads/sync', [FestCatalogController::class, 'syncHeads'])->defaults('program', $slug)->name('heads.sync');
             Route::get('/browse/{section}', [FestCatalogController::class, 'section'])
                 ->where('section', '[a-z0-9\-]+')
-                ->defaults('program', $slug)
                 ->name('section');
-            Route::post('/seed', [FestCatalogController::class, 'seed'])->defaults('program', $slug)->name('seed');
+            Route::post('/seed', [FestCatalogController::class, 'seed'])->name('seed');
             Route::post('/items', [FestCatalogController::class, 'store'])->defaults('program', $slug)->name('items.store');
-            Route::put('/items/{item}', [FestCatalogController::class, 'update'])->defaults('program', $slug)->name('items.update');
-            Route::delete('/items/{item}', [FestCatalogController::class, 'destroy'])->defaults('program', $slug)->name('items.destroy');
+            Route::put('/items/{item}', [FestCatalogController::class, 'update'])->name('items.update');
+            Route::delete('/items/{item}', [FestCatalogController::class, 'destroy'])->name('items.destroy');
             Route::post('/bulk', [FestCatalogController::class, 'bulk'])->defaults('program', $slug)->name('bulk');
-            Route::post('/import/{event}', [FestCatalogController::class, 'importToEvent'])->defaults('program', $slug)->name('import');
+            Route::post('/import/{event}', [FestCatalogController::class, 'importToEvent'])->name('import');
+
+            if ($eventType) {
+                $legacySections = array_column(FestCatalogSections::forEventType($eventType), 'slug');
+                if ($legacySections !== []) {
+                    Route::get('/{section}', [FestCatalogController::class, 'redirectLegacySection'])
+                        ->whereIn('section', $legacySections)
+                        ->name('legacy-section');
+                }
+            }
         });
+
+        // Catch mistyped /{prefix}/{section} URLs (e.g. relative "relay" from catalog hub → /sports/relay).
+        if ($eventType) {
+            $catalogSections = array_column(FestCatalogSections::forEventType($eventType), 'slug');
+            if ($catalogSections !== []) {
+                Route::get('/{catalogSection}', function (string $tenantId, string $catalogSection) use ($prefix) {
+                    return redirect("/sahodaya-admin/{$tenantId}/{$prefix}/catalog/master/{$catalogSection}", 301);
+                })
+                    ->whereIn('catalogSection', $catalogSections)
+                    ->name('catalog-section-fallback');
+            }
+        }
     });
 
     Route::get("/programs/{$slug}", fn (string $tenantId) => redirect("/sahodaya-admin/{$tenantId}/{$prefix}", 301));
     Route::get("/programs/{$slug}/{path}", fn (string $tenantId, string $path) => redirect("/sahodaya-admin/{$tenantId}/{$prefix}/{$path}", 301))
         ->where('path', '.*');
+
+    // Legacy `/programs/{slug}/catalog/*` mutation URLs (GET redirects above; POST cannot redirect).
+    Route::prefix("programs/{$slug}/catalog")->group(function () use ($slug) {
+        Route::post('/seed', [FestCatalogController::class, 'seed']);
+        Route::post('/items', [FestCatalogController::class, 'store'])->defaults('program', $slug);
+        Route::put('/items/{item}', [FestCatalogController::class, 'update']);
+        Route::delete('/items/{item}', [FestCatalogController::class, 'destroy']);
+        Route::post('/bulk', [FestCatalogController::class, 'bulk'])->defaults('program', $slug);
+        Route::post('/import/{event}', [FestCatalogController::class, 'importToEvent']);
+    });
 }
 
 Route::prefix('mcq')->name('mcq-hub.')->group(function () {
@@ -83,10 +126,21 @@ Route::prefix('mcq')->name('mcq-hub.')->group(function () {
     Route::get('/question-banks', [McqDashboardController::class, 'questionBanks'])->name('question-banks');
     Route::get('/payments', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'index'])->name('payments');
     Route::post('/payments/{schoolFee}/approve', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'approve'])->name('payments.approve');
+    Route::post('/payments/{schoolFee}/reject', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'reject'])->name('payments.reject');
     Route::get('/payments/{schoolFee}/proof', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'proof'])->name('payments.proof');
+    Route::get('/grade-masters', [\App\Http\Controllers\SahodayaAdmin\McqGradeMasterController::class, 'index'])->name('grade-masters');
+    Route::post('/grade-masters', [\App\Http\Controllers\SahodayaAdmin\McqGradeMasterController::class, 'store'])->name('grade-masters.store');
+    Route::put('/grade-masters/{gradeMaster}', [\App\Http\Controllers\SahodayaAdmin\McqGradeMasterController::class, 'update'])->name('grade-masters.update');
+    Route::get('/templates/hall-tickets', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'hallTickets'])->name('templates.hall-tickets');
+    Route::post('/templates/hall-tickets', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'storeHallTicket'])->name('templates.hall-tickets.store');
+    Route::get('/templates/certificates', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'certificates'])->name('templates.certificates');
+    Route::post('/templates/certificates', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'storeCertificate'])->name('templates.certificates.store');
 });
 
 Route::prefix('fest')->name('fest.')->group(function () {
+    Route::get('/appeals', [\App\Http\Controllers\SahodayaAdmin\FestAppealsHubController::class, 'index'])->name('appeals.index');
+    Route::post('/appeals/{appeal}/resolve', [\App\Http\Controllers\SahodayaAdmin\FestAppealsHubController::class, 'resolve'])->name('appeals.resolve');
+    Route::post('/appeals/{appeal}/mark-fee-paid', [\App\Http\Controllers\SahodayaAdmin\FestAppealsHubController::class, 'markFeePaid'])->name('appeals.mark-fee-paid');
     Route::get('/payments', [\App\Http\Controllers\SahodayaAdmin\FestPaymentsController::class, 'index'])->name('payments');
     Route::post('/payments/{schoolEventFee}/approve', [\App\Http\Controllers\SahodayaAdmin\FestPaymentsController::class, 'approve'])->name('payments.approve');
     Route::post('/payments/{schoolEventFee}/reject', [\App\Http\Controllers\SahodayaAdmin\FestPaymentsController::class, 'reject'])->name('payments.reject');
@@ -101,23 +155,20 @@ Route::prefix('programs/custom/catalog')->name('programs.catalog.')->group(funct
     Route::get('/', [FestCatalogController::class, 'index'])->defaults('program', 'custom')->name('index');
     Route::get('/master/{section?}', [FestCatalogController::class, 'master'])
         ->where('section', '[a-z0-9\-]+')
-        ->defaults('program', 'custom')
         ->name('master');
     Route::get('/list/{section?}', [FestCatalogController::class, 'list'])
         ->where('section', '[a-z0-9\-]+')
-        ->defaults('program', 'custom')
         ->name('list');
     Route::get('/assign', [FestCatalogController::class, 'assign'])->defaults('program', 'custom')->name('assign');
     Route::get('/browse/{section}', [FestCatalogController::class, 'section'])
         ->where('section', '[a-z0-9\-]+')
-        ->defaults('program', 'custom')
         ->name('section');
-    Route::post('/seed', [FestCatalogController::class, 'seed'])->defaults('program', 'custom')->name('seed');
+    Route::post('/seed', [FestCatalogController::class, 'seed'])->name('seed');
     Route::post('/items', [FestCatalogController::class, 'store'])->defaults('program', 'custom')->name('items.store');
-    Route::put('/items/{item}', [FestCatalogController::class, 'update'])->defaults('program', 'custom')->name('items.update');
-    Route::delete('/items/{item}', [FestCatalogController::class, 'destroy'])->defaults('program', 'custom')->name('items.destroy');
+    Route::put('/items/{item}', [FestCatalogController::class, 'update'])->name('items.update');
+    Route::delete('/items/{item}', [FestCatalogController::class, 'destroy'])->name('items.destroy');
     Route::post('/bulk', [FestCatalogController::class, 'bulk'])->defaults('program', 'custom')->name('bulk');
-    Route::post('/import/{event}', [FestCatalogController::class, 'importToEvent'])->defaults('program', 'custom')->name('import');
+    Route::post('/import/{event}', [FestCatalogController::class, 'importToEvent'])->name('import');
 });
 
 Route::get('/programs/{program}/{view}', function (string $tenantId, string $program, string $view) {

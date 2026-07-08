@@ -24,9 +24,7 @@ class StudentRecordCreator
             'academic_year_id' => StudentRecordHelper::activeAcademicYearIdForSchool($school),
         ];
 
-        $regNo = app(StudentRegistrationNumberGenerator::class)->generate($school);
-        $payload['admission_number'] = $regNo;
-        $payload['reg_no'] = $regNo;
+        $payload['reg_no'] = app(StudentRegistrationNumberGenerator::class)->generate($school);
 
         if (! empty($fields['parent_email'])) {
             $payload['parent_email'] = strtolower((string) $fields['parent_email']);

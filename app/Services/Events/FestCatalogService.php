@@ -11,16 +11,21 @@ use Illuminate\Support\Str;
 
 class FestCatalogService
 {
-    /** Seed CKSC master rows for a Sahodaya program (idempotent). */
-    public function ensureSeeded(string $tenantId, string $eventType): int
+    /** @return array{created: int, updated: int} Seed/sync CKSC master rows (idempotent). */
+    public function ensureSeeded(string $tenantId, string $eventType): array
     {
         $catalog = FestItemCatalog::forEventType($eventType);
         $order = (int) FestCatalogItem::forProgram($tenantId, $eventType)->max('display_order');
         $created = 0;
+        $updated = 0;
 
         foreach ($catalog as $row) {
             $key = $this->catalogKey($row);
             $normalized = $this->normalizeRow($row);
+
+            if ($eventType === 'sports') {
+                $normalized['head_key'] = FestItemHeadService::resolveCatalogHeadKey($normalized);
+            }
 
             $existing = FestCatalogItem::forProgram($tenantId, $eventType)
                 ->where('catalog_key', $key)
@@ -28,7 +33,11 @@ class FestCatalogService
 
             if ($existing) {
                 if ($existing->source === 'cksc') {
-                    $existing->update($this->syncableCatalogAttributes($normalized));
+                    $existing->fill($this->syncableCatalogAttributes($normalized));
+                    if ($existing->isDirty()) {
+                        $existing->save();
+                        $updated++;
+                    }
                 }
 
                 continue;
@@ -49,9 +58,21 @@ class FestCatalogService
 
         if ($eventType === 'sports') {
             $this->retireObsoleteSportsCatalogItems($tenantId, $catalog);
+
+            $headService = app(FestItemHeadService::class);
+            $headsCreated = $headService->ensureCatalogHeads($tenantId, $eventType);
+            $headLinks = $headService->syncCatalogItemHeadKeys($tenantId, $eventType);
+        } else {
+            $headsCreated = 0;
+            $headLinks = 0;
         }
 
-        return $created;
+        return [
+            'created' => $created,
+            'updated' => $updated,
+            'heads_created' => $headsCreated ?? 0,
+            'head_links' => $headLinks ?? 0,
+        ];
     }
 
     /** @param  array<string, mixed>  $normalized */
@@ -61,7 +82,7 @@ class FestCatalogService
             'title', 'item_code', 'category', 'stage_type', 'venue_type', 'competition_format',
             'sport_discipline', 'duration_minutes', 'criteria_json', 'participant_type', 'gender',
             'class_group', 'age_group', 'kids_band', 'max_per_school', 'min_group_size',
-            'max_group_size', 'qualify_count',
+            'max_group_size', 'qualify_count', 'head_key',
         ])->all();
     }
 

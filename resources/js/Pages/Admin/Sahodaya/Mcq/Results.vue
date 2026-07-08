@@ -1,8 +1,15 @@
 <template>
     <SahodayaAdminLayout :title="`Results — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="MCQ exam"
-                    description="Verify school fee payments to confirm registrations and issue hall tickets, then enter marks." />
+        <PageHeader :title="exam.title" eyebrow="Talent Search exam"
+                    description="Verify school fee payments to confirm registrations and issue hall tickets, then enter marks.">
+            <template #actions>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/certificates/preview`"
+                   target="_blank" rel="noopener" class="btn-secondary text-sm">Sample certificate ↗</a>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/preview`"
+                   target="_blank" rel="noopener" class="btn-secondary text-sm">Sample hall ticket ↗</a>
+            </template>
+        </PageHeader>
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="results" />
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -33,9 +40,13 @@
                     {{ exam.results_published ? 'Results published' : 'Results not published' }}
                 </p>
                 <p class="text-xs text-slate-600 mt-0.5">Schools {{ exam.results_published ? 'can' : 'cannot' }} view scores in their portal.</p>
+                <p v-if="gradeBands?.length" class="text-xs text-slate-500 mt-1">
+                    Grade bands: {{ gradeBands.map(b => `${b.label} (${b.min_percentage}-${b.max_percentage}%)`).join(' · ') }}
+                </p>
             </div>
             <button v-if="!exam.results_published" type="button" @click="publishResults" class="btn-primary text-sm">Publish results</button>
             <button v-else type="button" @click="unpublishResults" class="btn-secondary text-sm">Unpublish</button>
+            <button v-if="exam.results_published" type="button" @click="generateCertificates" class="btn-secondary text-sm">Generate certificates</button>
         </div>
 
         <section class="card overflow-hidden !p-0">
@@ -62,7 +73,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="r in filteredRegistrations" :key="r.id">
+                        <tr v-for="r in filteredRegistrations" :key="r.id" :class="r.attendance_status === 'absent' ? 'opacity-60' : ''">
                             <td>{{ r.student?.name || ('#' + r.student_id) }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
@@ -81,16 +92,21 @@
                             </td>
                             <td>
                                 <input v-model.number="markForms[r.id].score" type="number" min="0" step="0.01"
-                                       class="field w-20" :aria-label="`Score for ${r.student?.name || r.id}`">
+                                       class="field w-20" :disabled="!canEnterMarks(r)" :aria-label="`Score for ${r.student?.name || r.id}`">
                             </td>
                             <td>
-                                <select v-model="markForms[r.id].grade" class="field w-16" :aria-label="`Grade for ${r.student?.name || r.id}`">
+                                <select v-model="markForms[r.id].grade" class="field w-16" :disabled="!canEnterMarks(r)" :aria-label="`Grade for ${r.student?.name || r.id}`">
                                     <option value="">—</option>
-                                    <option v-for="g in ['A','B','C','D','F']" :key="g" :value="g">{{ g }}</option>
+                                    <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
                                 </select>
                             </td>
-                            <td>
-                                <button type="button" @click="saveMark(r)" class="link-brand text-xs">Save</button>
+                            <td class="text-xs whitespace-nowrap">
+                                <button v-if="canEnterMarks(r)" type="button" @click="saveMark(r)" class="link-brand text-xs">Save</button>
+                                <span v-else-if="r.attendance_status === 'absent'" class="text-red-600">Absent</span>
+                                <span v-else class="text-slate-400">Mark present first</span>
+                                <a v-if="exam.results_published && r.mark && r.attendance_status !== 'absent'"
+                                   :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/registrations/${r.id}/certificate`"
+                                   target="_blank" class="link-brand ml-2">Cert</a>
                             </td>
                         </tr>
                         <tr v-if="!filteredRegistrations.length">
@@ -109,7 +125,7 @@ import { router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 
-const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array });
+const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, gradeBands: { type: Array, default: () => [] } });
 
 const regSearch = ref('');
 
@@ -126,6 +142,11 @@ for (const r of props.registrations) {
 
 const presentCount = computed(() => props.registrations.filter((r) => r.attendance_status === 'present').length);
 const markedCount = computed(() => props.registrations.filter((r) => r.mark?.score != null).length);
+const gradeOptions = computed(() => props.gradeBands?.length ? props.gradeBands.map((b) => b.label) : ['A+', 'A', 'B', 'C', 'D', 'F']);
+
+function canEnterMarks(r) {
+    return r.attendance_status === 'present';
+}
 
 const filteredRegistrations = computed(() => {
     const q = regSearch.value.trim().toLowerCase();
@@ -149,6 +170,11 @@ function publishResults() {
 
 function unpublishResults() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/unpublish-results`, {}, { preserveScroll: true });
+}
+
+function generateCertificates() {
+    if (!confirm('Generate certificates for all eligible students with published results?')) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/certificates/generate`, {}, { preserveScroll: true });
 }
 
 function approveFee(registrationId) {

@@ -54,7 +54,6 @@
                 <div class="flex-1 min-w-[200px] max-w-md">
                     <label class="text-xs font-semibold text-gray-500 mb-1 block">Search school</label>
                     <input v-model="filterForm.search" type="search" placeholder="School name or prefix…"
-                           @keyup.enter="applyFilters"
                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0f3d7a]/20">
                 </div>
                 <div>
@@ -67,10 +66,6 @@
                     <input v-model="filterForm.date_to" type="date"
                            class="border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
                 </div>
-                <button @click="applyFilters"
-                        class="btn-primary">
-                    Apply
-                </button>
                 <a :href="exportUrl()"
                    class="ml-auto inline-flex items-center px-4 py-2.5 rounded-xl bg-[#eff6ff] hover:bg-[#dbeafe] text-[#0f3d7a] border border-[#bfdbfe] text-sm font-semibold transition">
                     Download Excel ↓
@@ -204,6 +199,7 @@
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { reactive, computed, defineComponent, h } from 'vue';
+import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String,
@@ -262,6 +258,8 @@ function applyFilters() {
         date_to: filterForm.date_to,
     }), { preserveState: true, replace: true });
 }
+
+useDebouncedInertiaFilters(filterForm, applyFilters, () => props.filters);
 
 function exportUrl() {
     const params = new URLSearchParams();

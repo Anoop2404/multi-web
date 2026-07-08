@@ -2,10 +2,25 @@
     <SahodayaAdminLayout :title="program.title" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="program.title" eyebrow="Teacher training"
-                    :description="`${program.registrations?.length ?? 0} registrations · ${program.status}`" />
-        <TrainingProgramSubNav :sahodaya-id="sahodaya.id" :program-id="program.id" />
+                    :description="`${program.registrations?.length ?? 0} registrations · ${program.status}`">
+            <template #actions>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/attendance`"
+                      class="btn-secondary text-sm">
+                    Attendance & report
+                </Link>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/certificate/preview`"
+                   target="_blank" rel="noopener" class="btn-secondary text-sm">
+                    Sample certificate ↗
+                </a>
+                <Link v-if="program.fee_type !== 'none' && program.fee_amount"
+                      :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/ledger`"
+                      class="btn-secondary text-sm">
+                    Payment ledger
+                </Link>
+            </template>
+        </PageHeader>
 
-        <form @submit.prevent="save" class="card mb-6 space-y-4">
+        <form id="overview" @submit.prevent="save" class="card mb-6 space-y-4">
             <h3 class="section-title">Program details</h3>
             <FormGrid>
                 <FormField label="Title" class-extra="sm:col-span-2" required>
@@ -16,6 +31,44 @@
                 <FormField label="Description" class-extra="sm:col-span-2">
                     <template #default="{ id }">
                         <textarea :id="id" v-model="form.description" class="field" rows="2"></textarea>
+                    </template>
+                </FormField>
+                <FormField label="Venue" class-extra="sm:col-span-2">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.venue" class="field" placeholder="e.g. St. Alphonsa Public School, Oorakam">
+                    </template>
+                </FormField>
+                <FormField label="Start date">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.start_date" type="date" class="field">
+                    </template>
+                </FormField>
+                <FormField label="End date">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.end_date" type="date" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Registration opens">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.registration_open" type="date" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Registration closes">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.registration_close" type="date" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Max participants">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.max_participants" type="number" min="1" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Teacher self-registration" hint="Teachers can register from their portal">
+                    <template #default="{ id }">
+                        <label class="inline-flex items-center gap-2 text-sm">
+                            <input :id="id" v-model="form.allow_teacher_self_registration" type="checkbox" class="rounded">
+                            Enabled
+                        </label>
                     </template>
                 </FormField>
                 <FormField label="Status">
@@ -48,11 +101,14 @@
         </form>
 
         <!-- Sessions with per-teacher attendance -->
-        <div class="card mb-4">
+        <div id="sessions" class="card mb-4 scroll-mt-6">
             <h4 class="font-semibold text-sm mb-3">Sessions</h4>
-            <form @submit.prevent="addSession" class="flex gap-2 mb-4">
-                <input v-model="sessionForm.title" class="field flex-1" placeholder="Session title" required>
-                <button class="btn-primary px-3 py-1.5 rounded text-xs whitespace-nowrap">Add session</button>
+            <form @submit.prevent="addSession" class="grid gap-2 sm:grid-cols-2 mb-4">
+                <input v-model="sessionForm.title" class="field sm:col-span-2" placeholder="Day / session title (e.g. Day 1)" required>
+                <input v-model="sessionForm.scheduled_at" type="datetime-local" class="field" placeholder="Date & time">
+                <input v-model="sessionForm.venue" class="field" placeholder="Venue (optional override)">
+                <input v-model="sessionForm.duration_minutes" type="number" min="15" class="field" placeholder="Duration (minutes)">
+                <button class="btn-primary px-3 py-1.5 rounded text-xs whitespace-nowrap sm:col-span-2 sm:w-fit">Add training day</button>
             </form>
             <div v-for="session in program.sessions" :key="session.id" class="border rounded-lg p-3 mb-3">
                 <div class="flex items-center justify-between mb-2">
@@ -99,7 +155,7 @@
         </div>
 
         <!-- Registrations -->
-        <div class="card">
+        <div id="registrations" class="card scroll-mt-6">
             <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
                 <h4 class="font-semibold text-sm">Registrations ({{ program.registrations?.length ?? 0 }})</h4>
                 <a v-if="confirmedRegistrations.length"
@@ -153,9 +209,8 @@
 
 <script setup>
 import { computed, reactive } from 'vue';
-import { useForm, router } from '@inertiajs/vue3';
+import { useForm, router, Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import TrainingProgramSubNav from '@/Components/sahodaya/TrainingProgramSubNav.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -168,11 +223,23 @@ const props = defineProps({
 const form = useForm({
     title: props.program.title,
     description: props.program.description ?? '',
+    venue: props.program.venue ?? '',
+    start_date: props.program.start_date?.slice?.(0, 10) ?? props.program.start_date ?? '',
+    end_date: props.program.end_date?.slice?.(0, 10) ?? props.program.end_date ?? '',
+    registration_open: props.program.registration_open?.slice?.(0, 10) ?? props.program.registration_open ?? '',
+    registration_close: props.program.registration_close?.slice?.(0, 10) ?? props.program.registration_close ?? '',
+    max_participants: props.program.max_participants ?? '',
+    allow_teacher_self_registration: props.program.allow_teacher_self_registration ?? true,
     status: props.program.status,
     fee_type: props.program.fee_type ?? 'none',
     fee_amount: props.program.fee_amount ?? '',
 });
-const sessionForm = useForm({ title: '' });
+const sessionForm = useForm({
+    title: '',
+    scheduled_at: '',
+    venue: '',
+    duration_minutes: '',
+});
 
 const localAttendance = reactive({});
 

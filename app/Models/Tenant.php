@@ -16,7 +16,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'id', 'type', 'name', 'domain', 'subdomain',
         'parent_id', 'plan', 'is_active', 'fest_registration_closed',
         'school_prefix', 'membership_status', 'renewal_status', 'application_payload', 'prefixes_locked',
-        'school_setup_wizard_dismissed',
+        'school_setup_wizard_dismissed', 'nav_overrides',
     ];
 
     protected $casts = [
@@ -24,6 +24,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'fest_registration_closed'  => 'boolean',
         'data'                      => 'array',
         'application_payload'       => 'array',
+        'nav_overrides'             => 'array',
         'prefixes_locked'           => 'boolean',
         'school_setup_wizard_dismissed' => 'boolean',
     ];
@@ -34,7 +35,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'id', 'type', 'name', 'domain', 'subdomain', 'parent_id', 'plan', 'is_active',
             'fest_registration_closed',
             'school_prefix', 'membership_status', 'renewal_status', 'application_payload', 'prefixes_locked',
-            'school_setup_wizard_dismissed',
+            'school_setup_wizard_dismissed', 'nav_overrides',
         ];
     }
 

@@ -6,15 +6,102 @@ use App\Models\MasterClass;
 use App\Models\McqExam;
 use App\Models\McqMark;
 use App\Models\McqRegistration;
+use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Services\Students\StudentVerificationGate;
 use App\Support\FestStudentClassResolver;
 use App\Support\Mcq\McqExamEligibilityConfig;
 use Illuminate\Support\Collection;
 
 class McqEligibilityService
 {
+    /** @var array<string, array<int, string>> */
+    private array $masterClassNameCache = [];
+
+    public function __construct(
+        private StudentVerificationGate $verificationGate,
+    ) {}
+
+    /**
+     * Resolve which of a school's own class IDs are eligible for this exam so that
+     * student queries can be scoped at the database level instead of loading every
+     * student (a school may have 300–2000 students).
+     *
+     * Returns null when there is no class-level restriction (all classes may apply,
+     * with only gender/verification filtered per student), in which case the caller
+     * should not constrain the student query by class.
+     *
+     * @return list<int>|null
+     */
+    public function eligibleSchoolClassIds(McqExam $exam, string $schoolId): ?array
+    {
+        $config = McqExamEligibilityConfig::normalize($exam->eligibility_config);
+        $assignmentType = $config['assignment_type'] ?? 'all';
+        $categoryIds = $config['class_category_ids'];
+        $masterClassIds = $config['master_class_ids'];
+        $classGroups = $config['class_groups'];
+
+        $noClassRestriction = $classGroups === [] && (
+            $assignmentType === 'all'
+            || ($assignmentType === 'category' && $categoryIds === [])
+            || ($assignmentType === 'class' && $masterClassIds === [])
+        );
+
+        if ($noClassRestriction) {
+            return null;
+        }
+
+        $classes = SchoolClass::where('tenant_id', $schoolId)
+            ->get(['id', 'name', 'class_category_id']);
+
+        $masterNames = $masterClassIds !== [] ? $this->masterClassNames($masterClassIds) : [];
+        $normalizedMasterNames = array_map(fn ($n) => $this->normalizeClassName((string) $n), $masterNames);
+        $masterNumbers = array_filter(array_map(
+            fn ($n) => FestStudentClassResolver::classNumberFromName((string) $n),
+            $masterNames
+        ), fn ($n) => $n !== null);
+
+        $ids = [];
+
+        foreach ($classes as $class) {
+            $passes = false;
+
+            if ($assignmentType === 'category' && $categoryIds !== []) {
+                $passes = (int) ($class->class_category_id ?? 0) > 0
+                    && in_array((int) $class->class_category_id, $categoryIds, true);
+            }
+
+            if (! $passes && $assignmentType === 'class' && $masterClassIds !== []) {
+                $className = trim((string) $class->name);
+                if ($className !== '') {
+                    $normalized = $this->normalizeClassName($className);
+                    $classNumber = FestStudentClassResolver::classNumberFromName($className);
+                    $passes = in_array($normalized, $normalizedMasterNames, true)
+                        || ($classNumber !== null && in_array($classNumber, $masterNumbers, true));
+                }
+            }
+
+            if (! $passes && $classGroups !== []) {
+                $group = FestStudentClassResolver::kalolsavClassGroup(
+                    FestStudentClassResolver::classNumberFromName((string) $class->name)
+                );
+                $passes = $group !== null && in_array($group, $classGroups, true);
+            }
+
+            if ($passes) {
+                $ids[] = (int) $class->id;
+            }
+        }
+
+        return $ids;
+    }
+
     public function isEligible(McqExam $exam, Student $student): bool
     {
+        if (! $this->verificationGate->isEligible($student, null, $exam->tenant_id)) {
+            return false;
+        }
+
         if (! $this->passesBasicConfig($exam, $student)) {
             return false;
         }
@@ -30,6 +117,25 @@ class McqEligibilityService
     public function eligibleStudents(McqExam $exam, Collection $students): Collection
     {
         return $students->filter(fn (Student $student) => $this->isEligible($exam, $student))->values();
+    }
+
+    public function ineligibilityReason(McqExam $exam, Student $student): ?string
+    {
+        if (! $this->verificationGate->isEligible($student, null, $exam->tenant_id)) {
+            return $this->verificationGate
+                ->ineligibilityReason($student, null, $exam->tenant_id)
+                ?? 'Student is not verified.';
+        }
+
+        if (! $this->passesBasicConfig($exam, $student)) {
+            return 'Student does not match class/gender eligibility for this exam.';
+        }
+
+        if ((int) ($exam->exam_level ?? 1) <= 1) {
+            return null;
+        }
+
+        return $this->parentExamIneligibilityReason($exam, $student);
     }
 
     /** @return list<int> */
@@ -116,7 +222,7 @@ class McqEligibilityService
             return false;
         }
 
-        $names = MasterClass::whereIn('id', $masterClassIds)->pluck('name');
+        $names = $this->masterClassNames($masterClassIds);
         $normalizedStudent = $this->normalizeClassName($className);
         $studentClassNum = FestStudentClassResolver::classNumberFromName($className);
 
@@ -132,6 +238,23 @@ class McqEligibilityService
         }
 
         return false;
+    }
+
+    /**
+     * Cached lookup of master class names, keyed by the requested id set, so
+     * per-student eligibility checks do not issue one query per student.
+     *
+     * @param  list<int>  $masterClassIds
+     * @return array<int, string>
+     */
+    private function masterClassNames(array $masterClassIds): array
+    {
+        sort($masterClassIds);
+        $key = implode(',', $masterClassIds);
+
+        return $this->masterClassNameCache[$key] ??= MasterClass::whereIn('id', $masterClassIds)
+            ->pluck('name')
+            ->all();
     }
 
     private function normalizeClassName(string $name): string
@@ -151,19 +274,39 @@ class McqEligibilityService
 
     private function passesParentExamEligibility(McqExam $exam, Student $student): bool
     {
+        return $this->parentExamIneligibilityReason($exam, $student) === null;
+    }
+
+    private function parentExamIneligibilityReason(McqExam $exam, Student $student): ?string
+    {
         $mode = $exam->eligibility_mode ?? 'open';
         if ($mode === 'open') {
-            return true;
+            return null;
         }
 
         if ($mode === 'manual') {
             $ids = $exam->promoted_student_ids ?? [];
 
-            return in_array($student->id, $ids, true);
+            return in_array($student->id, $ids, true)
+                ? null
+                : 'Student is not on the Level 2 promotion list.';
         }
 
         if (! $exam->parent_exam_id) {
-            return false;
+            return 'Level 2 exam is missing a parent Level 1 exam.';
+        }
+
+        $parentExam = McqExam::find($exam->parent_exam_id);
+        if (! $parentExam) {
+            return 'Parent Level 1 exam was not found.';
+        }
+
+        if (! $parentExam->results_published) {
+            return 'Level 1 results are not published yet.';
+        }
+
+        if (! $parentExam->promotion_locked) {
+            return 'Level 2 qualifier list is not locked yet.';
         }
 
         $registration = McqRegistration::where('exam_id', $exam->parent_exam_id)
@@ -172,18 +315,36 @@ class McqEligibilityService
             ->first();
 
         if (! $registration) {
-            return false;
+            return 'Student was not registered for Level 1.';
+        }
+
+        if ($registration->attendance_status === 'absent') {
+            return 'Student was absent in Level 1.';
+        }
+
+        if ($registration->status !== 'submitted') {
+            return 'Student did not complete Level 1 exam.';
         }
 
         $mark = McqMark::where('registration_id', $registration->id)->first();
         if (! $mark) {
-            return false;
+            return 'Level 1 marks are not available for this student.';
         }
 
-        return match ($mode) {
+        $qualified = match ($mode) {
             'cutoff_marks' => (float) $mark->score >= (float) ($exam->cutoff_score ?? 0),
             'top_rank'     => $mark->rank !== null && (int) $mark->rank <= (int) ($exam->top_rank_count ?? 0),
             default        => false,
+        };
+
+        if ($qualified) {
+            return null;
+        }
+
+        return match ($mode) {
+            'cutoff_marks' => 'Score below Level 2 cutoff.',
+            'top_rank'     => 'Rank outside Level 2 qualifier limit.',
+            default        => 'Student did not qualify for Level 2.',
         };
     }
 }

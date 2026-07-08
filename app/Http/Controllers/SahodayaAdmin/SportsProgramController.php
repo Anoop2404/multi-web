@@ -28,7 +28,7 @@ class SportsProgramController extends SahodayaAdminController
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'status', 'results_published']);
 
-        return $this->inertia('Sahodaya/Sports/Championship', [
+        return $this->inertia('Sahodaya/Sports/Championship', $this->programNavProps('sports-meet') + [
             'events'          => $events,
             'houseStandings'  => $hubData->crossEventHouseStandings($this->sahodaya),
         ]);
@@ -67,7 +67,7 @@ class SportsProgramController extends SahodayaAdminController
             ])
             ->values();
 
-        return $this->inertia('Sahodaya/Sports/Results', [
+        return $this->inertia('Sahodaya/Sports/Results', $this->programNavProps('sports-meet') + [
             'events'  => $events,
             'results' => $results,
         ]);
@@ -119,7 +119,7 @@ class SportsProgramController extends SahodayaAdminController
                 return $row;
             });
 
-        return $this->inertia('Sahodaya/Sports/Rankings', [
+        return $this->inertia('Sahodaya/Sports/Rankings', $this->programNavProps('sports-meet') + [
             'events'   => $events,
             'rankings' => $rows,
         ]);

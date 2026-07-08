@@ -5,7 +5,11 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Models\AccountHead;
 use App\Models\AcademicYearRecord;
 use App\Models\LedgerTransaction;
+use App\Models\LedgerOpeningBalance;
 use App\Services\Ledger\LedgerPostingService;
+use App\Services\Ledger\OpeningBalanceService;
+use App\Services\Ledger\FinancialStatementsService;
+use App\Services\Ledger\FeeWaiverService;
 use App\Services\Ledger\LedgerReportingService;
 use App\Support\AcademicYear;
 use App\Support\FinancialYear;
@@ -91,6 +95,8 @@ class LedgerController extends SahodayaAdminController
             'monthly'               => $monthly,
             'eventHeads'            => $reporting->eventIncomeHeads($this->sahodaya->id),
             'sportsHeads'           => $reporting->sportsIncomeHeads($this->sahodaya->id),
+            'mcqHeads'              => $reporting->mcqExamIncomeHeads($this->sahodaya->id),
+            'trainingHeads'         => $reporting->trainingProgramIncomeHeads($this->sahodaya->id),
             'filterFrom'            => $from,
             'filterTo'              => $to,
             'filterCategory'        => $category,
@@ -118,6 +124,8 @@ class LedgerController extends SahodayaAdminController
 
         $filename = 'ledger-'.($from ?? 'all').'-to-'.($to ?? 'all').'.csv';
 
+        app(\App\Services\Audit\PlatformAuditLogger::class)->reportDownloaded('ledger_export', ['from' => $from, 'to' => $to]);
+
         return response()->streamDownload(function () use ($transactions) {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['Date', 'Category', 'Head Code', 'Account Head', 'Type', 'Amount', 'Description']);
@@ -134,6 +142,44 @@ class LedgerController extends SahodayaAdminController
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+
+    public function financialStatements(Request $request, FinancialStatementsService $statements)
+    {
+        $financialYearId = $this->resolveFinancialYearId($request);
+        $from = $request->get('from');
+        $to = $request->get('to');
+        $headId = $request->integer('head_id') ?: null;
+
+        return $this->inertia('Sahodaya/Ledger/FinancialStatements', [
+            'trialBalance' => $statements->trialBalance($this->sahodaya->id, $financialYearId),
+            'cashBook' => $statements->cashBook($this->sahodaya->id, $financialYearId, $from, $to),
+            'incomeExpenditure' => $statements->incomeAndExpenditure($this->sahodaya->id, $financialYearId, $from, $to),
+            'balanceSheet' => $statements->balanceSheet($this->sahodaya->id, $financialYearId),
+            'generalLedger' => $headId ? $statements->generalLedger($this->sahodaya->id, $headId, $financialYearId, $from, $to) : collect(),
+            'monthlyIncome' => $this->monthlyIncomeTrend($financialYearId),
+            'heads' => AccountHead::where('tenant_id', $this->sahodaya->id)->orderBy('code')->get(['id', 'code', 'name']),
+            'filterFrom' => $from,
+            'filterTo' => $to,
+            'filterHeadId' => $headId,
+            'filterFinancialYearId' => $financialYearId,
+            'academicYears' => $this->academicYearOptions(),
+        ]);
+    }
+
+    public function waiveFee(Request $request, FeeWaiverService $waiver)
+    {
+        $data = $request->validate([
+            'fee_receipt_id' => 'required|exists:fee_receipts,id',
+            'waiver_amount' => 'required|numeric|min:0.01',
+            'reason' => 'required|string|max:500',
+        ]);
+
+        $receipt = \App\Models\FeeReceipt::findOrFail($data['fee_receipt_id']);
+        $waiver->apply($receipt, (float) $data['waiver_amount'], $data['reason'], $request->user()?->id);
+
+        return back()->with('success', 'Fee waiver applied.');
     }
 
     public function storeHead(Request $request)
@@ -220,6 +266,70 @@ class LedgerController extends SahodayaAdminController
         return back()->with('success', 'Expense posted.');
     }
 
+    public function openingBalances(Request $request, OpeningBalanceService $openings)
+    {
+        app(LedgerPostingService::class)->ensureDefaultHeads($this->sahodaya->id);
+
+        $financialYearId = $request->integer('financial_year_id') ?: (FinancialYear::currentId() ?? AcademicYear::activeId());
+
+        $heads = AccountHead::where('tenant_id', $this->sahodaya->id)
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'type']);
+
+        return $this->inertia('Sahodaya/Ledger/OpeningBalances', [
+            'heads'                 => $heads,
+            'openingBalances'       => $openings->listForTenant($this->sahodaya->id, $financialYearId),
+            'academicYears'         => $this->academicYearOptions(),
+            'filterFinancialYearId' => $financialYearId,
+        ]);
+    }
+
+    public function storeOpeningBalance(Request $request, OpeningBalanceService $openings)
+    {
+        $data = $request->validate([
+            'financial_year_id' => 'required|integer',
+            'account_head_id'   => 'required|exists:account_heads,id',
+            'entry_type'        => 'required|in:debit,credit',
+            'amount'            => 'required|numeric|min:0.01',
+            'notes'             => 'nullable|string|max:255',
+        ]);
+
+        $openings->save(
+            $this->sahodaya->id,
+            (int) $data['financial_year_id'],
+            (int) $data['account_head_id'],
+            $data['entry_type'],
+            $data['amount'],
+            $data['notes'] ?? null,
+            $request->user()->id,
+        );
+
+        return back()->with('success', 'Opening balance posted.');
+    }
+
+    public function destroyOpeningBalance(string $tenantId, LedgerOpeningBalance $openingBalance, OpeningBalanceService $openings)
+    {
+        abort_if($openingBalance->tenant_id !== $this->sahodaya->id, 403);
+
+        $openings->remove($openingBalance);
+
+        return back()->with('success', 'Opening balance removed.');
+    }
+
+    public function updateAccountHead(Request $request, string $tenantId, AccountHead $head)
+    {
+        abort_if($head->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $head->update(['name' => $data['name']]);
+
+        return back()->with('success', 'Ledger account name updated.');
+    }
+
     private function resolveFinancialYearId(Request $request): ?int
     {
         if ($request->has('financial_year_id')) {
@@ -252,5 +362,27 @@ class LedgerController extends SahodayaAdminController
     {
         return LedgerTransaction::where('tenant_id', $this->sahodaya->id)
             ->when($financialYearId, fn ($q) => $q->where('financial_year_id', $financialYearId));
+    }
+
+    /** @return list<array{month: string, income: float, expense: float}> */
+    private function monthlyIncomeTrend(?int $financialYearId): array
+    {
+        $from = now()->subMonths(11)->startOfMonth();
+
+        return \App\Models\LedgerTransaction::query()
+            ->where('tenant_id', $this->sahodaya->id)
+            ->when($financialYearId, fn ($q) => $q->where('financial_year_id', $financialYearId))
+            ->where('transaction_date', '>=', $from)
+            ->with('accountHead:id,type')
+            ->get()
+            ->groupBy(fn ($t) => $t->transaction_date?->format('Y-m') ?? 'unknown')
+            ->map(fn ($group, $month) => [
+                'month'   => $month,
+                'income'  => round((float) $group->filter(fn ($t) => $t->accountHead?->type === 'income' && $t->entry_type === 'credit')->sum('amount'), 2),
+                'expense' => round((float) $group->filter(fn ($t) => $t->accountHead?->type === 'expense' && $t->entry_type === 'debit')->sum('amount'), 2),
+            ])
+            ->sortKeys()
+            ->values()
+            ->all();
     }
 }

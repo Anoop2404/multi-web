@@ -20,7 +20,9 @@ class MembershipReceiptTemplate
         }
 
         if (empty($merged['registered_office']) && filled($profile?->address)) {
-            $merged['registered_office'] = $profile->address;
+            $merged['registered_office'] = 'Registered office : '.$profile->address;
+        } elseif (filled($merged['registered_office']) && ! str_starts_with(strtolower($merged['registered_office']), 'registered office')) {
+            $merged['registered_office'] = 'Registered office : '.$merged['registered_office'];
         }
 
         return $merged;

@@ -22,9 +22,7 @@ class SetupApiController extends SchoolApiController
             'school_code'     => $schoolCode,
             'code_locked'     => (bool) $this->school->prefixes_locked,
             'suggested_code'  => strtoupper(substr(preg_replace('/[^a-z]/i', '', $this->school->name), 0, 3)) ?: 'SCH',
-            'reg_no_example'  => ($sahodayaPrefix && $schoolCode)
-                ? strtoupper($sahodayaPrefix).'/'.strtoupper($schoolCode).'/26/0001'
-                : null,
+            'reg_no_example'  => \App\Services\Students\StudentRegistrationNumberGenerator::PREFIX.'/'.\App\Support\AcademicYear::yearSuffix(\App\Support\AcademicYear::forSchool($this->school)).'/0001',
             'sahodaya_prefix' => $sahodayaPrefix,
         ]);
     }

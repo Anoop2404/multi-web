@@ -6,10 +6,8 @@ use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
 use App\Models\MembershipPayment;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
-use App\Services\Membership\FeeReceiptService;
-use App\Services\Membership\MembershipReceiptService;
+use App\Services\Membership\MembershipPaymentApprovalService;
 use App\Services\Membership\MembershipNotifier;
-use App\Services\Membership\RegistrationStatusService;
 use App\Support\AcademicYear;
 use App\Support\ExcelExport;
 use App\Support\TenantStorage;
@@ -56,7 +54,7 @@ class PaymentVerificationController extends SahodayaAdminController
             ]);
         }
 
-        $payments = $this->paymentsQuery($schoolIds, $filters)
+        $payments = $this->paymentsQuery($this->sahodaya->id, $schoolIds, $filters)
             ->with('registration')
             ->paginate(15)
             ->withQueryString();
@@ -99,7 +97,7 @@ class PaymentVerificationController extends SahodayaAdminController
             ], $rows);
         }
 
-        $payments = $this->paymentsQuery($schoolIds, $filters)->get();
+        $payments = $this->paymentsQuery($this->sahodaya->id, $schoolIds, $filters)->get();
 
         $rows = $payments->map(fn (MembershipPayment $p) => [
             $p->school?->name ?? '',
@@ -130,108 +128,24 @@ class PaymentVerificationController extends SahodayaAdminController
         ]);
 
         if ($data['action'] === 'verify') {
-            $beforeStatus = $payment->status;
-            $payment->update([
-                'status'              => 'verified',
-                'verified_by_user_id' => $request->user()->id,
-                'verified_at'         => now(),
-            ]);
-
-            app(FeeReceiptService::class)->syncFromMembershipPayment($payment->fresh());
-
-            $receiptService = app(MembershipReceiptService::class);
-            $receiptService->issueForPayment($payment->fresh());
-            $freshReceipt = $payment->fresh()->feeReceipt;
-            $receiptNo = $freshReceipt?->receipt_number;
-            $receiptHtml = $freshReceipt
-                ? $receiptService->readGeneratedReceipt($freshReceipt)
-                : null;
-
-            app(DataChangeLogger::class)->updated(
+            app(MembershipPaymentApprovalService::class)->verify(
                 $payment,
-                "Payment verified for {$payment->school?->name}",
-                ['status' => ['old' => $beforeStatus, 'new' => 'verified']],
-                $payment->school_id,
-                'membership',
+                $request->user(),
+                $notifier,
+                $audit,
             );
-
-            $school = $payment->school;
-            $firstMembershipApproval = $school && $school->membership_status === 'pending';
-
-            if ($firstMembershipApproval) {
-                $school->update([
-                    'membership_status' => 'approved',
-                    'is_active'         => true,
-                ]);
-            }
-
-            $registration = $payment->registration;
-            if ($registration) {
-                $registration = app(RegistrationStatusService::class)
-                    ->ensureMembershipNumber($registration->load('school'));
-                $regBefore = $registration->registration_status;
-                $registration->update(['registration_status' => 'completed']);
-                $registration->refresh();
-                app(DataChangeLogger::class)->updated(
-                    $registration,
-                    "Registration completed for {$payment->school?->name}",
-                    ['registration_status' => ['old' => $regBefore, 'new' => 'completed']],
-                    $payment->school_id,
-                    'membership',
-                    ['membership_no' => $registration->reg_no],
-                );
-                $notifier->registrationCompleted(
-                    $payment->school,
-                    $payment->academic_year,
-                    $registration->reg_no,
-                    $firstMembershipApproval,
-                    $receiptHtml,
-                    $receiptNo,
-                );
-            } elseif ($firstMembershipApproval) {
-                $notifier->schoolApproved($school);
-            }
-
-            $audit->paymentVerified($payment->fresh());
 
             $this->notifyMembershipPaymentInApp($payment->school, 'membership.payment.approved', [
                 'academic_year' => $payment->academic_year,
             ]);
         } else {
-            $beforeStatus = $payment->status;
-            $payment->update([
-                'status'              => 'rejected',
-                'rejection_reason'    => $data['reason'],
-                'verified_by_user_id' => $request->user()->id,
-                'verified_at'         => now(),
-            ]);
-
-            app(FeeReceiptService::class)->syncFromMembershipPayment($payment->fresh());
-
-            app(DataChangeLogger::class)->updated(
+            app(MembershipPaymentApprovalService::class)->reject(
                 $payment,
-                "Payment rejected for {$payment->school?->name}",
-                ['status' => ['old' => $beforeStatus, 'new' => 'rejected']],
-                $payment->school_id,
-                'membership',
-                ['reason' => $data['reason']],
+                $request->user(),
+                $data['reason'],
+                $notifier,
+                $audit,
             );
-
-            $registration = $payment->registration;
-            if ($registration) {
-                $regBefore = $registration->registration_status;
-                $registration->update(['registration_status' => 'payment_rejected']);
-                app(DataChangeLogger::class)->updated(
-                    $registration,
-                    "Registration payment rejected for {$payment->school?->name}",
-                    ['registration_status' => ['old' => $regBefore, 'new' => 'payment_rejected']],
-                    $payment->school_id,
-                    'membership',
-                );
-            }
-
-            $notifier->paymentRejected($payment->school, $payment->academic_year, $data['reason']);
-            $audit->paymentRejected($payment->fresh(), $data['reason']);
 
             $this->notifyMembershipPaymentInApp($payment->school, 'membership.payment.rejected', [
                 'academic_year' => $payment->academic_year,
@@ -239,7 +153,7 @@ class PaymentVerificationController extends SahodayaAdminController
             ]);
         }
 
-        return back()->with('success', 'Payment review recorded.');
+        return back()->with('success', $data['action'] === 'verify' ? 'Payment verified.' : 'Payment rejected.');
     }
 
     public function proof(string $tenantId, string $paymentId)

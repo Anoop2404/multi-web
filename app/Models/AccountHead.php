@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AccountHead extends Model
 {
-    protected $fillable = ["tenant_id", "financial_year_id", "code", "name", "type", "category", "event_id", "is_active"];
+    protected $fillable = ["tenant_id", "financial_year_id", "code", "name", "type", "category", "event_id", "mcq_exam_id", "training_program_id", "is_active"];
 
     protected $casts = [
         'is_active' => 'boolean',

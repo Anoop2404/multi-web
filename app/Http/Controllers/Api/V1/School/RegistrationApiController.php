@@ -186,8 +186,22 @@ class RegistrationApiController extends SchoolApiController
         $data = $request->validate([
             'name'             => 'required|string|max:255',
             'subject'          => 'nullable|string|max:100',
-            'teaching_type_id' => ['nullable', Rule::exists('teaching_types', 'id')],
+            'subject_ids'      => 'nullable|array',
+            'subject_ids.*'    => 'integer',
+            'teaching_type_id' => ['nullable', Rule::exists((new \App\Models\TeachingType)->getConnectionName().'.teaching_types', 'id')],
         ]);
+
+        $subjectIds = array_values(array_filter($data['subject_ids'] ?? [], fn ($id) => filled($id)));
+        if ($subjectIds !== []) {
+            $labels = \App\Models\Subject::whereIn('id', $subjectIds)
+                ->forSahodaya($this->school->parent_id)
+                ->pluck('label')
+                ->all();
+            $data['subject_ids'] = $subjectIds;
+            $data['subject'] = $labels !== [] ? implode(', ', $labels) : ($data['subject'] ?? null);
+        } else {
+            unset($data['subject_ids']);
+        }
 
         $teacher = $submission->teachers()->create($data);
 
@@ -204,6 +218,7 @@ class RegistrationApiController extends SchoolApiController
             'submission'    => $submission,
             'teachers'      => $submission->teachers()->with('teachingType')->get(),
             'teaching_types'=> $resolver->teachingTypes($this->school->parent_id),
+            'subjects'      => $resolver->subjects($this->school->parent_id),
         ]);
     }
 

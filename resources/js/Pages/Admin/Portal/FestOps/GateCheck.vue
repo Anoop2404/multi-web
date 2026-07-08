@@ -70,6 +70,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { festOpsDashboardNav } from '@/support/festOpsPortalNav.js';
 
 const props = defineProps({
     sahodaya: Object,
@@ -90,10 +91,7 @@ let mediaStream = null;
 let scanFrame = null;
 let jsQR = null;
 
-const navItems = computed(() => [
-    { href: `/portal/fest-ops/${props.sahodaya.id}`, label: 'Dashboard' },
-    { href: `/portal/fest-ops/${props.sahodaya.id}/gate-check`, label: 'Gate Check' },
-]);
+const navItems = computed(() => festOpsDashboardNav(props.sahodaya.id));
 
 function flatPayload(data) {
     if (! data || typeof data !== 'object') return {};

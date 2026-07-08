@@ -123,6 +123,9 @@ class SahodayaDatabaseProvisioner
 
         if ($seedDefaults) {
             $this->seedDefaults($sahodaya);
+            $sahodaya->run(function () {
+                (new \Database\Seeders\TenantRolesAndPermissionsSeeder)->run();
+            });
         }
     }
 

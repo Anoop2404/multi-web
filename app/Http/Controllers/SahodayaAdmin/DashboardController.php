@@ -28,10 +28,6 @@ class DashboardController extends SahodayaAdminController
 
     public function index(SahodayaSetupService $setup)
     {
-        if (! $this->isStaff && $setup->shouldPromptWizard($this->sahodaya)) {
-            return redirect("/sahodaya-admin/{$this->sahodaya->id}/setup");
-        }
-
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
         $fees = $this->paymentFeeSummary($this->sahodaya->id, $schoolIds, $year);
@@ -77,15 +73,14 @@ class DashboardController extends SahodayaAdminController
         ], fn (int $count) => $count > 0);
 
         $base = "/sahodaya-admin/{$this->sahodaya->id}";
-        $appealsEventId = FestAppeal::whereIn('event_id', $festEventIds)
-            ->where('status', 'pending')
-            ->value('event_id');
         $reviewEventId = FestRegistration::whereIn('event_id', $festEventIds)
             ->where('status', 'submitted')
             ->value('event_id');
 
+        $pendingAppeals = (int) ($actionQueue['fest_appeals'] ?? 0);
+
         $actionQueueLinks = array_filter([
-            'fest_appeals' => $appealsEventId ? "{$base}/events/{$appealsEventId}/appeals" : null,
+            'fest_appeals' => $pendingAppeals > 0 ? "{$base}/fest/appeals" : null,
             'fest_registrations_review' => $reviewEventId ? "{$base}/events/{$reviewEventId}/registrations" : null,
         ]);
 
@@ -164,15 +159,22 @@ class DashboardController extends SahodayaAdminController
             ])
             ->all();
 
-        return $this->inertia('Sahodaya/Dashboard', compact(
-            'stats',
-            'actionQueue',
-            'actionQueueLinks',
-            'recentCirculars',
-            'activeEvents',
-            'festOps',
-            'dashboardExtras',
-            'recentActivity',
-        ));
+        $setupChecklist = $setup->checklist($this->sahodaya);
+
+        return $this->inertia('Sahodaya/Dashboard', [
+            'stats'               => $stats,
+            'actionQueue'         => $actionQueue,
+            'actionQueueLinks'    => $actionQueueLinks,
+            'recentCirculars'     => $recentCirculars,
+            'activeEvents'        => $activeEvents,
+            'festOps'             => $festOps,
+            'dashboardExtras'     => $dashboardExtras,
+            'recentActivity'      => $recentActivity,
+            'setupChecklist'      => $setupChecklist,
+            'setupCompletedCount' => collect($setupChecklist)->where('done', true)->count(),
+            'setupTotalSteps'     => count($setupChecklist),
+            'setupAllStepsComplete' => collect($setupChecklist)->every(fn (array $item) => $item['done']),
+            'showSetupBanner'     => ! $this->isStaff && $setup->shouldPromptWizard($this->sahodaya),
+        ]);
     }
 }

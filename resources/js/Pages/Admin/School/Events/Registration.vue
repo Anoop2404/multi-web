@@ -3,8 +3,8 @@
         <PageHeader
             :title="`${programLabel} Registration`"
             :eyebrow="programLabel"
-            :description="isSports
-                ? 'Pick athletes per event, then register. Age groups are filtered automatically.'
+                :description="isSports
+                ? 'Register athletes for the event, then assign items by head (Athletics, etc.).'
                 : isTeacherFest
                     ? 'Register teachers for open Teacher Fest events.'
                     : `Register students for open ${programLabel} events.`"
@@ -22,6 +22,28 @@
                 <a :href="`${programBase}/reports`" class="btn-secondary text-sm">Reports →</a>
             </template>
         </PageHeader>
+
+        <div v-if="schoolRegion?.applies" class="mb-5 max-w-2xl">
+            <div v-if="schoolRegion.region" class="notice-banner notice-banner--info text-sm">
+                <p>Your Kalotsav region: <strong>{{ schoolRegion.region }}</strong>.
+                    <a :href="schoolRegion.set_url" class="link-brand font-semibold">Change →</a>
+                </p>
+            </div>
+            <div v-else class="notice-banner notice-banner--warning text-sm">
+                <p class="font-semibold">Select your Kalotsav region</p>
+                <p class="mt-1">Your Sahodaya runs Kalotsav by region. Choose your region in
+                    <a :href="schoolRegion.set_url" class="link-brand font-semibold">annual registration →</a>
+                    (or ask your Sahodaya to assign it).
+                </p>
+            </div>
+        </div>
+
+        <SchoolEventWorkflowStepper v-if="singleEventMode && event?.id"
+                                    :school-id="school.id"
+                                    :program-prefix="programPrefix"
+                                    :event-id="event.id"
+                                    :is-sports="isSports"
+                                    current-step="registration" />
 
         <div v-if="showBulkImport && events.length" class="card mb-5 max-w-2xl text-sm border-indigo-100">
             <div class="flex items-center justify-between gap-2 mb-3">
@@ -75,9 +97,9 @@
             </summary>
             <div class="px-4 pb-4 pt-0 border-t border-slate-100">
                 <ol class="list-decimal pl-4 space-y-1 text-slate-600 mt-3 mb-3">
-                    <li>Use <strong>Pick athletes</strong> on each row, then <strong>Register</strong>.</li>
-                    <li>Students qualify when age on cutoff is <strong>under N</strong> (U14 = under 14) and gender matches.</li>
-                    <li>Sahodaya approves → chest numbers on fest day → results under Reports.</li>
+                    <li><strong>Step 1 · Register for event</strong> — add athletes to the sports fest (event ID assigned).</li>
+                    <li><strong>Step 2 · Register by item head</strong> — pick a head (Athletics, Field, Relay…), then add athletes to each item inside it.</li>
+                    <li>Pay event + item fees in the billing section; Sahodaya approves → chest numbers on fest day.</li>
                 </ol>
                 <p class="text-xs text-slate-500">
                     <button type="button" class="link-brand font-semibold" @click="showAddStudent = true">Add student</button>
@@ -183,131 +205,41 @@
                     {{ registrationClosedMessage(event) }}
                 </div>
 
-                <!-- ── SPORTS: age group nav + filtered list ── -->
+                <!-- ── SPORTS: event athletes + head/age filters ── -->
                 <div v-else-if="isSports" class="space-y-4">
-                    <template v-if="!sportsGroups(event).length">
-                        <p class="text-sm text-slate-400 py-8 text-center">No items in this event yet.</p>
-                    </template>
-                    <template v-else>
-                        <!-- Filters -->
-                        <div class="flex flex-wrap gap-2 items-center sticky top-0 z-10 -mx-1 px-1 py-2 bg-white/95 backdrop-blur border-b border-slate-100">
-                            <input v-model="sportsSearch[event.id]"
-                                   type="search"
-                                   class="field flex-1 min-w-[10rem] !py-1.5 text-sm"
-                                   placeholder="Search events…"
-                                   autocomplete="off">
-                            <div class="flex flex-wrap gap-1">
-                                <button type="button"
-                                        class="text-xs px-2.5 py-1 rounded-full border transition-colors"
-                                        :class="!sportsAgeFilter[event.id] ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
-                                        @click="sportsAgeFilter[event.id] = ''">
-                                    All
-                                </button>
-                                <button v-for="g in sportsGroups(event)" :key="g.key"
-                                        type="button"
-                                        class="text-xs px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
-                                        :class="sportsAgeFilter[event.id] === g.key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
-                                        @click="sportsAgeFilter[event.id] = g.key">
-                                    {{ g.label }}
-                                    <span v-if="g.openCount" class="font-semibold"
-                                          :class="sportsAgeFilter[event.id] === g.key ? 'text-indigo-100' : 'text-indigo-600'">
-                                        · {{ g.openCount }} open
-                                    </span>
-                                    <span v-if="g.registeredCount" class="opacity-75">· {{ g.registeredCount }} done</span>
-                                </button>
-                            </div>
-                            <button v-if="sportsSearch[event.id]?.trim() || sportsAgeFilter[event.id]"
-                                    type="button"
-                                    class="btn-secondary text-xs !py-1"
-                                    @click="clearSportsFilters(event.id)">
-                                Clear
-                            </button>
-                            <p v-if="sportsRegistrationSummary(event)"
-                               class="w-full sm:w-auto sm:ml-auto text-[11px] text-slate-500 order-last sm:order-none">
-                                {{ sportsRegistrationSummary(event) }}
+                    <div v-if="event.download_gate?.blocked"
+                         class="notice-banner notice-banner--warning text-sm">
+                        <p class="font-semibold">Payment pending — ID cards & hall tickets locked</p>
+                        <p class="mt-0.5">{{ event.download_gate.reason }} Pay membership and event fees to download ID cards and admit cards.</p>
+                        <p v-if="event.download_gate.links?.payments" class="mt-2">
+                            <a :href="event.download_gate.links.payments" class="link-brand font-semibold">Go to payments →</a>
+                        </p>
+                    </div>
+
+                    <SportsEventAthletesPanel
+                        :event="event"
+                        :students="studentsForEvent(event.id)"
+                        :event-registrations="event.event_registrations ?? []"
+                        :register-url="`${programBase}/events/${event.id}/register-students`"
+                        :items-url="`${programBase}/events/${event.id}/items`"
+                        :reports-href="`${programBase}/reports/${event.id}/registration-register`"
+                        :student-event-reg-fee="Number(event.student_event_reg_fee ?? 0)"
+                        :school-classes="schoolClasses"
+                    />
+
+                    <div class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h4 class="text-sm font-bold text-emerald-950">Step 2 · Register by item head</h4>
+                            <p class="text-xs text-emerald-900/80 mt-0.5">
+                                <strong>{{ eventRegisteredCount(event) }}</strong> event athlete{{ eventRegisteredCount(event) === 1 ? '' : 's' }}
+                                · pick an item head (Athletics, Field events, Relay, etc.) and add them to its items.
                             </p>
                         </div>
-
-                        <p v-if="filteredSportsGroups(event).length === 0" class="text-sm text-slate-400 py-6 text-center">
-                            No events match your filters.
-                        </p>
-
-                        <div v-for="group in filteredSportsGroups(event)" :key="group.key"
-                             class="rounded-xl border border-slate-200/80 overflow-hidden shadow-sm">
-                            <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-semibold text-sm text-slate-800">{{ group.label }}</span>
-                                    <span class="text-[11px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">
-                                        {{ groupVisibleItemCount(group) }} events
-                                    </span>
-                                </div>
-                                <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                                    <span>{{ group.eligibleCount }} eligible athletes</span>
-                                    <span v-if="group.openCount" class="text-indigo-700 font-semibold">
-                                        {{ group.openCount }} open
-                                    </span>
-                                    <span v-if="group.registeredCount" class="text-emerald-700 font-semibold">
-                                        {{ group.registeredCount }} registered
-                                    </span>
-                                    <span v-if="group.noEligibleCount" class="text-amber-700">
-                                        {{ group.noEligibleCount }} need athletes
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div v-for="(genderGroup, gi) in group.genderGroups" :key="gi">
-                                <div v-if="genderGroup.label"
-                                     class="px-4 py-1 bg-white border-b border-slate-50 flex items-center gap-2">
-                                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                        {{ genderGroup.label }}
-                                    </span>
-                                </div>
-                                <div class="overflow-x-auto">
-                                    <table class="data-table w-full text-sm">
-                                        <thead>
-                                            <tr>
-                                                <th class="min-w-[140px]">Event</th>
-                                                <th v-if="event.fee_required" class="w-20">Fee</th>
-                                                <th class="min-w-[120px]">Registered</th>
-                                                <th class="text-right min-w-[220px]">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <FestRegistrationItemRow
-                                                v-for="item in genderGroup.items"
-                                                :key="item.id"
-                                                layout="sports"
-                                                :row-id="itemRowId(event.id, item.id)"
-                                                :item="item"
-                                                :form="itemForms[itemFormKey(event.id, item.id)]"
-                                                :registrations="registrationsForItem(event.id, item.id)"
-                                                :eligible-students="eligibleStudentsForItem(event.id, item)"
-                                                :all-students="studentsForEvent(event.id)"
-                                                :student-ineligibility-reason="(student) => studentIneligibilityReason(student, event, item)"
-                                                :show-fee="event.fee_required"
-                                                :blocked="isItemBlocked(event, item)"
-                                                :block-reason="itemBlockReason(event, item)"
-                                                :error-message="itemErrors[itemFormKey(event.id, item.id)]"
-                                                :status-label="itemStatusMeta(event, item).label"
-                                                :status-class="itemStatusMeta(event, item).badgeClass"
-                                                :status-hint="itemStatusMeta(event, item).hint"
-                                                performer-label="athletes"
-                                                :is-teacher-fest="false"
-                                                :event-type="eventType"
-                                                :teachers="[]"
-                                                :student-label="studentOptionLabel"
-                                                :registered-names="registeredNames"
-                                                :can-withdraw="canWithdraw"
-                                                @register="submitItem(event, item)"
-                                                @withdraw="withdraw"
-                                                @add-student="showAddStudent = true"
-                                            />
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
+                        <Link :href="`${programBase}/item-registration?event=${event.id}`"
+                              class="btn-primary text-sm !min-h-0 shrink-0">
+                            Register by item head →
+                        </Link>
+                    </div>
                 </div>
 
                 <!-- ── KALOTSAV / KIDS FEST / TEACHER FEST: generic flat table ── -->
@@ -366,12 +298,12 @@
                 <!-- Item fees — separate from annual Sahodaya membership -->
                 <div v-if="event.fee_required && event.school_fee" class="mt-4 border-t border-gray-100 pt-4 space-y-3">
                     <div>
-                        <p class="text-xs font-semibold text-slate-800">Event item fees</p>
+                        <p class="text-xs font-semibold text-slate-800">Event fees & billing</p>
                         <p class="text-xs text-slate-500 mt-0.5">
-                            Charged per item you register below. Annual Sahodaya membership (₹{{ formatMoney(schoolMembershipFeeAmount(event)) }}+)
-                            is paid separately under
-                            <a :href="`/school-admin/${school.id}/registration`" class="link-brand font-semibold">Annual Registration</a>
-                            — not here.
+                            Includes per-student event registration (when athletes are registered above) plus item fees.
+                            Annual Sahodaya membership is paid under
+                            <a :href="`/school-admin/${school.id}/registration`" class="link-brand font-semibold">Annual Registration</a>.
+                            <a :href="`${programBase}/reports/${event.id}/fee-summary`" class="link-brand font-semibold ml-1">Fee report →</a>
                         </p>
                     </div>
                     <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm">
@@ -434,6 +366,8 @@ import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import QuickAddStudentModal from '@/Components/school/QuickAddStudentModal.vue';
 import FestRegistrationItemRow from '@/Components/school/FestRegistrationItemRow.vue';
+import SportsEventAthletesPanel from '@/Components/school/SportsEventAthletesPanel.vue';
+import SchoolEventWorkflowStepper from '@/Components/school/SchoolEventWorkflowStepper.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { genderLabel } from '@/support/festItemEligibility.js';
 
@@ -444,18 +378,29 @@ const props = defineProps({
     eventType: String,
     events: Array,
     focusEventId: { type: Number, default: null },
+    singleEventMode: { type: Boolean, default: false },
+    event: { type: Object, default: null },
+    programPrefix: { type: String, default: '' },
     registrations: Array,
     students: Array,
     studentsByEvent: { type: Object, default: () => ({}) },
+    lazyLoadStudents: { type: Boolean, default: false },
+    studentCount: { type: Number, default: 0 },
     schoolClasses: { type: Array, default: () => [] },
     teachers: { type: Array, default: () => [] },
     isTeacherFest: { type: Boolean, default: false },
     studentEditLock: { type: Object, default: () => ({ locked: false }) },
+    schoolRegion: { type: Object, default: null },
 });
 
 const { programSlug, programLabel, programBase } = useSchoolProgramContext(props);
-
-const isSports = computed(() => props.eventType === 'sports');
+const page = usePage();
+const programPrefix = computed(() =>
+    props.programPrefix
+    || page.props.programPrefix
+    || programBase.value.split('/').pop(),
+);
+const isSports = computed(() => props.eventType === 'sports' || programSlug.value === 'sports-meet');
 const isLocked = computed(() => !!props.studentEditLock?.locked);
 
 const displayEvents = computed(() => {
@@ -464,11 +409,53 @@ const displayEvents = computed(() => {
 });
 
 onMounted(() => {
+    const urlHeadId = new URLSearchParams(usePage().url.split('?')[1] ?? '').get('head_id')
+        ?? new URLSearchParams(usePage().url.split('?')[1] ?? '').get('head');
+
+    for (const event of props.events ?? []) {
+        if (props.eventType !== 'sports') continue;
+        const heads = event.head_navigation?.headsForFilter ?? [];
+        if (!heads.length) continue;
+
+        if (!sportsHeadFilter[event.id]) {
+            const matched = urlHeadId && heads.some((h) => String(h.id) === String(urlHeadId));
+            sportsHeadFilter[event.id] = matched ? urlHeadId : heads[0].id;
+        }
+    }
+
     if (!props.focusEventId) return;
     requestAnimationFrame(() => {
         document.getElementById(`event-${props.focusEventId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+
+    if (props.lazyLoadStudents) {
+        for (const event of props.events ?? []) {
+            loadStudentsForEvent(event.id);
+        }
+    }
 });
+
+async function loadStudentsForEvent(eventId) {
+    const map = props.studentsByEvent ?? {};
+    if ((map[eventId] ?? map[String(eventId)] ?? []).length) {
+        return;
+    }
+    if (fetchedStudentsByEvent[eventId]?.length) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`${programBase.value}/events/${eventId}/eligible-students?json=1`, {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        fetchedStudentsByEvent[eventId] = data.students ?? [];
+    } catch {
+        // keep empty pool — user can refresh
+    }
+}
 
 const importEventId = ref('');
 const importFile = ref(null);
@@ -482,6 +469,9 @@ const bulkAssignItemIds = ref([]);
 const bulkAssignForm = useForm({ student_ids: [], item_ids: [] });
 const sportsSearch = reactive({});
 const sportsAgeFilter = reactive({});
+const sportsHeadFilter = reactive({});
+const sportsItemFilter = reactive({});
+const fetchedStudentsByEvent = reactive({});
 
 const kalotsavItemGroups = [
     { key: 'on_stage', label: 'On stage' },
@@ -494,25 +484,93 @@ const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'
 const SPORTS_MALE_VALS = new Set(['male', 'm', 'boys', 'boy']);
 const SPORTS_FEMALE_VALS = new Set(['female', 'f', 'girls', 'girl']);
 
+function eventRegisteredStudentIds(event) {
+    return new Set((event.event_registrations ?? []).map((r) => r.student_id));
+}
+
+function eventRegisteredCount(event) {
+    const fromEventList = (event.event_registrations ?? []).length;
+    if (fromEventList > 0) return fromEventList;
+    return studentsForEvent(event.id).filter(
+        (s) => s.event_registered || s.event_registration_number,
+    ).length;
+}
+
+function sportsItemsForFilters(event) {
+    const headId = sportsHeadFilter[event.id] ?? '';
+    const itemId = sportsItemFilter[event.id] ?? '';
+    let items = event?.items ?? [];
+
+    if (headId) {
+        items = items.filter((i) => Number(i.head_id || 0) === Number(headId));
+    }
+    if (itemId) {
+        items = items.filter((i) => Number(i.id) === Number(itemId));
+    }
+
+    const q = (sportsSearch[event.id] ?? '').trim().toLowerCase();
+    if (q) {
+        items = items.filter((i) => String(i.title ?? '').toLowerCase().includes(q));
+    }
+
+    return items;
+}
+
+function sportsHeadOptions(event) {
+    return event.head_navigation?.headsForFilter ?? [];
+}
+
+function sportsItemOptions(event) {
+    const headId = sportsHeadFilter[event.id];
+    const groups = event.head_navigation?.headItemGroups ?? [];
+    if (headId) {
+        const head = groups.find((h) => Number(h.head_id) === Number(headId));
+        return head?.items ?? [];
+    }
+    return groups.flatMap((h) => h.items ?? []);
+}
+
+function selectSportsHead(eventId, headId) {
+    sportsHeadFilter[eventId] = headId;
+    sportsItemFilter[eventId] = '';
+}
+
 function sportsGroups(event) {
-    const grouped = event?.items_grouped ?? {};
+    const items = sportsItemsForFilters(event);
     const labels = event?.item_group_labels ?? {};
     const students = studentsForEvent(event.id);
     const allRegs = props.registrations ?? [];
+    const registeredStudentIds = eventRegisteredStudentIds(event);
+    const headNameById = Object.fromEntries(
+        (event.head_navigation?.headsForFilter ?? []).map((h) => [Number(h.id), h.name]),
+    );
 
-    return Object.keys(grouped)
-        .filter((key) => (grouped[key]?.length ?? 0) > 0)
+    const byAge = {};
+    for (const item of items) {
+        const key = item.age_group || 'open';
+        if (!byAge[key]) byAge[key] = [];
+        byAge[key].push(item);
+    }
+
+    return Object.keys(byAge)
+        .filter((key) => (byAge[key]?.length ?? 0) > 0)
         .sort((a, b) => {
             const ai = SPORTS_AGE_ORDER.indexOf(a.toLowerCase());
             const bi = SPORTS_AGE_ORDER.indexOf(b.toLowerCase());
             return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
         })
         .map((key) => {
-            const items = grouped[key] ?? [];
+            const groupItems = byAge[key] ?? [];
+            const headId = sportsHeadFilter[event.id] ? Number(sportsHeadFilter[event.id]) : null;
+            const headName = headId ? (headNameById[headId] ?? null) : null;
             const label = labels[key] ?? String(key).toUpperCase();
-            const itemIds = new Set(items.map((i) => Number(i.id)));
+            const itemIds = new Set(groupItems.map((i) => Number(i.id)));
 
-            const eligibleCount = students.filter(
+            const eligiblePool = event.require_event_registration
+                ? students.filter((s) => registeredStudentIds.has(s.id))
+                : students;
+
+            const eligibleCount = eligiblePool.filter(
                 (s) => (s.eligible_sports_groups ?? []).map(g => g.toLowerCase()).includes(key.toLowerCase()),
             ).length;
 
@@ -524,15 +582,15 @@ function sportsGroups(event) {
 
             let openCount = 0;
             let noEligibleCount = 0;
-            for (const item of items) {
+            for (const item of groupItems) {
                 const status = itemRegistrationStatus(event, item);
                 if (status === 'open' || status === 'partial') openCount++;
                 else if (status === 'no_eligible') noEligibleCount++;
             }
 
-            const maleItems = items.filter((i) => SPORTS_MALE_VALS.has(String(i.gender ?? '').toLowerCase()));
-            const femaleItems = items.filter((i) => SPORTS_FEMALE_VALS.has(String(i.gender ?? '').toLowerCase()));
-            const openItems = items.filter(
+            const maleItems = groupItems.filter((i) => SPORTS_MALE_VALS.has(String(i.gender ?? '').toLowerCase()));
+            const femaleItems = groupItems.filter((i) => SPORTS_FEMALE_VALS.has(String(i.gender ?? '').toLowerCase()));
+            const openItems = groupItems.filter(
                 (i) => !SPORTS_MALE_VALS.has(String(i.gender ?? '').toLowerCase())
                     && !SPORTS_FEMALE_VALS.has(String(i.gender ?? '').toLowerCase()),
             );
@@ -544,10 +602,18 @@ function sportsGroups(event) {
             if (openItems.length) {
                 genderGroups.push({ gender: 'open', label: hasBoth ? 'Open / Mixed' : '', items: openItems });
             }
-            if (!genderGroups.length) genderGroups.push({ gender: 'all', label: '', items });
+            if (!genderGroups.length) genderGroups.push({ gender: 'all', label: '', items: groupItems });
 
-            return { key, label, items, eligibleCount, registeredCount, openCount, noEligibleCount, genderGroups };
+            return { key, label, headName, items: groupItems, eligibleCount, registeredCount, openCount, noEligibleCount, genderGroups };
         });
+}
+
+function filteredSportsGroups(event) {
+    if (sportsHeadOptions(event).length && !sportsHeadFilter[event.id]) {
+        return [];
+    }
+    const ageKey = sportsAgeFilter[event.id] ?? '';
+    return sportsGroups(event).filter((group) => !ageKey || group.key === ageKey);
 }
 
 function sportsRegistrationSummary(event) {
@@ -578,25 +644,6 @@ function sportsRegistrationSummary(event) {
     return parts.join(' · ');
 }
 
-function filteredSportsGroups(event) {
-    const ageKey = sportsAgeFilter[event.id] ?? '';
-    const q = (sportsSearch[event.id] ?? '').trim().toLowerCase();
-
-    return sportsGroups(event)
-        .filter((group) => !ageKey || group.key === ageKey)
-        .map((group) => {
-            if (!q) return group;
-            const genderGroups = group.genderGroups
-                .map((gg) => ({
-                    ...gg,
-                    items: gg.items.filter((item) => String(item.title ?? '').toLowerCase().includes(q)),
-                }))
-                .filter((gg) => gg.items.length);
-            return { ...group, genderGroups };
-        })
-        .filter((group) => group.genderGroups.length);
-}
-
 function groupVisibleItemCount(group) {
     return group.genderGroups.reduce((n, gg) => n + gg.items.length, 0);
 }
@@ -604,6 +651,10 @@ function groupVisibleItemCount(group) {
 function clearSportsFilters(eventId) {
     sportsSearch[eventId] = '';
     sportsAgeFilter[eventId] = '';
+    sportsItemFilter[eventId] = '';
+    const event = props.events.find((e) => e.id === eventId);
+    const heads = event?.head_navigation?.headsForFilter ?? [];
+    sportsHeadFilter[eventId] = heads[0]?.id ?? '';
 }
 
 function onImportFile(e) {
@@ -648,7 +699,6 @@ const itemForms = reactive({});
 const itemErrors = reactive({});
 const eventPaymentFiles = reactive({});
 const eventPaymentRefs = reactive({});
-const page = usePage();
 
 function allItemsStatic(event) {
     return event?.items ?? [];
@@ -662,6 +712,8 @@ for (const e of props.events) {
     eventPaymentRefs[e.id] = '';
     sportsSearch[e.id] = '';
     sportsAgeFilter[e.id] = '';
+    sportsHeadFilter[e.id] = '';
+    sportsItemFilter[e.id] = '';
     for (const item of allItemsStatic(e)) {
         itemForms[itemFormKey(e.id, item.id)] = {
             team_name: '',
@@ -710,10 +762,17 @@ function isGroupItemRow(item) {
 
 function studentsForEvent(eventId) {
     const map = props.studentsByEvent ?? {};
-    return map[eventId] ?? map[String(eventId)] ?? props.students ?? [];
+    return fetchedStudentsByEvent[eventId]
+        ?? map[eventId]
+        ?? map[String(eventId)]
+        ?? props.students
+        ?? [];
 }
 
 function studentMatchesItem(student, event, item) {
+    if (student.is_verified === false) {
+        return false;
+    }
     if (event?.academic_year_id && student.academic_year_id && event.academic_year_id !== student.academic_year_id) {
         return false;
     }
@@ -726,6 +785,9 @@ function studentMatchesItem(student, event, item) {
         if (item.kids_band && item.kids_band !== 'open' && student.kids_fest_band !== item.kids_band) return false;
     }
     if (props.eventType === 'sports') {
+        if (event?.require_event_registration && !eventRegisteredStudentIds(event).has(student.id)) {
+            return false;
+        }
         if (!student.dob) {
             return false;
         }
@@ -743,10 +805,18 @@ function studentMatchesItem(student, event, item) {
 function eligibleStudentsForItem(eventId, item) {
     const event = props.events.find(e => e.id === eventId);
     const pool = studentsForEvent(eventId);
-    return pool.filter(s => studentMatchesItem(s, event, item));
+    let filtered = pool.filter(s => studentMatchesItem(s, event, item));
+    if (event?.require_event_registration) {
+        const registered = eventRegisteredStudentIds(event);
+        filtered = filtered.filter((s) => registered.has(s.id));
+    }
+    return filtered;
 }
 
 function studentIneligibilityReason(student, event, item) {
+    if (student.is_verified === false) {
+        return 'Pending Sahodaya verification';
+    }
     if (event?.academic_year_id && student.academic_year_id
         && Number(event.academic_year_id) !== Number(student.academic_year_id)) {
         return 'Not enrolled in this event\'s academic year';
@@ -764,6 +834,9 @@ function studentIneligibilityReason(student, event, item) {
     }
 
     if (props.eventType === 'sports') {
+        if (event?.require_event_registration && !eventRegisteredStudentIds(event).has(student.id)) {
+            return 'Register for the event first (Event athletes section above)';
+        }
         if (!student.dob) {
             return 'Date of birth is required for sports';
         }
@@ -808,6 +881,12 @@ function schoolMembershipFeeAmount(event) {
 }
 
 function canRegister(event) {
+    if (event.school_fest_registration_closed || props.school?.fest_registration_closed) {
+        return false;
+    }
+    if (event.registration_locked) {
+        return false;
+    }
     return event.status === 'registration_open';
 }
 
@@ -830,6 +909,12 @@ function statusClass(status) {
 }
 
 function registrationClosedMessage(event) {
+    if (event.school_fest_registration_closed || props.school?.fest_registration_closed) {
+        return 'Fest registration has been closed for your school by Sahodaya. Contact your coordinator to reopen.';
+    }
+    if (event.registration_locked) {
+        return 'Registration is locked for this event.';
+    }
     if (event.status === 'published') {
         return 'This event is published but registration has not been opened yet. Check back when your Sahodaya opens registration.';
     }
@@ -844,6 +929,9 @@ function registrationClosedMessage(event) {
 
 function studentOptionLabel(student) {
     const parts = [];
+    if (student.event_registration_number) {
+        parts.push(`Fest ID ${student.event_registration_number}`);
+    }
     if (student.reg_no) parts.push(student.reg_no);
     parts.push(student.class_name || 'no class');
     if (student.sports_age_on_cutoff != null) parts.push(`age ${student.sports_age_on_cutoff}`);

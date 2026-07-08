@@ -9,7 +9,7 @@ use App\Models\FestEventInvoice;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestFeeLedgerService;
 use App\Services\Events\FestInvoiceService;
-use App\Services\Fees\ProgramFeeReceiptMailer;
+use App\Services\Fees\OfflineProgramFeeOrchestrator;
 use App\Services\Fees\ProgramFeeReceiptService;
 use App\Support\FestPageActivity;
 use App\Support\ProgramRouteMap;
@@ -25,10 +25,11 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($schoolEventFee->event_id !== $event->id, 403);
 
-        $receipt = $schoolEventFee->feeReceipt;
+        $receipt = $schoolEventFee->receipts()->where('status', 'uploaded')->latest('id')->first()
+            ?? $schoolEventFee->feeReceipt;
         abort_unless($receipt && $receipt->status === 'uploaded', 422, 'No uploaded proof to approve.');
 
-        DB::transaction(function () use ($request, $receipt, $schoolEventFee) {
+        $fullyPaid = DB::transaction(function () use ($request, $receipt, $schoolEventFee) {
             $nextNo = app(SahodayaReceiptNumberAllocator::class)->next($this->sahodaya->id);
             $receiptNo = 'EF-'.str_pad((string) $nextNo, 4, '0', STR_PAD_LEFT);
 
@@ -39,11 +40,23 @@ class FestSchoolEventFeeController extends SahodayaAdminController
                 'reviewed_at' => now(),
             ]);
 
-            $schoolEventFee->update(['status' => 'approved']);
+            // Accumulate into amount_paid; status becomes partial or approved.
+            $schoolEventFee->refresh();
+            $schoolEventFee->refreshPaidState();
+            $fullyPaid = $schoolEventFee->fresh()->isFullyPaid();
 
-            FestEventInvoice::where('event_id', $schoolEventFee->event_id)
-                ->where('school_id', $schoolEventFee->school_id)
-                ->update(['status' => 'paid']);
+            if ($fullyPaid) {
+                FestEventInvoice::where('event_id', $schoolEventFee->event_id)
+                    ->where('school_id', $schoolEventFee->school_id)
+                    ->update(['status' => 'paid']);
+
+                // Fest no longer needs a separate registration approval — settling the
+                // fee auto-approves the school's registrations for this event.
+                app(\App\Services\Events\FestRegistrationApprovalService::class)
+                    ->approveSchoolEvent($event, $schoolEventFee->school_id);
+            }
+
+            return $fullyPaid;
         });
 
         app(FestFeeLedgerService::class)->postApprovedReceipt($receipt->fresh());
@@ -52,7 +65,7 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         $festHtml = app(ProgramFeeReceiptService::class)->renderFestSchoolEventFee($schoolEventFee);
         $slug = ProgramRouteMap::slugFromEventType($event->event_type) ?? 'kalotsav';
 
-        app(ProgramFeeReceiptMailer::class)->sendApproved(
+        app(OfflineProgramFeeOrchestrator::class)->notifyApproved(
             $schoolEventFee->school,
             $schoolEventFee->feeReceipt,
             ProgramRouteMap::labelForSlug($slug).' fee',
@@ -63,9 +76,14 @@ class FestSchoolEventFeeController extends SahodayaAdminController
 
         $audit->festEvent($event, FestPageActivity::FEES, 'fest.fee.approved', 'School event fee approved', [
             'school_id' => $schoolEventFee->school_id,
+            'fully_paid' => $fullyPaid,
         ]);
 
-        return back()->with('success', 'School event fee approved.');
+        $balance = $schoolEventFee->fresh()->outstandingBalance();
+
+        return back()->with('success', $fullyPaid
+            ? 'School event fee fully paid — registrations approved.'
+            : 'Partial payment of ₹'.number_format((float) $receipt->amount, 2).' approved. Balance ₹'.number_format($balance, 2).' pending.');
     }
 
     public function reject(Request $request, string $tenantId, FestEvent $event, FestSchoolEventFee $schoolEventFee, PlatformAuditLogger $audit)
@@ -75,8 +93,9 @@ class FestSchoolEventFeeController extends SahodayaAdminController
 
         $data = $request->validate(['rejection_reason' => 'nullable|string|max:500']);
 
-        $receipt = $schoolEventFee->feeReceipt;
-        if ($receipt) {
+        $receipt = $schoolEventFee->receipts()->where('status', 'uploaded')->latest('id')->first()
+            ?? $schoolEventFee->feeReceipt;
+        if ($receipt && $receipt->status === 'uploaded') {
             $receipt->update([
                 'status' => 'rejected',
                 'rejection_reason' => $data['rejection_reason'] ?? null,
@@ -85,15 +104,19 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             ]);
         }
 
-        $schoolEventFee->update([
-            'status' => 'rejected',
-            'fee_receipt_id' => null,
-        ]);
+        // Preserve any already-approved partial payments; fall back to partial/pending.
+        $schoolEventFee->refresh();
+        $schoolEventFee->refreshPaidState();
+        if ($schoolEventFee->fresh()->outstandingBalance() > 0 && ! $schoolEventFee->fresh()->isPartiallyPaid()) {
+            $schoolEventFee->update(['status' => 'rejected']);
+        }
 
-        FestEventInvoice::where('event_id', $schoolEventFee->event_id)
-            ->where('school_id', $schoolEventFee->school_id)
-            ->where('status', 'paid')
-            ->update(['status' => 'issued']);
+        if (! $schoolEventFee->fresh()->isFullyPaid()) {
+            FestEventInvoice::where('event_id', $schoolEventFee->event_id)
+                ->where('school_id', $schoolEventFee->school_id)
+                ->where('status', 'paid')
+                ->update(['status' => 'issued']);
+        }
 
         $audit->festEvent($event, FestPageActivity::FEES, 'fest.fee.rejected', 'School event fee rejected', [
             'school_id' => $schoolEventFee->school_id,

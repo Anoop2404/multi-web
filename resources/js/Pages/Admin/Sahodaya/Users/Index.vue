@@ -52,7 +52,7 @@
                     <p class="form-label mb-2">Duties</p>
                     <div class="flex flex-wrap gap-2">
                         <label v-for="d in dutyOptions" :key="d.value" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
-                            <input type="checkbox" :value="d.value" v-model="form.fest_ops_duties">
+                            <input type="checkbox" :value="d.value" v-model="form.fest_ops_duties" :aria-label="d.label">
                             {{ d.label }}
                         </label>
                     </div>
@@ -60,7 +60,7 @@
             </div>
             <div v-if="hasExamRole(form.roles)" class="card card--muted space-y-3">
                 <p class="text-xs font-semibold text-sky-900">Exam assignment</p>
-                <FormField label="MCQ exam">
+                <FormField label="Talent Search exam">
                     <template #default="{ id }">
                         <select :id="id" v-model="form.exam_staff_exam_id" class="field">
                             <option value="">Select exam (optional)</option>
@@ -171,13 +171,13 @@
                     </FormField>
                     <div class="flex flex-wrap gap-2">
                         <label v-for="d in dutyOptions" :key="d.value" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
-                            <input type="checkbox" :value="d.value" v-model="editForm.fest_ops_duties">
+                            <input type="checkbox" :value="d.value" v-model="editForm.fest_ops_duties" :aria-label="d.label">
                             {{ d.label }}
                         </label>
                     </div>
                 </div>
                 <div v-if="hasExamRole(editForm.roles)" class="card card--muted space-y-3">
-                    <FormField label="MCQ exam">
+                    <FormField label="Talent Search exam">
                         <template #default="{ id }">
                             <select :id="id" v-model="editForm.exam_staff_exam_id" class="field">
                                 <option value="">Select exam (optional)</option>

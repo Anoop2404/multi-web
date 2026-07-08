@@ -16,9 +16,123 @@ class TenantStorage
 
     public static function uploadDisk(): string
     {
-        $disk = config('filesystems.upload_disk', 'shared');
+        $disk = (string) config('filesystems.upload_disk', self::SHARED_DISK);
 
-        return $disk === 'local' ? self::SHARED_DISK : $disk;
+        if ($disk === 'local') {
+            return self::isS3Configured() ? 's3' : self::SHARED_DISK;
+        }
+
+        if ($disk === 's3' && ! self::isS3Configured()) {
+            return self::SHARED_DISK;
+        }
+
+        return $disk;
+    }
+
+    /** Resolve disk for an stored path (explicit disk column or default upload disk). */
+    public static function resolveDisk(?string $disk = null): string
+    {
+        if ($disk && $disk !== 'local') {
+            return $disk;
+        }
+
+        return self::uploadDisk();
+    }
+
+    public static function storeUploadedFile($file, string $directory, ?string $disk = null): string
+    {
+        return $file->store($directory, $disk ?? self::uploadDisk());
+    }
+
+    public static function storeUploadedFileAs($file, string $directory, string $name, ?string $disk = null): string
+    {
+        return $file->storeAs($directory, $name, $disk ?? self::uploadDisk());
+    }
+
+    /** Download or stream a private file; tries recorded disk then fallbacks. */
+    public static function downloadPrivate(string $relativePath, ?string $disk = null, ?string $filename = null): BinaryFileResponse|StreamedResponse|Response
+    {
+        $relativePath = ltrim($relativePath, '/');
+        $disks = array_values(array_unique(array_filter([
+            self::resolveDisk($disk),
+            self::uploadDisk(),
+            's3',
+            self::SHARED_DISK,
+            'local',
+        ])));
+
+        foreach ($disks as $name) {
+            try {
+                $storage = Storage::disk($name);
+                if ($storage->exists($relativePath)) {
+                    return $filename
+                        ? $storage->download($relativePath, $filename)
+                        : $storage->response($relativePath);
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        abort(404, 'File not found.');
+    }
+
+    /** Copy cloud object to a local temp path for batch processing (imports). */
+    public static function localTempPath(string $relativePath, ?string $disk = null): string
+    {
+        $relativePath = ltrim($relativePath, '/');
+        $resolved = self::resolveDisk($disk);
+
+        if (in_array($resolved, ['local', self::SHARED_DISK], true)) {
+            $path = Storage::disk($resolved)->path($relativePath);
+            if (is_file($path)) {
+                return $path;
+            }
+        }
+
+        foreach ([$resolved, self::uploadDisk(), 's3', self::SHARED_DISK, 'local'] as $name) {
+            try {
+                $storage = Storage::disk($name);
+                if ($storage->exists($relativePath)) {
+                    $tmp = tempnam(sys_get_temp_dir(), 'upload_');
+                    file_put_contents($tmp, $storage->get($relativePath));
+
+                    return $tmp;
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        throw new \RuntimeException("Upload not found: {$relativePath}");
+    }
+
+    public static function put(string $relativePath, string $contents, ?string $disk = null): void
+    {
+        Storage::disk($disk ?? self::uploadDisk())->put($relativePath, $contents);
+    }
+
+    public static function get(string $relativePath, ?string $disk = null): ?string
+    {
+        $relativePath = ltrim($relativePath, '/');
+
+        foreach ([self::resolveDisk($disk), self::uploadDisk(), 's3', self::SHARED_DISK, 'local'] as $name) {
+            try {
+                if (Storage::disk($name)->exists($relativePath)) {
+                    return Storage::disk($name)->get($relativePath);
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    public static function exists(string $relativePath, ?string $disk = null): bool
+    {
+        return self::get($relativePath, $disk) !== null
+            || Storage::disk(self::resolveDisk($disk))->exists(ltrim($relativePath, '/'));
     }
 
     public static function publicFilePath(Tenant $tenant, string $relativePath): ?string
@@ -123,11 +237,6 @@ class TenantStorage
         abort(404, 'File not found.');
     }
 
-    public static function storeUploadedFile($file, string $directory, ?string $disk = null): string
-    {
-        return $file->store($directory, $disk ?? self::uploadDisk());
-    }
-
     public static function storeStudentPhoto($file, string $schoolId): string
     {
         return self::storeUploadedFile($file, 'students/'.$schoolId, self::photosDisk());
@@ -181,12 +290,10 @@ class TenantStorage
         return self::storeUploadedFile($file, 'submissions/'.$schoolId, self::photosDisk());
     }
 
-    /** Store tenant logo — public disk locally; S3 when configured. */
+    /** Store tenant logo on the configured upload disk (S3 in production). */
     public static function storeLogo($file, string $tenantId): string
     {
-        $disk = self::isS3Configured() ? 's3' : 'public';
-
-        return $file->store('logos/'.$tenantId, $disk);
+        return $file->store('logos/'.$tenantId, self::uploadDisk());
     }
 
     /** Resolve logo path for display on the public site and admin UI. */
@@ -218,10 +325,10 @@ class TenantStorage
         return '/storage/'.$relative;
     }
 
-    /** Store a public website image (hero, sections) — always on public disk for browser access. */
+    /** Store public website media on the upload disk (S3 when configured). */
     public static function storeSiteMedia($file, string $tenantId): string
     {
-        return $file->store('site-media/'.$tenantId, 'public');
+        return $file->store('site-media/'.$tenantId, self::uploadDisk());
     }
 
     /** Resolve stored path or URL for display on the public site. */
@@ -260,14 +367,104 @@ class TenantStorage
             && filled(config('filesystems.disks.s3.bucket'));
     }
 
-    private static function photosDisk(): string
+    /** Find which local disk holds a relative path, if any. */
+    public static function findLocalDisk(string $relativePath): ?string
     {
-        if (self::isS3Configured()) {
-            return 's3';
+        $relativePath = ltrim($relativePath, '/');
+
+        if ($relativePath === '' || str_starts_with($relativePath, 'http://') || str_starts_with($relativePath, 'https://')) {
+            return null;
         }
 
-        // Never use tenant-suffixed public disk — files are not reachable via the /storage symlink.
-        return self::SHARED_DISK;
+        foreach (self::localDisks() as $disk) {
+            try {
+                if (Storage::disk($disk)->exists($relativePath)) {
+                    return $disk;
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    public static function existsOnS3(string $relativePath): bool
+    {
+        if (! self::isS3Configured()) {
+            return false;
+        }
+
+        try {
+            return Storage::disk('s3')->exists(ltrim($relativePath, '/'));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Copy a file from a local disk to S3 (same relative path).
+     *
+     * @return array{status: string, reason?: string, from?: string}
+     */
+    public static function migrateToS3(string $relativePath, ?string $sourceDisk = null, bool $deleteLocal = false): array
+    {
+        $relativePath = ltrim($relativePath, '/');
+
+        if ($relativePath === '') {
+            return ['status' => 'skipped', 'reason' => 'empty_path'];
+        }
+
+        if (str_starts_with($relativePath, 'http://') || str_starts_with($relativePath, 'https://') || str_starts_with($relativePath, '/')) {
+            return ['status' => 'skipped', 'reason' => 'external_or_absolute'];
+        }
+
+        if (! self::isS3Configured()) {
+            return ['status' => 'failed', 'reason' => 's3_not_configured'];
+        }
+
+        if (self::existsOnS3($relativePath)) {
+            return ['status' => 'skipped', 'reason' => 'already_on_s3'];
+        }
+
+        $sourceDisk = $sourceDisk && $sourceDisk !== 's3'
+            ? $sourceDisk
+            : self::findLocalDisk($relativePath);
+
+        if (! $sourceDisk) {
+            return ['status' => 'failed', 'reason' => 'source_not_found'];
+        }
+
+        if ($sourceDisk === 's3') {
+            return ['status' => 'skipped', 'reason' => 'already_on_s3'];
+        }
+
+        try {
+            $contents = Storage::disk($sourceDisk)->get($relativePath);
+            Storage::disk('s3')->put($relativePath, $contents);
+
+            if ($deleteLocal) {
+                Storage::disk($sourceDisk)->delete($relativePath);
+            }
+
+            return ['status' => 'migrated', 'from' => $sourceDisk];
+        } catch (\Throwable $e) {
+            return ['status' => 'failed', 'reason' => $e->getMessage()];
+        }
+    }
+
+    /** @return list<string> */
+    private static function localDisks(): array
+    {
+        return array_values(array_unique(array_merge(
+            (array) config('erp.legacy_migration_local_disks', ['shared', 'local', 'public']),
+            [self::SHARED_DISK, 'local', 'public'],
+        )));
+    }
+
+    private static function photosDisk(): string
+    {
+        return self::uploadDisk();
     }
 
     /** @return list<string> */

@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Teacher;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 
 class TeacherProfileController extends Controller
@@ -62,10 +61,11 @@ class TeacherProfileController extends Controller
             'password'         => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        $request->user()->update([
-            'password'             => Hash::make($data['password']),
+        $request->user()->forceFill([
+            'password'             => $data['password'],
+            'plain_password'       => null,
             'must_change_password' => false,
-        ]);
+        ])->save();
 
         return back()->with('success', 'Password updated.');
     }

@@ -31,7 +31,7 @@
                 <button type="button" class="btn-primary" :disabled="eligibilityForm.processing" @click="saveEligibility">
                     {{ eligibilityForm.processing ? 'Saving…' : 'Save age cutoff' }}
                 </button>
-                <a :href="`/sahodaya-admin/${sahodaya.id}/sports-age-groups`" class="btn-secondary text-sm">
+                <a :href="`/sahodaya-admin/${sahodaya.id}/sports/age-groups`" class="btn-secondary text-sm">
                     Manage age categories →
                 </a>
             </FormActions>
@@ -48,7 +48,7 @@
                 Default reference date is <strong>31 December</strong> of the competition year (CBSE standard).
                 Item registration uses <strong>under-N</strong> rules (U17 = age under 17 on this date).
                 Age group definitions (U8–U19) are managed under
-                <a :href="`/sahodaya-admin/${sahodaya?.id}/sports-age-groups`" class="link-brand font-semibold">Sports age categories</a>.
+                <a :href="`/sahodaya-admin/${sahodaya?.id}/sports/age-groups`" class="link-brand font-semibold">Sports age categories</a>.
             </p>
         </FormSection>
     </div>

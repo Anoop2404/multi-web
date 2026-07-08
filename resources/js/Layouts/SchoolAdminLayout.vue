@@ -52,7 +52,7 @@
                                      :icon="item.icon"
                                      :label="item.label"
                                      :badge="item.badge ?? 0"
-                                     :active="schoolNavItemActive(page.url, item.href, item.exact)" />
+                                     :active="schoolNavItemActive(page.url, item.href, item.exact, item.matchQuery)" />
                 </template>
             </nav>
 
@@ -80,7 +80,8 @@
                         </svg>
                     </button>
                     <h1 v-if="showHeaderTitle" class="text-base font-bold text-[#041525] truncate">{{ title }}</h1>
-                    <span v-if="isStaffUser" class="hidden sm:inline text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-medium">View only</span>
+                    <span v-if="isEventCoordinatorUser" class="hidden sm:inline text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-medium">Event coordinator</span>
+                    <span v-else-if="isStaffUser" class="hidden sm:inline text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-medium">View only</span>
                     <slot name="header-suffix" />
                 </div>
                 <div class="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -98,6 +99,7 @@
             <main class="sa-main flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isStaffUser }">
                 <StaffReadOnlyBanner v-if="isStaffUser" />
                 <FlashBanner />
+                <ValidationBanner />
                 <slot />
             </main>
         </div>
@@ -109,6 +111,7 @@ import { Head, usePage } from '@inertiajs/vue3';
 import SignOutButton from '@/Components/SignOutButton.vue';
 import StaffReadOnlyBanner from '@/Components/StaffReadOnlyBanner.vue';
 import FlashBanner from '@/Components/ui/FlashBanner.vue';
+import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import SahodayaNavItem from '@/Components/sahodaya/SahodayaNavItem.vue';
 import SahodayaSidebarNavSearch from '@/Components/sahodaya/SahodayaSidebarNavSearch.vue';
 import SahodayaSvgIcon from '@/Components/sahodaya/SahodayaSvgIcon.vue';
@@ -117,14 +120,20 @@ import {
     detectSchoolFestContextFromUrl,
     detectSchoolMcqExamIdFromUrl,
     detectSchoolMcqHubFromUrl,
+    detectSchoolMembershipFromUrl,
     detectSchoolProgramFromUrl,
+    detectSchoolTrainingFromUrl,
     schoolAdminNav,
+    schoolEventCoordinatorNav,
     schoolFestScopedNav,
     schoolMcqExamScopedNav,
     schoolMcqHubNav,
+    schoolMembershipScopedNav,
     schoolNavItemActive,
     schoolProgramScopedNav,
+    schoolTrainingHubNav,
 } from '@/support/schoolAdminNav.js';
+import { detectSchoolEventFromUrl, schoolEventScopedNav } from '@/support/schoolEventNav.js';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -139,6 +148,8 @@ const page = usePage();
 const mobileNavOpen = ref(false);
 const navSearch = ref('');
 const isStaffUser = computed(() => props.isStaff || page.props.isStaff);
+const isEventCoordinatorUser = computed(() => page.props.isEventCoordinator ?? false);
+const eventScopes = computed(() => page.props.eventScopes ?? []);
 const school = computed(() => props.school ?? page.props.school);
 const tid = computed(() => school.value?.id ?? '');
 const publicUrl = computed(() => page.props.publicUrl ?? null);
@@ -180,6 +191,9 @@ const navGroups = computed(() => {
         websiteEnabled: websiteEnabled.value,
         schoolHasPrefix: Boolean(school.value?.school_prefix),
         pendingChangeRequests: props.pendingChangeRequests || page.props.pendingChangeRequests || 0,
+        coordinatorMode: isEventCoordinatorUser.value,
+        navVisibility: page.props.navVisibility ?? null,
+        membershipPaid: page.props.membershipPaid !== false,
     };
 
     const mcqExamId = detectSchoolMcqExamIdFromUrl(page.url);
@@ -195,12 +209,35 @@ const navGroups = computed(() => {
         return schoolMcqHubNav(tid.value, options);
     }
 
+    if (detectSchoolMembershipFromUrl(page.url)) {
+        return schoolMembershipScopedNav(tid.value, options);
+    }
+
+    if (detectSchoolTrainingFromUrl(page.url)) {
+        return schoolTrainingHubNav(tid.value, options);
+    }
+
+    const schoolEventCtx = detectSchoolEventFromUrl(page.url);
+    const festEvent = page.props.event;
+    if (schoolEventCtx?.eventId && festEvent?.id) {
+        return schoolEventScopedNav(tid.value, schoolEventCtx.programSlug, festEvent, {
+            ...options,
+            programPrefix: schoolEventCtx.programPrefix ?? page.props.programPrefix,
+            isSports: festEvent.event_type === 'sports' || schoolEventCtx.programSlug === 'sports-meet',
+            programEvents: page.props.programEvents ?? [],
+        });
+    }
+
     if (activeProgramSlug.value) {
         return schoolProgramScopedNav(tid.value, activeProgramSlug.value, options);
     }
 
-    if (festContext.value) {
+    if (festContext.value && !isEventCoordinatorUser.value) {
         return schoolFestScopedNav(tid.value, options);
+    }
+
+    if (isEventCoordinatorUser.value) {
+        return schoolEventCoordinatorNav(tid.value, eventScopes.value);
     }
 
     return schoolAdminNav(tid.value, options);

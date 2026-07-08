@@ -49,39 +49,24 @@ class EventContext
     /** @return list<string> */
     public function scoreboardClusters(): array
     {
-        if ($this->event->event_type !== 'kids_fest' || $this->event->parent_event_id) {
+        $partitionService = app(FestPartitionService::class);
+
+        if (! $partitionService->isPartitionedHub($this->event)) {
             return [];
         }
 
-        return app(FestKidsFestClusterService::class)
-            ->clusters($this->event)
-            ->map(fn (FestEvent $c) => $c->cluster_key)
-            ->filter()
-            ->values()
-            ->all();
+        return $partitionService->partitionKeys($this->event);
     }
 
     public function scoreboardClusterLabel(string $clusterKey): string
     {
-        $cluster = FestEvent::where('parent_event_id', $this->event->id)
-            ->where('cluster_key', $clusterKey)
-            ->first();
-
-        return $cluster?->cluster_label ?? ucfirst(str_replace('-', ' ', $clusterKey));
+        return app(FestPartitionService::class)->partitionLabel($this->event, $clusterKey);
     }
 
     /** @return list<array{school_id: string, school_name: string, total_points: int, rank: int}> */
     public function scoreboardByCluster(string $clusterKey): array
     {
-        $cluster = FestEvent::where('parent_event_id', $this->event->id)
-            ->where('cluster_key', $clusterKey)
-            ->first();
-
-        if (! $cluster) {
-            return [];
-        }
-
-        return self::for($cluster)->scoreboardBySchool();
+        return app(FestPartitionService::class)->scoreboardByPartition($this->event, $clusterKey);
     }
 
     /** @return list<string> */
@@ -186,11 +171,17 @@ class EventContext
 
     public function scoreboardBySchool(): array
     {
-        $clusterService = app(FestKidsFestClusterService::class);
-        if ($clusterService->isUmbrella($this->event)) {
-            return $clusterService->combinedScoreboard($this->event);
+        $partitionService = app(FestPartitionService::class);
+        if ($partitionService->isPartitionedHub($this->event)) {
+            return $partitionService->combinedScoreboard($this->event);
         }
 
+        return $this->scoreboardBySchoolForEvent();
+    }
+
+    /** @return list<array{school_id: string, school_name: string, total_points: int, rank: int}> */
+    public function scoreboardBySchoolForEvent(): array
+    {
         $schoolIds = FestResult::where('event_id', $this->event->id)
             ->whereNull('item_id')
             ->pluck('school_id', 'school_id');

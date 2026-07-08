@@ -7,7 +7,10 @@ use App\Models\McqExam;
 use App\Models\SchoolUserEventScope;
 use App\Models\TrainingProgram;
 use App\Models\User;
+use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
+use App\Support\TenantUserCatalog;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class SchoolUserScopeService
@@ -151,11 +154,7 @@ class SchoolUserScopeService
 
         $scopeType = $scope->scope_type ?? 'program';
 
-        if ($scopeType === 'program' || $scope->event_id === null) {
-            return true;
-        }
-
-        if ($eventId === null) {
+        if ($scopeType === 'program') {
             return true;
         }
 
@@ -163,7 +162,130 @@ class SchoolUserScopeService
             return false;
         }
 
-        return (int) $scope->event_id === (int) $eventId;
+        if ($eventId !== null) {
+            return (int) $scope->event_id === (int) $eventId;
+        }
+
+        return $programSlug !== null;
+    }
+
+    public function homeUrlFor(User $user, string $schoolId): string
+    {
+        $scopes = $this->scopesForUser($user->id, $schoolId);
+        if ($scopes === []) {
+            return "/school-admin/{$schoolId}";
+        }
+
+        $first = $scopes[0];
+        $slug = $first['program_slug'];
+
+        if ($slug === 'mcq') {
+            if (($first['scope_type'] ?? '') === 'mcq_exam' && ! empty($first['event_id'])) {
+                return "/school-admin/{$schoolId}/mcq/{$first['event_id']}/register";
+            }
+
+            return "/school-admin/{$schoolId}/mcq";
+        }
+
+        if ($slug === 'training') {
+            return "/school-admin/{$schoolId}/training";
+        }
+
+        $prefix = ProgramRouteMap::prefixFromSlug($slug) ?? $slug;
+
+        if (($first['scope_type'] ?? '') === 'fest_event' && ! empty($first['event_id'])) {
+            return "/school-admin/{$schoolId}/{$prefix}/events/{$first['event_id']}/overview";
+        }
+
+        return "/school-admin/{$schoolId}/{$prefix}";
+    }
+
+    /** @return list<array{program_slug: string, scope_type: string, event_id: ?int, label: string}> */
+    public function scopesWithLabels(int $userId, string $schoolId, ?string $sahodayaId = null): array
+    {
+        $options = $sahodayaId ? $this->scopeOptionsForSchool($schoolId, $sahodayaId) : [];
+        $labels = collect($options['fest_events'] ?? [])
+            ->keyBy('id')
+            ->map(fn ($e) => $e['title']);
+
+        foreach ($options['mcq_exams'] ?? [] as $exam) {
+            $labels[(int) $exam['id']] = $exam['title'];
+        }
+        foreach ($options['training_programs'] ?? [] as $program) {
+            $labels[(int) $program['id']] = $program['title'];
+        }
+
+        $programLabels = collect($this->programCatalog())->pluck('label', 'slug');
+
+        return collect($this->scopesForUser($userId, $schoolId))
+            ->map(function (array $scope) use ($labels, $programLabels) {
+                $slug = $scope['program_slug'];
+                $type = $scope['scope_type'] ?? 'program';
+                $eventId = $scope['event_id'] ?? null;
+
+                if ($type === 'program') {
+                    $label = $programLabels[$slug] ?? $slug;
+                    $label = "All {$label} events";
+                } elseif ($eventId && $labels->has($eventId)) {
+                    $label = $labels[$eventId];
+                } else {
+                    $label = ($programLabels[$slug] ?? $slug).' #'.($eventId ?? '?');
+                }
+
+                return array_merge($scope, ['label' => $label]);
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, FestEvent>  $events
+     * @return Collection<int, FestEvent>
+     */
+    public function filterFestEventsForUser(?User $user, string $schoolId, string $programSlug, Collection $events): Collection
+    {
+        if (! $user || ! $user->hasRole('school_event_coordinator') || $user->hasAnyRole(TenantUserCatalog::schoolManagementRoles())) {
+            return $events;
+        }
+
+        $scopes = SchoolUserEventScope::where('user_id', $user->id)
+            ->where('school_id', $schoolId)
+            ->where('program_slug', $programSlug)
+            ->get();
+
+        if ($scopes->contains(fn (SchoolUserEventScope $s) => ($s->scope_type ?? 'program') === 'program')) {
+            return $events;
+        }
+
+        $eventIds = $scopes
+            ->filter(fn (SchoolUserEventScope $s) => ($s->scope_type ?? '') === 'fest_event' && $s->event_id)
+            ->pluck('event_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($eventIds === []) {
+            return collect();
+        }
+
+        return $events->whereIn('id', $eventIds)->values();
+    }
+
+    /** @return list<string> */
+    public function assignedProgramSlugs(int $userId, string $schoolId): array
+    {
+        return SchoolUserEventScope::where('user_id', $userId)
+            ->where('school_id', $schoolId)
+            ->pluck('program_slug')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function isCoordinatorOnly(User $user): bool
+    {
+        return $user->hasRole('school_event_coordinator')
+            && ! $user->hasAnyRole(TenantUserCatalog::schoolManagementRoles())
+            && ! $user->isSuperAdmin();
     }
 
     /** @return list<array{slug: string, label: string}> */
@@ -174,7 +296,9 @@ class SchoolUserScopeService
             ['slug' => 'sports-meet', 'label' => 'Sports Meet'],
             ['slug' => 'kids-fest', 'label' => 'Kids Fest'],
             ['slug' => 'teacher-fest', 'label' => 'Teacher Fest'],
-            ['slug' => 'mcq', 'label' => 'MCQ Exams'],
+            ['slug' => 'english-fest', 'label' => 'English Fest'],
+            ['slug' => 'science-fest', 'label' => 'Science Fest'],
+            ['slug' => 'mcq', 'label' => 'Talent Search Exams'],
             ['slug' => 'training', 'label' => 'Training Programs'],
         ];
     }

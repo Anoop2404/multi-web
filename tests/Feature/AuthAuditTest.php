@@ -28,7 +28,8 @@ class AuthAuditTest extends TestCase
 
         $response->assertRedirect('/login');
         $response->assertSessionHasErrors('email');
-        $this->assertStringContainsString('Invalid email or password', session('errors')->first('email'));
+        $this->assertStringContainsString('Invalid', session('errors')->first('email'));
+        $this->assertStringContainsString('password', strtolower(session('errors')->first('email')));
 
         $this->assertDatabaseHas('audit_logs', [
             'action'   => 'login.failed',

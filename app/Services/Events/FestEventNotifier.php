@@ -8,6 +8,7 @@ use App\Models\FestRegistration;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Notifications\NotificationService;
+use App\Support\TenancyDatabase;
 
 class FestEventNotifier
 {
@@ -77,25 +78,23 @@ class FestEventNotifier
 
     public function sportsWinnersReceived(FestEvent $event, Tenant $school, int $count): void
     {
-        $users = User::role(['sahodaya_admin', 'sahodaya_staff', 'event_coordinator'])
-            ->where('tenant_id', $event->tenant_id)
-            ->get();
+        $this->withSahodayaUsers($event->tenant_id, ['sahodaya_admin', 'sahodaya_staff', 'event_coordinator'], function ($users) use ($event, $school, $count) {
+            $service = app(NotificationService::class);
+            $replacements = [
+                'event_title' => $event->title,
+                'school_name' => $school->name,
+                'count'       => (string) $count,
+            ];
 
-        $service = app(NotificationService::class);
-        $replacements = [
-            'event_title' => $event->title,
-            'school_name' => $school->name,
-            'count'       => (string) $count,
-        ];
-
-        foreach ($users as $user) {
-            $service->notifyFromTemplate(
-                $user,
-                'sports.winners.received',
-                $replacements,
-                "/sahodaya-admin/{$event->tenant_id}/events/{$event->id}/registrations",
-            );
-        }
+            foreach ($users as $user) {
+                $service->notifyFromTemplate(
+                    $user,
+                    'sports.winners.received',
+                    $replacements,
+                    "/sahodaya-admin/{$event->tenant_id}/events/{$event->id}/registrations",
+                );
+            }
+        });
     }
 
     public function notifySchoolForChestReveal(FestEvent $event, string $schoolId, string $participantName): void
@@ -108,24 +107,22 @@ class FestEventNotifier
 
     public function appealReceived(FestEvent $event, string $participantName): void
     {
-        $users = User::role(['sahodaya_admin', 'sahodaya_staff', 'event_coordinator'])
-            ->where('tenant_id', $event->tenant_id)
-            ->get();
+        $this->withSahodayaUsers($event->tenant_id, ['sahodaya_admin', 'sahodaya_staff', 'event_coordinator'], function ($users) use ($event, $participantName) {
+            $service = app(NotificationService::class);
+            $replacements = [
+                'event_title'      => $event->title,
+                'participant_name' => $participantName,
+            ];
 
-        $service = app(NotificationService::class);
-        $replacements = [
-            'event_title'      => $event->title,
-            'participant_name' => $participantName,
-        ];
-
-        foreach ($users as $user) {
-            $service->notifyFromTemplate(
-                $user,
-                'fest.appeal.received',
-                $replacements,
-                "/sahodaya-admin/{$event->tenant_id}/events/{$event->id}/appeals",
-            );
-        }
+            foreach ($users as $user) {
+                $service->notifyFromTemplate(
+                    $user,
+                    'fest.appeal.received',
+                    $replacements,
+                    "/sahodaya-admin/{$event->tenant_id}/events/{$event->id}/appeals",
+                );
+            }
+        });
     }
 
     public function judgeAssigned(\App\Models\FestJudgeAssignment $assignment): void
@@ -194,12 +191,18 @@ class FestEventNotifier
 
     private function notifySchool(string $schoolId, string $template, array $replacements, ?string $url = null): void
     {
-        $users = User::role(['school_admin', 'school_staff'])->where('tenant_id', $schoolId)->get();
-        $service = app(NotificationService::class);
-
-        foreach ($users as $user) {
-            $service->notifyFromTemplate($user, $template, $replacements, $url);
+        $school = Tenant::query()->find($schoolId);
+        if (! $school?->parent_id) {
+            return;
         }
+
+        $this->withSchoolUsers($school, ['school_admin', 'school_staff'], function ($users) use ($template, $replacements, $url) {
+            $service = app(NotificationService::class);
+
+            foreach ($users as $user) {
+                $service->notifyFromTemplate($user, $template, $replacements, $url);
+            }
+        });
     }
 
     private function notifyEventParticipants(FestEvent $event, string $schoolId, string $template, array $replacements): void
@@ -229,5 +232,28 @@ class FestEventNotifier
                 $service->notifyFromTemplate($user, $template, $replacements, $portalPath);
             }
         }
+    }
+
+    /** @param  list<string>  $roles */
+    private function withSahodayaUsers(string $sahodayaId, array $roles, callable $callback): void
+    {
+        $sahodaya = Tenant::query()->find($sahodayaId);
+        if (! $sahodaya) {
+            return;
+        }
+
+        TenancyDatabase::withTenantDatabase($sahodaya, function () use ($sahodaya, $roles, $callback) {
+            $users = User::role($roles)->where('tenant_id', $sahodaya->id)->get();
+            $callback($users);
+        });
+    }
+
+    /** @param  list<string>  $roles */
+    private function withSchoolUsers(Tenant $school, array $roles, callable $callback): void
+    {
+        TenancyDatabase::withTenantDatabase($school, function () use ($school, $roles, $callback) {
+            $users = User::role($roles)->where('tenant_id', $school->id)->get();
+            $callback($users);
+        });
     }
 }

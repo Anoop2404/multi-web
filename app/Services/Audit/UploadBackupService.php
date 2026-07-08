@@ -3,6 +3,7 @@
 namespace App\Services\Audit;
 
 use App\Models\UploadedFileBackup;
+use App\Support\TenantStorage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
@@ -22,12 +23,13 @@ class UploadBackupService
             ? "backups/schools/{$schoolId}/{$purpose}/".now()->format('Y-m')
             : "backups/general/{$purpose}/".now()->format('Y-m');
 
-        $path = $file->storeAs($subdir, Str::uuid().'_'.$safeName, 'local');
+        $disk = TenantStorage::uploadDisk();
+        $path = $file->storeAs($subdir, Str::uuid().'_'.$safeName, $disk);
 
         return UploadedFileBackup::create([
             'school_id'            => $schoolId,
             'purpose'              => $purpose,
-            'storage_disk'         => 'local',
+            'storage_disk'         => $disk,
             'storage_path'         => $path,
             'original_name'        => $file->getClientOriginalName(),
             'mime_type'            => $file->getClientMimeType(),

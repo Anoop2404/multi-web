@@ -9,15 +9,23 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class TrainingProgram extends Model
 {
     protected $fillable = [
-        'tenant_id', 'academic_year_id', 'title', 'description', 'conductor_level',
-        'registration_open', 'registration_close', 'max_participants', 'status',
-        'fee_type', 'fee_amount',
+        'tenant_id', 'academic_year_id', 'title', 'description', 'venue',
+        'start_date', 'end_date', 'conductor_level',
+        'registration_open', 'registration_close', 'max_participants',
+        'allow_teacher_self_registration', 'status',
+        'fee_type', 'fee_amount', 'late_fee_amount', 'penalty_amount', 'eligibility_config',
     ];
 
     protected $casts = [
         'registration_open'  => 'date',
         'registration_close' => 'date',
+        'start_date'         => 'date',
+        'end_date'           => 'date',
+        'allow_teacher_self_registration' => 'boolean',
         'fee_amount'         => 'decimal:2',
+        'late_fee_amount'    => 'decimal:2',
+        'penalty_amount'     => 'decimal:2',
+        'eligibility_config' => 'array',
     ];
 
     protected static function booted(): void
@@ -42,5 +50,20 @@ class TrainingProgram extends Model
     public function registrations(): HasMany
     {
         return $this->hasMany(TrainingRegistration::class, 'program_id');
+    }
+
+    /** Number of training days (from sessions, or from start/end date span). */
+    public function dayCount(): int
+    {
+        $sessions = $this->relationLoaded('sessions') ? $this->sessions : $this->sessions()->get();
+        if ($sessions->isNotEmpty()) {
+            return $sessions->count();
+        }
+
+        if ($this->start_date && $this->end_date) {
+            return $this->start_date->diffInDays($this->end_date) + 1;
+        }
+
+        return $this->start_date ? 1 : 0;
     }
 }

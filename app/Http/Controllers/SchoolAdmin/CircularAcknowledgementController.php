@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\Circular;
+use App\Support\TenantStorage;
 use App\Models\CircularAcknowledgement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -43,7 +44,7 @@ class CircularAcknowledgementController extends SchoolAdminController
     {
         abort_if($circular->tenant_id !== $this->school->parent_id, 403);
 
-        $disk = config('filesystems.default', 's3');
+        $disk = config('filesystems.default', \App\Support\TenantStorage::uploadDisk());
 
         if (! Storage::disk($disk)->exists($circular->file_path)) {
             abort(404, 'Circular file not found.');

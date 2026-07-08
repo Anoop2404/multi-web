@@ -13,6 +13,7 @@ use App\Models\FestSchoolEventFee;
 use App\Models\InAppNotification;
 use App\Models\McqQuestionBank;
 use App\Models\Tenant;
+use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
 use App\Services\Events\FestCertificateService;
 use App\Services\Events\FestReportService;
@@ -29,11 +30,38 @@ class TeacherDashboardController extends Controller
     public function trainingPage(Request $request, string $tenantId)
     {
         $payload = $this->teacherPortalPayload($request, $tenantId);
+        $school = Tenant::findOrFail($tenantId);
+        $teacher = $request->attributes->get('portalTeacher');
+        $eligibility = app(\App\Services\Training\TeacherTrainingEligibilityService::class);
+
+        $registeredProgramIds = TrainingRegistration::where('teacher_id', $teacher->id)
+            ->pluck('program_id');
+
+        $openPrograms = TrainingProgram::where('tenant_id', $school->parent_id)
+            ->whereIn('status', ['published', 'ongoing'])
+            ->where('allow_teacher_self_registration', true)
+            ->whereNotIn('id', $registeredProgramIds)
+            ->orderByDesc('registration_open')
+            ->get()
+            ->filter(fn (TrainingProgram $p) => $eligibility->isEligible($p, $teacher))
+            ->map(fn (TrainingProgram $p) => [
+                'id'          => $p->id,
+                'title'       => $p->title,
+                'description' => $p->description,
+                'venue'       => $p->venue,
+                'start_date'  => $p->start_date?->toDateString(),
+                'end_date'    => $p->end_date?->toDateString(),
+                'fee_type'    => $p->fee_type,
+                'fee_amount'  => $p->fee_amount,
+                'has_fee'     => $p->hasFee(),
+            ])
+            ->values();
 
         return inertia('Portal/Teacher/Training', [
-            'school'   => $payload['school'],
-            'teacher'  => $payload['teacher'],
-            'training' => $payload['training'],
+            'school'       => $payload['school'],
+            'teacher'      => $payload['teacher'],
+            'training'     => $payload['training'],
+            'openPrograms' => $openPrograms,
         ]);
     }
 
@@ -126,14 +154,15 @@ class TeacherDashboardController extends Controller
 
         $registration->load(['program', 'teacher']);
         $sahodaya = Tenant::findOrFail($registration->program->tenant_id);
-        $fieldValues = app(TrainingCertificateService::class)->resolveFieldValues($registration, $sahodaya);
+        $service = app(TrainingCertificateService::class);
+        $render = $service->renderContext($registration, $sahodaya);
 
-        return view('training.certificate', [
+        return view('training.certificate', array_merge($render, [
             'registration' => $registration,
             'certificate'  => $certificate,
             'sahodaya'     => $sahodaya,
-            'fieldValues'  => $fieldValues,
-        ]);
+            'fieldValues'  => $service->resolveFieldValues($registration, $sahodaya),
+        ]));
     }
 
     /** @return array<string, mixed> */
@@ -156,8 +185,11 @@ class TeacherDashboardController extends Controller
                 return [
                     'id'               => $reg->id,
                     'status'           => $reg->status,
-                    'program'          => $reg->program?->only('id', 'title', 'description'),
-                    'feeReceipt'       => $reg->feeReceipt?->only('status'),
+                    'fee_status'       => $reg->fee_status,
+                    'amount_paid'      => $reg->amount_paid,
+                    'fee_total'        => $reg->feeTotalDue(),
+                    'program'          => $reg->program?->only('id', 'title', 'description', 'venue', 'fee_type', 'fee_amount'),
+                    'feeReceipt'       => $reg->feeReceipt?->only('id', 'status', 'amount'),
                     'certificate_uuid' => $reg->certificate?->verification_uuid,
                     'sessions'         => $sessions->map(fn ($s) => [
                         'id'           => $s->id,

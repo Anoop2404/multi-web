@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 
 class BankAccount extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = [
         'tenant_id', 'account_name', 'bank_name', 'account_no', 'ifsc', 'is_active',
     ];
@@ -14,6 +17,6 @@ class BankAccount extends Model
 
     public function tenant()
     {
-        return $this->belongsTo(Tenant::class, 'tenant_id');
+        return $this->belongsToCentralTenant('tenant_id');
     }
 }

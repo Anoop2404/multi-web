@@ -10,7 +10,7 @@ use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Services\Events\EventContext;
 use App\Services\Events\FestCertificateService;
-use App\Support\SchoolFestProgram;
+use App\Support\ProgramRouteMap;
 use Illuminate\Http\Request;
 
 class FestEventPortalController extends SchoolAdminController
@@ -148,7 +148,7 @@ class FestEventPortalController extends SchoolAdminController
             'registrations'   => $registrations,
             'appeals'         => $appeals,
             'programSlug'     => $programSlug,
-            'registrationUrl' => "/school-admin/{$this->school->id}/programs/{$programSlug}/registration",
+            'registrationUrl' => ProgramRouteMap::schoolRegistrationUrl($this->school->id, $programSlug),
         ]);
     }
 

@@ -40,20 +40,15 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import PortalAssignmentsHub from '@/Components/portal/PortalAssignmentsHub.vue';
+import { judgePortalNavItems } from '@/support/judgePortalNav.js';
 import { computed } from 'vue';
 
 const props = defineProps({ sahodaya: Object, events: Array, assignments: Object, itemProgress: { type: Array, default: () => [] } });
 
 const navItems = computed(() => {
-    const base = `/portal/judge/${props.sahodaya.id}`;
-    const items = [{ href: base, label: 'Dashboard', exact: true }];
-    if (props.events?.length === 1) {
-        items.push({
-            href: `${base}/events/${props.events[0].id}/marks`,
-            label: 'Enter marks',
-        });
-    }
-    return items;
+    const eventId = props.events?.length === 1 ? props.events[0].id : null;
+
+    return judgePortalNavItems(props.sahodaya.id, eventId);
 });
 
 const itemCount = computed(() =>

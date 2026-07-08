@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\AdmissionEnquiry;
 use App\Models\SahodayaProfile;
-use App\Models\TcRequest;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\PortalVerifyEmail;
@@ -203,19 +202,6 @@ class EmailTemplatesTest extends TestCase
 
         $branding = EmailBranding::forTenant($school);
 
-        $tc = new TcRequest([
-            'student_name' => 'Student A',
-            'admission_number' => 'ADM001',
-            'class' => '10',
-            'division' => 'A',
-            'dob' => '2010-01-01',
-            'parent_name' => 'Parent A',
-            'phone' => '9999999999',
-            'email' => 'parent@example.com',
-            'reason' => 'Relocation',
-        ]);
-        $tc->created_at = now();
-
         $enquiry = new AdmissionEnquiry([
             'student_name' => 'Student B',
             'dob' => '2012-05-05',
@@ -228,13 +214,6 @@ class EmailTemplatesTest extends TestCase
             'message' => 'Interested in admission',
         ]);
         $enquiry->created_at = now();
-
-        View::make('emails.tc-request', array_merge($branding, [
-            'tcRequest' => $tc,
-            'school' => $school,
-            'headerTitle' => 'Transfer Certificate Request',
-            'headerSubtitle' => $school->name,
-        ]))->render();
 
         View::make('emails.admission-enquiry', array_merge($branding, [
             'enquiry' => $enquiry,

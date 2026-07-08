@@ -1,5 +1,7 @@
 <template>
-    <SahodayaAdminLayout title="House championship" :sahodaya="sahodaya">
+    <SahodayaEventsLayout title="House championship" :sahodaya="sahodaya" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :program="program"
+                         :program-events="programEvents" :show-header-title="false">
         <PageHeader
             title="House championship"
             eyebrow="Sports Meet"
@@ -54,17 +56,21 @@
             </table>
             <p v-else class="p-6 text-sm text-slate-500">No sports events yet. Create one from the Sports Meet dashboard.</p>
         </section>
-    </SahodayaAdminLayout>
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
 import { Link } from '@inertiajs/vue3';
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 
 defineProps({
     sahodaya: Object,
+    publicUrl: String,
+    pendingPaymentsCount: Number,
+    program: Object,
     events: { type: Array, default: () => [] },
+    programEvents: { type: Array, default: () => [] },
     houseStandings: { type: Array, default: () => [] },
 });
 </script>

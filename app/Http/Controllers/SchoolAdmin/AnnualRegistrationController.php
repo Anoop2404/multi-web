@@ -4,7 +4,9 @@ namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\MembershipPayment;
 use App\Models\ClassCategory;
+use App\Models\Region;
 use App\Models\Registration;
+use App\Models\SchoolRegionAssignment;
 use App\Models\SahodayaProfile;
 use App\Models\SahodayaRegistrationWindow;
 use App\Models\SchoolClass;
@@ -83,8 +85,20 @@ class AnnualRegistrationController extends SchoolAdminController
 
         $feeNotConfigured = $profile && ! $profile->membershipFeeConfigured($academicYear);
 
+        $regions = Region::forTenant($sahodaya->id)
+            ->active()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'description']);
+        $selectedRegionId = $regions->isEmpty() ? null : SchoolRegionAssignment::forTenant($sahodaya->id)
+            ->forYear($academicYear)
+            ->where('school_id', $this->school->id)
+            ->value('region_id');
+
         return $this->inertia('School/Registration/Index', [
             'academicYear'       => $academicYear,
+            'regions'            => $regions,
+            'selectedRegionId'   => $selectedRegionId,
             'registration'       => $registration?->load('submission'),
             'profile'            => $profilePayload,
             'registrationWindow' => $windowService->displayPayload($window),
@@ -162,6 +176,39 @@ class AnnualRegistrationController extends SchoolAdminController
             ->with('success', $message);
     }
 
+    public function saveRegion(Request $request)
+    {
+        $sahodayaId = $this->school->parent_id;
+        $academicYear = AcademicYear::forSchool($this->school);
+
+        $regionIds = Region::forTenant($sahodayaId)->active()->pluck('id')->all();
+
+        $data = $request->validate([
+            'region_id' => ['nullable', Rule::in($regionIds)],
+        ]);
+
+        if (empty($data['region_id'])) {
+            SchoolRegionAssignment::forTenant($sahodayaId)
+                ->forYear($academicYear)
+                ->where('school_id', $this->school->id)
+                ->delete();
+
+            return back()->with('success', 'Region cleared.');
+        }
+
+        SchoolRegionAssignment::updateOrCreate(
+            ['school_id' => $this->school->id, 'academic_year' => $academicYear],
+            [
+                'tenant_id'           => $sahodayaId,
+                'region_id'           => $data['region_id'],
+                'source'              => 'school',
+                'assigned_by_user_id' => $request->user()?->id,
+            ],
+        );
+
+        return back()->with('success', 'Region saved.');
+    }
+
     public function students(EffectiveMasterDataResolver $resolver)
     {
         $registration = $this->currentRegistration();
@@ -189,6 +236,7 @@ class AnnualRegistrationController extends SchoolAdminController
         return $this->inertia('School/Registration/Students', [
             'registration' => $registration,
             'submission'   => $submission,
+            'profile'      => $this->registrationProfilePayload(),
             'students'     => $students,
             'studentTotal' => $students->count(),
         ]);
@@ -219,6 +267,7 @@ class AnnualRegistrationController extends SchoolAdminController
         return $this->inertia('School/Registration/Counts', [
             'registration' => $registration,
             'submission'   => $submission,
+            'profile'      => $this->registrationProfilePayload(),
             'categories'   => $categories,
             'counts'       => $existing,
             'dbStudentCount' => $dbStudentCount,
@@ -269,8 +318,14 @@ class AnnualRegistrationController extends SchoolAdminController
         return $this->inertia('School/Registration/Teachers', [
             'registration'  => $registration,
             'submission'    => $submission,
-            'teachers'      => $submission->teachers()->with('teachingType')->get(),
+            'profile'       => $this->registrationProfilePayload(),
+            'teachers'      => $submission->teachers()->with('teachingType')->get()->map(function (SubmissionTeacher $teacher) {
+                return array_merge($teacher->toArray(), [
+                    'subject_labels' => $this->subjectLabelsFor($teacher->subject_ids ?? []),
+                ]);
+            }),
             'teachingTypes' => $resolver->teachingTypes($this->school->parent_id),
+            'subjects'      => $resolver->subjects($this->school->parent_id),
         ]);
     }
 
@@ -283,13 +338,76 @@ class AnnualRegistrationController extends SchoolAdminController
 
         $data = $request->validate([
             'name'             => 'required|string|max:255',
-            'subject'          => 'nullable|string|max:100',
-            'teaching_type_id' => ['nullable', Rule::exists('teaching_types', 'id')],
+            'subject_ids'      => 'nullable|array',
+            'subject_ids.*'    => 'integer',
+            'teaching_type_id' => ['nullable', Rule::exists((new \App\Models\TeachingType)->getConnectionName().'.teaching_types', 'id')],
         ]);
 
-        $submission->teachers()->create($data);
+        $submission->teachers()->create($this->teacherPayloadFrom($data));
 
         return back()->with('success', 'Teacher added.');
+    }
+
+    public function bulkStoreTeachers(Request $request, MembershipRegistrationWindowService $windowService)
+    {
+        $this->assertRegistrationEditAllowed($windowService);
+        $registration = $this->currentRegistration();
+        $submission = $registration->submission;
+        abort_unless(in_array($submission->teacher_status, ['pending', 'rejected']), 403);
+
+        $data = $request->validate([
+            'teachers'                    => 'required|array|min:1|max:50',
+            'teachers.*.name'             => 'required|string|max:255',
+            'teachers.*.subject_ids'      => 'nullable|array',
+            'teachers.*.subject_ids.*'    => 'integer',
+            'teachers.*.teaching_type_id' => ['nullable', Rule::exists((new \App\Models\TeachingType)->getConnectionName().'.teaching_types', 'id')],
+        ]);
+
+        $added = 0;
+        foreach ($data['teachers'] as $row) {
+            if (blank($row['name'] ?? null)) {
+                continue;
+            }
+            $submission->teachers()->create($this->teacherPayloadFrom($row));
+            $added++;
+        }
+
+        return back()->with('success', "{$added} teacher(s) added.");
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function teacherPayloadFrom(array $data): array
+    {
+        $subjectIds = array_values(array_filter($data['subject_ids'] ?? [], fn ($id) => filled($id)));
+        $labels = $this->subjectLabelsFor($subjectIds);
+
+        return [
+            'name'             => $data['name'],
+            'subject_ids'      => $subjectIds ?: null,
+            'subject'          => $labels !== [] ? implode(', ', $labels) : null,
+            'teaching_type_id' => $data['teaching_type_id'] ?? null,
+        ];
+    }
+
+    /**
+     * @param  array<int, int>  $subjectIds
+     * @return array<int, string>
+     */
+    private function subjectLabelsFor(array $subjectIds): array
+    {
+        if ($subjectIds === []) {
+            return [];
+        }
+
+        return \App\Models\Subject::whereIn('id', $subjectIds)
+            ->forSahodaya($this->school->parent_id)
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->pluck('label')
+            ->all();
     }
 
     public function destroyTeacher(string $tenantId, SubmissionTeacher $teacher, MembershipRegistrationWindowService $windowService)
@@ -481,6 +599,18 @@ class AnnualRegistrationController extends SchoolAdminController
             ->firstOrFail();
 
         return $registration;
+    }
+
+    private function registrationProfilePayload(): ?array
+    {
+        $profile = SahodayaProfile::where('tenant_id', $this->school->parent_id)->first();
+        if (! $profile) {
+            return null;
+        }
+
+        return array_merge($profile->toArray(), [
+            'payment_details_text' => $profile->paymentDetailsText(),
+        ]);
     }
 
     private function assertRegistrationEditAllowed(MembershipRegistrationWindowService $windowService): void

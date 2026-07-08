@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Services\Events\FestNumberingService;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FestParticipant extends Model
 {
     protected $fillable = [
-        'registration_id', 'group_id', 'student_id', 'teacher_id', 'event_id',
+        'registration_id', 'group_id', 'student_id', 'teacher_id', 'event_id', 'chest_head_id',
         'participant_type', 'participant_role', 'chest_no', 'chest_revealed_at',
         'level_registration_number', 'item_registration_number', 'disqualified_at', 'disqualification_reason',
     ];
@@ -41,5 +43,12 @@ class FestParticipant extends Model
     public function mark(): BelongsTo
     {
         return $this->belongsTo(FestMark::class, 'id', 'participant_id');
+    }
+
+    protected function chestNo(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?int $value) => $value ?? app(FestNumberingService::class)->effectiveChestNumber($this),
+        );
     }
 }

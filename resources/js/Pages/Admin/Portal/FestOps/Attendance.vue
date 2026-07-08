@@ -39,16 +39,13 @@
 import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import { festOpsEventNav } from '@/support/festOpsPortalNav.js';
 
 const props = defineProps({ sahodaya: Object, event: Object, participants: Array, attendance: Object, duties: Array });
 
 const base = computed(() => `/portal/fest-ops/${props.sahodaya.id}/events/${props.event.id}`);
 
-const navItems = computed(() => [
-    { href: `/portal/fest-ops/${props.sahodaya.id}`, label: 'Dashboard' },
-    { href: base.value, label: 'Event' },
-    { href: `${base.value}/attendance`, label: 'Attendance' },
-]);
+const navItems = computed(() => festOpsEventNav(props.sahodaya.id, props.event.id, props.duties));
 
 function keyFor(p) {
     return `${p.registration?.item_id}-${p.id}`;

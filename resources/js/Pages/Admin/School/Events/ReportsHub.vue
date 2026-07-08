@@ -5,7 +5,7 @@
             <HubCard
                 v-for="p in programs"
                 :key="p.slug"
-                :href="`/school-admin/${school.id}/programs/${p.slug}/reports`"
+                :href="schoolProgramHref(school.id, p.slug, 'reports')"
                 :label="p.label"
                 icon="📊"
             />
@@ -14,15 +14,18 @@
             <h3 class="section-title mb-2">Qualifiers</h3>
             <p class="text-sm text-gray-500 mb-3">Students and teachers promoted to the next fest level.</p>
             <div class="flex flex-wrap gap-2">
-                <a v-for="p in programs" :key="'q-'+p.slug"
-                   :href="`/school-admin/${school.id}/programs/${p.slug}/qualifiers`"
-                   class="btn-secondary text-xs">{{ p.label }} qualifiers</a>
+                <Link v-for="p in programs" :key="'q-'+p.slug"
+                      :href="schoolProgramHref(school.id, p.slug, 'qualifiers')"
+                      class="btn-secondary text-xs">{{ p.label }} qualifiers</Link>
             </div>
         </div>
     </SchoolAdminLayout>
 </template>
 
 <script setup>
+import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { schoolProgramHref } from '@/support/schoolProgramNav.js';
+
 defineProps({ school: Object, programs: Array });
 </script>

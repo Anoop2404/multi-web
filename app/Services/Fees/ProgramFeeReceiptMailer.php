@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\Log;
 
 class ProgramFeeReceiptMailer
 {
+    public function __construct(
+        private FeeReceiptEmailTracker $tracker,
+    ) {}
+
     public function sendApproved(
         Tenant $school,
         FeeReceipt $receipt,
@@ -18,26 +22,31 @@ class ProgramFeeReceiptMailer
         string $contextTitle,
         ?string $receiptHtml = null,
         string $adminPath = 'payments',
-    ): void {
+    ): bool {
         $sahodaya = $school->parent_id ? Tenant::find($school->parent_id) : null;
         if (! $sahodaya) {
-            return;
+            return false;
         }
 
         $receiptHtml ??= app(ProgramFeeReceiptService::class)->readOrGenerate($receipt);
         if (! $receiptHtml) {
+            $this->tracker->markSkipped($receipt, 'Receipt HTML not available');
             Log::warning('Program fee receipt email skipped: HTML not available', [
                 'receipt_id' => $receipt->id,
                 'school_id'  => $school->id,
             ]);
 
-            return;
+            return false;
         }
 
         $recipients = $this->schoolRecipientEmails($school);
         if ($recipients === []) {
-            return;
+            $this->tracker->markSkipped($receipt, 'No school recipient emails');
+
+            return false;
         }
+
+        $this->tracker->markQueued($receipt);
 
         $receiptNo = $receipt->receipt_number ?? '—';
         $subject = "Fee receipt {$receiptNo} — {$contextTitle}";
@@ -72,12 +81,18 @@ class ProgramFeeReceiptMailer
                 $viewData,
                 $attachments,
             );
+            $this->tracker->markSent($receipt->fresh());
+
+            return true;
         } catch (\Throwable $e) {
+            $this->tracker->markFailed($receipt->fresh(), $e->getMessage());
             Log::warning('Program fee receipt email failed', [
                 'receipt_id' => $receipt->id,
                 'school_id'  => $school->id,
                 'error'      => $e->getMessage(),
             ]);
+
+            return false;
         }
     }
 

@@ -16,10 +16,20 @@ class FestGateController extends Controller
     {
         $sahodaya = Tenant::where('id', $tenantId)->where('type', 'sahodaya')->firstOrFail();
 
-        $events = FestEvent::where('tenant_id', $tenantId)
+        $eventsQuery = FestEvent::where('tenant_id', $tenantId)
             ->whereIn('status', ['published', 'registration_open', 'ongoing'])
-            ->orderByDesc('event_start')
-            ->get(['id', 'title', 'status', 'event_start']);
+            ->orderByDesc('event_start');
+
+        $user = $request->user();
+        if ($user && ! $user->isSuperAdmin() && ! $user->hasRole('sahodaya_admin')) {
+            $assignedIds = FestEventStaff::query()
+                ->where('user_id', $user->id)
+                ->whereHas('event', fn ($q) => $q->where('tenant_id', $tenantId))
+                ->pluck('event_id');
+            $eventsQuery->whereIn('id', $assignedIds);
+        }
+
+        $events = $eventsQuery->get(['id', 'title', 'status', 'event_start']);
 
         return inertia('Portal/FestOps/GateCheck', [
             'sahodaya' => $sahodaya->only('id', 'name'),
@@ -70,7 +80,7 @@ class FestGateController extends Controller
     private function assertCanScan(Request $request, FestEvent $event): void
     {
         $user = $request->user();
-        if ($user->isSuperAdmin() || $user->hasAnyRole(['sahodaya_admin', 'fest_event_ops'])) {
+        if ($user->isSuperAdmin() || $user->hasAnyRole(['sahodaya_admin', 'fest_ops'])) {
             return;
         }
 

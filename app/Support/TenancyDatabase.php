@@ -194,4 +194,25 @@ MSG);
             ->pluck('id')
             ->all();
     }
+
+    /**
+     * School tenant IDs under a Sahodaya matching name or prefix search (central tenants table).
+     *
+     * @return list<string>
+     */
+    public static function schoolIdsMatchingSearch(string $sahodayaId, string $search): array
+    {
+        $query = Tenant::query()
+            ->where('type', 'school')
+            ->where('parent_id', $sahodayaId);
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('school_prefix', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->pluck('id')->all();
+    }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
+use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
@@ -9,29 +11,57 @@ use App\Models\FestRegistration;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestMarkSaveService;
+use App\Services\Events\FestRankPointService;
 use App\Services\Events\FestSportsAutoRankService;
 use App\Support\FestPageActivity;
 use Illuminate\Http\Request;
 
 class FestMarkEntryController extends SahodayaAdminController
 {
-    public function index(string $tenantId, FestEvent $event)
+    use BuildsItemHeadReportContext;
+
+    public function index(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $event->load('items');
 
+        $headId = $this->resolveHeadQueryParam($request->query('head_id') ?? $request->query('head'));
+        $itemId = $request->integer('item_id') ?: null;
+        $itemIds = $this->itemIdsForHeadFilter($event, $headId, $itemId);
+
         $registrations = FestRegistration::where('event_id', $event->id)
             ->where('status', 'approved')
+            ->when($itemIds !== null, fn ($q) => $q->whereIn('item_id', $itemIds))
             ->with(['item', 'school', 'participants.student', 'participants.teacher'])
             ->get();
 
         $marks = FestMark::where('event_id', $event->id)->get()->keyBy('participant_id');
 
+        $attendance = FestAttendance::where('event_id', $event->id)
+            ->get()
+            ->mapWithKeys(fn (FestAttendance $row) => [
+                "{$row->item_id}-{$row->participant_id}" => ['status' => $row->status],
+            ])
+            ->all();
+
+        $selectedHeadId = match (true) {
+            $headId === 0 => 'other',
+            $headId !== null => $headId,
+            default => null,
+        };
+
         return $this->inertia('Sahodaya/Events/MarkEntry', $this->withEventActivity($event, FestPageActivity::MARKS, [
-            'event'         => $event,
-            'registrations' => $registrations,
-            'marks'         => $marks,
+            'event'          => $event,
+            'registrations'  => $registrations,
+            'marks'          => $marks,
+            'attendance'     => $attendance,
+            'selectedHeadId' => $selectedHeadId,
+            'selectedItemId' => $itemId,
+            'competitionUrl' => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/competition",
+            'rankPoints'     => $event->event_type === 'sports'
+                ? app(FestRankPointService::class)->listForEvent($event)
+                : [],
         ]));
     }
 

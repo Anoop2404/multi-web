@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1\School;
 
 use App\Models\Registration;
-use App\Models\SahodayaProfile;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Support\AcademicYear;
@@ -14,19 +13,12 @@ class DashboardApiController extends SchoolApiController
     {
         $tid = $this->school->id;
         $academicYear = AcademicYear::forSchool($this->school);
-        $sahodaya = $this->school->parent;
-        $profile = $sahodaya
-            ? SahodayaProfile::where('tenant_id', $sahodaya->id)->first()
-            : null;
         $registration = Registration::where('school_id', $this->school->id)
             ->where('academic_year', $academicYear)
             ->first();
 
         $schoolCode = $this->school->school_prefix;
-        $sahodayaPrefix = $profile?->prefix;
-        $regNoExample = ($sahodayaPrefix && $schoolCode)
-            ? strtoupper($sahodayaPrefix).'/'.strtoupper($schoolCode).'/'.AcademicYear::yearSuffix($academicYear).'/0001'
-            : null;
+        $regNoExample = \App\Services\Students\StudentRegistrationNumberGenerator::PREFIX.'/'.AcademicYear::yearSuffix($academicYear).'/0001';
 
         $classCount = SchoolClass::where('tenant_id', $tid)->where('is_active', true)->count();
         $studentCount = Student::where('tenant_id', $tid)->where('status', 'active')->count();

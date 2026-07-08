@@ -8,6 +8,8 @@ use App\Services\Events\FestTaxonomyRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+use App\Support\ProgramRouteMap;
+
 class FestTaxonomyMasterController extends SahodayaAdminController
 {
     public function index(Request $request, FestTaxonomyRegistry $registry)
@@ -17,11 +19,16 @@ class FestTaxonomyMasterController extends SahodayaAdminController
         $dimension = $request->input('dimension', 'sport_discipline');
         abort_unless(array_key_exists($dimension, FestTaxonomyMaster::DIMENSIONS), 404);
 
-        return $this->inertia('Sahodaya/TaxonomyMasters/Index', [
+        $programSlug = $request->input('program');
+        $navProps = $programSlug && ProgramRouteMap::eventTypeFromSlug($programSlug)
+            ? $this->programNavProps($programSlug)
+            : [];
+
+        return $this->inertia('Sahodaya/TaxonomyMasters/Index', $navProps + [
             'dimension'   => $dimension,
             'dimensions'  => FestTaxonomyMaster::DIMENSIONS,
             'entries'     => $registry->forTenant($this->sahodaya->id)->rowsForDimension($dimension),
-            'sportsAgeGroupsUrl' => "/sahodaya-admin/{$this->sahodaya->id}/sports-age-groups",
+            'sportsAgeGroupsUrl' => "/sahodaya-admin/{$this->sahodaya->id}/sports/age-groups",
         ]);
     }
 

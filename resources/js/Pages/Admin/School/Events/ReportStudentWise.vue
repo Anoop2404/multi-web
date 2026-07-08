@@ -6,8 +6,8 @@
             description="Per-student registrations and scores for this event."
         >
             <template #actions>
-                <Link :href="`${programBase}/reports`" class="btn-secondary text-sm">← Reports</Link>
-                <a :href="exportUrl" class="btn-primary text-sm">Export CSV ↓</a>
+                <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
+                <ReportDownloadButtons :pdf-url="pdfUrl" :csv-url="csvUrl" />
             </template>
         </PageHeader>
 
@@ -23,12 +23,19 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 
-const props = defineProps({ school: Object, program: [String, Object], programMeta: { type: Object, default: null }, event: Object, rows: Array });
+const props = defineProps({
+    school: Object,
+    program: [String, Object],
+    programMeta: { type: Object, default: null },
+    event: Object,
+    rows: Array,
+    pdfUrl: String,
+    csvUrl: String,
+});
 const { programLabel, programBase } = useSchoolProgramContext(props);
-const exportUrl = computed(() => `${programBase.value}/reports/${props.event.id}/student-wise/export`);
 </script>

@@ -32,6 +32,42 @@
                         </span>
                     </div>
 
+                    <div v-if="form.conduct_levels.includes('state')" class="border rounded-xl p-3 bg-emerald-50 space-y-3">
+                        <div>
+                            <p class="text-xs font-semibold text-emerald-900">State handoff</p>
+                            <p class="text-xs text-emerald-700 mt-0.5">Used when Sahodayas submit published Kalotsav qualifiers to the State workspace.</p>
+                        </div>
+                        <select v-model="form.state_domain_id" class="field">
+                            <option value="">Create / configure state API endpoint</option>
+                            <option v-for="domain in stateDomains" :key="domain.id" :value="domain.id">
+                                {{ domain.name }} — {{ domain.api_base_url || domain.domain || domain.api_client_id }}
+                            </option>
+                        </select>
+                        <div class="grid sm:grid-cols-2 gap-2">
+                            <input v-model="form.state_domain.name" class="field" placeholder="State domain name">
+                            <input v-model="form.state_domain.domain" class="field" placeholder="Public domain">
+                            <input v-model="form.state_domain.api_base_url" class="field" placeholder="API base URL">
+                            <input v-model="form.state_domain.api_client_id" class="field" placeholder="Client ID">
+                            <input v-model="form.state_domain.api_client_secret" type="password" class="field sm:col-span-2" placeholder="Set / rotate shared API secret">
+                        </div>
+                        <div class="grid sm:grid-cols-2 gap-3 text-xs">
+                            <div class="space-y-2">
+                                <p class="font-semibold text-emerald-900">Regional qualifiers</p>
+                                <label v-for="pos in [1, 2, 3]" :key="`regional-${pos}`" class="inline-flex items-center gap-1 mr-3">
+                                    <input type="checkbox" :value="pos" v-model="form.qualifier_policy.regional.positions">
+                                    Position {{ pos }}
+                                </label>
+                            </div>
+                            <div class="space-y-2">
+                                <p class="font-semibold text-emerald-900">District qualifiers</p>
+                                <label v-for="pos in [1, 2, 3]" :key="`district-${pos}`" class="inline-flex items-center gap-1 mr-3">
+                                    <input type="checkbox" :value="pos" v-model="form.qualifier_policy.district.positions">
+                                    Position {{ pos }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Per-level fees -->
                     <div v-if="form.conduct_levels.filter(l => l !== 'state').length" class="border rounded-xl p-3 bg-gray-50 space-y-3">
                         <div>
@@ -195,6 +231,8 @@ const props = defineProps({
     defaultAgeGroupFees: Object,
     participationPresets: Object,
     taxonomy: Object,
+    stateDomains: Array,
+    defaultQualifierPolicy: Object,
 });
 
 function buildLevelFees(program, conductLevels) {
@@ -265,6 +303,24 @@ const form = useForm({
     event_start: props.program.event_start?.slice?.(0, 10) ?? '',
     event_end: props.program.event_end?.slice?.(0, 10) ?? '',
     venue: props.program.venue ?? '',
+    state_domain_id: props.program.state_domain_id ?? '',
+    state_flow_mode: props.program.state_flow_mode ?? 'state_domain_event',
+    qualifier_policy: {
+        regional: {
+            positions: [...(props.program.qualifier_policy?.regional?.positions ?? props.defaultQualifierPolicy?.regional?.positions ?? [1])],
+        },
+        district: {
+            positions: [...(props.program.qualifier_policy?.district?.positions ?? props.defaultQualifierPolicy?.district?.positions ?? [1, 2])],
+        },
+        skip_item_flags: [...(props.program.qualifier_policy?.skip_item_flags ?? props.defaultQualifierPolicy?.skip_item_flags ?? ['mcs_only'])],
+    },
+    state_domain: {
+        name: props.program.state_domain?.name ?? '',
+        domain: props.program.state_domain?.domain ?? '',
+        api_base_url: props.program.state_domain?.api_base_url ?? '',
+        api_client_id: props.program.state_domain?.api_client_id ?? '',
+        api_client_secret: '',
+    },
     description: props.program.description ?? '',
 });
 

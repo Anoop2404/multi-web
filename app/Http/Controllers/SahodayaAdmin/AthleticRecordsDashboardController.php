@@ -26,7 +26,7 @@ class AthleticRecordsDashboardController extends SahodayaAdminController
             ->limit(50)
             ->get();
 
-        return $this->inertia('Sahodaya/Sports/Records', [
+        return $this->inertia('Sahodaya/Sports/Records', $this->programNavProps('sports-meet') + [
             'records'      => $records,
             'recentBreaks' => $recentBreaks,
         ]);

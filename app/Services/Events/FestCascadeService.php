@@ -9,6 +9,9 @@ class FestCascadeService
 {
     public function spawnChildEvent(FestEvent $parent, string $title, array $overrides = []): FestEvent
     {
+        $copyItems = $overrides['copy_items'] ?? true;
+        unset($overrides['copy_items']);
+
         $levelRound = $overrides['level_round'] ?? $parent->level_round ?? 'sahodaya';
 
         if (! isset($overrides['fee_type'])) {
@@ -42,8 +45,10 @@ class FestCascadeService
             'description'        => "Cascaded from {$parent->title}",
         ], $overrides));
 
-        $parent->loadMissing('items');
-        app(FestItemSyncService::class)->copyAllItemsToChild($parent, $child);
+        if ($copyItems) {
+            $parent->loadMissing('items');
+            app(FestItemSyncService::class)->copyAllItemsToChild($parent, $child);
+        }
 
         return $child;
     }

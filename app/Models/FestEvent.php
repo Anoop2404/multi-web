@@ -2,18 +2,22 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FestEvent extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = [
         'tenant_id', 'academic_year_id', 'title', 'event_type', 'conductor_level',
         'conduct_levels', 'level_round', 'state_program_id', 'conducting_school_id',
-        'is_cascaded', 'parent_event_id', 'cluster_key', 'cluster_label', 'cloned_from_event_id',
+        'is_cascaded', 'parent_event_id',         'cluster_key', 'cluster_label', 'cloned_from_event_id',
+        'conduct_mode', 'partition_role', 'partition_key', 'aggregation_config', 'scoring_preset',
         'registration_open', 'registration_close', 'event_start', 'event_end', 'sports_age_cutoff_date', 'venue',
-        'fee_type', 'fee_amount', 'fee_settings', 'numbering_settings', 'status', 'results_published', 'description',
+        'fee_type', 'fee_amount', 'fee_settings', 'numbering_settings', 'status', 'nav_hidden', 'results_published', 'description',
         'scoring_locked', 'appeals_open', 'chest_reveal_mode', 'require_judge_scores_before_publish',
         'appeal_fee_amount', 'certificate_collection_open', 'registration_locked', 'schedule_published',
         'record_tracking_enabled', 'default_record_prize_label', 'require_all_marks_before_publish',
@@ -23,6 +27,7 @@ class FestEvent extends Model
 
     protected $casts = [
         'is_cascaded'                         => 'boolean',
+        'nav_hidden'                          => 'boolean',
         'results_published'                   => 'boolean',
         'scoring_locked'                      => 'boolean',
         'appeals_open'                        => 'boolean',
@@ -35,6 +40,7 @@ class FestEvent extends Model
         'allow_student_self_register'         => 'boolean',
         'record_tracking_enabled'             => 'boolean',
         'conduct_levels'                      => 'array',
+        'aggregation_config'                  => 'array',
         'registration_open'                   => 'date',
         'registration_close'                  => 'date',
         'event_reg_start'                     => 'date',
@@ -95,7 +101,7 @@ class FestEvent extends Model
 
     public function conductingSchool(): BelongsTo
     {
-        return $this->belongsTo(Tenant::class, 'conducting_school_id');
+        return $this->belongsToCentralTenant('conducting_school_id');
     }
 
     public function scopeForTenant($q, string $tenantId)
@@ -108,9 +114,40 @@ class FestEvent extends Model
         return $q->where('event_type', $type);
     }
 
+    public function scopeVisibleInNav($q)
+    {
+        return $q->where('nav_hidden', false);
+    }
+
+    /**
+     * The single top-level Sahodaya hub event for a program type & year.
+     * Excludes school rounds, partition/region child events, and cluster spawns.
+     */
+    public function scopePrimaryHub($q)
+    {
+        return $q->whereNull('parent_event_id')
+            ->whereNull('conducting_school_id')
+            ->whereNull('partition_role')
+            ->where(function ($inner) {
+                $inner->whereIn('level_round', ['sahodaya', 'state'])
+                    ->orWhereNull('level_round');
+            });
+    }
+
+    /** Fest program types that are unique (one per Sahodaya per academic year). */
+    public static function singletonEventTypes(): array
+    {
+        return ['kalolsavam', 'sports', 'kids_fest', 'teacher_fest', 'english_fest', 'science_fest'];
+    }
+
+    public static function isSingletonType(?string $eventType): bool
+    {
+        return $eventType !== null && in_array($eventType, self::singletonEventTypes(), true);
+    }
+
     public function scopeVisibleToSchool($q, string $schoolId)
     {
-        return $q->where(function ($inner) use ($schoolId) {
+        return $q->where('nav_hidden', false)->where(function ($inner) use ($schoolId) {
             $inner->where(function ($cluster) {
                 $cluster->where('level_round', 'sahodaya')
                     ->orWhereNull('level_round');

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FestSubstitutionRequest extends Model
 {
+    use BelongsToCentralTenant;
+
     protected $fillable = [
         'event_id', 'school_id', 'registration_id', 'original_participant_id',
         'replacement_participant_id', 'replacement_student_id', 'reason', 'status',
@@ -24,7 +27,7 @@ class FestSubstitutionRequest extends Model
 
     public function school(): BelongsTo
     {
-        return $this->belongsTo(Tenant::class, 'school_id');
+        return $this->belongsToCentralTenant('school_id');
     }
 
     public function registration(): BelongsTo

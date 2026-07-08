@@ -12,7 +12,7 @@
                     (e.g. <span class="font-mono font-semibold">AMU</span> for AMU Residential School).
                 </p>
                 <p class="text-blue-800/90 leading-relaxed">
-                    It is used in Sahodaya numbers — school membership <span class="font-mono">SAHODAYA/CODE/0001</span> and student <span class="font-mono">SAHODAYA/CODE/YEAR/0001</span>.
+                    It is used in Sahodaya numbers — school membership <span class="font-mono">SAHODAYA/YY/1</span> and student <span class="font-mono">STU/YY/0001</span>.
                     <span v-if="regNoExample" class="block mt-2 font-mono text-xs bg-white/70 border border-blue-100 rounded px-2 py-1.5 inline-block">
                         Example student reg no: {{ regNoExample }}
                     </span>
