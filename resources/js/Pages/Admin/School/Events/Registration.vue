@@ -1012,7 +1012,21 @@ function isItemFull(event, item) {
     return itemRegistrationCount(event.id, item.id) >= itemMaxPerSchool(item);
 }
 
+function itemRegWindowMessage(item) {
+    if (item.registration_open !== false) return '';
+    if (item.reg_start && item.reg_end) {
+        return `Registration for this item is closed (window was ${item.reg_start} – ${item.reg_end}).`;
+    }
+    if (item.reg_end) return `Registration for this item closed on ${item.reg_end}.`;
+    if (item.reg_start) return `Registration for this item opens on ${item.reg_start}.`;
+    return 'Registration is closed for this item.';
+}
+
 function itemBlockReason(event, item) {
+    if (item.registration_open === false) {
+        return itemRegWindowMessage(item);
+    }
+
     if (isItemFull(event, item)) {
         const max = itemMaxPerSchool(item);
         return max === 1
@@ -1089,6 +1103,10 @@ function itemNoEligibleHint(event, item) {
 }
 
 function itemRegistrationStatus(event, item) {
+    if (item.registration_open === false) {
+        return 'closed';
+    }
+
     const regs = itemRegistrationCount(event.id, item.id);
     const max = itemMaxPerSchool(item);
 
@@ -1134,6 +1152,14 @@ function itemStatusMeta(event, item) {
             label: 'No match',
             badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
             hint: itemNoEligibleHint(event, item),
+        };
+    }
+
+    if (status === 'closed') {
+        return {
+            label: 'Closed',
+            badgeClass: 'bg-amber-50 text-amber-800 border-amber-100',
+            hint: itemRegWindowMessage(item),
         };
     }
 

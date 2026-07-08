@@ -2,6 +2,7 @@
 
 namespace App\Services\Events;
 
+use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestItemHead;
 use Illuminate\Support\Carbon;
@@ -10,12 +11,38 @@ class FestItemWindowResolver
 {
     public function effectiveRegStart(FestEventItem $item): ?Carbon
     {
-        return $this->firstDate($item->reg_start, $this->head($item)?->reg_start);
+        if ($item->reg_start) {
+            return Carbon::parse($item->reg_start)->startOfDay();
+        }
+
+        $head = $this->head($item);
+        if ($head?->reg_start && $this->usesHeadRegistrationWindows($item)) {
+            return Carbon::parse($head->reg_start)->startOfDay();
+        }
+
+        $event = $this->event($item);
+
+        return $event?->registration_open
+            ? Carbon::parse($event->registration_open)->startOfDay()
+            : null;
     }
 
     public function effectiveRegEnd(FestEventItem $item): ?Carbon
     {
-        return $this->firstDate($item->reg_end, $this->head($item)?->reg_end);
+        if ($item->reg_end) {
+            return Carbon::parse($item->reg_end)->startOfDay();
+        }
+
+        $head = $this->head($item);
+        if ($head?->reg_end && $this->usesHeadRegistrationWindows($item)) {
+            return Carbon::parse($head->reg_end)->startOfDay();
+        }
+
+        $event = $this->event($item);
+
+        return $event?->registration_close
+            ? Carbon::parse($event->registration_close)->startOfDay()
+            : null;
     }
 
     public function effectiveCompetitionStart(FestEventItem $item): ?Carbon
@@ -82,6 +109,19 @@ class FestItemWindowResolver
         }
     }
 
+    private function event(FestEventItem $item): ?FestEvent
+    {
+        if ($item->relationLoaded('event')) {
+            return $item->event;
+        }
+
+        if (! $item->event_id) {
+            return null;
+        }
+
+        return $item->event()->first(['id', 'event_type', 'registration_open', 'registration_close']);
+    }
+
     private function head(FestEventItem $item): ?FestItemHead
     {
         if ($item->relationLoaded('head')) {
@@ -93,6 +133,14 @@ class FestItemWindowResolver
         }
 
         return $item->head()->first(['id', 'name', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time']);
+    }
+
+    /** Sports and Kalotsav use per-head registration windows; other programs follow event dates unless the item sets its own. */
+    private function usesHeadRegistrationWindows(FestEventItem $item): bool
+    {
+        $event = $this->event($item);
+
+        return in_array($event?->event_type, ['sports', 'kalolsavam'], true);
     }
 
     private function firstDate(mixed $primary, mixed $fallback): ?Carbon
