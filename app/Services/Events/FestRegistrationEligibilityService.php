@@ -155,6 +155,7 @@ class FestRegistrationEligibilityService
             'kalolsavam' => $this->validateKalolsav($student, $item),
             'kids_fest'  => $this->validateKidsFest($student, $item),
             'sports'     => $this->validateSports($student, $event, $item),
+            'custom'     => $this->validateCustomClassGroup($student, $item),
             default      => null,
         };
     }
@@ -172,8 +173,28 @@ class FestRegistrationEligibilityService
             return 'class could not be mapped to a Kalotsav category (Classes 3–12 only).';
         }
 
+        return $this->validateItemClassGroup($studentGroup, $item);
+    }
+
+    private function validateCustomClassGroup(Student $student, FestEventItem $item): ?string
+    {
         $itemGroup = $item->class_group ?? 'open';
-        if ($itemGroup === 'open') {
+        if ($itemGroup === 'open' || $itemGroup === '') {
+            return null;
+        }
+
+        $studentGroup = FestStudentClassResolver::kalolsavClassGroupForStudent($student);
+        if ($studentGroup === null) {
+            return 'class could not be mapped to a fest category.';
+        }
+
+        return $this->validateItemClassGroup($studentGroup, $item);
+    }
+
+    private function validateItemClassGroup(string $studentGroup, FestEventItem $item): ?string
+    {
+        $itemGroup = $item->class_group ?? 'open';
+        if ($itemGroup === 'open' || $itemGroup === '') {
             return null;
         }
 

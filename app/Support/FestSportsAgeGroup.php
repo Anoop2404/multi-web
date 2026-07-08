@@ -271,7 +271,9 @@ class FestSportsAgeGroup
             if ($age && $age !== 'open') {
                 $parts[] = self::labels($event->tenant_id)[$age] ?? strtoupper($age);
             }
-        } elseif ($event->event_type === 'kalolsavam' && filled($item->class_group) && $item->class_group !== 'open') {
+        } elseif (in_array($event->event_type, ['kalolsavam', 'custom'], true)
+            && filled($item->class_group)
+            && $item->class_group !== 'open') {
             $labels = FestClassGroupScheme::labels(null, $event);
             $parts[] = $labels[$item->class_group] ?? strtoupper($item->class_group);
         } elseif ($event->event_type === 'kids_fest' && filled($item->kids_band) && $item->kids_band !== 'open') {

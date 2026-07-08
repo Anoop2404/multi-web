@@ -94,4 +94,37 @@ class FestRegistrationEligibilityServiceTest extends TestCase
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('gender', strtolower($errors[0]));
     }
+
+    public function test_custom_event_enforces_class_group_on_item(): void
+    {
+        $event = new FestEvent(['event_type' => 'custom']);
+        $item = new FestEventItem(['class_group' => 'up', 'gender' => 'open']);
+        $student = new Student(['name' => 'Meera', 'gender' => 'female']);
+        $student->setRelation('schoolClass', (object) ['name' => 'Class 8']);
+
+        $errors = $this->service->validateStudent($student, $event, $item);
+
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('belongs to', $errors[0]);
+    }
+
+    public function test_custom_event_accepts_matching_class_group(): void
+    {
+        $event = new FestEvent(['event_type' => 'custom']);
+        $item = new FestEventItem(['class_group' => 'up', 'gender' => 'open']);
+        $student = new Student(['name' => 'Meera', 'gender' => 'female']);
+        $student->setRelation('schoolClass', (object) ['name' => 'Class 6']);
+
+        $this->assertSame([], $this->service->validateStudent($student, $event, $item));
+    }
+
+    public function test_custom_event_ignores_class_group_when_item_is_open(): void
+    {
+        $event = new FestEvent(['event_type' => 'custom']);
+        $item = new FestEventItem(['class_group' => 'open', 'gender' => 'open']);
+        $student = new Student(['name' => 'Meera', 'gender' => 'female']);
+        $student->setRelation('schoolClass', (object) ['name' => 'Class 12']);
+
+        $this->assertSame([], $this->service->validateStudent($student, $event, $item));
+    }
 }

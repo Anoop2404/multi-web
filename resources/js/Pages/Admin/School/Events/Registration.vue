@@ -780,6 +780,9 @@ function studentMatchesItem(student, event, item) {
         if (!student.eligible_kalolsav) return false;
         if (item.class_group && item.class_group !== 'open' && student.kalolsav_class_group !== item.class_group) return false;
     }
+    if (props.eventType === 'custom') {
+        if (item.class_group && item.class_group !== 'open' && student.kalolsav_class_group !== item.class_group) return false;
+    }
     if (props.eventType === 'kids_fest') {
         if (!student.eligible_kids_fest) return false;
         if (item.kids_band && item.kids_band !== 'open' && student.kids_fest_band !== item.kids_band) return false;
@@ -855,6 +858,18 @@ function studentIneligibilityReason(student, event, item) {
 
     if (props.eventType === 'kalolsavam') {
         if (!student.eligible_kalolsav) return 'Not eligible for Kalotsav (Classes 3–12)';
+        if (item.class_group && item.class_group !== 'open' && student.kalolsav_class_group !== item.class_group) {
+            return classGroupMismatchReason(student, item);
+        }
+    }
+
+    if (props.eventType === 'custom') {
+        if (item.class_group && item.class_group !== 'open') {
+            if (!student.kalolsav_class_group) return 'Class could not be mapped to a fest category';
+            if (student.kalolsav_class_group !== item.class_group) {
+                return classGroupMismatchReason(student, item);
+            }
+        }
     }
 
     if (props.eventType === 'kids_fest') {
@@ -946,6 +961,20 @@ function studentOptionLabel(student) {
 function categoryShort(student) {
     const map = { lp: '1', up: '2', hs: '3', hss: '4' };
     return map[student.kalolsav_class_group] ?? student.kalolsav_class_group;
+}
+
+function classGroupMismatchReason(student, item) {
+    const labels = {
+        lp: 'Classes 3 & 4',
+        up: 'Classes 5, 6 & 7',
+        hs: 'Classes 8, 9 & 10',
+        hss: 'Classes 11 & 12',
+    };
+    const expected = labels[item.class_group] ?? item.class_group?.toUpperCase?.() ?? item.class_group;
+    const actual = labels[student.kalolsav_class_group]
+        ?? (student.class_name ? `Class ${student.class_name}` : student.kalolsav_class_group?.toUpperCase?.() ?? 'another category');
+
+    return `Student is in ${actual}, but this item is for ${expected}`;
 }
 
 function performerCount(reg) {
@@ -1072,14 +1101,14 @@ function itemStatusMeta(event, item) {
         return {
             label: 'Open',
             badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-            hint: `${regs}/${max} entries · ${eligible} athlete${eligible === 1 ? '' : 's'} eligible`,
+            hint: `${regs}/${max} entries · ${eligible} ${isSports.value ? 'athlete' : 'student'}${eligible === 1 ? '' : 's'} eligible`,
         };
     }
 
     return {
         label: 'Open',
         badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-        hint: `${eligible} athlete${eligible === 1 ? '' : 's'} can register`,
+            hint: `${eligible} ${isSports.value ? 'athlete' : 'student'}${eligible === 1 ? '' : 's'} can register`,
     };
 }
 

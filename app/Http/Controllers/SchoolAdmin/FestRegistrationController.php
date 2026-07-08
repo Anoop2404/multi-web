@@ -513,6 +513,8 @@ class FestRegistrationController extends SchoolAdminController
             'participant_type'  => $item->participant_type,
             'gender'            => $item->gender,
             'age_group'         => $item->age_group,
+            'class_group'       => $item->class_group,
+            'kids_band'         => $item->kids_band,
             'head_id'           => $item->head_id,
             'max_per_school'    => $item->max_per_school,
             'min_group_size'    => $item->min_group_size,

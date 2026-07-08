@@ -237,6 +237,63 @@ class KannurLegacyMembershipImporter
     }
 
     /**
+     * Map legacy portal schools to existing member schools in the new system.
+     *
+     * @return array{
+     *     matches: list<array{
+     *         legacy_user_id: string,
+     *         legacy: array<string, string|null>,
+     *         legacy_user: array<string, string|null>|null,
+     *         school: Tenant,
+     *     }>,
+     *     unmatched: list<array<string, mixed>>,
+     *     legacy_schools: int,
+     * }
+     */
+    public function resolveSchoolMatches(Tenant $sahodaya, string $sqlPath): array
+    {
+        if (! is_readable($sqlPath)) {
+            throw new \InvalidArgumentException("Legacy SQL dump not found: {$sqlPath}");
+        }
+
+        $legacy = $this->loadLegacyData(file_get_contents($sqlPath));
+        $linkedUserIds = $this->linkedSchoolUserIds($legacy['users']);
+        $schoolsByUserId = $this->indexLegacySchools($legacy['schools'], $linkedUserIds);
+        $legacyUsersById = $this->indexLegacyUsers($legacy['users'], $linkedUserIds);
+        $newSchools = $this->indexNewSchools($sahodaya);
+
+        $matches = [];
+        $unmatched = [];
+
+        foreach ($schoolsByUserId as $userId => $legacySchool) {
+            $newSchool = $this->matchNewSchool($legacySchool, $newSchools);
+            if ($newSchool) {
+                $matches[] = [
+                    'legacy_user_id' => $userId,
+                    'legacy'         => $legacySchool,
+                    'legacy_user'    => $legacyUsersById[$userId] ?? null,
+                    'school'         => $newSchool,
+                ];
+
+                continue;
+            }
+
+            $unmatched[] = [
+                'legacy_user_id' => $userId,
+                'legacy_name'    => $legacySchool['school_name'] ?? '',
+                'affiliation_no' => $legacySchool['affiliation_no'] ?? '',
+                'email'          => $legacySchool['email'] ?? '',
+            ];
+        }
+
+        return [
+            'matches'        => $matches,
+            'unmatched'      => $unmatched,
+            'legacy_schools' => count($schoolsByUserId),
+        ];
+    }
+
+    /**
      * @return array<string, list<array<string, string|null>>>
      */
     private function loadLegacyData(string $sql): array
@@ -278,6 +335,25 @@ class KannurLegacyMembershipImporter
         }
 
         return $linked;
+    }
+
+    /**
+     * @param  list<array<string, string|null>>  $users
+     * @param  array<string, true>  $linkedUserIds
+     * @return array<string, array<string, string|null>>
+     */
+    private function indexLegacyUsers(array $users, array $linkedUserIds): array
+    {
+        $indexed = [];
+
+        foreach ($users as $user) {
+            $userId = (string) ($user['user_id'] ?? '');
+            if ($userId !== '' && isset($linkedUserIds[$userId])) {
+                $indexed[$userId] = $user;
+            }
+        }
+
+        return $indexed;
     }
 
     /**
