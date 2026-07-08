@@ -19,6 +19,7 @@ use App\Services\Audit\UploadBackupService;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Membership\FeeReceiptService;
 use App\Services\Membership\MembershipNotifier;
+use App\Services\Membership\MembershipPaymentProofService;
 use App\Services\Membership\MembershipRegistrationWindowService;
 use App\Services\Membership\RegistrationStatusService;
 use App\Support\AcademicYear;
@@ -306,12 +307,13 @@ class RegistrationApiController extends SchoolApiController
         return $this->message('Payment proof submitted.', 201, MembershipPaymentResource::make($payment));
     }
 
-    public function paymentProof(string $tenantId, string $paymentId)
+    public function paymentProof(string $tenantId, string $paymentId, MembershipPaymentProofService $proofs)
     {
-        $payment = MembershipPayment::where('school_id', $this->school->id)->findOrFail($paymentId);
-        abort_unless($payment->payment_proof_path, 404);
+        $payment = MembershipPayment::where('school_id', $this->school->id)
+            ->with('school')
+            ->findOrFail($paymentId);
 
-        return TenantStorage::downloadResponse($this->school, $payment->payment_proof_path);
+        return $proofs->download($payment);
     }
 
     private function currentRegistration(): Registration

@@ -20,6 +20,7 @@ use App\Services\Audit\UploadBackupService;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Membership\FeeReceiptService;
 use App\Services\Membership\MembershipNotifier;
+use App\Services\Membership\MembershipPaymentProofService;
 use App\Services\Membership\MembershipRegistrationWindowService;
 use App\Services\Membership\RegistrationStatusService;
 use App\Support\AcademicYear;
@@ -444,9 +445,22 @@ class AnnualRegistrationController extends SchoolAdminController
 
     public function payment()
     {
+        $registration = Registration::where('school_id', $this->school->id)
+            ->where('academic_year', AcademicYear::forSchool($this->school))
+            ->with('submission')
+            ->first();
+
+        if (! $registration) {
+            return redirect("/school-admin/{$this->school->id}/registration")
+                ->with('info', 'Start annual registration before uploading a membership payment.');
+        }
+
         $registration = app(RegistrationStatusService::class)
-            ->ensureMembershipFee($this->currentRegistration());
-        abort_unless(in_array($registration->registration_status, ['payment_pending', 'payment_rejected']), 403);
+            ->ensureMembershipFee($registration);
+        if (! in_array($registration->registration_status, ['payment_pending', 'payment_rejected'], true)) {
+            return redirect("/school-admin/{$this->school->id}/payments")
+                ->with('info', 'Membership payment is not pending. View the latest payment status and receipts here.');
+        }
 
         $profile = SahodayaProfile::where('tenant_id', $this->school->parent_id)->first();
         $slab = \App\Models\MembershipFeeSlab::where('sahodaya_id', $this->school->parent_id)
@@ -566,12 +580,11 @@ class AnnualRegistrationController extends SchoolAdminController
             ->with('success', 'Payment proof submitted. Sahodaya will verify your payment.');
     }
 
-    public function paymentProof(MembershipPayment $payment)
+    public function paymentProof(string $tenantId, MembershipPayment $payment, MembershipPaymentProofService $proofs)
     {
         abort_unless($payment->school_id === $this->school->id, 403);
-        abort_unless($payment->payment_proof_path, 404);
 
-        return TenantStorage::downloadResponse($this->school, $payment->payment_proof_path);
+        return $proofs->download($payment);
     }
 
     public function showSubmissionStudentImage(string $tenantId, SubmissionStudent $student)

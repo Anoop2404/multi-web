@@ -139,20 +139,62 @@
         .amount-box .value { font-size: 20px; }
         .signatures {
             display: flex;
-            gap: 48px;
+            gap: 28px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
         .signature-block {
             text-align: center;
-            min-width: 160px;
+            min-width: 145px;
         }
         .signature-line {
             border-top: 1px dotted #64748b;
             margin-bottom: 6px;
             height: 48px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .signature-image {
+            max-height: 44px;
+            max-width: 130px;
+            object-fit: contain;
         }
         .signature-label {
             font-size: 12px;
             font-weight: 600;
+        }
+        .signature-name {
+            font-size: 11px;
+            margin-top: 3px;
+            color: #334155;
+        }
+        .seal-block {
+            text-align: center;
+            min-width: 110px;
+        }
+        .seal-image {
+            width: 86px;
+            height: 86px;
+            object-fit: contain;
+        }
+        .seal-placeholder {
+            width: 86px;
+            height: 86px;
+            border: 2px dashed {{ $template['accent_color'] ?? '#1e3a8a' }};
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: {{ $template['accent_color'] ?? '#1e3a8a' }};
+            font-size: 11px;
+            font-weight: 700;
+            margin: 0 auto;
+        }
+        .seal-label {
+            font-size: 11px;
+            color: #475569;
+            margin-top: 4px;
         }
         @media print {
             body { padding: 0; }
@@ -209,14 +251,33 @@
                 <div class="value">{{ number_format($amount, 2) }}</div>
             </div>
             <div class="signatures">
-                <div class="signature-block">
-                    <div class="signature-line"></div>
-                    <div class="signature-label">{{ $template['receiver_label'] ?? 'Receiver Signature' }}</div>
+                @if(!empty($template['show_seal']))
+                <div class="seal-block">
+                    @if(!empty($sealUrl))
+                        <img src="{{ $sealUrl }}" alt="Seal" class="seal-image">
+                    @else
+                        <div class="seal-placeholder">SEAL</div>
+                    @endif
+                    <div class="seal-label">{{ $template['seal_label'] ?? 'Sahodaya Seal' }}</div>
                 </div>
+                @endif
+
+                @if(($template['receipt_signatures_enabled'] ?? true) && !empty($representatives))
+                    @foreach($representatives as $representative)
+                        @continue(empty($representative['enabled']))
                 <div class="signature-block">
-                    <div class="signature-line"></div>
-                    <div class="signature-label">{{ $template['counter_label'] ?? 'Counter Signature' }}</div>
+                    <div class="signature-line">
+                        @if(!empty($representative['signature_url']))
+                            <img src="{{ $representative['signature_url'] }}" alt="Signature" class="signature-image">
+                        @endif
+                    </div>
+                    <div class="signature-label">{{ $representative['designation'] ?? 'Authorised Signatory' }}</div>
+                    @if(!empty($representative['name']))
+                        <div class="signature-name">{{ $representative['name'] }}</div>
+                    @endif
                 </div>
+                    @endforeach
+                @endif
             </div>
         </div>
     </div>

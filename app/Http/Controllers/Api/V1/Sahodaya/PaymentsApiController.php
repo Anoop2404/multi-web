@@ -10,9 +10,9 @@ use App\Support\AcademicYear;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Membership\MembershipPaymentApprovalService;
+use App\Services\Membership\MembershipPaymentProofService;
 use App\Services\Membership\MembershipNotifier;
 use App\Support\TenancyDatabase;
-use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class PaymentsApiController extends SahodayaApiController
@@ -105,15 +105,13 @@ class PaymentsApiController extends SahodayaApiController
         return $this->ok(MembershipPaymentResource::make($payment->fresh()->load('school')));
     }
 
-    public function proof(string $tenantId, string $paymentId)
+    public function proof(string $tenantId, string $paymentId, MembershipPaymentProofService $proofs)
     {
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
         $payment = MembershipPayment::whereIn('school_id', $schoolIds)
             ->with('school')
             ->findOrFail($paymentId);
 
-        abort_unless($payment->payment_proof_path, 404);
-
-        return TenantStorage::downloadResponse($payment->school, $payment->payment_proof_path);
+        return $proofs->download($payment);
     }
 }

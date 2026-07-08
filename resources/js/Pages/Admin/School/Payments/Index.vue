@@ -80,7 +80,33 @@
                        class="btn-primary text-xs !py-1.5 !px-3">
                         Receipt ↗
                     </a>
+                    <button v-if="p.proof_url" type="button"
+                            class="btn-secondary text-xs !py-1.5 !px-3"
+                            @click="openProofPreview(p)">
+                        Proof
+                    </button>
                 </div>
+            </div>
+        </div>
+
+        <div v-if="proofPreview" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/70" @click="closeProofPreview"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Payment proof</p>
+                        <h3 class="font-bold text-slate-900 truncate">{{ proofPreview.label }}</h3>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <a :href="proofPreview.proof_url" target="_blank" rel="noopener" class="btn-secondary text-xs">
+                            Open in new tab
+                        </a>
+                        <button type="button" class="btn-ghost text-sm" @click="closeProofPreview">Close</button>
+                    </div>
+                </div>
+                <iframe :src="proofPreviewUrl"
+                        class="w-full flex-1 bg-slate-50"
+                        title="Payment proof preview"></iframe>
             </div>
         </div>
     </SchoolAdminLayout>
@@ -97,6 +123,8 @@ const props = defineProps({
 });
 
 const activeTab = ref('all');
+const proofPreview = ref(null);
+const proofPreviewUrl = computed(() => proofPreview.value?.proof_url ? withPreview(proofPreview.value.proof_url) : null);
 
 const tabs = computed(() => [
     { key: 'all', label: 'All', count: props.payments.length },
@@ -139,5 +167,17 @@ function statusClass(status) {
         rejected:  'bg-red-50 text-red-600',
         pending:   'bg-gray-100 text-gray-600',
     }[status] ?? 'bg-gray-100 text-gray-600';
+}
+
+function openProofPreview(payment) {
+    proofPreview.value = payment;
+}
+
+function closeProofPreview() {
+    proofPreview.value = null;
+}
+
+function withPreview(url) {
+    return `${url}${url.includes('?') ? '&' : '?'}preview=1`;
 }
 </script>

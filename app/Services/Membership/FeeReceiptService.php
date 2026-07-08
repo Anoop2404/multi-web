@@ -30,6 +30,18 @@ class FeeReceiptService
     {
         $receipt = $payment->feeReceipt;
         if (! $receipt) {
+            $receipt = FeeReceipt::query()
+                ->where('feeable_type', $payment->getMorphClass())
+                ->where('feeable_id', $payment->id)
+                ->latest('id')
+                ->first();
+
+            if ($receipt) {
+                $payment->update(['fee_receipt_id' => $receipt->id]);
+            }
+        }
+
+        if (! $receipt) {
             $this->createForMembershipPayment($payment);
 
             return;

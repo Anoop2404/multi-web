@@ -30,6 +30,9 @@ class SahodayaSetupService
             || filled($profile->payment_account_no)
             || filled($profile->payment_upi)
         );
+        $hasReceiptTemplate = $profile && collect($profile->receipt_template_json ?? [])
+            ->filter(fn ($value) => filled($value) || is_bool($value))
+            ->isNotEmpty();
         $hasClasses = MasterClass::where('sahodaya_id', $sahodaya->id)->where('is_active', true)->exists();
 
         return [
@@ -72,6 +75,14 @@ class SahodayaSetupService
                 'tabLabel' => 'Payment Details',
                 'done'     => $hasPayment,
                 'href'     => "{$settings}?tab=payment",
+            ],
+            [
+                'key'      => 'receipt',
+                'label'    => 'Configure membership receipt template',
+                'tab'      => 'receipt',
+                'tabLabel' => 'Receipt Template',
+                'done'     => $hasReceiptTemplate,
+                'href'     => "{$settings}?tab=receipt",
             ],
             [
                 'key'      => 'classes',

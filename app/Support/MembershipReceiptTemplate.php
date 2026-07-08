@@ -25,6 +25,41 @@ class MembershipReceiptTemplate
             $merged['registered_office'] = 'Registered office : '.$merged['registered_office'];
         }
 
+        $representatives = is_array($merged['representatives'] ?? null)
+            ? $merged['representatives']
+            : [];
+
+        if ($representatives === []) {
+            $representatives = [
+                [
+                    'enabled' => true,
+                    'name' => '',
+                    'designation' => $merged['receiver_label'] ?? 'Receiver Signature',
+                    'signature_path' => null,
+                ],
+                [
+                    'enabled' => true,
+                    'name' => '',
+                    'designation' => $merged['counter_label'] ?? 'Counter Signature',
+                    'signature_path' => null,
+                ],
+            ];
+        }
+
+        $merged['representatives'] = array_values(array_map(
+            fn (array $representative) => [
+                'enabled' => array_key_exists('enabled', $representative) ? (bool) $representative['enabled'] : true,
+                'name' => (string) ($representative['name'] ?? ''),
+                'designation' => (string) ($representative['designation'] ?? 'Authorised Signatory'),
+                'signature_path' => $representative['signature_path'] ?? null,
+            ],
+            array_slice($representatives, 0, 4),
+        ));
+        $merged['receipt_signatures_enabled'] = array_key_exists('receipt_signatures_enabled', $merged)
+            ? (bool) $merged['receipt_signatures_enabled']
+            : true;
+        $merged['show_seal'] = array_key_exists('show_seal', $merged) ? (bool) $merged['show_seal'] : false;
+
         return $merged;
     }
 

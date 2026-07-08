@@ -120,7 +120,7 @@
                     </FormGrid>
                 </FormSection>
 
-                <FormSection title="Branding" hint="Logo shown on the registration portal and admin sidebar.">
+                <FormSection title="Branding" hint="Logo shown on the registration portal, admin sidebar, and this Sahodaya's membership receipts.">
                     <div class="flex items-center gap-5">
                         <div v-if="sahodaya.logo_url" class="w-16 h-16 rounded-full border border-gray-200 overflow-hidden shrink-0 bg-white">
                             <img :src="sahodaya.logo_url" alt="Logo"
@@ -310,12 +310,84 @@
             <!-- Tab: Receipt Template -->
             <form v-show="activeTab === 'receipt'" @submit.prevent="saveReceiptTemplate" class="space-y-5">
                 <FormSection title="Membership Fee Receipt"
-                             hint="Official receipt emailed to schools when Sahodaya verifies membership payment. Matches your printed receipt book layout.">
+                             hint="Separate receipt template for this Sahodaya only. Membership receipts use this header, logo, wording, colour, and numbering when opened or emailed.">
                     <p class="text-xs text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-3">
                         Next receipt number: <strong class="font-mono">{{ receiptForm.receipt_next_number }}</strong>
                         · Placeholders for purpose line:
                         <span v-for="(ph, i) in receiptPlaceholders" :key="ph" class="font-mono text-[11px]">{{ ph }}<span v-if="i < receiptPlaceholders.length - 1">, </span></span>
                     </p>
+                    <div class="mb-5 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-bold text-slate-900">Receipt signatories & seal</p>
+                                <p class="text-xs text-slate-500 mt-0.5">Enable representatives, set their name/designation, and upload signature images for this Sahodaya.</p>
+                            </div>
+                            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                <input type="checkbox" v-model="receiptForm.receipt_signatures_enabled" class="w-4 h-4 text-purple-600 rounded">
+                                Show signatures
+                            </label>
+                        </div>
+
+                        <div class="grid gap-3">
+                            <div v-for="(rep, index) in receiptForm.representatives" :key="index"
+                                 class="rounded-xl border border-white bg-white p-3 shadow-sm">
+                                <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
+                                        <input type="checkbox" v-model="rep.enabled" class="w-4 h-4 text-purple-600 rounded">
+                                        Representative {{ index + 1 }}
+                                    </label>
+                                    <button v-if="receiptForm.representatives.length > 1" type="button"
+                                            class="text-xs text-red-600 hover:underline"
+                                            @click="removeReceiptRepresentative(index)">
+                                        Remove
+                                    </button>
+                                </div>
+                                <FormGrid>
+                                    <FormField label="Name">
+                                        <input v-model="rep.name" class="field" placeholder="Name printed below signature">
+                                    </FormField>
+                                    <FormField label="Designation / position">
+                                        <input v-model="rep.designation" class="field" placeholder="President / Secretary / Treasurer">
+                                    </FormField>
+                                    <FormField label="Signature image" class-extra="sm:col-span-2"
+                                               hint="PNG/JPG/WebP, max 2 MB. Transparent PNG works best.">
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <input type="file" accept="image/*"
+                                                   class="text-sm text-gray-600"
+                                                   @change="uploadReceiptAsset('signature', index, $event)">
+                                            <span v-if="rep.signature_path" class="text-xs text-emerald-700 font-semibold">Signature uploaded</span>
+                                        </div>
+                                    </FormField>
+                                </FormGrid>
+                            </div>
+                        </div>
+
+                        <button v-if="receiptForm.representatives.length < 4" type="button"
+                                class="btn-secondary text-xs"
+                                @click="addReceiptRepresentative">
+                            Add representative
+                        </button>
+
+                        <div class="rounded-xl border border-white bg-white p-3 shadow-sm">
+                            <div class="flex flex-wrap items-center gap-5 mb-3">
+                                <label class="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
+                                    <input type="checkbox" v-model="receiptForm.show_seal" class="w-4 h-4 text-purple-600 rounded">
+                                    Show seal
+                                </label>
+                                <span v-if="receiptForm.seal_path" class="text-xs text-emerald-700 font-semibold">Seal uploaded</span>
+                            </div>
+                            <FormGrid>
+                                <FormField label="Seal label">
+                                    <input v-model="receiptForm.seal_label" class="field" placeholder="Sahodaya Seal">
+                                </FormField>
+                                <FormField label="Seal image" hint="PNG/JPG/WebP, max 2 MB.">
+                                    <input type="file" accept="image/*"
+                                           class="text-sm text-gray-600"
+                                           @change="uploadReceiptAsset('seal', null, $event)">
+                                </FormField>
+                            </FormGrid>
+                        </div>
+                    </div>
                     <FormGrid>
                         <FormField label="Header title" class-extra="sm:col-span-2"
                                    hint="Leave blank to use Sahodaya name in capitals">
@@ -894,7 +966,17 @@ const mailForm = useForm({
 const testMailForm = useForm({ test_email: props.profile?.contact_email ?? '' });
 const receiptForm = useForm({
     ...props.receiptTemplate,
+    receipt_signatures_enabled: props.receiptTemplate?.receipt_signatures_enabled ?? true,
+    representatives: normalizeReceiptRepresentatives(props.receiptTemplate?.representatives),
+    show_seal: props.receiptTemplate?.show_seal ?? false,
+    seal_label: props.receiptTemplate?.seal_label ?? 'Sahodaya Seal',
+    seal_path: props.receiptTemplate?.seal_path ?? null,
     receipt_next_number: props.receiptNextNumber,
+});
+const receiptAssetForm = useForm({
+    asset_type: '',
+    signature_index: null,
+    file: null,
 });
 const logoForm    = useForm({ logo: null });
 const windowForm  = useForm({
@@ -970,6 +1052,8 @@ const setupChecklist = computed(() => {
         ? (props.feeSlabs?.length > 0)
         : ((feeForm.fixed_membership_fee_amount ?? 0) > 0));
     const windowOk = !!(regWin?.registration_starts_at && regWin?.registration_ends_at);
+    const receiptTemplateOk = Object.values(props.profile?.receipt_template_json ?? {})
+        .some((value) => value !== null && value !== '' && value !== undefined);
 
     return [
         {
@@ -1010,6 +1094,13 @@ const setupChecklist = computed(() => {
             tab: 'payment',
             tabLabel: 'Payment Details',
             done: hasPayment,
+        },
+        {
+            key: 'receipt',
+            label: 'Configure this Sahodaya’s membership receipt template, numbering, and signature labels.',
+            tab: 'receipt',
+            tabLabel: 'Receipt Template',
+            done: receiptTemplateOk,
         },
         {
             key: 'classes',
@@ -1069,6 +1160,54 @@ function saveMailSettings() {
 }
 function saveReceiptTemplate() {
     receiptForm.put(`/sahodaya-admin/${props.sahodaya.id}/membership/receipt-template`);
+}
+function normalizeReceiptRepresentatives(representatives = []) {
+    const base = Array.isArray(representatives) && representatives.length
+        ? representatives
+        : [
+            { enabled: true, name: '', designation: 'Receiver Signature', signature_path: null },
+            { enabled: true, name: '', designation: 'Counter Signature', signature_path: null },
+        ];
+
+    return base.slice(0, 4).map((rep) => ({
+        enabled: rep.enabled ?? true,
+        name: rep.name ?? '',
+        designation: rep.designation ?? 'Authorised Signatory',
+        signature_path: rep.signature_path ?? null,
+    }));
+}
+function addReceiptRepresentative() {
+    if (receiptForm.representatives.length >= 4) return;
+    receiptForm.representatives.push({
+        enabled: true,
+        name: '',
+        designation: 'Authorised Signatory',
+        signature_path: null,
+    });
+}
+function removeReceiptRepresentative(index) {
+    receiptForm.representatives.splice(index, 1);
+}
+function uploadReceiptAsset(assetType, signatureIndex, event) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    receiptAssetForm.asset_type = assetType;
+    receiptAssetForm.signature_index = signatureIndex;
+    receiptAssetForm.file = file;
+    receiptAssetForm.post(`/sahodaya-admin/${props.sahodaya.id}/membership/receipt-template/assets`, {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            if (assetType === 'seal') {
+                receiptForm.show_seal = true;
+            }
+        },
+        onFinish: () => {
+            receiptAssetForm.reset();
+            event.target.value = '';
+        },
+    });
 }
 function sendTestMail() {
     testMailForm.post(`/sahodaya-admin/${props.sahodaya.id}/membership/mail-settings/test`);

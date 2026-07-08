@@ -7,10 +7,10 @@ use App\Models\MembershipPayment;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Membership\MembershipPaymentApprovalService;
+use App\Services\Membership\MembershipPaymentProofService;
 use App\Services\Membership\MembershipNotifier;
 use App\Support\AcademicYear;
 use App\Support\ExcelExport;
-use App\Support\TenantStorage;
 use App\Support\TenancyDatabase;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -156,7 +156,7 @@ class PaymentVerificationController extends SahodayaAdminController
         return back()->with('success', $data['action'] === 'verify' ? 'Payment verified.' : 'Payment rejected.');
     }
 
-    public function proof(string $tenantId, string $paymentId)
+    public function proof(string $tenantId, string $paymentId, MembershipPaymentProofService $proofs)
     {
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
 
@@ -165,9 +165,7 @@ class PaymentVerificationController extends SahodayaAdminController
             ->with('school')
             ->findOrFail($paymentId);
 
-        abort_unless($payment->payment_proof_path, 404);
-
-        return TenantStorage::downloadResponse($payment->school, $payment->payment_proof_path);
+        return $proofs->download($payment);
     }
 
     private function notifyMembershipPaymentInApp(\App\Models\Tenant $school, string $template, array $replacements): void

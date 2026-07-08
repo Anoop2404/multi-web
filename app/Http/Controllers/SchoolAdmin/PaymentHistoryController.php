@@ -63,14 +63,7 @@ class PaymentHistoryController extends SchoolAdminController
         abort_if($payment->school_id !== $this->school->id, 403);
         abort_unless($payment->status === 'verified', 404, 'Receipt not available for unverified payments.');
 
-        $payment->loadMissing('feeReceipt');
-
-        if (! $payment->feeReceipt?->generated_receipt_path) {
-            $receiptService->issueForPayment($payment->fresh());
-            $payment->refresh();
-        }
-
-        $html = $payment->feeReceipt ? $receiptService->readGeneratedReceipt($payment->feeReceipt) : null;
+        $html = $receiptService->readOrGenerateForPayment($payment);
         abort_if(! $html, 404, 'Receipt not yet generated.');
 
         return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);

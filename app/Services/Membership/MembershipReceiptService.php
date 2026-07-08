@@ -7,7 +7,6 @@ use App\Models\MembershipPayment;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Support\IndianAmountInWords;
-use App\Support\Mail\EmailBranding;
 use App\Support\MembershipReceiptTemplate;
 use App\Support\SahodayaReceiptNumberAllocator;
 use App\Support\TenantBranding;
@@ -38,10 +37,6 @@ class MembershipReceiptService
 
         $profile = SahodayaProfile::where('tenant_id', $sahodaya->id)->first();
         $template = MembershipReceiptTemplate::resolve($profile, $sahodaya);
-
-        if (! ($template['auto_email_on_verify'] ?? true)) {
-            return null;
-        }
 
         $receipt = $payment->feeReceipt;
         if (! $receipt) {
@@ -99,9 +94,19 @@ class MembershipReceiptService
             '{{receipt_no}}'      => $receiptNo,
         ];
 
-        $portal = EmailBranding::portalUrl($sahodaya);
         $logoUrl = ($template['show_logo'] ?? true)
-            ? EmailBranding::absoluteAssetUrl(TenantBranding::logoUrl($sahodaya), $portal)
+            ? TenantBranding::logoEmbedSrc($sahodaya)
+            : null;
+        $representatives = collect($template['representatives'] ?? [])
+            ->map(fn (array $representative) => array_merge($representative, [
+                'signature_url' => ! empty($representative['signature_path'])
+                    ? TenantStorage::photoDataUri($sahodaya, $representative['signature_path'])
+                    : null,
+            ]))
+            ->values()
+            ->all();
+        $sealUrl = ! empty($template['seal_path'])
+            ? TenantStorage::photoDataUri($sahodaya, $template['seal_path'])
             : null;
 
         return [
@@ -118,6 +123,8 @@ class MembershipReceiptService
             'transactionRef'  => $payment->transaction_ref,
             'purpose'         => MembershipReceiptTemplate::interpolate($template['purpose_template'] ?? '', $vars),
             'logoUrl'         => $logoUrl,
+            'representatives' => $representatives,
+            'sealUrl'         => $sealUrl,
             'sahodayaName'    => $sahodaya->name,
         ];
     }
@@ -197,6 +204,48 @@ class MembershipReceiptService
         }
 
         return null;
+    }
+
+    public function readOrGenerateForPayment(MembershipPayment $payment): ?string
+    {
+        if ($payment->status !== 'verified') {
+            return null;
+        }
+
+        $payment = $payment->fresh(['school.parent', 'registration', 'feeReceipt']) ?? $payment;
+
+        if (! $payment->feeReceipt?->generated_receipt_path) {
+            $this->issueForPayment($payment);
+            $payment = $payment->fresh(['school.parent', 'registration', 'feeReceipt']) ?? $payment;
+        }
+
+        $receipt = $payment->feeReceipt;
+        if (! $receipt) {
+            return null;
+        }
+
+        $school = $payment->school;
+        $sahodaya = $school?->parent;
+        if (! $school || ! $sahodaya) {
+            return null;
+        }
+
+        $profile = SahodayaProfile::where('tenant_id', $sahodaya->id)->first();
+        $template = MembershipReceiptTemplate::resolve($profile, $sahodaya);
+        $receiptNo = $receipt->receipt_number ?: (string) app(SahodayaReceiptNumberAllocator::class)->next($sahodaya->id);
+        $html = $this->renderHtml($payment, $school, $sahodaya, $profile, $template, $receiptNo);
+
+        try {
+            $receipt->update([
+                'receipt_number'         => $receiptNo,
+                'generated_receipt_path' => $this->storeHtml($sahodaya, $receiptNo, $html),
+                'payment_date'           => $payment->verified_at?->toDateString() ?? $receipt->payment_date ?? now()->toDateString(),
+            ]);
+        } catch (\Throwable) {
+            // If storage is temporarily unavailable, still render the verified receipt.
+        }
+
+        return $html;
     }
 
     private function formatPaymentMethod(?string $method): string

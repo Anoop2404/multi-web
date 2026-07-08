@@ -29,7 +29,9 @@ return new class extends Migration
             $table->string('log_name', 50)->nullable()->index();
             $table->string('action', 30)->index();
             $table->text('description');
-            $table->nullableMorphs('subject');
+            $table->string('subject_type')->nullable();
+            $table->string('subject_id')->nullable();
+            $table->index(['subject_type', 'subject_id']);
             $table->unsignedBigInteger('causer_user_id')->nullable();
             $table->json('changes')->nullable();
             $table->json('properties')->nullable();

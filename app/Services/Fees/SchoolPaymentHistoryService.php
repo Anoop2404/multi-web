@@ -100,6 +100,7 @@ class SchoolPaymentHistoryService
             'payment_date'         => $p->verified_at?->toDateString() ?? $p->created_at->toDateString(),
             'transaction_ref'      => $p->transaction_ref,
             'receipt_number'       => $p->feeReceipt?->receipt_number,
+            'proof_url'            => $this->membershipProofUrl($p, $urlSchoolId),
             'receipt_url'          => $this->membershipReceiptUrl($p, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $p->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $p->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -248,6 +249,15 @@ class SchoolPaymentHistoryService
         }
 
         return null;
+    }
+
+    private function membershipProofUrl(MembershipPayment $payment, ?string $urlSchoolId): ?string
+    {
+        if (! $urlSchoolId || ! $payment->payment_proof_path) {
+            return null;
+        }
+
+        return "/school-admin/{$urlSchoolId}/registration/payments/{$payment->id}/proof";
     }
 
     private function programReceiptUrl(

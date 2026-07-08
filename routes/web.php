@@ -358,6 +358,8 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/registration/payment', [AnnualRegistrationController::class, 'uploadPayment'])->name('registration.payment.upload');
     Route::get('/registration/payments/{payment}/proof', [AnnualRegistrationController::class, 'paymentProof'])->name('registration.payment.proof');
     Route::get('/registration/receipt/{payment}', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'membershipReceipt'])->name('registration.receipt');
+    Route::get('/membership/payment', [AnnualRegistrationController::class, 'payment'])->name('membership.payment.redirect');
+    Route::get('/membership-payments', [AnnualRegistrationController::class, 'payment'])->name('membership-payments.redirect');
 
     Route::get('/fest/reports', [\App\Http\Controllers\SchoolAdmin\FestSchoolReportController::class, 'reportsHub'])->name('fest.reports.hub');
 
@@ -723,6 +725,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::put('/membership/subjects/{subject}', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateSubject'])->name('membership.subjects.update');
         Route::delete('/membership/subjects/{subject}', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'destroySubject'])->name('membership.subjects.destroy');
         Route::put('/membership/receipt-template', [\App\Http\Controllers\SahodayaAdmin\MembershipReceiptController::class, 'updateTemplate'])->name('membership.receipt-template.update');
+        Route::post('/membership/receipt-template/assets', [\App\Http\Controllers\SahodayaAdmin\MembershipReceiptController::class, 'uploadAsset'])->name('membership.receipt-template.assets');
         Route::get('/membership/receipt-template/preview', [\App\Http\Controllers\SahodayaAdmin\MembershipReceiptController::class, 'preview'])->name('membership.receipt-template.preview');
         Route::get('/membership/payments/{payment}/receipt', [\App\Http\Controllers\SahodayaAdmin\MembershipReceiptController::class, 'show'])->name('membership.payments.receipt');
 

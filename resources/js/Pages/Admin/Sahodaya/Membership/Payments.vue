@@ -140,10 +140,10 @@
                     <div class="px-6 py-4 flex flex-col sm:flex-row items-start gap-6">
                         <div v-if="p.proof_url" class="shrink-0">
                             <p class="text-xs font-semibold text-gray-500 mb-2">Payment Proof</p>
-                            <a :href="p.proof_url" target="_blank" rel="noopener"
-                               class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#0f3d7a] font-semibold hover:bg-blue-50 transition">
-                                📎 View upload ↗
-                            </a>
+                            <button type="button" @click="openProofPreview(p)"
+                                    class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#0f3d7a] font-semibold hover:bg-blue-50 transition">
+                                📎 View upload
+                            </button>
                         </div>
                         <div v-if="p.status === 'verified'" class="shrink-0">
                             <p class="text-xs font-semibold text-gray-500 mb-2">Official Receipt</p>
@@ -192,13 +192,34 @@
                       v-html="link.label" />
             </div>
         </div>
+
+        <div v-if="proofPreview" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/70" @click="closeProofPreview"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Payment proof</p>
+                        <h3 class="font-bold text-slate-900 truncate">{{ proofPreview.school?.name }} · {{ proofPreview.academic_year }}</h3>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <a :href="proofPreview.proof_url" target="_blank" rel="noopener" class="btn-secondary text-xs">
+                            Open in new tab
+                        </a>
+                        <button type="button" class="btn-ghost text-sm" @click="closeProofPreview">Close</button>
+                    </div>
+                </div>
+                <iframe :src="proofPreviewUrl"
+                        class="w-full flex-1 bg-slate-50"
+                        title="Payment proof preview"></iframe>
+            </div>
+        </div>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
-import { reactive, computed, defineComponent, h } from 'vue';
+import { reactive, computed, defineComponent, h, ref } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 
 const props = defineProps({
@@ -218,6 +239,8 @@ const filterForm = reactive({
     date_from: props.filters?.dateFrom ?? props.filters?.date_from ?? '',
     date_to:   props.filters?.dateTo ?? props.filters?.date_to ?? '',
 });
+const proofPreview = ref(null);
+const proofPreviewUrl = computed(() => proofPreview.value?.proof_url ? withPreview(proofPreview.value.proof_url) : null);
 
 const statusTabs = [
     { key: 'payment-due', label: 'Payment Not Done' },
@@ -304,6 +327,18 @@ function rejectPayment(payment) {
         action: 'reject',
         reason: reason.trim(),
     });
+}
+
+function openProofPreview(payment) {
+    proofPreview.value = payment;
+}
+
+function closeProofPreview() {
+    proofPreview.value = null;
+}
+
+function withPreview(url) {
+    return `${url}${url.includes('?') ? '&' : '?'}preview=1`;
 }
 
 const statusColors = {

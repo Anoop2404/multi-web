@@ -152,8 +152,11 @@ class TenantStorage
         $relativePath = ltrim($relativePath, '/');
 
         return [
+            self::storageRoot('tenant'.$tenant->id.'/app/shared/'.$relativePath),
+            self::storageRoot('tenant'.$tenant->id.'/app/private/'.$relativePath),
             self::storageRoot('tenant'.$tenant->id.'/app/public/'.$relativePath),
             self::storageRoot('app/shared/'.$relativePath),
+            self::storageRoot('app/private/'.$relativePath),
             self::storageRoot('app/public/'.$relativePath),
         ];
     }
@@ -470,7 +473,7 @@ class TenantStorage
     /** @return list<string> */
     private static function downloadDisks(): array
     {
-        $disks = ['s3', self::uploadDisk(), self::SHARED_DISK];
+        $disks = ['s3', self::uploadDisk(), self::SHARED_DISK, 'local', 'public'];
 
         return array_values(array_unique($disks));
     }
