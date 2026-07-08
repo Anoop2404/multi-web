@@ -444,7 +444,10 @@ class KannurLegacyMembershipImporter
             }
         }
 
-        return compact('by_affiliation', 'by_email');
+        return [
+            'by_affiliation' => $byAffiliation,
+            'by_email' => $byEmail,
+        ];
     }
 
     /**
