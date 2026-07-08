@@ -14,6 +14,7 @@ use App\Services\Membership\FeeReceiptService;
 use App\Services\Membership\MembershipFeeCalculator;
 use App\Services\Membership\SchoolMembershipNumberGenerator;
 use App\Support\SchoolApplicationForm;
+use App\Support\TenantStorage;
 use App\Support\TenancyDatabase;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -53,6 +54,8 @@ class KannurLegacyMembershipImporter
         bool $dryRun = false,
         ?string $legacyUploadsPath = null,
         ?Command $output = null,
+        ?string $storageDisk = null,
+        bool $proofsOnly = false,
     ): array {
         if (! is_readable($sqlPath)) {
             throw new \InvalidArgumentException("Legacy SQL dump not found: {$sqlPath}");
@@ -60,6 +63,17 @@ class KannurLegacyMembershipImporter
 
         $sql = file_get_contents($sqlPath);
         $legacy = $this->loadLegacyData($sql);
+
+        if ($proofsOnly) {
+            return $this->syncLegacyProofs(
+                $sahodaya,
+                $legacy,
+                $dryRun,
+                $legacyUploadsPath,
+                $storageDisk,
+                $output,
+            );
+        }
         $academicYear = $this->normalizeAcademicYear($legacy['academic_years'][0]['year_name'] ?? '2026-2027');
         $flatFee = $this->legacyFlatFee($legacy['fee_structure']);
         $slabs = $this->combinedSlabs($legacy['student_wise_fee'], $flatFee, $academicYear);
@@ -84,6 +98,8 @@ class KannurLegacyMembershipImporter
             'registrations_updated'=> 0,
             'payments_imported'    => 0,
             'payments_skipped'     => 0,
+            'proofs_copied'        => 0,
+            'proofs_missing'       => 0,
             'dues_pending'         => 0,
             'completed'            => 0,
         ];
@@ -112,6 +128,7 @@ class KannurLegacyMembershipImporter
             $legacyUploadsPath,
             &$stats,
             $output,
+            $storageDisk,
         ) {
             $this->configureMembership($sahodaya, $academicYear, $slabs, $output);
 
@@ -147,6 +164,7 @@ class KannurLegacyMembershipImporter
                     $strengthRows,
                     $payment,
                     $legacyUploadsPath,
+                    $storageDisk,
                     &$stats,
                 ) {
                     $registrationExists = Registration::query()
@@ -176,6 +194,8 @@ class KannurLegacyMembershipImporter
                             $academicYear,
                             $payment,
                             $legacyUploadsPath,
+                            $storageDisk,
+                            $stats,
                         );
 
                         if ($imported) {
@@ -659,6 +679,8 @@ class KannurLegacyMembershipImporter
         string $academicYear,
         array $payment,
         ?string $legacyUploadsPath,
+        ?string $storageDisk = null,
+        ?array &$stats = null,
     ): bool {
         $legacyPaymentId = (string) ($payment['payment_id'] ?? '');
         $transactionRef = self::LEGACY_TRANSACTION_PREFIX.$legacyPaymentId
@@ -674,7 +696,14 @@ class KannurLegacyMembershipImporter
             return false;
         }
 
-        $proofPath = $this->resolveProofPath($payment, $legacyUploadsPath);
+        $proof = $this->storeLegacyProof($school, $payment, $legacyUploadsPath, $storageDisk);
+        if ($stats !== null) {
+            if ($proof['copied']) {
+                $stats['proofs_copied']++;
+            } else {
+                $stats['proofs_missing']++;
+            }
+        }
         $status = ($payment['is_verified'] ?? 'N') === 'Y' ? 'verified' : 'submitted';
         $verifiedAt = $status === 'verified'
             ? $this->parseLegacyDate($payment['created_date'] ?? $payment['payment_date'] ?? null)
@@ -685,7 +714,7 @@ class KannurLegacyMembershipImporter
             'academic_year'    => $academicYear,
             'registration_id'  => $registration->id,
             'amount'           => (float) ($payment['amount'] ?? 0),
-            'payment_proof_path' => $proofPath,
+            'payment_proof_path' => $proof['path'],
             'payment_method'   => $this->normalizePaymentMethod($payment),
             'transaction_ref'  => $transactionRef,
             'status'           => $status,
@@ -698,23 +727,147 @@ class KannurLegacyMembershipImporter
     }
 
     /**
-     * @param  array<string, string|null>  $payment
+     * @param  array<string, list<array<string, string|null>>>  $legacy
+     * @return array<string, mixed>
      */
-    private function resolveProofPath(array $payment, ?string $legacyUploadsPath): string
-    {
-        $filename = trim((string) ($payment['receipt_file'] ?? ''));
-        if ($filename === '') {
-            return 'legacy-import/kannur/missing-proof.txt';
+    private function syncLegacyProofs(
+        Tenant $sahodaya,
+        array $legacy,
+        bool $dryRun,
+        ?string $legacyUploadsPath,
+        ?string $storageDisk,
+        ?Command $output,
+    ): array {
+        if (! $legacyUploadsPath || ! is_dir($legacyUploadsPath)) {
+            throw new \InvalidArgumentException('Legacy uploads directory is required for --proofs-only.');
         }
 
-        if ($legacyUploadsPath) {
-            $source = rtrim($legacyUploadsPath, '/').'/'.$filename;
-            if (is_readable($source)) {
-                return 'legacy-import/kannur/'.$filename;
+        $academicYear = $this->normalizeAcademicYear($legacy['academic_years'][0]['year_name'] ?? '2026-2027');
+        $linkedUserIds = $this->linkedSchoolUserIds($legacy['users']);
+        $schoolsByUserId = $this->indexLegacySchools($legacy['schools'], $linkedUserIds);
+        $importableUserIds = array_fill_keys(array_keys($schoolsByUserId), true);
+        $paymentsByUserId = $this->indexPayments($legacy['payments'], $importableUserIds);
+        $newSchools = $this->indexNewSchools($sahodaya);
+
+        $stats = [
+            'mode'            => 'proofs_only',
+            'academic_year'   => $academicYear,
+            'payments_found'  => 0,
+            'proofs_copied'   => 0,
+            'proofs_missing'  => 0,
+            'proofs_skipped'  => 0,
+            'unmatched'       => [],
+        ];
+
+        $this->line($output, "Syncing legacy payment proofs from: {$legacyUploadsPath}");
+
+        TenancyDatabase::withTenantDatabase($sahodaya, function () use (
+            $academicYear,
+            $schoolsByUserId,
+            $paymentsByUserId,
+            $newSchools,
+            $legacyUploadsPath,
+            $storageDisk,
+            $dryRun,
+            &$stats,
+            $output,
+        ) {
+            foreach ($schoolsByUserId as $userId => $legacySchool) {
+                $payment = $paymentsByUserId[$userId] ?? null;
+                if (! $payment) {
+                    continue;
+                }
+
+                $newSchool = $this->matchNewSchool($legacySchool, $newSchools);
+                if (! $newSchool) {
+                    $stats['unmatched'][] = $legacySchool['school_name'] ?? $userId;
+                    continue;
+                }
+
+                $legacyPaymentId = (string) ($payment['payment_id'] ?? '');
+                $membershipPayment = MembershipPayment::query()
+                    ->where('school_id', $newSchool->id)
+                    ->where('academic_year', $academicYear)
+                    ->where('transaction_ref', 'like', self::LEGACY_TRANSACTION_PREFIX.$legacyPaymentId.'%')
+                    ->first();
+
+                if (! $membershipPayment) {
+                    $stats['proofs_skipped']++;
+                    continue;
+                }
+
+                $stats['payments_found']++;
+                $proof = $this->storeLegacyProof($newSchool, $payment, $legacyUploadsPath, $storageDisk, $dryRun);
+
+                if ($proof['copied']) {
+                    $stats['proofs_copied']++;
+                } else {
+                    $stats['proofs_missing']++;
+                }
+
+                if (! $dryRun && $proof['copied'] && $membershipPayment->payment_proof_path !== $proof['path']) {
+                    $membershipPayment->update(['payment_proof_path' => $proof['path']]);
+                    app(FeeReceiptService::class)->syncFromMembershipPayment($membershipPayment->fresh());
+                }
+            }
+        });
+
+        return $stats;
+    }
+
+    /**
+     * @param  array<string, string|null>  $payment
+     * @return array{path: string, copied: bool}
+     */
+    private function storeLegacyProof(
+        Tenant $school,
+        array $payment,
+        ?string $legacyUploadsPath,
+        ?string $storageDisk = null,
+        bool $dryRun = false,
+    ): array {
+        $filename = trim((string) ($payment['receipt_file'] ?? ''));
+        if ($filename === '') {
+            return ['path' => 'legacy-import/kannur/missing-proof.txt', 'copied' => false];
+        }
+
+        $storagePath = "payments/{$school->id}/legacy/{$filename}";
+        $source = $legacyUploadsPath ? $this->findLegacyProofSource($legacyUploadsPath, $filename) : null;
+
+        if (! $source) {
+            return ['path' => "legacy-import/kannur/{$filename}", 'copied' => false];
+        }
+
+        if (! $dryRun) {
+            $disk = $storageDisk ?? TenantStorage::uploadDisk();
+            TenantStorage::put($storagePath, (string) file_get_contents($source), $disk);
+        }
+
+        return ['path' => $storagePath, 'copied' => true];
+    }
+
+    private function findLegacyProofSource(string $root, string $filename): ?string
+    {
+        $direct = rtrim($root, '/').'/'.$filename;
+        if (is_readable($direct)) {
+            return $direct;
+        }
+
+        if (! is_dir($root)) {
+            return null;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile() && $file->getFilename() === $filename) {
+                return $file->getPathname();
             }
         }
 
-        return 'legacy-import/kannur/'.$filename;
+        return null;
     }
 
     /**

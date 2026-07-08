@@ -12,6 +12,8 @@ class ImportKannurLegacyMembership extends Command
                             {tenant : Kannur Sahodaya tenant UUID}
                             {--sql= : Path to legacy SQL dump (default: ~/Downloads/kannursahodaya-3533d24f.sql)}
                             {--legacy-uploads= : Path to old receipt uploads directory on disk}
+                            {--storage-disk= : Storage disk for proofs (shared, local, s3; default: upload disk)}
+                            {--proofs-only : Only copy receipt files for already-imported legacy payments}
                             {--dry-run : Preview mappings without writing}';
 
     protected $description = 'Import Kannur legacy membership fees, student counts, payments, and dues from the old Sahodaya SQL dump';
@@ -21,6 +23,15 @@ class ImportKannurLegacyMembership extends Command
         $tenantId = (string) $this->argument('tenant');
         $sqlPath = $this->option('sql') ?: (getenv('HOME').'/Downloads/kannursahodaya-3533d24f.sql');
         $dryRun = (bool) $this->option('dry-run');
+        $proofsOnly = (bool) $this->option('proofs-only');
+        $storageDisk = $this->option('storage-disk') ?: null;
+        $legacyUploads = $this->option('legacy-uploads') ?: null;
+
+        if ($proofsOnly && ! $legacyUploads) {
+            $this->error('--legacy-uploads is required when using --proofs-only');
+
+            return self::FAILURE;
+        }
 
         $sahodaya = Tenant::query()->where('type', 'sahodaya')->find($tenantId);
         if (! $sahodaya) {
@@ -36,16 +47,24 @@ class ImportKannurLegacyMembership extends Command
             return self::FAILURE;
         }
 
-        $this->info(($dryRun ? '[DRY RUN] ' : '')."Importing legacy membership for {$sahodaya->name}");
+        $this->info(($dryRun ? '[DRY RUN] ' : '').($proofsOnly ? 'Syncing legacy proofs' : 'Importing legacy membership')." for {$sahodaya->name}");
         $this->line("SQL: {$sqlPath}");
+        if ($legacyUploads) {
+            $this->line("Legacy uploads: {$legacyUploads}");
+        }
+        if ($storageDisk) {
+            $this->line("Storage disk: {$storageDisk}");
+        }
 
         try {
             $stats = $importer->import(
                 $sahodaya,
                 $sqlPath,
                 $dryRun,
-                $this->option('legacy-uploads'),
+                $legacyUploads,
                 $this,
+                $storageDisk,
+                $proofsOnly,
             );
         } catch (\Throwable $e) {
             $this->error($e->getMessage());
