@@ -129,11 +129,11 @@
                 <tr v-for="student in students.data" :key="student.id" class="hover:bg-gray-50/80">
                     <td class="px-4 py-3 w-14">
                         <button
-                            v-if="canEditPhoto"
+                            v-if="canUpdatePhoto"
                             type="button"
                             class="group relative w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center hover:ring-2 hover:ring-[#0f3d7a]/30 transition cursor-pointer"
-                            :title="`Change photo — ${student.name}`"
-                            @click="openPhotoModal(student)"
+                            :title="student.photo_url ? `Change photo — ${student.name}` : `Add photo — ${student.name}`"
+                            @click.stop="openPhotoModal(student)"
                         >
                             <img v-if="student.photo_url && !photoBroken[student.id]" :src="student.photo_url" :alt="student.name"
                                  class="w-full h-full object-cover" @error="photoBroken[student.id] = true">
@@ -349,28 +349,12 @@
         </div>
 
         <!-- Quick photo update (click avatar in list) -->
-        <div v-if="showPhotoEdit && photoEditStudent" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closePhotoModal"></div>
-            <div class="relative modal-shell max-w-md">
-                <div class="modal-head">
-                    <div>
-                        <h3 class="font-bold text-[#041525]">Update photo</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">{{ photoEditStudent.name }} · existing photo is kept unless you save a new one</p>
-                    </div>
-                    <button type="button" @click="closePhotoModal" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
-                </div>
-                <form @submit.prevent="submitPhotoOnly" class="p-6 space-y-4">
-                    <ProfilePhotoCropper v-model="photoOnlyFile" :existing-url="photoEditStudent.photo_url" />
-                    <div class="flex items-center justify-end gap-3 pt-2">
-                        <button type="button" @click="closePhotoModal" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
-                        <button type="submit" :disabled="photoForm.processing || !(photoOnlyFile instanceof File)"
-                                class="btn-primary disabled:opacity-50">
-                            {{ photoForm.processing ? 'Saving…' : 'Save photo' }}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+        <StudentPhotoEditModal
+            v-model="showPhotoEdit"
+            :student="photoEditStudent"
+            :school-id="school.id"
+            @saved="onPhotoSaved"
+        />
 
         <!-- Import CSV modal removed — use StudentBulkUploadModal -->
     </SchoolAdminLayout>
@@ -380,6 +364,7 @@
 import SahodayaDataTable from '@/Components/SahodayaDataTable.vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ProfilePhotoCropper from '@/Components/school/ProfilePhotoCropper.vue';
+import StudentPhotoEditModal from '@/Components/school/StudentPhotoEditModal.vue';
 import StudentBulkUploadModal from '@/Components/school/StudentBulkUploadModal.vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
@@ -402,7 +387,7 @@ const props = defineProps({
 
 const isLocked = computed(() => !!props.studentEditLock?.locked);
 const needsChangeRequest = computed(() => isLocked.value && !props.canManageDirectly);
-const canEditPhoto = computed(() => props.canManageDirectly || !needsChangeRequest.value);
+const canUpdatePhoto = computed(() => props.canManageDirectly || !needsChangeRequest.value);
 const canBulkUpload = computed(() =>
     props.school?.school_prefix
     && schoolClasses.value.length > 0
@@ -417,11 +402,8 @@ const showPhotoEdit = ref(false);
 const editingStudent = ref(null);
 const photoEditStudent = ref(null);
 const editPhotoFile = ref(null);
-const photoOnlyFile = ref(null);
 const createPhotoFile = ref(null);
 const photoBroken = reactive({});
-
-const photoForm = useForm({});
 
 const columns = computed(() => {
     const base = [
@@ -601,6 +583,10 @@ watch(showBulkUpload, (open) => {
     if (!open) clearModalQuery();
 });
 
+watch(showPhotoEdit, (open) => {
+    if (!open) photoEditStudent.value = null;
+});
+
 function openEditModal(student) {
     editingStudent.value = student;
     editPhotoFile.value = null;
@@ -623,38 +609,13 @@ function closeEditModal() {
 }
 
 function openPhotoModal(student) {
-    if (needsChangeRequest.value) {
-        openEditModal(student);
-        return;
-    }
     photoEditStudent.value = student;
-    photoOnlyFile.value = null;
-    photoForm.clearErrors();
     showPhotoEdit.value = true;
 }
 
-function closePhotoModal() {
-    showPhotoEdit.value = false;
+function onPhotoSaved() {
     photoEditStudent.value = null;
-    photoOnlyFile.value = null;
-    photoForm.reset();
-}
-
-function submitPhotoOnly() {
-    if (!photoEditStudent.value || !(photoOnlyFile.value instanceof File)) {
-        return;
-    }
-
-    photoForm
-        .transform(() => ({ photo: photoOnlyFile.value }))
-        .post(`/school-admin/${props.school.id}/students/${photoEditStudent.value.id}/photo`, {
-            forceFormData: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                closePhotoModal();
-                router.reload({ only: ['students', 'unverifiedCount'], preserveScroll: true });
-            },
-        });
+    router.reload({ only: ['students', 'unverifiedCount'], preserveScroll: true });
 }
 
 function openCreateRequestModal() {

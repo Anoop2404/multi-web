@@ -21,8 +21,23 @@
                 <div class="profile-hero__bg"></div>
                 <div class="profile-hero__content">
                     <div class="profile-hero__photo-wrap">
-                        <img v-if="student.photo_url" :src="student.photo_url" :alt="student.name" class="profile-hero__photo">
-                        <div v-else class="profile-hero__photo profile-hero__photo--empty">{{ initials(student.name) }}</div>
+                        <button
+                            v-if="canEdit"
+                            type="button"
+                            class="group relative block rounded-full"
+                            :title="student.photo_url ? 'Change photo' : 'Add photo'"
+                            @click="showPhotoEdit = true"
+                        >
+                            <img v-if="student.photo_url" :src="student.photo_url" :alt="student.name" class="profile-hero__photo">
+                            <div v-else class="profile-hero__photo profile-hero__photo--empty">{{ initials(student.name) }}</div>
+                            <span class="absolute inset-0 flex items-center justify-center rounded-full bg-[#041525]/45 text-white text-xs font-bold uppercase tracking-wide opacity-0 group-hover:opacity-100 transition">
+                                {{ student.photo_url ? 'Change' : 'Add photo' }}
+                            </span>
+                        </button>
+                        <template v-else>
+                            <img v-if="student.photo_url" :src="student.photo_url" :alt="student.name" class="profile-hero__photo">
+                            <div v-else class="profile-hero__photo profile-hero__photo--empty">{{ initials(student.name) }}</div>
+                        </template>
                         <span class="profile-hero__status" :class="student.is_verified ? 'is-verified' : 'is-pending'">
                             {{ student.is_verified ? 'Verified' : 'Pending verification' }}
                         </span>
@@ -251,6 +266,13 @@
                 <StudentSportsProfileSection :sports-profile="sportsProfile" />
             </div>
         </div>
+
+        <StudentPhotoEditModal
+            v-model="showPhotoEdit"
+            :student="student"
+            :school-id="school.id"
+            @saved="onPhotoSaved"
+        />
     </SchoolAdminLayout>
 </template>
 
@@ -259,6 +281,7 @@ import { computed, ref, onMounted } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ProfilePhotoCropper from '@/Components/school/ProfilePhotoCropper.vue';
+import StudentPhotoEditModal from '@/Components/school/StudentPhotoEditModal.vue';
 import StudentPortalLoginCard from '@/Components/students/StudentPortalLoginCard.vue';
 import StudentSportsProfileSection from '@/Components/students/StudentSportsProfileSection.vue';
 import {
@@ -281,6 +304,7 @@ const props = defineProps({
 
 const activeTab = ref('profile');
 const isEditing = ref(false);
+const showPhotoEdit = ref(false);
 const editPhotoFile = ref(null);
 
 const tabs = [
@@ -382,6 +406,10 @@ function cancelEdit() {
     isEditing.value = false;
     editPhotoFile.value = null;
     editForm.reset();
+}
+
+function onPhotoSaved() {
+    router.reload({ only: ['student'], preserveScroll: true });
 }
 
 function submitEdit() {

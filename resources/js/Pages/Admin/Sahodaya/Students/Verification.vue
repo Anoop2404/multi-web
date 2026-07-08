@@ -4,7 +4,7 @@
         <PageHeader :title="selectedSchool ? selectedSchool.name : 'Student verification'"
                     eyebrow="Membership"
                     :description="selectedSchool
-                        ? 'Review and verify students at this school. Use filters to show pending or verified only.'
+                        ? 'Review student details in the list and verify directly — no separate profile page needed.'
                         : 'Start with schools — pick a school to review students. Filter by verification status across all member schools.'">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/schools`" class="btn-secondary text-sm">
@@ -136,44 +136,68 @@
                     {{ students.total.toLocaleString('en-IN') }} student{{ students.total === 1 ? '' : 's' }}
                 </span>
             </div>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Student</th>
-                        <th>Class</th>
-                        <th>Status</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="row in students?.data ?? []" :key="row.id">
-                        <td>
-                            <Link :href="`/sahodaya-admin/${sahodaya.id}/students/${row.id}`"
-                                  class="font-medium text-[#0f3d7a] hover:underline">
-                                {{ row.name }}
-                            </Link>
-                            <p class="text-xs font-mono text-slate-500">{{ row.reg_no }}</p>
-                        </td>
-                        <td class="text-sm">{{ row.class_name ?? '—' }}</td>
-                        <td>
-                            <span class="status-pill text-xs" :class="row.is_verified ? 'status-pill--completed' : 'status-pill--open'">
-                                {{ row.is_verified ? 'Verified' : 'Pending' }}
-                            </span>
-                        </td>
-                        <td class="text-right whitespace-nowrap">
-                            <Link :href="`/sahodaya-admin/${sahodaya.id}/students/${row.id}`"
-                                  class="text-xs font-semibold text-[#0f3d7a] hover:underline mr-3">
-                                Profile
-                            </Link>
-                            <button v-if="!row.is_verified" type="button" class="btn-primary text-xs"
-                                    @click="verifyOne(row)">Verify</button>
-                        </td>
-                    </tr>
-                    <tr v-if="!(students?.data?.length)">
-                        <td colspan="4" class="p-8 text-center text-slate-400">No students match the filters.</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="data-table min-w-[56rem]">
+                    <thead>
+                        <tr>
+                            <th class="w-14">Photo</th>
+                            <th>Student</th>
+                            <th>Class</th>
+                            <th>Gender / DOB</th>
+                            <th>Parent / contact</th>
+                            <th>Status</th>
+                            <th class="text-right w-28"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in students?.data ?? []" :key="row.id" class="align-top">
+                            <td class="py-3">
+                                <div class="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center shrink-0">
+                                    <img v-if="row.photo_url" :src="row.photo_url" :alt="row.name" class="w-full h-full object-cover">
+                                    <span v-else class="text-xs text-gray-400 font-semibold">{{ initials(row.name) }}</span>
+                                </div>
+                            </td>
+                            <td class="py-3">
+                                <p class="font-semibold text-gray-900">{{ row.name }}</p>
+                                <p v-if="row.reg_no" class="text-xs font-mono text-slate-500 mt-0.5">{{ row.reg_no }}</p>
+                                <p v-if="row.admission_number" class="text-xs text-slate-500 mt-0.5">Adm. {{ row.admission_number }}</p>
+                                <p v-if="row.roll_number" class="text-xs text-slate-500">Roll {{ row.roll_number }}</p>
+                            </td>
+                            <td class="py-3 text-sm">
+                                <p class="font-medium text-gray-800">{{ row.class_name ?? '—' }}</p>
+                                <p v-if="row.category" class="text-xs text-slate-500 mt-0.5">{{ row.category }}</p>
+                            </td>
+                            <td class="py-3 text-sm text-gray-600 whitespace-nowrap">
+                                <p class="capitalize">{{ formatGender(row.gender) }}</p>
+                                <p v-if="row.dob_display" class="text-xs text-slate-500 mt-0.5">{{ dobLabel(row) }}</p>
+                                <p v-else class="text-xs text-amber-700 mt-0.5">DOB not set</p>
+                            </td>
+                            <td class="py-3 text-sm text-gray-600">
+                                <p v-if="row.parent_name" class="font-medium text-gray-800">{{ row.parent_name }}</p>
+                                <p v-if="row.parent_phone" class="text-xs text-slate-500 mt-0.5">{{ row.parent_phone }}</p>
+                                <p v-if="row.parent_email" class="text-xs text-slate-500 break-all">{{ row.parent_email }}</p>
+                                <p v-if="!row.parent_name && !row.parent_phone && !row.parent_email" class="text-slate-400">—</p>
+                            </td>
+                            <td class="py-3">
+                                <span class="status-pill text-xs" :class="row.is_verified ? 'status-pill--completed' : 'status-pill--open'">
+                                    {{ row.is_verified ? 'Verified' : 'Pending' }}
+                                </span>
+                                <p v-if="row.is_verified && row.verified_at_display" class="text-[11px] text-slate-500 mt-1">
+                                    {{ row.verified_at_display }}
+                                    <template v-if="row.verified_by"> · {{ row.verified_by }}</template>
+                                </p>
+                            </td>
+                            <td class="py-3 text-right whitespace-nowrap">
+                                <button v-if="!row.is_verified" type="button" class="btn-primary text-xs"
+                                        @click="verifyOne(row)">Verify</button>
+                            </td>
+                        </tr>
+                        <tr v-if="!(students?.data?.length)">
+                            <td colspan="7" class="p-8 text-center text-slate-400">No students match the filters.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <div v-if="students?.links?.length > 3" class="px-4 py-3 border-t border-gray-100 flex justify-center gap-1">
                 <Link v-for="link in students.links" :key="link.label"
                       :href="link.url || '#'"
@@ -190,6 +214,7 @@ import { computed, reactive } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import { formatAgeLabel } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object,
@@ -254,5 +279,18 @@ function bulkVerifySchoolRow(row) {
         verify_all_unverified: true,
         school_id: row.id,
     }, { preserveScroll: true });
+}
+
+function initials(name) {
+    return (name || '?').trim().charAt(0).toUpperCase();
+}
+
+function formatGender(gender) {
+    return gender ? gender.charAt(0).toUpperCase() + gender.slice(1) : '—';
+}
+
+function dobLabel(row) {
+    const age = row.age_years != null ? formatAgeLabel(row.dob) : null;
+    return age ? `${row.dob_display} · ${age}` : row.dob_display;
 }
 </script>

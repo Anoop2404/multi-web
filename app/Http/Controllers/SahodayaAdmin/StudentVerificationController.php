@@ -198,17 +198,27 @@ class StudentVerificationController extends SahodayaAdminController
         $school = Tenant::find($student->tenant_id);
 
         return [
-            'id'            => $student->id,
-            'name'          => $student->name,
-            'reg_no'        => $student->reg_no,
-            'gender'        => $student->gender,
-            'class_name'    => $student->schoolClass?->name,
-            'category'      => $student->schoolClass?->classCategory?->label,
-            'school_id'     => $student->tenant_id,
-            'school_name'   => $school?->name,
-            'is_verified'   => $student->isVerified(),
-            'verified_at'   => $student->verified_at?->toIso8601String(),
-            'verified_by'   => $student->verifiedBy?->name ?? $student->verifiedBy?->email,
+            'id'                => $student->id,
+            'name'              => $student->name,
+            'reg_no'            => $student->reg_no,
+            'admission_number'  => $student->admission_number,
+            'roll_number'       => $student->roll_number,
+            'gender'            => $student->gender,
+            'dob'               => $student->dob?->format('Y-m-d'),
+            'dob_display'       => $student->dob?->format('j M Y'),
+            'age_years'         => $student->dob ? (int) $student->dob->diffInYears(now()) : null,
+            'class_name'        => $student->schoolClass?->name,
+            'category'          => $student->schoolClass?->classCategory?->label,
+            'parent_name'       => $student->parent_name,
+            'parent_phone'      => $student->parent_phone,
+            'parent_email'      => $student->parent_email,
+            'photo_url'         => $student->photoUrl(),
+            'school_id'         => $student->tenant_id,
+            'school_name'       => $school?->name,
+            'is_verified'       => $student->isVerified(),
+            'verified_at'       => $student->verified_at?->toIso8601String(),
+            'verified_at_display' => $student->verified_at?->format('j M Y'),
+            'verified_by'       => $student->verifiedBy?->name ?? $student->verifiedBy?->email,
         ];
     }
 }
