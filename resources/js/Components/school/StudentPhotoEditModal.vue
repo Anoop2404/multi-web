@@ -17,7 +17,7 @@
                     <p v-if="photoForm.errors.photo" class="text-xs text-red-500">{{ photoForm.errors.photo }}</p>
                     <div class="flex items-center justify-end gap-3 pt-2">
                         <button type="button" @click="close" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
-                        <button type="submit" :disabled="photoForm.processing || !(photoFile instanceof File)"
+                        <button type="submit" :disabled="photoForm.processing || !canSavePhoto"
                                 class="btn-primary disabled:opacity-50">
                             {{ photoForm.processing ? 'Saving…' : 'Save photo' }}
                         </button>
@@ -43,6 +43,8 @@ const emit = defineEmits(['update:modelValue', 'saved']);
 
 const photoFile = ref(null);
 const photoForm = useForm({});
+
+const canSavePhoto = computed(() => photoFile.value instanceof File);
 
 const modalTitle = computed(() => {
     if (props.student?.has_photo || props.student?.photo_url) {
