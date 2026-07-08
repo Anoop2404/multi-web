@@ -40,4 +40,15 @@ class AuthControllerHomeForTest extends TestCase
             $this->assertSame($expectedUrl, AuthController::homeFor($user), "Failed for role {$roleName}");
         }
     }
+
+    public function test_central_superadmin_routes_to_admin_dashboard_in_dedicated_database_mode(): void
+    {
+        config(['tenancy.database_per_sahodaya' => true]);
+
+        $user = User::factory()->create(['tenant_id' => null]);
+        $user->assignRole(Role::findByName('superadmin', 'web'));
+
+        $this->assertTrue($user->isSuperAdmin());
+        $this->assertSame(route('admin.dashboard'), AuthController::homeFor($user));
+    }
 }

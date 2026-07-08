@@ -69,7 +69,7 @@ Expected new/updated migrations:
 ### Step 3 — Provision + migrate Sahodaya tenant databases
 
 ```bash
-php artisan sahodaya:provision-databases --create --seed
+php artisan sahodaya:provision-databases --seed
 ```
 
 Expected per Sahodaya database:
@@ -78,13 +78,19 @@ Expected per Sahodaya database:
 
 Use this project command in production instead of raw `tenants:migrate`. Raw `tenants:migrate`
 iterates every tenant row and aborts on the first missing PostgreSQL database. The provisioner
-configures, creates (with `--create`), migrates, and reports individual Sahodaya failures without
-blocking the rest.
+configures, creates missing databases by default, migrates, and reports individual Sahodaya
+failures without blocking the rest.
 
 For one tenant:
 
 ```bash
-php artisan sahodaya:provision-databases --tenant=<sahodaya-uuid> --create --seed
+php artisan sahodaya:provision-databases --tenant=<sahodaya-uuid> --seed
+```
+
+To audit without creating missing databases:
+
+```bash
+php artisan sahodaya:provision-databases --no-create
 ```
 
 Verify one tenant:

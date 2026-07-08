@@ -10,10 +10,11 @@ class ProvisionSahodayaDatabases extends Command
 {
     protected $signature = 'sahodaya:provision-databases
                             {--seed : Seed default Sahodaya profile and site template after migrate}
-                            {--create : Create the PostgreSQL database if it does not exist}
+                            {--create : Create the PostgreSQL database if it does not exist (default)}
+                            {--no-create : Do not create missing PostgreSQL databases; report them only}
                             {--tenant= : Provision a single Sahodaya tenant id}';
 
-    protected $description = 'Configure, create (optional), and migrate Sahodaya tenant databases';
+    protected $description = 'Configure, create, and migrate Sahodaya tenant databases without aborting on one missing DB';
 
     public function handle(SahodayaDatabaseProvisioner $provisioner): int
     {
@@ -24,7 +25,7 @@ class ProvisionSahodayaDatabases extends Command
         }
 
         $seed = (bool) $this->option('seed');
-        $create = (bool) $this->option('create');
+        $create = ! (bool) $this->option('no-create');
         $tenantId = $this->option('tenant');
 
         if ($tenantId) {

@@ -159,7 +159,7 @@ class PlatformReadinessCheck extends Command
         if ($missing !== []) {
             return [
                 'ok' => false,
-                'message' => 'missing DB: '.implode(', ', $missing).' — run sahodaya:provision-databases --create --seed',
+                'message' => 'missing DB: '.implode(', ', $missing).' — run sahodaya:provision-databases --seed',
             ];
         }
 

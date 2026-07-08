@@ -56,11 +56,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isSuperAdmin(): bool
     {
-        if (! config('tenancy.database_per_sahodaya', true)) {
-            return $this->tenant_id === null && $this->hasRole('superadmin');
-        }
-
-        return false;
+        return $this->tenant_id === null && $this->hasRole('superadmin');
     }
 
     public function sendEmailVerificationNotification(): void
