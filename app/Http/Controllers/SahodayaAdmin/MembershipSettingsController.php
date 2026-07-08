@@ -383,9 +383,9 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Custom category added.');
     }
 
-    public function updateCustomCategory(Request $request, ClassCategory $classCategory)
+    public function updateCustomCategory(Request $request, int $classCategoryId)
     {
-        abort_if($classCategory->sahodaya_id !== $this->sahodaya->id, 403);
+        $classCategory = $this->findCustomCategory($classCategoryId);
 
         $data = $request->validate([
             'code'       => 'required|string|max:20',
@@ -405,9 +405,9 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Category updated.');
     }
 
-    public function destroyCustomCategory(ClassCategory $classCategory)
+    public function destroyCustomCategory(int $classCategoryId)
     {
-        abort_if($classCategory->sahodaya_id !== $this->sahodaya->id, 403);
+        $classCategory = $this->findCustomCategory($classCategoryId);
 
         $classCategory->delete();
 
@@ -438,9 +438,9 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Class added.');
     }
 
-    public function updateMasterClass(Request $request, MasterClass $masterClass, EffectiveMasterDataResolver $resolver)
+    public function updateMasterClass(Request $request, int $masterClassId, EffectiveMasterDataResolver $resolver)
     {
-        abort_if($masterClass->sahodaya_id !== $this->sahodaya->id, 403);
+        $masterClass = $this->findMasterClass($masterClassId);
 
         $data = $request->validate([
             'name'              => 'required|string|max:50',
@@ -459,9 +459,9 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Class updated.');
     }
 
-    public function destroyMasterClass(MasterClass $masterClass)
+    public function destroyMasterClass(int $masterClassId)
     {
-        abort_if($masterClass->sahodaya_id !== $this->sahodaya->id, 403);
+        $masterClass = $this->findMasterClass($masterClassId);
 
         $masterClass->delete();
 
@@ -492,9 +492,9 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Category visibility updated.');
     }
 
-    public function updateGlobalCategorySort(Request $request, ClassCategory $classCategory)
+    public function updateGlobalCategorySort(Request $request, int $classCategoryId)
     {
-        abort_if($classCategory->sahodaya_id !== null, 403);
+        $classCategory = $this->findGlobalCategory($classCategoryId);
 
         $data = $request->validate([
             'sort_order' => 'required|integer|min:0',
@@ -620,5 +620,29 @@ class MembershipSettingsController extends SahodayaAdminController
         ]);
 
         return back()->with('success', 'Registration form fields saved.');
+    }
+
+    private function findMasterClass(int $masterClassId): MasterClass
+    {
+        $masterClass = MasterClass::query()->find($masterClassId);
+        abort_if(! $masterClass || $masterClass->sahodaya_id !== $this->sahodaya->id, 404);
+
+        return $masterClass;
+    }
+
+    private function findCustomCategory(int $classCategoryId): ClassCategory
+    {
+        $classCategory = ClassCategory::query()->find($classCategoryId);
+        abort_if(! $classCategory || $classCategory->sahodaya_id !== $this->sahodaya->id, 403);
+
+        return $classCategory;
+    }
+
+    private function findGlobalCategory(int $classCategoryId): ClassCategory
+    {
+        $classCategory = ClassCategory::query()->find($classCategoryId);
+        abort_if(! $classCategory || $classCategory->sahodaya_id !== null, 403);
+
+        return $classCategory;
     }
 }

@@ -47,7 +47,8 @@
                 <ul class="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-indigo-800/90 text-xs">
                     <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'profile'">Profile & Rules</button> — name, prefix, academic year, contact</li>
                     <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'window'">Registration Window</button> — open/close dates for the active year</li>
-                    <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'categories'">Class Master</button> — add classes 1, 2, 3… and assign categories</li>
+                    <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'class-categories'">Class Categories</button> — Pre-Primary, Primary, Secondary groups</li>
+                    <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'class-master'">Class Master</button> — add classes 1, 2, 3… and assign categories</li>
                     <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'fees'">Membership Fees</button> — fee amount or slabs for {{ academicYear }}</li>
                 </ul>
             </div>
@@ -612,16 +613,123 @@
                 </FormSection>
             </div>
 
-            <!-- Tab: Class Master -->
-            <div v-show="activeTab === 'categories'" class="space-y-5">
+            <!-- Tab: Class Categories (configure first) -->
+            <div v-show="activeTab === 'class-categories'" class="space-y-5">
                 <p class="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
-                    Add each class (<strong>1, 2, 3, LKG, UKG…</strong>) and assign it to a <strong>category</strong> (Primary, Secondary, etc.).
+                    Set up <strong>class categories</strong> first (Pre-Primary, Primary, Secondary, etc.), then add individual classes under
+                    <button type="button" class="underline font-semibold text-purple-700" @click="activeTab = 'class-master'">Class Master</button>.
+                    Lower sort numbers appear first in lists.
+                </p>
+
+                <FormSection title="Class Categories"
+                             hint="Group classes into categories. Disable categories you don't use. Edit sort order to control display sequence.">
+                    <div class="space-y-2">
+                        <div v-for="cat in sortedGlobalCategories" :key="cat.id"
+                             class="p-3 rounded-xl border"
+                             :class="hiddenCategoryIds.includes(cat.id) ? 'border-gray-100 bg-gray-50 opacity-60' : 'border-purple-100 bg-purple-50/30'">
+                            <template v-if="editingGlobalCategoryId === cat.id">
+                                <div class="flex flex-wrap gap-3 items-end">
+                                    <FormField label="Sort" hint="Lower = first">
+                                        <input v-model.number="editGlobalCategoryForm.sort_order" type="number" min="0" class="field w-20">
+                                    </FormField>
+                                    <div class="pb-0.5 text-sm text-gray-600">
+                                        <span class="font-mono text-xs text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded mr-2">{{ cat.code }}</span>
+                                        {{ cat.label }}
+                                    </div>
+                                </div>
+                                <div class="flex gap-2 mt-3">
+                                    <button type="button" @click="saveGlobalCategoryEdit(cat)" class="btn-secondary text-xs">Save</button>
+                                    <button type="button" @click="cancelGlobalCategoryEdit" class="text-xs text-gray-500">Cancel</button>
+                                </div>
+                            </template>
+                            <template v-else>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-xs font-mono text-gray-400 w-6">{{ cat.sort_order }}</span>
+                                        <span class="font-mono text-xs text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded">{{ cat.code }}</span>
+                                        <span class="text-sm font-medium text-gray-700">{{ cat.label }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <button type="button" @click="startGlobalCategoryEdit(cat)" class="text-xs text-purple-600 hover:underline">Edit sort</button>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox"
+                                                   :checked="!hiddenCategoryIds.includes(cat.id)"
+                                                   @change="toggleCategory(cat.id, !$event.target.checked)"
+                                                   class="sr-only peer">
+                                            <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-[#041525]/20 rounded-full peer peer-checked:bg-[#041525] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </FormSection>
+
+                <FormSection v-if="customCategories.length" title="Your Custom Categories"
+                             hint="Edit or remove categories you added for this Sahodaya.">
+                    <div v-for="cat in sortedCustomCategories" :key="cat.id"
+                         class="p-3 rounded-xl border border-gray-100 text-sm mb-2 space-y-3">
+                        <template v-if="editingCategoryId === cat.id">
+                            <div class="flex flex-wrap gap-3 items-end">
+                                <FormField label="Sort" hint="Lower = first">
+                                    <input v-model.number="editCategoryForm.sort_order" type="number" min="0" class="field w-20">
+                                </FormField>
+                                <FormField label="Code">
+                                    <input v-model="editCategoryForm.code" class="field w-24">
+                                </FormField>
+                                <FormField label="Label">
+                                    <input v-model="editCategoryForm.label" class="field w-48">
+                                </FormField>
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="button" @click="saveCategoryEdit(cat)" class="btn-secondary text-xs">Save</button>
+                                <button type="button" @click="cancelCategoryEdit" class="text-xs text-gray-500">Cancel</button>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <span class="text-xs font-mono text-gray-400 w-6">{{ cat.sort_order }}</span>
+                                    <span class="font-mono text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{{ cat.code }}</span>
+                                    <span class="font-medium text-gray-700">{{ cat.label }}</span>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <button type="button" @click="startCategoryEdit(cat)" class="text-xs text-purple-600 hover:underline">Edit</button>
+                                    <button type="button" @click="removeCategory(cat)" class="text-xs text-red-500 hover:underline">Remove</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </FormSection>
+
+                <FormSection title="Add Custom Category" hint="Only if you need an extra category beyond the global list (Pre-Primary, Primary, etc.).">
+                    <form @submit.prevent="addCategory" class="flex flex-wrap gap-3 items-end">
+                        <FormField label="Sort" hint="Lower = first">
+                            <input v-model.number="categoryForm.sort_order" type="number" min="0" class="field w-20"
+                                   :placeholder="String(nextCategorySort)">
+                        </FormField>
+                        <FormField label="Code">
+                            <input v-model="categoryForm.code" class="field w-24" placeholder="PRE">
+                        </FormField>
+                        <FormField label="Label">
+                            <input v-model="categoryForm.label" class="field w-48" placeholder="Pre-Primary">
+                        </FormField>
+                        <button type="submit" class="btn-secondary mb-0.5">Add Category</button>
+                    </form>
+                </FormSection>
+            </div>
+
+            <!-- Tab: Class Master -->
+            <div v-show="activeTab === 'class-master'" class="space-y-5">
+                <p class="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+                    Add each class (<strong>1, 2, 3, LKG, UKG…</strong>) and assign it to a category from
+                    <button type="button" class="underline font-semibold text-purple-700" @click="activeTab = 'class-categories'">Class Categories</button>.
                     All member schools automatically get this class list — they cannot add their own.
                 </p>
 
                 <FormSection title="Classes"
                              hint="Each row is one class. Schools pick from this list when registering students.">
-                    <div v-if="masterClasses.length" class="overflow-hidden rounded-xl border border-slate-100">
+                    <div v-if="sortedMasterClasses.length" class="overflow-hidden rounded-xl border border-slate-100">
                         <table class="data-table">
                             <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                                 <tr>
@@ -632,7 +740,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
-                                <tr v-for="cls in masterClasses" :key="cls.id" class="hover:bg-gray-50/80">
+                                <tr v-for="cls in sortedMasterClasses" :key="cls.id" class="hover:bg-gray-50/80">
                                     <td v-if="editingClassId === cls.id" colspan="4" class="px-4 py-3">
                                         <div class="flex flex-wrap gap-3 items-end">
                                             <FormField label="Sort order" hint="Lower = first">
@@ -686,103 +794,6 @@
                             </select>
                         </FormField>
                         <button type="submit" :disabled="!classForm.class_category_id" class="btn-secondary mb-0.5">Add Class</button>
-                    </form>
-                </FormSection>
-
-                <FormSection title="Class Categories"
-                             hint="Group classes into categories (Primary, Secondary, etc.). Disable categories you don't use.">
-                    <div class="space-y-2">
-                        <div v-for="cat in globalCategories" :key="cat.id"
-                             class="p-3 rounded-xl border"
-                             :class="hiddenCategoryIds.includes(cat.id) ? 'border-gray-100 bg-gray-50 opacity-60' : 'border-purple-100 bg-purple-50/30'">
-                            <template v-if="editingGlobalCategoryId === cat.id">
-                                <div class="flex flex-wrap gap-3 items-end">
-                                    <FormField label="Sort" hint="Lower = first">
-                                        <input v-model.number="editGlobalCategoryForm.sort_order" type="number" min="0" class="field w-20">
-                                    </FormField>
-                                    <div class="pb-0.5 text-sm text-gray-600">
-                                        <span class="font-mono text-xs text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded mr-2">{{ cat.code }}</span>
-                                        {{ cat.label }}
-                                    </div>
-                                </div>
-                                <div class="flex gap-2 mt-3">
-                                    <button type="button" @click="saveGlobalCategoryEdit(cat)" class="btn-secondary text-xs">Save</button>
-                                    <button type="button" @click="cancelGlobalCategoryEdit" class="text-xs text-gray-500">Cancel</button>
-                                </div>
-                            </template>
-                            <template v-else>
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <span class="text-xs font-mono text-gray-400 w-6">{{ cat.sort_order }}</span>
-                                        <span class="font-mono text-xs text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded">{{ cat.code }}</span>
-                                        <span class="text-sm font-medium text-gray-700">{{ cat.label }}</span>
-                                    </div>
-                                    <div class="flex items-center gap-3">
-                                        <button type="button" @click="startGlobalCategoryEdit(cat)" class="text-xs text-purple-600 hover:underline">Edit sort</button>
-                                        <label class="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox"
-                                                   :checked="!hiddenCategoryIds.includes(cat.id)"
-                                                   @change="toggleCategory(cat.id, !$event.target.checked)"
-                                                   class="sr-only peer">
-                                            <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-[#041525]/20 rounded-full peer peer-checked:bg-[#041525] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                                        </label>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </FormSection>
-
-                <FormSection v-if="customCategories.length" title="Your Custom Categories"
-                             hint="Edit or remove categories you added for this Sahodaya.">
-                    <div v-for="cat in customCategories" :key="cat.id"
-                         class="p-3 rounded-xl border border-gray-100 text-sm mb-2 space-y-3">
-                        <template v-if="editingCategoryId === cat.id">
-                            <div class="flex flex-wrap gap-3 items-end">
-                                <FormField label="Sort" hint="Lower = first">
-                                    <input v-model.number="editCategoryForm.sort_order" type="number" min="0" class="field w-20">
-                                </FormField>
-                                <FormField label="Code">
-                                    <input v-model="editCategoryForm.code" class="field w-24">
-                                </FormField>
-                                <FormField label="Label">
-                                    <input v-model="editCategoryForm.label" class="field w-48">
-                                </FormField>
-                            </div>
-                            <div class="flex gap-2">
-                                <button type="button" @click="saveCategoryEdit(cat)" class="btn-secondary text-xs">Save</button>
-                                <button type="button" @click="cancelCategoryEdit" class="text-xs text-gray-500">Cancel</button>
-                            </div>
-                        </template>
-                        <template v-else>
-                            <div class="flex items-center justify-between gap-3">
-                                <div class="flex items-center gap-3 min-w-0">
-                                    <span class="text-xs font-mono text-gray-400 w-6">{{ cat.sort_order }}</span>
-                                    <span class="font-mono text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{{ cat.code }}</span>
-                                    <span class="font-medium text-gray-700">{{ cat.label }}</span>
-                                </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <button type="button" @click="startCategoryEdit(cat)" class="text-xs text-purple-600 hover:underline">Edit</button>
-                                    <button type="button" @click="removeCategory(cat)" class="text-xs text-red-500 hover:underline">Remove</button>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </FormSection>
-
-                <FormSection title="Add Custom Category" hint="Only if you need an extra category beyond the global list (Pre-Primary, Primary, etc.).">
-                    <form @submit.prevent="addCategory" class="flex flex-wrap gap-3 items-end">
-                        <FormField label="Sort" hint="Lower = first">
-                            <input v-model.number="categoryForm.sort_order" type="number" min="0" class="field w-20"
-                                   :placeholder="String(nextCategorySort)">
-                        </FormField>
-                        <FormField label="Code">
-                            <input v-model="categoryForm.code" class="field w-24" placeholder="PRE">
-                        </FormField>
-                        <FormField label="Label">
-                            <input v-model="categoryForm.label" class="field w-48" placeholder="Pre-Primary">
-                        </FormField>
-                        <button type="submit" class="btn-secondary mb-0.5">Add Category</button>
                     </form>
                 </FormSection>
             </div>
@@ -952,7 +963,8 @@ const tabs = [
     { key: 'form',       label: 'Registration Form' },
     { key: 'window',     label: 'Registration Window' },
     { key: 'fees',       label: 'Membership Fees' },
-    { key: 'categories', label: 'Class Master' },
+    { key: 'class-categories', label: 'Class Categories' },
+    { key: 'class-master',     label: 'Class Master' },
     { key: 'types',      label: 'Teaching Types' },
     { key: 'subjects',   label: 'Subject Master' },
 ];
@@ -961,12 +973,20 @@ const tabKeys = tabs.map((t) => t.key);
 
 function resolveInitialTab() {
     const fromUrl = new URLSearchParams(window.location.search).get('tab');
-    if (fromUrl && tabKeys.includes(fromUrl)) {
-        return fromUrl;
+    const legacyTabMap = { categories: 'class-categories' };
+    const normalize = (tab) => legacyTabMap[tab] ?? tab;
+    if (fromUrl) {
+        const tab = normalize(fromUrl);
+        if (tabKeys.includes(tab)) {
+            return tab;
+        }
     }
     const stored = sessionStorage.getItem(`sah-settings-tab-${props.sahodaya?.id}`);
-    if (stored && tabKeys.includes(stored)) {
-        return stored;
+    if (stored) {
+        const tab = normalize(stored);
+        if (tabKeys.includes(tab)) {
+            return tab;
+        }
     }
     return 'profile';
 }
@@ -1139,7 +1159,7 @@ const setupChecklist = computed(() => {
         {
             key: 'classes',
             label: 'Add at least one class to the Class Master (LKG, 1, 2, 3…).',
-            tab: 'categories',
+            tab: 'class-master',
             tabLabel: 'Class Master',
             done: (props.masterClasses?.length ?? 0) > 0,
         },
@@ -1187,6 +1207,18 @@ const nextSubjectSort = computed(() => {
     if (! props.customSubjects?.length) return 1;
     return Math.max(...props.customSubjects.map(s => s.sort_order ?? 0)) + 1;
 });
+
+const sortedGlobalCategories = computed(() =>
+    [...(props.globalCategories ?? [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label).localeCompare(String(b.label))),
+);
+
+const sortedCustomCategories = computed(() =>
+    [...(props.customCategories ?? [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label).localeCompare(String(b.label))),
+);
+
+const sortedMasterClasses = computed(() =>
+    [...(props.masterClasses ?? [])].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0) || String(a.name).localeCompare(String(b.name))),
+);
 
 function saveProfile() { profileForm.put(`/sahodaya-admin/${props.sahodaya.id}/membership/settings`); }
 function savePaymentDetails() {

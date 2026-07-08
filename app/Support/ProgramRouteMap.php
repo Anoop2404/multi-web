@@ -42,6 +42,12 @@ class ProgramRouteMap
             'event_type' => 'science_fest',
             'icon'       => 'layers',
         ],
+        'custom' => [
+            'slug'       => 'custom',
+            'label'      => 'Custom Events',
+            'event_type' => 'custom',
+            'icon'       => 'calendar',
+        ],
     ];
 
     public static function slugFromPrefix(string $prefix): string
@@ -118,10 +124,6 @@ class ProgramRouteMap
     /** School registration page for a fest program slug. */
     public static function schoolRegistrationUrl(string $schoolId, string $programSlug): string
     {
-        if ($programSlug === 'custom') {
-            return "/school-admin/{$schoolId}/fest-programs";
-        }
-
         return self::schoolBase($schoolId, self::prefixFromSlug($programSlug)).'/registration';
     }
 

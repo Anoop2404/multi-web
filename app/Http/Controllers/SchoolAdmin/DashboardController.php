@@ -90,6 +90,7 @@ class DashboardController extends SchoolAdminController
             ['slug' => 'teacher-fest', 'label' => 'Teacher Fest', 'type' => 'teacher_fest'],
             ['slug' => 'english-fest', 'label' => 'English Fest', 'type' => 'english_fest'],
             ['slug' => 'science-fest', 'label' => 'Science Fest', 'type' => 'science_fest'],
+            ['slug' => 'custom', 'label' => 'Custom Events', 'type' => 'custom'],
         ];
 
         return collect($programs)->map(function (array $p) use ($sahodayaId) {

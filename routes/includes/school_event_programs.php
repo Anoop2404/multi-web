@@ -12,6 +12,7 @@ use App\Http\Controllers\SchoolAdmin\EnglishFestController;
 use App\Http\Controllers\SchoolAdmin\ScienceFestController;
 use App\Http\Controllers\SchoolAdmin\SportsMeetController;
 use App\Http\Controllers\SchoolAdmin\TeacherFestController;
+use App\Http\Controllers\SchoolAdmin\CustomFestController;
 use App\Http\Controllers\SchoolAdmin\TrainingController;
 use App\Http\Controllers\SchoolAdmin\TrainingRegistrationController;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,7 @@ $festPrograms = [
     ['prefix' => 'teacher-fest', 'slug' => 'teacher-fest', 'controller' => TeacherFestController::class],
     ['prefix' => 'english-fest', 'slug' => 'english-fest', 'controller' => EnglishFestController::class],
     ['prefix' => 'science-fest', 'slug' => 'science-fest', 'controller' => ScienceFestController::class],
+    ['prefix' => 'custom', 'slug' => 'custom', 'controller' => CustomFestController::class],
 ];
 
 foreach ($festPrograms as $cfg) {
@@ -292,7 +294,7 @@ Route::prefix('training')->name('training.')->group(function () {
 });
 
 Route::get("/programs/{program}", function (string $tenantId, string $program) use ($festProgramSlugs) {
-    $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest', 'english-fest' => 'english-fest', 'science-fest' => 'science-fest'];
+    $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest', 'english-fest' => 'english-fest', 'science-fest' => 'science-fest', 'custom' => 'custom'];
     if (isset($map[$program])) {
         return redirect("/school-admin/{$tenantId}/{$map[$program]}", 301);
     }
@@ -301,7 +303,7 @@ Route::get("/programs/{program}", function (string $tenantId, string $program) u
 })->where('program', $festProgramSlugs);
 
 Route::get("/programs/{program}/{path}", function (string $tenantId, string $program, string $path) {
-    $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest', 'english-fest' => 'english-fest', 'science-fest' => 'science-fest'];
+    $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest', 'english-fest' => 'english-fest', 'science-fest' => 'science-fest', 'custom' => 'custom'];
     if (isset($map[$program])) {
         return redirect("/school-admin/{$tenantId}/{$map[$program]}/{$path}", 301);
     }

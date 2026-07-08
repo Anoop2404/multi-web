@@ -9,6 +9,7 @@ export const SCHOOL_FEST_PROGRAMS = [
     { slug: 'teacher-fest', prefix: 'teacher-fest', label: 'Teacher Fest', icon: 'users' },
     { slug: 'english-fest', prefix: 'english-fest', label: 'English Fest', icon: 'file-text' },
     { slug: 'science-fest', prefix: 'science-fest', label: 'Science Fest', icon: 'layers' },
+    { slug: 'custom', prefix: 'custom', label: 'Custom Events', icon: 'calendar' },
 ];
 
 const SLUG_TO_PREFIX = Object.fromEntries(SCHOOL_FEST_PROGRAMS.map((p) => [p.slug, p.prefix]));
@@ -17,12 +18,12 @@ const PREFIX_TO_SLUG = Object.fromEntries(SCHOOL_FEST_PROGRAMS.map((p) => [p.pre
 /** @returns {string|null} program slug */
 export function detectSchoolProgramFromUrl(url) {
     const path = (url ?? '').split('?')[0];
-    const dedicated = path.match(/\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)(?:\/|$)/);
+    const dedicated = path.match(/\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest|custom)(?:\/|$)/);
     if (dedicated?.[1] && PREFIX_TO_SLUG[dedicated[1]]) {
         return PREFIX_TO_SLUG[dedicated[1]];
     }
 
-    const legacy = path.match(/\/programs\/(kalotsav|sports-meet|kids-fest|teacher-fest|english-fest|science-fest)(?:\/|$)/);
+    const legacy = path.match(/\/programs\/(kalotsav|sports-meet|kids-fest|teacher-fest|english-fest|science-fest|custom)(?:\/|$)/);
     return legacy?.[1] ?? null;
 }
 

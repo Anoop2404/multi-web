@@ -11,6 +11,7 @@ use App\Models\FestRegistration;
 use App\Services\Events\EventContext;
 use App\Services\Events\FestCertificateService;
 use App\Support\ProgramRouteMap;
+use App\Support\SchoolFestProgram;
 use Illuminate\Http\Request;
 
 class FestEventPortalController extends SchoolAdminController
