@@ -311,7 +311,9 @@ class FestSchoolEventFeeService
             'school_id' => $schoolId,
         ]);
 
-        if ($record->exists && $record->status === 'approved') {
+        // Only freeze records that already have a positive balance fully settled.
+        // Zero-total "approved" stubs (created before fees were configured) must be recalculated.
+        if ($record->exists && (float) $record->total_due > 0 && $record->isFullyPaid()) {
             return $record;
         }
 

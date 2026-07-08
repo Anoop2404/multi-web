@@ -589,4 +589,25 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(400.0, (float) $fee->participation_fee);
         $this->assertSame(400.0, (float) $fee->total_due);
     }
+
+    public function test_recalculates_zero_approved_stub_when_fees_are_configured_later(): void
+    {
+        ['school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();
+
+        $event->update(['fee_type' => 'none', 'fee_settings' => null]);
+        $service = app(FestSchoolEventFeeService::class);
+
+        $this->approvedRegistration($event->fresh(), $item->fresh(), $school);
+        $stub = $service->recalculate($event->fresh(), $school->id);
+
+        $this->assertSame(0.0, (float) $stub->total_due);
+        $this->assertSame('approved', $stub->status);
+
+        $item->update(['fee_amount' => 400]);
+        $fee = $service->recalculate($event->fresh(), $school->id);
+
+        $this->assertSame(400.0, (float) $fee->total_due);
+        $this->assertSame(1, $fee->participation_item_count);
+        $this->assertSame('pending', $fee->status);
+    }
 }

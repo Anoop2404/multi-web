@@ -547,7 +547,7 @@ class FestRegistrationController extends SchoolAdminController
             ->where('school_id', $this->school->id)
             ->first();
 
-        if (! $schoolFee && $feeService->feeRequired($event)) {
+        if ($feeService->feeRequired($event)) {
             $schoolFee = $feeService->recalculate($event, $this->school->id);
         }
 
