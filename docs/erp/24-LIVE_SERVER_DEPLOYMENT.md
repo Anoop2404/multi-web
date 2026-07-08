@@ -66,15 +66,26 @@ Expected new/updated migrations:
 - `2026_07_06_160001_erp_central_scale_indexes` — users + audit_logs indexes
 - Tenant user auth code (no central schema change beyond indexes)
 
-### Step 3 — Tenant migrations (every Sahodaya DB)
+### Step 3 — Provision + migrate Sahodaya tenant databases
 
 ```bash
-php artisan tenants:migrate --force
+php artisan sahodaya:provision-databases --create --seed
 ```
 
 Expected per Sahodaya database:
 - `2026_07_06_160002_erp_tenant_scale_indexes` — fest, ledger, teachers indexes
 - `2026_07_06_170001_tenant_users_and_permissions` — **users**, roles, sanctum tables
+
+Use this project command in production instead of raw `tenants:migrate`. Raw `tenants:migrate`
+iterates every tenant row and aborts on the first missing PostgreSQL database. The provisioner
+configures, creates (with `--create`), migrates, and reports individual Sahodaya failures without
+blocking the rest.
+
+For one tenant:
+
+```bash
+php artisan sahodaya:provision-databases --tenant=<sahodaya-uuid> --create --seed
+```
 
 Verify one tenant:
 

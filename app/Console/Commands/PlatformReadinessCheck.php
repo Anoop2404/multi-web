@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
+use App\Models\Tenant;
+use App\Services\Tenancy\SahodayaDatabaseProvisioner;
 
 class PlatformReadinessCheck extends Command
 {
@@ -22,6 +24,7 @@ class PlatformReadinessCheck extends Command
             'redis_cache'    => $this->checkRedisCache(),
             'redis_queue'    => $this->checkRedisQueue(),
             'central_db'     => $this->checkCentralDatabase(),
+            'sahodaya_databases' => $this->checkSahodayaDatabases(),
             'tenant_users_migrated' => $this->checkTenantUsersReady(),
         ];
 
@@ -124,6 +127,50 @@ class PlatformReadinessCheck extends Command
             'ok'      => false,
             'message' => "{$tenantUsers} portal user(s) still in central — run users:migrate-to-tenant-databases",
         ];
+    }
+
+    /** @return array{ok: bool, message: string} */
+    private function checkSahodayaDatabases(): array
+    {
+        if (! config('tenancy.database_per_sahodaya', true)) {
+            return ['ok' => true, 'message' => 'single-database mode — skip Sahodaya DB check'];
+        }
+
+        $provisioner = app(SahodayaDatabaseProvisioner::class);
+        $missing = [];
+        $notReady = [];
+
+        Tenant::query()
+            ->where('type', 'sahodaya')
+            ->orderBy('name')
+            ->get()
+            ->each(function (Tenant $tenant) use ($provisioner, &$missing, &$notReady) {
+                $status = $provisioner->status($tenant);
+                if (! $status['exists']) {
+                    $missing[] = "{$tenant->name} ({$status['name']})";
+
+                    return;
+                }
+                if (! $status['ready']) {
+                    $notReady[] = "{$tenant->name} ({$status['name']})";
+                }
+            });
+
+        if ($missing !== []) {
+            return [
+                'ok' => false,
+                'message' => 'missing DB: '.implode(', ', $missing).' — run sahodaya:provision-databases --create --seed',
+            ];
+        }
+
+        if ($notReady !== []) {
+            return [
+                'ok' => false,
+                'message' => 'DB not migrated/seeded: '.implode(', ', $notReady).' — run sahodaya:provision-databases --seed',
+            ];
+        }
+
+        return ['ok' => true, 'message' => 'all Sahodaya databases exist and have tenant schema'];
     }
 
     /** @return array{ok: bool, message: string} */

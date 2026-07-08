@@ -82,7 +82,7 @@ class MigrateTenantUsersFromCentral extends Command
                     $failedTenants++;
                     $this->error(
                         '  → missing tenant auth table(s): '.implode(', ', $missingTables)
-                        .'. Run php artisan tenants:migrate --tenant='.$sahodaya->id.' before migrating users.'
+                        .'. Run php artisan sahodaya:provision-databases --tenant='.$sahodaya->id.' --create --seed before migrating users.'
                     );
 
                     return;
