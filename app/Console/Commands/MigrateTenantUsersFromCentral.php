@@ -47,6 +47,7 @@ class MigrateTenantUsersFromCentral extends Command
 
         $central = DB::connection(config('tenancy.database.central_connection', 'central'));
         $totalUsers = 0;
+        $failedTenants = 0;
 
         foreach ($sahodayas as $sahodaya) {
             $tenantIds = array_merge([$sahodaya->id], TenancyDatabase::schoolIdsFor($sahodaya->id));
@@ -74,7 +75,19 @@ class MigrateTenantUsersFromCentral extends Command
                 $seedRoles,
                 $purge,
                 &$totalUsers,
+                &$failedTenants,
             ) {
+                $missingTables = $this->missingTenantAuthTables();
+                if ($missingTables !== []) {
+                    $failedTenants++;
+                    $this->error(
+                        '  → missing tenant auth table(s): '.implode(', ', $missingTables)
+                        .'. Run php artisan tenants:migrate --tenant='.$sahodaya->id.' before migrating users.'
+                    );
+
+                    return;
+                }
+
                 if ($seedRoles) {
                     (new TenantRolesAndPermissionsSeeder)->run();
                 }
@@ -107,6 +120,12 @@ class MigrateTenantUsersFromCentral extends Command
                     $this->info('  → removed migrated users from central');
                 }
             });
+        }
+
+        if ($failedTenants > 0) {
+            $this->error("Aborted for {$failedTenants} tenant(s) because required tenant auth tables are missing.");
+
+            return self::FAILURE;
         }
 
         if ($dryRun) {
@@ -219,6 +238,25 @@ class MigrateTenantUsersFromCentral extends Command
         }
 
         DB::statement("SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE((SELECT MAX(id) FROM users), 1))");
+    }
+
+    /** @return list<string> */
+    private function missingTenantAuthTables(): array
+    {
+        $tableNames = config('permission.table_names');
+        $required = array_filter([
+            'users',
+            $tableNames['roles'] ?? 'roles',
+            $tableNames['permissions'] ?? 'permissions',
+            $tableNames['model_has_roles'] ?? 'model_has_roles',
+            $tableNames['model_has_permissions'] ?? 'model_has_permissions',
+            'personal_access_tokens',
+        ]);
+
+        return array_values(array_filter(
+            $required,
+            fn (string $table) => ! \Illuminate\Support\Facades\Schema::hasTable($table),
+        ));
     }
 
     /** @param  list<int>  $userIds */
