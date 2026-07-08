@@ -47,9 +47,15 @@ class KannurLegacySchoolCredentialSyncTest extends TestCase
         $this->assertSame('legacy.user@gmail.com', $email);
     }
 
-    public function test_non_gmail_addresses_are_rejected(): void
+    public function test_non_gmail_addresses_are_rejected_for_gmail_helper(): void
     {
         $this->assertFalse($this->sync->isGmailLoginEmail('office@school.edu'));
         $this->assertTrue($this->sync->isGmailLoginEmail('office.school@gmail.com'));
+    }
+
+    public function test_any_valid_email_is_accepted_for_login(): void
+    {
+        $this->assertTrue($this->sync->isLoginEmail('office@school.edu'));
+        $this->assertTrue($this->sync->isLoginEmail('kasturbaschool@yahoo.com'));
     }
 }

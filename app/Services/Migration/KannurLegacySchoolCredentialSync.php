@@ -43,7 +43,7 @@ class KannurLegacySchoolCredentialSync
                 $email = $this->resolveLoginEmail($match['school'], $match['legacy'], $match['legacy_user']);
                 if ($email === null) {
                     $stats['skipped_no_email']++;
-                    $this->line($output, "✗ {$match['school']->name} — no Gmail login email");
+                    $this->line($output, "✗ {$match['school']->name} — no login email");
 
                     continue;
                 }
@@ -76,7 +76,7 @@ class KannurLegacySchoolCredentialSync
 
                 if ($email === null) {
                     $stats['skipped_no_email']++;
-                    $this->line($output, "Skipped {$school->name}: no Gmail login email");
+                    $this->line($output, "Skipped {$school->name}: no login email");
 
                     continue;
                 }
@@ -128,7 +128,7 @@ class KannurLegacySchoolCredentialSync
         ];
 
         foreach ($candidates as $email) {
-            if ($this->isGmailLoginEmail($email)) {
+            if ($this->isLoginEmail($email)) {
                 return $email;
             }
         }
@@ -136,13 +136,14 @@ class KannurLegacySchoolCredentialSync
         return null;
     }
 
-    private function schoolPayloadEmail(Tenant $school): string
+    public function isLoginEmail(?string $email): bool
     {
-        $payload = is_array($school->application_payload) ? $school->application_payload : [];
+        $email = strtolower(trim((string) $email));
 
-        return strtolower(trim((string) ($payload['school_email'] ?? '')));
+        return $email !== '' && (bool) filter_var($email, FILTER_VALIDATE_EMAIL);
     }
 
+    /** @deprecated Use isLoginEmail() */
     public function isGmailLoginEmail(?string $email): bool
     {
         $email = strtolower(trim((string) $email));
@@ -152,6 +153,13 @@ class KannurLegacySchoolCredentialSync
         }
 
         return str_ends_with($email, '@gmail.com');
+    }
+
+    private function schoolPayloadEmail(Tenant $school): string
+    {
+        $payload = is_array($school->application_payload) ? $school->application_payload : [];
+
+        return strtolower(trim((string) ($payload['school_email'] ?? '')));
     }
 
     private function schoolHasAdminLogin(Tenant $school): bool

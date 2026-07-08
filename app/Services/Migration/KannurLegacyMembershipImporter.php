@@ -283,6 +283,8 @@ class KannurLegacyMembershipImporter
                 'legacy_name'    => $legacySchool['school_name'] ?? '',
                 'affiliation_no' => $legacySchool['affiliation_no'] ?? '',
                 'email'          => $legacySchool['email'] ?? '',
+                'legacy'         => $legacySchool,
+                'legacy_user'    => $legacyUsersById[$userId] ?? null,
             ];
         }
 
