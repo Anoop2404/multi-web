@@ -570,4 +570,23 @@ class FestSchoolEventFeeServiceTest extends TestCase
 
         $this->assertStringStartsWith('data:image/png;base64,', $uri);
     }
+
+    public function test_per_item_fee_amount_enables_billing_without_explicit_fee_model(): void
+    {
+        ['school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();
+
+        $event->update(['fee_type' => 'none', 'fee_settings' => null]);
+        $item->update(['fee_amount' => 400]);
+
+        $service = app(FestSchoolEventFeeService::class);
+
+        $this->assertTrue($service->feeRequired($event->fresh()));
+        $this->assertSame('item_catalog', $service->resolveSchedule($event->fresh())['fee_model']);
+
+        $this->approvedRegistration($event->fresh(), $item->fresh(), $school);
+        $fee = $service->recalculate($event->fresh(), $school->id);
+
+        $this->assertSame(400.0, (float) $fee->participation_fee);
+        $this->assertSame(400.0, (float) $fee->total_due);
+    }
 }

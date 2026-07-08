@@ -4,6 +4,8 @@ namespace App\Services\Events;
 
 use App\Models\FeeReceipt;
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
+use App\Models\FestItemHead;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
@@ -85,6 +87,56 @@ class FestSchoolEventFeeService
                 $schedule['participant_type_fees'] ?? []
             );
         }
+
+        if (($schedule['fee_model'] ?? 'none') === 'none' && $this->eventHasConfiguredItemFees($event)) {
+            $schedule['fee_model'] = 'item_catalog';
+            $schedule = $this->applyItemCatalogDefaults($event, $schedule);
+        }
+
+        return $schedule;
+    }
+
+    private function eventHasConfiguredItemFees(FestEvent $event): bool
+    {
+        if (FestEventItem::query()
+            ->where('event_id', $event->id)
+            ->where(function ($q) {
+                $q->where('is_enabled', true)->orWhereNull('is_enabled');
+            })
+            ->whereNotNull('fee_amount')
+            ->where('fee_amount', '>', 0)
+            ->exists()) {
+            return true;
+        }
+
+        return FestItemHead::query()
+            ->where('event_id', $event->id)
+            ->where(function ($q) {
+                $q->where(fn ($inner) => $inner->whereNotNull('default_item_fee')->where('default_item_fee', '>', 0))
+                    ->orWhere(fn ($inner) => $inner->whereNotNull('extra_item_fee')->where('extra_item_fee', '>', 0));
+            })
+            ->exists();
+    }
+
+    /** @param  array<string, mixed>  $schedule */
+    private function applyItemCatalogDefaults(FestEvent $event, array $schedule): array
+    {
+        $scheme = \App\Support\FestClassGroupScheme::resolveForEvent($event, $schedule);
+        $schedule['class_group_scheme'] = $scheme;
+        $schedule['class_group_fees'] = array_merge(
+            \App\Support\FestClassGroupScheme::defaultFees($scheme, $event),
+            $schedule['class_group_fees'] ?? []
+        );
+        if ($event->event_type === 'sports') {
+            $schedule['age_group_fees'] = array_merge(
+                \App\Support\FestSportsAgeGroup::defaultFees($event->tenant_id),
+                $schedule['age_group_fees'] ?? []
+            );
+        }
+        $schedule['participant_type_fees'] = array_merge(
+            config('fest_fees.default_participant_type_fees', []),
+            $schedule['participant_type_fees'] ?? []
+        );
 
         return $schedule;
     }
