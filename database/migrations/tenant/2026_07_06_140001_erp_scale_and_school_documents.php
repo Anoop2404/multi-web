@@ -15,7 +15,7 @@ return new class extends Migration
             if (! $this->indexExists('students', 'students_tenant_status_idx')) {
                 $table->index(['tenant_id', 'status'], 'students_tenant_status_idx');
             }
-            if (! $this->indexExists('students', 'students_verified_at_idx')) {
+            if (Schema::hasColumn('students', 'verified_at') && ! $this->indexExists('students', 'students_verified_at_idx')) {
                 $table->index(['verified_at'], 'students_verified_at_idx');
             }
             if (! $this->indexExists('students', 'students_name_idx')) {
