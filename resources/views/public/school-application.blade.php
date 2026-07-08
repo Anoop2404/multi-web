@@ -6,15 +6,33 @@
 @php
     $hasSchoolStep = collect($fields)->where('group', 'school')->where('enabled', true)->isNotEmpty()
         || ($fields['school_name']['enabled'] ?? true);
-    $hasStep2 = collect($fields)->whereIn('group', ['principal', 'account'])->where('enabled', true)->isNotEmpty();
-    $twoStep = $hasSchoolStep && $hasStep2;
+    $hasLeadershipStep = collect($fields)->where('group', 'leadership')->where('enabled', true)->isNotEmpty();
+    $hasPrincipalStep = collect($fields)->whereIn('group', ['principal', 'account'])->where('enabled', true)->isNotEmpty();
+    $hasStep2 = $hasPrincipalStep || $hasLeadershipStep;
+    $threeStep = $hasSchoolStep && $hasPrincipalStep && $hasLeadershipStep;
+    $twoStep = $hasSchoolStep && $hasStep2 && ! $threeStep;
+    $totalSteps = $threeStep ? 3 : ($twoStep ? 2 : 1);
 
     $step1Fields = ['school_name', 'school_email', 'school_prefix', 'cbse_affiliation', 'phone', 'highest_class', 'website', 'address', 'district'];
+    $step2Fields = [
+        'principal_name', 'principal_email', 'principal_phone',
+        'password', 'password_confirmation',
+    ];
+    $step3Fields = [
+        'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
+        'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
+    ];
     $errorStep = 1;
     if ($errors->any()) {
-        $errorStep = $errors->hasAny($step1Fields) ? 1 : 2;
+        if ($errors->hasAny($step1Fields)) {
+            $errorStep = 1;
+        } elseif ($threeStep && $errors->hasAny($step3Fields)) {
+            $errorStep = 3;
+        } else {
+            $errorStep = $twoStep || $threeStep ? 2 : 1;
+        }
     }
-    $initialStep = $twoStep ? $errorStep : 1;
+    $initialStep = ($twoStep || $threeStep) ? $errorStep : 1;
 @endphp
 <div class="portal-wrap">
     <div class="portal-page">
@@ -48,25 +66,39 @@
 
                 @if($errors->any())
                 <div class="portal-alert portal-alert-error">
-                    Please correct the highlighted fields.
+                    <p class="font-semibold">Please correct the following:</p>
+                    <ul class="mt-2 space-y-1 text-sm list-disc pl-4">
+                        @foreach($errors->all() as $message)
+                        <li>{{ $message }}</li>
+                        @endforeach
+                    </ul>
                 </div>
                 @endif
 
                 <form method="POST" action="{{ route('school-register.store') }}" class="portal-form" id="school-register-form"
-                      data-two-step="{{ $twoStep ? '1' : '0' }}" data-initial-step="{{ $initialStep }}">
+                      data-multi-step="{{ ($twoStep || $threeStep) ? '1' : '0' }}"
+                      data-total-steps="{{ $totalSteps }}"
+                      data-initial-step="{{ $initialStep }}">
                     @csrf
 
-                    @if($twoStep)
+                    @if($twoStep || $threeStep)
                     <div class="portal-form-steps" aria-label="Registration progress">
                         <div class="portal-form-step {{ $initialStep === 1 ? 'is-active' : 'is-done' }}" data-step-indicator="1">
                             <span class="portal-form-step-num">1</span>
                             <span>School</span>
                         </div>
-                        <div class="portal-form-step-line {{ $initialStep === 2 ? 'is-done' : '' }}"></div>
-                        <div class="portal-form-step {{ $initialStep === 2 ? 'is-active' : '' }}" data-step-indicator="2">
+                        <div class="portal-form-step-line {{ $initialStep > 1 ? 'is-done' : '' }}"></div>
+                        <div class="portal-form-step {{ $initialStep === 2 ? 'is-active' : ($initialStep > 2 ? 'is-done' : '') }}" data-step-indicator="2">
                             <span class="portal-form-step-num">2</span>
                             <span>Principal</span>
                         </div>
+                        @if($threeStep)
+                        <div class="portal-form-step-line {{ $initialStep > 2 ? 'is-done' : '' }}"></div>
+                        <div class="portal-form-step {{ $initialStep === 3 ? 'is-active' : '' }}" data-step-indicator="3">
+                            <span class="portal-form-step-num">3</span>
+                            <span>Leadership</span>
+                        </div>
+                        @endif
                     </div>
                     @endif
 
@@ -169,7 +201,7 @@
                                 <label class="portal-label" for="website">{{ $fields['website']['label'] }}
                                     @if($fields['website']['required'])<span class="portal-required">*</span>@endif
                                 </label>
-                                <input id="website" name="website" type="url"
+                                <input id="website" name="website" type="text"
                                        value="{{ old('website') }}"
                                        class="portal-input @error('website') is-error @enderror"
                                        placeholder="{{ $fields['website']['placeholder'] }}"
@@ -207,7 +239,7 @@
                             @endif
                         </div>
 
-                        @if($twoStep)
+                        @if($twoStep || $threeStep)
                         <div class="portal-form-actions">
                             <a href="/login" class="portal-form-link">Sign in</a>
                             <div class="portal-form-actions-end">
@@ -219,8 +251,15 @@
                     @endif
 
                     @if($hasStep2)
-                    <div class="portal-form-step-panel {{ ! $twoStep || $initialStep === 2 ? 'is-active' : '' }}" data-step-panel="2">
+                    <div class="portal-form-step-panel {{ $initialStep === 2 ? 'is-active' : '' }}" data-step-panel="2">
                         <div class="field-grid field-grid-2">
+                            @if($hasPrincipalStep)
+                            @if(($fields['principal_name']['enabled'] ?? false) || ($fields['principal_email']['enabled'] ?? false) || ($fields['principal_phone']['enabled'] ?? false))
+                            <div class="field-span-2">
+                                <p class="text-sm font-semibold text-slate-800">Principal</p>
+                            </div>
+                            @endif
+
                             @if($fields['principal_name']['enabled'] ?? false)
                             <div>
                                 <label class="portal-label" for="principal_name">{{ $fields['principal_name']['label'] }}
@@ -262,6 +301,11 @@
                                 @error('principal_phone')<p class="portal-error">{{ $message }}</p>@enderror
                             </div>
                             @endif
+                            @endif
+
+                            @if(! $threeStep && $hasLeadershipStep)
+                            @include('public.partials.school-application-leadership-fields', ['fields' => $fields])
+                            @endif
 
                             @if($fields['password']['enabled'] ?? false)
                             <div>
@@ -287,17 +331,35 @@
                         </div>
 
                         <div class="portal-form-actions">
-                            @if($twoStep)
+                            @if($twoStep || $threeStep)
                             <button type="button" class="portal-btn portal-btn-secondary" data-step-back="1">Back</button>
                             @else
                             <a href="/login" class="portal-form-link">Sign in</a>
                             @endif
                             <div class="portal-form-actions-end">
+                                @if($threeStep)
+                                <button type="button" class="portal-btn portal-btn-primary" data-step-next="3">Continue</button>
+                                @else
+                                <button type="submit" class="portal-btn portal-btn-primary">Register</button>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    @if($threeStep)
+                    <div class="portal-form-step-panel {{ $initialStep === 3 ? 'is-active' : '' }}" data-step-panel="3">
+                        <div class="field-grid field-grid-2">
+                            @include('public.partials.school-application-leadership-fields', ['fields' => $fields])
+                        </div>
+                        <div class="portal-form-actions">
+                            <button type="button" class="portal-btn portal-btn-secondary" data-step-back="2">Back</button>
+                            <div class="portal-form-actions-end">
                                 <button type="submit" class="portal-btn portal-btn-primary">Register</button>
                             </div>
                         </div>
                     </div>
-                    @elseif(! $twoStep && $hasSchoolStep)
+                    @endif
+                    @elseif(! $twoStep && ! $threeStep && $hasSchoolStep)
                     <div class="portal-form-actions">
                         <a href="/login" class="portal-form-link">Sign in</a>
                         <div class="portal-form-actions-end">
@@ -317,7 +379,8 @@
     const form = document.getElementById('school-register-form');
     if (!form) return;
 
-    const twoStep = form.dataset.twoStep === '1';
+    const multiStep = form.dataset.multiStep === '1';
+    const totalSteps = parseInt(form.dataset.totalSteps || '1', 10);
     let currentStep = parseInt(form.dataset.initialStep || '1', 10);
 
     function setStep(step) {
@@ -330,8 +393,9 @@
             indicator.classList.toggle('is-active', n === step);
             indicator.classList.toggle('is-done', n < step);
         });
-        const line = form.querySelector('.portal-form-step-line');
-        if (line) line.classList.toggle('is-done', step > 1);
+        form.querySelectorAll('.portal-form-step-line').forEach((line, index) => {
+            line.classList.toggle('is-done', step > index + 1);
+        });
     }
 
     function validatePanel(step) {
@@ -351,7 +415,8 @@
 
     form.querySelectorAll('[data-step-next]').forEach((btn) => {
         btn.addEventListener('click', () => {
-            if (validatePanel(currentStep)) setStep(parseInt(btn.dataset.stepNext, 10));
+            const next = parseInt(btn.dataset.stepNext, 10);
+            if (validatePanel(currentStep)) setStep(next);
         });
     });
 
@@ -360,14 +425,23 @@
     });
 
     form.addEventListener('submit', (e) => {
-        if (!twoStep) return;
-        if (currentStep !== 2) {
+        if (!multiStep) return;
+        if (currentStep < totalSteps) {
             e.preventDefault();
-            if (validatePanel(1)) setStep(2);
+            if (validatePanel(currentStep)) setStep(currentStep + 1);
+            return;
+        }
+        if (!validatePanel(currentStep)) {
+            e.preventDefault();
         }
     });
 
-    if (twoStep) setStep(currentStep);
+    if (multiStep) setStep(currentStep);
+
+    const firstError = form.querySelector('.is-error, .portal-error');
+    if (firstError) {
+        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 })();
 </script>
 @endsection

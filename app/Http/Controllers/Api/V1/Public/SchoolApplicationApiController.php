@@ -31,7 +31,7 @@ class SchoolApplicationApiController extends ApiController
 
         $hasSchoolStep = collect($fields)->where('group', 'school')->where('enabled', true)->isNotEmpty()
             || ($fields['school_name']['enabled'] ?? true);
-        $hasStep2 = collect($fields)->whereIn('group', ['principal', 'account'])->where('enabled', true)->isNotEmpty();
+        $hasStep2 = collect($fields)->whereIn('group', ['principal', 'leadership', 'account'])->where('enabled', true)->isNotEmpty();
 
         return $this->ok([
             'tenant_name'           => $sahodaya->name,

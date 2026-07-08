@@ -52,21 +52,12 @@ class SchoolApplicationApiTest extends TestCase
         SahodayaProfile::create(['tenant_id' => $sahodaya->id]);
 
         $this->postJson('http://api-sahodaya.test/api/v1/public/school-register', [
-            'school_name'              => 'API Demo School',
-            'school_email'             => 'api.demo.school@gmail.com',
-            'school_prefix'            => 'ADS',
-            'cbse_affiliation'         => '930320',
-            'phone'                    => '9876543210',
-            'highest_class'            => 'Class 12',
-            'principal_name'           => 'Principal Demo',
-            'principal_email'          => 'principal.demo@gmail.com',
-            'principal_phone'          => '9876543211',
-            'vice_principal_name'      => 'VP Demo',
-            'vice_principal_email'     => 'vp.demo@gmail.com',
-            'vice_principal_phone'     => '9876543212',
-            'event_coordinator_name'   => 'EC Demo',
-            'event_coordinator_email'  => 'ec.demo@gmail.com',
-            'event_coordinator_phone'  => '9876543213',
+            'school_name'      => 'API Demo School',
+            'school_email'     => 'api.demo.school@gmail.com',
+            'school_prefix'    => 'ADS',
+            'cbse_affiliation' => '930320',
+            'phone'            => '9876543210',
+            'highest_class'    => 'Class 12',
         ])
             ->assertCreated()
             ->assertJsonPath('data.email', 'api.demo.school@gmail.com');

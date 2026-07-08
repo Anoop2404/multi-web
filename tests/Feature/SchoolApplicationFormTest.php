@@ -44,6 +44,20 @@ class SchoolApplicationFormTest extends TestCase
         $this->assertTrue($fields['cbse_affiliation']['required']);
     }
 
+    public function test_principal_and_leadership_hidden_by_default_on_public_form(): void
+    {
+        $fields = SchoolApplicationForm::resolve(null);
+
+        foreach ([
+            'principal_name', 'principal_email', 'principal_phone',
+            'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
+            'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
+        ] as $key) {
+            $this->assertFalse($fields[$key]['enabled'], "{$key} should be hidden on public registration by default");
+            $this->assertFalse($fields[$key]['required'], "{$key} should not be required on public registration by default");
+        }
+    }
+
     public function test_school_prefix_must_be_unique_within_sahodaya(): void
     {
         $sahodaya = Tenant::create([

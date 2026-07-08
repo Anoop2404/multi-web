@@ -445,7 +445,7 @@
             <!-- Tab: Registration Form -->
             <form v-show="activeTab === 'form'" @submit.prevent="saveFormConfig" class="space-y-5">
                 <FormSection title="School Registration Form"
-                             hint="Choose which fields appear on the public /school-register page. Disabled fields are hidden from applicants.">
+                             hint="Choose which fields appear on the public /school-register page. Principal, vice principal, and events coordinator are off by default — schools add those from their admin profile after registration.">
                     <div v-for="(items, groupKey) in formFieldGroups" :key="groupKey" class="space-y-3">
                         <p class="text-xs font-bold uppercase tracking-wide text-gray-500">
                             {{ applicationFormGroups[groupKey] || groupKey }}
