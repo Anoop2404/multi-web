@@ -5,9 +5,12 @@ namespace App\Support;
 use App\Models\FestEvent;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
+use App\Services\Membership\EffectiveMasterDataResolver;
 
 class FestClassGroupScheme
 {
+    public const CLUSTER_PREFIX = 'cc_';
+
     public const KEYS = ['lp', 'up', 'hs', 'hss', 'open'];
 
     public static function options(): array
@@ -22,6 +25,10 @@ class FestClassGroupScheme
 
     public static function isValid(?string $scheme): bool
     {
+        if ($scheme === 'cluster') {
+            return true;
+        }
+
         return filled($scheme) && isset(config('fest_class_group_schemes.schemes')[$scheme]);
     }
 
@@ -65,6 +72,12 @@ class FestClassGroupScheme
     {
         $resolved = self::resolve($scheme, $event);
 
+        if ($resolved === 'cluster') {
+            $tenantId = $event?->tenant_id ?? null;
+
+            return $tenantId ? self::clusterLabels($tenantId) : ['open' => 'Open / All Categories'];
+        }
+
         return config("fest_class_group_schemes.schemes.{$resolved}.groups", []);
     }
 
@@ -72,6 +85,10 @@ class FestClassGroupScheme
     public static function defaultFees(?string $scheme = null, ?FestEvent $event = null): array
     {
         $resolved = self::resolve($scheme, $event);
+
+        if ($resolved === 'cluster') {
+            return [];
+        }
 
         return config("fest_class_group_schemes.schemes.{$resolved}.default_fees", []);
     }
@@ -85,17 +102,65 @@ class FestClassGroupScheme
 
         $scheme = SahodayaProfile::where('tenant_id', $sahodayaTenantId)->value('fest_class_group_scheme');
 
+        if ($scheme === 'cluster') {
+            return self::clusterLabels($sahodayaTenantId);
+        }
+
         return self::labels($scheme);
+    }
+
+    /** @return array<string, string> */
+    public static function clusterLabels(string $sahodayaId): array
+    {
+        $resolver = app(EffectiveMasterDataResolver::class);
+        $categories = $resolver->classCategories($sahodayaId);
+        $classesByCategory = $resolver->masterClasses($sahodayaId)->groupBy('class_category_id');
+
+        $labels = ['open' => 'Open / All Categories'];
+
+        foreach ($categories as $category) {
+            $classNames = ($classesByCategory[$category->id] ?? collect())
+                ->pluck('name')
+                ->map(fn ($name) => trim((string) $name))
+                ->filter()
+                ->sort()
+                ->values()
+                ->all();
+
+            $suffix = $classNames !== []
+                ? ' — Classes '.implode(', ', $classNames)
+                : '';
+
+            $labels[self::clusterKey((int) $category->id)] = trim($category->label.$suffix);
+        }
+
+        return $labels;
+    }
+
+    public static function clusterKey(int $classCategoryId): string
+    {
+        return self::CLUSTER_PREFIX.$classCategoryId;
+    }
+
+    public static function isClusterKey(?string $key): bool
+    {
+        return is_string($key) && str_starts_with($key, self::CLUSTER_PREFIX);
+    }
+
+    public static function categoryIdFromClusterKey(?string $key): ?int
+    {
+        if (! self::isClusterKey($key)) {
+            return null;
+        }
+
+        $id = (int) substr($key, strlen(self::CLUSTER_PREFIX));
+
+        return $id > 0 ? $id : null;
     }
 
     /** @return array<string, string> */
     public static function taxonomyClassGroups(?string $scheme = null, ?FestEvent $event = null): array
     {
-        $labels = self::labels($scheme, $event);
-        if ($labels !== []) {
-            return $labels;
-        }
-
-        return config('fest_item_taxonomy.class_group', []);
+        return self::labels($scheme, $event);
     }
 }

@@ -869,15 +869,15 @@ function studentIneligibilityReason(student, event, item) {
     if (props.eventType === 'kalolsavam') {
         if (!student.eligible_kalolsav) return 'Not eligible for Kalotsav (Classes 3–12)';
         if (item.class_group && item.class_group !== 'open' && student.kalolsav_class_group !== item.class_group) {
-            return classGroupMismatchReason(student, item);
+            return classGroupMismatchReason(student, item, event);
         }
     }
 
     if (props.eventType === 'custom') {
         if (item.class_group && item.class_group !== 'open') {
-            if (!student.kalolsav_class_group) return 'Class could not be mapped to a fest category';
+            if (!student.kalolsav_class_group) return 'Class is not assigned to a membership category';
             if (student.kalolsav_class_group !== item.class_group) {
-                return classGroupMismatchReason(student, item);
+                return classGroupMismatchReason(student, item, event);
             }
         }
     }
@@ -973,13 +973,8 @@ function categoryShort(student) {
     return map[student.kalolsav_class_group] ?? student.kalolsav_class_group;
 }
 
-function classGroupMismatchReason(student, item) {
-    const labels = {
-        lp: 'Classes 3 & 4',
-        up: 'Classes 5, 6 & 7',
-        hs: 'Classes 8, 9 & 10',
-        hss: 'Classes 11 & 12',
-    };
+function classGroupMismatchReason(student, item, event) {
+    const labels = event?.class_group_labels ?? {};
     const expected = labels[item.class_group] ?? item.class_group?.toUpperCase?.() ?? item.class_group;
     const actual = labels[student.kalolsav_class_group]
         ?? (student.class_name ? `Class ${student.class_name}` : student.kalolsav_class_group?.toUpperCase?.() ?? 'another category');

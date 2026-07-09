@@ -100,7 +100,7 @@ class FestRegistrationEligibilityService
                 'verified_at' => $student->verified_at?->toIso8601String(),
                 'event_registered' => $eventRegNo !== null,
                 'event_registration_number' => $eventRegNo,
-                'kalolsav_class_group' => FestStudentClassResolver::kalolsavClassGroupForStudent($student),
+                'kalolsav_class_group' => FestStudentClassResolver::classGroupForStudent($student, $event),
                 'kids_fest_band' => FestStudentClassResolver::kidsFestBandForStudent($student),
                 'sports_age_group' => FestSportsAgeGroup::primaryAgeGroupForStudent($student, $event),
                 'eligible_sports_groups' => FestSportsAgeGroup::eligibleAgeGroupsForStudent($student, $event),
@@ -155,7 +155,7 @@ class FestRegistrationEligibilityService
             'kalolsavam' => $this->validateKalolsav($student, $item),
             'kids_fest'  => $this->validateKidsFest($student, $item),
             'sports'     => $this->validateSports($student, $event, $item),
-            'custom'     => $this->validateCustomClassGroup($student, $item),
+            'custom'     => $this->validateCustomClassGroup($student, $item, $event),
             default      => null,
         };
     }
@@ -173,25 +173,27 @@ class FestRegistrationEligibilityService
             return 'class could not be mapped to a Kalotsav category (Classes 3–12 only).';
         }
 
-        return $this->validateItemClassGroup($studentGroup, $item);
+        return $this->validateItemClassGroup($studentGroup, $item, $item->event);
     }
 
-    private function validateCustomClassGroup(Student $student, FestEventItem $item): ?string
+    private function validateCustomClassGroup(Student $student, FestEventItem $item, FestEvent $event): ?string
     {
         $itemGroup = $item->class_group ?? 'open';
         if ($itemGroup === 'open' || $itemGroup === '') {
             return null;
         }
 
-        $studentGroup = FestStudentClassResolver::kalolsavClassGroupForStudent($student);
+        $studentGroup = FestStudentClassResolver::classGroupForStudent($student, $event);
         if ($studentGroup === null) {
-            return 'class could not be mapped to a fest category.';
+            return FestClassGroupScheme::resolveForEvent($event) === 'cluster'
+                ? 'class is not assigned to a membership category.'
+                : 'class could not be mapped to a fest category.';
         }
 
-        return $this->validateItemClassGroup($studentGroup, $item);
+        return $this->validateItemClassGroup($studentGroup, $item, $event);
     }
 
-    private function validateItemClassGroup(string $studentGroup, FestEventItem $item): ?string
+    private function validateItemClassGroup(string $studentGroup, FestEventItem $item, ?FestEvent $event = null): ?string
     {
         $itemGroup = $item->class_group ?? 'open';
         if ($itemGroup === 'open' || $itemGroup === '') {
@@ -199,7 +201,7 @@ class FestRegistrationEligibilityService
         }
 
         if ($studentGroup !== $itemGroup) {
-            $labels = FestClassGroupScheme::labels(null, $item->event);
+            $labels = FestClassGroupScheme::labels(null, $event ?? $item->event);
             $expected = $labels[$itemGroup] ?? strtoupper($itemGroup);
             $actual = $labels[$studentGroup] ?? strtoupper($studentGroup);
 

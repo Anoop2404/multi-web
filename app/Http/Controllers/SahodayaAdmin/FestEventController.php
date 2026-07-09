@@ -622,7 +622,7 @@ class FestEventController extends SahodayaAdminController
             'qualify_count'        => 'nullable|integer|min:1',
             'fee_amount'           => 'nullable|numeric|min:0',
             'head_id'              => 'nullable|exists:fest_item_heads,id',
-        ], $this->taxonomyValidationRules($registry)));
+        ], $this->taxonomyValidationRules($registry, $event)));
 
         $data['participant_type'] = $data['participant_type'] ?? 'individual';
         $data = FestEventItemPayload::applyDefaults($data);
@@ -681,7 +681,7 @@ class FestEventController extends SahodayaAdminController
             'max_squad'      => 'nullable|integer|min:1',
             'min_squad'      => 'nullable|integer|min:1',
             'standbys'       => 'nullable|integer|min:0',
-        ], $this->taxonomyValidationRules($registry)));
+        ], $this->taxonomyValidationRules($registry, $event)));
 
         $participantType = $data['participant_type'] ?? $item->participant_type;
 
@@ -832,10 +832,10 @@ class FestEventController extends SahodayaAdminController
     }
 
     /** @return array<string, mixed> */
-    private function taxonomyValidationRules(FestTaxonomyRegistry $registry): array
+    private function taxonomyValidationRules(FestTaxonomyRegistry $registry, FestEvent $event): array
     {
         $ageKeys = array_keys(FestSportsAgeGroup::labels($this->sahodaya->id));
-        $classKeys = array_keys(FestClassGroupScheme::labels(null));
+        $classKeys = array_keys(FestClassGroupScheme::labels(null, $event));
         $kidsKeys = array_keys(\App\Support\FestKidsFestBand::labels());
 
         return [

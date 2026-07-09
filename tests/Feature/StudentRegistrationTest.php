@@ -324,6 +324,40 @@ class StudentRegistrationTest extends TestCase
             ->assertDownload('students.csv');
     }
 
+    public function test_import_history_preview_returns_rows(): void
+    {
+        Storage::fake('shared');
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['tenant' => $school, 'class' => $class] = $this->schoolWithClass();
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        $csv = "full_name,class_name,gender\nRahul Kumar,{$class->name},male\n";
+        $backup = UploadedFileBackup::create([
+            'school_id'    => $school->id,
+            'purpose'      => 'student_import',
+            'storage_disk' => 'shared',
+            'storage_path' => 'backups/test/preview-students.csv',
+            'original_name'=> 'students.csv',
+            'mime_type'    => 'text/csv',
+            'status'       => 'success',
+            'imported_count' => 1,
+        ]);
+        Storage::disk('shared')->put($backup->storage_path, $csv);
+
+        $this->actingAs($admin)
+            ->getJson("/school-admin/{$school->id}/imports/{$backup->id}/preview")
+            ->assertOk()
+            ->assertJsonPath('type', 'students')
+            ->assertJsonPath('total_rows', 1)
+            ->assertJsonPath('valid.0.name', 'Rahul Kumar')
+            ->assertJsonPath('valid.0.class', $class->name);
+    }
+
     public function test_student_import_rejects_empty_upload(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);

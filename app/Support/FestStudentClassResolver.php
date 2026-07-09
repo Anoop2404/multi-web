@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\FestEvent;
 use App\Models\Student;
 
 class FestStudentClassResolver
@@ -39,6 +40,25 @@ class FestStudentClassResolver
     public static function kalolsavClassGroupForStudent(Student $student): ?string
     {
         return self::kalolsavClassGroup(self::classNumberFromStudent($student));
+    }
+
+    public static function clusterClassGroupForStudent(Student $student): ?string
+    {
+        $student->loadMissing('schoolClass');
+        $categoryId = (int) ($student->schoolClass?->class_category_id ?? 0);
+
+        return $categoryId > 0 ? FestClassGroupScheme::clusterKey($categoryId) : null;
+    }
+
+    public static function classGroupForStudent(Student $student, FestEvent $event): ?string
+    {
+        $scheme = FestClassGroupScheme::resolveForEvent($event);
+
+        if ($scheme === 'cluster') {
+            return self::clusterClassGroupForStudent($student);
+        }
+
+        return self::kalolsavClassGroupForStudent($student);
     }
 
     public static function kidsFestBandForStudent(Student $student): ?string

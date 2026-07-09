@@ -206,6 +206,7 @@
                             </select>
                             <p class="text-xs text-gray-500 mt-1">
                                 CBSE Kerala uses Category I–IV (classes III–XII). Sahodaya standard uses LP–HSS (classes I–XII).
+                                <strong>Class master</strong> uses your Membership → Class master categories (CATEGORY1–4, etc.) for custom events and item fees.
                             </p>
                         </FormField>
                     </FormGrid>

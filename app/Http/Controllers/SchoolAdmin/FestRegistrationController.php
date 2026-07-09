@@ -618,6 +618,8 @@ class FestRegistrationController extends SchoolAdminController
         [$grouped, $groupLabels] = $this->groupItemsForEvent($event, $enabledItems);
         $event->setAttribute('items_grouped', $grouped);
         $event->setAttribute('item_group_labels', $groupLabels);
+        $event->setAttribute('class_group_labels', FestClassGroupScheme::labels(null, $event));
+        $event->setAttribute('class_group_scheme', FestClassGroupScheme::resolveForEvent($event, $schedule));
         $event->unsetRelation('items');
         $event->setAttribute('items', $enabledItems);
 

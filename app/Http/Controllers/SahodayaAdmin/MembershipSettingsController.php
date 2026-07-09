@@ -114,7 +114,7 @@ class MembershipSettingsController extends SahodayaAdminController
             'payment_ifsc'                 => 'nullable|string|max:20',
             'payment_upi'                  => 'nullable|string|max:100',
             'active_academic_year'         => ['nullable', 'string', 'max:10', 'regex:/^\d{4}-\d{2}$/'],
-            'fest_class_group_scheme'      => 'nullable|in:cbse,sahodaya',
+            'fest_class_group_scheme'      => 'nullable|in:cbse,sahodaya,cluster',
         ]);
 
         if ($profile->prefixes_locked && isset($data['prefix']) && $data['prefix'] !== $profile->prefix) {

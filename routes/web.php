@@ -298,6 +298,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/students/setup', [SchoolClassController::class, 'index'])->name('students.setup');
 
     Route::get('/imports', [\App\Http\Controllers\SchoolAdmin\ImportHistoryController::class, 'index'])->name('imports.index');
+    Route::get('/imports/{backup}/preview', [\App\Http\Controllers\SchoolAdmin\ImportHistoryController::class, 'preview'])->name('imports.preview');
     Route::get('/imports/{backup}/download', [\App\Http\Controllers\SchoolAdmin\ImportHistoryController::class, 'download'])->name('imports.download');
 
     Route::get('/students',                    [StudentController::class, 'index'])->name('students.index');
