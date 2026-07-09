@@ -38,7 +38,7 @@ class ImportHistoryController extends SchoolAdminController
             'created_at' => $backup->created_at?->toIso8601String(),
         ])->values();
 
-        return $this->inertia('Admin/School/Imports/History', [
+        return $this->inertia('School/Imports/History', [
             'imports' => $imports,
         ]);
     }

@@ -274,6 +274,26 @@ class StudentRegistrationTest extends TestCase
         ]);
     }
 
+    public function test_import_history_page_loads(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['tenant' => $school] = $this->schoolWithClass();
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        $this->actingAs($admin)
+            ->get("/school-admin/{$school->id}/imports")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('School/Imports/History', false)
+                ->has('imports')
+            );
+    }
+
     public function test_student_import_rejects_empty_upload(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
