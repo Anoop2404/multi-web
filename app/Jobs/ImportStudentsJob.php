@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Tenant;
+use App\Models\UploadedFileBackup;
 use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Notifications\NotificationService;
@@ -37,7 +38,19 @@ class ImportStudentsJob implements ShouldQueue
         try {
             $tmp = TenantStorage::localTempPath($this->storagePath, $this->storageDisk);
             $result = TenancyDatabase::withTenantDatabase($school, function () use ($school, $tmp) {
-                return (new StudentCsvImporter($school))->importFromPath($tmp);
+                $result = (new StudentCsvImporter($school))->importFromPath($tmp);
+
+                if ($this->backupId) {
+                    UploadedFileBackup::whereKey($this->backupId)->update([
+                        'status'         => $result['success'] ? UploadedFileBackup::STATUS_SUCCESS : UploadedFileBackup::STATUS_FAILED,
+                        'total_rows'     => $result['imported'] + $result['skipped'],
+                        'imported_count' => $result['imported'],
+                        'error_count'    => count($result['errors']),
+                        'errors'         => array_slice($result['errors'], 0, 50),
+                    ]);
+                }
+
+                return $result;
             });
         } finally {
             if ($tmp && str_starts_with($tmp, sys_get_temp_dir())) {
@@ -60,17 +73,13 @@ class ImportStudentsJob implements ShouldQueue
             ],
         );
 
-        $message = "Student import finished: {$result['imported']} added";
-        if ($result['skipped'] > 0) {
-            $message .= ", {$result['skipped']} skipped";
-        }
-        if ($result['errors'] !== []) {
-            $message .= ' ('.count($result['errors']).' errors)';
-        }
+        $message = $result['success']
+            ? "Student import finished: {$result['imported']} added"
+            : 'Student import rejected: '.count($result['errors']).' error(s) found, nothing was imported';
 
         app(NotificationService::class)->notify(
             $user,
-            'Student import complete',
+            $result['success'] ? 'Student import complete' : 'Student import rejected',
             $message,
             "/school-admin/{$this->schoolId}/students?bulk=1",
             ['in_app', 'email'],

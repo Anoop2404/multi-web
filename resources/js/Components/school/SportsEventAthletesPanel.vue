@@ -70,7 +70,7 @@
                 <tbody>
                     <tr v-for="row in visibleRows" :key="row.id" class="hover:bg-slate-50/80">
                         <td>
-                            <input v-if="!row.registered && row.hasDob && row.isVerified" type="checkbox"
+                            <input v-if="!row.registered && row.hasDob && (row.isVerified || !requireVerified)" type="checkbox"
                                    :checked="isSelected(row.id)"
                                    @change="toggleRow(row.id, $event)">
                             <span v-else-if="row.registered" class="text-emerald-600 text-xs">✓</span>
@@ -96,7 +96,7 @@
                                   class="text-[10px] text-amber-700" title="Add date of birth on student profile">
                                 DOB required
                             </span>
-                            <span v-else-if="!row.isVerified"
+                            <span v-else-if="requireVerified && !row.isVerified"
                                   class="text-[10px] text-amber-700" title="Sahodaya must verify this student before event registration">
                                 Verification required
                             </span>
@@ -113,7 +113,7 @@
         <p v-if="registeredCount" class="px-4 py-2 text-xs text-slate-600 border-t border-indigo-50 bg-white/60">
             <strong>{{ registeredCount }}</strong> athlete{{ registeredCount === 1 ? '' : 's' }} registered for this event.
         </p>
-        <p v-if="unregisteredVisibleCount && selectableVisibleCount < unregisteredVisibleCount"
+        <p v-if="requireVerified && unregisteredVisibleCount && selectableVisibleCount < unregisteredVisibleCount"
            class="px-4 py-2 text-xs text-amber-800 border-t border-indigo-50 bg-amber-50/60">
             {{ unregisteredVisibleCount - selectableVisibleCount }} student(s) need a date of birth and/or Sahodaya verification before they can be registered.
         </p>
@@ -144,6 +144,8 @@ const showUnregisteredOnly = ref(false);
 const selectedIds = ref([]);
 const selectAllRef = ref(null);
 const form = useForm({ student_ids: [] });
+
+const requireVerified = computed(() => props.event?.require_verified_students !== false);
 
 function normalizeId(id) {
     return Number(id);
@@ -230,6 +232,7 @@ const rows = computed(() => (props.students ?? []).map((s) => {
     const eventRegNumber = reg?.registration_number ?? s.event_registration_number ?? null;
     const registered = Boolean(reg || s.event_registered || eventRegNumber);
     const hasDob = !!s.dob;
+    const needsVerification = requireVerified.value && s.is_verified === false;
     return {
         id,
         name: s.name,
@@ -242,7 +245,7 @@ const rows = computed(() => (props.students ?? []).map((s) => {
         event_reg_number: eventRegNumber,
         hasDob,
         isVerified: s.is_verified !== false,
-        ineligible_reason: !hasDob ? 'DOB required' : (s.is_verified === false ? 'Verification required' : null),
+        ineligible_reason: !hasDob ? 'DOB required' : (needsVerification ? 'Verification required' : null),
     };
 }));
 
@@ -279,8 +282,12 @@ const unregisteredVisible = computed(() => visibleRows.value.filter((r) => !r.re
 
 const unregisteredVisibleCount = computed(() => unregisteredVisible.value.length);
 
-/** Unregistered students with DOB and Sahodaya verification — required before event registration. */
-const selectableVisible = computed(() => unregisteredVisible.value.filter((r) => r.hasDob && r.isVerified));
+/** Unregistered students with DOB (and verification when required) — eligible for event registration. */
+const selectableVisible = computed(() => unregisteredVisible.value.filter((r) => {
+    if (!r.hasDob) return false;
+    if (requireVerified.value && !r.isVerified) return false;
+    return true;
+}));
 
 const selectableVisibleCount = computed(() => selectableVisible.value.length);
 

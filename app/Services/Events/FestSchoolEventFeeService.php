@@ -413,8 +413,10 @@ class FestSchoolEventFeeService
             $catalog = $this->itemFeeResolver->participationBreakdown($event, $fee->school_id, $schedule);
             foreach ($catalog['lines'] as $line) {
                 $items[] = [
-                    'label' => $line['label'].' — ₹'.number_format($line['amount'], 2),
+                    'label' => $line['label'],
                     'amount' => (float) $line['amount'],
+                    'item_title' => $line['item_title'] ?? null,
+                    'head_name' => $line['head_name'] ?? null,
                 ];
             }
         } elseif ($fee->participation_item_count > 0 && $feeModel === 'cksc_tiered') {

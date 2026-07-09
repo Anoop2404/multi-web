@@ -40,4 +40,39 @@ class UploadBackupService
             'metadata'             => $metadata ?: null,
         ]);
     }
+
+    public function storeFromPath(
+        string $sourcePath,
+        string $originalName,
+        ?string $mimeType,
+        string $purpose,
+        ?string $schoolId = null,
+        ?Model $related = null,
+        ?int $userId = null,
+        array $metadata = [],
+    ): UploadedFileBackup {
+        $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName) ?: 'upload.bin';
+        $subdir = $schoolId
+            ? "backups/schools/{$schoolId}/{$purpose}/".now()->format('Y-m')
+            : "backups/general/{$purpose}/".now()->format('Y-m');
+
+        $disk = TenantStorage::uploadDisk();
+        $path = $subdir.'/'.Str::uuid().'_'.$safeName;
+        $contents = file_get_contents($sourcePath) ?: '';
+        TenantStorage::put($path, $contents, $disk);
+
+        return UploadedFileBackup::create([
+            'school_id'            => $schoolId,
+            'purpose'              => $purpose,
+            'storage_disk'         => $disk,
+            'storage_path'         => $path,
+            'original_name'        => $originalName,
+            'mime_type'            => $mimeType,
+            'size_bytes'           => strlen($contents),
+            'related_type'         => $related?->getMorphClass(),
+            'related_id'           => $related?->getKey(),
+            'uploaded_by_user_id'  => $userId,
+            'metadata'             => $metadata ?: null,
+        ]);
+    }
 }

@@ -71,30 +71,34 @@ class FestFinanceController extends SahodayaAdminController
         return back()->with('success', 'Invoice issued for '.$school->name.'.');
     }
 
-    public function pdf(string $tenantId, FestEvent $event, FestEventInvoice $invoice)
+    public function pdf(Request $request, string $tenantId, FestEvent $event, FestEventInvoice $invoice)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($invoice->event_id !== $event->id, 404);
 
-        return $this->renderInvoicePdf($event, $invoice, 'fest.finance.invoice');
+        return $this->renderInvoicePdf($request, $event, $invoice, 'fest.finance.invoice');
     }
 
-    public function pdfDetailed(string $tenantId, FestEvent $event, FestEventInvoice $invoice)
+    public function pdfDetailed(Request $request, string $tenantId, FestEvent $event, FestEventInvoice $invoice)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($invoice->event_id !== $event->id, 404);
 
-        return $this->renderInvoicePdf($event, $invoice, 'fest.finance.invoice-detailed', 'demand-');
+        return $this->renderInvoicePdf($request, $event, $invoice, 'fest.finance.invoice-detailed', 'demand-');
     }
 
-    private function renderInvoicePdf(FestEvent $event, FestEventInvoice $invoice, string $view, string $prefix = '')
+    private function renderInvoicePdf(Request $request, FestEvent $event, FestEventInvoice $invoice, string $view, string $prefix = '')
     {
         $invoice->load('school');
+        $invoiceService = app(FestInvoiceService::class);
+        $invoice = $invoiceService->issueForSchool($event, $invoice->school);
 
-        return Pdf::loadView($view, [
-            'event'    => $event,
-            'invoice'  => $invoice,
-            'sahodaya' => $this->sahodaya,
-        ])->download($prefix.$invoice->invoice_number.'.pdf');
+        $pdf = Pdf::loadView($view, $invoiceService->invoiceViewData($event, $invoice, $this->sahodaya));
+
+        if ($request->boolean('preview')) {
+            return $pdf->stream($prefix.$invoice->invoice_number.'.pdf');
+        }
+
+        return $pdf->download($prefix.$invoice->invoice_number.'.pdf');
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services\Students;
 
 use App\Models\FestEvent;
+use App\Models\McqExam;
 use App\Models\SahodayaProfile;
 use App\Models\Student;
 
@@ -33,13 +34,23 @@ class StudentVerificationGate
         return $this->requiredGlobally($event->tenant_id ?? null);
     }
 
-    public function requiredForMcq(string $sahodayaId): bool
+    public function requiredForMcq(McqExam $exam): bool
     {
-        return $this->requiredGlobally($sahodayaId);
+        $settings = is_array($exam->settings_json) ? $exam->settings_json : [];
+
+        if (array_key_exists('require_verified_students', $settings)) {
+            return (bool) $settings['require_verified_students'];
+        }
+
+        return $this->requiredGlobally($exam->tenant_id ?? null);
     }
 
-    public function isEligible(Student $student, ?FestEvent $event = null, ?string $sahodayaId = null): bool
-    {
+    public function isEligible(
+        Student $student,
+        ?FestEvent $event = null,
+        ?string $sahodayaId = null,
+        ?McqExam $mcqExam = null,
+    ): bool {
         if ($student->isVerified()) {
             return true;
         }
@@ -48,14 +59,22 @@ class StudentVerificationGate
             return ! $this->requiredForEvent($event);
         }
 
+        if ($mcqExam) {
+            return ! $this->requiredForMcq($mcqExam);
+        }
+
         $tenantId = $sahodayaId ?? $student->tenant?->parent_id;
 
         return $tenantId ? ! $this->requiredGlobally($tenantId) : true;
     }
 
-    public function ineligibilityReason(Student $student, ?FestEvent $event = null, ?string $sahodayaId = null): ?string
-    {
-        if ($this->isEligible($student, $event, $sahodayaId)) {
+    public function ineligibilityReason(
+        Student $student,
+        ?FestEvent $event = null,
+        ?string $sahodayaId = null,
+        ?McqExam $mcqExam = null,
+    ): ?string {
+        if ($this->isEligible($student, $event, $sahodayaId, $mcqExam)) {
             return null;
         }
 
@@ -63,11 +82,17 @@ class StudentVerificationGate
     }
 
     /** @param  \Illuminate\Database\Eloquent\Builder<Student>  $query */
-    public function scopeEligible($query, ?FestEvent $event = null, ?string $sahodayaId = null): void
-    {
+    public function scopeEligible(
+        $query,
+        ?FestEvent $event = null,
+        ?string $sahodayaId = null,
+        ?McqExam $mcqExam = null,
+    ): void {
         $required = $event
             ? $this->requiredForEvent($event)
-            : ($sahodayaId ? $this->requiredGlobally($sahodayaId) : false);
+            : ($mcqExam
+                ? $this->requiredForMcq($mcqExam)
+                : ($sahodayaId ? $this->requiredGlobally($sahodayaId) : false));
 
         if ($required) {
             $query->verified();

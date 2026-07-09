@@ -2,6 +2,15 @@ import { computed, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import { settingsDescriptionForEvent } from '@/support/sahodayaEventCapabilities.js';
 
+export function studentVerificationModeFromEvent(event) {
+    const feeSettings = event?.fee_settings ?? {};
+    if (!Object.prototype.hasOwnProperty.call(feeSettings, 'require_verified_students')) {
+        return 'inherit';
+    }
+
+    return feeSettings.require_verified_students ? 'required' : 'optional';
+}
+
 const schemeLabelMap = {
     cbse: {
         lp: 'Category I — Classes III & IV',
@@ -82,6 +91,7 @@ export function useEventSettingsForms(props) {
         appeal_fee_amount: props.event.appeal_fee_amount ?? '',
         record_tracking_enabled: props.event.record_tracking_enabled ?? false,
         default_record_prize_label: props.event.default_record_prize_label ?? 'Record Break Prize',
+        student_verification_mode: studentVerificationModeFromEvent(props.event),
     });
 
     const venueForm = useForm({ name: '', location: '', capacity: null });
@@ -112,6 +122,7 @@ export function useEventSettingsForms(props) {
         event_reg_start: props.event.event_reg_start ?? '',
         event_reg_end: props.event.event_reg_end ?? '',
         allow_student_self_register: props.event.allow_student_self_register ?? false,
+        student_verification_mode: studentVerificationModeFromEvent(props.event),
     });
 
     const numberingSettingsForm = useForm({

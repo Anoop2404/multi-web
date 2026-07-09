@@ -16,6 +16,19 @@
                         <input type="checkbox" v-model="settingsForm.registration_locked"> Block new registrations
                     </label>
                 </FormField>
+                <FormField label="Student verification for item registration">
+                    <select v-model="settingsForm.student_verification_mode" class="field">
+                        <option value="inherit">
+                            Use cluster default — {{ clusterRequireStudentVerification ? 'verified students only' : 'unverified allowed' }}
+                        </option>
+                        <option value="required">Require verified students only</option>
+                        <option value="optional">Allow unverified students</option>
+                    </select>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Applies to all items in this event (Kalotsav, Sports, Kids Fest, Custom, etc.).
+                        Cluster default is set under Membership → Settings.
+                    </p>
+                </FormField>
                 <FormField label="Certificate collection">
                     <label class="flex items-center gap-2 text-sm text-slate-700">
                         <input type="checkbox" v-model="settingsForm.certificate_collection_open"> Allow certificate pickup
@@ -58,6 +71,6 @@
 <script setup>
 import { computed, inject } from 'vue';
 
-const { settingsForm, judgeGate, saveSettings, backfillRegs, event } = inject('eventSettings');
+const { settingsForm, judgeGate, saveSettings, backfillRegs, event, clusterRequireStudentVerification } = inject('eventSettings');
 const isSports = computed(() => event?.event_type === 'sports');
 </script>

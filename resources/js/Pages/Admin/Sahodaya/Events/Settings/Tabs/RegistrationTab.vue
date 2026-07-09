@@ -25,6 +25,15 @@
                 <input type="checkbox" v-model="registrationSettingsForm.allow_student_self_register" class="mt-0.5">
                 <span>Allow students to self-register from their portal profile</span>
             </label>
+            <FormField label="Student verification for item registration">
+                <select v-model="registrationSettingsForm.student_verification_mode" class="field">
+                    <option value="inherit">
+                        Use cluster default — {{ clusterRequireStudentVerification ? 'verified students only' : 'unverified allowed' }}
+                    </option>
+                    <option value="required">Require verified students only</option>
+                    <option value="optional">Allow unverified students</option>
+                </select>
+            </FormField>
             <FormActions>
                 <button type="submit" class="btn-primary" :disabled="registrationSettingsForm.processing">Save registration settings</button>
             </FormActions>
@@ -123,7 +132,7 @@
 import { inject, ref, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 
-const { registrationSettingsForm, saveRegistrationSettings, saveItemWindow, saveHeadWindow, sahodaya, event, itemHeads } = inject('eventSettings');
+const { registrationSettingsForm, saveRegistrationSettings, saveItemWindow, saveHeadWindow, sahodaya, event, itemHeads, clusterRequireStudentVerification } = inject('eventSettings');
 
 const savingId = ref(null);
 const savingHeadId = ref(null);

@@ -5,15 +5,20 @@ namespace App\Http\Controllers\SchoolAdmin;
 use App\Http\Controllers\Concerns\ManagesTeacherPortalCredentials;
 use App\Models\SchoolClass;
 use App\Models\Teacher;
+use App\Models\UploadedFileBackup;
 use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Audit\UploadBackupService;
 use App\Services\Auth\LoginCodeGenerator;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Portal\TeacherPortalProvisioner;
+use App\Services\Spreadsheet\SpreadsheetReader;
+use App\Services\Spreadsheet\SpreadsheetWriter;
 use App\Support\AcademicYear;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class TeacherController extends SchoolAdminController
@@ -177,134 +182,227 @@ class TeacherController extends SchoolAdminController
         return back()->with($skipped === [] ? 'success' : 'warning', $message);
     }
 
-    public function importTemplate()
+    public function importTemplate(Request $request, EffectiveMasterDataResolver $resolver)
     {
         $header = ['name', 'email', 'mobile', 'gender', 'designation', 'teaching_type', 'subjects', 'qualification', 'date_of_joining'];
-        $sample = ['Anita Menon', 'anita@school.edu', '9876543210', 'female', 'PGT', 'Permanent', 'Mathematics; Physics', 'M.Sc B.Ed', '2020-06-01'];
 
-        $csv = implode(',', $header)."\n".implode(',', array_map(fn ($v) => '"'.str_replace('"', '""', $v).'"', $sample))."\n";
+        $designation = $resolver->designations($this->school->parent_id)->first()?->label ?? 'PGT';
+        $teachingType = $resolver->teachingTypes($this->school->parent_id)->first()?->label ?? 'Trained Graduate Teacher';
+        $subjects = $resolver->subjects($this->school->parent_id)->take(2)->pluck('label')->implode('; ') ?: 'Mathematics; Physics';
+
+        $sample = ['Anita Menon', 'anita@school.edu', '9876543210', 'female', $designation, $teachingType, $subjects, 'M.Sc B.Ed', '2020-06-01'];
+
+        if ($request->query('format') === 'csv') {
+            $csv = implode(',', $header)."\n".implode(',', array_map(fn ($v) => '"'.str_replace('"', '""', $v).'"', $sample))."\n";
+
+            return response()->streamDownload(
+                fn () => print("\xEF\xBB\xBF".$csv),
+                'teacher-import-sample.csv',
+                ['Content-Type' => 'text/csv; charset=UTF-8'],
+            );
+        }
+
+        $xlsx = SpreadsheetWriter::xlsx([$header, $sample]);
 
         return response()->streamDownload(
-            fn () => print("\xEF\xBB\xBF".$csv),
-            'teacher-import-sample.csv',
-            ['Content-Type' => 'text/csv; charset=UTF-8'],
+            fn () => print $xlsx,
+            'teacher-import-sample.xlsx',
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
         );
     }
 
     public function importStore(Request $request, EffectiveMasterDataResolver $resolver, PlatformAuditLogger $audit)
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt|max:5120']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx|max:5120']);
 
-        $path = $request->file('file')->getRealPath();
-        $handle = fopen($path, 'rb');
-        if ($handle === false) {
-            return back()->with('error', 'Could not read the uploaded file.');
-        }
-
-        $header = fgetcsv($handle);
-        if ($header === false) {
-            fclose($handle);
-
-            return back()->with('error', 'The file is empty.');
-        }
-        $header = array_map(fn ($h) => strtolower(trim((string) preg_replace('/^\xEF\xBB\xBF/', '', $h))), $header);
+        $backup = app(UploadBackupService::class)->store(
+            $request->file('file'),
+            'teacher_import',
+            $this->school->id,
+            null,
+            $request->user()->id,
+        );
 
         $subjectMap = $this->lookupMap($resolver->subjects($this->school->parent_id));
         $typeMap = $this->lookupMap($resolver->teachingTypes($this->school->parent_id));
         $designationMap = $this->lookupMap($resolver->designations($this->school->parent_id));
         $yearId = AcademicYear::activeId();
 
-        $created = 0;
-        $skipped = [];
-        $line = 1;
+        $validRows = [];
+        $errors = [];
+        $seenEmails = [];
+        $line = 0;
+        $header = null;
 
-        while (($cols = fgetcsv($handle)) !== false) {
-            $line++;
-            $row = [];
-            foreach ($header as $i => $key) {
-                $row[$key] = isset($cols[$i]) ? trim((string) $cols[$i]) : null;
-            }
+        $path = TenantStorage::localTempPath($backup->storage_path, $backup->storage_disk);
+        try {
+            foreach (SpreadsheetReader::rows($path) as $cols) {
+                $line++;
 
-            if (blank($row['name'] ?? null)) {
-                continue;
-            }
+                if ($line === 1) {
+                    $header = array_map(fn ($h) => strtolower(trim((string) preg_replace('/^\xEF\xBB\xBF/', '', (string) $h))), $cols);
 
-            $email = filled($row['email'] ?? null) ? strtolower(trim($row['email'])) : null;
-            if (! $email) {
-                $skipped[] = "Row {$line}: {$row['name']} (email required)";
-
-                continue;
-            }
-
-            if (blank($row['mobile'] ?? null)) {
-                $skipped[] = "Row {$line}: {$row['name']} (mobile required)";
-
-                continue;
-            }
-
-            $typeId = $typeMap[strtolower((string) ($row['teaching_type'] ?? ''))] ?? null;
-            if (! $typeId) {
-                $skipped[] = "Row {$line}: {$row['name']} (category required)";
-
-                continue;
-            }
-
-            $subjectIds = [];
-            foreach (preg_split('/[;,]/', (string) ($row['subjects'] ?? '')) as $token) {
-                $token = strtolower(trim($token));
-                if ($token !== '' && isset($subjectMap[$token])) {
-                    $subjectIds[] = $subjectMap[$token];
+                    continue;
                 }
+
+                $row = [];
+                foreach ($header as $i => $key) {
+                    $row[$key] = isset($cols[$i]) ? trim((string) $cols[$i]) : null;
+                }
+
+                if (blank($row['name'] ?? null)) {
+                    continue;
+                }
+
+                $name = $row['name'];
+
+                $email = filled($row['email'] ?? null) ? strtolower(trim($row['email'])) : null;
+                if (! $email) {
+                    $errors[] = ['row' => $line, 'message' => "{$name}: email is required."];
+
+                    continue;
+                }
+
+                if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $errors[] = ['row' => $line, 'message' => "{$name}: invalid email \"{$email}\"."];
+
+                    continue;
+                }
+
+                if (blank($row['mobile'] ?? null)) {
+                    $errors[] = ['row' => $line, 'message' => "{$name}: mobile is required."];
+
+                    continue;
+                }
+
+                $typeId = $typeMap[strtolower((string) ($row['teaching_type'] ?? ''))] ?? null;
+                if (! $typeId) {
+                    $errors[] = ['row' => $line, 'message' => "{$name}: teaching_type \"".($row['teaching_type'] ?? '')."\" is not recognized."];
+
+                    continue;
+                }
+
+                $subjectIds = [];
+                foreach (preg_split('/[;,]/', (string) ($row['subjects'] ?? '')) as $token) {
+                    $token = strtolower(trim($token));
+                    if ($token !== '' && isset($subjectMap[$token])) {
+                        $subjectIds[] = $subjectMap[$token];
+                    }
+                }
+                if ($subjectIds === []) {
+                    $errors[] = ['row' => $line, 'message' => "{$name}: no recognized subjects."];
+
+                    continue;
+                }
+
+                if (isset($seenEmails[$email])) {
+                    $errors[] = ['row' => $line, 'message' => "{$name}: duplicate email \"{$email}\" (also used on row {$seenEmails[$email]})."];
+
+                    continue;
+                }
+
+                if (Teacher::where('email', $email)->exists() || User::where('email', $email)->exists()) {
+                    $errors[] = ['row' => $line, 'message' => "{$name}: email \"{$email}\" is already registered."];
+
+                    continue;
+                }
+
+                $seenEmails[$email] = $line;
+
+                $validRows[] = [
+                    'name'             => $name,
+                    'email'            => $email,
+                    'mobile'           => $row['mobile'],
+                    'gender'           => in_array(strtolower((string) ($row['gender'] ?? '')), ['male', 'female', 'other'], true) ? strtolower($row['gender']) : null,
+                    'teaching_type_id' => $typeId,
+                    'designation_id'   => $designationMap[strtolower((string) ($row['designation'] ?? ''))] ?? null,
+                    'subject_ids'      => array_unique($subjectIds),
+                    'qualification'    => $row['qualification'] ?? null,
+                    'date_of_joining'  => $this->parseDate($row['date_of_joining'] ?? null),
+                ];
             }
-            if ($subjectIds === []) {
-                $skipped[] = "Row {$line}: {$row['name']} (subjects required)";
-
-                continue;
+        } finally {
+            if (str_starts_with($path, sys_get_temp_dir())) {
+                @unlink($path);
             }
-
-            if (Teacher::where('email', $email)->exists()) {
-                $skipped[] = "Row {$line}: {$row['name']} (duplicate email)";
-
-                continue;
-            }
-
-            $teacher = Teacher::create([
-                'tenant_id'        => $this->school->id,
-                'academic_year_id' => $yearId,
-                'name'             => $row['name'],
-                'email'            => $email,
-                'mobile'           => $row['mobile'],
-                'gender'           => in_array(strtolower((string) ($row['gender'] ?? '')), ['male', 'female', 'other'], true) ? strtolower($row['gender']) : null,
-                'teaching_type_id' => $typeId,
-                'designation_id'   => $designationMap[strtolower((string) ($row['designation'] ?? ''))] ?? null,
-                'qualification'    => $row['qualification'] ?? null,
-                'date_of_joining'  => $this->parseDate($row['date_of_joining'] ?? null),
-                'status'           => 'active',
-            ]);
-
-            $teacher->syncSubjectIds(array_unique($subjectIds));
-
-            app(LoginCodeGenerator::class)->assignTeacher($teacher);
-
-            try {
-                app(TeacherPortalProvisioner::class)->provision($teacher->fresh(), $email);
-            } catch (\Throwable) {
-                $skipped[] = "Row {$line}: {$row['name']} (portal login failed)";
-            }
-
-            $created++;
         }
 
-        fclose($handle);
+        if ($header === null) {
+            $backup->update(['status' => UploadedFileBackup::STATUS_FAILED, 'errors' => [['row' => 0, 'message' => 'The file is empty.']]]);
+
+            return back()->with('error', 'The file is empty.');
+        }
+
+        if ($errors !== []) {
+            $backup->update([
+                'status'         => UploadedFileBackup::STATUS_FAILED,
+                'total_rows'     => count($validRows) + count($errors),
+                'imported_count' => 0,
+                'error_count'    => count($errors),
+                'errors'         => array_slice($errors, 0, 50),
+            ]);
+
+            return back()->with('importErrors', $errors)->with('error', 'Import rejected: fix the error(s) below and re-upload. Nothing was imported.');
+        }
+
+        if ($validRows === []) {
+            $backup->update(['status' => UploadedFileBackup::STATUS_FAILED, 'errors' => [['row' => 0, 'message' => 'The file has no data rows to import.']]]);
+
+            return back()->with('error', 'The file has no data rows to import.');
+        }
+
+        try {
+            $created = DB::transaction(function () use ($validRows, $yearId) {
+                $count = 0;
+
+                foreach ($validRows as $row) {
+                    $teacher = Teacher::create([
+                        'tenant_id'        => $this->school->id,
+                        'academic_year_id' => $yearId,
+                        'name'             => $row['name'],
+                        'email'            => $row['email'],
+                        'mobile'           => $row['mobile'],
+                        'gender'           => $row['gender'],
+                        'teaching_type_id' => $row['teaching_type_id'],
+                        'designation_id'   => $row['designation_id'],
+                        'qualification'    => $row['qualification'],
+                        'date_of_joining'  => $row['date_of_joining'],
+                        'status'           => 'active',
+                    ]);
+
+                    $teacher->syncSubjectIds($row['subject_ids']);
+
+                    app(LoginCodeGenerator::class)->assignTeacher($teacher);
+                    app(TeacherPortalProvisioner::class)->provision($teacher->fresh(), $row['email']);
+
+                    $count++;
+                }
+
+                return $count;
+            });
+        } catch (\Throwable $e) {
+            $backup->update([
+                'status'         => UploadedFileBackup::STATUS_FAILED,
+                'total_rows'     => count($validRows),
+                'imported_count' => 0,
+                'error_count'    => 1,
+                'errors'         => [['row' => 0, 'message' => 'Import failed and was rolled back: '.$e->getMessage()]],
+            ]);
+
+            return back()->with('error', 'Import failed and was rolled back: '.$e->getMessage());
+        }
+
+        $backup->update([
+            'status'         => UploadedFileBackup::STATUS_SUCCESS,
+            'total_rows'     => $created,
+            'imported_count' => $created,
+            'error_count'    => 0,
+            'errors'         => [],
+        ]);
 
         $audit->log('teacher.imported', "Imported {$created} teacher(s) from CSV", $this->school);
 
-        $message = "Imported {$created} teacher(s).";
-        if ($skipped !== []) {
-            $message .= ' Skipped '.count($skipped).' row(s): '.implode('; ', array_slice($skipped, 0, 5)).'.';
-        }
-
-        return back()->with($skipped === [] ? 'success' : 'warning', $message);
+        return back()->with('success', "Imported {$created} teacher(s).");
     }
 
     /**

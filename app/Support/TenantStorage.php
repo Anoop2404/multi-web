@@ -41,12 +41,63 @@ class TenantStorage
 
     public static function storeUploadedFile($file, string $directory, ?string $disk = null): string
     {
-        return $file->store($directory, $disk ?? self::uploadDisk());
+        $disk = $disk ?? self::uploadDisk();
+        $path = $file->store($directory, $disk);
+
+        if (is_string($path) && $path !== '' && self::storedFileExists($path, $disk)) {
+            return $path;
+        }
+
+        if (self::canFallbackToSharedDisk($disk)) {
+            self::ensureSharedDiskReady();
+            $fallbackPath = $file->store($directory, self::SHARED_DISK);
+
+            if (is_string($fallbackPath) && $fallbackPath !== '' && self::storedFileExists($fallbackPath, self::SHARED_DISK)) {
+                return $fallbackPath;
+            }
+        }
+
+        $configured = config('filesystems.upload_disk', self::SHARED_DISK);
+
+        throw new \RuntimeException(match (true) {
+            $disk === 's3' && ! self::storedFileExists(is_string($path) ? $path : '', 's3') => 'Could not upload to S3. Check AWS credentials, bucket, and endpoint — or set UPLOAD_DISK=shared for local dev.',
+            default => "Could not save file to the {$configured} disk.",
+        });
     }
 
     public static function storeUploadedFileAs($file, string $directory, string $name, ?string $disk = null): string
     {
-        return $file->storeAs($directory, $name, $disk ?? self::uploadDisk());
+        $disk = $disk ?? self::uploadDisk();
+        $path = $file->storeAs($directory, $name, $disk);
+
+        if (is_string($path) && $path !== '' && self::storedFileExists($path, $disk)) {
+            return $path;
+        }
+
+        if (self::canFallbackToSharedDisk($disk)) {
+            self::ensureSharedDiskReady();
+            $fallbackPath = $file->storeAs($directory, $name, self::SHARED_DISK);
+
+            if (is_string($fallbackPath) && $fallbackPath !== '' && self::storedFileExists($fallbackPath, self::SHARED_DISK)) {
+                return $fallbackPath;
+            }
+        }
+
+        throw new \RuntimeException('Could not save file to storage.');
+    }
+
+    private static function canFallbackToSharedDisk(string $primaryDisk): bool
+    {
+        return $primaryDisk !== self::SHARED_DISK
+            && app()->environment(['local', 'testing']);
+    }
+
+    private static function ensureSharedDiskReady(): void
+    {
+        $root = storage_path('app/'.self::SHARED_DISK);
+        if (! is_dir($root)) {
+            mkdir($root, 0775, true);
+        }
     }
 
     /** Download or stream a private file; tries recorded disk then fallbacks. */
@@ -414,6 +465,33 @@ class TenantStorage
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    public static function storedFileExists(string $relativePath, ?string $disk = null): bool
+    {
+        $relativePath = ltrim($relativePath, '/');
+
+        if ($relativePath === '') {
+            return false;
+        }
+
+        foreach (array_values(array_unique(array_filter([
+            self::resolveDisk($disk),
+            self::uploadDisk(),
+            's3',
+            self::SHARED_DISK,
+            'local',
+        ]))) as $name) {
+            try {
+                if (Storage::disk($name)->exists($relativePath)) {
+                    return true;
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return false;
     }
 
     /**

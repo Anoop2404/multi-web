@@ -40,8 +40,10 @@
                         <td class="p-3 font-semibold">₹{{ inv.total_amount }}</td>
                         <td class="p-3"><span class="text-xs px-2 py-0.5 rounded bg-gray-100">{{ inv.status }}</span></td>
                         <td class="p-3 text-right text-xs space-y-1">
+                            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/finance/invoices/${inv.id}/pdf?preview=1`"
+                               class="block text-indigo-600 font-semibold" target="_blank">Preview invoice ↗</a>
                             <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/finance/invoices/${inv.id}/pdf`"
-                               class="block text-indigo-600 font-semibold" target="_blank">Invoice PDF ↗</a>
+                               class="block text-indigo-600 font-semibold" target="_blank">Download invoice ↓</a>
                             <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/finance/invoices/${inv.id}/demand-pdf`"
                                class="block text-violet-600 font-semibold" target="_blank">Payment demand ↗</a>
                         </td>

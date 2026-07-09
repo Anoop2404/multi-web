@@ -175,4 +175,54 @@ class SchoolApplicationFormTest extends TestCase
         $this->assertTrue($profile->application_form_config['district']['required']);
         $this->assertTrue($profile->application_form_config['website']['enabled']);
     }
+
+    public function test_school_profile_always_exposes_leadership_fields(): void
+    {
+        $fields = SchoolApplicationForm::resolveForSchoolProfile(null);
+
+        foreach ([
+            'principal_name', 'principal_email', 'principal_phone',
+            'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
+            'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
+        ] as $key) {
+            $this->assertTrue($fields[$key]['enabled'], "{$key} should be on school profile");
+        }
+
+        $this->assertTrue($fields['principal_name']['required']);
+        $this->assertTrue($fields['event_coordinator_name']['required']);
+        $this->assertFalse($fields['vice_principal_name']['required']);
+    }
+
+    public function test_vice_principal_is_optional_for_leadership_requirements(): void
+    {
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'Test Sahodaya',
+            'subdomain' => 'test-sahodaya',
+            'is_active' => true,
+        ]);
+
+        $school = Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'Test School',
+            'parent_id'         => $sahodaya->id,
+            'membership_status' => 'approved',
+            'is_active'         => true,
+            'application_payload' => [
+                'principal_name' => 'Principal A',
+                'principal_email' => 'principal@test.edu',
+                'principal_phone' => '9999999999',
+                'event_coordinator_name' => 'Coordinator B',
+                'event_coordinator_email' => 'events@test.edu',
+                'event_coordinator_phone' => '8888888888',
+            ],
+        ]);
+
+        $status = \App\Support\SchoolContactRequirements::status($school);
+
+        $this->assertTrue($status['complete']);
+        $this->assertSame([], $status['pending']);
+    }
 }

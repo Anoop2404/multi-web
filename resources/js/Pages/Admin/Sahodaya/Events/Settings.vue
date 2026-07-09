@@ -96,6 +96,7 @@ const props = defineProps({
     activityLogs: { type: Array, default: () => [] },
     itemHeads: { type: Array, default: () => [] },
     ledgerAccount: { type: Object, default: () => ({}) },
+    clusterRequireStudentVerification: { type: Boolean, default: true },
 });
 
 const ctx = useEventSettingsForms(props);

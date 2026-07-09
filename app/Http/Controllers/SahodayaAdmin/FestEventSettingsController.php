@@ -11,6 +11,7 @@ use App\Models\FestStage;
 use App\Models\FestVenue;
 use App\Models\FestVolunteer;
 use App\Models\FestSchoolVerification;
+use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Support\Fest\FestEventSettingsPayload;
 use App\Support\FestPageActivity;
@@ -112,6 +113,9 @@ class FestEventSettingsController extends SahodayaAdminController
             'schoolVerifications' => $this->schoolVerificationRows($event, $schools),
             'mandatoryGaps' => app(FestMandatoryItemService::class)->schoolsWithMissing($event),
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::settingsTab($initialTab)),
+            'clusterRequireStudentVerification' => (bool) (
+                SahodayaProfile::where('tenant_id', $this->sahodaya->id)->value('require_student_verification') ?? true
+            ),
         ]);
     }
 
@@ -254,11 +258,15 @@ class FestEventSettingsController extends SahodayaAdminController
             'registration_locked'                 => 'nullable|boolean',
             'record_tracking_enabled'             => 'nullable|boolean',
             'default_record_prize_label'          => 'nullable|string|max:120',
+            'student_verification_mode'           => 'nullable|in:inherit,required,optional',
         ]);
 
         $data = FestEventSettingsPayload::applyDefaults($data);
+        $verificationMode = $data['student_verification_mode'] ?? null;
+        unset($data['student_verification_mode']);
 
         $event->update($data);
+        $this->applyStudentVerificationMode($event, $verificationMode);
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,
@@ -734,7 +742,11 @@ class FestEventSettingsController extends SahodayaAdminController
             'event_reg_start' => 'nullable|date',
             'event_reg_end' => 'nullable|date',
             'allow_student_self_register' => 'nullable|boolean',
+            'student_verification_mode' => 'nullable|in:inherit,required,optional',
         ]);
+
+        $verificationMode = $data['student_verification_mode'] ?? null;
+        unset($data['student_verification_mode']);
 
         $event->update([
             'require_event_registration' => (bool) ($data['require_event_registration'] ?? false),
@@ -743,7 +755,28 @@ class FestEventSettingsController extends SahodayaAdminController
             'allow_student_self_register' => (bool) ($data['allow_student_self_register'] ?? false),
         ]);
 
+        $this->applyStudentVerificationMode($event, $verificationMode);
+
         return back()->with('success', 'Registration settings saved.');
+    }
+
+    private function applyStudentVerificationMode(FestEvent $event, ?string $mode): void
+    {
+        if ($mode === null) {
+            return;
+        }
+
+        $feeSettings = is_array($event->fee_settings) ? $event->fee_settings : [];
+
+        if ($mode === 'inherit') {
+            unset($feeSettings['require_verified_students']);
+        } elseif ($mode === 'required') {
+            $feeSettings['require_verified_students'] = true;
+        } elseif ($mode === 'optional') {
+            $feeSettings['require_verified_students'] = false;
+        }
+
+        $event->update(['fee_settings' => $feeSettings]);
     }
 
     public function updateNumberingSettings(Request $request, string $tenantId, FestEvent $event)

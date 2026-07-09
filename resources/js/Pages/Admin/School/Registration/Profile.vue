@@ -51,7 +51,8 @@
                     <div>
                         <p class="font-semibold text-amber-950">Leadership contacts needed</p>
                         <p class="mt-1 text-sm text-amber-900/85">
-                            Fest registrations may be held until principal, vice principal, and events coordinator details are on file.
+                            Fest registrations may be held until principal and events coordinator details are on file.
+                            Scroll down to the <strong>Principal</strong> and <strong>Other leadership contacts</strong> sections.
                         </p>
                     </div>
                     <button type="button" class="btn-primary text-xs !py-2"
@@ -260,7 +261,7 @@
                     <div class="rounded-xl border border-[#dbeafe] bg-[#f0f9ff] p-4 text-xs leading-relaxed text-[#0f3d7a]">
                         <p class="font-semibold">Tip</p>
                         <p class="mt-1 opacity-90">
-                            Save each section after editing. Leadership contacts are required before fest event registrations can proceed.
+                            Save each section after editing. Principal and events coordinator are required before fest registrations can proceed. Vice principal is optional.
                         </p>
                     </div>
                 </aside>
@@ -302,8 +303,8 @@ const SECTION_ICONS = {
 };
 
 const LEADERSHIP_GROUPS = [
-    { key: 'vice_principal', label: 'Vice principal', prefix: 'vice_principal_' },
-    { key: 'event_coordinator', label: 'Events coordinator', prefix: 'event_coordinator_' },
+    { key: 'vice_principal', label: 'Vice principal (optional)', prefix: 'vice_principal_', optional: true },
+    { key: 'event_coordinator', label: 'Events coordinator', prefix: 'event_coordinator_', optional: false },
 ];
 
 function fieldsForSection(sectionKey) {
@@ -362,13 +363,12 @@ const membershipApproved = computed(() =>
 
 const leadershipChecklist = computed(() => {
     const roles = props.leadershipContacts?.pending ?? [];
-    const allRoles = [
+    const requiredRoles = [
         { key: 'principal', label: 'Principal', sectionKey: 'principal' },
-        { key: 'vice_principal', label: 'Vice Principal', sectionKey: 'leadership' },
         { key: 'event_coordinator', label: 'Events Coordinator', sectionKey: 'leadership' },
     ];
 
-    return allRoles.map(role => {
+    return requiredRoles.map(role => {
         const pending = roles.find(r => r.key === role.key);
         return {
             ...role,

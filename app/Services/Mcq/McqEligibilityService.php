@@ -98,7 +98,7 @@ class McqEligibilityService
 
     public function isEligible(McqExam $exam, Student $student): bool
     {
-        if (! $this->verificationGate->isEligible($student, null, $exam->tenant_id)) {
+        if (! $this->verificationGate->isEligible($student, null, $exam->tenant_id, $exam)) {
             return false;
         }
 
@@ -121,9 +121,9 @@ class McqEligibilityService
 
     public function ineligibilityReason(McqExam $exam, Student $student): ?string
     {
-        if (! $this->verificationGate->isEligible($student, null, $exam->tenant_id)) {
+        if (! $this->verificationGate->isEligible($student, null, $exam->tenant_id, $exam)) {
             return $this->verificationGate
-                ->ineligibilityReason($student, null, $exam->tenant_id)
+                ->ineligibilityReason($student, null, $exam->tenant_id, $exam)
                 ?? 'Student is not verified.';
         }
 

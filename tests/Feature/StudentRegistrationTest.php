@@ -193,6 +193,232 @@ class StudentRegistrationTest extends TestCase
         ]);
     }
 
+    public function test_bulk_csv_import_is_all_or_nothing(): void
+    {
+        ['tenant' => $tenant, 'class' => $class] = $this->schoolWithClass();
+        $tenant->update(['school_prefix' => 'TST']);
+
+        // One good row, one row with an unknown class — the whole file must be rejected.
+        $csv = "full_name,class_name,email\n"
+            ."Rahul Kumar,10,rahul@example.com\n"
+            ."Anita Shah,NoSuchClass,\n";
+
+        $path = tempnam(sys_get_temp_dir(), 'students');
+        file_put_contents($path, $csv);
+        $file = new UploadedFile($path, 'students.csv', 'text/csv', null, true);
+
+        $result = (new \App\Services\Students\StudentCsvImporter($tenant->fresh()))->import($file);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(0, $result['imported']);
+        $this->assertNotEmpty($result['errors']);
+        $this->assertSame(0, Student::where('tenant_id', $tenant->id)->count());
+    }
+
+    public function test_bulk_xlsx_import_creates_students(): void
+    {
+        ['tenant' => $tenant, 'class' => $class] = $this->schoolWithClass();
+        $tenant->update(['school_prefix' => 'TST']);
+
+        $xlsx = \App\Services\Spreadsheet\SpreadsheetWriter::xlsx([
+            ['full_name', 'class_name', 'email'],
+            ['Rahul Kumar', '10', 'rahul@example.com'],
+        ]);
+
+        $path = tempnam(sys_get_temp_dir(), 'students').'.xlsx';
+        file_put_contents($path, $xlsx);
+        $file = new UploadedFile($path, 'students.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
+
+        $result = (new \App\Services\Students\StudentCsvImporter($tenant->fresh()))->import($file);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(1, $result['imported']);
+        $this->assertDatabaseHas('students', [
+            'tenant_id'       => $tenant->id,
+            'name'            => 'Rahul Kumar',
+            'school_class_id' => $class->id,
+        ]);
+    }
+
+    public function test_student_import_preview_and_store_via_http(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['tenant' => $school, 'class' => $class] = $this->schoolWithClass();
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        $csv = "full_name,class_name,gender,dob,email\n"
+            ."Rahul Kumar,10,male,2012-05-01,\n";
+        $file = UploadedFile::fake()->createWithContent('students.csv', $csv, 'text/csv');
+
+        $this->actingAs($admin)
+            ->postJson("/school-admin/{$school->id}/students/import/preview", ['file' => $file])
+            ->assertOk()
+            ->assertJsonPath('total_rows', 1)
+            ->assertJsonPath('errors', [])
+            ->assertJsonPath('valid.0.name', 'Rahul Kumar');
+
+        $this->actingAs($admin)
+            ->post("/school-admin/{$school->id}/students/import", ['file' => $file])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('students', [
+            'tenant_id'       => $school->id,
+            'name'            => 'Rahul Kumar',
+            'school_class_id' => $class->id,
+        ]);
+    }
+
+    public function test_student_import_rejects_empty_upload(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['tenant' => $school] = $this->schoolWithClass();
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        $file = UploadedFile::fake()->create('empty.csv', 0, 'text/csv');
+
+        $this->actingAs($admin)
+            ->postJson("/school-admin/{$school->id}/students/import/preview", ['file' => $file])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['file']);
+    }
+
+    public function test_student_photo_zip_matches_underscore_student_id_filenames(): void
+    {
+        Storage::fake('shared');
+        config(['filesystems.upload_disk' => 'shared']);
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['tenant' => $school, 'class' => $class] = $this->schoolWithClass();
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        $student = Student::create([
+            'tenant_id'       => $school->id,
+            'school_class_id' => $class->id,
+            'name'            => 'Photo Zip Student',
+            'status'          => 'active',
+            'reg_no'          => 'STU/26/0006',
+            'admission_number'=> app(StudentRegistrationNumberGenerator::class)->generate($school),
+        ]);
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'student_photos').'.zip';
+        $zip = new \ZipArchive;
+        $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        $zip->addFromString('STU_26_0006.jpg', base64_decode(
+            '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k='
+        ));
+        $zip->close();
+
+        $zipUpload = new UploadedFile($zipPath, 'photos.zip', 'application/zip', null, true);
+
+        $this->actingAs($admin)
+            ->post("/school-admin/{$school->id}/students/photos-zip", ['zip' => $zipUpload])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $student->refresh();
+        $this->assertNotNull($student->photo);
+        $this->assertTrue(Storage::disk('shared')->exists($student->photo));
+
+        @unlink($zipPath);
+    }
+
+    public function test_student_photo_zip_matches_folder_path_student_id(): void
+    {
+        Storage::fake('shared');
+        config(['filesystems.upload_disk' => 'shared']);
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['tenant' => $school, 'class' => $class] = $this->schoolWithClass();
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        $student = Student::create([
+            'tenant_id'       => $school->id,
+            'school_class_id' => $class->id,
+            'name'            => 'Folder Path Student',
+            'status'          => 'active',
+            'reg_no'          => 'STU/26/0007',
+            'admission_number'=> app(StudentRegistrationNumberGenerator::class)->generate($school),
+        ]);
+
+        $jpeg = base64_decode(
+            '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k='
+        );
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'student_photos').'.zip';
+        $zip = new \ZipArchive;
+        $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        $zip->addFromString('STU/26/0007.jpg', $jpeg);
+        $zip->close();
+
+        $zipUpload = new UploadedFile($zipPath, 'photos.zip', 'application/zip', null, true);
+
+        $this->actingAs($admin)
+            ->post("/school-admin/{$school->id}/students/photos-zip", ['zip' => $zipUpload])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $student->refresh();
+        $this->assertNotNull($student->photo);
+
+        @unlink($zipPath);
+    }
+
+    public function test_student_photo_upload_matches_by_student_name(): void
+    {
+        Storage::fake('shared');
+        config(['filesystems.upload_disk' => 'shared']);
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['tenant' => $school, 'class' => $class] = $this->schoolWithClass();
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        $student = Student::create([
+            'tenant_id'       => $school->id,
+            'school_class_id' => $class->id,
+            'name'            => 'Rahul Kumar',
+            'status'          => 'active',
+            'reg_no'          => 'STU/26/0011',
+            'admission_number'=> app(StudentRegistrationNumberGenerator::class)->generate($school),
+        ]);
+
+        $photo = UploadedFile::fake()->image('Rahul Kumar.jpg');
+
+        $this->actingAs($admin)
+            ->post("/school-admin/{$school->id}/students/photos-zip", ['photos' => [$photo]])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $student->refresh();
+        $this->assertNotNull($student->photo);
+        $this->assertTrue(Storage::disk('shared')->exists($student->photo));
+    }
+
     public function test_import_template_uses_school_class_names(): void
     {
         ['tenant' => $tenant, 'class' => $class] = $this->schoolWithClass();
@@ -226,7 +452,7 @@ class StudentRegistrationTest extends TestCase
         ]);
 
         $photoUrl = $student->fresh()->photoUrl();
-        $this->assertSame("/school-admin/{$school->id}/students/{$student->id}/photo", $photoUrl);
+        $this->assertStringContainsString("/school-admin/{$school->id}/students/{$student->id}/photo", $photoUrl);
 
         $admin = \App\Models\User::factory()->create([
             'tenant_id'         => $school->id,
@@ -269,7 +495,7 @@ class StudentRegistrationTest extends TestCase
 
         $photoUrl = $student->fresh()->photoUrl();
         $this->assertNotNull($photoUrl);
-        $this->assertStringContainsString('students/'.$school->id.'/avatar.jpg', $photoUrl);
+        $this->assertStringContainsString("/school-admin/{$school->id}/students/{$student->id}/photo", $photoUrl);
 
         $this->actingAs($admin)
             ->get("/school-admin/{$school->id}/students/{$student->id}/photo")

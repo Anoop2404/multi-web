@@ -297,6 +297,9 @@ Route::prefix('school-admin/{tenantId}')
 
     Route::get('/students/setup', [SchoolClassController::class, 'index'])->name('students.setup');
 
+    Route::get('/imports', [\App\Http\Controllers\SchoolAdmin\ImportHistoryController::class, 'index'])->name('imports.index');
+    Route::get('/imports/{backup}/download', [\App\Http\Controllers\SchoolAdmin\ImportHistoryController::class, 'download'])->name('imports.download');
+
     Route::get('/students',                    [StudentController::class, 'index'])->name('students.index');
     Route::get('/students/import',             [StudentController::class, 'importForm'])->name('students.import');
     Route::get('/students/import/template',    [StudentController::class, 'importTemplate'])->name('students.import.template');
@@ -324,6 +327,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/students/{student}/photo',                   [StudentController::class, 'showPhoto'])->name('students.photo');
     Route::post('/students/{student}/photo',                   [StudentController::class, 'updatePhoto'])->name('students.photo.upload');
     Route::post('/students/photos-zip',                        [StudentController::class, 'uploadPhotosZip'])->name('students.photos-zip');
+    Route::get('/students/photo-naming-list',                  [StudentController::class, 'photoNamingList'])->name('students.photo-naming-list');
     Route::post('/students/{student}/portal-login', [StudentController::class, 'provisionPortal'])->name('students.portal-login');
     Route::post('/students/{student}/reset-portal-password', [StudentController::class, 'resetPortalPassword'])->name('students.reset-portal-password');
     Route::post('/students/bulk-portal-provision', [StudentController::class, 'bulkProvisionPortal'])->name('students.bulk-portal-provision');

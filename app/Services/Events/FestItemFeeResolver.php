@@ -73,12 +73,12 @@ class FestItemFeeResolver
         return FestRegistration::where('event_id', $event->id)
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved'])
-            ->with('item')
+            ->with(['item.head:id,name'])
             ->get();
     }
 
     /**
-     * @return array{total: float, count: int, lines: array<int, array{label: string, amount: float, item_id: ?int}>}
+     * @return array{total: float, count: int, lines: array<int, array{label: string, amount: float, item_id: ?int, item_title: string, head_name: ?string}>}
      */
     public function participationBreakdown(FestEvent $event, string $schoolId, array $schedule): array
     {
@@ -87,9 +87,13 @@ class FestItemFeeResolver
 
         foreach ($this->billableRegistrations($event, $schoolId) as $registration) {
             $amount = $this->amountForItem($registration->item, $schedule, $event);
-            $label = $registration->item?->title ?? 'Registration #'.$registration->id;
+            $itemTitle = $registration->item?->title ?? 'Registration #'.$registration->id;
+            $headName = $registration->item?->head?->name;
+            $label = $headName ? "{$headName} — {$itemTitle}" : $itemTitle;
             $lines[] = [
                 'label' => $label,
+                'item_title' => $itemTitle,
+                'head_name' => $headName,
                 'amount' => $amount,
                 'item_id' => $registration->item_id,
             ];

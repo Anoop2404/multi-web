@@ -4,7 +4,10 @@ namespace App\Services\Students;
 
 use App\Models\SchoolClass;
 use App\Models\Tenant;
+use App\Services\Spreadsheet\SpreadsheetReader;
+use App\Services\Spreadsheet\SpreadsheetWriter;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 
 class StudentCsvImporter
 {
@@ -20,176 +23,136 @@ class StudentCsvImporter
     public function __construct(private Tenant $school) {}
 
     /**
-     * @return array{imported: int, skipped: int, errors: list<array{row: int, message: string}>}
+     * @return array{imported: int, skipped: int, errors: list<array{row: int, message: string}>, success: bool}
      */
     public function import(UploadedFile $file): array
     {
-        return $this->importFromPath($file->getRealPath());
+        return $this->importFromPath($file->getRealPath() ?: $file->getPathname());
     }
 
     /** Count non-empty data rows (excludes header). */
     public function countDataRows(string $path): int
     {
-        $handle = fopen($path, 'r');
-        if ($handle === false) {
-            return 0;
-        }
-
-        fgetcsv($handle);
         $count = 0;
+        $rowNumber = 0;
 
-        while (($row = fgetcsv($handle)) !== false) {
+        foreach (SpreadsheetReader::rows($path) as $row) {
+            $rowNumber++;
+
+            if ($rowNumber === 1) {
+                continue; // header
+            }
+
             if (! $this->rowIsEmpty($row)) {
                 $count++;
             }
         }
 
-        fclose($handle);
-
         return $count;
     }
 
     /**
-     * @return array{imported: int, skipped: int, errors: list<array{row: int, message: string}>}
+     * Validate the whole file, then import it as a single all-or-nothing
+     * transaction: if any row is invalid, nothing is persisted.
+     *
+     * @return array{imported: int, skipped: int, errors: list<array{row: int, message: string}>, success: bool}
      */
     public function importFromPath(string $path): array
     {
-        $classes = SchoolClass::where('tenant_id', $this->school->id)
-            ->active()
-            ->get()
-            ->keyBy(fn (SchoolClass $c) => strtolower(trim($c->name)));
+        $validation = $this->validateRows($path);
 
-        if ($classes->isEmpty()) {
+        if ($validation['errors'] !== []) {
+            return [
+                'imported' => 0,
+                'skipped'  => $validation['total_rows'],
+                'errors'   => $validation['errors'],
+                'success'  => false,
+            ];
+        }
+
+        if ($validation['rows'] === []) {
             return [
                 'imported' => 0,
                 'skipped'  => 0,
-                'errors'   => [['row' => 0, 'message' => 'No classes found. Contact your Sahodaya admin to configure the class master.']],
+                'errors'   => [['row' => 0, 'message' => 'The file has no data rows to import.']],
+                'success'  => false,
             ];
         }
 
-        $handle = fopen($path, 'r');
-        if ($handle === false) {
+        try {
+            $imported = DB::transaction(function () use ($validation) {
+                $creator = app(StudentRecordCreator::class);
+                $count = 0;
+
+                foreach ($validation['rows'] as $row) {
+                    $fields = [
+                        'school_class_id' => $row['school_class_id'],
+                        'name'            => $row['name'],
+                        'gender'          => $row['gender'] ?? 'other',
+                        'dob'             => $row['dob'],
+                    ];
+
+                    if ($row['email'] !== null) {
+                        $fields['parent_email'] = $row['email'];
+                    }
+
+                    $creator->create($this->school, $fields);
+                    $count++;
+                }
+
+                return $count;
+            });
+        } catch (\Throwable $e) {
             return [
                 'imported' => 0,
-                'skipped'  => 0,
-                'errors'   => [['row' => 0, 'message' => 'Could not read the uploaded file.']],
+                'skipped'  => $validation['total_rows'],
+                'errors'   => [['row' => 0, 'message' => 'Import failed and was rolled back: '.$e->getMessage()]],
+                'success'  => false,
             ];
         }
 
-        $header = fgetcsv($handle);
-        if (! $header) {
-            fclose($handle);
-
-            return [
-                'imported' => 0,
-                'skipped'  => 0,
-                'errors'   => [['row' => 0, 'message' => 'The file is empty.']],
-            ];
-        }
-
-        $columns = $this->mapColumns($header);
-        if (! isset($columns['name'], $columns['class'])) {
-            fclose($handle);
-
-            return [
-                'imported' => 0,
-                'skipped'  => 0,
-                'errors'   => [['row' => 1, 'message' => 'CSV must include name and class columns (e.g. full_name, class_name).']],
-            ];
-        }
-
-        $imported = 0;
-        $skipped = 0;
-        $errors = [];
-        $rowNumber = 1;
-        $creator = app(StudentRecordCreator::class);
-
-        while (($row = fgetcsv($handle)) !== false) {
-            $rowNumber++;
-
-            if ($this->rowIsEmpty($row)) {
-                continue;
-            }
-
-            $name = trim((string) ($row[$columns['name']] ?? ''));
-            $className = trim((string) ($row[$columns['class']] ?? ''));
-            $email = isset($columns['email']) ? trim((string) ($row[$columns['email']] ?? '')) : '';
-            $genderRaw = isset($columns['gender']) ? strtolower(trim((string) ($row[$columns['gender']] ?? ''))) : '';
-            $dobRaw = isset($columns['dob']) ? trim((string) ($row[$columns['dob']] ?? '')) : '';
-
-            if ($name === '') {
-                $errors[] = ['row' => $rowNumber, 'message' => 'Student name is required.'];
-                $skipped++;
-
-                continue;
-            }
-
-            if ($className === '') {
-                $errors[] = ['row' => $rowNumber, 'message' => "Class is required for \"{$name}\"."];
-                $skipped++;
-
-                continue;
-            }
-
-            $schoolClass = $classes->get(strtolower($className));
-            if (! $schoolClass) {
-                $errors[] = ['row' => $rowNumber, 'message' => "Unknown class \"{$className}\" for \"{$name}\". It must match a class defined by your Sahodaya."];
-                $skipped++;
-
-                continue;
-            }
-
-            if ($email !== '' && ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $errors[] = ['row' => $rowNumber, 'message' => "Invalid email for \"{$name}\"."];
-                $skipped++;
-
-                continue;
-            }
-
-            $gender = $this->normalizeGender($genderRaw);
-            if ($genderRaw !== '' && $gender === null) {
-                $errors[] = ['row' => $rowNumber, 'message' => "Invalid gender \"{$genderRaw}\" for \"{$name}\". Use male, female, or other."];
-                $skipped++;
-
-                continue;
-            }
-
-            $dob = $this->normalizeDob($dobRaw);
-            if ($dobRaw !== '' && $dob === null) {
-                $errors[] = ['row' => $rowNumber, 'message' => "Invalid date of birth \"{$dobRaw}\" for \"{$name}\". Use YYYY-MM-DD."];
-                $skipped++;
-
-                continue;
-            }
-
-            $fields = [
-                'school_class_id' => $schoolClass->id,
-                'name'            => $name,
-                'gender'          => $gender ?? 'other',
-                'dob'             => $dob,
-            ];
-
-            if ($email !== '') {
-                $fields['parent_email'] = $email;
-            }
-
-            $creator->create($this->school, $fields);
-
-            $imported++;
-        }
-
-        fclose($handle);
-
-        return compact('imported', 'skipped', 'errors');
+        return [
+            'imported' => $imported,
+            'skipped'  => 0,
+            'errors'   => [],
+            'success'  => true,
+        ];
     }
 
     /**
-     * Validate CSV rows without persisting — for import preview.
+     * Validate rows without persisting — for import preview.
      *
      * @return array{valid: list<array{row: int, name: string, class: string, gender: ?string, dob: ?string, email: ?string}>, errors: list<array{row: int, message: string}>, total_rows: int}
      */
     public function previewFromPath(string $path, int $limit = 100): array
     {
+        $validation = $this->validateRows($path);
+
+        $valid = array_map(fn (array $row) => [
+            'row'    => $row['row'],
+            'name'   => $row['name'],
+            'class'  => $row['class_name'],
+            'gender' => $row['gender'],
+            'dob'    => $row['dob'],
+            'email'  => $row['email'],
+        ], array_slice($validation['rows'], 0, $limit));
+
+        return [
+            'valid'      => $valid,
+            'errors'     => $validation['errors'],
+            'total_rows' => $validation['total_rows'],
+        ];
+    }
+
+    /**
+     * Read and validate every data row in the file. Returns fully resolved
+     * rows ready for persistence, and the complete list of errors found —
+     * used by both the transactional importer and the preview endpoint.
+     *
+     * @return array{rows: list<array{row: int, school_class_id: int, name: string, class_name: string, gender: ?string, dob: ?string, email: ?string}>, errors: list<array{row: int, message: string}>, total_rows: int}
+     */
+    private function validateRows(string $path): array
+    {
         $classes = SchoolClass::where('tenant_id', $this->school->id)
             ->active()
             ->get()
@@ -197,46 +160,36 @@ class StudentCsvImporter
 
         if ($classes->isEmpty()) {
             return [
-                'valid'      => [],
+                'rows'       => [],
                 'errors'     => [['row' => 0, 'message' => 'No classes found. Contact your Sahodaya admin to configure the class master.']],
                 'total_rows' => 0,
             ];
         }
 
-        $handle = fopen($path, 'r');
-        if ($handle === false) {
-            return [
-                'valid'      => [],
-                'errors'     => [['row' => 0, 'message' => 'Could not read the uploaded file.']],
-                'total_rows' => 0,
-            ];
-        }
-
-        $header = fgetcsv($handle);
-        if (! $header) {
-            fclose($handle);
-
-            return ['valid' => [], 'errors' => [['row' => 0, 'message' => 'The file is empty.']], 'total_rows' => 0];
-        }
-
-        $columns = $this->mapColumns($header);
-        if (! isset($columns['name'], $columns['class'])) {
-            fclose($handle);
-
-            return [
-                'valid'      => [],
-                'errors'     => [['row' => 1, 'message' => 'CSV must include name and class columns.']],
-                'total_rows' => 0,
-            ];
-        }
-
-        $valid = [];
+        $rows = [];
         $errors = [];
-        $rowNumber = 1;
+        $rowNumber = 0;
         $totalRows = 0;
+        $header = null;
+        $columns = [];
 
-        while (($row = fgetcsv($handle)) !== false) {
+        foreach (SpreadsheetReader::rows($path) as $row) {
             $rowNumber++;
+
+            if ($rowNumber === 1) {
+                $header = $row;
+                $columns = $this->mapColumns($header);
+
+                if (! isset($columns['name'], $columns['class'])) {
+                    return [
+                        'rows'       => [],
+                        'errors'     => [['row' => 1, 'message' => 'File must include name and class columns (e.g. full_name, class_name).']],
+                        'total_rows' => 0,
+                    ];
+                }
+
+                continue;
+            }
 
             if ($this->rowIsEmpty($row)) {
                 continue;
@@ -252,51 +205,63 @@ class StudentCsvImporter
 
             if ($name === '') {
                 $errors[] = ['row' => $rowNumber, 'message' => 'Student name is required.'];
+
                 continue;
             }
 
             if ($className === '') {
                 $errors[] = ['row' => $rowNumber, 'message' => "Class is required for \"{$name}\"."];
+
                 continue;
             }
 
-            if (! $classes->has(strtolower($className))) {
-                $errors[] = ['row' => $rowNumber, 'message' => "Unknown class \"{$className}\" for \"{$name}\"."];
+            $schoolClass = $classes->get(strtolower($className));
+            if (! $schoolClass) {
+                $errors[] = ['row' => $rowNumber, 'message' => "Unknown class \"{$className}\" for \"{$name}\". It must match a class defined by your Sahodaya."];
+
                 continue;
             }
 
             if ($email !== '' && ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $errors[] = ['row' => $rowNumber, 'message' => "Invalid email for \"{$name}\"."];
+
                 continue;
             }
 
             $gender = $this->normalizeGender($genderRaw);
             if ($genderRaw !== '' && $gender === null) {
-                $errors[] = ['row' => $rowNumber, 'message' => "Invalid gender \"{$genderRaw}\" for \"{$name}\"."];
+                $errors[] = ['row' => $rowNumber, 'message' => "Invalid gender \"{$genderRaw}\" for \"{$name}\". Use male, female, or other."];
+
                 continue;
             }
 
             $dob = $this->normalizeDob($dobRaw);
             if ($dobRaw !== '' && $dob === null) {
-                $errors[] = ['row' => $rowNumber, 'message' => "Invalid date of birth \"{$dobRaw}\" for \"{$name}\"."];
+                $errors[] = ['row' => $rowNumber, 'message' => "Invalid date of birth \"{$dobRaw}\" for \"{$name}\". Use YYYY-MM-DD."];
+
                 continue;
             }
 
-            if (count($valid) < $limit) {
-                $valid[] = [
-                    'row'    => $rowNumber,
-                    'name'   => $name,
-                    'class'  => $className,
-                    'gender' => $gender,
-                    'dob'    => $dob,
-                    'email'  => $email !== '' ? $email : null,
-                ];
-            }
+            $rows[] = [
+                'row'             => $rowNumber,
+                'school_class_id' => $schoolClass->id,
+                'name'            => $name,
+                'class_name'      => $className,
+                'gender'          => $gender,
+                'dob'             => $dob,
+                'email'           => $email !== '' ? $email : null,
+            ];
         }
 
-        fclose($handle);
+        if ($header === null) {
+            return [
+                'rows'       => [],
+                'errors'     => [['row' => 0, 'message' => 'The file is empty.']],
+                'total_rows' => 0,
+            ];
+        }
 
-        return ['valid' => $valid, 'errors' => $errors, 'total_rows' => $totalRows];
+        return ['rows' => $rows, 'errors' => $errors, 'total_rows' => $totalRows];
     }
 
     public static function templateCsv(): string
@@ -308,25 +273,42 @@ class StudentCsvImporter
 
     public function templateCsvForSchool(): string
     {
+        $lines = array_map(
+            fn (array $row) => implode(',', array_map($this->escapeCsvField(...), $row)),
+            $this->templateRowsForSchool(),
+        );
+
+        return implode("\n", $lines)."\n";
+    }
+
+    public function templateXlsxForSchool(): string
+    {
+        return SpreadsheetWriter::xlsx($this->templateRowsForSchool());
+    }
+
+    /** @return list<list<string>> */
+    private function templateRowsForSchool(): array
+    {
         $classes = SchoolClass::where('tenant_id', $this->school->id)
             ->active()
             ->orderBy('display_order')
             ->orderBy('name')
             ->pluck('name');
 
-        $class1 = $classes->get(0, '10');
-        $class2 = $classes->get(1, $class1);
+        $class1 = (string) $classes->get(0, '10');
+        $class2 = (string) $classes->get(1, $class1);
 
-        $lines = ['full_name,class_name,gender,dob,email'];
-        $lines[] = 'Rahul Kumar,'.$this->escapeCsvField($class1).',male,2012-05-01,';
-        $lines[] = 'Priya Nair,'.$this->escapeCsvField($class2).',female,2018-03-15,parent@example.com';
+        $rows = [
+            ['full_name', 'class_name', 'gender', 'dob', 'email'],
+            ['Rahul Kumar', $class1, 'male', '2012-05-01', ''],
+            ['Priya Nair', $class2, 'female', '2018-03-15', 'parent@example.com'],
+        ];
 
         if ($classes->count() > 2) {
-            $class3 = $classes->get(2);
-            $lines[] = 'Anita Shah,'.$this->escapeCsvField($class3).',female,2011-08-20,anita@example.com';
+            $rows[] = ['Anita Shah', (string) $classes->get(2), 'female', '2011-08-20', 'anita@example.com'];
         }
 
-        return implode("\n", $lines)."\n";
+        return $rows;
     }
 
     private function normalizeGender(string $value): ?string

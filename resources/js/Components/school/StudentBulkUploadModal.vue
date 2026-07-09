@@ -24,7 +24,7 @@
                 <div v-show="activeTab === 'csv'" class="space-y-4">
                     <div class="rounded-xl border border-[#dbeafe] bg-[#f0f9ff] p-4 text-sm text-[#041525] space-y-2">
                         <p class="font-semibold">Spreadsheet import (recommended)</p>
-                        <p class="text-xs text-gray-600">Download the template, fill in Excel or Google Sheets, save as CSV, then upload. No row limit.</p>
+                        <p class="text-xs text-gray-600">Download the template, fill it in Excel, Google Sheets, or any spreadsheet app, then upload the file directly &mdash; no need to convert to CSV. No row limit.</p>
                         <ul class="list-disc list-inside text-xs text-gray-600 space-y-0.5">
                             <li><strong>full_name</strong> — required</li>
                             <li><strong>class_name</strong> — required, must match your class master</li>
@@ -32,6 +32,7 @@
                             <li><strong>dob</strong> — optional (YYYY-MM-DD)</li>
                             <li><strong>email</strong> — optional parent email</li>
                         </ul>
+                        <p class="text-xs text-gray-600">Keep the first row as column headers — column order doesn't matter, but the names must match the template.</p>
                     </div>
 
                     <p v-if="classNames.length" class="text-xs text-gray-500">
@@ -39,23 +40,31 @@
                         {{ classNames.join(', ') }}
                     </p>
 
-                    <a :href="templateUrl"
-                       class="inline-flex items-center gap-2 text-sm font-semibold text-[#0f3d7a] hover:underline">
-                        ↓ Download CSV template
-                    </a>
+                    <div class="flex flex-wrap gap-3">
+                        <a :href="templateUrl"
+                           class="inline-flex items-center gap-2 text-sm font-semibold text-[#0f3d7a] hover:underline">
+                            ↓ Download Excel template (.xlsx)
+                        </a>
+                        <a :href="`${templateUrl}?format=csv`"
+                           class="inline-flex items-center gap-2 text-sm font-semibold text-[#0f3d7a] hover:underline">
+                            ↓ Download CSV template
+                        </a>
+                    </div>
 
                     <form @submit.prevent="submitCsv" class="space-y-3">
                         <div>
-                            <label class="form-label mb-1.5">CSV file *</label>
-                            <input type="file" accept=".csv,.txt,text/csv" required @change="onCsvFile"
+                            <label class="form-label mb-1.5">CSV or Excel file *</label>
+                            <input type="file" accept=".csv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required @change="onCsvFile"
                                    class="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#f0f9ff] file:text-[#0f3d7a]">
-                            <p v-if="csvForm.errors.file" class="text-xs text-red-500 mt-1">{{ csvForm.errors.file }}</p>
+                            <p v-if="previewError" class="text-xs text-red-500 mt-1">{{ previewError }}</p>
                         </div>
 
-                        <button v-if="csvForm.file && !previewData" type="button" class="btn-secondary text-sm"
+                        <button v-if="csvFile && !previewData" type="button" class="btn-secondary text-sm"
                                 :disabled="previewLoading" @click="runPreview">
                             {{ previewLoading ? 'Checking…' : 'Preview before import' }}
                         </button>
+
+                        <p v-if="previewError" class="text-xs text-red-600">{{ previewError }}</p>
 
                         <div v-if="previewData" class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
                             <p class="text-xs font-semibold text-slate-700">
@@ -76,17 +85,17 @@
                             </table>
                         </div>
 
-                        <div v-if="importResult?.errors?.length" class="rounded-lg border border-red-100 bg-red-50 p-3 max-h-32 overflow-y-auto">
+                        <div v-if="importErrors?.length" class="rounded-lg border border-red-100 bg-red-50 p-3 max-h-32 overflow-y-auto">
                             <p class="text-xs font-semibold text-red-700 mb-1">Import issues</p>
                             <ul class="text-xs text-red-600 space-y-0.5">
-                                <li v-for="(err, i) in importResult.errors" :key="i">Row {{ err.row }}: {{ err.message }}</li>
+                                <li v-for="(err, i) in importErrors" :key="i">Row {{ err.row }}: {{ err.message }}</li>
                             </ul>
                         </div>
 
                         <FormActions>
                             <button type="button" @click="close" class="btn-ghost">Cancel</button>
-                            <button type="submit" :disabled="csvForm.processing || !classNames.length" class="btn-primary">
-                                {{ csvForm.processing ? 'Importing…' : 'Import CSV' }}
+                            <button type="submit" :disabled="importing || !csvFile || !classNames.length" class="btn-primary">
+                                {{ importing ? 'Importing…' : 'Import CSV' }}
                             </button>
                         </FormActions>
                     </form>
@@ -107,19 +116,26 @@
                 <div v-show="activeTab === 'zip'" class="space-y-4">
                     <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-gray-700 space-y-2">
                         <p class="font-semibold text-slate-900">Attach photos to existing students</p>
-                        <p class="text-xs">Upload a ZIP of image files named by each student&apos;s <strong>registration number</strong> (e.g. <code class="font-mono">TST001.jpg</code>). JPG, PNG, or WebP.</p>
+                        <p class="text-xs text-gray-600">
+                            Put JPG, PNG, or WebP images in a ZIP. Copy each student's admission number from the students list
+                            (e.g. <code class="font-mono">STU/26/0006</code>) and paste it as the image filename — add
+                            <code class="font-mono">.jpg</code> at the end. No special renaming needed; the system matches automatically.
+                        </p>
                     </div>
+
                     <form @submit.prevent="submitZip" class="space-y-3">
                         <div>
                             <label class="form-label mb-1.5">ZIP file *</label>
                             <input type="file" accept=".zip,application/zip" required @change="onZipFile"
                                    class="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#f0f9ff] file:text-[#0f3d7a]">
-                            <p v-if="zipForm.errors.zip" class="text-xs text-red-500 mt-1">{{ zipForm.errors.zip }}</p>
                         </div>
+
+                        <p v-if="photoError" class="text-xs text-red-500">{{ photoError }}</p>
+
                         <FormActions>
                             <button type="button" @click="close" class="btn-ghost">Cancel</button>
-                            <button type="submit" :disabled="zipForm.processing" class="btn-primary">
-                                {{ zipForm.processing ? 'Uploading…' : 'Upload photos' }}
+                            <button type="submit" :disabled="photoUploading || !zipFile" class="btn-primary">
+                                {{ photoUploading ? 'Uploading…' : 'Upload ZIP' }}
                             </button>
                         </FormActions>
                     </form>
@@ -130,7 +146,7 @@
 </template>
 
 <script setup>
-import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -153,16 +169,26 @@ const tabs = [
 
 const templateUrl = computed(() => `/school-admin/${props.schoolId}/students/import/template`);
 const bulkGridUrl = computed(() => `/school-admin/${props.schoolId}/students/bulk`);
-const importResult = computed(() => page.props.flash?.importResult ?? null);
-
-const csvForm = useForm({ file: null });
-const zipForm = useForm({ zip: null });
+const importErrors = ref(null);
+const importing = ref(false);
+const photoUploading = ref(false);
+const photoError = ref(null);
+const csvFile = ref(null);
+const zipFile = ref(null);
 const previewData = ref(null);
 const previewLoading = ref(false);
+const previewError = ref(null);
 
 watch(() => props.modelValue, (open) => {
     if (open) activeTab.value = props.initialTab;
-    if (!open) previewData.value = null;
+    if (!open) {
+        previewData.value = null;
+        previewError.value = null;
+        csvFile.value = null;
+        zipFile.value = null;
+        importErrors.value = null;
+        photoError.value = null;
+    }
 });
 
 function close() {
@@ -170,53 +196,106 @@ function close() {
 }
 
 function onCsvFile(e) {
-    csvForm.file = e.target.files[0] ?? null;
+    csvFile.value = e.target.files[0] ?? null;
     previewData.value = null;
+    previewError.value = null;
+    importErrors.value = null;
 }
 
 async function runPreview() {
-    if (!csvForm.file) return;
+    if (!csvFile.value) return;
     previewLoading.value = true;
     previewData.value = null;
+    previewError.value = null;
     const formData = new FormData();
-    formData.append('file', csvForm.file);
+    formData.append('file', csvFile.value);
     try {
         const res = await fetch(`/school-admin/${props.schoolId}/students/import/preview`, {
             method: 'POST',
-            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '' },
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
             body: formData,
+            credentials: 'same-origin',
         });
-        previewData.value = await res.json();
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+            previewError.value = data?.errors?.file?.[0]
+                ?? data?.message
+                ?? 'Preview failed. Choose the file again and retry.';
+            return;
+        }
+        previewData.value = data;
+        importErrors.value = null;
+    } catch {
+        previewError.value = 'Preview failed. Check your connection and try again.';
     } finally {
         previewLoading.value = false;
     }
 }
 
 function onZipFile(e) {
-    zipForm.zip = e.target.files[0] ?? null;
+    zipFile.value = e.target.files[0] ?? null;
+    photoError.value = null;
 }
 
 function submitCsv() {
-    csvForm.post(`/school-admin/${props.schoolId}/students/import`, {
+    if (!csvFile.value || importing.value) return;
+
+    importing.value = true;
+    importErrors.value = null;
+
+    const formData = new FormData();
+    formData.append('file', csvFile.value);
+
+    router.post(`/school-admin/${props.schoolId}/students/import`, formData, {
         forceFormData: true,
         preserveScroll: true,
+        onFinish: () => {
+            importing.value = false;
+        },
         onSuccess: () => {
-            csvForm.reset();
             const result = usePage().props.flash?.importResult;
-            if (!result?.errors?.length) {
-                close();
+            if (result?.errors?.length) {
+                importErrors.value = result.errors;
+                return;
             }
+            csvFile.value = null;
+            previewData.value = null;
+            close();
+        },
+        onError: (errors) => {
+            importErrors.value = errors.file
+                ? [{ row: 0, message: errors.file }]
+                : [{ row: 0, message: 'Import failed. Choose the file again and retry.' }];
         },
     });
 }
 
 function submitZip() {
-    zipForm.post(`/school-admin/${props.schoolId}/students/photos-zip`, {
+    if (photoUploading.value || !zipFile.value) return;
+
+    photoUploading.value = true;
+    photoError.value = null;
+
+    const formData = new FormData();
+    formData.append('zip', zipFile.value);
+
+    router.post(`/school-admin/${props.schoolId}/students/photos-zip`, formData, {
         forceFormData: true,
         preserveScroll: true,
+        onFinish: () => {
+            photoUploading.value = false;
+        },
         onSuccess: () => {
-            zipForm.reset();
+            zipFile.value = null;
             close();
+            router.reload({ only: ['students', 'unverifiedCount'] });
+        },
+        onError: (errors) => {
+            photoError.value = errors.zip ?? 'Photo upload failed. Choose the ZIP file again and retry.';
         },
     });
 }

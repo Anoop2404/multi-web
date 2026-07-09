@@ -178,7 +178,7 @@
                         <input type="checkbox" v-model="feeSettingsForm.require_verified_students" class="mt-0.5">
                         <span>
                             Require Sahodaya-verified students only
-                            <span class="block text-xs text-slate-500 mt-0.5">Overrides cluster default — only verified students can be registered for this event.</span>
+                            <span class="block text-xs text-slate-500 mt-0.5">Overrides cluster default for this event. Turn off to allow unverified students for this event's items.</span>
                         </span>
                     </label>
                 </div>

@@ -30,8 +30,8 @@ class McqRegistrationGateService
 
         if ($student) {
             $verificationGate = app(StudentVerificationGate::class);
-            if (! $verificationGate->isEligible($student, null, $exam->tenant_id)) {
-                return $verificationGate->ineligibilityReason($student, null, $exam->tenant_id)
+            if (! $verificationGate->isEligible($student, null, $exam->tenant_id, $exam)) {
+                return $verificationGate->ineligibilityReason($student, null, $exam->tenant_id, $exam)
                     ?? 'Student is not verified.';
             }
 

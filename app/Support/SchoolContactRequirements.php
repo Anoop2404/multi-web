@@ -7,24 +7,27 @@ use App\Models\User;
 
 class SchoolContactRequirements
 {
-    /** @return list<array{key: string, label: string, fields: list<string>}> */
+    /** @return list<array{key: string, label: string, fields: list<string>, required: bool}> */
     public static function roles(): array
     {
         return [
             [
-                'key'    => 'principal',
-                'label'  => 'Principal',
-                'fields' => ['principal_name', 'principal_email', 'principal_phone'],
+                'key'      => 'principal',
+                'label'    => 'Principal',
+                'fields'   => ['principal_name', 'principal_email', 'principal_phone'],
+                'required' => true,
             ],
             [
-                'key'    => 'vice_principal',
-                'label'  => 'Vice Principal',
-                'fields' => ['vice_principal_name', 'vice_principal_email', 'vice_principal_phone'],
+                'key'      => 'vice_principal',
+                'label'    => 'Vice Principal',
+                'fields'   => ['vice_principal_name', 'vice_principal_email', 'vice_principal_phone'],
+                'required' => false,
             ],
             [
-                'key'    => 'event_coordinator',
-                'label'  => 'Events Coordinator',
-                'fields' => ['event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone'],
+                'key'      => 'event_coordinator',
+                'label'    => 'Events Coordinator',
+                'fields'   => ['event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone'],
+                'required' => true,
             ],
         ];
     }
@@ -36,6 +39,10 @@ class SchoolContactRequirements
         $pending = [];
 
         foreach (self::roles() as $role) {
+            if (! ($role['required'] ?? true)) {
+                continue;
+            }
+
             $missing = [];
             foreach ($role['fields'] as $field) {
                 if (! filled($payload[$field] ?? null)) {
@@ -71,6 +78,10 @@ class SchoolContactRequirements
         $missing = [];
 
         foreach (self::roles() as $role) {
+            if (! ($role['required'] ?? true)) {
+                continue;
+            }
+
             foreach ($role['fields'] as $field) {
                 if (! filled($payload[$field] ?? null)) {
                     $missing[] = $field;

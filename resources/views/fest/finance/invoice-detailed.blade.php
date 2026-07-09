@@ -12,6 +12,11 @@ table.data th{background:#1d3557;color:#fff;text-align:left}
 .sig{display:table-cell;width:33%;text-align:center;padding-top:40px;border-top:1px solid #999}
 </style>
 </head><body>
+@php
+    $participationLines = $participationLines ?? [];
+    $showHeadColumn = collect($participationLines)->contains(fn ($line) => ! empty($line['head_name'] ?? null));
+    $sl = 0;
+@endphp
 <div class="header">
     <h2 style="margin:0">{{ $sahodaya->name }}</h2>
     <p style="margin:4px 0 0">Festival Participation — Payment Demand Notice</p>
@@ -31,10 +36,57 @@ table.data th{background:#1d3557;color:#fff;text-align:left}
     </tr>
 </table>
 <table class="data">
-    <thead><tr><th>Sl</th><th>Particulars</th><th style="text-align:right;width:120px">Amount (₹)</th></tr></thead>
+    <thead>
+        <tr>
+            <th style="width:40px">Sl</th>
+            @if($showHeadColumn)
+                <th>Item head</th>
+                <th>Item</th>
+            @else
+                <th>Particulars</th>
+            @endif
+            <th style="text-align:right;width:120px">Amount (₹)</th>
+        </tr>
+    </thead>
     <tbody>
-        <tr><td>1</td><td>School registration fee</td><td style="text-align:right">{{ number_format((float) $invoice->school_registration_fee, 2) }}</td></tr>
-        <tr><td>2</td><td>Participation fee ({{ $invoice->participation_item_count }} item(s))</td><td style="text-align:right">{{ number_format((float) $invoice->participation_fee, 2) }}</td></tr>
+        @if((float) $invoice->school_registration_fee > 0)
+            @php $sl++; @endphp
+            <tr>
+                <td>{{ $sl }}</td>
+                @if($showHeadColumn)
+                    <td colspan="2">School registration fee</td>
+                @else
+                    <td>School registration fee</td>
+                @endif
+                <td style="text-align:right">{{ number_format((float) $invoice->school_registration_fee, 2) }}</td>
+            </tr>
+        @endif
+        @forelse($participationLines as $line)
+            @php $sl++; @endphp
+            <tr>
+                <td>{{ $sl }}</td>
+                @if($showHeadColumn)
+                    <td>{{ $line['head_name'] ?? '—' }}</td>
+                    <td>{{ $line['item_title'] ?? $line['label'] }}</td>
+                @else
+                    <td>{{ $line['label'] ?? $line['item_title'] }}</td>
+                @endif
+                <td style="text-align:right">{{ number_format((float) ($line['amount'] ?? 0), 2) }}</td>
+            </tr>
+        @empty
+            @if((float) $invoice->participation_fee > 0)
+                @php $sl++; @endphp
+                <tr>
+                    <td>{{ $sl }}</td>
+                    @if($showHeadColumn)
+                        <td colspan="2">Participation fee ({{ $invoice->participation_item_count }} item(s))</td>
+                    @else
+                        <td>Participation fee ({{ $invoice->participation_item_count }} item(s))</td>
+                    @endif
+                    <td style="text-align:right">{{ number_format((float) $invoice->participation_fee, 2) }}</td>
+                </tr>
+            @endif
+        @endforelse
     </tbody>
 </table>
 <div class="total-box">

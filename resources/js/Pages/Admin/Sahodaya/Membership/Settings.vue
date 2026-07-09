@@ -186,9 +186,9 @@
                             <label class="flex items-center gap-3 cursor-pointer mt-2">
                                 <input v-model="profileForm.require_student_verification" type="checkbox"
                                        class="w-4 h-4 text-purple-600 rounded">
-                                <span class="text-sm font-medium text-gray-700">Require Sahodaya verification before fest / Talent Search registration</span>
+                                <span class="text-sm font-medium text-gray-700">Require verified students for event registration</span>
                             </label>
-                            <p class="text-xs text-gray-500 mt-1">When on, only students verified by Sahodaya (or school leadership) can be registered for events and Talent Search exams cluster-wide.</p>
+                            <p class="text-xs text-gray-500 mt-1">When on, only Sahodaya-verified students can be registered for fest events (Kalotsav, Sports, Kids Fest, Custom, etc.) and Talent Search. Turn off to allow unverified students across all events and items.</p>
                         </FormField>
                     </FormGrid>
                     <p class="text-xs text-gray-500">

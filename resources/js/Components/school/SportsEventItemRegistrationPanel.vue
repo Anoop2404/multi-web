@@ -367,7 +367,7 @@ function registeredNames(reg) {
 }
 
 function studentMatchesItem(student, item) {
-    if (student.is_verified === false) return false;
+    if (props.event?.require_verified_students !== false && student.is_verified === false) return false;
     if (!student.dob) return false;
     if (item.age_group && item.age_group !== 'open') {
         if (!(student.eligible_sports_groups ?? []).includes(item.age_group)) return false;
@@ -383,7 +383,9 @@ function eligibleStudentsForItem(item) {
 }
 
 function studentIneligibilityReason(student, item) {
-    if (student.is_verified === false) return 'Pending Sahodaya verification';
+    if (props.event?.require_verified_students !== false && student.is_verified === false) {
+        return 'Pending Sahodaya verification';
+    }
     if (!student.dob) return 'Date of birth required';
     const itemGender = String(item.gender ?? 'open').toLowerCase();
     const studentGender = String(student.gender ?? '').toLowerCase();

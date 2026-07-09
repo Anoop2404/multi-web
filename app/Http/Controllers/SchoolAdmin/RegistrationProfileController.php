@@ -22,7 +22,7 @@ class RegistrationProfileController extends SchoolAdminController
         $profile = $sahodaya
             ? SahodayaProfile::where('tenant_id', $sahodaya->id)->first()
             : null;
-        $fields = SchoolApplicationForm::resolve($profile);
+        $fields = SchoolApplicationForm::resolveForSchoolProfile($profile);
         $payload = $this->school->application_payload ?? [];
 
         $editableFields = collect(SchoolApplicationForm::editableFieldKeys())
@@ -55,7 +55,7 @@ class RegistrationProfileController extends SchoolAdminController
             [
                 'key'   => 'leadership',
                 'title' => 'Other leadership contacts',
-                'hint'  => 'Vice principal and events coordinator — required for fest operations.',
+                'hint'  => 'Vice principal (optional) and events coordinator — coordinator is required for fest operations.',
             ],
         ];
 
@@ -105,7 +105,7 @@ class RegistrationProfileController extends SchoolAdminController
         abort_unless($sahodaya, 422);
 
         $profile = SahodayaProfile::where('tenant_id', $sahodaya->id)->first();
-        $fields = SchoolApplicationForm::resolve($profile);
+        $fields = SchoolApplicationForm::resolveForSchoolProfile($profile);
 
         $section = $request->validate([
             'section' => 'required|in:school,principal,leadership',

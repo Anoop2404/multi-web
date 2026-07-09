@@ -151,6 +151,20 @@
             </FormGrid>
 
             <div class="border-t border-slate-100 pt-4">
+                <FormField label="Student verification for registration" class-extra="mb-4">
+                    <template #default="{ id }">
+                        <select :id="id" v-model="form.student_verification_mode" class="field">
+                            <option value="inherit">
+                                Use cluster default — {{ clusterRequireStudentVerification ? 'verified students only' : 'unverified allowed' }}
+                            </option>
+                            <option value="required">Require verified students only</option>
+                            <option value="optional">Allow unverified students</option>
+                        </select>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Cluster default is set under Membership → Settings. Applies to school registration for this exam.
+                        </p>
+                    </template>
+                </FormField>
                 <McqEligibilityPicker v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
             </div>
 
@@ -244,7 +258,17 @@ const props = defineProps({
     hallTicketTemplates: { type: Array, default: () => [] },
     certificateTemplates: { type: Array, default: () => [] },
     gradeBands: { type: Array, default: () => [] },
+    clusterRequireStudentVerification: { type: Boolean, default: true },
 });
+
+function studentVerificationModeFromExam(exam) {
+    const settings = exam?.settings_json ?? {};
+    if (!Object.prototype.hasOwnProperty.call(settings, 'require_verified_students')) {
+        return 'inherit';
+    }
+
+    return settings.require_verified_students ? 'required' : 'optional';
+}
 
 const ledgerForm = useForm({ name: props.ledgerAccount?.name ?? '' });
 
@@ -264,6 +288,7 @@ const form = useForm({
     status: props.exam.status,
     delivery_mode: props.exam.delivery_mode ?? 'offline',
     requires_hall_ticket: !!(props.exam.settings_json?.requires_hall_ticket),
+    student_verification_mode: studentVerificationModeFromExam(props.exam),
     scheduled_at: props.exam.scheduled_at ? props.exam.scheduled_at.slice(0, 16) : '',
     fee_amount: props.exam.fee_amount ?? '',
     school_discount_amount: props.exam.school_discount_amount ?? '',

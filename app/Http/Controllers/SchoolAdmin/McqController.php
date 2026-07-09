@@ -11,6 +11,7 @@ use App\Services\Mcq\McqRegistrationGateService;
 use App\Services\Mcq\McqReportService;
 use App\Services\Mcq\McqSchoolFeeService;
 use App\Services\School\SchoolDocumentDownloadGateService;
+use App\Services\Students\StudentVerificationGate;
 use App\Support\Mcq\McqExamEligibilityConfig;
 use App\Support\Mcq\McqExamLevelLabels;
 use App\Support\Mcq\McqRegistrationStatusPresenter;
@@ -200,6 +201,7 @@ class McqController extends SchoolAdminController
                 'status_label'           => McqExamLevelLabels::statusLabel($exam->status),
                 'series_title'           => $exam->series?->title,
                 'parent_exam_title'      => $exam->parentExam?->title,
+                'require_verified_students' => app(StudentVerificationGate::class)->requiredForMcq($exam),
             ]),
             'tab'                    => $tab,
             'registrations'          => $registrations,

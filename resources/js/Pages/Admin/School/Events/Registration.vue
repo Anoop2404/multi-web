@@ -338,10 +338,16 @@
                                 View Receipt ↗
                             </a>
                             <a v-if="itemFeesDue(event) > 0"
+                               :href="`${programBase}/events/${event.id}/invoice?preview=1`"
+                               target="_blank" rel="noopener"
+                               class="px-2 py-1 bg-white border border-indigo-300 text-indigo-700 text-xs font-semibold rounded">
+                                Preview Invoice ↗
+                            </a>
+                            <a v-if="itemFeesDue(event) > 0"
                                :href="`${programBase}/events/${event.id}/invoice`"
                                target="_blank" rel="noopener"
                                class="px-2 py-1 bg-indigo-50 border border-indigo-300 text-indigo-700 text-xs font-semibold rounded">
-                                Download Invoice ↗
+                                Download Invoice ↓
                             </a>
                         </div>
                     </div>
@@ -769,8 +775,12 @@ function studentsForEvent(eventId) {
         ?? [];
 }
 
+function requireVerifiedForEvent(event) {
+    return event?.require_verified_students !== false;
+}
+
 function studentMatchesItem(student, event, item, { skipVerification = false } = {}) {
-    if (!skipVerification && student.is_verified === false) {
+    if (!skipVerification && requireVerifiedForEvent(event) && student.is_verified === false) {
         return false;
     }
     if (event?.academic_year_id && student.academic_year_id && event.academic_year_id !== student.academic_year_id) {
@@ -817,7 +827,7 @@ function eligibleStudentsForItem(eventId, item) {
 }
 
 function studentIneligibilityReason(student, event, item) {
-    if (student.is_verified === false) {
+    if (requireVerifiedForEvent(event) && student.is_verified === false) {
         return 'Pending Sahodaya verification';
     }
     if (event?.academic_year_id && student.academic_year_id
@@ -1073,7 +1083,9 @@ function itemNoEligibleHint(event, item) {
         return 'No students on record — add students first.';
     }
 
-    const pendingVerify = pool.filter((s) => s.is_verified === false);
+    const pendingVerify = requireVerifiedForEvent(event)
+        ? pool.filter((s) => s.is_verified === false)
+        : [];
     const verifyBlockedMatches = pendingVerify.filter(
         (s) => studentMatchesItem(s, event, item, { skipVerification: true }),
     );

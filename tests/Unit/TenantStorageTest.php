@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\Tenant;
 use App\Support\TenantStorage;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -54,5 +55,19 @@ class TenantStorageTest extends TestCase
         $this->assertSame($tenantDir, TenantStorage::publicFilePath($school, $relative));
 
         @unlink($tenantDir);
+    }
+
+    public function test_store_uploaded_file_falls_back_to_shared_when_s3_write_fails_locally(): void
+    {
+        Storage::fake('s3');
+        config(['filesystems.upload_disk' => 's3']);
+        $this->app->detectEnvironment(fn () => 'local');
+
+        $file = \Illuminate\Http\UploadedFile::fake()->image('STU_26_0001.jpg');
+
+        $path = TenantStorage::storeUploadedFile($file, 'students/test-school');
+
+        Storage::disk('shared')->assertExists($path);
+        $this->assertStringStartsWith('students/test-school/', $path);
     }
 }

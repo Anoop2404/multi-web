@@ -24,6 +24,9 @@
                 <button v-if="canBulkUpload" type="button" @click="openBulkUpload" class="btn-secondary">
                     Bulk upload
                 </button>
+                <Link v-if="canBulkUpload" :href="`/school-admin/${school.id}/imports`" class="btn-secondary text-sm">
+                    Import history
+                </Link>
                 <Link v-if="canBulkUpload" :href="`/school-admin/${school.id}/students/create`"
                       :class="['btn-primary', !schoolClasses.length ? 'pointer-events-none opacity-50' : '']"
                       :title="!schoolClasses.length ? 'Classes are configured by your Sahodaya' : ''">
@@ -135,7 +138,8 @@
                             :title="student.photo_url ? `Change photo — ${student.name}` : `Add photo — ${student.name}`"
                             @click.stop="openPhotoModal(student)"
                         >
-                            <img v-if="student.photo_url && !photoBroken[student.id]" :src="student.photo_url" :alt="student.name"
+                            <img v-if="student.photo_url && !photoBroken[student.id]" :key="student.photo_url"
+                                 :src="student.photo_url" :alt="student.name"
                                  class="w-full h-full object-cover" @error="photoBroken[student.id] = true">
                             <span v-else class="text-xs text-gray-400 font-semibold">{{ initials(student.name) }}</span>
                             <span class="absolute inset-0 flex items-center justify-center bg-[#041525]/45 text-white text-[10px] font-bold uppercase tracking-wide opacity-0 group-hover:opacity-100 transition">
@@ -145,7 +149,8 @@
                         <Link v-else :href="profileUrl(student)"
                               class="relative w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center hover:ring-2 hover:ring-[#0f3d7a]/20 transition"
                               title="View profile">
-                            <img v-if="student.photo_url && !photoBroken[student.id]" :src="student.photo_url" :alt="student.name"
+                            <img v-if="student.photo_url && !photoBroken[student.id]" :key="student.photo_url"
+                                 :src="student.photo_url" :alt="student.name"
                                  class="w-full h-full object-cover" @error="photoBroken[student.id] = true">
                             <span v-else class="text-xs text-gray-400 font-semibold">{{ initials(student.name) }}</span>
                         </Link>
@@ -404,6 +409,15 @@ const photoEditStudent = ref(null);
 const editPhotoFile = ref(null);
 const createPhotoFile = ref(null);
 const photoBroken = reactive({});
+
+watch(() => props.students?.data, (rows) => {
+    if (!rows?.length) return;
+    for (const student of rows) {
+        if (student.photo_url) {
+            delete photoBroken[student.id];
+        }
+    }
+}, { deep: true });
 
 const columns = computed(() => {
     const base = [

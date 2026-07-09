@@ -610,4 +610,30 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(1, $fee->participation_item_count);
         $this->assertSame('pending', $fee->status);
     }
+
+    public function test_invoice_participation_lines_include_item_head_name(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();
+
+        $head = \App\Models\FestItemHead::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'event_type' => 'custom',
+            'name' => 'Quiz categories',
+            'slug' => 'quiz-categories',
+        ]);
+
+        $event->update(['event_type' => 'custom', 'fee_type' => 'none', 'fee_settings' => null]);
+        $item->update(['fee_amount' => 400, 'head_id' => $head->id, 'title' => 'GK QUIZ Category 2']);
+
+        $this->approvedRegistration($event->fresh(), $item->fresh(), $school);
+
+        $invoice = app(\App\Services\Events\FestInvoiceService::class)->issueForSchool($event->fresh(), $school);
+        $lines = app(\App\Services\Events\FestInvoiceService::class)->participationLines($event->fresh(), $invoice);
+
+        $this->assertCount(1, $lines);
+        $this->assertSame('Quiz categories', $lines[0]['head_name']);
+        $this->assertSame('GK QUIZ Category 2', $lines[0]['item_title']);
+        $this->assertSame(400.0, (float) $lines[0]['amount']);
+    }
 }

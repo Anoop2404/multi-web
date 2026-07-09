@@ -27,6 +27,7 @@ use App\Support\FestSportsAgeGroup;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
 use App\Services\Students\StudentEditLockService;
+use App\Services\Students\StudentVerificationGate;
 use App\Services\Notifications\SahodayaAdminNotifier;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -484,6 +485,7 @@ class FestRegistrationController extends SchoolAdminController
             'status'                     => $event->status,
             'fee_required'               => (bool) ($event->fee_required ?? false),
             'require_event_registration' => (bool) ($event->require_event_registration ?? false),
+            'require_verified_students'  => (bool) ($event->require_verified_students ?? true),
             'results_published'          => (bool) ($event->results_published ?? false),
             'items'                      => $event->getAttribute('items') ?? [],
             'item_group_labels'          => $event->getAttribute('item_group_labels') ?? [],
@@ -591,6 +593,7 @@ class FestRegistrationController extends SchoolAdminController
         $event->setAttribute('school_fest_registration_closed', (bool) $this->school->fest_registration_closed);
         $event->setAttribute('registration_locked', (bool) $event->registration_locked);
         $event->setAttribute('allow_student_self_register', (bool) $event->allow_student_self_register);
+        $event->setAttribute('require_verified_students', app(StudentVerificationGate::class)->requiredForEvent($event));
         $event->setAttribute('event_registrations', app(\App\Services\Events\FestEventRegistrationService::class)
             ->studentEventRegistrations($event, $this->school->id));
         if ($event->event_type === 'sports') {
@@ -729,24 +732,20 @@ class FestRegistrationController extends SchoolAdminController
         ]);
     }
 
-    public function eventInvoice(string $tenantId, FestEvent $event, string $program, FestInvoiceService $invoiceService)
+    public function eventInvoice(Request $request, string $tenantId, FestEvent $event, string $program, FestInvoiceService $invoiceService)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $sahodaya = \App\Models\Tenant::findOrFail($this->school->parent_id);
-        $invoice = FestEventInvoice::where('event_id', $event->id)
-            ->where('school_id', $this->school->id)
-            ->first();
+        $invoice = $invoiceService->issueForSchool($event, $this->school);
 
-        if (! $invoice) {
-            $invoice = $invoiceService->issueForSchool($event, $this->school);
+        $pdf = Pdf::loadView('fest.finance.invoice', $invoiceService->invoiceViewData($event, $invoice, $sahodaya));
+
+        if ($request->boolean('preview')) {
+            return $pdf->stream($invoice->invoice_number.'.pdf');
         }
 
-        return Pdf::loadView('fest.finance.invoice', [
-            'event'    => $event,
-            'invoice'  => $invoice,
-            'sahodaya' => $sahodaya,
-        ])->download($invoice->invoice_number.'.pdf');
+        return $pdf->download($invoice->invoice_number.'.pdf');
     }
 
     public function withdraw(Request $request, string $tenantId, FestRegistration $registration, string $program)

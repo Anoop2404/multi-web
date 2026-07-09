@@ -15,6 +15,7 @@ use App\Services\Mcq\McqRankingService;
 use App\Services\Mcq\McqRegistrationApprovalService;
 use App\Services\Mcq\McqSchoolFeeService;
 use App\Services\Membership\EffectiveMasterDataResolver;
+use App\Services\Students\StudentVerificationGate;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
@@ -181,6 +182,8 @@ class McqExamController extends SahodayaAdminController
             'hallTicketTemplates' => \App\Models\McqHallTicketTemplate::where('tenant_id', $this->sahodaya->id)->where('is_active', true)->orderBy('title')->get(['id', 'title', 'is_default']),
             'certificateTemplates' => \App\Models\McqCertificateTemplate::where('tenant_id', $this->sahodaya->id)->where('is_active', true)->orderBy('title')->get(['id', 'title', 'is_default']),
             'gradeBands' => app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam),
+            'clusterRequireStudentVerification' => app(StudentVerificationGate::class)
+                ->requiredGlobally($this->sahodaya->id),
         ]);
     }
 
@@ -221,6 +224,7 @@ class McqExamController extends SahodayaAdminController
             'grade_master_id' => 'nullable|integer|exists:mcq_grade_masters,id',
             'hall_ticket_template_id' => 'nullable|integer|exists:mcq_hall_ticket_templates,id',
             'certificate_template_id' => 'nullable|integer|exists:mcq_certificate_templates,id',
+            'student_verification_mode' => 'nullable|in:inherit,required,optional',
         ]);
 
         $fee = (float) ($data['fee_amount'] ?? 0);
@@ -265,6 +269,20 @@ class McqExamController extends SahodayaAdminController
             $settings['requires_hall_ticket'] = (bool) $data['requires_hall_ticket'];
             $data['settings_json'] = $settings;
             unset($data['requires_hall_ticket']);
+        }
+
+        $verificationMode = $data['student_verification_mode'] ?? null;
+        unset($data['student_verification_mode']);
+        if ($verificationMode !== null) {
+            $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
+            if ($verificationMode === 'inherit') {
+                unset($settings['require_verified_students']);
+            } elseif ($verificationMode === 'required') {
+                $settings['require_verified_students'] = true;
+            } elseif ($verificationMode === 'optional') {
+                $settings['require_verified_students'] = false;
+            }
+            $data['settings_json'] = $settings;
         }
 
         $exam->update($data);

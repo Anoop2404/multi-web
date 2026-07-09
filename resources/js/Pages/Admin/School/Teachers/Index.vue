@@ -9,8 +9,9 @@
             <div class="flex flex-wrap gap-2">
                 <button type="button" class="btn-secondary" :class="mode === 'single' ? 'ring-2 ring-[#041525]/20' : ''" @click="mode = 'single'">Add one</button>
                 <button type="button" class="btn-secondary" :class="mode === 'bulk' ? 'ring-2 ring-[#041525]/20' : ''" @click="mode = 'bulk'">Add many</button>
-                <button type="button" class="btn-secondary" :class="mode === 'import' ? 'ring-2 ring-[#041525]/20' : ''" @click="mode = 'import'">Import CSV</button>
+                <button type="button" class="btn-secondary" :class="mode === 'import' ? 'ring-2 ring-[#041525]/20' : ''" @click="mode = 'import'">Import CSV/Excel</button>
                 <button type="button" class="btn-secondary" :class="mode === 'photos' ? 'ring-2 ring-[#041525]/20' : ''" @click="mode = 'photos'">Update photos (ZIP)</button>
+                <Link :href="`/school-admin/${school.id}/imports`" class="btn-secondary">Import history</Link>
             </div>
 
             <!-- Bulk add -->
@@ -71,14 +72,33 @@
 
             <!-- Import CSV -->
             <form v-if="mode === 'import'" @submit.prevent="importCsv" class="card space-y-4">
-                <h3 class="section-title text-base">Import teachers from CSV</h3>
-                <p class="text-sm text-slate-600">
-                    Upload a CSV with columns: <span class="font-mono text-xs">name, email, mobile, gender, designation, teaching_type, subjects, qualification, date_of_joining</span>.
-                    <strong>Email, mobile, category (teaching_type), and subjects are required.</strong> Portal logins are created automatically.
-                </p>
-                <a :href="`/school-admin/${school.id}/teachers/import/template`" class="text-sm font-semibold text-[#041525] hover:underline">↓ Download sample CSV</a>
-                <input type="file" accept=".csv,text/csv" @change="importForm.file = $event.target.files[0]" class="field">
+                <h3 class="section-title text-base">Import teachers from CSV or Excel</h3>
+                <div class="rounded-xl border border-[#dbeafe] bg-[#f0f9ff] p-4 text-sm text-[#041525] space-y-2">
+                    <p class="text-xs text-gray-600">Download the template, fill it in Excel, Google Sheets, or any spreadsheet app, then upload the file directly — .csv and .xlsx are both accepted. No row limit.</p>
+                    <ul class="list-disc list-inside text-xs text-gray-600 space-y-0.5">
+                        <li><strong>name</strong> — required</li>
+                        <li><strong>email</strong> — required, must be unique</li>
+                        <li><strong>mobile</strong> — required</li>
+                        <li><strong>teaching_type</strong> — required, must match a category configured by your Sahodaya</li>
+                        <li><strong>subjects</strong> — required, separate multiple with <span class="font-mono">;</span> (e.g. <span class="font-mono">Mathematics; Physics</span>)</li>
+                        <li><strong>gender, designation, qualification, date_of_joining</strong> — optional</li>
+                    </ul>
+                    <p class="text-xs text-gray-600">Portal logins are created automatically for each imported teacher.</p>
+                    <p class="text-xs font-semibold text-amber-700">All rows must be valid — if any row has an error, nothing is imported. Fix the file and re-upload.</p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <a :href="`/school-admin/${school.id}/teachers/import/template`" class="text-sm font-semibold text-[#041525] hover:underline">↓ Download Excel template (.xlsx)</a>
+                    <a :href="`/school-admin/${school.id}/teachers/import/template?format=csv`" class="text-sm font-semibold text-[#041525] hover:underline">↓ Download CSV template</a>
+                    <Link :href="`/school-admin/${school.id}/imports`" class="text-sm font-semibold text-[#041525] hover:underline">View import history</Link>
+                </div>
+                <input type="file" accept=".csv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" @change="importForm.file = $event.target.files[0]" class="field">
                 <p v-if="importForm.errors.file" class="text-xs text-red-600">{{ importForm.errors.file }}</p>
+                <div v-if="importErrors.length" class="rounded-lg border border-red-100 bg-red-50 p-3 max-h-32 overflow-y-auto">
+                    <p class="text-xs font-semibold text-red-700 mb-1">Import rejected — fix these and re-upload</p>
+                    <ul class="text-xs text-red-600 space-y-0.5">
+                        <li v-for="(err, i) in importErrors" :key="i">Row {{ err.row }}: {{ err.message }}</li>
+                    </ul>
+                </div>
                 <div class="flex justify-end">
                     <button type="submit" class="btn-primary" :disabled="importForm.processing || !importForm.file">Import</button>
                 </div>
@@ -253,7 +273,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { useForm, router, usePage } from '@inertiajs/vue3';
+import { Link, useForm, router, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import FormField from '@/Components/ui/FormField.vue';
@@ -269,6 +289,8 @@ const props = defineProps({
     designations: Array,
     subjects: Array,
 });
+
+const importErrors = computed(() => usePage().props.flash?.importErrors ?? []);
 
 const editingTeacher = ref(null);
 const provisionTeacher = ref(null);

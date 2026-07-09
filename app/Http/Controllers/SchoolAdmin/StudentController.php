@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\ManagesStudentPortalCredentials;
 use App\Http\Controllers\Concerns\DownloadsStudentFestIdCard;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Models\UploadedFileBackup;
 use App\Models\User;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
@@ -26,8 +27,12 @@ use App\Services\Events\FestBulkRegistrationService;
 use App\Services\Events\FestEventRegistrationService;
 use App\Services\Events\FestItemRegistrationGate;
 use App\Services\Events\FestRegistrationEligibilityService;
+use App\Support\StudentPhotoNaming;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -424,81 +429,203 @@ class StudentController extends SchoolAdminController
     {
         $this->assertCanEditStudents();
 
-        $request->validate([
-            'zip' => 'required|file|mimes:zip|max:51200',
-        ]);
+        if ($request->hasFile('photos')) {
+            $request->validate([
+                'photos'   => 'required|array|min:1|max:200',
+                'photos.*' => 'required|image|max:5120',
+            ]);
 
-        $zipPath = $request->file('zip')->getRealPath();
+            $results = collect($request->file('photos'))
+                ->map(fn (UploadedFile $photo) => $this->processUploadedPhotoFile($photo))
+                ->all();
+        } else {
+            $results = [];
+        }
+
+        if ($request->hasFile('zip')) {
+            $request->validate([
+                'zip' => 'required|file|mimes:zip|max:51200',
+            ]);
+
+            $results = array_merge($results, $this->processPhotoZipFile($request->file('zip')));
+        }
+
+        if ($request->hasFile('photos') || $request->hasFile('zip')) {
+            return $this->finishPhotoBulkUpload($results);
+        }
+
+        abort(422, 'Choose one or more photos, or upload a ZIP file.');
+    }
+
+    /** @return list<array{status: string, label: string, student?: string, match?: string}> */
+    private function processPhotoZipFile(UploadedFile $zipFile): array
+    {
+        abort_if($zipFile->getSize() === 0, 422, 'The uploaded ZIP file is empty.');
+
+        $zipPath = $zipFile->getRealPath() ?: $zipFile->getPathname();
+        abort_unless(is_string($zipPath) && $zipPath !== '' && is_readable($zipPath), 422, 'Could not read the uploaded ZIP file.');
+
         $zip = new \ZipArchive;
         abort_unless($zip->open($zipPath) === true, 422, 'Could not open zip file.');
 
-        $updated = 0;
-        $skipped = 0;
+        $results = [];
 
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $entry = $zip->getNameIndex($i);
-            if (! $entry || str_ends_with($entry, '/')) {
+            if (! $entry || str_ends_with($entry, '/') || str_contains($entry, '__MACOSX') || str_ends_with($entry, '.DS_Store')) {
                 continue;
             }
 
-            $basename = pathinfo($entry, PATHINFO_FILENAME);
-            if ($basename === '') {
-                $skipped++;
-
-                continue;
-            }
-
-            $student = Student::where('tenant_id', $this->school->id)
-                ->where(function ($q) use ($basename) {
-                    $q->where('reg_no', $basename)
-                        ->orWhere('admission_number', $basename);
-                })
-                ->first();
-
-            if (! $student) {
-                $skipped++;
+            $ext = strtolower(pathinfo($entry, PATHINFO_EXTENSION) ?: 'jpg');
+            if (! in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+                $results[] = ['status' => 'skipped', 'label' => $entry];
 
                 continue;
             }
 
             $contents = $zip->getFromIndex($i);
             if ($contents === false) {
-                $skipped++;
+                $results[] = ['status' => 'skipped', 'label' => $entry];
 
                 continue;
             }
 
-            $ext = strtolower(pathinfo($entry, PATHINFO_EXTENSION) ?: 'jpg');
-            if (! in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
-                $skipped++;
+            $basename = pathinfo(str_replace('\\', '/', $entry), PATHINFO_FILENAME);
+            if ($basename === '') {
+                $results[] = ['status' => 'skipped', 'label' => $entry];
 
                 continue;
             }
 
-            $tmp = tempnam(sys_get_temp_dir(), 'fest-photo-');
+            $tmp = tempnam(sys_get_temp_dir(), 'student-photo-');
             file_put_contents($tmp, $contents);
 
-            $uploaded = new \Illuminate\Http\UploadedFile(
+            $uploaded = new UploadedFile(
                 $tmp,
                 $basename.'.'.$ext,
                 mime_content_type($tmp) ?: 'image/jpeg',
                 null,
-                true
+                true,
             );
 
-            $student->update([
-                'photo' => TenantStorage::storeStudentPhoto($uploaded, $this->school->id),
-            ]);
-
-            $this->markStudentUnverified($student);
-
+            $results[] = $this->processUploadedPhotoFile($uploaded, $entry);
             @unlink($tmp);
-            $updated++;
         }
 
         $zip->close();
 
-        return back()->with('success', "Updated {$updated} student photo(s). {$skipped} file(s) skipped.");
+        return $results;
+    }
+
+    /** @return array{status: string, label: string, student?: string, match?: string} */
+    private function processUploadedPhotoFile(UploadedFile $photo, ?string $label = null): array
+    {
+        $label ??= $photo->getClientOriginalName();
+        $resolved = StudentPhotoNaming::resolveStudent($this->schoolStudentsForPhotoMatching(), $label);
+
+        if (! $resolved) {
+            return ['status' => 'skipped', 'label' => $label];
+        }
+
+        try {
+            $this->attachPhotoToStudent($resolved['student'], $photo);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return ['status' => 'skipped', 'label' => $label, 'error' => $e->getMessage()];
+        }
+
+        return [
+            'status'  => 'updated',
+            'label'   => $label,
+            'student' => $resolved['student']->name,
+            'match'   => $resolved['match'],
+        ];
+    }
+
+    /** @param  list<array{status: string, label: string, student?: string, match?: string}>  $results */
+    private function finishPhotoBulkUpload(array $results)
+    {
+        $updated = collect($results)->where('status', 'updated');
+        $skipped = collect($results)->where('status', 'skipped');
+        $byName = $updated->where('match', 'name')->count();
+        $byId = $updated->where('match', 'id')->count();
+
+        if ($updated->isEmpty()) {
+            $failed = $skipped->first(fn ($row) => ! empty($row['error']));
+            $storageHint = $failed['error'] ?? null;
+
+            return back()->with('error',
+                ($storageHint ? $storageHint.' ' : '')
+                .'No photos were matched or saved. Copy each student\'s ID (e.g. STU/26/0006), paste it as the image filename, and add .jpg — '
+                .'your computer may save it as STU_26_0006.jpg, which also works. '
+                .$skipped->count().' file(s) could not be processed.'
+            );
+        }
+
+        $parts = ["Updated {$updated->count()} student photo(s)."];
+        $names = $updated->pluck('student')->filter()->unique()->values();
+        if ($names->isNotEmpty()) {
+            $parts[] = $names->take(5)->join(', ').($names->count() > 5 ? '…' : '');
+        }
+        if ($byName > 0) {
+            $parts[] = "{$byName} matched by name";
+        }
+        if ($byId > 0) {
+            $parts[] = "{$byId} matched by student ID";
+        }
+        if ($skipped->isNotEmpty()) {
+            $parts[] = $skipped->count().' skipped';
+        }
+
+        return back()->with('success', implode(' · ', $parts).'.');
+    }
+
+    /** @return Collection<int, Student> */
+    private function schoolStudentsForPhotoMatching(): Collection
+    {
+        return Student::where('tenant_id', $this->school->id)
+            ->where('status', 'active')
+            ->get(['id', 'name', 'reg_no', 'admission_number', 'photo']);
+    }
+
+    private function attachPhotoToStudent(Student $student, UploadedFile $photo): void
+    {
+        $path = TenantStorage::storeStudentPhoto($photo, $this->school->id);
+
+        $student->update(['photo' => $path]);
+
+        $this->markStudentUnverified($student);
+    }
+
+    public function photoNamingList(): StreamedResponse
+    {
+        $rows = Student::where('tenant_id', $this->school->id)
+            ->where('status', 'active')
+            ->whereNotNull('reg_no')
+            ->orderBy('name')
+            ->get(['name', 'reg_no', 'photo']);
+
+        $filename = 'student-photo-filenames-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['student_name', 'student_id', 'photo_filename', 'photo_filename_by_name', 'has_photo']);
+            foreach ($rows as $student) {
+                $row = StudentPhotoNaming::namingRow($student);
+                if (! $row) {
+                    continue;
+                }
+                fputcsv($out, [
+                    $row['name'],
+                    $row['reg_no'],
+                    $row['photo_filename'],
+                    $row['photo_filename_by_name'],
+                    $row['has_photo'] ? 'yes' : 'no',
+                ]);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function update(Request $request, string $tenantId, Student $student)
@@ -899,14 +1026,26 @@ class StudentController extends SchoolAdminController
         return redirect("/school-admin/{$this->school->id}/students?bulk=1");
     }
 
-    public function importTemplate(): StreamedResponse
+    public function importTemplate(Request $request): StreamedResponse
     {
-        $csv = (new StudentCsvImporter($this->school))->templateCsvForSchool();
+        $importer = new StudentCsvImporter($this->school);
+
+        if ($request->query('format') === 'csv') {
+            $csv = $importer->templateCsvForSchool();
+
+            return response()->streamDownload(
+                fn () => print("\xEF\xBB\xBF".$csv),
+                'student-import-sample.csv',
+                ['Content-Type' => 'text/csv; charset=UTF-8'],
+            );
+        }
+
+        $xlsx = $importer->templateXlsxForSchool();
 
         return response()->streamDownload(
-            fn () => print("\xEF\xBB\xBF".$csv),
-            'student-import-sample.csv',
-            ['Content-Type' => 'text/csv; charset=UTF-8'],
+            fn () => print $xlsx,
+            'student-import-sample.xlsx',
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
         );
     }
 
@@ -919,10 +1058,12 @@ class StudentController extends SchoolAdminController
         $this->assertCanAddStudents();
 
         $request->validate([
-            'file' => 'required|file|mimes:csv,txt|max:10240',
+            'file' => 'required|file|mimes:csv,txt,xlsx|max:10240',
         ]);
 
-        $tmp = $request->file('file')->getRealPath();
+        $file = $request->file('file');
+        $this->assertImportFileReadable($file);
+        $tmp = $this->importUploadPath($file);
         $importer = new StudentCsvImporter($this->school);
         $preview = $importer->previewFromPath($tmp);
         $preview['row_count'] = $importer->countDataRows($tmp);
@@ -939,45 +1080,51 @@ class StudentController extends SchoolAdminController
         $this->assertCanAddStudents();
 
         $request->validate([
-            'file' => 'required|file|mimes:csv,txt|max:10240',
+            'file' => 'required|file|mimes:csv,txt,xlsx|max:10240',
         ]);
 
         $file = $request->file('file');
-        $backup = app(UploadBackupService::class)->store(
-            $file,
+        $this->assertImportFileReadable($file);
+        $tmp = $this->importUploadPath($file);
+
+        $importer = new StudentCsvImporter($this->school);
+        $rowCount = $importer->countDataRows($tmp);
+        $threshold = (int) config('erp.async_import_threshold', 500);
+
+        $backup = app(UploadBackupService::class)->storeFromPath(
+            $tmp,
+            $file->getClientOriginalName(),
+            $file->getClientMimeType(),
             'student_import',
             $this->school->id,
             null,
             $request->user()->id,
         );
 
-        $importer = new StudentCsvImporter($this->school);
-        $tmp = TenantStorage::localTempPath($backup->storage_path, $backup->storage_disk);
-        try {
-            $rowCount = $importer->countDataRows($tmp);
-            $threshold = (int) config('erp.async_import_threshold', 500);
+        if ($rowCount > $threshold) {
+            ImportStudentsJob::dispatch(
+                $this->school->id,
+                $backup->storage_path,
+                $request->user()->id,
+                $backup->id,
+                $backup->storage_disk,
+            );
 
-            if ($rowCount > $threshold) {
-                ImportStudentsJob::dispatch(
-                    $this->school->id,
-                    $backup->storage_path,
-                    $request->user()->id,
-                    $backup->id,
-                    $backup->storage_disk,
-                );
-
-                return back()->with(
-                    'success',
-                    "Import queued ({$rowCount} rows). You will be notified when it completes.",
-                );
-            }
-
-            $result = $importer->importFromPath($tmp);
-        } finally {
-            if (str_starts_with($tmp, sys_get_temp_dir())) {
-                @unlink($tmp);
-            }
+            return back()->with(
+                'success',
+                "Import queued ({$rowCount} rows). You will be notified when it completes.",
+            );
         }
+
+        $result = $importer->importFromPath($tmp);
+
+        $backup->update([
+            'status'         => $result['success'] ? UploadedFileBackup::STATUS_SUCCESS : UploadedFileBackup::STATUS_FAILED,
+            'total_rows'     => $result['imported'] + $result['skipped'],
+            'imported_count' => $result['imported'],
+            'error_count'    => count($result['errors']),
+            'errors'         => array_slice($result['errors'], 0, 50),
+        ]);
 
         app(DataChangeLogger::class)->event(
             'imported',
@@ -993,17 +1140,12 @@ class StudentController extends SchoolAdminController
             ],
         );
 
-        if ($result['imported'] === 0 && $result['errors'] !== []) {
-            return back()->with('importResult', $result)->with('error', 'Import failed. Fix the errors below and try again.');
-        }
-
-        $message = "Imported {$result['imported']} student(s).";
-        if ($result['skipped'] > 0) {
-            $message .= " {$result['skipped']} row(s) skipped.";
+        if (! $result['success']) {
+            return back()->with('importResult', $result)->with('error', 'Import rejected: fix the error(s) below and re-upload. Nothing was imported.');
         }
 
         return back()
-            ->with('success', $message)
+            ->with('success', "Imported {$result['imported']} student(s).")
             ->with('importResult', $result);
     }
 
@@ -1163,5 +1305,27 @@ class StudentController extends SchoolAdminController
             'has_portal_login'  => (bool) $student->user_id,
             'has_photo'         => (bool) $student->photo,
         ];
+    }
+
+    private function importUploadPath(UploadedFile $file): string
+    {
+        $path = $file->getRealPath() ?: $file->getPathname();
+
+        if (! is_string($path) || $path === '' || ! is_readable($path)) {
+            throw ValidationException::withMessages([
+                'file' => 'The upload could not be read. Choose the file again and retry.',
+            ]);
+        }
+
+        return $path;
+    }
+
+    private function assertImportFileReadable(UploadedFile $file): void
+    {
+        if ($file->getSize() === 0) {
+            throw ValidationException::withMessages([
+                'file' => 'The uploaded file is empty. Re-download the template or re-save your spreadsheet, then choose the file again.',
+            ]);
+        }
     }
 }

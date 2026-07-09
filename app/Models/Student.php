@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
-use App\Support\TenantStorage;
 use Illuminate\Database\Eloquent\Model;
 
 class Student extends Model
@@ -56,23 +55,12 @@ class Student extends Model
 
     public function photoUrl(): ?string
     {
-        if (! $this->photo) {
+        if (! $this->photo || ! $this->tenant_id) {
             return null;
         }
 
         if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
             return $this->photo;
-        }
-
-        if (! $this->tenant_id) {
-            return null;
-        }
-
-        $tenant = $this->relationLoaded('tenant') ? $this->tenant : null;
-        $tenant = $tenant ?? Tenant::query()->find($this->tenant_id);
-
-        if (! $tenant) {
-            return null;
         }
 
         $serveRoute = url(route('school.students.photo', [
@@ -82,20 +70,7 @@ class Student extends Model
 
         $version = $this->updated_at?->timestamp ?? 0;
 
-        if (TenantStorage::isS3Configured()) {
-            try {
-                if (\Illuminate\Support\Facades\Storage::disk('s3')->exists($this->photo)) {
-                    $fromStorage = TenantStorage::assetUrl($tenant, $this->photo);
-                    if ($fromStorage) {
-                        return $fromStorage;
-                    }
-                }
-            } catch (\Throwable) {
-                // S3 unreachable — fall back to app route below.
-            }
-        }
-
-        // Local / shared storage is served through the app route (works across disks).
+        // Always serve through the app route so private S3/shared disks work in the browser.
         return $serveRoute.($version ? '?v='.$version : '');
     }
 }

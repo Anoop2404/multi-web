@@ -187,6 +187,43 @@ class SchoolApplicationForm
         return $resolved;
     }
 
+    /**
+     * School admin profile always exposes principal and leadership contacts,
+     * regardless of Sahodaya public registration form toggles.
+     *
+     * @return array<string, array{label: string, group: string, enabled: bool, required: bool, placeholder?: string, hint?: string}>
+     */
+    public static function resolveForSchoolProfile(?SahodayaProfile $profile): array
+    {
+        $fields = self::resolve($profile);
+
+        $profileFields = [
+            'principal_name' => true,
+            'principal_email' => true,
+            'principal_phone' => true,
+            'event_coordinator_name' => true,
+            'event_coordinator_email' => true,
+            'event_coordinator_phone' => true,
+            'vice_principal_name' => false,
+            'vice_principal_email' => false,
+            'vice_principal_phone' => false,
+        ];
+
+        foreach ($profileFields as $key => $required) {
+            if (! isset($fields[$key])) {
+                continue;
+            }
+
+            $fields[$key]['enabled'] = true;
+            $fields[$key]['required'] = $required;
+            $fields[$key]['hint'] = $required
+                ? 'Required before fest event registrations can proceed.'
+                : 'Optional — add if your school has a vice principal.';
+        }
+
+        return $fields;
+    }
+
     /** @return array<int, string> */
     public static function highestClassOptions(): array
     {
