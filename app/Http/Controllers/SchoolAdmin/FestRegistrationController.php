@@ -23,6 +23,7 @@ use App\Services\Events\FestRegistrationService;
 use App\Services\Events\FestRegistrationImportService;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Http\Controllers\SchoolAdmin\Concerns\BuildsSchoolFestEventContext;
+use App\Support\FestClassGroupScheme;
 use App\Support\FestSportsAgeGroup;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
