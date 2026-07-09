@@ -110,37 +110,13 @@ class AuthController extends Controller
     {
         $request->validate(['email' => 'required|email']);
 
-        $email = strtolower(trim($request->input('email')));
-        $status = null;
-
-        $send = function () use ($email, &$status) {
-            $status = \Illuminate\Support\Facades\Password::sendResetLink(['email' => $email]);
-        };
-
-        if ($sahodayaId = $this->resolveSahodayaIdForMail()) {
-            SahodayaMailer::for($sahodayaId)->withSahodayaMailer($send);
-        } else {
-            $send();
-        }
+        $status = \Illuminate\Support\Facades\Password::sendResetLink(
+            ['email' => strtolower(trim($request->input('email')))],
+        );
 
         return $status === \Illuminate\Support\Facades\Password::RESET_LINK_SENT
             ? back()->with('status', __($status))
             : back()->withErrors(['email' => __($status)]);
-    }
-
-    /**
-     * Resolve the Sahodaya tenant whose mail settings should be used for the
-     * current request's host (schools use their parent Sahodaya's settings).
-     */
-    private function resolveSahodayaIdForMail(): ?string
-    {
-        $tenant = TenantBranding::resolveTenant();
-
-        if (! $tenant) {
-            return null;
-        }
-
-        return $tenant->type === 'sahodaya' ? $tenant->id : $tenant->parent_id;
     }
 
     public function showResetPassword(Request $request, string $token): Response

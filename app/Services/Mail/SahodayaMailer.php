@@ -134,6 +134,19 @@ class SahodayaMailer
         });
     }
 
+    public function sendPasswordReset(User $user, string $token): void
+    {
+        if ($this->isConfigured() && $this->usesZeptoMailApi()) {
+            (new \App\Notifications\PortalResetPassword($token))->deliverVia($this, $user);
+
+            return;
+        }
+
+        $this->withSahodayaMailer(function () use ($user, $token) {
+            $user->notify(new \App\Notifications\PortalResetPassword($token));
+        });
+    }
+
     /**
      * Run a mail callback using this Sahodaya's mail settings.
      */

@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\UsesTenantConnectionWhenIsolated;
+use App\Notifications\PortalResetPassword;
 use App\Notifications\PortalVerifyEmail;
+use App\Services\Mail\SahodayaMailer;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -78,5 +80,19 @@ class User extends Authenticatable implements MustVerifyEmail
     public function sendEmailVerificationNotification(): void
     {
         $this->notify(new PortalVerifyEmail);
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $school = $this->tenant_id ? Tenant::query()->find($this->tenant_id) : null;
+        $sahodayaId = $school?->parent_id ?: $school?->id;
+
+        if ($sahodayaId) {
+            SahodayaMailer::for($sahodayaId)->sendPasswordReset($this, $token);
+
+            return;
+        }
+
+        $this->notify(new PortalResetPassword($token));
     }
 }
