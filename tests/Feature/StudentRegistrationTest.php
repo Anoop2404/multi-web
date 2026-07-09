@@ -8,6 +8,7 @@ use App\Models\SahodayaProfile;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
+use App\Models\UploadedFileBackup;
 use App\Services\Membership\MasterClassService;
 use App\Services\Students\SchoolClassProvisioner;
 use App\Services\Students\StudentRegistrationNumberGenerator;
@@ -292,6 +293,35 @@ class StudentRegistrationTest extends TestCase
                 ->component('School/Imports/History', false)
                 ->has('imports')
             );
+    }
+
+    public function test_import_history_download_returns_file(): void
+    {
+        Storage::fake('shared');
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['tenant' => $school] = $this->schoolWithClass();
+
+        $admin = \App\Models\User::factory()->create([
+            'tenant_id'         => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        $backup = UploadedFileBackup::create([
+            'school_id'    => $school->id,
+            'purpose'      => 'student_import',
+            'storage_disk' => 'shared',
+            'storage_path' => 'backups/test/students.csv',
+            'original_name'=> 'students.csv',
+            'mime_type'    => 'text/csv',
+            'status'       => 'success',
+        ]);
+        Storage::disk('shared')->put($backup->storage_path, "full_name,class_name\nAda,10\n");
+
+        $this->actingAs($admin)
+            ->get("/school-admin/{$school->id}/imports/{$backup->id}/download")
+            ->assertOk()
+            ->assertDownload('students.csv');
     }
 
     public function test_student_import_rejects_empty_upload(): void

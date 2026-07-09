@@ -43,7 +43,7 @@ class ImportHistoryController extends SchoolAdminController
         ]);
     }
 
-    public function download(UploadedFileBackup $backup): BinaryFileResponse|StreamedResponse|HttpResponse
+    public function download(string $tenantId, UploadedFileBackup $backup): BinaryFileResponse|StreamedResponse|HttpResponse
     {
         abort_unless($backup->school_id === $this->school->id, 404);
         abort_unless(in_array($backup->purpose, self::PURPOSES, true), 404);

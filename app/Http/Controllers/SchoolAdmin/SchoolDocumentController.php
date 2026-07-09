@@ -83,7 +83,7 @@ class SchoolDocumentController extends SchoolAdminController
         return back()->with('success', 'Document uploaded and submitted for review.');
     }
 
-    public function download(SchoolDocument $document)
+    public function download(string $tenantId, SchoolDocument $document)
     {
         abort_unless($document->school_id === $this->school->id, 404);
 
