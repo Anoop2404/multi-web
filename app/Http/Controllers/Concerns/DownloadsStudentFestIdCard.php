@@ -16,12 +16,12 @@ trait DownloadsStudentFestIdCard
 {
     use BuildsFestIdCardResponses;
 
-    protected function assertStudentFestIdCardAccess(FestEvent $event, Student $student, Tenant $school): void
+    protected function assertStudentFestIdCardAccess(FestEvent $event, Student $student, Tenant $school, ?int $headId = null): void
     {
         abort_if($student->tenant_id !== $school->id, 403);
         abort_if($event->tenant_id !== $school->parent_id, 403);
 
-        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $school);
+        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $school, $headId);
 
         $hasRegistration = FestParticipant::query()
             ->where('student_id', $student->id)
@@ -40,8 +40,6 @@ trait DownloadsStudentFestIdCard
 
     protected function studentFestIdCardResponse(Request $request, FestEvent $event, Student $student, Tenant $school)
     {
-        $this->assertStudentFestIdCardAccess($event, $student, $school);
-
         $defaultScope = $event->event_type === 'sports' ? 'head' : 'event';
         $scope = in_array($request->input('scope'), ['item', 'event', 'head'], true)
             ? $request->input('scope')
@@ -67,6 +65,28 @@ trait DownloadsStudentFestIdCard
                 ?->registration
                 ?->item_id;
         }
+
+        // Resolve which Event Head's fee gates this download: an explicit head_id filter wins,
+        // otherwise derive it from the student's registered item when the card is scoped to a
+        // single head or a single item (sports events default to per-head cards).
+        $headId = $filters['head_id'] ?? null;
+        if ($headId === null && in_array($scope, ['head', 'item'], true)) {
+            $headId = FestParticipant::query()
+                ->where('student_id', $student->id)
+                ->whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $event->id)
+                    ->where('school_id', $school->id)
+                    ->whereNotIn('status', ['rejected', 'withdrawn'])
+                    ->when(! empty($filters['item_id']), fn ($qq) => $qq->where('item_id', $filters['item_id'])))
+                ->with('registration.item:id,head_id')
+                ->orderBy('id')
+                ->first()
+                ?->registration
+                ?->item
+                ?->head_id;
+        }
+
+        $this->assertStudentFestIdCardAccess($event, $student, $school, $headId);
 
         $service = app(FestIdCardService::class);
         $cards = $service->cards($event, 'student', $filters);

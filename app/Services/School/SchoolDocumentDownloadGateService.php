@@ -41,8 +41,18 @@ class SchoolDocumentDownloadGateService
             ->exists();
     }
 
-    public function festEventFeeCleared(FestEvent $event, Tenant $school): bool
+    /**
+     * @param  ?int  $headId  When given and the event bills sports_composite fees per Event Head,
+     *                        only that head's fee needs to be paid — a school can clear Athletics
+     *                        while Chess is still pending. Omit (or pass null) to fall back to the
+     *                        old "whole event fee" check for every other event/fee model.
+     */
+    public function festEventFeeCleared(FestEvent $event, Tenant $school, ?int $headId = null): bool
     {
+        if ($headId !== null && $this->festFees->usesPerHeadBilling($event)) {
+            return $this->festFees->isHeadPaid($event, $school->id, $headId);
+        }
+
         return $this->festFees->isPaid($event, $school->id);
     }
 
@@ -76,15 +86,19 @@ class SchoolDocumentDownloadGateService
         abort(422, 'Sahodaya membership fee payment is pending. Pay and get it verified before downloading ID cards or hall tickets.');
     }
 
-    public function assertFestEventFeeForDownloads(FestEvent $event, Tenant $school): void
+    public function assertFestEventFeeForDownloads(FestEvent $event, Tenant $school, ?int $headId = null): void
     {
         $this->assertMembershipFeeForDownloads($school);
 
-        if ($this->festEventFeeCleared($event, $school)) {
+        if ($this->festEventFeeCleared($event, $school, $headId)) {
             return;
         }
 
-        abort(422, 'Event fee payment is pending. Upload payment proof and wait for verification before downloading ID cards or hall tickets.');
+        $message = $headId !== null && $this->festFees->usesPerHeadBilling($event)
+            ? 'Event Head fee payment is pending. Upload payment proof for this head and wait for verification before downloading ID cards or hall tickets.'
+            : 'Event fee payment is pending. Upload payment proof and wait for verification before downloading ID cards or hall tickets.';
+
+        abort(422, $message);
     }
 
     public function assertMcqExamFeeForDownloads(McqExam $exam, Tenant $school): void

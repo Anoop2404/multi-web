@@ -257,7 +257,9 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $this->school);
+        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
+            $event, $this->school, $request->integer('head_id') ?: null,
+        );
 
         $request->merge(['school_id' => $this->school->id]);
 
@@ -564,7 +566,9 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $this->school);
+        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
+            $event, $this->school, $request->integer('head_id') ?: null,
+        );
 
         $filters = array_merge($this->idCardFilters($request), [
             'school_id'        => $this->school->id,
@@ -588,7 +592,9 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $this->school);
+        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
+            $event, $this->school, $request->integer('head_id') ?: null,
+        );
 
         $cluster = Tenant::findOrFail($this->school->parent_id);
         $filters = array_merge($this->idCardFilters($request), [
