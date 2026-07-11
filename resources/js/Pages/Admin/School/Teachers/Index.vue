@@ -213,6 +213,7 @@
                             <td class="p-3 font-medium">
                                 {{ t.name }}
                                 <p class="text-xs text-slate-500 font-mono">{{ t.login_code || t.email }}</p>
+                                <p v-if="t.employee_code" class="text-xs text-slate-400 font-mono">{{ t.employee_code }}</p>
                             </td>
                             <td class="p-3 text-gray-600">{{ t.teaching_type || '—' }}</td>
                             <td class="p-3 text-xs text-gray-600">{{ (t.subject_labels || []).join(', ') || t.subject || '—' }}</td>

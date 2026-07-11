@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Audit\UploadBackupService;
+use App\Services\Auth\EmployeeCodeGenerator;
 use App\Services\Auth\LoginCodeGenerator;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Portal\TeacherPortalProvisioner;
@@ -44,7 +45,7 @@ class TeacherController extends SchoolAdminController
                 $subjectIds = $t->subject_ids ?? [];
 
                 return [
-                    ...$t->only('id', 'name', 'email', 'login_code', 'mobile', 'designation', 'designation_id', 'subject', 'user_id', 'teaching_type_id', 'status'),
+                    ...$t->only('id', 'name', 'email', 'login_code', 'employee_code', 'mobile', 'designation', 'designation_id', 'subject', 'user_id', 'teaching_type_id', 'status'),
                     'gender' => $t->gender,
                     'is_verified' => $t->isVerified(),
                     'teaching_type' => $t->teachingType?->label,
@@ -119,7 +120,7 @@ class TeacherController extends SchoolAdminController
 
         $subjectLabelMap = app(EffectiveMasterDataResolver::class)->subjects($this->school->parent_id)->pluck('label', 'id');
 
-        $header = ['Name', 'Login Code', 'Email', 'Mobile', 'Designation', 'Teaching Type', 'Subjects', 'Status', 'Verification', 'Verified By'];
+        $header = ['Name', 'Teacher ID', 'Employee Code', 'Email', 'Mobile', 'Designation', 'Teaching Type', 'Subjects', 'Status', 'Verification', 'Verified By'];
         $rows = [$header];
 
         foreach ($teachers as $t) {
@@ -128,6 +129,7 @@ class TeacherController extends SchoolAdminController
             $rows[] = [
                 $t->name,
                 $t->login_code ?? '',
+                $t->employee_code ?? '',
                 $t->email ?? '',
                 $t->mobile ?? '',
                 $t->designation ?? '',
@@ -197,6 +199,7 @@ class TeacherController extends SchoolAdminController
         $this->syncRelations($teacher, $data);
 
         app(LoginCodeGenerator::class)->assignTeacher($teacher);
+        app(EmployeeCodeGenerator::class)->assign($teacher);
 
         $audit->log('teacher.created', "Teacher created: {$teacher->name}", $teacher);
 
@@ -264,6 +267,7 @@ class TeacherController extends SchoolAdminController
             $teacher->syncSubjectIds($ids);
 
             app(LoginCodeGenerator::class)->assignTeacher($teacher);
+            app(EmployeeCodeGenerator::class)->assign($teacher);
 
             if ($request->boolean('create_logins', true)) {
                 try {
@@ -475,6 +479,7 @@ class TeacherController extends SchoolAdminController
                     $teacher->syncSubjectIds($row['subject_ids']);
 
                     app(LoginCodeGenerator::class)->assignTeacher($teacher);
+                    app(EmployeeCodeGenerator::class)->assign($teacher);
                     app(TeacherPortalProvisioner::class)->provision($teacher->fresh(), $row['email']);
 
                     $count++;
@@ -541,6 +546,13 @@ class TeacherController extends SchoolAdminController
         }
     }
 
+    /**
+     * School admins may edit a teacher's record freely at any time — unlike Student
+     * Registry, there is no Sahodaya-side change-request/edit-lock workflow gating
+     * these edits. This is an intentional product decision (not a gap): confirmed
+     * with the platform owner to keep Teacher Registry edits unrestricted rather
+     * than add edit-lock parity with Student Registry.
+     */
     public function update(Request $request, string $tenantId, Teacher $teacher, PlatformAuditLogger $audit, DataChangeLogger $changes)
     {
         abort_if($teacher->tenant_id !== $this->school->id, 403);

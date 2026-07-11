@@ -15,7 +15,7 @@ class Teacher extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'tenant_id', 'user_id', 'academic_year_id', 'reg_no', 'login_code', 'name', 'gender', 'dob',
+        'tenant_id', 'user_id', 'academic_year_id', 'reg_no', 'login_code', 'employee_code', 'name', 'gender', 'dob',
         'email', 'mobile', 'address', 'photo',
         'designation', 'designation_id', 'subject', 'subject_ids', 'teaching_type_id',
         'qualification', 'experience_years', 'date_of_joining', 'employment_status',
