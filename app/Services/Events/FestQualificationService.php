@@ -292,6 +292,10 @@ class FestQualificationService
       $group = FestGroup::create([
         'registration_id' => $registration->id,
         'team_name'       => $sourceGroup->team_name,
+        'coach_name'      => $sourceGroup->coach_name,
+        'coach_phone'     => $sourceGroup->coach_phone,
+        'manager_name'    => $sourceGroup->manager_name,
+        'manager_phone'   => $sourceGroup->manager_phone,
       ]);
       $groupId = $group->id;
     }

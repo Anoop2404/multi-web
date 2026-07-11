@@ -136,7 +136,22 @@
             </template>
         </div>
 
-        <div v-if="event.fee_required && event.school_fee" class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-2">
+        <div v-if="event.fee_required && event.uses_per_head_billing && event.school_head_fees?.length"
+             class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-2">
+            <p class="text-xs font-semibold text-slate-800">Fees by Event Head</p>
+            <p class="text-xs text-slate-500">Each head is billed separately. Pay from the main Registration page.</p>
+            <ul class="text-xs text-indigo-900 space-y-1">
+                <li v-for="hf in event.school_head_fees" :key="hf.head_id" class="flex justify-between gap-3">
+                    <span>{{ hf.head_name }}</span>
+                    <span class="font-semibold shrink-0">
+                        ₹{{ formatMoney(hf.outstanding) }} due
+                        <span class="font-normal text-indigo-700">· {{ hf.status }}</span>
+                    </span>
+                </li>
+            </ul>
+            <a :href="`${programBase}/registration`" class="text-xs link-brand font-semibold">Open fee payments →</a>
+        </div>
+        <div v-else-if="event.fee_required && event.school_fee" class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-2">
             <p class="text-xs font-semibold text-slate-800">Event fees & billing</p>
             <p class="text-xs text-indigo-900 font-semibold">
                 Item fees due: ₹{{ formatMoney(itemFeesDue) }}
@@ -204,7 +219,16 @@ const eventRegisteredIds = computed(() => {
 
 function initForms() {
     for (const item of props.event.items ?? []) {
-        itemForms[itemFormKey(item.id)] = { team_name: '', student_ids: [], teacher_ids: [], standby_ids: [] };
+        itemForms[itemFormKey(item.id)] = {
+            team_name: '',
+            coach_name: '',
+            coach_phone: '',
+            manager_name: '',
+            manager_phone: '',
+            student_ids: [],
+            teacher_ids: [],
+            standby_ids: [],
+        };
     }
 }
 initForms();
@@ -512,6 +536,10 @@ function submitItem(item) {
         event_id: props.event.id,
         item_id: item.id,
         team_name: form.team_name,
+        coach_name: form.coach_name || null,
+        coach_phone: form.coach_phone || null,
+        manager_name: form.manager_name || null,
+        manager_phone: form.manager_phone || null,
         student_ids: form.student_ids,
         teacher_ids: [],
         standby_ids: (form.standby_ids ?? []).slice(0, 2),
@@ -522,6 +550,10 @@ function submitItem(item) {
             form.student_ids = [];
             form.standby_ids = [];
             form.team_name = '';
+            form.coach_name = '';
+            form.coach_phone = '';
+            form.manager_name = '';
+            form.manager_phone = '';
             router.reload({ only: ['event', 'students', 'registrations'] });
         },
         onError: (errors) => {

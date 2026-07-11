@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SchoolAdmin;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestGroup;
+use App\Models\FestItemHead;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
@@ -493,6 +494,8 @@ class FestRegistrationController extends SchoolAdminController
             'head_navigation'            => $event->getAttribute('head_navigation') ?? [],
             'event_registrations'        => $event->getAttribute('event_registrations') ?? [],
             'school_fee'                 => $event->getAttribute('school_fee'),
+            'uses_per_head_billing'      => (bool) ($event->getAttribute('uses_per_head_billing') ?? false),
+            'school_head_fees'           => $event->getAttribute('school_head_fees') ?? [],
         ];
     }
 
@@ -562,6 +565,32 @@ class FestRegistrationController extends SchoolAdminController
             $schoolFee->toArray(),
             ['breakdown' => $feeService->breakdown($event, $schoolFee, $schedule)]
         ) : null);
+
+        $usesPerHead = $feeService->usesPerHeadBilling($event);
+        $event->setAttribute('uses_per_head_billing', $usesPerHead);
+        $event->setAttribute('school_head_fees', []);
+        if ($usesPerHead && $feeService->feeRequired($event)) {
+            $headFees = $feeService->recalculateAllHeadsForSchool($event, $this->school->id);
+            $headsById = FestItemHead::where('event_id', $event->id)->get()->keyBy('id');
+            $event->setAttribute('school_head_fees', $headFees->map(function (FestSchoolEventFee $fee) use ($feeService, $event, $schedule, $headsById) {
+                $head = $headsById->get($fee->head_id);
+
+                return [
+                    'id' => $fee->id,
+                    'head_id' => $fee->head_id,
+                    'head_name' => $head?->name ?? 'Event head',
+                    'school_registration_fee' => (float) $fee->school_registration_fee,
+                    'student_registration_fee' => (float) $fee->student_registration_fee,
+                    'participation_fee' => (float) $fee->participation_fee,
+                    'participation_item_count' => (int) $fee->participation_item_count,
+                    'total_due' => (float) $fee->total_due,
+                    'amount_paid' => (float) $fee->amount_paid,
+                    'outstanding' => (float) $fee->outstandingBalance(),
+                    'status' => $fee->status,
+                    'breakdown' => $feeService->breakdown($event, $fee, $schedule),
+                ];
+            })->values()->all());
+        }
         $feeRequired = $feeService->feeRequired($event);
         $enabledItems = $event->items->filter(fn ($i) => ($i->is_enabled ?? true));
         if ($headId !== null) {
@@ -635,6 +664,10 @@ class FestRegistrationController extends SchoolAdminController
             'event_id'       => 'required|exists:fest_events,id',
             'item_id'        => 'required|exists:fest_event_items,id',
             'team_name'      => 'nullable|string|max:255',
+            'coach_name'     => 'nullable|string|max:255',
+            'coach_phone'    => 'nullable|string|max:40',
+            'manager_name'   => 'nullable|string|max:255',
+            'manager_phone'  => 'nullable|string|max:40',
             'student_ids'    => $event->event_type === 'teacher_fest' ? 'nullable|array' : 'required|array|min:1',
             'student_ids.*'  => 'exists:students,id',
             'teacher_ids'    => $event->event_type === 'teacher_fest' ? 'required|array|min:1' : 'nullable|array',
@@ -658,6 +691,12 @@ class FestRegistrationController extends SchoolAdminController
             $performerIds,
             $standbyIds,
             $data['team_name'] ?? null,
+            teamContacts: [
+                'coach_name' => $data['coach_name'] ?? null,
+                'coach_phone' => $data['coach_phone'] ?? null,
+                'manager_name' => $data['manager_name'] ?? null,
+                'manager_phone' => $data['manager_phone'] ?? null,
+            ],
         );
 
         app(PlatformAuditLogger::class)->festRegistrationSubmitted($registration->fresh(['event', 'item']));
@@ -671,47 +710,78 @@ class FestRegistrationController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
+        $feeService = app(FestSchoolEventFeeService::class);
+        abort_unless($feeService->feeRequired($event), 422, 'This event does not require a fee.');
+
+        $usesPerHead = $feeService->usesPerHeadBilling($event);
+
         $data = $request->validate([
             'payment_proof'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'transaction_ref' => 'nullable|string|max:100',
             'bank_name'       => 'nullable|string|max:100',
+            'amount'          => 'nullable|numeric|min:0.01',
+            'head_id'         => ($usesPerHead ? 'required' : 'nullable').'|integer|exists:fest_item_heads,id',
         ]);
 
-        $feeService = app(FestSchoolEventFeeService::class);
-        abort_unless($feeService->feeRequired($event), 422, 'This event does not require a fee.');
-
-        $feeService->attachPayment(
-            $event,
-            $this->school->id,
-            $request->file('payment_proof'),
-            $request->user()->id,
-            $data['transaction_ref'] ?? null,
-            $data['bank_name'] ?? null,
-        );
+        if ($usesPerHead) {
+            $feeService->attachPaymentForHead(
+                $event,
+                $this->school->id,
+                (int) $data['head_id'],
+                $request->file('payment_proof'),
+                $request->user()->id,
+                $data['transaction_ref'] ?? null,
+                $data['bank_name'] ?? null,
+                isset($data['amount']) ? (float) $data['amount'] : null,
+            );
+            $contextLabel = $event->title.' — '.((FestItemHead::find($data['head_id'])?->name) ?? 'head').' fee';
+        } else {
+            $feeService->attachPayment(
+                $event,
+                $this->school->id,
+                $request->file('payment_proof'),
+                $request->user()->id,
+                $data['transaction_ref'] ?? null,
+                $data['bank_name'] ?? null,
+            );
+            $contextLabel = $event->title.' event fee';
+        }
 
         app(SahodayaAdminNotifier::class)->notifyAdmins(
             $this->school->parent_id,
             'payment.proof.uploaded',
             [
                 'school_name'    => $this->school->name,
-                'context_label'  => $event->title.' event fee',
+                'context_label'  => $contextLabel,
             ],
             "/sahodaya-admin/{$this->school->parent_id}/events/{$event->id}/fees"
         );
 
         app(PlatformAuditLogger::class)->festFeeProofUploaded($event, $this->school->id);
 
-        return back()->with('success', 'Payment proof uploaded for this event.');
+        return back()->with('success', $usesPerHead
+            ? 'Payment proof uploaded for this Event Head.'
+            : 'Payment proof uploaded for this event.');
     }
 
-    public function feeReceipt(string $tenantId, FestEvent $event, string $program)
+    public function feeReceipt(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $schoolFee = FestSchoolEventFee::where('event_id', $event->id)
+        $feeService = app(FestSchoolEventFeeService::class);
+        $query = FestSchoolEventFee::where('event_id', $event->id)
             ->where('school_id', $this->school->id)
-            ->with('feeReceipt')
-            ->firstOrFail();
+            ->with('feeReceipt');
+
+        if ($feeService->usesPerHeadBilling($event)) {
+            $headId = (int) $request->query('head_id');
+            abort_unless($headId > 0, 422, 'Select which Event Head receipt to view.');
+            $query->where('head_id', $headId);
+        } elseif (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'head_id')) {
+            $query->whereNull('head_id');
+        }
+
+        $schoolFee = $query->firstOrFail();
 
         $receipt = $schoolFee->feeReceipt;
         abort_if(! $receipt || $receipt->status !== 'approved', 403, 'Receipt is not yet approved.');
@@ -719,10 +789,11 @@ class FestRegistrationController extends SchoolAdminController
         $registrations = FestRegistration::where('event_id', $event->id)
             ->where('school_id', $this->school->id)
             ->whereIn('status', ['submitted', 'approved'])
+            ->when($schoolFee->head_id, function ($q) use ($schoolFee) {
+                $q->whereHas('item', fn ($iq) => $iq->where('head_id', $schoolFee->head_id));
+            })
             ->with('item')
             ->get();
-
-        $feeService = app(FestSchoolEventFeeService::class);
 
         return view('receipts.fest-fee-official', [
             'receipt'        => $receipt,

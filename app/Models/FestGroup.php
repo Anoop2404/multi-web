@@ -8,7 +8,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FestGroup extends Model
 {
-    protected $fillable = ['registration_id', 'team_name', 'status'];
+    protected $fillable = [
+        'registration_id', 'team_name', 'status',
+        'coach_name', 'coach_phone', 'manager_name', 'manager_phone',
+    ];
 
     public function registration(): BelongsTo
     {

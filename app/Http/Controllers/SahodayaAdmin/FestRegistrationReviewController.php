@@ -123,6 +123,10 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'school_id'        => 'required|exists:tenants,id',
             'item_id'          => 'required|exists:fest_event_items,id',
             'team_name'        => 'nullable|string|max:255',
+            'coach_name'       => 'nullable|string|max:255',
+            'coach_phone'      => 'nullable|string|max:40',
+            'manager_name'     => 'nullable|string|max:255',
+            'manager_phone'    => 'nullable|string|max:40',
             'student_ids'      => 'required|array|min:1',
             'student_ids.*'    => 'integer|exists:students,id',
             'standby_ids'      => 'nullable|array|max:2',
@@ -146,6 +150,12 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 $data['standby_ids'] ?? [],
                 $data['team_name'] ?? null,
                 skipSchoolClosedCheck: true,
+                teamContacts: [
+                    'coach_name' => $data['coach_name'] ?? null,
+                    'coach_phone' => $data['coach_phone'] ?? null,
+                    'manager_name' => $data['manager_name'] ?? null,
+                    'manager_phone' => $data['manager_phone'] ?? null,
+                ],
             );
         } catch (ValidationException $e) {
             return back()

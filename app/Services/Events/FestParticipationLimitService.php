@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestItemHead;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\Student;
@@ -62,6 +63,8 @@ class FestParticipationLimitService
             }
         }
 
+        $errors = array_merge($errors, $this->validateHeadCapacity($item, $policy));
+
         $regs = $this->schoolRegistrations($schoolId, $policy);
         $isOnStage = ($item->stage_type ?? '') === 'on_stage';
         $isOffStage = ($item->stage_type ?? '') === 'off_stage';
@@ -106,6 +109,71 @@ class FestParticipationLimitService
         }
 
         return $errors;
+    }
+
+    /**
+     * Enforce FestItemHead.max_participants / max_teams when set (> 0).
+     * null/0 = unlimited (same convention as max_per_school).
+     *
+     * @return list<string>
+     */
+    private function validateHeadCapacity(FestEventItem $item, array $policy): array
+    {
+        if (! $item->head_id) {
+            return [];
+        }
+
+        $head = $item->relationLoaded('head')
+            ? $item->head
+            : FestItemHead::find($item->head_id);
+
+        if (! $head) {
+            return [];
+        }
+
+        $statuses = $this->countableStatuses($policy);
+        $isTeam = $item->isTeamItem();
+
+        if ($isTeam) {
+            $maxTeams = (int) ($head->max_teams ?? 0);
+            if ($maxTeams <= 0) {
+                return [];
+            }
+
+            $teamCount = FestRegistration::where('event_id', $this->event->id)
+                ->whereIn('status', $statuses)
+                ->whereHas('item', fn ($q) => $q
+                    ->where('head_id', $head->id)
+                    ->whereIn('participant_type', ['team', 'group']))
+                ->count();
+
+            if ($teamCount >= $maxTeams) {
+                return ["{$head->name} has reached its team cap ({$maxTeams})."];
+            }
+
+            return [];
+        }
+
+        $maxParticipants = (int) ($head->max_participants ?? 0);
+        if ($maxParticipants <= 0) {
+            return [];
+        }
+
+        $participantCount = FestRegistration::where('event_id', $this->event->id)
+            ->whereIn('status', $statuses)
+            ->whereHas('item', fn ($q) => $q
+                ->where('head_id', $head->id)
+                ->where(function ($q) {
+                    $q->whereNull('participant_type')
+                        ->orWhereNotIn('participant_type', ['team', 'group']);
+                }))
+            ->count();
+
+        if ($participantCount >= $maxParticipants) {
+            return ["{$head->name} has reached its participant cap ({$maxParticipants})."];
+        }
+
+        return [];
     }
 
     /** @return list<string> */

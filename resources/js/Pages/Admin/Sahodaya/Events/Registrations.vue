@@ -224,6 +224,20 @@
                     <FormField v-if="selectedItemIsGroup" label="Team name" required>
                         <input v-model="onBehalfForm.team_name" type="text" class="field text-sm" required>
                     </FormField>
+                    <div v-if="selectedItemIsGroup" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <FormField label="Coach name">
+                            <input v-model="onBehalfForm.coach_name" type="text" class="field text-sm" placeholder="Optional">
+                        </FormField>
+                        <FormField label="Coach phone">
+                            <input v-model="onBehalfForm.coach_phone" type="text" class="field text-sm" placeholder="Optional">
+                        </FormField>
+                        <FormField label="Manager name">
+                            <input v-model="onBehalfForm.manager_name" type="text" class="field text-sm" placeholder="Optional">
+                        </FormField>
+                        <FormField label="Manager phone">
+                            <input v-model="onBehalfForm.manager_phone" type="text" class="field text-sm" placeholder="Optional">
+                        </FormField>
+                    </div>
                     <div>
                         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                             <label class="text-xs font-semibold text-gray-600">Performers</label>
@@ -344,6 +358,10 @@ const onBehalfForm = reactive({
     school_id: props.registerSchoolId ? String(props.registerSchoolId) : '',
     item_id: '',
     team_name: '',
+    coach_name: '',
+    coach_phone: '',
+    manager_name: '',
+    manager_phone: '',
     student_ids: [],
     standby_ids: [],
     auto_approve: true,
@@ -450,6 +468,10 @@ function openOnBehalf() {
     onBehalfForm.school_id = filterSchoolId.value || onBehalfForm.school_id || '';
     onBehalfForm.item_id = '';
     onBehalfForm.team_name = '';
+    onBehalfForm.coach_name = '';
+    onBehalfForm.coach_phone = '';
+    onBehalfForm.manager_name = '';
+    onBehalfForm.manager_phone = '';
     onBehalfForm.student_ids = [];
     onBehalfForm.standby_ids = [];
     onBehalfOpen.value = true;
@@ -474,6 +496,10 @@ function submitOnBehalf() {
         school_id: onBehalfForm.school_id,
         item_id: onBehalfForm.item_id,
         team_name: onBehalfForm.team_name || null,
+        coach_name: onBehalfForm.coach_name || null,
+        coach_phone: onBehalfForm.coach_phone || null,
+        manager_name: onBehalfForm.manager_name || null,
+        manager_phone: onBehalfForm.manager_phone || null,
         student_ids: onBehalfForm.student_ids,
         standby_ids: onBehalfForm.standby_ids,
         auto_approve: onBehalfForm.auto_approve,

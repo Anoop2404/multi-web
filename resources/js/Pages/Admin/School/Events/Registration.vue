@@ -296,17 +296,90 @@
                 </form>
 
                 <!-- Item fees — separate from annual Sahodaya membership -->
-                <div v-if="event.fee_required && event.school_fee" class="mt-4 border-t border-gray-100 pt-4 space-y-3">
+                <div v-if="event.fee_required && (event.uses_per_head_billing ? event.school_head_fees?.length : event.school_fee)"
+                     class="mt-4 border-t border-gray-100 pt-4 space-y-3">
                     <div>
                         <p class="text-xs font-semibold text-slate-800">Event fees & billing</p>
                         <p class="text-xs text-slate-500 mt-0.5">
-                            Includes per-student event registration (when athletes are registered above) plus item fees.
+                            <template v-if="event.uses_per_head_billing">
+                                Each Event Head is billed separately — paying one head does not clear another.
+                            </template>
+                            <template v-else>
+                                Includes per-student event registration (when athletes are registered above) plus item fees.
+                            </template>
                             Annual Sahodaya membership is paid under
                             <a :href="`/school-admin/${school.id}/registration`" class="link-brand font-semibold">Annual Registration</a>.
                             <a :href="`${programBase}/reports/${event.id}/fee-summary`" class="link-brand font-semibold ml-1">Fee report →</a>
                         </p>
                     </div>
-                    <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm">
+
+                    <!-- Per-head invoices (sports_composite) -->
+                    <div v-if="event.uses_per_head_billing" class="space-y-3">
+                        <div v-for="headFee in event.school_head_fees" :key="headFee.head_id"
+                             class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm space-y-2">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <p class="font-semibold text-indigo-950">{{ headFee.head_name }}</p>
+                                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full border"
+                                      :class="headFeeStatusClass(headFee.status)">
+                                    {{ headFeeStatusLabel(headFee.status) }}
+                                </span>
+                            </div>
+                            <ul v-if="(headFee.breakdown?.items ?? []).length" class="text-xs text-indigo-900 space-y-1">
+                                <li v-for="(line, i) in headFee.breakdown.items" :key="i" class="flex justify-between gap-4">
+                                    <span>{{ line.label }}</span>
+                                    <span class="font-semibold shrink-0">₹{{ formatMoney(line.amount) }}</span>
+                                </li>
+                            </ul>
+                            <div class="flex flex-wrap justify-between gap-2 text-xs pt-2 border-t border-indigo-100">
+                                <span class="text-indigo-800">
+                                    Due ₹{{ formatMoney(headFee.total_due) }}
+                                    <span v-if="headFee.amount_paid > 0"> · Paid ₹{{ formatMoney(headFee.amount_paid) }}</span>
+                                </span>
+                                <span class="font-semibold text-indigo-950">
+                                    Outstanding ₹{{ formatMoney(headFee.outstanding) }}
+                                </span>
+                            </div>
+                            <div class="flex flex-wrap gap-2 items-center">
+                                <form v-if="canUploadHeadFee(headFee)"
+                                      @submit.prevent="uploadHeadPayment(event, headFee)"
+                                      class="flex flex-wrap gap-2 items-center">
+                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                                           @change="e => setHeadPaymentFile(event.id, headFee.head_id, e.target.files[0])"
+                                           class="text-xs">
+                                    <input v-model="headPaymentRefs[headPaymentKey(event.id, headFee.head_id)]"
+                                           class="field text-xs w-36" placeholder="Txn ref (opt)">
+                                    <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">
+                                        Upload proof
+                                    </button>
+                                </form>
+                                <a v-if="headFee.status === 'approved'"
+                                   :href="`${programBase}/events/${event.id}/receipt?head_id=${headFee.head_id}`"
+                                   target="_blank" rel="noopener"
+                                   class="px-2 py-1 bg-green-50 border border-green-300 text-green-700 text-xs font-semibold rounded">
+                                    View Receipt ↗
+                                </a>
+                            </div>
+                        </div>
+                        <div v-if="event.school_fee && Number(event.school_fee.total_due) > 0"
+                             class="flex flex-wrap gap-2 items-center text-xs">
+                            <span class="text-slate-600 font-semibold">
+                                Combined total: ₹{{ formatMoney(event.school_fee.total_due) }}
+                            </span>
+                            <a :href="`${programBase}/events/${event.id}/invoice?preview=1`"
+                               target="_blank" rel="noopener"
+                               class="px-2 py-1 bg-white border border-indigo-300 text-indigo-700 font-semibold rounded">
+                                Preview combined invoice ↗
+                            </a>
+                            <a :href="`${programBase}/events/${event.id}/invoice`"
+                               target="_blank" rel="noopener"
+                               class="px-2 py-1 bg-indigo-50 border border-indigo-300 text-indigo-700 font-semibold rounded">
+                                Download combined invoice ↓
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Single-invoice path (non sports_composite) -->
+                    <div v-else class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm">
                         <ul v-if="itemFeeLines(event).length" class="text-xs text-indigo-900 space-y-1">
                             <li v-for="(line, i) in itemFeeLines(event)" :key="i" class="flex justify-between gap-4">
                                 <span>{{ line.label }}</span>
@@ -705,6 +778,8 @@ const itemForms = reactive({});
 const itemErrors = reactive({});
 const eventPaymentFiles = reactive({});
 const eventPaymentRefs = reactive({});
+const headPaymentFiles = reactive({});
+const headPaymentRefs = reactive({});
 
 function allItemsStatic(event) {
     return event?.items ?? [];
@@ -712,6 +787,10 @@ function allItemsStatic(event) {
 
 function itemFormKey(eventId, itemId) {
     return `${eventId}-${itemId}`;
+}
+
+function headPaymentKey(eventId, headId) {
+    return `${eventId}:${headId}`;
 }
 
 for (const e of props.events) {
@@ -723,6 +802,10 @@ for (const e of props.events) {
     for (const item of allItemsStatic(e)) {
         itemForms[itemFormKey(e.id, item.id)] = {
             team_name: '',
+            coach_name: '',
+            coach_phone: '',
+            manager_name: '',
+            manager_phone: '',
             student_ids: [],
             teacher_ids: [],
             standby_ids: [],
@@ -1227,6 +1310,10 @@ function submitItem(event, item) {
         event_id: event.id,
         item_id: item.id,
         team_name: form.team_name,
+        coach_name: form.coach_name || null,
+        coach_phone: form.coach_phone || null,
+        manager_name: form.manager_name || null,
+        manager_phone: form.manager_phone || null,
         student_ids: form.student_ids,
         teacher_ids: form.teacher_ids,
         standby_ids: standby,
@@ -1238,6 +1325,10 @@ function submitItem(event, item) {
             form.teacher_ids = [];
             form.standby_ids = [];
             form.team_name = '';
+            form.coach_name = '';
+            form.coach_phone = '';
+            form.manager_name = '';
+            form.manager_phone = '';
         },
         onError: (errors) => {
             itemErrors[key] = extractItemErrors(errors, item.id)
@@ -1283,6 +1374,51 @@ function uploadEventPayment(event) {
     router.post(`${programBase.value}/events/${event.id}/payment`, {
         payment_proof: file,
         transaction_ref: eventPaymentRefs[event.id] || null,
+    }, { forceFormData: true, preserveScroll: true });
+}
+
+function setHeadPaymentFile(eventId, headId, file) {
+    headPaymentFiles[headPaymentKey(eventId, headId)] = file;
+}
+
+function canUploadHeadFee(headFee) {
+    if (Number(headFee.outstanding) <= 0) return false;
+    if (['approved', 'proof_uploaded'].includes(headFee.status)) return false;
+
+    return ['pending', 'rejected', 'partial'].includes(headFee.status);
+}
+
+function headFeeStatusLabel(status) {
+    return ({
+        approved: 'Paid / approved',
+        proof_uploaded: 'Proof pending approval',
+        rejected: 'Rejected — re-upload',
+        partial: 'Partially paid',
+        pending: 'Payment due',
+    })[status] ?? status;
+}
+
+function headFeeStatusClass(status) {
+    return ({
+        approved: 'bg-green-50 text-green-700 border-green-200',
+        proof_uploaded: 'bg-amber-50 text-amber-800 border-amber-200',
+        rejected: 'bg-red-50 text-red-700 border-red-200',
+        partial: 'bg-sky-50 text-sky-800 border-sky-200',
+        pending: 'bg-white text-indigo-800 border-indigo-200',
+    })[status] ?? 'bg-white text-slate-600 border-slate-200';
+}
+
+function uploadHeadPayment(event, headFee) {
+    const key = headPaymentKey(event.id, headFee.head_id);
+    const file = headPaymentFiles[key];
+    if (!file) {
+        alert('Choose a payment proof file for this Event Head first.');
+        return;
+    }
+    router.post(`${programBase.value}/events/${event.id}/payment`, {
+        payment_proof: file,
+        transaction_ref: headPaymentRefs[key] || null,
+        head_id: headFee.head_id,
     }, { forceFormData: true, preserveScroll: true });
 }
 </script>

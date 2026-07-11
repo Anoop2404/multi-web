@@ -22,6 +22,7 @@ class FestRegistrationCreateService
     /**
      * @param  list<int>  $performerIds
      * @param  list<int>  $standbyIds
+     * @param  array{coach_name?: ?string, coach_phone?: ?string, manager_name?: ?string, manager_phone?: ?string}|null  $teamContacts
      */
     public function createForSchool(
         FestEvent $event,
@@ -31,6 +32,7 @@ class FestRegistrationCreateService
         array $standbyIds = [],
         ?string $teamName = null,
         bool $skipSchoolClosedCheck = false,
+        ?array $teamContacts = null,
     ): FestRegistration {
         abort_if($school->parent_id !== $event->tenant_id, 403);
         abort_if($item->event_id !== $event->id, 403);
@@ -93,7 +95,7 @@ class FestRegistrationCreateService
         abort_if($eligibilityErrors, 422, implode(' ', $eligibilityErrors));
 
         try {
-            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup) {
+            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts) {
                 $eventRegService = app(FestEventRegistrationService::class);
                 foreach (array_merge($performerIds, $standbyIds) as $studentId) {
                     if ($eventRegService->requireEventRegistration($event) && $event->event_type !== 'sports') {
@@ -119,6 +121,10 @@ class FestRegistrationCreateService
                     $group = FestGroup::create([
                         'registration_id' => $registration->id,
                         'team_name'       => $teamName,
+                        'coach_name'      => filled($teamContacts['coach_name'] ?? null) ? trim((string) $teamContacts['coach_name']) : null,
+                        'coach_phone'     => filled($teamContacts['coach_phone'] ?? null) ? trim((string) $teamContacts['coach_phone']) : null,
+                        'manager_name'    => filled($teamContacts['manager_name'] ?? null) ? trim((string) $teamContacts['manager_name']) : null,
+                        'manager_phone'   => filled($teamContacts['manager_phone'] ?? null) ? trim((string) $teamContacts['manager_phone']) : null,
                     ]);
                     $groupId = $group->id;
                 }

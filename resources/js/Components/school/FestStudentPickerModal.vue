@@ -103,9 +103,29 @@
                 </ul>
             </div>
 
-            <div v-if="teamName !== undefined" class="px-5 py-3 border-t border-slate-100 shrink-0">
-                <label class="text-xs font-semibold text-slate-600 block mb-1">Team name</label>
-                <input v-model="localTeamName" type="text" class="field !py-2 !text-sm max-w-sm" placeholder="Required for group items">
+            <div v-if="teamName !== undefined" class="px-5 py-3 border-t border-slate-100 shrink-0 space-y-3">
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 block mb-1">Team name</label>
+                    <input v-model="localTeamName" type="text" class="field !py-2 !text-sm max-w-sm" placeholder="Required for group items">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Coach name <span class="font-normal text-slate-400">(optional)</span></label>
+                        <input v-model="localCoachName" type="text" class="field !py-2 !text-sm" placeholder="Coach name">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Coach phone <span class="font-normal text-slate-400">(optional)</span></label>
+                        <input v-model="localCoachPhone" type="text" class="field !py-2 !text-sm" placeholder="Phone">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Manager name <span class="font-normal text-slate-400">(optional)</span></label>
+                        <input v-model="localManagerName" type="text" class="field !py-2 !text-sm" placeholder="Manager name">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Manager phone <span class="font-normal text-slate-400">(optional)</span></label>
+                        <input v-model="localManagerPhone" type="text" class="field !py-2 !text-sm" placeholder="Phone">
+                    </div>
+                </div>
             </div>
 
             <div class="modal-foot shrink-0 flex flex-wrap justify-end gap-2">
@@ -134,17 +154,35 @@ const props = defineProps({
     selectedIds: { type: Array, default: () => [] },
     teamName: { type: String, default: undefined },
     requireTeamName: { type: Boolean, default: false },
+    coachName: { type: String, default: undefined },
+    coachPhone: { type: String, default: undefined },
+    managerName: { type: String, default: undefined },
+    managerPhone: { type: String, default: undefined },
     confirmLabel: { type: String, default: 'Apply selection' },
     maxSelected: { type: Number, default: null },
     showAddStudent: { type: Boolean, default: true },
 });
 
-const emit = defineEmits(['update:modelValue', 'update:selectedIds', 'update:teamName', 'confirm', 'add-student']);
+const emit = defineEmits([
+    'update:modelValue',
+    'update:selectedIds',
+    'update:teamName',
+    'update:coachName',
+    'update:coachPhone',
+    'update:managerName',
+    'update:managerPhone',
+    'confirm',
+    'add-student',
+]);
 
 const search = ref('');
 const showIneligible = ref(false);
 const localSelected = ref([]);
 const localTeamName = ref('');
+const localCoachName = ref('');
+const localCoachPhone = ref('');
+const localManagerName = ref('');
+const localManagerPhone = ref('');
 const searchInput = ref(null);
 
 const ineligibleCount = computed(() => props.entries.filter(e => !e.eligible).length);
@@ -187,6 +225,10 @@ watch(() => props.modelValue, (open) => {
     if (open) {
         localSelected.value = [...(props.selectedIds ?? [])];
         localTeamName.value = props.teamName ?? '';
+        localCoachName.value = props.coachName ?? '';
+        localCoachPhone.value = props.coachPhone ?? '';
+        localManagerName.value = props.managerName ?? '';
+        localManagerPhone.value = props.managerPhone ?? '';
         search.value = '';
         showIneligible.value = false;
         nextTick(() => searchInput.value?.focus());
@@ -221,6 +263,10 @@ function confirm() {
     emit('update:selectedIds', [...localSelected.value]);
     if (props.teamName !== undefined) {
         emit('update:teamName', localTeamName.value);
+        emit('update:coachName', localCoachName.value);
+        emit('update:coachPhone', localCoachPhone.value);
+        emit('update:managerName', localManagerName.value);
+        emit('update:managerPhone', localManagerPhone.value);
     }
     emit('confirm');
     close();
