@@ -143,6 +143,22 @@
                     </template>
                 </FormField>
                 <p class="text-xs text-slate-500 sm:col-span-2">Example: ₹150 student fee with ₹30 discount → school pays ₹120 per student to Sahodaya.</p>
+                <FormField label="Payment deadline" hint="Fee due date. Schools paying after this date are charged the late fee/penalty below.">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.payment_deadline" type="date" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Late fee (₹)" hint="Flat amount added to the total due if paid after the deadline">
+                    <template #default="{ id }">
+                        <input :id="id" v-model.number="form.late_fee_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
+                    </template>
+                </FormField>
+                <FormField label="Penalty (₹)" hint="Additional penalty amount added on top of the late fee, if any">
+                    <template #default="{ id }">
+                        <input :id="id" v-model.number="form.penalty_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
+                    </template>
+                </FormField>
+                <p class="text-xs text-slate-500 sm:col-span-2">Late fee and penalty only apply once a payment deadline is set; they're re-checked every time a school's fee is (re)synced.</p>
                 <FormField label="Reg. no. starts at" hint="First hall-ticket number when tickets are issued. Use presets or enter any number from 1. Locked after any ticket is issued.">
                     <template #default="{ id }">
                         <McqRegNoStartField :input-id="id" v-model="form.next_hall_ticket_no" :disabled="exam.tickets_issued" />
@@ -292,6 +308,9 @@ const form = useForm({
     scheduled_at: props.exam.scheduled_at ? props.exam.scheduled_at.slice(0, 16) : '',
     fee_amount: props.exam.fee_amount ?? '',
     school_discount_amount: props.exam.school_discount_amount ?? '',
+    payment_deadline: props.exam.payment_deadline ?? '',
+    late_fee_amount: props.exam.late_fee_amount ?? '',
+    penalty_amount: props.exam.penalty_amount ?? '',
     next_hall_ticket_no: props.exam.next_hall_ticket_no ?? 100,
     eligibility_config: {
         scope: eligibilityDefaults.scope ?? 'all',
