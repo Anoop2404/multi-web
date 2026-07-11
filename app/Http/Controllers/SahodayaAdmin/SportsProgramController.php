@@ -7,8 +7,10 @@ use App\Models\Certificate;
 use App\Models\FestEvent;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
+use App\Models\FestRankPoint;
 use App\Models\FestRegistration;
 use App\Models\Tenant;
+use App\Services\Events\FestRankPointService;
 use App\Services\Events\ProgramHubDataService;
 
 class SportsProgramController extends SahodayaAdminController
@@ -79,7 +81,7 @@ class SportsProgramController extends SahodayaAdminController
             ->ofType('sports')
             ->where('results_published', true)
             ->orderByDesc('event_start')
-            ->get(['id', 'title']);
+            ->get(['id', 'title', 'event_type']);
 
         $schoolIds = FestRegistration::query()
             ->whereIn('event_id', $events->pluck('id'))
@@ -88,18 +90,49 @@ class SportsProgramController extends SahodayaAdminController
             ->pluck('school_id');
 
         $schools = Tenant::whereIn('id', $schoolIds)->get(['id', 'name'])->keyBy('id');
+        $eventsById = $events->keyBy('id');
+        $configuredEventIds = FestRankPoint::query()
+            ->whereIn('event_id', $events->pluck('id'))
+            ->distinct()
+            ->pluck('event_id')
+            ->flip();
+        $rankPoints = app(FestRankPointService::class);
 
         $rows = FestMark::query()
             ->whereIn('event_id', $events->pluck('id'))
             ->whereNotNull('position')
-            ->where('position', '<=', 3)
-            ->with('participant.registration:id,school_id')
+            ->with([
+                'participant.registration:id,school_id',
+                'item:id,participant_type',
+            ])
             ->get()
             ->groupBy(fn (FestMark $mark) => $mark->participant?->registration?->school_id)
-            ->map(function ($marks, $schoolId) use ($schools) {
+            ->map(function ($marks, $schoolId) use ($schools, $eventsById, $configuredEventIds, $rankPoints) {
                 $gold = $marks->where('position', 1)->count();
                 $silver = $marks->where('position', 2)->count();
                 $bronze = $marks->where('position', 3)->count();
+
+                $points = $marks->sum(function (FestMark $mark) use ($eventsById, $configuredEventIds, $rankPoints) {
+                    $position = (int) $mark->position;
+                    $event = $eventsById->get($mark->event_id);
+                    if (! $event || $position < 1) {
+                        return 0;
+                    }
+
+                    if ($configuredEventIds->has($mark->event_id)) {
+                        $isGroup = in_array($mark->item?->participant_type, ['team', 'group'], true);
+
+                        return $rankPoints->pointsForRank($event, $position, $isGroup);
+                    }
+
+                    // Legacy fallback when the event has no FestRankPoint rows configured.
+                    return match ($position) {
+                        1 => 5,
+                        2 => 3,
+                        3 => 1,
+                        default => 0,
+                    };
+                });
 
                 return [
                     'school_id'   => $schoolId,
@@ -107,7 +140,7 @@ class SportsProgramController extends SahodayaAdminController
                     'gold'        => $gold,
                     'silver'      => $silver,
                     'bronze'      => $bronze,
-                    'points'      => ($gold * 5) + ($silver * 3) + ($bronze * 1),
+                    'points'      => (int) $points,
                 ];
             })
             ->filter(fn ($row) => $row['school_id'])
