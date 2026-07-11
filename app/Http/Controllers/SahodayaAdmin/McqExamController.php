@@ -337,13 +337,19 @@ class McqExamController extends SahodayaAdminController
         return back()->with('success', "Results published. {$ranked} student(s) ranked.");
     }
 
-    public function unpublishResults(string $tenantId, McqExam $exam)
+    public function unpublishResults(Request $request, string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         $exam->update(['results_published' => false]);
 
-        return back()->with('success', 'Results hidden.');
+        app(PlatformAuditLogger::class)->mcq(
+            $exam,
+            'mcq.results.unpublished',
+            "Talent Search results unpublished (reopened for correction) for {$exam->title} by {$request->user()?->name}",
+        );
+
+        return back()->with('success', 'Results hidden. Marks can now be edited; publish again when corrections are complete.');
     }
 
     public function storeMark(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)

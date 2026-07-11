@@ -37,6 +37,8 @@ class McqExamsWriteApiController extends SahodayaApiController
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
         abort_if($registration->exam_id !== $exam->id, 403);
+        abort_if($exam->results_published, 422, 'Results are published for this exam. Unpublish results before editing marks.');
+        abort_if($registration->blocksScoring(), 422, 'Marks cannot be entered for students marked '.$registration->attendanceStatusLabel().'.');
 
         $data = $request->validate([
             'correct_count'    => 'required|integer|min:0',

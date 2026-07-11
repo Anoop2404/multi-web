@@ -40,12 +40,13 @@
                     {{ exam.results_published ? 'Results published' : 'Results not published' }}
                 </p>
                 <p class="text-xs text-slate-600 mt-0.5">Schools {{ exam.results_published ? 'can' : 'cannot' }} view scores in their portal.</p>
+                <p v-if="exam.results_published" class="text-xs text-amber-700 mt-1">Marks are locked while results are published. Unpublish to reopen for correction.</p>
                 <p v-if="gradeBands?.length" class="text-xs text-slate-500 mt-1">
                     Grade bands: {{ gradeBands.map(b => `${b.label} (${b.min_percentage}-${b.max_percentage}%)`).join(' · ') }}
                 </p>
             </div>
             <button v-if="!exam.results_published" type="button" @click="publishResults" class="btn-primary text-sm">Publish results</button>
-            <button v-else type="button" @click="unpublishResults" class="btn-secondary text-sm">Unpublish</button>
+            <button v-else type="button" @click="unpublishResults" class="btn-secondary text-sm">Unpublish (reopen for correction)</button>
             <button v-if="exam.results_published" type="button" @click="generateCertificates" class="btn-secondary text-sm">Generate certificates</button>
         </div>
 
@@ -73,7 +74,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="r in filteredRegistrations" :key="r.id" :class="r.attendance_status === 'absent' ? 'opacity-60' : ''">
+                        <tr v-for="r in filteredRegistrations" :key="r.id" :class="['absent','malpractice','withheld'].includes(r.attendance_status) ? 'opacity-60' : ''">
                             <td>{{ r.student?.name || ('#' + r.student_id) }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
@@ -102,7 +103,8 @@
                             </td>
                             <td class="text-xs whitespace-nowrap">
                                 <button v-if="canEnterMarks(r)" type="button" @click="saveMark(r)" class="link-brand text-xs">Save</button>
-                                <span v-else-if="r.attendance_status === 'absent'" class="text-red-600">Absent</span>
+                                <span v-else-if="exam.results_published" class="text-amber-700">Results published</span>
+                                <span v-else-if="['absent','malpractice','withheld'].includes(r.attendance_status)" class="text-red-600 capitalize">{{ r.attendance_status }}</span>
                                 <span v-else class="text-slate-400">Mark present first</span>
                                 <a v-if="exam.results_published && r.mark && r.attendance_status !== 'absent'"
                                    :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/registrations/${r.id}/certificate`"
@@ -145,7 +147,7 @@ const markedCount = computed(() => props.registrations.filter((r) => r.mark?.sco
 const gradeOptions = computed(() => props.gradeBands?.length ? props.gradeBands.map((b) => b.label) : ['A+', 'A', 'B', 'C', 'D', 'F']);
 
 function canEnterMarks(r) {
-    return r.attendance_status === 'present';
+    return r.attendance_status === 'present' && !props.exam.results_published;
 }
 
 const filteredRegistrations = computed(() => {

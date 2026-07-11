@@ -416,6 +416,7 @@ class McqExamOpsController extends SahodayaAdminController
     public function bulkImportMarks(Request $request, string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($exam->results_published, 422, 'Results are published for this exam. Unpublish results before importing marks.');
 
         $request->validate(['file' => 'required|file|mimes:csv,txt']);
 

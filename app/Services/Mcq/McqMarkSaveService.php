@@ -22,6 +22,12 @@ class McqMarkSaveService
             ]);
         }
 
+        if ($exam->results_published) {
+            throw ValidationException::withMessages([
+                'results' => 'Results are published for this exam. Unpublish results before editing marks.',
+            ]);
+        }
+
         if ($exam->isOfflineDelivery() && $registration->attendance_status !== 'present') {
             throw ValidationException::withMessages([
                 'attendance' => 'Mark attendance as present before entering marks.',
