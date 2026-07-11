@@ -12,9 +12,14 @@ class FestRegistrationApprovalService
      * Used when the school's event fee is fully paid — fest no longer needs a
      * separate Sahodaya registration-approval step.
      *
+     * @param  ?int  $headId  When given, only registrations for items under this Event Head are
+     *                        auto-approved — used when a school pays one head's fee under
+     *                        sports_composite per-head billing, so paying Athletics doesn't also
+     *                        auto-approve a still-unpaid Chess registration. Omit for the old
+     *                        whole-event behavior (every fee model without heads).
      * @return int Number of registrations approved.
      */
-    public function approveSchoolEvent(FestEvent $event, string $schoolId): int
+    public function approveSchoolEvent(FestEvent $event, string $schoolId, ?int $headId = null): int
     {
         $count = 0;
 
@@ -22,6 +27,7 @@ class FestRegistrationApprovalService
             ->where('event_id', $event->id)
             ->where('school_id', $schoolId)
             ->whereIn('status', ['draft', 'submitted', 'pending_approval'])
+            ->when($headId !== null, fn ($q) => $q->whereHas('item', fn ($qq) => $qq->where('head_id', $headId)))
             ->orderBy('id')
             ->get()
             ->each(function (FestRegistration $registration) use (&$count) {

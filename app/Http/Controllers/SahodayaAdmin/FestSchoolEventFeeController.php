@@ -46,14 +46,19 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             $fullyPaid = $schoolEventFee->fresh()->isFullyPaid();
 
             if ($fullyPaid) {
-                FestEventInvoice::where('event_id', $schoolEventFee->event_id)
-                    ->where('school_id', $schoolEventFee->school_id)
-                    ->update(['status' => 'paid']);
-
-                // Fest no longer needs a separate registration approval — settling the
-                // fee auto-approves the school's registrations for this event.
+                // Fest no longer needs a separate registration approval — settling the fee
+                // auto-approves the school's registrations. For per-head billing this record
+                // covers only its own head, so only that head's registrations are approved,
+                // not the whole event (head_id is null for non-head events/fee models, which
+                // keeps the original whole-event behavior there).
                 app(\App\Services\Events\FestRegistrationApprovalService::class)
-                    ->approveSchoolEvent($event, $schoolEventFee->school_id);
+                    ->approveSchoolEvent($event, $schoolEventFee->school_id, $schoolEventFee->head_id);
+
+                if ($schoolEventFee->head_id === null) {
+                    FestEventInvoice::where('event_id', $schoolEventFee->event_id)
+                        ->where('school_id', $schoolEventFee->school_id)
+                        ->update(['status' => 'paid']);
+                }
             }
 
             return $fullyPaid;
@@ -111,7 +116,10 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             $schoolEventFee->update(['status' => 'rejected']);
         }
 
-        if (! $schoolEventFee->fresh()->isFullyPaid()) {
+        // Invoice-status rollup for per-head fee records is handled by FestInvoiceService
+        // (issueForSchool sums every head's fee record); only reset it directly here for
+        // the old non-head, single-record path.
+        if ($schoolEventFee->head_id === null && ! $schoolEventFee->fresh()->isFullyPaid()) {
             FestEventInvoice::where('event_id', $schoolEventFee->event_id)
                 ->where('school_id', $schoolEventFee->school_id)
                 ->where('status', 'paid')
