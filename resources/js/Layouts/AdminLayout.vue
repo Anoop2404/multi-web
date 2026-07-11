@@ -116,6 +116,7 @@ const stateNavGroups = computed(() => [
             { href: '/admin/state-programs', icon: '🏆', label: 'All Programs' },
             { href: '/admin/kalotsav', icon: '🎭', label: 'Kalotsav' },
             { href: '/admin/sports', icon: '⚽', label: 'Sports' },
+            { href: '/admin/board-results', icon: '📊', label: 'Board results' },
         ],
     },
     {

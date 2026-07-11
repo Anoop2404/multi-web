@@ -10,6 +10,7 @@ use App\Models\McqSchoolFee;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Models\TrainingRegistration;
+use App\Models\TrainingSchoolFee;
 use App\Services\Events\FestSchoolEventFeeService;
 use App\Support\IndianAmountInWords;
 use App\Support\SahodayaReceiptNumberAllocator;
@@ -86,6 +87,28 @@ class ProgramFeeReceiptService
         });
     }
 
+    public function issueTrainingSchoolBatch(TrainingSchoolFee $schoolFee, FeeReceipt $receipt): FeeReceipt
+    {
+        $schoolFee->loadMissing(['program', 'school']);
+        $sahodaya = Tenant::find($schoolFee->school?->parent_id);
+        abort_unless($sahodaya, 422, 'School Sahodaya not found.');
+
+        return $this->issueOnApprove($receipt, $sahodaya, 'TRN', function (string $receiptNo) use ($schoolFee, $receipt, $sahodaya) {
+            return View::make('receipts.program-fee-official', $this->buildViewData(
+                receipt: $receipt,
+                sahodaya: $sahodaya,
+                school: $schoolFee->school,
+                receiptNo: $receiptNo,
+                receiptTitle: 'Training Program Batch Fee Receipt',
+                contextLabel: $schoolFee->program?->title ?? 'Training Program',
+                detailLines: $this->filterDetailLines([
+                    ['label' => 'Teachers covered', 'value' => (string) $schoolFee->teacher_count],
+                    ['label' => 'Fee type', 'value' => 'School batch payment'],
+                ]),
+            ))->render();
+        });
+    }
+
     /** @param callable(string): string $htmlBuilder */
     public function issueOnApprove(FeeReceipt $receipt, Tenant $sahodaya, string $prefix, callable $htmlBuilder): FeeReceipt
     {
@@ -133,6 +156,7 @@ class ProgramFeeReceiptService
             McqSchoolFee::class => $this->issueMcqSchoolBatch($feeable, $receipt),
             McqRegistration::class => $this->issueMcqRegistration($feeable, $receipt),
             TrainingRegistration::class => $this->issueTraining($feeable, $receipt),
+            TrainingSchoolFee::class => $this->issueTrainingSchoolBatch($feeable, $receipt),
             default => null,
         };
 
@@ -202,7 +226,8 @@ class ProgramFeeReceiptService
         return match (true) {
             $feeable instanceof McqSchoolFee,
             $feeable instanceof McqRegistration,
-            $feeable instanceof TrainingRegistration => (string) $feeable->school_id,
+            $feeable instanceof TrainingRegistration,
+            $feeable instanceof TrainingSchoolFee => (string) $feeable->school_id,
             default => null,
         };
     }

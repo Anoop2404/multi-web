@@ -40,6 +40,7 @@ class HandleInertiaRequests extends Middleware
                 'warning'      => fn () => $request->session()->get('warning'),
                 'info'         => fn () => $request->session()->get('info'),
                 'importResult' => fn () => $request->session()->get('importResult'),
+                'import_errors' => fn () => $request->session()->get('import_errors'),
                 'newCredentials' => fn () => $request->session()->get('newCredentials'),
                 'mcqNewCredentials' => fn () => $request->session()->get('mcqNewCredentials'),
                 'studentPortalCredentials' => fn () => $request->session()->get('studentPortalCredentials'),

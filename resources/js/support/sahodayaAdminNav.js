@@ -60,6 +60,7 @@ export function detectSahodayaMembershipFromUrl(url) {
         || /\/student-change-requests(?:\/|$)/.test(path)
         || /\/users\/profile-change-requests(?:\/|$)/.test(path)
         || /\/documents\/(?:review|types)(?:\/|$)/.test(path)
+        || /\/board-results(?:\/|$)/.test(path)
         || /\/academic-years(?:\/|$)/.test(path)
         || /\/auth\/login-audit(?:\/|$)/.test(path)
         || /\/calendar(?:\/|$)/.test(path)
@@ -138,6 +139,8 @@ export function sahodayaMembershipScopedNav(sahodayaId, options = {}) {
                 { label: 'Student counts', href: `${base}/membership/submissions`, icon: 'inbox', badge: pendingSubmissionsCount },
                 { label: 'Membership reports', href: `${base}/membership/reports`, icon: 'bar-chart' },
                 { label: 'Document review', href: `${base}/documents/review`, icon: 'file-text' },
+                { label: 'Board results', href: `${base}/board-results/verification`, icon: 'bar-chart' },
+                { label: 'Board reports', href: `${base}/board-results/reports`, icon: 'file-text' },
                 { label: 'Program calendar', href: `${base}/calendar`, icon: 'calendar' },
                 { label: 'Login audit', href: `${base}/auth/login-audit`, icon: 'shield' },
             ],
@@ -164,6 +167,7 @@ export function sahodayaTrainingHubNav(sahodayaId, options = {}) {
             section: 'Teacher training',
             items: [
                 { label: 'Programs dashboard', href: `${base}/training`, icon: 'grid', exact: true },
+                { label: 'Resource persons', href: `${base}/training/resource-persons`, icon: 'users' },
             ],
         },
     ];
@@ -364,6 +368,8 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
                 { label: 'Reports hub', href: `${base}/reports/hub`, icon: 'inbox' },
                 { label: 'Login audit', href: `${base}/auth/login-audit`, icon: 'shield' },
                 { label: 'Document review', href: `${base}/documents/review`, icon: 'file-text' },
+                { label: 'Board results', href: `${base}/board-results/verification`, icon: 'bar-chart' },
+                { label: 'Board reports', href: `${base}/board-results/reports`, icon: 'file-text' },
                 { label: 'Program calendar', href: `${base}/calendar`, icon: 'calendar' },
             ],
         });

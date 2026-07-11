@@ -8,6 +8,7 @@ use App\Models\FestSchoolEventFee;
 use App\Models\McqRegistration;
 use App\Models\McqSchoolFee;
 use App\Models\TrainingRegistration;
+use App\Models\TrainingSchoolFee;
 use App\Services\Ledger\FeeReceiptLedgerDispatcher;
 
 class FeeReceiptObserver
@@ -38,6 +39,12 @@ class FeeReceiptObserver
         }
 
         if ($feeable instanceof TrainingRegistration) {
+            $feeable->loadMissing('program');
+
+            return $feeable->program?->tenant_id;
+        }
+
+        if ($feeable instanceof TrainingSchoolFee) {
             $feeable->loadMissing('program');
 
             return $feeable->program?->tenant_id;

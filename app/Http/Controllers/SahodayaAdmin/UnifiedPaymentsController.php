@@ -195,7 +195,9 @@ class UnifiedPaymentsController extends SahodayaAdminController
                 FestSchoolEventFee::findOrFail($id)->school_id
             ),
             'training' => Tenant::findOrFail(
-                TrainingRegistration::findOrFail($id)->school_id
+                str_starts_with($id, 'training-batch-')
+                    ? \App\Models\TrainingSchoolFee::findOrFail((int) str_replace('training-batch-', '', $id))->school_id
+                    : TrainingRegistration::findOrFail($id)->school_id
             ),
             'mcq' => Tenant::findOrFail(
                 str_starts_with($id, 'batch-')
@@ -219,6 +221,14 @@ class UnifiedPaymentsController extends SahodayaAdminController
                 ];
             })(),
             'training' => (function () use ($id) {
+                if (str_starts_with($id, 'training-batch-')) {
+                    $fee = \App\Models\TrainingSchoolFee::with('program')->findOrFail((int) str_replace('training-batch-', '', $id));
+
+                    return [
+                        'fee_type' => 'Training batch fee',
+                        'title'    => $fee->program?->title ?? 'Training program',
+                    ];
+                }
                 $reg = TrainingRegistration::with('program')->findOrFail($id);
 
                 return [

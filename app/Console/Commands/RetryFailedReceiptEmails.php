@@ -129,6 +129,17 @@ class RetryFailedReceiptEmails extends Command
             );
         }
 
+        if ($receipt->feeable_type === (new \App\Models\TrainingSchoolFee)->getMorphClass()) {
+            $fee = \App\Models\TrainingSchoolFee::with('program')->find($receipt->feeable_id);
+
+            return $orchestrator->notifyApproved(
+                $school,
+                $receipt,
+                'Training batch fee',
+                $fee?->program?->title ?? 'Training Program',
+            );
+        }
+
         return false;
     }
 }

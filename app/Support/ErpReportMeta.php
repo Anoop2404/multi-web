@@ -323,11 +323,13 @@ class ErpReportMeta
             'RPT-MCQ-008' => ['columns' => ['exam', 'rank', 'student', 'school', 'score'], 'filters' => ['exam_id']],
             'RPT-MCQ-009' => ['columns' => ['exam', 'question', 'attempts', 'correct_pct'], 'filters' => ['exam_id']],
             'RPT-MCQ-010' => ['columns' => ['exam', 'student', 'school', 'status'], 'filters' => ['exam_id']],
-            'RPT-MCQ-011' => ['columns' => ['school', 'exam', 'registered', 'present', 'avg_score'], 'filters' => ['exam_id']],
+            'RPT-MCQ-011' => ['columns' => ['school', 'exam', 'registered', 'present', 'examined', 'avg_score', 'pass_rate', 'top_10', 'top_50', 'ranked'], 'filters' => ['exam_id']],
             'RPT-MCQ-012' => ['columns' => ['exam', 'tier', 'cutoff_score', 'promoted_count'], 'filters' => ['exam_id']],
             'RPT-MCQ-013' => ['columns' => ['exam', 'student', 'school', 'action', 'ip_address', 'created_at'], 'filters' => ['exam_id']],
             'RPT-MCQ-014' => ['columns' => ['bank', 'questions', 'created_at']],
             'RPT-MCQ-015' => ['columns' => ['exam', 'status', 'registration_opens', 'registration_closes', 'registered']],
+            'RPT-MCQ-016' => ['columns' => ['exam', 'examined', 'pass_rate', 'mean_score', 'median_score'], 'filters' => ['exam_id']],
+            'RPT-MCQ-017' => ['columns' => ['hall_ticket', 'participant', 'school', 'status', 'note'], 'filters' => ['exam_id']],
 
             // Training
             'RPT-TRN-001' => ['columns' => ['program', 'status', 'capacity', 'enrolled', 'fee']],
@@ -341,8 +343,18 @@ class ErpReportMeta
             'RPT-TRN-009' => ['columns' => ['program', 'capacity', 'enrolled', 'utilization_pct']],
             'RPT-TRN-010' => ['columns' => ['school', 'program', 'teacher', 'amount', 'status']],
             'RPT-TRN-011' => ['columns' => ['program', 'teacher', 'school', 'status', 'submitted_at']],
-            'RPT-TRN-012' => ['columns' => ['program', 'resource_person', 'sessions', 'status']],
+            'RPT-TRN-012' => ['columns' => ['program', 'resource_person', 'role', 'sessions', 'honorarium', 'status']],
             'RPT-TRN-013' => ['columns' => ['school', 'teachers', 'hours', 'sessions_present', 'year']],
+            'RPT-TRN-014' => ['columns' => ['program', 'teacher_type', 'participants', 'confirmed', 'waitlisted']],
+            'RPT-TRN-015' => ['columns' => ['program', 'subject', 'participants', 'confirmed']],
+            'RPT-TRN-016' => ['columns' => ['program', 'session', 'date', 'present', 'late', 'absent', 'with_permission']],
+
+            // Board results (FRD-21)
+            'RPT-BRD-001' => ['columns' => ['school', 'class', 'examination_type', 'academic_year', 'appeared', 'passed', 'pass_percent', 'distinctions', 'highest_mark', 'status'], 'filters' => ['academic_year']],
+            'RPT-BRD-002' => ['columns' => ['rank', 'school', 'class', 'examination_type', 'score', 'pass_percent', 'scope'], 'filters' => ['academic_year']],
+            'RPT-BRD-003' => ['columns' => ['school', 'class', 'examination_type', 'academic_year', 'pass_percent', 'appeared', 'passed'], 'filters' => ['academic_year']],
+            'RPT-BRD-004' => ['columns' => ['rank', 'student', 'school', 'admission_no', 'roll_no', 'percentage', 'marks_obtained', 'total_marks'], 'filters' => ['academic_year']],
+            'RPT-BRD-005' => ['columns' => ['stream', 'rank', 'student', 'school', 'percentage', 'admission_no', 'roll_no'], 'filters' => ['academic_year']],
 
             // Email
             'RPT-EML-001' => ['columns' => ['recipient', 'template_key', 'status', 'sent_at', 'error'], 'filters' => ['from', 'to']],

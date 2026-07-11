@@ -834,25 +834,31 @@ class ErpReportQueryService
     private function mcqSchoolPerformance(string $sahodayaId, array $filters = []): Collection
     {
         $examIds = McqExam::where('tenant_id', $sahodayaId)->pluck('id');
+        $reportService = app(\App\Services\Mcq\McqReportService::class);
 
-        return McqRegistration::query()
-            ->whereIn('exam_id', $examIds)
-            ->when(! empty($filters['exam_id']), fn ($q) => $q->where('exam_id', $filters['exam_id']))
-            ->with(['exam:id,title', 'school:id,name'])
-            ->get()
-            ->groupBy(fn (McqRegistration $r) => $r->exam_id.'|'.$r->school_id)
-            ->map(function ($group) {
-                $first = $group->first();
+        $exams = McqExam::whereIn('id', $examIds)
+            ->when(! empty($filters['exam_id']), fn ($q) => $q->where('id', $filters['exam_id']))
+            ->get();
 
-                return [
-                    'school'     => $first->school?->name,
-                    'exam'       => $first->exam?->title,
-                    'registered' => $group->count(),
-                    'present'    => $group->where('attendance_status', 'present')->count(),
-                    'avg_score'  => '—',
-                ];
-            })
-            ->values();
+        $rows = collect();
+        foreach ($exams as $exam) {
+            foreach ($reportService->schoolPerformanceRows($exam) as $row) {
+                $rows->push([
+                    'school'     => $row['school_name'],
+                    'exam'       => $exam->title,
+                    'registered' => $row['registered'],
+                    'present'    => $row['present'],
+                    'examined'   => $row['examined'],
+                    'avg_score'  => $row['avg_score'] ?? '—',
+                    'pass_rate'  => $row['pass_rate'] ?? '—',
+                    'top_10'     => $row['top_10'],
+                    'top_50'     => $row['top_50'],
+                    'ranked'     => $row['ranked'],
+                ]);
+            }
+        }
+
+        return $rows->values();
     }
 
     private function festRegistrationWindowStatus(string $sahodayaId, ?string $eventType = null): Collection

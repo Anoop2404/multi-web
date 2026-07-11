@@ -231,6 +231,31 @@ class NotificationTemplatesSeeder extends Seeder
                 'body_template' => 'Fee proof for {{program_title}} was rejected. {{reason}}',
             ],
             [
+                'slug'          => 'training.payment.reminder',
+                'title'         => 'Training fee payment reminder',
+                'body_template' => 'Payment of ₹{{amount}} is still pending for {{program_title}}. Please upload or complete your fee payment.',
+            ],
+            [
+                'slug'          => 'training.reminder',
+                'title'         => 'Training program reminder',
+                'body_template' => 'Reminder: {{program_title}} starts on {{start_date}}. Venue: {{venue}}.',
+            ],
+            [
+                'slug'          => 'training.session.reminder',
+                'title'         => 'Training session reminder',
+                'body_template' => '{{session_title}} for {{program_title}} is scheduled at {{scheduled_at}}. Venue: {{venue}}.',
+            ],
+            [
+                'slug'          => 'training.certificate.available',
+                'title'         => 'Training certificate available',
+                'body_template' => 'Your certificate for {{program_title}} is now available.',
+            ],
+            [
+                'slug'          => 'training.waitlist.promoted',
+                'title'         => 'Training waitlist — seat available',
+                'body_template' => 'A seat opened for {{program_title}}. Your registration is now {{status}}. Welcome, {{teacher_name}}.',
+            ],
+            [
                 'slug'          => 'fest.appeal.received',
                 'title'         => 'Fest appeal received',
                 'body_template' => 'An appeal was submitted for {{participant_name}} at {{event_title}}.',
@@ -254,6 +279,46 @@ class NotificationTemplatesSeeder extends Seeder
                 'slug'          => 'mcq.attendance_correction.rejected',
                 'title'         => 'Attendance correction rejected',
                 'body_template' => 'Your attendance correction request for {{student_name}} ({{exam_title}}) was rejected. {{reason}}',
+            ],
+            [
+                'slug'          => 'mcq.exam.reminder',
+                'title'         => 'Talent Search exam reminder',
+                'body_template' => 'Reminder: {{exam_title}} is scheduled on {{scheduled_at}}. Venue: {{venue}}. Please arrive on time with your hall ticket.',
+            ],
+            [
+                'slug'          => 'mcq.certificate.ready',
+                'title'         => 'Talent Search certificate ready',
+                'body_template' => 'Your certificate for {{exam_title}} is now available.',
+            ],
+            [
+                'slug'          => 'board_results.upload_reminder',
+                'title'         => 'Board result upload reminder',
+                'body_template' => 'Reminder: please upload and submit Class {{class}} ({{examination_type}}) board results for {{academic_year}}.',
+            ],
+            [
+                'slug'          => 'board_results.submission_confirmation',
+                'title'         => 'Board result submitted',
+                'body_template' => 'Your Class {{class}} ({{examination_type}}) result for {{academic_year}} was submitted for Sahodaya verification.',
+            ],
+            [
+                'slug'          => 'board_results.verification_pending',
+                'title'         => 'Board result awaiting verification',
+                'body_template' => '{{school_name}} submitted Class {{class}} ({{examination_type}}) results for {{academic_year}} and is awaiting verification.',
+            ],
+            [
+                'slug'          => 'board_results.result_approved',
+                'title'         => 'Board result approved',
+                'body_template' => 'Your Class {{class}} ({{examination_type}}) result for {{academic_year}} has been approved by Sahodaya.',
+            ],
+            [
+                'slug'          => 'board_results.result_rejected',
+                'title'         => 'Board result rejected',
+                'body_template' => 'Your Class {{class}} ({{examination_type}}) result for {{academic_year}} was rejected. Reason: {{reason}}',
+            ],
+            [
+                'slug'          => 'board_results.result_published',
+                'title'         => 'Board result published',
+                'body_template' => 'Your Class {{class}} ({{examination_type}}) result for {{academic_year}} is now published. Pass %: {{pass_percent}}.',
             ],
         ];
     }

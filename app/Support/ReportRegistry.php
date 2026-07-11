@@ -26,6 +26,7 @@ class ReportRegistry
             self::kalotsavReports($base),
             self::mcqReports($base),
             self::trainingReports($base),
+            self::boardResultReports($base),
             self::emailReports($base),
             self::auditReports($base),
             self::documentReports($base),
@@ -365,6 +366,8 @@ class ReportRegistry
             self::row('RPT-MCQ-013', 'Exam IP audit', 'mcq', 'new', self::runnerHref($base, 'RPT-MCQ-013'), null, true),
             self::row('RPT-MCQ-014', 'Question bank export', 'mcq', 'retain', "{$base}/mcq/question-banks"),
             self::row('RPT-MCQ-015', 'Registration window status', 'mcq', 'new', "{$base}/mcq"),
+            self::row('RPT-MCQ-016', 'Result analysis', 'mcq', 'new', "{$base}/mcq-exams"),
+            self::row('RPT-MCQ-017', 'Malpractice register', 'mcq', 'new', "{$base}/mcq-exams"),
         ];
     }
 
@@ -385,6 +388,21 @@ class ReportRegistry
             self::row('RPT-TRN-011', 'Nomination approval queue', 'training', 'retain', "{$base}/training"),
             self::row('RPT-TRN-012', 'Resource person assignment', 'training', 'new', "{$base}/training"),
             self::row('RPT-TRN-013', 'School-wise CPD hours', 'training', 'new', self::runnerHref($base, 'RPT-TRN-013'), null, true),
+            self::row('RPT-TRN-014', 'Teacher-type wise participation', 'training', 'new', self::runnerHref($base, 'RPT-TRN-014'), null, true),
+            self::row('RPT-TRN-015', 'Subject-wise participation', 'training', 'new', self::runnerHref($base, 'RPT-TRN-015'), null, true),
+            self::row('RPT-TRN-016', 'Day-wise participation', 'training', 'new', self::runnerHref($base, 'RPT-TRN-016'), null, true),
+        ];
+    }
+
+    /** @return list<array<string, string>> */
+    private static function boardResultReports(string $base): array
+    {
+        return [
+            self::row('RPT-BRD-001', 'School Result Summary', 'board_results', 'new', self::runnerHref($base, 'RPT-BRD-001'), null, true),
+            self::row('RPT-BRD-002', 'Overall Ranking', 'board_results', 'new', self::runnerHref($base, 'RPT-BRD-002'), null, true),
+            self::row('RPT-BRD-003', 'Pass % Report', 'board_results', 'new', self::runnerHref($base, 'RPT-BRD-003'), null, true),
+            self::row('RPT-BRD-004', 'Class X Merit Register', 'board_results', 'new', self::runnerHref($base, 'RPT-BRD-004'), null, true),
+            self::row('RPT-BRD-005', 'Stream Merit Register', 'board_results', 'new', self::runnerHref($base, 'RPT-BRD-005'), null, true),
         ];
     }
 

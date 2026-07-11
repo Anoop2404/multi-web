@@ -77,6 +77,16 @@ class ReceiptEmailResendService
             return $ok;
         }
 
+        if ($receipt->feeable_type === (new \App\Models\TrainingSchoolFee)->getMorphClass()) {
+            $fee = \App\Models\TrainingSchoolFee::with('program')->find($receipt->feeable_id);
+            $ok = $this->orchestrator->notifyApproved($school, $receipt, 'Training batch fee', $fee?->program?->title ?? 'Training Program');
+            if ($ok) {
+                $this->tracker->markSent($receipt->fresh());
+            }
+
+            return $ok;
+        }
+
         return false;
     }
 

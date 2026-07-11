@@ -4,6 +4,8 @@ namespace App\Services\Reports\Concerns;
 
 use App\Models\Alumni;
 use App\Models\AuditLog;
+use App\Models\BoardResult;
+use App\Models\BoardResultRanking;
 use App\Models\FeeReceipt;
 use App\Models\LedgerOpeningBalance;
 use App\Models\LedgerTransaction;
@@ -27,15 +29,19 @@ use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\TcRequest;
 use App\Models\Tenant;
+use App\Models\Topper;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
+use App\Models\TrainingAttendance;
 use App\Models\TrainingFeedback;
 use App\Models\TrainingSession;
+use App\Models\Subject;
 use App\Models\User;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
+use App\Services\BoardResults\RankingEngine;
 use App\Services\Ledger\FinancialStatementsService;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Training\TrainingCpdService;
@@ -128,6 +134,8 @@ trait QueriesExtendedReports
             'RPT-MCQ-012' => $this->rptMcqTierCutoffs($sahodayaId, $filters),
             'RPT-MCQ-014' => $this->rptMcqQuestionBankExport($sahodayaId),
             'RPT-MCQ-015' => $this->rptMcqRegistrationWindow($sahodayaId),
+            'RPT-MCQ-016' => $this->rptMcqResultAnalysis($sahodayaId, $filters),
+            'RPT-MCQ-017' => $this->rptMcqMalpracticeRegister($sahodayaId, $filters),
 
             'RPT-TRN-001' => $this->rptTrainingProgramList($sahodayaId),
             'RPT-TRN-002' => $this->rptTrainingNominationsBySchool($sahodayaId),
@@ -138,6 +146,15 @@ trait QueriesExtendedReports
             'RPT-TRN-011' => $this->rptTrainingNominationQueue($sahodayaId),
             'RPT-TRN-012' => $this->rptTrainingResourcePersons($sahodayaId),
             'RPT-TRN-013' => $this->rptTrainingCpdBySchool($sahodayaId),
+            'RPT-TRN-014' => $this->rptTrainingTeacherTypeParticipation($sahodayaId),
+            'RPT-TRN-015' => $this->rptTrainingSubjectParticipation($sahodayaId),
+            'RPT-TRN-016' => $this->rptTrainingDayWiseParticipation($sahodayaId),
+
+            'RPT-BRD-001' => $this->rptBoardResultSummary($sahodayaId, $filters),
+            'RPT-BRD-002' => $this->rptBoardOverallRanking($sahodayaId, $filters),
+            'RPT-BRD-003' => $this->rptBoardPassPercent($sahodayaId, $filters),
+            'RPT-BRD-004' => $this->rptBoardClassXMerit($sahodayaId, $filters),
+            'RPT-BRD-005' => $this->rptBoardStreamMerit($sahodayaId, $filters),
 
             'RPT-EML-001' => $this->rptEmailDeliveryLog($filters),
             'RPT-EML-002' => $this->rptFailedEmails($filters),
@@ -1154,10 +1171,51 @@ trait QueriesExtendedReports
         return McqExam::where('tenant_id', $sahodayaId)->withCount('registrations')->orderByDesc('scheduled_at')->get()
             ->map(fn (McqExam $e) => [
                 'exam' => $e->title, 'status' => $e->status,
-                'registration_opens' => $e->settings_json['registration_open'] ?? '—',
-                'registration_closes' => $e->settings_json['registration_close'] ?? '—',
+                'registration_opens' => $e->registration_opens_at?->toDateTimeString()
+                    ?? ($e->settings_json['registration_open'] ?? '—'),
+                'registration_closes' => $e->registration_closes_at?->toDateTimeString()
+                    ?? ($e->settings_json['registration_close'] ?? '—'),
+                'result_date' => $e->result_date?->toDateString() ?? '—',
                 'registered' => $e->registrations_count,
             ]);
+    }
+
+    /** @param  array<string, mixed>  $filters */
+    protected function rptMcqResultAnalysis(string $sahodayaId, array $filters): Collection
+    {
+        $exams = McqExam::where('tenant_id', $sahodayaId)
+            ->when(! empty($filters['exam_id']), fn ($q) => $q->where('id', $filters['exam_id']))
+            ->where('results_published', true)
+            ->get();
+
+        $reports = app(\App\Services\Mcq\McqReportService::class);
+
+        return $exams->map(function (McqExam $exam) use ($reports) {
+            $analysis = $reports->resultAnalysis($exam);
+
+            return [
+                'exam' => $exam->title,
+                'examined' => $analysis['examined'],
+                'pass_rate' => $analysis['pass_rate'],
+                'mean_score' => $analysis['mean_score'],
+                'median_score' => $analysis['median_score'],
+            ];
+        })->values();
+    }
+
+    /** @param  array<string, mixed>  $filters */
+    protected function rptMcqMalpracticeRegister(string $sahodayaId, array $filters): Collection
+    {
+        return $this->mcqRegistrationsQuery($sahodayaId, $filters)
+            ->filter(fn (McqRegistration $r) => in_array($r->attendance_status, ['malpractice', 'withheld'], true))
+            ->map(fn (McqRegistration $r) => [
+                'hall_ticket' => $r->hall_ticket_no,
+                'participant' => $r->participantName(),
+                'school' => $r->school?->name,
+                'status' => $r->attendance_status,
+                'note' => $r->attendance_note,
+            ])
+            ->values();
     }
 
     /** @param  array<string, mixed>  $filters */
@@ -1167,7 +1225,7 @@ trait QueriesExtendedReports
 
         return McqRegistration::whereIn('exam_id', $examIds)
             ->when(! empty($filters['exam_id']), fn ($q) => $q->where('exam_id', $filters['exam_id']))
-            ->with(['exam:id,title', 'student:id,name', 'school:id,name'])->get();
+            ->with(['exam:id,title', 'student:id,name', 'teacher:id,name', 'school:id,name'])->get();
     }
 
     protected function rptTrainingProgramList(string $sahodayaId): Collection
@@ -1264,11 +1322,148 @@ trait QueriesExtendedReports
 
     protected function rptTrainingResourcePersons(string $sahodayaId): Collection
     {
-        return TrainingProgram::where('tenant_id', $sahodayaId)->with('sessions')->get()
-            ->flatMap(fn (TrainingProgram $p) => $p->sessions->map(fn (TrainingSession $s) => [
-                'program' => $p->title, 'resource_person' => $s->title,
-                'sessions' => 1, 'status' => $p->status,
-            ]));
+        return TrainingProgram::where('tenant_id', $sahodayaId)
+            ->with(['sessions.resourcePerson', 'resourcePersons'])
+            ->get()
+            ->flatMap(function (TrainingProgram $program) {
+                /** @var array<int, array{program: string, resource_person: string, role: ?string, sessions: int, honorarium: mixed, status: string}> $rows */
+                $rows = [];
+
+                foreach ($program->resourcePersons as $person) {
+                    $rows[$person->id] = [
+                        'program' => $program->title,
+                        'resource_person' => $person->name,
+                        'role' => $person->pivot->role,
+                        'sessions' => 0,
+                        'honorarium' => $person->pivot->honorarium,
+                        'status' => $program->status,
+                    ];
+                }
+
+                foreach ($program->sessions as $session) {
+                    if (! $session->resource_person_id) {
+                        continue;
+                    }
+
+                    $personId = (int) $session->resource_person_id;
+                    $name = $session->resourcePerson?->name;
+
+                    if (! isset($rows[$personId])) {
+                        $rows[$personId] = [
+                            'program' => $program->title,
+                            'resource_person' => $name ?? '—',
+                            'role' => null,
+                            'sessions' => 0,
+                            'honorarium' => null,
+                            'status' => $program->status,
+                        ];
+                    } elseif ($name) {
+                        $rows[$personId]['resource_person'] = $name;
+                    }
+
+                    $rows[$personId]['sessions']++;
+                }
+
+                return collect($rows)->values();
+            });
+    }
+
+    protected function rptTrainingTeacherTypeParticipation(string $sahodayaId): Collection
+    {
+        return TrainingRegistration::whereIn('school_id', $this->schoolIds($sahodayaId))
+            ->whereNotIn('status', ['cancelled', 'rejected'])
+            ->with(['program:id,title', 'teacher.teachingType'])
+            ->get()
+            ->groupBy(fn (TrainingRegistration $r) => ($r->program_id ?? 0).'|'.($r->teacher?->teaching_type_id ?? 0))
+            ->map(function ($group) {
+                /** @var \Illuminate\Support\Collection<int, TrainingRegistration> $group */
+                $first = $group->first();
+
+                return [
+                    'program' => $first->program?->title ?? '—',
+                    'teacher_type' => $first->teacher?->teachingType?->label ?? 'Unspecified',
+                    'participants' => $group->count(),
+                    'confirmed' => $group->whereIn('status', ['confirmed', 'completed'])->count(),
+                    'waitlisted' => $group->where('status', 'waitlisted')->count(),
+                ];
+            })
+            ->sortBy(['program', 'teacher_type'])
+            ->values();
+    }
+
+    protected function rptTrainingSubjectParticipation(string $sahodayaId): Collection
+    {
+        $subjectLabels = Subject::forSahodaya($sahodayaId)->pluck('label', 'id');
+
+        $rows = [];
+        TrainingRegistration::whereIn('school_id', $this->schoolIds($sahodayaId))
+            ->whereNotIn('status', ['cancelled', 'rejected', 'waitlisted'])
+            ->with(['program:id,title', 'teacher:id,subject_ids'])
+            ->get()
+            ->each(function (TrainingRegistration $r) use (&$rows, $subjectLabels) {
+                $ids = array_map('intval', $r->teacher?->subject_ids ?? []);
+                if ($ids === []) {
+                    $key = ($r->program_id ?? 0).'|0';
+                    if (! isset($rows[$key])) {
+                        $rows[$key] = [
+                            'program' => $r->program?->title ?? '—',
+                            'subject' => 'Unspecified',
+                            'participants' => 0,
+                            'confirmed' => 0,
+                        ];
+                    }
+                    $rows[$key]['participants']++;
+                    if (in_array($r->status, ['confirmed', 'completed'], true)) {
+                        $rows[$key]['confirmed']++;
+                    }
+
+                    return;
+                }
+
+                foreach ($ids as $subjectId) {
+                    $key = ($r->program_id ?? 0).'|'.$subjectId;
+                    if (! isset($rows[$key])) {
+                        $rows[$key] = [
+                            'program' => $r->program?->title ?? '—',
+                            'subject' => $subjectLabels->get($subjectId) ?? "Subject #{$subjectId}",
+                            'participants' => 0,
+                            'confirmed' => 0,
+                        ];
+                    }
+                    $rows[$key]['participants']++;
+                    if (in_array($r->status, ['confirmed', 'completed'], true)) {
+                        $rows[$key]['confirmed']++;
+                    }
+                }
+            });
+
+        return collect($rows)->sortBy(['program', 'subject'])->values();
+    }
+
+    protected function rptTrainingDayWiseParticipation(string $sahodayaId): Collection
+    {
+        $programIds = TrainingProgram::where('tenant_id', $sahodayaId)->pluck('id');
+
+        return TrainingSession::whereIn('program_id', $programIds)
+            ->with('program:id,title')
+            ->orderBy('scheduled_at')
+            ->get()
+            ->map(function (TrainingSession $session) {
+                $counts = TrainingAttendance::where('session_id', $session->id)
+                    ->selectRaw('status, COUNT(*) as total')
+                    ->groupBy('status')
+                    ->pluck('total', 'status');
+
+                return [
+                    'program' => $session->program?->title ?? '—',
+                    'session' => $session->title,
+                    'date' => $session->scheduled_at?->format('j M Y') ?? '—',
+                    'present' => (int) ($counts['present'] ?? 0),
+                    'late' => (int) ($counts['late'] ?? 0),
+                    'absent' => (int) ($counts['absent'] ?? 0),
+                    'with_permission' => (int) ($counts['with_permission'] ?? 0),
+                ];
+            });
     }
 
     /** @param  array<string, mixed>  $filters */
@@ -1458,6 +1653,137 @@ trait QueriesExtendedReports
                 'registrations_today' => FestRegistration::where('event_id', $e->id)->whereDate('created_at', today())->count(),
                 'pending_marks' => FestEventItem::where('event_id', $e->id)->whereNull('results_published_at')->count(),
                 'pending_payments' => FestSchoolEventFee::where('event_id', $e->id)->whereNotIn('status', ['approved', 'waived'])->count(),
+            ]);
+    }
+
+    /** @param  array<string, mixed>  $filters */
+    protected function rptBoardResultSummary(string $sahodayaId, array $filters): Collection
+    {
+        $year = $filters['academic_year'] ?? AcademicYear::forSahodaya($sahodayaId);
+        $schoolIds = $this->schoolIds($sahodayaId);
+        $names = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
+
+        return BoardResult::query()
+            ->whereIn('tenant_id', $schoolIds)
+            ->where('academic_year', $year)
+            ->orderBy('tenant_id')
+            ->orderBy('class')
+            ->get()
+            ->map(fn (BoardResult $r) => [
+                'school' => $names[$r->tenant_id] ?? $r->tenant_id,
+                'class' => $r->class,
+                'examination_type' => $r->examination_type,
+                'academic_year' => $r->academic_year,
+                'appeared' => $r->total_appeared,
+                'passed' => $r->pass_count,
+                'pass_percent' => $r->pass_percent,
+                'distinctions' => $r->distinctions,
+                'highest_mark' => $r->highest_mark,
+                'status' => $r->status,
+            ]);
+    }
+
+    /** @param  array<string, mixed>  $filters */
+    protected function rptBoardOverallRanking(string $sahodayaId, array $filters): Collection
+    {
+        $year = $filters['academic_year'] ?? AcademicYear::forSahodaya($sahodayaId);
+        $names = Tenant::where('parent_id', $sahodayaId)->where('type', 'school')->pluck('name', 'id');
+
+        return BoardResultRanking::query()
+            ->where('sahodaya_id', $sahodayaId)
+            ->where('academic_year', $year)
+            ->whereIn('scope', [RankingEngine::SCOPE_OVERALL, RankingEngine::SCOPE_OVERALL_PASS_PERCENT])
+            ->orderBy('scope')
+            ->orderBy('rank')
+            ->get()
+            ->map(fn (BoardResultRanking $r) => [
+                'rank' => $r->rank,
+                'school' => $names[$r->entity_id] ?? $r->entity_id,
+                'class' => $r->class,
+                'examination_type' => $r->examination_type,
+                'score' => $r->score,
+                'pass_percent' => $r->meta['pass_percent'] ?? null,
+                'scope' => $r->scope,
+            ]);
+    }
+
+    /** @param  array<string, mixed>  $filters */
+    protected function rptBoardPassPercent(string $sahodayaId, array $filters): Collection
+    {
+        $year = $filters['academic_year'] ?? AcademicYear::forSahodaya($sahodayaId);
+        $schoolIds = $this->schoolIds($sahodayaId);
+        $names = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
+
+        return BoardResult::query()
+            ->whereIn('tenant_id', $schoolIds)
+            ->where('academic_year', $year)
+            ->whereIn('status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED])
+            ->orderByDesc('pass_percent')
+            ->get()
+            ->map(fn (BoardResult $r) => [
+                'school' => $names[$r->tenant_id] ?? $r->tenant_id,
+                'class' => $r->class,
+                'examination_type' => $r->examination_type,
+                'academic_year' => $r->academic_year,
+                'pass_percent' => $r->pass_percent,
+                'appeared' => $r->total_appeared,
+                'passed' => $r->pass_count,
+            ]);
+    }
+
+    /** @param  array<string, mixed>  $filters */
+    protected function rptBoardClassXMerit(string $sahodayaId, array $filters): Collection
+    {
+        $year = $filters['academic_year'] ?? AcademicYear::forSahodaya($sahodayaId);
+        $schoolIds = $this->schoolIds($sahodayaId);
+        $names = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
+
+        return Topper::query()
+            ->whereHas('boardResult', fn ($q) => $q
+                ->whereIn('tenant_id', $schoolIds)
+                ->where('academic_year', $year)
+                ->where('class', 10)
+                ->published())
+            ->orderByDesc('percentage')
+            ->orderBy('rank')
+            ->get()
+            ->map(fn (Topper $t) => [
+                'rank' => $t->rank,
+                'student' => $t->name,
+                'school' => $names[$t->tenant_id] ?? $t->tenant_id,
+                'admission_no' => $t->admission_no,
+                'roll_no' => $t->roll_no,
+                'percentage' => $t->percentage,
+                'marks_obtained' => $t->marks_obtained,
+                'total_marks' => $t->total_marks,
+            ]);
+    }
+
+    /** @param  array<string, mixed>  $filters */
+    protected function rptBoardStreamMerit(string $sahodayaId, array $filters): Collection
+    {
+        $year = $filters['academic_year'] ?? AcademicYear::forSahodaya($sahodayaId);
+        $schoolIds = $this->schoolIds($sahodayaId);
+        $names = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
+
+        return Topper::query()
+            ->whereHas('boardResult', fn ($q) => $q
+                ->whereIn('tenant_id', $schoolIds)
+                ->where('academic_year', $year)
+                ->where('class', 12)
+                ->published())
+            ->with('examStream')
+            ->orderBy('stream')
+            ->orderByDesc('percentage')
+            ->get()
+            ->map(fn (Topper $t) => [
+                'stream' => $t->examStream?->label ?? $t->stream,
+                'rank' => $t->rank,
+                'student' => $t->name,
+                'school' => $names[$t->tenant_id] ?? $t->tenant_id,
+                'percentage' => $t->percentage,
+                'admission_no' => $t->admission_no,
+                'roll_no' => $t->roll_no,
             ]);
     }
 }

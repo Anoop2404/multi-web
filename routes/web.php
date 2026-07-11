@@ -28,6 +28,7 @@ use App\Http\Controllers\SahodayaAdmin\SportsAgeGroupController;
 use App\Http\Controllers\SahodayaAdmin\LedgerController;
 use App\Http\Controllers\SahodayaAdmin\McqExamController;
 use App\Http\Controllers\SahodayaAdmin\TrainingProgramController;
+use App\Http\Controllers\SahodayaAdmin\TrainingResourcePersonController;
 use App\Http\Controllers\SahodayaAdmin\FestResultsController;
 use App\Http\Controllers\SahodayaAdmin\ScreenSettingController;
 use App\Http\Controllers\Portal\JudgeDashboardController;
@@ -111,6 +112,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
         });
 
         Route::get('/sports', [\App\Http\Controllers\Admin\SportsResultsController::class, 'index'])->name('sports.index');
+        Route::get('/board-results', [\App\Http\Controllers\StateAdmin\StateBoardResultsController::class, 'index'])->name('board-results.index');
 
         Route::get('/sahodayas', [TenantController::class, 'indexSahodayas'])->name('sahodayas.index');
     });
@@ -519,6 +521,9 @@ Route::prefix('school-admin/{tenantId}')
     // Board Results
     Route::get('/board-results',                                   [BoardResultController::class, 'index'])->name('board-results.index');
     Route::post('/board-results',                                  [BoardResultController::class, 'store'])->name('board-results.store');
+    Route::put('/board-results/{boardResult}',                     [BoardResultController::class, 'update'])->name('board-results.update');
+    Route::post('/board-results/{boardResult}/submit',             [BoardResultController::class, 'submit'])->name('board-results.submit');
+    Route::post('/board-results/{boardResult}/upload-pdf',         [BoardResultController::class, 'uploadPdf'])->name('board-results.upload-pdf');
     Route::delete('/board-results/{boardResult}',                  [BoardResultController::class, 'destroy'])->name('board-results.destroy');
     Route::get('/board-results/{boardResult}/toppers',             [BoardResultController::class, 'toppers'])->name('board-results.toppers');
     Route::post('/board-results/{boardResult}/toppers',            [BoardResultController::class, 'storeTopper'])->name('board-results.toppers.store');
@@ -771,6 +776,19 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{document}/approve', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentReviewController::class, 'approve'])->name('approve');
             Route::post('/{document}/reject', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentReviewController::class, 'reject'])->name('reject');
             Route::get('/{document}/download', [\App\Http\Controllers\SahodayaAdmin\SchoolDocumentReviewController::class, 'download'])->name('download');
+        });
+
+        Route::prefix('board-results')->name('board-results.')->group(function () {
+            Route::get('/verification', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'index'])->name('verification');
+            Route::get('/reports', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'index'])->name('reports');
+            Route::get('/reports/subject-merit', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'subjectMerit'])->name('reports.subject-merit');
+            Route::get('/reports/excellence', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'excellence'])->name('reports.excellence');
+            Route::post('/topper-cap', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'updateTopperCap'])->name('topper-cap');
+            Route::post('/{boardResult}/verify', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verify'])->name('verify');
+            Route::post('/{boardResult}/approve', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'approve'])->name('approve');
+            Route::post('/{boardResult}/reject', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'reject'])->name('reject');
+            Route::post('/{boardResult}/publish', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'publish'])->name('publish');
+            Route::get('/{boardResult}/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'downloadPdf'])->name('pdf');
         });
         Route::get('/membership/reports/export/schools', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportSchools'])->name('membership.reports.export.schools');
         Route::get('/membership/reports/export/payments-pending', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPaymentsPending'])->name('membership.reports.export.payments-pending');
@@ -1043,10 +1061,17 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/reports/fees-rejected/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRejectedFees'])->name('reports.fees-rejected.export');
             Route::get('/{exam}/reports/grade-bands/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportGradeBands'])->name('reports.grade-bands.export');
             Route::get('/{exam}/reports/session-status/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportSessionStatus'])->name('reports.session-status.export');
+            Route::get('/{exam}/reports/result-analysis/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportResultAnalysis'])->name('reports.result-analysis.export');
+            Route::get('/{exam}/reports/school-performance/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportSchoolPerformance'])->name('reports.school-performance.export');
+            Route::get('/{exam}/reports/malpractice/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportMalpractice'])->name('reports.malpractice.export');
             Route::get('/{exam}/attendance', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'attendance'])->name('attendance');
             Route::post('/{exam}/attendance', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'storeAttendance'])->name('attendance.store');
             Route::post('/{exam}/attendance/import', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'importAttendance'])->name('attendance.import');
             Route::get('/{exam}/attendance/export', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'exportAttendance'])->name('attendance.export');
+            Route::get('/{exam}/attendance/sheet.pdf', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'attendanceSheetPdf'])->name('attendance.sheet');
+            Route::get('/{exam}/mark-sheet.pdf', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'markSheetPdf'])->name('mark-sheet');
+            Route::get('/{exam}/result-sheet.pdf', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'resultSheetPdf'])->name('result-sheet');
+            Route::get('/{exam}/registrations/{registration}/invoice', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'registrationInvoice'])->name('registrations.invoice');
             Route::get('/{exam}/attendance-corrections', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'attendanceCorrections'])->name('attendance-corrections');
             Route::post('/{exam}/attendance-corrections/{correctionRequest}/approve', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'approveAttendanceCorrection'])->name('attendance-corrections.approve');
             Route::post('/{exam}/attendance-corrections/{correctionRequest}/reject', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'rejectAttendanceCorrection'])->name('attendance-corrections.reject');
@@ -1055,6 +1080,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/hall-tickets/preview', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'previewHallTicket'])->name('hall-tickets.preview');
             Route::post('/{exam}/hall-tickets/design', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'updateHallTicketDesign'])->name('hall-tickets.design');
             Route::post('/{exam}/hall-tickets/generate', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'generateHallTickets'])->name('hall-tickets.generate');
+            Route::post('/{exam}/hall-tickets/halls', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'saveHalls'])->name('hall-tickets.halls');
+            Route::post('/{exam}/hall-tickets/allocate-seats', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'allocateSeats'])->name('hall-tickets.allocate-seats');
             Route::get('/{exam}/hall-tickets/print-all', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'printAllHallTickets'])->name('hall-tickets.print-all');
             Route::get('/{exam}/staff', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'staff'])->name('staff');
             Route::post('/{exam}/staff', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'storeStaff'])->name('staff.store');
@@ -1074,6 +1101,16 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::prefix('training')->name('training.')->group(function () {
             Route::get('/', [TrainingProgramController::class, 'index'])->name('index');
             Route::post('/', [TrainingProgramController::class, 'store'])->name('store');
+
+            Route::get('/resource-persons', [TrainingResourcePersonController::class, 'index'])->name('resource-persons.index');
+            Route::post('/resource-persons', [TrainingResourcePersonController::class, 'store'])->name('resource-persons.store');
+            Route::put('/resource-persons/{resourcePerson}', [TrainingResourcePersonController::class, 'update'])->name('resource-persons.update');
+            Route::delete('/resource-persons/{resourcePerson}', [TrainingResourcePersonController::class, 'destroy'])->name('resource-persons.destroy');
+
+            Route::post('/categories', [\App\Http\Controllers\SahodayaAdmin\TrainingCategoryController::class, 'store'])->name('categories.store');
+            Route::put('/categories/{category}', [\App\Http\Controllers\SahodayaAdmin\TrainingCategoryController::class, 'update'])->name('categories.update');
+            Route::delete('/categories/{category}', [\App\Http\Controllers\SahodayaAdmin\TrainingCategoryController::class, 'destroy'])->name('categories.destroy');
+
             Route::get('/{program}', [TrainingProgramController::class, 'show'])->name('show');
             Route::put('/{program}', [TrainingProgramController::class, 'update'])->name('update');
             Route::get('/{program}/registrations', [TrainingProgramController::class, 'registrations'])->name('registrations');
@@ -1081,9 +1118,19 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{program}/registrations/export-pdf', [TrainingProgramController::class, 'exportRegistrationsPdf'])->name('registrations.export-pdf');
             Route::get('/{program}/payments', [TrainingProgramController::class, 'payments'])->name('payments');
             Route::post('/{program}/registrations/{registration}/fee/record', [TrainingProgramController::class, 'recordPayment'])->name('registrations.fee.record');
+            Route::post('/{program}/school-fees/{schoolFee}/approve', [TrainingProgramController::class, 'approveSchoolFee'])->name('school-fees.approve');
+            Route::post('/{program}/school-fees/{schoolFee}/reject', [TrainingProgramController::class, 'rejectSchoolFee'])->name('school-fees.reject');
+            Route::get('/{program}/school-fees/{schoolFee}/proof', [TrainingProgramController::class, 'schoolFeeProof'])->name('school-fees.proof');
+            Route::get('/{program}/school-fees/{schoolFee}/invoice', [TrainingProgramController::class, 'schoolFeeInvoice'])->name('school-fees.invoice');
             Route::post('/{program}/sessions', [TrainingProgramController::class, 'storeSession'])->name('sessions.store');
+            Route::put('/{program}/sessions/{session}', [TrainingProgramController::class, 'updateSession'])->name('sessions.update');
+            Route::delete('/{program}/sessions/{session}', [TrainingProgramController::class, 'destroySession'])->name('sessions.destroy');
+            Route::post('/{program}/resource-persons', [TrainingResourcePersonController::class, 'assign'])->name('resource-persons.assign');
+            Route::put('/{program}/resource-persons/{resourcePerson}', [TrainingResourcePersonController::class, 'updateAssignment'])->name('resource-persons.assignment.update');
+            Route::delete('/{program}/resource-persons/{resourcePerson}', [TrainingResourcePersonController::class, 'unassign'])->name('resource-persons.unassign');
             Route::post('/{program}/sessions/{session}/attendance', [TrainingProgramController::class, 'storeSessionAttendance'])->name('sessions.attendance');
             Route::post('/{program}/sessions/{session}/attendance/{registration}', [TrainingProgramController::class, 'updateAttendance'])->name('sessions.attendance.update');
+            Route::post('/{program}/sessions/{session}/attendance/{registration}/review', [TrainingProgramController::class, 'reviewAttendanceCorrection'])->name('sessions.attendance.review');
             Route::get('/{program}/attendance', [TrainingProgramController::class, 'attendance'])->name('attendance');
             Route::get('/{program}/attendance/sheet', [TrainingProgramController::class, 'attendanceSheet'])->name('attendance.sheet');
             Route::get('/{program}/attendance/sheet/pdf', [TrainingProgramController::class, 'exportAttendanceSheetPdf'])->name('attendance.sheet.pdf');
@@ -1092,9 +1139,12 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{program}/attendance/export', [TrainingProgramController::class, 'exportAttendance'])->name('attendance.export');
             Route::get('/{program}/attendance/export-pdf', [TrainingProgramController::class, 'exportAttendanceSheetPdf'])->name('attendance.export-pdf');
             Route::post('/{program}/registrations/{registration}/confirm', [TrainingProgramController::class, 'confirmRegistration'])->name('registrations.confirm');
+            Route::post('/{program}/registrations/{registration}/cancel', [TrainingProgramController::class, 'cancelRegistration'])->name('registrations.cancel');
             Route::post('/{program}/registrations/{registration}/fee/approve', [TrainingProgramController::class, 'approveFee'])->name('registrations.fee.approve');
             Route::post('/{program}/registrations/{registration}/fee/reject', [TrainingProgramController::class, 'rejectFee'])->name('registrations.fee.reject');
             Route::get('/{program}/registrations/{registration}/fee/proof', [TrainingProgramController::class, 'feeProof'])->name('registrations.fee.proof');
+            Route::get('/{program}/registrations/{registration}/invoice', [TrainingProgramController::class, 'registrationInvoice'])->name('registrations.invoice');
+            Route::get('/{program}/registrations/{registration}/id-card', [TrainingProgramController::class, 'registrationIdCard'])->name('registrations.id-card');
             Route::get('/{program}/certificate/preview', [TrainingProgramController::class, 'previewCertificate'])->name('certificate.preview');
             Route::post('/{program}/registrations/{registration}/certificate', [TrainingProgramController::class, 'issueCertificate'])->name('registrations.certificate');
             Route::get('/{program}/registrations/{registration}/certificate/print', [TrainingProgramController::class, 'printCertificate'])->name('registrations.certificate.print');
@@ -1105,6 +1155,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{program}/qr/regenerate', [TrainingProgramController::class, 'regenerateQr'])->name('qr.regenerate');
             Route::get('/{program}/qr-reports', [TrainingProgramController::class, 'qrReports'])->name('qr-reports');
             Route::get('/{program}/qr-reports/export', [TrainingProgramController::class, 'exportQrRegistrations'])->name('qr-reports.export');
+            Route::get('/{program}/qr-teachers', [TrainingProgramController::class, 'qrTeachers'])->name('qr-teachers');
             Route::get('/{program}/feedback', [TrainingProgramController::class, 'feedback'])->name('feedback');
             Route::post('/{program}/feedback/{feedback}/review', [TrainingProgramController::class, 'markFeedbackReviewed'])->name('feedback.review');
             Route::post('/{program}/pending-schools/{pendingSchool}/link', [TrainingProgramController::class, 'linkPendingSchool'])->name('pending-schools.link');
@@ -1252,6 +1303,8 @@ Route::prefix('portal/teacher/{tenantId}')
         Route::get('/question-banks/{bank}', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'showBank'])->name('question-banks.show');
         Route::post('/question-banks/{bank}/questions', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'storeQuestion'])->name('questions.store');
         Route::delete('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\Portal\TeacherMcqController::class, 'destroyQuestion'])->name('questions.destroy');
+        Route::get('/exams', [\App\Http\Controllers\Portal\TeacherMcqRegistrationController::class, 'index'])->name('exams');
+        Route::post('/exams/{exam}/register', [\App\Http\Controllers\Portal\TeacherMcqRegistrationController::class, 'register'])->name('exams.register');
         Route::get('/profile', [\App\Http\Controllers\Portal\TeacherProfileController::class, 'edit'])->name('profile');
         Route::get('/photo', [\App\Http\Controllers\Portal\TeacherProfileController::class, 'photo'])->name('photo');
         Route::put('/profile', [\App\Http\Controllers\Portal\TeacherProfileController::class, 'update'])->name('profile.update');
@@ -1310,6 +1363,7 @@ Route::prefix('portal/student/{tenantId}')
         Route::post('/fest/{event}/appeals', [\App\Http\Controllers\Portal\PortalFestAppealController::class, 'storeStudent'])->name('fest.appeals.store');
         Route::get('/mcq/{registration}/hall-ticket', [\App\Http\Controllers\Portal\StudentMcqController::class, 'hallTicket'])->name('mcq.hall-ticket');
         Route::get('/mcq/{registration}/certificate', [\App\Http\Controllers\Portal\StudentMcqController::class, 'certificate'])->name('mcq.certificate');
+        Route::get('/mcq/{registration}/invoice', [\App\Http\Controllers\Portal\StudentMcqController::class, 'invoice'])->name('mcq.invoice');
         Route::get('/mcq/{registration}/exam', [\App\Http\Controllers\Portal\StudentMcqController::class, 'showExam'])->name('mcq.exam');
         Route::post('/mcq/{registration}/start', [\App\Http\Controllers\Portal\StudentMcqController::class, 'startExam'])->name('mcq.start');
         Route::post('/mcq/{registration}/save-answers', [\App\Http\Controllers\Portal\StudentMcqController::class, 'saveAnswer'])->name('mcq.save-answers');
@@ -1330,6 +1384,10 @@ Route::get('/certificates/verify/{uuid}', [PublicCertificateController::class, '
 Route::get('/certificates/print/{uuid}', [PublicCertificateController::class, 'print'])
     ->middleware('web')
     ->name('certificates.print');
+
+Route::get('/verify/{uuid}', [PublicCertificateController::class, 'verify'])
+    ->middleware('web')
+    ->name('verify');
 
 // ── Live display screens (Phase 20) ──────────────────────────────────────────
 Route::get('/display/{tenantId}/{slug}', [DisplayScreenController::class, 'show'])

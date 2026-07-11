@@ -78,6 +78,11 @@ Route::middleware([
         Route::get('/papers/{exam}/download', [McqArchiveController::class, 'download'])->name('archive.download');
     });
 
+    Route::prefix('academic-results')->name('tenant.academic-results.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Public\AcademicResultsPortalController::class, 'index'])->name('index');
+        Route::get('/merit-list.pdf', [\App\Http\Controllers\Public\AcademicResultsPortalController::class, 'meritListPdf'])->name('merit-list');
+    });
+
     // Public website pages (require global + tenant public-site setting)
     Route::middleware(['website.enabled', 'public.website.enabled'])->group(function () {
         Route::get('/news', [NewsArticleController::class, 'index'])->name('tenant.news.index');

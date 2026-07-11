@@ -96,7 +96,7 @@ class LedgerReportingService
                 $receipt = $registration->feeReceipt;
                 $amount = $receipt
                     ? (float) $receipt->amount
-                    : (($program->fee_type !== 'none' && $program->fee_amount) ? (float) $program->fee_amount : 0.0);
+                    : (($program->usesPerTeacherFee()) ? (float) $program->fee_amount : 0.0);
 
                 return [
                     'teacher'         => $registration->teacher?->name ?? "Registration #{$registration->id}",
@@ -109,8 +109,26 @@ class LedgerReportingService
                 ];
             });
 
-        $collected = (float) $registrations
-            ->filter(fn (array $row) => ($row['status'] ?? '') === 'approved')
+        $schoolFees = \App\Models\TrainingSchoolFee::where('program_id', $program->id)
+            ->with(['school', 'feeReceipt'])
+            ->orderBy('school_id')
+            ->get()
+            ->map(fn (\App\Models\TrainingSchoolFee $fee) => [
+                'teacher'         => 'Batch ('.$fee->teacher_count.' teachers)',
+                'school'          => $fee->school?->name ?? $fee->school_id,
+                'status'          => $fee->status,
+                'amount'          => (float) $fee->total_due,
+                'receipt_number'  => $fee->feeReceipt?->receipt_number,
+                'payment_date'    => $fee->feeReceipt?->payment_date?->toDateString(),
+                'ledger_posted'   => $fee->status === 'approved' && $fee->feeReceipt?->status === 'approved',
+            ]);
+
+        $rows = $program->usesSchoolBatchFee()
+            ? $schoolFees
+            : $registrations;
+
+        $collected = (float) $rows
+            ->filter(fn (array $row) => in_array($row['status'] ?? '', ['approved'], true))
             ->sum('amount');
 
         return [
@@ -118,12 +136,12 @@ class LedgerReportingService
             'account_code'    => $code,
             'account_name'    => $head?->name ?? LedgerAccountCatalog::trainingProgramIncomeHeadName($program),
             'transactions'    => $transactions,
-            'registrations'   => $registrations,
+            'registrations'   => $rows,
             'summary'         => [
-                'total_due'      => (float) $registrations->sum('amount'),
+                'total_due'      => (float) $rows->sum('amount'),
                 'collected'      => $collected,
-                'pending'        => $registrations->whereIn('status', ['registered', 'pending'])->count(),
-                'awaiting'       => $registrations->where('status', 'uploaded')->count(),
+                'pending'        => $rows->whereIn('status', ['registered', 'pending'])->count(),
+                'awaiting'       => $rows->whereIn('status', ['uploaded', 'proof_uploaded'])->count(),
                 'ledger_credits' => (float) $transactions->where('entry_type', 'credit')->sum('amount'),
             ],
         ];

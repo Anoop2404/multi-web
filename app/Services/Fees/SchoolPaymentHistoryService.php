@@ -9,6 +9,7 @@ use App\Models\McqRegistration;
 use App\Models\McqSchoolFee;
 use App\Models\Tenant;
 use App\Models\TrainingRegistration;
+use App\Models\TrainingSchoolFee;
 use App\Models\FeeReceipt;
 use App\Support\TenancyDatabase;
 use Illuminate\Support\Collection;
@@ -58,6 +59,12 @@ class SchoolPaymentHistoryService
             ->get()
             ->map(fn (TrainingRegistration $r) => $this->mapTrainingRow($r, $schoolNames, $urlSchoolId, $sahodayaId));
 
+        $trainingBatch = TrainingSchoolFee::whereIn('school_id', $schoolIds)
+            ->whereNotNull('fee_receipt_id')
+            ->with(['feeReceipt', 'program'])
+            ->get()
+            ->map(fn (TrainingSchoolFee $f) => $this->mapTrainingBatchRow($f, $schoolNames, $urlSchoolId, $sahodayaId));
+
         $mcqBatch = McqSchoolFee::whereIn('school_id', $schoolIds)
             ->whereNotNull('fee_receipt_id')
             ->with(['feeReceipt', 'exam'])
@@ -73,6 +80,7 @@ class SchoolPaymentHistoryService
         return $membership
             ->concat($fest)
             ->concat($training)
+            ->concat($trainingBatch)
             ->concat($mcqBatch)
             ->concat($mcq)
             ->sortByDesc('payment_date')
@@ -168,6 +176,37 @@ class SchoolPaymentHistoryService
             'receipt_emailed_at'   => $r->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
             'fee_receipt_id'       => $r->feeReceipt?->id,
             'rejection_reason'     => $r->feeReceipt?->status === 'rejected' ? $r->feeReceipt->rejection_reason : null,
+        ];
+    }
+
+    /** @param  Collection<string, string>  $schoolNames */
+    private function mapTrainingBatchRow(
+        TrainingSchoolFee $f,
+        Collection $schoolNames,
+        ?string $urlSchoolId,
+        ?string $sahodayaId,
+    ): array {
+        $schoolId = $f->school_id;
+
+        return [
+            'id'                   => 'training-batch-'.$f->id,
+            'type'                 => 'training',
+            'school_id'            => $schoolId,
+            'school_name'          => $schoolNames->get($schoolId),
+            'label'                => ($f->program?->title ?? 'Training').' — batch fee ('.$f->teacher_count.' teachers)',
+            'level_label'          => null,
+            'amount'               => $f->total_due,
+            'amount_paid'          => (float) $f->amount_paid,
+            'balance'              => $f->outstandingBalance(),
+            'status'               => $f->status === 'approved' ? 'approved' : ($f->status === 'proof_uploaded' ? 'uploaded' : $f->status),
+            'payment_date'         => $f->feeReceipt?->payment_date?->toDateString(),
+            'transaction_ref'      => $f->feeReceipt?->transaction_ref,
+            'receipt_number'       => $f->feeReceipt?->receipt_number,
+            'receipt_url'          => $this->programReceiptUrl($f->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
+            'receipt_email_status' => $f->feeReceipt?->receipt_email_status,
+            'receipt_emailed_at'   => $f->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
+            'fee_receipt_id'       => $f->feeReceipt?->id,
+            'rejection_reason'     => $f->feeReceipt?->status === 'rejected' ? $f->feeReceipt->rejection_reason : null,
         ];
     }
 

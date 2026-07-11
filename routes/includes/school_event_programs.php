@@ -276,8 +276,11 @@ Route::prefix('mcq')->name('mcq.')->group(function () {
     Route::post('/{exam}/cancel', [McqController::class, 'cancelRegistration'])->name('cancel');
     Route::post('/{exam}/register-by-class', [McqController::class, 'bulkRegister'])->name('register-by-class');
     Route::post('/{exam}/register-bulk', [McqController::class, 'bulkRegister']);
+    Route::post('/{exam}/register-teacher', [McqController::class, 'registerTeacher']);
+    Route::post('/{exam}/register-teachers-bulk', [McqController::class, 'bulkRegisterTeachers']);
     Route::post('/{exam}/fee', [McqController::class, 'uploadFee']);
     Route::get('/{exam}/hall-tickets/pdf', [McqController::class, 'hallTicketsPdf']);
+    Route::get('/{exam}/registrations/{registration}/invoice', [McqController::class, 'registrationInvoice'])->name('registrations.invoice');
     Route::get('/{exam}/credentials/export', [McqRegistrationController::class, 'exportCredentials'])->name('credentials.export');
     Route::post('/{exam}/students/{student}/reset-portal-password', [McqRegistrationController::class, 'resetPortalPassword'])->name('students.reset-portal-password');
     Route::post('/', [McqRegistrationController::class, 'store']);
@@ -294,7 +297,11 @@ Route::prefix('training')->name('training.')->group(function () {
     Route::get('/import/template', [TrainingRegistrationController::class, 'importTemplate'])->name('import.template');
     Route::post('/import', [TrainingRegistrationController::class, 'importStore'])->name('import');
     Route::get('/{program}/export', [TrainingRegistrationController::class, 'export'])->name('export');
+    Route::get('/{program}/school-fee/invoice', [TrainingRegistrationController::class, 'downloadSchoolInvoice'])->name('school-fee.invoice');
     Route::post('/{registration}/payment', [TrainingRegistrationController::class, 'uploadPayment'])->name('payment');
+    Route::get('/{registration}/invoice', [TrainingRegistrationController::class, 'downloadInvoice'])->name('invoice');
+    Route::get('/{registration}/id-card', [TrainingRegistrationController::class, 'downloadIdCard'])->name('id-card');
+    Route::post('/{program}/school-payment', [TrainingRegistrationController::class, 'uploadSchoolPayment'])->name('school-payment');
     Route::get('/{program}/attendance', [TrainingRegistrationController::class, 'attendance'])->name('attendance');
     Route::post('/{program}/sessions/{session}/attendance', [TrainingRegistrationController::class, 'markAllPresent'])->name('sessions.attendance');
     Route::post('/{program}/sessions/{session}/attendance/{registration}', [TrainingRegistrationController::class, 'updateAttendance'])->name('sessions.attendance.update');
