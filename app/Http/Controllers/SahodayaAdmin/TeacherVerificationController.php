@@ -22,6 +22,12 @@ class TeacherVerificationController extends SahodayaAdminController
         return $this->subjectLabelMap ??= Subject::forSahodaya($this->sahodaya->id)->pluck('label', 'id');
     }
 
+    /**
+     * Two-level view mirroring StudentVerificationController::index(): a per-school
+     * summary (pending/verified counts, "verify all" per row) when no school is
+     * selected, drilling into a paginated per-teacher list once one is picked —
+     * matches the Student verification UX (checklist Low/Polish item).
+     */
     public function index(Request $request, EffectiveMasterDataResolver $resolver)
     {
         $filters = $request->validate([
@@ -45,30 +51,91 @@ class TeacherVerificationController extends SahodayaAdminController
             'unverified' => (clone $base)->whereNull('verified_at')->count(),
         ];
 
-        $teachers = (clone $base)
-            ->with(['teachingType', 'verifiedBy:id,name,email'])
-            ->when(! empty($filters['school_id']), fn ($q) => $q->where('tenant_id', $filters['school_id']))
-            ->when(! empty($filters['teaching_type_id']), fn ($q) => $q->where('teaching_type_id', $filters['teaching_type_id']))
-            ->when(($filters['verification'] ?? 'all') === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
-            ->when(($filters['verification'] ?? 'all') === 'unverified', fn ($q) => $q->whereNull('verified_at'))
-            ->when(! empty($filters['search']), function ($q) use ($filters) {
-                $term = '%'.$filters['search'].'%';
-                $q->where(fn ($inner) => $inner
-                    ->where('name', 'like', $term)
-                    ->orWhere('reg_no', 'like', $term)
-                    ->orWhere('email', 'like', $term));
-            })
-            ->orderBy('tenant_id')
-            ->orderBy('name')
-            ->paginate(50)
-            ->withQueryString();
-
         $schools = Tenant::whereIn('id', $schoolIds)->orderBy('name')->get(['id', 'name']);
 
+        $statsBySchool = (clone $base)
+            ->selectRaw('tenant_id, count(*) as total, sum(case when verified_at is null then 1 else 0 end) as unverified')
+            ->groupBy('tenant_id')
+            ->get()
+            ->keyBy('tenant_id');
+
+        $schoolSummaries = $schools->map(function (Tenant $school) use ($statsBySchool) {
+            $row = $statsBySchool->get($school->id);
+            $total = (int) ($row->total ?? 0);
+            $unverified = (int) ($row->unverified ?? 0);
+
+            return [
+                'id'         => $school->id,
+                'name'       => $school->name,
+                'total'      => $total,
+                'verified'   => $total - $unverified,
+                'unverified' => $unverified,
+            ];
+        });
+
+        $verification = $filters['verification'] ?? 'all';
+
+        if ($verification === 'unverified') {
+            $schoolSummaries = $schoolSummaries->filter(fn (array $row) => $row['unverified'] > 0);
+        } elseif ($verification === 'verified') {
+            $schoolSummaries = $schoolSummaries->filter(fn (array $row) => $row['total'] > 0 && $row['unverified'] === 0);
+        }
+
+        if (! empty($filters['search']) && empty($filters['school_id'])) {
+            $term = mb_strtolower($filters['search']);
+            $schoolSummaries = $schoolSummaries->filter(
+                fn (array $row) => str_contains(mb_strtolower($row['name']), $term)
+            );
+        }
+
+        $schoolSummaries = $schoolSummaries->sortBy([
+            ['unverified', 'desc'],
+            ['name', 'asc'],
+        ])->values();
+
+        $selectedSchool = null;
+        $teachers = null;
+
+        if (! empty($filters['school_id'])) {
+            $school = $schools->firstWhere('id', $filters['school_id']);
+            if ($school) {
+                $row = $statsBySchool->get($school->id);
+                $total = (int) ($row->total ?? 0);
+                $unverified = (int) ($row->unverified ?? 0);
+                $selectedSchool = [
+                    'id'         => $school->id,
+                    'name'       => $school->name,
+                    'total'      => $total,
+                    'verified'   => $total - $unverified,
+                    'unverified' => $unverified,
+                ];
+            }
+
+            $teachers = (clone $base)
+                ->with(['teachingType', 'verifiedBy:id,name,email'])
+                ->where('tenant_id', $filters['school_id'])
+                ->when(! empty($filters['teaching_type_id']), fn ($q) => $q->where('teaching_type_id', $filters['teaching_type_id']))
+                ->when($verification === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
+                ->when($verification === 'unverified', fn ($q) => $q->whereNull('verified_at'))
+                ->when(! empty($filters['search']), function ($q) use ($filters) {
+                    $term = '%'.$filters['search'].'%';
+                    $q->where(fn ($inner) => $inner
+                        ->where('name', 'like', $term)
+                        ->orWhere('reg_no', 'like', $term)
+                        ->orWhere('email', 'like', $term));
+                })
+                ->orderBy('name')
+                ->paginate(50)
+                ->withQueryString()
+                ->through(fn (Teacher $t) => $this->mapTeacher($t));
+        }
+
         return $this->inertia('Sahodaya/Teachers/Verification', [
-            'teachers'   => $teachers->through(fn (Teacher $t) => $this->mapTeacher($t)),
-            'counts'     => $counts,
-            'filters'    => array_merge([
+            'teachers'        => $teachers,
+            'schoolSummaries' => $schoolSummaries,
+            'selectedSchool'  => $selectedSchool,
+            'counts'          => $counts,
+            'filters'         => array_merge([
                 'school_id' => '',
                 'verification' => 'all',
                 'search' => '',
@@ -204,8 +271,10 @@ class TeacherVerificationController extends SahodayaAdminController
             'id'              => $teacher->id,
             'name'            => $teacher->name,
             'reg_no'          => $teacher->reg_no,
+            'employee_code'   => $teacher->employee_code,
             'email'           => $teacher->email,
             'mobile'          => $teacher->mobile,
+            'photo_url'       => $teacher->photoUrl(),
             'category'        => $teacher->teachingType?->label,
             'subjects'        => collect($teacher->subject_ids ?? [])
                 ->map(fn ($id) => $this->subjectLabelMap()->get($id))
@@ -216,6 +285,7 @@ class TeacherVerificationController extends SahodayaAdminController
             'school_name'     => $school?->name,
             'is_verified'     => $teacher->isVerified(),
             'verified_at'     => $teacher->verified_at?->toIso8601String(),
+            'verified_at_display' => $teacher->verified_at?->format('j M Y'),
             'verified_by'     => $teacher->verifiedBy?->name ?? $teacher->verifiedBy?->email,
             'rejection_reason'=> $teacher->rejection_reason,
         ];
