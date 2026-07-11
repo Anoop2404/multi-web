@@ -193,8 +193,12 @@ export function sahodayaTrainingProgramScopedNav(sahodayaId, programId, options 
             items: [
                 { label: 'Overview & settings', href: programBase, icon: 'file-text', exact: true },
                 { label: 'Payment ledger', href: `${programBase}/ledger`, icon: 'layers' },
+                { label: 'Fee approvals', href: `${programBase}/payments`, icon: 'credit-card' },
                 { label: 'Sessions', href: `${programBase}#sessions`, icon: 'calendar' },
-                { label: 'Registrations', href: `${programBase}#registrations`, icon: 'users' },
+                { label: 'Registrations', href: `${programBase}/registrations`, icon: 'users' },
+                { label: 'Attendance', href: `${programBase}/attendance`, icon: 'clipboard', exact: true },
+                { label: 'Attendance sheet', href: `${programBase}/attendance/sheet`, icon: 'file-text' },
+                { label: 'Attendance report', href: `${programBase}/attendance/report`, icon: 'bar-chart' },
                 { label: 'Certificates (ZIP)', href: `${programBase}/certificates/export`, icon: 'award' },
             ],
         },

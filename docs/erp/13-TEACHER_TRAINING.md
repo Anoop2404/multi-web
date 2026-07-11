@@ -35,21 +35,44 @@ Block nomination with clear message if fail.
 
 ---
 
-## 3. Nomination Flow
+## 3b. QR Registration (public)
+
+Per-program public registration via dedicated QR / URL on the Sahodaya domain.
+
+| Capability | Detail |
+|------------|--------|
+| Registration QR | Unique token URL `/training/register/{token}` — PNG/SVG/PDF download |
+| Window control | Honours `registration_open` / `registration_close`, program status, and `qr_registration_enabled` |
+| Form | Name*, email*, phone, DOB, gender, school search (+ manual school), designation, department, experience, photo, consent |
+| Teacher linking | Match by email / mobile / name+school; else create teacher with `verified_at = null` (pending school verification) |
+| Pending schools | Manual school name creates `training_pending_schools` row |
+| Attendance QR | Separate program + per-session QR; check-in by email/mobile/registration ID; only confirmed registrations |
+| Reports | QR registrations, teachers created, pending schools, designation-wise — admin page + Excel export |
+| Audit | `training.qr.registered`, `training.qr.teacher_created`, `training.qr.pending_school`, `training.qr.attendance`, `training.qr.regenerated` |
+
+**Services:** `TrainingQrService`, `TrainingPublicRegistrationService`, `TrainingAttendanceCheckInService`, `TrainingQrReportService`  
+**Public controller:** `Public\TrainingQrRegistrationController`
+
+---
+
+## 3. Nomination & attendance flow
 
 ```mermaid
 flowchart TD
-    Open[Window open] --> Nom[School nominates teachers]
+    Open[Window open] --> Nom[School nominates / QR / self-register]
     Nom --> Elig[Eligibility check]
-    Elig --> Submit[Submitted]
-    Submit --> Approve[Training coordinator approve]
-    Approve --> Fee[Fee invoice if applicable]
-    Fee --> Proof[Offline proof]
-    Proof --> Verify[Finance verify + receipt]
+    Elig --> Submit[Registered or auto-confirmed if free]
+    Submit --> Fee[Fee proof if paid]
+    Fee --> Verify[Sahodaya verifies fee]
     Verify --> Confirm[Confirmed seat]
+    Confirm --> Attend[School or Sahodaya marks attendance]
+    Attend --> Cert[Certificate when attendance met]
 ```
 
-**Controllers:** `TrainingRegistrationController`, school admin training index
+Unverified teachers may register and attend unless **Require verified teachers** is on.  
+Schools mark attendance at `/school-admin/{id}/training/{program}/attendance` when **School attendance** is enabled.
+
+**Controllers:** `TrainingRegistrationController`, school admin training index / attendance
 
 ---
 

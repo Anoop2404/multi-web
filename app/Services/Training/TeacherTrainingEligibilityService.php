@@ -19,7 +19,7 @@ class TeacherTrainingEligibilityService
             return false;
         }
 
-        if (! $this->verificationGate->isEligible($teacher, $program->tenant_id)) {
+        if ($program->require_verified_teachers && ! $this->verificationGate->isEligible($teacher, $program->tenant_id)) {
             return false;
         }
 
@@ -40,7 +40,7 @@ class TeacherTrainingEligibilityService
             return 'Teacher is not active.';
         }
 
-        if ($reason = $this->verificationGate->ineligibilityReason($teacher, $program->tenant_id)) {
+        if ($program->require_verified_teachers && ($reason = $this->verificationGate->ineligibilityReason($teacher, $program->tenant_id))) {
             return $reason;
         }
 

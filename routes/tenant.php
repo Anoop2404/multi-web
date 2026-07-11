@@ -35,6 +35,25 @@ Route::middleware([
         ->middleware('throttle:10,1')
         ->name('school-register.store');
 
+    // Teacher training QR registration + attendance (Sahodaya public)
+    Route::prefix('training')->name('tenant.training.')->group(function () {
+        Route::get('/register/{token}', [\App\Http\Controllers\Public\TrainingQrRegistrationController::class, 'show'])->name('register.show');
+        Route::get('/register/{token}/schools', [\App\Http\Controllers\Public\TrainingQrRegistrationController::class, 'searchSchools'])->name('register.schools');
+        Route::post('/register/{token}', [\App\Http\Controllers\Public\TrainingQrRegistrationController::class, 'store'])
+            ->middleware('throttle:20,1')
+            ->name('register.store');
+        Route::get('/register/{token}/success', [\App\Http\Controllers\Public\TrainingQrRegistrationController::class, 'success'])->name('register.success');
+
+        Route::get('/attendance/program/{token}', [\App\Http\Controllers\Public\TrainingQrRegistrationController::class, 'attendanceProgram'])->name('attendance.program');
+        Route::post('/attendance/program/{token}', [\App\Http\Controllers\Public\TrainingQrRegistrationController::class, 'storeAttendance'])
+            ->middleware('throttle:30,1')
+            ->name('attendance.program.store');
+        Route::get('/attendance/{token}', [\App\Http\Controllers\Public\TrainingQrRegistrationController::class, 'attendanceSession'])->name('attendance.show');
+        Route::post('/attendance/{token}', [\App\Http\Controllers\Public\TrainingQrRegistrationController::class, 'storeAttendance'])
+            ->middleware('throttle:30,1')
+            ->name('attendance.store');
+    });
+
     // Public festival portal (always available on Sahodaya tenants)
     Route::prefix('fest')->name('tenant.fest.')->group(function () {
         Route::get('/', [FestPortalController::class, 'index'])->name('index');

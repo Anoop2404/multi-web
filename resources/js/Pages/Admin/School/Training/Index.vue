@@ -1,11 +1,9 @@
 <template>
     <SchoolAdminLayout title="Teacher Training" :school="school" :show-header-title="false">
         <PageHeader title="Teacher Training" eyebrow="Teacher training"
-            description="Register teachers for Sahodaya training programs." />
-
+            description="Register teachers (including unverified), upload fees, and mark session attendance." />
 
         <div class="space-y-4">
-            <p class="text-sm text-gray-500">Register teachers for Sahodaya training programs.</p>
             <div v-for="program in programs" :key="program.id" class="card">
                 <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
                     <div>
@@ -17,17 +15,39 @@
                                 <span class="mx-1">·</span>
                                 <span class="font-semibold text-indigo-700">Fee: ₹{{ program.fee_amount }}</span>
                             </template>
+                            <template v-if="program.sessions_count">
+                                <span class="mx-1">·</span>
+                                {{ program.sessions_count }} session(s)
+                            </template>
+                            <template v-if="!program.require_verified_teachers">
+                                <span class="mx-1">·</span>
+                                <span class="text-amber-700">Unverified teachers allowed</span>
+                            </template>
                         </p>
                     </div>
+                    <Link v-if="program.allow_school_attendance !== false && ['published','ongoing','completed'].includes(program.status)"
+                          :href="`/school-admin/${school.id}/training/${program.id}/attendance`"
+                          class="btn-secondary text-sm">
+                        Mark attendance
+                    </Link>
                 </div>
 
                 <ul v-if="registrations[program.id]?.length" class="text-sm divide-y mb-3">
                     <li v-for="r in registrations[program.id]" :key="r.id" class="py-2">
                         <div class="flex justify-between items-start gap-2 flex-wrap">
-                            <span>{{ r.teacher?.name }}</span>
+                            <div>
+                                <span>{{ r.teacher?.name }}</span>
+                                <span v-if="r.teacher && !r.teacher.verified_at"
+                                      class="ml-2 text-[10px] uppercase tracking-wide text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                                    Unverified
+                                </span>
+                                <span v-if="r.registration_source === 'qr'"
+                                      class="ml-1 text-[10px] uppercase tracking-wide text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
+                                    QR
+                                </span>
+                            </div>
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-gray-400 text-xs capitalize">{{ r.status }}</span>
-                                <!-- Fee status -->
                                 <template v-if="program.fee_type !== 'none' && program.fee_amount">
                                     <span v-if="r.fee_receipt?.status === 'approved'" class="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded">Fee paid</span>
                                     <span v-else-if="r.fee_receipt?.status === 'uploaded'" class="text-xs text-yellow-700">Fee pending approval</span>
@@ -35,7 +55,6 @@
                                 </template>
                             </div>
                         </div>
-                        <!-- Fee upload form -->
                         <form v-if="program.fee_type !== 'none' && program.fee_amount && needsFeeUpload(r)"
                               @submit.prevent="uploadFee(r)" class="flex flex-wrap gap-2 items-center mt-2">
                             <input type="file" accept=".pdf,.jpg,.jpeg,.png"
@@ -51,7 +70,11 @@
                       @submit.prevent="register(program)" class="flex flex-wrap gap-2 items-end">
                     <select v-model="forms[program.id]" class="field max-w-xs" required>
                         <option value="">Select teacher</option>
-                        <option v-for="t in (eligibleByProgram[program.id] || [])" :key="t.id" :value="t.id">{{ t.name }}<template v-if="t.category"> ({{ t.category }})</template></option>
+                        <option v-for="t in (eligibleByProgram[program.id] || [])" :key="t.id" :value="t.id">
+                            {{ t.name }}
+                            <template v-if="t.category"> ({{ t.category }})</template>
+                            <template v-if="!t.is_verified"> — unverified</template>
+                        </option>
                     </select>
                     <button class="btn-primary">Register</button>
                 </form>
@@ -63,7 +86,7 @@
 
 <script setup>
 import { reactive } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 
 const props = defineProps({ school: Object, programs: Array, registrations: Object, eligibleByProgram: Object });
@@ -98,4 +121,3 @@ function uploadFee(registration) {
     });
 }
 </script>
-

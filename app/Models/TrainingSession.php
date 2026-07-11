@@ -8,11 +8,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TrainingSession extends Model
 {
-    protected $fillable = ["program_id", "title", "scheduled_at", "venue", "duration_minutes"];
+    protected $fillable = ['program_id', 'title', 'scheduled_at', 'venue', 'duration_minutes', 'attendance_token'];
 
     protected $casts = [
         'scheduled_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $session) {
+            if (! filled($session->attendance_token)) {
+                $session->attendance_token = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(40));
+            }
+        });
+    }
 
     public function program(): BelongsTo
     {

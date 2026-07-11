@@ -1071,11 +1071,21 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/', [TrainingProgramController::class, 'store'])->name('store');
             Route::get('/{program}', [TrainingProgramController::class, 'show'])->name('show');
             Route::put('/{program}', [TrainingProgramController::class, 'update'])->name('update');
+            Route::get('/{program}/registrations', [TrainingProgramController::class, 'registrations'])->name('registrations');
+            Route::get('/{program}/registrations/export', [TrainingProgramController::class, 'exportRegistrations'])->name('registrations.export');
+            Route::get('/{program}/registrations/export-pdf', [TrainingProgramController::class, 'exportRegistrationsPdf'])->name('registrations.export-pdf');
+            Route::get('/{program}/payments', [TrainingProgramController::class, 'payments'])->name('payments');
+            Route::post('/{program}/registrations/{registration}/fee/record', [TrainingProgramController::class, 'recordPayment'])->name('registrations.fee.record');
             Route::post('/{program}/sessions', [TrainingProgramController::class, 'storeSession'])->name('sessions.store');
             Route::post('/{program}/sessions/{session}/attendance', [TrainingProgramController::class, 'storeSessionAttendance'])->name('sessions.attendance');
             Route::post('/{program}/sessions/{session}/attendance/{registration}', [TrainingProgramController::class, 'updateAttendance'])->name('sessions.attendance.update');
             Route::get('/{program}/attendance', [TrainingProgramController::class, 'attendance'])->name('attendance');
+            Route::get('/{program}/attendance/sheet', [TrainingProgramController::class, 'attendanceSheet'])->name('attendance.sheet');
+            Route::get('/{program}/attendance/sheet/pdf', [TrainingProgramController::class, 'exportAttendanceSheetPdf'])->name('attendance.sheet.pdf');
+            Route::get('/{program}/attendance/report', [TrainingProgramController::class, 'attendanceReport'])->name('attendance.report');
+            Route::get('/{program}/attendance/report/pdf', [TrainingProgramController::class, 'exportAttendanceReportPdf'])->name('attendance.report.pdf');
             Route::get('/{program}/attendance/export', [TrainingProgramController::class, 'exportAttendance'])->name('attendance.export');
+            Route::get('/{program}/attendance/export-pdf', [TrainingProgramController::class, 'exportAttendanceSheetPdf'])->name('attendance.export-pdf');
             Route::post('/{program}/registrations/{registration}/confirm', [TrainingProgramController::class, 'confirmRegistration'])->name('registrations.confirm');
             Route::post('/{program}/registrations/{registration}/fee/approve', [TrainingProgramController::class, 'approveFee'])->name('registrations.fee.approve');
             Route::post('/{program}/registrations/{registration}/fee/reject', [TrainingProgramController::class, 'rejectFee'])->name('registrations.fee.reject');
@@ -1086,6 +1096,11 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{program}/certificates/export', [TrainingProgramController::class, 'exportCertificatesZip'])->name('certificates.export');
             Route::get('/{program}/ledger', [TrainingProgramController::class, 'ledger'])->name('ledger');
             Route::put('/{program}/ledger-account', [TrainingProgramController::class, 'updateLedgerAccount'])->name('ledger-account.update');
+            Route::get('/{program}/qr/{kind}/{format}', [TrainingProgramController::class, 'downloadQr'])->name('qr.download');
+            Route::post('/{program}/qr/regenerate', [TrainingProgramController::class, 'regenerateQr'])->name('qr.regenerate');
+            Route::get('/{program}/qr-reports', [TrainingProgramController::class, 'qrReports'])->name('qr-reports');
+            Route::get('/{program}/qr-reports/export', [TrainingProgramController::class, 'exportQrRegistrations'])->name('qr-reports.export');
+            Route::get('/{program}/sessions/{session}/qr/{format}', [TrainingProgramController::class, 'downloadSessionAttendanceQr'])->name('sessions.qr');
         });
 
         Route::prefix('ledger')->name('ledger.')->group(function () {

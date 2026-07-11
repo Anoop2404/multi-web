@@ -1,22 +1,16 @@
 <template>
-    <SahodayaAdminLayout :title="`${program.title} — Attendance`" :sahodaya="sahodaya" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="program.title" eyebrow="Mark attendance"
-                    :description="`${program.sessions?.length ?? 0} session(s) · ${confirmedRegistrations.length} eligible`">
+    <SchoolAdminLayout :title="`${program.title} — Attendance`" :school="school" :show-header-title="false">
+        <PageHeader :title="program.title" eyebrow="Training attendance"
+                    :description="`${program.sessions?.length ?? 0} session(s) · ${registrations.length} eligible teacher(s)`">
             <template #actions>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}`" class="btn-secondary text-sm">
-                    ← Program
-                </Link>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/attendance/sheet`"
-                      class="btn-secondary text-sm">
-                    Attendance sheet
-                </Link>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/attendance/report`"
-                      class="btn-primary text-sm">
-                    Attendance report
-                </Link>
+                <Link :href="`/school-admin/${school.id}/training`" class="btn-secondary text-sm">Back to programs</Link>
             </template>
         </PageHeader>
+
+        <p v-if="!registrations.length" class="card text-sm text-gray-500 py-6 text-center mb-4">
+            No teachers from your school are ready for attendance yet.
+            Register teachers first. QR / venue programmes allow attendance before payment is recorded.
+        </p>
 
         <div v-for="session in program.sessions" :key="session.id" class="card mb-4">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -25,34 +19,33 @@
                     <p class="text-xs text-gray-500">
                         {{ session.scheduled_at ? formatDate(session.scheduled_at) : 'No date' }}
                         <span v-if="session.venue"> · {{ session.venue }}</span>
-                        <span v-if="session.duration_minutes"> · {{ session.duration_minutes }} min</span>
                     </p>
                 </div>
-                <button type="button" @click="markAllPresent(session)"
+                <button v-if="registrations.length" type="button" @click="markAllPresent(session)"
                         class="text-xs text-indigo-600 font-semibold border border-indigo-200 px-2 py-1 rounded">
                     Mark all present
                 </button>
             </div>
 
             <div class="overflow-x-auto">
-                <table class="data-table min-w-[640px] text-sm">
+                <table class="data-table min-w-[560px] text-sm">
                     <thead>
                         <tr>
                             <th>Teacher</th>
-                            <th>School</th>
+                            <th>Verification</th>
                             <th>Attendance</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="r in confirmedRegistrations" :key="r.id">
+                        <tr v-for="r in registrations" :key="r.id">
                             <td>
                                 <div>{{ r.teacher?.name || `#${r.id}` }}</div>
-                                <span v-if="r.teacher && !r.teacher.verified_at"
-                                      class="text-[10px] uppercase tracking-wide text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
-                                    Unverified
-                                </span>
+                                <div class="text-xs text-gray-400">{{ r.teacher?.designation || '' }}</div>
                             </td>
-                            <td class="text-gray-500">{{ r.school?.name || r.teacher?.school_name || '—' }}</td>
+                            <td>
+                                <span v-if="r.teacher?.is_verified" class="text-xs text-green-700 font-semibold">Verified</span>
+                                <span v-else class="text-xs text-amber-700 font-semibold">Unverified</span>
+                            </td>
                             <td>
                                 <div class="flex gap-1">
                                     <button type="button" @click="setAttendance(session, r, 'present')"
@@ -72,36 +65,30 @@
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="!confirmedRegistrations.length">
-                            <td colspan="3" class="text-center text-gray-400 py-4">No confirmed registrations.</td>
-                        </tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
         <p v-if="!program.sessions?.length" class="card text-sm text-gray-400 py-6 text-center">
-            Add training days/sessions on the program page first.
+            Sahodaya has not added training sessions yet.
         </p>
-    </SahodayaAdminLayout>
+    </SchoolAdminLayout>
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
-import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import PageHeader from '@/Components/ui/PageHeader.vue';
+import { reactive } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
+import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 
 const props = defineProps({
-    sahodaya: Object,
-    publicUrl: String,
-    pendingPaymentsCount: Number,
+    school: Object,
     program: Object,
+    registrations: Array,
     attendanceMap: Object,
 });
 
 const localAttendance = reactive({});
-
 for (const [sessionId, regMap] of Object.entries(props.attendanceMap ?? {})) {
     localAttendance[sessionId] = {};
     for (const [regId, rec] of Object.entries(regMap)) {
@@ -109,36 +96,16 @@ for (const [sessionId, regMap] of Object.entries(props.attendanceMap ?? {})) {
     }
 }
 
-const confirmedRegistrations = computed(() =>
-    (props.program.registrations ?? []).filter(r =>
-        ['confirmed', 'completed'].includes(r.status)
-        || r.registration_source === 'qr'
-        || (r.status === 'registered' && (props.program.fee_type === 'none' || !props.program.fee_amount)),
-    )
-);
+function formatDate(value) {
+    try {
+        return new Date(value).toLocaleString();
+    } catch {
+        return value;
+    }
+}
 
 function attendanceStatus(sessionId, regId) {
     return localAttendance[sessionId]?.[regId] ?? null;
-}
-
-function formatDate(value) {
-    return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-}
-
-function markAllPresent(session) {
-    router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/sessions/${session.id}/attendance`,
-        {},
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                for (const r of confirmedRegistrations.value) {
-                    if (!localAttendance[session.id]) localAttendance[session.id] = {};
-                    localAttendance[session.id][r.id] = 'present';
-                }
-            },
-        }
-    );
 }
 
 function setAttendance(session, registration, status) {
@@ -146,9 +113,25 @@ function setAttendance(session, registration, status) {
     localAttendance[session.id][registration.id] = status;
 
     router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/sessions/${session.id}/attendance/${registration.id}`,
+        `/school-admin/${props.school.id}/training/${props.program.id}/sessions/${session.id}/attendance/${registration.id}`,
         { status },
         { preserveScroll: true }
+    );
+}
+
+function markAllPresent(session) {
+    router.post(
+        `/school-admin/${props.school.id}/training/${props.program.id}/sessions/${session.id}/attendance`,
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                for (const r of props.registrations) {
+                    if (!localAttendance[session.id]) localAttendance[session.id] = {};
+                    localAttendance[session.id][r.id] = 'present';
+                }
+            },
+        }
     );
 }
 </script>

@@ -75,18 +75,37 @@ class TrainingProgramController extends SahodayaAdminController
             ->with('success', 'Training program created.');
     }
 
-    public function show(string $tenantId, TrainingProgram $program)
+    public function show(string $tenantId, TrainingProgram $program, \App\Services\Training\TrainingQrService $qr)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 
-        $program->load(['sessions', 'registrations.teacher', 'registrations.school', 'registrations.feeReceipt', 'registrations.certificate']);
+        $qr->ensureProgramTokens($program);
+        $program->load(['sessions', 'registrations.teacher', 'registrations.school', 'registrations.feeReceipt', 'registrations.certificate', 'registrations.pendingSchool']);
 
         $attendanceMap = TrainingAttendance::whereIn(
             'registration_id',
             $program->registrations->pluck('id')
         )->get()->groupBy('session_id')->map(fn ($rows) => $rows->keyBy('registration_id'));
 
-        return $this->inertia('Sahodaya/Training/Show', compact('program', 'attendanceMap'));
+        $registrationUrl = $qr->registrationUrl($program);
+        $attendanceUrl = $qr->attendanceUrl($program);
+
+        return $this->inertia('Sahodaya/Training/Show', [
+            'program' => $program,
+            'attendanceMap' => $attendanceMap,
+            'qr' => [
+                'registration_url' => $registrationUrl,
+                'attendance_url'   => $attendanceUrl,
+                'registration_open'=> $qr->isRegistrationOpen($program),
+                'registration_png' => $qr->dataUri($registrationUrl),
+                'attendance_png'   => $qr->dataUri($attendanceUrl),
+                'session_urls'     => $program->sessions->mapWithKeys(function ($session) use ($qr, $program) {
+                    $qr->ensureSessionToken($session);
+
+                    return [$session->id => $qr->attendanceUrl($program, $session)];
+                }),
+            ],
+        ]);
     }
 
     public function update(Request $request, string $tenantId, TrainingProgram $program)
@@ -103,12 +122,18 @@ class TrainingProgramController extends SahodayaAdminController
             'registration_close' => 'nullable|date',
             'max_participants'   => 'nullable|integer|min:1',
             'allow_teacher_self_registration' => 'nullable|boolean',
+            'qr_registration_enabled' => 'nullable|boolean',
+            'require_verified_teachers' => 'nullable|boolean',
+            'allow_school_attendance' => 'nullable|boolean',
             'status'             => 'required|in:draft,published,ongoing,completed,cancelled',
             'fee_type'           => 'nullable|in:none,flat',
             'fee_amount'         => 'nullable|numeric|min:0',
         ]);
 
         $data = TrainingProgramPayload::applyDefaults($data);
+        $data['qr_registration_enabled'] = (bool) ($data['qr_registration_enabled'] ?? false);
+        $data['require_verified_teachers'] = (bool) ($data['require_verified_teachers'] ?? false);
+        $data['allow_school_attendance'] = (bool) ($data['allow_school_attendance'] ?? true);
 
         $program->update($data);
 
@@ -122,6 +147,177 @@ class TrainingProgramController extends SahodayaAdminController
         );
 
         return back()->with('success', 'Program updated.');
+    }
+
+    public function registrations(string $tenantId, TrainingProgram $program)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        $program->load([
+            'registrations' => fn ($q) => $q->latest('id'),
+            'registrations.teacher.teachingType',
+            'registrations.school',
+            'registrations.feeReceipt',
+            'registrations.certificate',
+            'registrations.pendingSchool',
+        ]);
+
+        return $this->inertia('Sahodaya/Training/Registrations', [
+            'program' => $program->only([
+                'id', 'title', 'status', 'fee_type', 'fee_amount',
+            ]),
+            'registrations' => $program->registrations,
+        ]);
+    }
+
+    public function exportRegistrations(string $tenantId, TrainingProgram $program, TrainingReportService $reports)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportRegistrations($program);
+    }
+
+    public function exportRegistrationsPdf(string $tenantId, TrainingProgram $program, TrainingReportService $reports)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportRegistrationsPdf($program, $this->sahodaya);
+    }
+
+    public function payments(string $tenantId, TrainingProgram $program)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        $program->load([
+            'registrations' => fn ($q) => $q->latest('id'),
+            'registrations.teacher',
+            'registrations.school',
+            'registrations.feeReceipt',
+            'registrations.pendingSchool',
+        ]);
+
+        $rows = $program->registrations->map(function (TrainingRegistration $r) use ($program) {
+            $receipt = $r->feeReceipt;
+            $outstanding = $r->outstandingBalance();
+
+            return [
+                'id' => $r->id,
+                'teacher_name' => $r->teacher?->name,
+                'teacher_email' => $r->teacher?->email,
+                'school_name' => $r->school?->name ?? $r->pendingSchool?->school_name,
+                'source' => $r->registration_source,
+                'status' => $r->status,
+                'fee_status' => $r->fee_status,
+                'amount_due' => $r->feeTotalDue(),
+                'amount_paid' => (float) ($r->amount_paid ?? 0),
+                'outstanding' => $outstanding,
+                'receipt' => $receipt ? [
+                    'id' => $receipt->id,
+                    'status' => $receipt->status,
+                    'amount' => (float) $receipt->amount,
+                    'transaction_ref' => $receipt->transaction_ref,
+                    'payment_date' => $receipt->payment_date?->toDateString(),
+                    'has_file' => filled($receipt->file_path),
+                ] : null,
+                'can_approve' => $receipt?->status === 'uploaded',
+                'can_reject' => $receipt?->status === 'uploaded',
+                'can_record' => $program->hasFee()
+                    && $outstanding > 0
+                    && (
+                        (! $receipt || in_array($receipt->status, ['rejected', 'superseded'], true))
+                        || $r->fee_status === 'auto_approved'
+                    ),
+            ];
+        })->values();
+
+        return $this->inertia('Sahodaya/Training/FeeApprovals', [
+            'program' => $program->only(['id', 'title', 'status', 'fee_type', 'fee_amount']),
+            'hasFee' => $program->hasFee(),
+            'rows' => $rows,
+            'counts' => [
+                'awaiting_proof' => $rows->where('can_record', true)->count(),
+                'pending_approval' => $rows->where('can_approve', true)->count(),
+                'approved' => $rows->filter(fn ($r) => ($r['receipt']['status'] ?? null) === 'approved' || $r['status'] === 'confirmed')->count(),
+            ],
+        ]);
+    }
+
+    public function recordPayment(Request $request, string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->program_id !== $program->id, 403);
+        abort_unless($program->hasFee(), 422, 'This programme does not require a fee.');
+        abort_unless(
+            in_array($registration->status, ['registered', 'confirmed'], true),
+            422,
+            'Only registered or confirmed participants can be marked paid.'
+        );
+
+        $registration->loadMissing(['program', 'teacher', 'school']);
+        $outstanding = $registration->outstandingBalance();
+        abort_if($outstanding <= 0, 422, 'This training fee is already fully paid.');
+
+        $data = $request->validate([
+            'amount'          => 'nullable|numeric|min:1|max:'.$outstanding,
+            'transaction_ref' => 'nullable|string|max:100',
+            'payment_date'    => 'nullable|date',
+            'note'            => 'nullable|string|max:255',
+        ]);
+
+        $amount = round((float) ($data['amount'] ?? $outstanding), 2);
+
+        \App\Models\FeeReceipt::supersedePriorForFeeable($registration);
+
+        $receipt = \App\Models\FeeReceipt::create([
+            'feeable_type'        => TrainingRegistration::class,
+            'feeable_id'          => $registration->id,
+            'file_path'           => '',
+            'transaction_ref'     => $data['transaction_ref'] ?? ($data['note'] ?? 'Recorded by Sahodaya'),
+            'payment_date'        => $data['payment_date'] ?? now()->toDateString(),
+            'amount'              => $amount,
+            'status'              => 'approved',
+            'uploaded_by_user_id' => $request->user()->id,
+            'reviewed_by'         => $request->user()->id,
+            'reviewed_at'         => now(),
+        ]);
+
+        $registration->update(['fee_receipt_id' => $receipt->id]);
+        $registration->refresh();
+        $registration->refreshPaidState('fee_status');
+        $fullyPaid = $registration->fresh()->isFullyPaid();
+
+        if ($fullyPaid && $registration->fresh()->status === 'registered') {
+            $registration->update(['status' => 'confirmed']);
+        }
+
+        $issued = app(ProgramFeeReceiptService::class)->issueTraining(
+            $registration->fresh(['program', 'teacher', 'school']),
+            $receipt->fresh(),
+        );
+
+        app(OfflineProgramFeeOrchestrator::class)->notifyApproved(
+            $registration->school,
+            $issued,
+            'Training fee',
+            $registration->program?->title ?? 'Training Program',
+            adminPath: 'payments',
+        );
+
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.fee.recorded',
+            "Training fee recorded for {$registration->teacher?->name}",
+            [
+                'registration_id' => $registration->id,
+                'amount' => $amount,
+                'fully_paid' => $fullyPaid,
+            ],
+            $registration,
+        );
+
+        return back()->with('success', $fullyPaid
+            ? 'Venue payment recorded.'
+            : 'Partial venue payment of ₹'.number_format($amount, 2).' recorded.');
     }
 
     public function storeSession(Request $request, string $tenantId, TrainingProgram $program)
@@ -324,8 +520,8 @@ class TrainingProgramController extends SahodayaAdminController
         abort_if($session->program_id !== $program->id, 403);
 
         $registrations = TrainingRegistration::where('program_id', $program->id)
-            ->where('status', 'confirmed')
-            ->get();
+            ->get()
+            ->filter(fn (TrainingRegistration $r) => app(\App\Services\Training\TrainingRegistrationLifecycle::class)->canMarkAttendance($r, $program));
 
         foreach ($registrations as $registration) {
             TrainingAttendance::updateOrCreate(
@@ -342,6 +538,11 @@ class TrainingProgramController extends SahodayaAdminController
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
         abort_if($session->program_id !== $program->id, 403);
         abort_if($registration->program_id !== $program->id, 403);
+        abort_unless(
+            app(\App\Services\Training\TrainingRegistrationLifecycle::class)->canMarkAttendance($registration, $program),
+            422,
+            'This registration cannot be marked for attendance yet.'
+        );
 
         $data = $request->validate([
             'status' => 'required|in:present,absent',
@@ -373,11 +574,59 @@ class TrainingProgramController extends SahodayaAdminController
         ]);
     }
 
+    public function attendanceSheet(string $tenantId, TrainingProgram $program)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        $program->load(['sessions', 'registrations']);
+        $lifecycle = app(\App\Services\Training\TrainingRegistrationLifecycle::class);
+        $attendeeCount = $program->registrations
+            ->filter(fn (TrainingRegistration $r) => $lifecycle->canMarkAttendance($r, $program))
+            ->count();
+
+        return $this->inertia('Sahodaya/Training/AttendanceSheet', [
+            'program' => $program->only(['id', 'title', 'status', 'venue', 'start_date', 'end_date']),
+            'attendeeCount' => $attendeeCount,
+            'sessionCount' => max(1, $program->sessions->count()),
+        ]);
+    }
+
+    public function attendanceReport(string $tenantId, TrainingProgram $program, TrainingReportService $reports)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        $program->load(['sessions' => fn ($q) => $q->orderBy('scheduled_at')]);
+
+        return $this->inertia('Sahodaya/Training/AttendanceReport', [
+            'program' => $program->only(['id', 'title', 'status', 'venue', 'start_date', 'end_date']),
+            'sessions' => $program->sessions->map(fn ($s) => [
+                'id' => $s->id,
+                'title' => $s->title,
+                'scheduled_at' => $s->scheduled_at,
+            ]),
+            'rows' => $reports->attendanceRows($program),
+        ]);
+    }
+
     public function exportAttendance(string $tenantId, TrainingProgram $program, TrainingReportService $reports)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 
         return $reports->exportAttendance($program);
+    }
+
+    public function exportAttendanceSheetPdf(string $tenantId, TrainingProgram $program, TrainingReportService $reports)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportAttendanceSheetPdf($program, $this->sahodaya);
+    }
+
+    public function exportAttendanceReportPdf(string $tenantId, TrainingProgram $program, TrainingReportService $reports)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportAttendanceReportPdf($program, $this->sahodaya);
     }
 
     public function issueCertificate(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
@@ -500,5 +749,124 @@ class TrainingProgramController extends SahodayaAdminController
         $setup->updateHeadName($head, $data['name']);
 
         return back()->with('success', 'Ledger account name saved.');
+    }
+
+    public function downloadQr(string $tenantId, TrainingProgram $program, string $kind, string $format, \App\Services\Training\TrainingQrService $qr)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless(in_array($kind, ['registration', 'attendance'], true), 404);
+        abort_unless(in_array($format, ['png', 'svg', 'pdf'], true), 404);
+
+        $url = $kind === 'registration' ? $qr->registrationUrl($program) : $qr->attendanceUrl($program);
+        $slug = str($program->title)->slug().'-'.$kind.'-qr';
+        $isRegistration = $kind === 'registration';
+        $branding = $qr->posterBranding(
+            $this->sahodaya,
+            $program,
+            $url,
+            $isRegistration ? 'Registration QR' : 'Attendance QR',
+            $isRegistration ? 'Scan to register for this training' : 'Scan to mark attendance',
+        );
+
+        return $this->downloadBrandedQr($qr, $url, $branding, $format, $slug);
+    }
+
+    public function downloadSessionAttendanceQr(string $tenantId, TrainingProgram $program, TrainingSession $session, string $format, \App\Services\Training\TrainingQrService $qr)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($session->program_id !== $program->id, 404);
+        abort_unless(in_array($format, ['png', 'svg', 'pdf'], true), 404);
+
+        $url = $qr->attendanceUrl($program, $session);
+        $slug = str($program->title)->slug().'-'.str($session->title)->slug().'-attendance-qr';
+        $branding = $qr->posterBranding(
+            $this->sahodaya,
+            $program,
+            $url,
+            'Attendance · '.$session->title,
+            'Scan to mark attendance for this session',
+            $session,
+        );
+
+        return $this->downloadBrandedQr($qr, $url, $branding, $format, $slug);
+    }
+
+    /**
+     * @param  array{
+     *     org_name: string,
+     *     logo_src: ?string,
+     *     program_title: string,
+     *     label: string,
+     *     instruction: string,
+     *     venue: ?string,
+     *     dates: ?string,
+     *     url: string
+     * }  $branding
+     */
+    private function downloadBrandedQr(
+        \App\Services\Training\TrainingQrService $qr,
+        string $url,
+        array $branding,
+        string $format,
+        string $slug,
+    ) {
+        if ($format === 'png') {
+            return response($qr->brandedPng($url, $branding), 200, [
+                'Content-Type' => 'image/png',
+                'Content-Disposition' => "attachment; filename=\"{$slug}.png\"",
+            ]);
+        }
+
+        if ($format === 'svg') {
+            return response($qr->brandedSvg($url, $branding), 200, [
+                'Content-Type' => 'image/svg+xml',
+                'Content-Disposition' => "attachment; filename=\"{$slug}.svg\"",
+            ]);
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.qr-download', [
+            'orgName' => $branding['org_name'],
+            'logoSrc' => $branding['logo_src'],
+            'programTitle' => $branding['program_title'],
+            'label' => $branding['label'],
+            'instruction' => $branding['instruction'],
+            'venue' => $branding['venue'],
+            'dates' => $branding['dates'],
+            'url' => $branding['url'],
+            'qrDataUri' => $qr->dataUri($url, 400),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download($slug.'.pdf');
+    }
+
+    public function regenerateQr(string $tenantId, TrainingProgram $program, PlatformAuditLogger $audit)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        $program->forceFill([
+            'qr_registration_token' => \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(40)),
+            'attendance_qr_token'   => \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(40)),
+        ])->save();
+
+        $audit->training($program, 'training.qr.regenerated', "QR tokens regenerated: {$program->title}");
+
+        return back()->with('success', 'QR codes regenerated. Old links no longer work.');
+    }
+
+    public function qrReports(string $tenantId, TrainingProgram $program, \App\Services\Training\TrainingQrReportService $reports)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        return $this->inertia('Sahodaya/Training/QrReports', [
+            'program' => $program->only('id', 'title', 'status'),
+            'report'  => $reports->summary($program),
+        ]);
+    }
+
+    public function exportQrRegistrations(string $tenantId, TrainingProgram $program, \App\Services\Training\TrainingQrReportService $reports)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportQrRegistrations($program);
     }
 }

@@ -33,10 +33,11 @@ class TeacherTrainingRegistrationController extends Controller
             $eligibility->ineligibilityReason($program, $teacher) ?? 'You are not eligible for this programme.');
 
         TrainingRegistration::create([
-            'program_id'  => $program->id,
-            'teacher_id'  => $teacher->id,
-            'school_id'   => $school->id,
-            'status'      => 'registered',
+            'program_id'          => $program->id,
+            'teacher_id'          => $teacher->id,
+            'school_id'           => $school->id,
+            'status'              => app(\App\Services\Training\TrainingRegistrationLifecycle::class)->initialStatus($program),
+            'registration_source' => 'self',
         ]);
 
         return back()->with('success', 'Registered successfully. Upload payment proof if a fee applies.');

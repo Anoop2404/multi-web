@@ -291,6 +291,9 @@ Route::prefix('training')->name('training.')->group(function () {
     Route::get('/', [TrainingController::class, 'hub'])->name('index');
     Route::post('/', [TrainingRegistrationController::class, 'store']);
     Route::post('/{registration}/payment', [TrainingRegistrationController::class, 'uploadPayment']);
+    Route::get('/{program}/attendance', [TrainingRegistrationController::class, 'attendance'])->name('attendance');
+    Route::post('/{program}/sessions/{session}/attendance', [TrainingRegistrationController::class, 'markAllPresent'])->name('sessions.attendance');
+    Route::post('/{program}/sessions/{session}/attendance/{registration}', [TrainingRegistrationController::class, 'updateAttendance'])->name('sessions.attendance.update');
 });
 
 Route::get("/programs/{program}", function (string $tenantId, string $program) use ($festProgramSlugs) {

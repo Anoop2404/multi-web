@@ -4,6 +4,10 @@
         <PageHeader :title="program.title" eyebrow="Teacher training"
                     :description="`${program.registrations?.length ?? 0} registrations · ${program.status}`">
             <template #actions>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/qr-reports`"
+                      class="btn-secondary text-sm">
+                    QR reports
+                </Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/attendance`"
                       class="btn-secondary text-sm">
                     Attendance & report
@@ -71,6 +75,30 @@
                         </label>
                     </template>
                 </FormField>
+                <FormField label="QR registration" hint="Public QR form; expires after registration closes">
+                    <template #default="{ id }">
+                        <label class="inline-flex items-center gap-2 text-sm">
+                            <input :id="id" v-model="form.qr_registration_enabled" type="checkbox" class="rounded">
+                            Enabled
+                        </label>
+                    </template>
+                </FormField>
+                <FormField label="Require verified teachers" hint="Off = unverified teachers may register and attend">
+                    <template #default="{ id }">
+                        <label class="inline-flex items-center gap-2 text-sm">
+                            <input :id="id" v-model="form.require_verified_teachers" type="checkbox" class="rounded">
+                            Required
+                        </label>
+                    </template>
+                </FormField>
+                <FormField label="School attendance" hint="Schools can mark present/absent for their teachers">
+                    <template #default="{ id }">
+                        <label class="inline-flex items-center gap-2 text-sm">
+                            <input :id="id" v-model="form.allow_school_attendance" type="checkbox" class="rounded">
+                            Enabled
+                        </label>
+                    </template>
+                </FormField>
                 <FormField label="Status">
                     <template #default="{ id }">
                         <select :id="id" v-model="form.status" class="field">
@@ -100,9 +128,49 @@
             </FormActions>
         </form>
 
-        <!-- Sessions with per-teacher attendance -->
+        <div id="qr" class="card mb-6 scroll-mt-6">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="section-title">QR registration & attendance</h3>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {{ qr?.registration_open ? 'Registration QR is open' : 'Registration QR is closed (window / status / toggle)' }}
+                    </p>
+                </div>
+                <button type="button" class="btn-secondary text-xs" @click="regenerateQr">Regenerate QR tokens</button>
+            </div>
+            <div class="grid gap-6 sm:grid-cols-2">
+                <div class="space-y-2">
+                    <p class="text-sm font-semibold">Registration QR</p>
+                    <img v-if="qr?.registration_png" :src="qr.registration_png" alt="Registration QR" class="w-40 h-40 border rounded bg-white p-2">
+                    <p class="text-xs text-gray-500 break-all">{{ qr?.registration_url }}</p>
+                    <div class="flex flex-wrap gap-2">
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/qr/registration/png`" class="text-xs font-semibold text-indigo-600">PNG</a>
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/qr/registration/svg`" class="text-xs font-semibold text-indigo-600">SVG</a>
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/qr/registration/pdf`" class="text-xs font-semibold text-indigo-600">PDF</a>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <p class="text-sm font-semibold">Attendance QR (program)</p>
+                    <img v-if="qr?.attendance_png" :src="qr.attendance_png" alt="Attendance QR" class="w-40 h-40 border rounded bg-white p-2">
+                    <p class="text-xs text-gray-500 break-all">{{ qr?.attendance_url }}</p>
+                    <div class="flex flex-wrap gap-2">
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/qr/attendance/png`" class="text-xs font-semibold text-indigo-600">PNG</a>
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/qr/attendance/svg`" class="text-xs font-semibold text-indigo-600">SVG</a>
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/qr/attendance/pdf`" class="text-xs font-semibold text-indigo-600">PDF</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sessions -->
         <div id="sessions" class="card mb-4 scroll-mt-6">
-            <h4 class="font-semibold text-sm mb-3">Sessions</h4>
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
+                <h4 class="font-semibold text-sm">Sessions</h4>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/attendance`"
+                      class="text-xs font-semibold text-indigo-600">
+                    Open attendance →
+                </Link>
+            </div>
             <form @submit.prevent="addSession" class="grid gap-2 sm:grid-cols-2 mb-4">
                 <input v-model="sessionForm.title" class="field sm:col-span-2" placeholder="Day / session title (e.g. Day 1)" required>
                 <input v-model="sessionForm.scheduled_at" type="datetime-local" class="field" placeholder="Date & time">
@@ -111,104 +179,51 @@
                 <button class="btn-primary px-3 py-1.5 rounded text-xs whitespace-nowrap sm:col-span-2 sm:w-fit">Add training day</button>
             </form>
             <div v-for="session in program.sessions" :key="session.id" class="border rounded-lg p-3 mb-3">
-                <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center justify-between gap-2">
                     <div>
                         <p class="text-sm font-medium">{{ session.title }}</p>
                         <p class="text-xs text-gray-500">{{ session.scheduled_at || 'No date' }} {{ session.venue ? `· ${session.venue}` : '' }}</p>
                     </div>
-                    <button @click="markAllPresent(session)"
-                            class="text-xs text-indigo-600 font-semibold border border-indigo-200 px-2 py-1 rounded">
-                        Mark all present
-                    </button>
+                    <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/sessions/${session.id}/qr/png`"
+                       class="text-xs text-indigo-600 font-semibold border border-indigo-200 px-2 py-1 rounded whitespace-nowrap">
+                        Session QR
+                    </a>
                 </div>
-                <table v-if="confirmedRegistrations.length" class="w-full text-xs mt-2">
-                    <thead class="text-left text-gray-500">
-                        <tr>
-                            <th class="pb-1">Teacher</th>
-                            <th class="pb-1">Attendance</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y">
-                        <tr v-for="r in confirmedRegistrations" :key="r.id">
-                            <td class="py-1.5">{{ r.teacher?.name || `#${r.id}` }}</td>
-                            <td class="py-1.5">
-                                <div class="flex gap-1">
-                                    <button @click="setAttendance(session, r, 'present')"
-                                            class="px-2 py-0.5 rounded text-xs font-semibold transition"
-                                            :class="attendanceStatus(session.id, r.id) === 'present' ? 'btn-primary !min-h-0 !px-2 !py-0.5 text-xs' : 'bg-gray-100 text-gray-600 hover:bg-green-100 px-2 py-0.5 rounded text-xs font-semibold'">
-                                        Present
-                                    </button>
-                                    <button @click="setAttendance(session, r, 'absent')"
-                                            class="px-2 py-0.5 rounded text-xs font-semibold transition"
-                                            :class="attendanceStatus(session.id, r.id) === 'absent'
-                                                ? 'bg-red-500 text-white'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-red-100'">
-                                        Absent
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <p v-else class="text-xs text-gray-400 mt-2">No confirmed registrations yet.</p>
             </div>
+            <p v-if="!program.sessions?.length" class="text-xs text-gray-400">No sessions yet. Add a training day above.</p>
         </div>
 
         <!-- Registrations -->
-        <div id="registrations" class="card scroll-mt-6">
-            <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
-                <h4 class="font-semibold text-sm">Registrations ({{ program.registrations?.length ?? 0 }})</h4>
-                <a v-if="confirmedRegistrations.length"
-                   :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/certificates/export`"
-                   class="text-xs font-semibold text-indigo-600">
-                    Download all certificates (ZIP) ↗
-                </a>
+        <div class="card scroll-mt-6">
+            <div class="flex flex-wrap justify-between items-center gap-2">
+                <div>
+                    <h4 class="font-semibold text-sm">Registrations</h4>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ program.registrations?.length ?? 0 }} registration(s)</p>
+                </div>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations`"
+                      class="btn-primary text-sm">
+                    Open registrations →
+                </Link>
             </div>
-            <ul class="text-sm divide-y">
-                <li v-for="r in program.registrations" :key="r.id" class="py-2 flex justify-between items-center gap-2 flex-wrap">
-                    <div>
-                        <span>{{ r.teacher?.name || `#${r.id}` }}</span>
-                        <span class="text-xs text-gray-400 ml-2">{{ r.teacher?.school_name || '' }}</span>
-                    </div>
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-xs text-gray-400 capitalize">{{ r.status }}</span>
-                        <template v-if="program.fee_type !== 'none' && program.fee_amount > 0">
-                            <span v-if="r.fee_receipt?.status === 'approved'" class="text-xs text-green-700 font-semibold">Fee approved</span>
-                            <span v-else-if="r.fee_receipt?.status === 'uploaded'" class="text-xs text-amber-700 font-semibold">Fee pending</span>
-                            <span v-else-if="r.fee_receipt?.status === 'rejected'" class="text-xs text-red-600 font-semibold">Fee rejected</span>
-                            <span v-else class="text-xs text-gray-400">No fee proof</span>
-                            <a v-if="['uploaded', 'approved'].includes(r.fee_receipt?.status)"
-                               :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations/${r.id}/fee/proof`"
-                               target="_blank" rel="noopener"
-                               class="text-xs text-indigo-600 font-semibold">View proof ↗</a>
-                            <button v-if="r.fee_receipt?.status === 'uploaded'"
-                                    @click="approveFee(r)"
-                                    class="text-xs text-green-600 font-semibold">Approve fee</button>
-                            <button v-if="r.fee_receipt?.status === 'uploaded'"
-                                    @click="rejectFee(r)"
-                                    class="text-xs text-red-600 font-semibold">Reject fee</button>
-                        </template>
-                        <button v-if="r.status === 'registered' && canConfirm(r)" @click="confirm(r)"
-                                class="text-xs text-green-600 font-semibold">Confirm</button>
-                        <template v-if="r.status === 'confirmed'">
-                            <button @click="issueCertificate(r)"
-                                    class="text-xs text-purple-600 font-semibold">
-                                {{ r.certificate ? 'Reissue cert' : 'Issue cert' }}
-                            </button>
-                            <a v-if="r.certificate"
-                               :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations/${r.id}/certificate/print`"
-                               target="_blank" rel="noopener"
-                               class="text-xs text-indigo-600 font-semibold">Print cert ↗</a>
-                        </template>
-                    </div>
-                </li>
-            </ul>
+        </div>
+
+        <!-- Attendance -->
+        <div class="card scroll-mt-6">
+            <div class="flex flex-wrap justify-between items-center gap-2">
+                <div>
+                    <h4 class="font-semibold text-sm">Attendance</h4>
+                    <p class="text-xs text-gray-500 mt-0.5">Mark present/absent by session</p>
+                </div>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/attendance`"
+                      class="btn-primary text-sm">
+                    Open attendance →
+                </Link>
+            </div>
         </div>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue';
 import { useForm, router, Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 
@@ -218,6 +233,7 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     program: Object,
     attendanceMap: Object,
+    qr: Object,
 });
 
 const form = useForm({
@@ -230,6 +246,9 @@ const form = useForm({
     registration_close: props.program.registration_close?.slice?.(0, 10) ?? props.program.registration_close ?? '',
     max_participants: props.program.max_participants ?? '',
     allow_teacher_self_registration: props.program.allow_teacher_self_registration ?? true,
+    qr_registration_enabled: props.program.qr_registration_enabled ?? true,
+    require_verified_teachers: props.program.require_verified_teachers ?? false,
+    allow_school_attendance: props.program.allow_school_attendance ?? true,
     status: props.program.status,
     fee_type: props.program.fee_type ?? 'none',
     fee_amount: props.program.fee_amount ?? '',
@@ -240,23 +259,6 @@ const sessionForm = useForm({
     venue: '',
     duration_minutes: '',
 });
-
-const localAttendance = reactive({});
-
-for (const [sessionId, regMap] of Object.entries(props.attendanceMap ?? {})) {
-    localAttendance[sessionId] = {};
-    for (const [regId, rec] of Object.entries(regMap)) {
-        localAttendance[sessionId][regId] = rec.status;
-    }
-}
-
-const confirmedRegistrations = computed(() =>
-    (props.program.registrations ?? []).filter(r => r.status === 'confirmed')
-);
-
-function attendanceStatus(sessionId, regId) {
-    return localAttendance[sessionId]?.[regId] ?? null;
-}
 
 function save() {
     form.put(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}`, { preserveScroll: true });
@@ -269,57 +271,9 @@ function addSession() {
     });
 }
 
-function markAllPresent(session) {
-    router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/sessions/${session.id}/attendance`,
-        {},
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                for (const r of confirmedRegistrations.value) {
-                    if (!localAttendance[session.id]) localAttendance[session.id] = {};
-                    localAttendance[session.id][r.id] = 'present';
-                }
-            },
-        }
-    );
-}
-
-function setAttendance(session, registration, status) {
-    if (!localAttendance[session.id]) localAttendance[session.id] = {};
-    localAttendance[session.id][registration.id] = status;
-
-    router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/sessions/${session.id}/attendance/${registration.id}`,
-        { status },
-        { preserveScroll: true }
-    );
-}
-
-function confirm(registration) {
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/registrations/${registration.id}/confirm`, {}, { preserveScroll: true });
-}
-
-function canConfirm(registration) {
-    if (props.program.fee_type === 'none' || !props.program.fee_amount || props.program.fee_amount <= 0) {
-        return true;
-    }
-    return registration.fee_receipt?.status === 'approved';
-}
-
-function approveFee(registration) {
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/registrations/${registration.id}/fee/approve`, {}, { preserveScroll: true });
-}
-
-function rejectFee(registration) {
-    const reason = window.prompt('Rejection reason (optional):') ?? '';
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/registrations/${registration.id}/fee/reject`, {
-        rejection_reason: reason || null,
-    }, { preserveScroll: true });
-}
-
-function issueCertificate(registration) {
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/registrations/${registration.id}/certificate`, {}, { preserveScroll: true });
+function regenerateQr() {
+    if (!window.confirm('Regenerate QR tokens? Existing printed QR codes and links will stop working.')) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/qr/regenerate`, {}, { preserveScroll: true });
 }
 </script>
 

@@ -42,7 +42,11 @@ class TrainingApiController extends SchoolApiController
 
         $registration = TrainingRegistration::firstOrCreate(
             ['program_id' => $program->id, 'teacher_id' => $teacher->id],
-            ['school_id' => $this->school->id, 'status' => 'pending']
+            [
+                'school_id'           => $this->school->id,
+                'status'              => app(\App\Services\Training\TrainingRegistrationLifecycle::class)->initialStatus($program),
+                'registration_source' => 'school',
+            ]
         );
 
         return response()->json(['data' => $registration->load(['program', 'teacher'])], 201);

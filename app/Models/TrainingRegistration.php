@@ -18,10 +18,13 @@ class TrainingRegistration extends Model
 
     protected $fillable = [
         'program_id', 'teacher_id', 'school_id', 'status', 'fee_status', 'amount_paid', 'fee_receipt_id',
+        'registration_source', 'consent_at', 'department', 'teacher_created', 'pending_school_id',
     ];
 
     protected $casts = [
-        'amount_paid' => 'decimal:2',
+        'amount_paid'     => 'decimal:2',
+        'consent_at'      => 'datetime',
+        'teacher_created' => 'boolean',
     ];
 
     /** Training fee is defined on the program, not on the registration row. */
@@ -70,5 +73,10 @@ class TrainingRegistration extends Model
     {
         return $this->hasOne(Certificate::class, 'entity_id')
             ->where('entity_type', self::class);
+    }
+
+    public function pendingSchool(): BelongsTo
+    {
+        return $this->belongsTo(TrainingPendingSchool::class, 'pending_school_id');
     }
 }

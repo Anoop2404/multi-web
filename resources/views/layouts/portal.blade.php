@@ -338,6 +338,7 @@
             margin-bottom: .4rem; letter-spacing: .01em;
         }
         .portal-required { color: #dc2626; }
+        .portal-optional { color: #94a3b8; font-weight: 500; font-size: .9em; }
         .portal-btn {
             display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
             width: 100%;
