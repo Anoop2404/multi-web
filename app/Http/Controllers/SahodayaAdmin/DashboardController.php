@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsMembershipExports;
 use App\Models\AuditLog;
+use App\Models\BoardResult;
 use App\Models\Circular;
 use App\Models\FestAppeal;
 use App\Models\FestEvent;
@@ -18,6 +19,7 @@ use App\Models\SchoolYearSubmission;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\TrainingProgram;
+use App\Services\BoardResults\RankingEngine;
 use App\Services\Membership\SahodayaSetupService;
 use App\Services\Training\TrainingCpdService;
 use App\Support\AcademicYear;
@@ -27,7 +29,7 @@ class DashboardController extends SahodayaAdminController
 {
     use BuildsMembershipExports;
 
-    public function index(SahodayaSetupService $setup, TrainingCpdService $cpd)
+    public function index(SahodayaSetupService $setup, TrainingCpdService $cpd, RankingEngine $ranking)
     {
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
@@ -74,6 +76,10 @@ class DashboardController extends SahodayaAdminController
             'fest_registrations_review' => FestRegistration::whereIn('event_id', $festEventIds)
                 ->where('status', 'submitted')
                 ->count(),
+            'board_results_pending' => BoardResult::query()
+                ->whereIn('tenant_id', $schoolIds)
+                ->whereIn('status', [BoardResult::STATUS_SUBMITTED, BoardResult::STATUS_VERIFIED])
+                ->count(),
         ], fn (int $count) => $count > 0);
 
         $base = "/sahodaya-admin/{$this->sahodaya->id}";
@@ -86,6 +92,7 @@ class DashboardController extends SahodayaAdminController
         $actionQueueLinks = array_filter([
             'fest_appeals' => $pendingAppeals > 0 ? "{$base}/fest/appeals" : null,
             'fest_registrations_review' => $reviewEventId ? "{$base}/events/{$reviewEventId}/registrations" : null,
+            'board_results_pending' => "{$base}/board-results/verification",
         ]);
 
         $stats = [
@@ -168,6 +175,17 @@ class DashboardController extends SahodayaAdminController
 
         $setupChecklist = $setup->checklist($this->sahodaya);
 
+        $boardResultsWidget = [
+            'pending_verification' => BoardResult::query()
+                ->whereIn('tenant_id', $schoolIds)
+                ->whereIn('status', [BoardResult::STATUS_SUBMITTED, BoardResult::STATUS_VERIFIED])
+                ->count(),
+            'top_schools' => $ranking->topSchools($this->sahodaya->id, $year, 5),
+            'pass_percent_trend' => $ranking->passPercentTrend($this->sahodaya->id, 5),
+            'recent_awards' => app(\App\Services\BoardResults\AwardsEngine::class)
+                ->recentForDashboard($this->sahodaya->id, $year, 7),
+        ];
+
         return $this->inertia('Sahodaya/Dashboard', [
             'stats'               => $stats,
             'actionQueue'         => $actionQueue,
@@ -177,6 +195,7 @@ class DashboardController extends SahodayaAdminController
             'festOps'             => $festOps,
             'dashboardExtras'     => $dashboardExtras,
             'recentActivity'      => $recentActivity,
+            'boardResultsWidget'  => $boardResultsWidget,
             'setupChecklist'      => $setupChecklist,
             'setupCompletedCount' => collect($setupChecklist)->where('done', true)->count(),
             'setupTotalSteps'     => count($setupChecklist),

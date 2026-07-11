@@ -2,7 +2,8 @@
     $year  = $config['academic_year'] ?? null;
     $class = $config['class'] ?? null; // 10 or 12
 
-    $query = \App\Models\BoardResult::where('tenant_id', $tenant->id);
+    $query = \App\Models\BoardResult::where('tenant_id', $tenant->id)
+        ->published();
     if ($year)  $query->where('academic_year', $year);
     if ($class) $query->where('class', $class);
 
@@ -27,6 +28,9 @@
                     Class {{ $result->class }}
                 </span>
                 {{ $result->academic_year }}
+                @if($result->examination_type)
+                <span class="text-sm font-medium text-gray-500">{{ $result->examination_type }}</span>
+                @endif
             </h3>
 
             {{-- Stats --}}

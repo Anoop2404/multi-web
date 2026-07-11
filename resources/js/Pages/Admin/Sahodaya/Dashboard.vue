@@ -176,6 +176,48 @@
                     </EmptyState>
                 </div>
 
+                <!-- Board results -->
+                <div class="card">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="section-title text-base">Board results</h3>
+                        <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification`" class="link-brand text-xs">
+                            Verification →
+                        </Link>
+                    </div>
+                    <div class="mb-4 flex flex-wrap gap-3 text-sm">
+                        <span class="rounded-lg bg-amber-50 px-3 py-1.5 font-semibold text-amber-800">
+                            {{ boardResultsWidget.pending_verification ?? 0 }} pending verification
+                        </span>
+                    </div>
+                    <div v-if="boardResultsWidget.top_schools?.length" class="mb-4">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Top schools (pass %)</p>
+                        <ul class="divide-y divide-slate-100">
+                            <li v-for="s in boardResultsWidget.top_schools" :key="`${s.school_id}-${s.rank}`"
+                                class="flex items-center justify-between gap-2 py-2 text-sm">
+                                <span class="min-w-0 truncate">
+                                    <span class="font-semibold text-slate-500">#{{ s.rank }}</span>
+                                    {{ s.school_name }}
+                                </span>
+                                <span class="shrink-0 font-semibold text-[#0f3d7a]">{{ s.pass_percent }}%</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div v-if="boardResultsWidget.pass_percent_trend?.length">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Pass % trend</p>
+                        <div class="flex flex-wrap gap-2">
+                            <span v-for="row in boardResultsWidget.pass_percent_trend" :key="row.academic_year"
+                                  class="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs text-slate-700">
+                                {{ row.academic_year }}: <strong>{{ row.avg_pass_percent }}%</strong>
+                                <span class="text-slate-400">({{ row.schools }})</span>
+                            </span>
+                        </div>
+                    </div>
+                    <p v-if="!boardResultsWidget.top_schools?.length && !boardResultsWidget.pass_percent_trend?.length"
+                       class="text-sm text-slate-400">
+                        No published/approved results yet.
+                    </p>
+                </div>
+
                 <!-- Recent circulars -->
                 <div v-if="websiteEnabled && canSee('website')" class="card">
                     <div class="mb-4 flex items-center justify-between">
@@ -260,6 +302,7 @@ const props = defineProps({
     festOps:                 { type: Object, default: () => ({ programs: [] }) },
     dashboardExtras:         { type: Object, default: () => ({}) },
     recentActivity:          { type: Array, default: () => [] },
+    boardResultsWidget:      { type: Object, default: () => ({ pending_verification: 0, top_schools: [], pass_percent_trend: [], recent_awards: [] }) },
     setupChecklist:          { type: Array, default: () => [] },
     setupCompletedCount:     { type: Number, default: 0 },
     setupTotalSteps:         { type: Number, default: 0 },
@@ -296,6 +339,7 @@ const actionQueueItems = computed(() => {
         mcq_fee_proofs: { href: `${base}/mcq/payments`, label: 'Talent Search batch fees awaiting approval', color: 'indigo', icon: '📝' },
         fest_appeals: { href: `${base}/events`, label: 'open fest appeals', color: 'amber', icon: '⚖️' },
         fest_registrations_review: { href: `${base}/events`, label: 'fest registrations to review', color: 'navy', icon: '📥' },
+        board_results_pending: { href: `${base}/board-results/verification`, label: 'board results awaiting verification', color: 'amber', icon: '📊' },
     };
     return Object.entries(q).map(([key, count]) => {
         const meta = map[key] ?? {};

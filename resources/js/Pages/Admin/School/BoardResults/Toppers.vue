@@ -27,15 +27,23 @@
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
                             <label class="form-label mb-1.5">Student name *</label>
-                            <input v-model="form.name" type="text" required class="field">
+                            <input v-model="form.name" type="text" required class="field" :disabled="!canEdit">
+                        </div>
+                        <div>
+                            <label class="form-label mb-1.5">Admission No</label>
+                            <input v-model="form.admission_no" type="text" class="field" :disabled="!canEdit" placeholder="School admission number">
+                        </div>
+                        <div>
+                            <label class="form-label mb-1.5">Roll No</label>
+                            <input v-model="form.roll_no" type="text" class="field" :disabled="!canEdit" placeholder="Board roll number">
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Overall percentage *</label>
-                            <input v-model="form.percentage" type="number" required min="0" max="100" step="0.01" class="field">
+                            <input v-model="form.percentage" type="number" required min="0" max="100" step="0.01" class="field" :disabled="!canEdit">
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Overall rank</label>
-                            <input v-model="form.rank" type="number" min="1" placeholder="1" class="field">
+                            <input v-model="form.rank" type="number" min="1" placeholder="1" class="field" :disabled="!canEdit">
                         </div>
                         <div v-if="isClass12">
                             <label class="form-label mb-1.5">Stream *</label>
@@ -81,10 +89,12 @@
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">
-                        <button type="submit" class="btn-primary" :disabled="form.processing">
+                        <button v-if="canEdit" type="submit" class="btn-primary" :disabled="form.processing || atCap">
                             {{ editingId ? 'Save changes' : 'Add topper' }}
                         </button>
-                        <button v-if="editingId" type="button" class="btn-secondary text-sm" @click="cancelEdit">Cancel edit</button>
+                        <p v-if="atCap && !editingId" class="text-xs text-amber-600">Top-N limit reached ({{ topperCap }}).</p>
+                        <button v-if="editingId && canEdit" type="button" class="btn-secondary text-sm" @click="cancelEdit">Cancel edit</button>
+                        <p v-if="!canEdit" class="text-xs text-amber-600">Result is {{ boardResult.status }} — toppers are locked.</p>
                         <Link :href="`/school-admin/${school.id}/board-results`" class="text-sm text-gray-500 hover:text-gray-700">← Back to results</Link>
                     </div>
                 </form>
@@ -93,7 +103,9 @@
             <!-- Toppers list -->
             <div class="card card--flush">
                 <div class="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-                    <h3 class="font-bold text-gray-800">Overall toppers ({{ boardResult.toppers?.length ?? 0 }})</h3>
+                    <h3 class="font-bold text-gray-800">
+                        Overall toppers ({{ boardResult.toppers?.length ?? 0 }}{{ topperCap ? ` / ${topperCap}` : '' }})
+                    </h3>
                 </div>
                 <div v-if="sortedToppers.length" class="divide-y divide-gray-50">
                     <div v-for="t in sortedToppers" :key="t.id" class="px-5 py-4">
@@ -110,7 +122,9 @@
                                             <span v-if="t.is_perfect_scorer" class="ml-1 text-xs bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded">Perfect</span>
                                         </p>
                                         <p class="text-xs text-gray-500 mt-0.5">
-                                            <span v-if="t.stream">{{ t.stream }}</span>
+                                            <span v-if="t.admission_no">Adm {{ t.admission_no }}</span>
+                                            <span v-if="t.roll_no">{{ t.admission_no ? ' · ' : '' }}Roll {{ t.roll_no }}</span>
+                                            <span v-if="t.stream">{{ (t.admission_no || t.roll_no) ? ' · ' : '' }}{{ t.stream }}</span>
                                             <span v-if="t.marks_obtained && t.total_marks"> · {{ t.marks_obtained }}/{{ t.total_marks }}</span>
                                         </p>
                                     </div>
@@ -124,7 +138,7 @@
                                     </span>
                                 </div>
 
-                                <div class="mt-2 flex gap-3 text-xs">
+                                <div v-if="canEdit" class="mt-2 flex gap-3 text-xs">
                                     <button type="button" class="text-indigo-600 font-semibold hover:underline" @click="startEdit(t)">Edit</button>
                                     <button type="button" class="text-red-400 hover:underline" @click="remove(t)">Remove</button>
                                 </div>
@@ -152,18 +166,25 @@ const props = defineProps({
     streamOptions:      { type: Object, default: () => ({}) },
     subjectsByStream:   { type: Object, default: () => ({}) },
     subjectWiseLeaders: { type: Array, default: () => [] },
+    canEdit:            { type: Boolean, default: true },
+    topperCap:          { type: Number, default: null },
+    topperCount:        { type: Number, default: 0 },
 });
 
 const pageTitle = computed(() => `Toppers — Class ${props.boardResult.class} (${props.boardResult.academic_year})`);
+
+const editingId = ref(null);
+
+const atCap = computed(() => props.topperCap != null && props.topperCount >= props.topperCap && !editingId.value);
 
 const sortedToppers = computed(() =>
     [...(props.boardResult.toppers ?? [])].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)),
 );
 
-const editingId = ref(null);
-
 const form = useForm({
     name: '',
+    admission_no: '',
+    roll_no: '',
     percentage: '',
     rank: '',
     stream_key: '',
@@ -203,6 +224,8 @@ function streamKeyFromTopper(t) {
 function startEdit(t) {
     editingId.value = t.id;
     form.name = t.name;
+    form.admission_no = t.admission_no ?? '';
+    form.roll_no = t.roll_no ?? '';
     form.percentage = t.percentage;
     form.rank = t.rank ?? '';
     form.stream_key = streamKeyFromTopper(t);

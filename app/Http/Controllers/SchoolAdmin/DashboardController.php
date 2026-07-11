@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\AdmissionEnquiry;
+use App\Models\BoardResult;
+use App\Models\BoardResultRanking;
 use App\Models\FestEvent;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
@@ -13,6 +15,8 @@ use App\Models\SchoolClass;
 use App\Models\SchoolDocument;
 use App\Models\Student;
 use App\Models\DataChangeLog;
+use App\Models\Topper;
+use App\Services\BoardResults\RankingEngine;
 use App\Services\Training\TrainingCpdService;
 use App\Support\AcademicYear;
 use App\Support\ProgramRouteMap;
@@ -28,6 +32,7 @@ class DashboardController extends SchoolAdminController
 
         $tid = $this->school->id;
         $yearId = AcademicYear::activeId();
+        $year = AcademicYear::forSchool($this->school);
         $cpd = app(TrainingCpdService::class);
         $cpdHours = $cpd->totalHoursForSchool($tid, $yearId);
         $cpdTeachers = $cpd->summaryForSchool($tid, $yearId)->count();
@@ -47,6 +52,7 @@ class DashboardController extends SchoolAdminController
                 'teachers' => $cpdTeachers,
                 'year' => AcademicYear::forSchool($this->school),
             ],
+            'boardResultsWidget' => $this->boardResultsWidget($tid, $year),
             'setup' => $this->setupStatus(),
             'membershipComplete' => $this->membershipComplete(),
             'recentActivity' => $this->recentActivity(),
@@ -58,6 +64,55 @@ class DashboardController extends SchoolAdminController
             'showSetupWizard' => ! $this->school->school_setup_wizard_dismissed
                 && $this->school->membership_status === 'approved',
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function boardResultsWidget(string $schoolId, string $year): array
+    {
+        $sahodayaId = $this->school->parent_id;
+        $published = BoardResult::query()
+            ->where('tenant_id', $schoolId)
+            ->where('academic_year', $year)
+            ->published()
+            ->with(['toppers' => fn ($q) => $q->orderBy('rank')->limit(5)])
+            ->get();
+
+        $ranks = [];
+        if ($sahodayaId) {
+            $ranks = BoardResultRanking::query()
+                ->where('sahodaya_id', $sahodayaId)
+                ->where('academic_year', $year)
+                ->where('entity_type', 'school')
+                ->where('entity_id', $schoolId)
+                ->whereIn('scope', [RankingEngine::SCOPE_OVERALL_PASS_PERCENT, RankingEngine::SCOPE_OVERALL])
+                ->orderBy('scope')
+                ->get(['scope', 'rank', 'score', 'class', 'examination_type'])
+                ->map(fn (BoardResultRanking $r) => [
+                    'scope' => $r->scope,
+                    'rank' => $r->rank,
+                    'score' => $r->score,
+                    'class' => $r->class,
+                    'examination_type' => $r->examination_type,
+                ])
+                ->all();
+        }
+
+        return [
+            'academic_year' => $year,
+            'published_count' => $published->count(),
+            'pending_count' => BoardResult::query()
+                ->where('tenant_id', $schoolId)
+                ->whereIn('status', [BoardResult::STATUS_DRAFT, BoardResult::STATUS_REJECTED, BoardResult::STATUS_SUBMITTED])
+                ->count(),
+            'ranks' => $ranks,
+            'toppers' => $published->flatMap(fn (BoardResult $r) => $r->toppers->map(fn (Topper $t) => [
+                'name' => $t->name,
+                'percentage' => $t->percentage,
+                'rank' => $t->rank,
+                'class' => $r->class,
+            ]))->take(5)->values()->all(),
+            'href' => "/school-admin/{$schoolId}/board-results",
+        ];
     }
 
     public function dismissSetupWizard()

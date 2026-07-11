@@ -176,8 +176,9 @@
             </div>
 
             <!-- CPD hours -->
-            <div v-if="cpd" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div v-if="cpd || boardResultsWidget" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <DashboardStatCard
+                    v-if="cpd"
                     label="CPD hours this year"
                     :value="Number(cpd.hours ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 1 })"
                     :hint="cpd.year ? `${cpd.teachers ?? 0} teachers · ${cpd.year}` : `${cpd.teachers ?? 0} teachers`"
@@ -185,6 +186,38 @@
                     tone="green"
                     :href="`${base}/training`"
                 />
+                <div v-if="boardResultsWidget" class="card sm:col-span-2">
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                        <div>
+                            <h3 class="section-title text-base">Board results</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">{{ boardResultsWidget.academic_year }}</p>
+                        </div>
+                        <Link :href="boardResultsWidget.href" class="link-brand text-xs">Manage →</Link>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 text-sm mb-3">
+                        <div class="rounded-lg bg-slate-50 px-3 py-2">
+                            <p class="text-xs text-slate-500">Published</p>
+                            <p class="font-semibold text-slate-900">{{ boardResultsWidget.published_count }}</p>
+                        </div>
+                        <div class="rounded-lg bg-amber-50 px-3 py-2">
+                            <p class="text-xs text-amber-700">In progress</p>
+                            <p class="font-semibold text-amber-900">{{ boardResultsWidget.pending_count }}</p>
+                        </div>
+                    </div>
+                    <ul v-if="boardResultsWidget.ranks?.length" class="text-xs text-slate-600 space-y-1 mb-3">
+                        <li v-for="(r, i) in boardResultsWidget.ranks" :key="i">
+                            Sahodaya rank #{{ r.rank }}
+                            <span class="text-slate-400">({{ r.scope?.replace(/_/g, ' ') }})</span>
+                        </li>
+                    </ul>
+                    <ul v-if="boardResultsWidget.toppers?.length" class="text-xs divide-y divide-slate-100">
+                        <li v-for="(t, i) in boardResultsWidget.toppers" :key="i" class="flex justify-between py-1.5">
+                            <span>{{ t.name }} · Class {{ t.class }}</span>
+                            <span class="font-semibold text-indigo-600">{{ t.percentage }}%</span>
+                        </li>
+                    </ul>
+                    <p v-else class="text-xs text-slate-400">No published toppers for this year yet.</p>
+                </div>
             </div>
 
             <!-- Extras: stats, actions, deadlines -->
@@ -275,6 +308,7 @@ const props = defineProps({
     programSummaries: { type: Array, default: () => [] },
     dashboardExtras: { type: Object, default: () => ({}) },
     cpd: { type: Object, default: null },
+    boardResultsWidget: { type: Object, default: null },
     setup:  { type: Object, required: true },
     membershipComplete: { type: Object, default: null },
     leadershipContacts: { type: Object, default: null },
