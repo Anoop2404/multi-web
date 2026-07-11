@@ -219,6 +219,11 @@ class TeacherController extends SchoolAdminController
         ]));
     }
 
+    /**
+     * Structured-error, transactional all-or-nothing commit — matches importStore()'s
+     * pattern instead of the old silent skip-and-continue behaviour. Any row error
+     * rejects the whole batch (nothing is partially created).
+     */
     public function storeBulk(Request $request, EffectiveMasterDataResolver $resolver)
     {
         $data = $request->validate([
@@ -234,58 +239,108 @@ class TeacherController extends SchoolAdminController
             'create_logins'               => 'nullable|boolean',
         ]);
 
-        $yearId = AcademicYear::activeId();
         $validSubjectIds = $resolver->subjects($this->school->parent_id)->pluck('id')->all();
-        $created = 0;
-        $skipped = [];
+
+        $rows = [];
+        $errors = [];
+        $seenEmails = [];
+        $line = 0;
 
         foreach ($data['teachers'] as $row) {
+            $line++;
+
             if (blank($row['name'] ?? null)) {
                 continue;
             }
 
+            $name = $row['name'];
+
             $email = filled($row['email'] ?? null) ? strtolower(trim($row['email'])) : null;
-            if ($email && Teacher::where('email', $email)->exists()) {
-                $skipped[] = "{$row['name']} (duplicate email)";
+            if (! $email) {
+                $errors[] = ['row' => $line, 'message' => "{$name}: email is required."];
 
                 continue;
             }
 
-            $teacher = Teacher::create([
-                'tenant_id'        => $this->school->id,
-                'academic_year_id' => $yearId,
-                'name'             => $row['name'],
+            if (isset($seenEmails[$email])) {
+                $errors[] = ['row' => $line, 'message' => "{$name}: duplicate email \"{$email}\" (also used on row {$seenEmails[$email]})."];
+
+                continue;
+            }
+
+            if (Teacher::where('email', $email)->exists() || User::where('email', $email)->exists()) {
+                $errors[] = ['row' => $line, 'message' => "{$name}: email \"{$email}\" is already registered."];
+
+                continue;
+            }
+
+            $seenEmails[$email] = $line;
+
+            $ids = array_values(array_intersect(array_map('intval', $row['subject_ids'] ?? []), $validSubjectIds));
+            if ($ids === []) {
+                $errors[] = ['row' => $line, 'message' => "{$name}: no recognized subjects."];
+
+                continue;
+            }
+
+            $rows[] = [
+                'name'             => $name,
                 'email'            => $email,
                 'mobile'           => $row['mobile'],
                 'gender'           => $row['gender'] ?? null,
                 'teaching_type_id' => $row['teaching_type_id'],
                 'designation_id'   => $row['designation_id'] ?? null,
-                'status'           => 'active',
-            ]);
+                'subject_ids'      => $ids,
+            ];
+        }
 
-            $ids = array_values(array_intersect(array_map('intval', $row['subject_ids'] ?? []), $validSubjectIds));
-            $teacher->syncSubjectIds($ids);
+        if ($errors !== []) {
+            return back()->with('bulkErrors', $errors)->with('error', 'Nothing was added: fix the error(s) below and resubmit.');
+        }
 
-            app(LoginCodeGenerator::class)->assignTeacher($teacher);
-            app(EmployeeCodeGenerator::class)->assign($teacher);
+        if ($rows === []) {
+            return back()->with('error', 'No teachers to add — fill in at least one row.');
+        }
 
-            if ($request->boolean('create_logins', true)) {
-                try {
-                    app(TeacherPortalProvisioner::class)->provision($teacher->fresh(), $email);
-                } catch (\Throwable) {
-                    $skipped[] = "{$row['name']} (portal login failed)";
+        $createLogins = $request->boolean('create_logins', true);
+
+        try {
+            $created = DB::transaction(function () use ($rows, $createLogins) {
+                $yearId = AcademicYear::activeId();
+                $count = 0;
+
+                foreach ($rows as $row) {
+                    $teacher = Teacher::create([
+                        'tenant_id'        => $this->school->id,
+                        'academic_year_id' => $yearId,
+                        'name'             => $row['name'],
+                        'email'            => $row['email'],
+                        'mobile'           => $row['mobile'],
+                        'gender'           => $row['gender'],
+                        'teaching_type_id' => $row['teaching_type_id'],
+                        'designation_id'   => $row['designation_id'],
+                        'status'           => 'active',
+                    ]);
+
+                    $teacher->syncSubjectIds($row['subject_ids']);
+
+                    app(LoginCodeGenerator::class)->assignTeacher($teacher);
+                    app(EmployeeCodeGenerator::class)->assign($teacher);
+
+                    if ($createLogins) {
+                        app(TeacherPortalProvisioner::class)->provision($teacher->fresh(), $row['email']);
+                    }
+
+                    $count++;
                 }
-            }
 
-            $created++;
+                return $count;
+            });
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Add teachers failed and was rolled back: '.$e->getMessage());
         }
 
-        $message = "{$created} teacher(s) added.";
-        if ($skipped !== []) {
-            $message .= ' Skipped: '.implode(', ', array_slice($skipped, 0, 5)).'.';
-        }
-
-        return back()->with($skipped === [] ? 'success' : 'warning', $message);
+        return back()->with('success', "{$created} teacher(s) added.");
     }
 
     public function importTemplate(Request $request, EffectiveMasterDataResolver $resolver)
@@ -553,7 +608,7 @@ class TeacherController extends SchoolAdminController
      * with the platform owner to keep Teacher Registry edits unrestricted rather
      * than add edit-lock parity with Student Registry.
      */
-    public function update(Request $request, string $tenantId, Teacher $teacher, PlatformAuditLogger $audit, DataChangeLogger $changes)
+    public function update(Request $request, string $tenantId, Teacher $teacher, DataChangeLogger $changes)
     {
         abort_if($teacher->tenant_id !== $this->school->id, 403);
 
@@ -572,8 +627,10 @@ class TeacherController extends SchoolAdminController
 
         $this->markTeacherUnverified($teacher);
 
+        // Single canonical log for this event (DataChangeLogger, with a full before/after
+        // diff) — matches StudentController::update()'s pattern. Previously also fired
+        // PlatformAuditLogger for the same event; that was a redundant duplicate write.
         $changes->updated($teacher, 'Teacher updated', DataChangeLogger::diff($before, $teacher->only(array_keys($data))), $this->school->id, 'teachers');
-        $audit->log('teacher.updated', "Teacher updated: {$teacher->name}", $teacher);
 
         return back()->with('success', 'Teacher updated.');
     }

@@ -22,6 +22,12 @@
                     <h3 class="section-title text-base">Add multiple teachers</h3>
                     <button type="button" class="text-xs font-semibold text-[#041525] hover:underline" @click="addRow">+ Add row</button>
                 </div>
+                <div v-if="bulkErrors.length" class="rounded-lg border border-red-100 bg-red-50 p-3 max-h-32 overflow-y-auto">
+                    <p class="text-xs font-semibold text-red-700 mb-1">Nothing was added — fix these and resubmit</p>
+                    <ul class="text-xs text-red-600 space-y-0.5">
+                        <li v-for="(err, i) in bulkErrors" :key="i">Row {{ err.row }}: {{ err.message }}</li>
+                    </ul>
+                </div>
                 <div v-for="(row, i) in bulkForm.teachers" :key="i" class="rounded-xl border border-slate-100 p-3 space-y-3">
                     <div class="flex items-start gap-3">
                         <div class="flex-1 space-y-3">
@@ -330,6 +336,7 @@ const props = defineProps({
 });
 
 const importErrors = computed(() => usePage().props.flash?.importErrors ?? []);
+const bulkErrors = computed(() => usePage().props.flash?.bulkErrors ?? []);
 
 const f = reactive({
     teaching_type_id: '',
