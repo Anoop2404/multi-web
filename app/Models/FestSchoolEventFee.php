@@ -14,7 +14,7 @@ class FestSchoolEventFee extends Model
     use TracksPartialPayments;
 
     protected $fillable = [
-        'event_id', 'school_id', 'school_registration_fee', 'student_registration_fee',
+        'event_id', 'school_id', 'head_id', 'school_registration_fee', 'student_registration_fee',
         'participation_item_count', 'participation_fee', 'extra_item_fee', 'total_due',
         'amount_paid', 'override_amount', 'fee_receipt_id', 'status',
     ];
@@ -37,6 +37,11 @@ class FestSchoolEventFee extends Model
     public function school(): BelongsTo
     {
         return $this->belongsToCentralTenant('school_id');
+    }
+
+    public function head(): BelongsTo
+    {
+        return $this->belongsTo(FestItemHead::class, 'head_id');
     }
 
     public function feeReceipt(): BelongsTo
