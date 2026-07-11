@@ -456,10 +456,45 @@ class TeacherController extends SchoolAdminController
             ]);
         }
 
+        $this->markTeacherUnverified($teacher);
+
         $changes->updated($teacher, 'Teacher updated', DataChangeLogger::diff($before, $teacher->only(array_keys($data))), $this->school->id, 'teachers');
         $audit->log('teacher.updated', "Teacher updated: {$teacher->name}", $teacher);
 
         return back()->with('success', 'Teacher updated.');
+    }
+
+    /**
+     * Any edit to an already-verified teacher resets verification — matches
+     * StudentController::markStudentUnverified() and the FRD-02 "re-verification
+     * after edits" requirement. No-op for teachers that aren't currently verified.
+     */
+    private function markTeacherUnverified(Teacher $teacher): void
+    {
+        if ($teacher->verified_at === null) {
+            return;
+        }
+
+        $teacher->update([
+            'verified_at'         => null,
+            'verified_by_user_id' => null,
+        ]);
+
+        $notificationService = app(\App\Services\Notifications\NotificationService::class);
+        $replacements = ['teacher_name' => $teacher->name];
+
+        // "Required" tells this school their teacher now needs re-verification.
+        foreach (User::role(['school_admin', 'school_staff'])->where('tenant_id', $this->school->id)->get() as $user) {
+            $notificationService->notifyFromTemplate($user, 'teacher.verification.required', $replacements, '/school-admin/'.$this->school->id.'/teachers');
+        }
+
+        // "Pending" puts it back in the Sahodaya reviewer queue.
+        app(\App\Services\Notifications\SahodayaAdminNotifier::class)->notifyAdmins(
+            $this->school->parent_id,
+            'teacher.verification.pending',
+            $replacements,
+            "/sahodaya-admin/{$this->school->parent_id}/teachers/verification",
+        );
     }
 
     public function provisionPortal(Request $request, string $tenantId, Teacher $teacher)

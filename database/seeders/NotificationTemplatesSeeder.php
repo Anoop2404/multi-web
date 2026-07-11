@@ -111,6 +111,26 @@ class NotificationTemplatesSeeder extends Seeder
                 'body_template' => 'Your teacher portal account for {{school_name}} is ready. Sign in at {{login_url}} using {{login_email}} and the password provided by your school.',
             ],
             [
+                'slug'          => 'teacher.verification.pending',
+                'title'         => 'Teacher awaiting verification',
+                'body_template' => '{{teacher_name}} has been added and is awaiting Sahodaya verification.',
+            ],
+            [
+                'slug'          => 'teacher.verification.approved',
+                'title'         => 'Teacher verified',
+                'body_template' => '{{teacher_name}} has been verified by your Sahodaya.',
+            ],
+            [
+                'slug'          => 'teacher.verification.rejected',
+                'title'         => 'Teacher verification rejected',
+                'body_template' => 'Verification for {{teacher_name}} was rejected. Reason: {{reason}}',
+            ],
+            [
+                'slug'          => 'teacher.verification.required',
+                'title'         => 'Teacher needs re-verification',
+                'body_template' => '{{teacher_name}} was edited and now requires re-verification by your Sahodaya.',
+            ],
+            [
                 'slug'          => 'circular.published',
                 'title'         => 'New circular',
                 'body_template' => 'A new circular "{{circular_title}}" has been issued by your Sahodaya.',

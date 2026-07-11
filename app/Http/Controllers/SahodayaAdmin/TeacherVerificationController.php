@@ -5,8 +5,10 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Membership\EffectiveMasterDataResolver;
+use App\Services\Notifications\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
@@ -98,6 +100,10 @@ class TeacherVerificationController extends SahodayaAdminController
             ['teacher_id' => $teacher->id, 'verified_by' => 'sahodaya'],
         );
 
+        $this->notifySchool($teacher->tenant_id, 'teacher.verification.approved', [
+            'teacher_name' => $teacher->name,
+        ]);
+
         return back()->with('success', "Verified {$teacher->name}.");
     }
 
@@ -122,6 +128,11 @@ class TeacherVerificationController extends SahodayaAdminController
             $teacher,
             ['teacher_id' => $teacher->id, 'reason' => $data['reason']],
         );
+
+        $this->notifySchool($teacher->tenant_id, 'teacher.verification.rejected', [
+            'teacher_name' => $teacher->name,
+            'reason'       => $data['reason'],
+        ]);
 
         return back()->with('success', "Rejected {$teacher->name}.");
     }
@@ -152,13 +163,33 @@ class TeacherVerificationController extends SahodayaAdminController
             abort(422, 'Select teachers or choose verify all unverified.');
         }
 
+        $affected = (clone $query)->get(['id', 'tenant_id', 'name']);
+
         $count = $query->update([
             'verified_at'         => now(),
             'verified_by_user_id' => $request->user()?->id,
             'rejection_reason'    => null,
         ]);
 
+        foreach ($affected->groupBy('tenant_id') as $schoolId => $teachers) {
+            $this->notifySchool((string) $schoolId, 'teacher.verification.approved', [
+                'teacher_name' => $teachers->count() === 1
+                    ? $teachers->first()->name
+                    : "{$teachers->count()} teachers",
+            ]);
+        }
+
         return back()->with('success', $count > 0 ? "Verified {$count} teacher(s)." : 'No unverified teachers matched.');
+    }
+
+    /** Notify a school's admin/staff users from a NotificationTemplate slug. */
+    private function notifySchool(string $schoolId, string $slug, array $replacements = []): void
+    {
+        $service = app(NotificationService::class);
+
+        foreach (User::role(['school_admin', 'school_staff'])->where('tenant_id', $schoolId)->get() as $user) {
+            $service->notifyFromTemplate($user, $slug, $replacements, "/school-admin/{$schoolId}/teachers");
+        }
     }
 
     /** @return array<string, mixed> */
