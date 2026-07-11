@@ -13,7 +13,7 @@
             <p class="font-semibold">Sports meets need the composite billing model</p>
             <p class="mt-1 text-xs text-amber-900/90">
                 <strong>Flat per item</strong> charges one rate for every registration only.
-                To combine <strong>school fee + student registration + included items + extra item fee</strong>,
+                To bill <strong>each Event Head separately</strong> — school fee + student registration + per-item/team fees + free quotas —
                 switch billing model to
                 <button type="button" class="font-semibold underline" @click="feeSettingsForm.fee_model = 'sports_composite'">
                     Sports composite
@@ -231,6 +231,97 @@
                         </tbody>
                     </table>
                 </div>
+            </section>
+
+            <section v-if="feeSettingsForm.fee_model === 'sports_composite' && feeSettingsForm.head_fees.length" class="card space-y-4">
+                <div>
+                    <h3 class="section-title">Event Head billing</h3>
+                    <p class="section-desc">
+                        Each Event Head (Athletics, Chess, …) is billed and paid <strong>independently</strong> — a school can clear
+                        Athletics while Chess is still pending. School/Student/Team fees below override the event-wide defaults above
+                        once a head has its own rates set.
+                    </p>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700 space-y-1">
+                    <p><strong>School fee</strong> — once per school, per head.</p>
+                    <p><strong>Student fee</strong> — once per student registered under this head, added on top of item charges.</p>
+                    <p><strong>Team fee</strong> — once per team entry (relay, group items), separate from the student fee and its own quota.</p>
+                    <p><strong>Individual / Team quota</strong> — how many item entries / team entries per student are free before item/team fees apply (0 = none free).</p>
+                    <p><strong>Approval</strong> — Auto approves registrations the moment this head's fee is fully paid; Manual requires a Sahodaya reviewer regardless of payment.</p>
+                </div>
+                <div class="space-y-4">
+                    <div v-for="row in feeSettingsForm.head_fees" :key="row.id"
+                         class="rounded-xl border border-slate-200 p-4 space-y-3">
+                        <p class="font-semibold text-slate-900">{{ row.name }}</p>
+                        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <FormField label="School fee (₹)" hint="Once per school">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="row.school_registration_fee" type="number" min="0" class="field" placeholder="—">
+                                </template>
+                            </FormField>
+                            <FormField label="Student fee (₹)" hint="Per student under this head">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="row.student_registration_fee" type="number" min="0" class="field" placeholder="—">
+                                </template>
+                            </FormField>
+                            <FormField label="Team fee (₹)" hint="Per team entry">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="row.team_registration_fee" type="number" min="0" class="field" placeholder="—">
+                                </template>
+                            </FormField>
+                            <FormField label="Individual quota" hint="Free item entries per student">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="row.included_items_per_student" type="number" min="0" class="field" placeholder="0">
+                                </template>
+                            </FormField>
+                            <FormField label="Team quota" hint="Free team entries per student">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="row.included_teams" type="number" min="0" class="field" placeholder="0">
+                                </template>
+                            </FormField>
+                            <FormField label="Verification policy">
+                                <template #default="{ id }">
+                                    <select :id="id" v-model="row.verification_policy" class="field">
+                                        <option value="all_students">All students</option>
+                                        <option value="verified_only">Verified students only</option>
+                                    </select>
+                                </template>
+                            </FormField>
+                            <FormField label="Approval policy">
+                                <template #default="{ id }">
+                                    <select :id="id" v-model="row.approval_policy" class="field">
+                                        <option value="auto">Auto (on full payment)</option>
+                                        <option value="manual">Manual review</option>
+                                    </select>
+                                </template>
+                            </FormField>
+                            <FormField label="Max participants" hint="Leave blank for no cap">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="row.max_participants" type="number" min="0" class="field" placeholder="—">
+                                </template>
+                            </FormField>
+                            <FormField label="Max teams" hint="Leave blank for no cap">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="row.max_teams" type="number" min="0" class="field" placeholder="—">
+                                </template>
+                            </FormField>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section v-else-if="feeSettingsForm.fee_model === 'sports_composite'" class="card space-y-3">
+                <div>
+                    <h3 class="section-title">Event Head billing</h3>
+                    <p class="section-desc">Per-head School/Student/Team fees, quotas and approval policy (Chess, Athletics, …).</p>
+                </div>
+                <p class="text-sm text-slate-600">
+                    No item heads on this event yet.
+                    <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/competition`" class="link-brand font-semibold">
+                        Open competition hub →
+                    </Link>
+                    then return here to set fees per head.
+                </p>
             </section>
 
             <section v-if="feeSettingsForm.fee_model === 'item_catalog'" class="card space-y-4">

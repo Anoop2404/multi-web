@@ -57,7 +57,14 @@ class FestEventSettingsController extends SahodayaAdminController
         $itemHeads = \App\Models\FestItemHead::where('event_id', $event->id)
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id', 'name', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'default_item_fee', 'extra_item_fee']);
+            ->get([
+                'id', 'name', 'reg_start', 'reg_end', 'competition_start', 'competition_end',
+                'default_item_fee', 'extra_item_fee',
+                'school_registration_fee', 'student_registration_fee', 'team_registration_fee',
+                'included_items_per_student', 'included_teams',
+                'verification_policy', 'approval_policy',
+                'max_participants', 'max_teams',
+            ]);
 
         $ledgerAccount = app(\App\Services\Ledger\LedgerAccountSetupService::class)
             ->festLedgerMeta($event, $this->sahodaya->id);
@@ -312,6 +319,15 @@ class FestEventSettingsController extends SahodayaAdminController
             'head_fees.*.id' => 'required|exists:fest_item_heads,id',
             'head_fees.*.default_item_fee' => 'nullable|numeric|min:0',
             'head_fees.*.extra_item_fee' => 'nullable|numeric|min:0',
+            'head_fees.*.school_registration_fee' => 'nullable|numeric|min:0',
+            'head_fees.*.student_registration_fee' => 'nullable|numeric|min:0',
+            'head_fees.*.team_registration_fee' => 'nullable|numeric|min:0',
+            'head_fees.*.included_items_per_student' => 'nullable|integer|min:0|max:50',
+            'head_fees.*.included_teams' => 'nullable|integer|min:0|max:50',
+            'head_fees.*.verification_policy' => 'nullable|in:verified_only,all_students',
+            'head_fees.*.approval_policy' => 'nullable|in:auto,manual',
+            'head_fees.*.max_participants' => 'nullable|integer|min:0',
+            'head_fees.*.max_teams' => 'nullable|integer|min:0',
             'item_fees' => 'nullable|array',
             'item_fees.*.id' => 'required|exists:fest_event_items,id',
             'item_fees.*.fee_amount' => 'nullable|numeric|min:0',
@@ -343,13 +359,24 @@ class FestEventSettingsController extends SahodayaAdminController
         }
 
         foreach ($data['head_fees'] ?? [] as $row) {
+            $numeric = fn (string $key) => isset($row[$key]) && $row[$key] !== '' ? (float) $row[$key] : null;
+            $int = fn (string $key, int $default = 0) => isset($row[$key]) && $row[$key] !== '' ? (int) $row[$key] : $default;
+            $intNullable = fn (string $key) => isset($row[$key]) && $row[$key] !== '' ? (int) $row[$key] : null;
+
             \App\Models\FestItemHead::where('event_id', $event->id)
                 ->where('id', $row['id'])
                 ->update([
-                    'default_item_fee' => isset($row['default_item_fee']) && $row['default_item_fee'] !== ''
-                        ? (float) $row['default_item_fee'] : null,
-                    'extra_item_fee' => isset($row['extra_item_fee']) && $row['extra_item_fee'] !== ''
-                        ? (float) $row['extra_item_fee'] : null,
+                    'default_item_fee' => $numeric('default_item_fee'),
+                    'extra_item_fee' => $numeric('extra_item_fee'),
+                    'school_registration_fee' => $numeric('school_registration_fee'),
+                    'student_registration_fee' => $numeric('student_registration_fee'),
+                    'team_registration_fee' => $numeric('team_registration_fee'),
+                    'included_items_per_student' => $int('included_items_per_student', 0),
+                    'included_teams' => $int('included_teams', 0),
+                    'verification_policy' => $row['verification_policy'] ?? 'all_students',
+                    'approval_policy' => $row['approval_policy'] ?? 'auto',
+                    'max_participants' => $intNullable('max_participants'),
+                    'max_teams' => $intNullable('max_teams'),
                 ]);
         }
 
