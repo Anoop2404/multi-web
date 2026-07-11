@@ -2,12 +2,14 @@
 
 namespace App\Services\Training;
 
+use App\Models\SchoolRegionAssignment;
 use App\Models\Teacher;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
 use App\Services\Teachers\TeacherVerificationGate;
 use App\Support\Training\TrainingProgramEligibilityConfig;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class TeacherTrainingEligibilityService
 {
@@ -15,23 +17,24 @@ class TeacherTrainingEligibilityService
 
     public function isEligible(TrainingProgram $program, Teacher $teacher): bool
     {
-        if ($teacher->status !== 'active') {
-            return false;
+        return $this->ineligibilityReason($program, $teacher) === null;
+    }
+
+    /**
+     * Throw when the teacher cannot register for the programme.
+     *
+     * @throws ValidationException
+     */
+    public function assertTeacherEligible(TrainingProgram $program, Teacher $teacher): void
+    {
+        $reason = $this->ineligibilityReason($program, $teacher);
+        if ($reason === null) {
+            return;
         }
 
-        if ($program->require_verified_teachers && ! $this->verificationGate->isEligible($teacher, $program->tenant_id)) {
-            return false;
-        }
-
-        if (! $this->registrationWindowOpen($program)) {
-            return false;
-        }
-
-        if (! $this->hasCapacity($program)) {
-            return false;
-        }
-
-        return $this->passesConfig($program, $teacher);
+        throw ValidationException::withMessages([
+            'eligibility' => $reason,
+        ]);
     }
 
     public function ineligibilityReason(TrainingProgram $program, Teacher $teacher): ?string
@@ -52,11 +55,7 @@ class TeacherTrainingEligibilityService
             return 'Maximum participant limit reached.';
         }
 
-        if (! $this->passesConfig($program, $teacher)) {
-            return 'Teacher does not match required category or subject.';
-        }
-
-        return null;
+        return $this->configIneligibilityReason($program, $teacher);
     }
 
     /** @return Collection<int, Teacher> */
@@ -65,27 +64,72 @@ class TeacherTrainingEligibilityService
         return $teachers->filter(fn (Teacher $t) => $this->isEligible($program, $t))->values();
     }
 
-    private function passesConfig(TrainingProgram $program, Teacher $teacher): bool
+    private function configIneligibilityReason(TrainingProgram $program, Teacher $teacher): ?string
     {
         $config = TrainingProgramEligibilityConfig::normalize($program->eligibility_config);
+
         $typeIds = $config['teaching_type_ids'];
-        $subjectIds = $config['subject_ids'];
-
         if ($typeIds !== [] && ! in_array((int) $teacher->teaching_type_id, $typeIds, true)) {
-            return false;
+            return 'Teacher does not match required teaching category.';
         }
 
-        if ($subjectIds === []) {
-            return true;
+        $subjectIds = $config['subject_ids'];
+        if ($subjectIds !== []) {
+            $teacherSubjectIds = array_map('intval', $teacher->subject_ids ?? []);
+            if ($teacherSubjectIds === [] || array_intersect($teacherSubjectIds, $subjectIds) === []) {
+                return 'Teacher does not teach a required subject.';
+            }
         }
 
-        $teacherSubjectIds = array_map('intval', $teacher->subject_ids ?? []);
-
-        if ($teacherSubjectIds !== []) {
-            return array_intersect($teacherSubjectIds, $subjectIds) !== [];
+        $excluded = $config['excluded_designation_ids'];
+        if ($excluded !== [] && $teacher->designation_id !== null
+            && in_array((int) $teacher->designation_id, $excluded, true)) {
+            return 'This designation is not eligible for this training.';
         }
 
-        return false;
+        $minYears = $config['min_experience_years'];
+        if ($minYears !== null) {
+            $years = (int) ($teacher->experience_years ?? 0);
+            if ($years < $minYears) {
+                return "Teacher must have at least {$minYears} year(s) of experience.";
+            }
+        }
+
+        if ($config['prior_training']['required'] && ! $this->hasCompletedPriorTraining($teacher, $config['prior_training']['program_id'])) {
+            return $config['prior_training']['program_id']
+                ? 'Teacher must have completed the required prior training programme.'
+                : 'Teacher must have completed a prior training programme.';
+        }
+
+        $regionIds = $config['region_ids'];
+        if ($regionIds !== [] && ! $this->schoolInRegions((string) $teacher->tenant_id, $program->tenant_id, $regionIds)) {
+            return 'Teacher\'s school is not in an eligible region.';
+        }
+
+        return null;
+    }
+
+    private function hasCompletedPriorTraining(Teacher $teacher, ?int $programId): bool
+    {
+        $query = TrainingRegistration::query()
+            ->where('teacher_id', $teacher->id)
+            ->whereIn('status', ['confirmed', 'completed']);
+
+        if ($programId !== null) {
+            $query->where('program_id', $programId);
+        }
+
+        return $query->exists();
+    }
+
+    /** @param  list<int>  $regionIds */
+    private function schoolInRegions(string $schoolId, string $sahodayaId, array $regionIds): bool
+    {
+        return SchoolRegionAssignment::query()
+            ->where('tenant_id', $sahodayaId)
+            ->where('school_id', $schoolId)
+            ->whereIn('region_id', $regionIds)
+            ->exists();
     }
 
     private function registrationWindowOpen(TrainingProgram $program): bool

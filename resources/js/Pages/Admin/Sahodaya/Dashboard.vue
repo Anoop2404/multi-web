@@ -335,6 +335,18 @@ const primaryStats = computed(() => {
             tone: 'green',
         });
     }
+    if (canSee('training')) {
+        items.push({
+            label: 'CPD hours',
+            value: Number(props.stats.cpd_hours ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 1 }),
+            href: `${base}/training`,
+            hint: props.stats.cpd_year
+                ? `${props.stats.cpd_schools ?? 0} schools · ${props.stats.cpd_year}`
+                : `${props.stats.cpd_schools ?? 0} schools this year`,
+            icon: '🎓',
+            tone: 'indigo',
+        });
+    }
     return items;
 });
 

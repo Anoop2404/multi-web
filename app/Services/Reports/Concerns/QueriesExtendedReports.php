@@ -29,6 +29,7 @@ use App\Models\TcRequest;
 use App\Models\Tenant;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
+use App\Models\TrainingFeedback;
 use App\Models\TrainingSession;
 use App\Models\User;
 use App\Models\FestEvent;
@@ -37,6 +38,7 @@ use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Services\Ledger\FinancialStatementsService;
 use App\Services\Membership\EffectiveMasterDataResolver;
+use App\Services\Training\TrainingCpdService;
 use App\Support\AcademicYear;
 use Illuminate\Support\Collection;
 
@@ -135,6 +137,7 @@ trait QueriesExtendedReports
             'RPT-TRN-008' => $this->rptTrainingFeedbackSummary($sahodayaId),
             'RPT-TRN-011' => $this->rptTrainingNominationQueue($sahodayaId),
             'RPT-TRN-012' => $this->rptTrainingResourcePersons($sahodayaId),
+            'RPT-TRN-013' => $this->rptTrainingCpdBySchool($sahodayaId),
 
             'RPT-EML-001' => $this->rptEmailDeliveryLog($filters),
             'RPT-EML-002' => $this->rptFailedEmails($filters),
@@ -571,13 +574,47 @@ trait QueriesExtendedReports
     protected function rptTeacherTrainingHistory(string $sahodayaId): Collection
     {
         $schoolIds = $this->schoolIds($sahodayaId);
+        $cpd = app(TrainingCpdService::class);
+        $yearLabel = AcademicYear::forSahodaya($sahodayaId);
 
-        return TrainingRegistration::whereIn('school_id', $schoolIds)
-            ->with(['teacher:id,name', 'school:id,name', 'program:id,title'])
-            ->orderByDesc('updated_at')->get()
-            ->map(fn (TrainingRegistration $r) => [
-                'teacher' => $r->teacher?->name, 'school' => $r->school?->name, 'program' => $r->program?->title,
-                'status' => $r->status, 'completed_at' => $r->updated_at?->format('j M Y'), 'year' => $r->program?->title,
+        $registrations = TrainingRegistration::whereIn('school_id', $schoolIds)
+            ->with(['teacher:id,name', 'school:id,name', 'program:id,title,academic_year_id'])
+            ->orderByDesc('updated_at')
+            ->get();
+
+        $hoursByReg = $cpd->hoursForRegistrations($registrations->pluck('id'));
+        $yearIds = $registrations->pluck('program.academic_year_id')->filter()->unique()->values();
+        $yearLabels = $yearIds->isEmpty()
+            ? collect()
+            : \App\Models\AcademicYearRecord::whereIn('id', $yearIds)->pluck('label', 'id');
+
+        return $registrations->map(function (TrainingRegistration $r) use ($hoursByReg, $yearLabels, $yearLabel) {
+            $programYearId = $r->program?->academic_year_id;
+
+            return [
+                'teacher' => $r->teacher?->name,
+                'school' => $r->school?->name,
+                'program' => $r->program?->title,
+                'status' => $r->status,
+                'hours' => (float) ($hoursByReg->get($r->id) ?? 0),
+                'year' => $programYearId ? ($yearLabels[$programYearId] ?? $yearLabel) : $yearLabel,
+            ];
+        });
+    }
+
+    protected function rptTrainingCpdBySchool(string $sahodayaId): Collection
+    {
+        $yearId = AcademicYear::activeId();
+        $yearLabel = AcademicYear::forSahodaya($sahodayaId);
+
+        return app(TrainingCpdService::class)
+            ->summaryForSahodaya($sahodayaId, $yearId)
+            ->map(fn (array $row) => [
+                'school' => $row['school'],
+                'teachers' => $row['teachers'],
+                'hours' => $row['hours'],
+                'sessions_present' => $row['sessions_present'],
+                'year' => $yearLabel,
             ]);
     }
 
@@ -1151,7 +1188,7 @@ trait QueriesExtendedReports
             ->groupBy(fn (TrainingRegistration $r) => $r->program_id.'|'.$r->school_id)
             ->map(fn ($group) => [
                 'program' => $group->first()->program?->title, 'school' => $group->first()->school?->name,
-                'nominations' => $group->count(), 'approved' => $group->where('status', 'approved')->count(),
+                'nominations' => $group->count(), 'confirmed' => $group->where('status', 'confirmed')->count(),
             ])->values();
     }
 
@@ -1169,7 +1206,7 @@ trait QueriesExtendedReports
     protected function rptTrainingAttendance(string $sahodayaId): Collection
     {
         return TrainingRegistration::whereIn('school_id', $this->schoolIds($sahodayaId))
-            ->where('status', 'approved')->with(['program:id,title', 'teacher:id,name', 'school:id,name'])
+            ->whereIn('status', ['confirmed', 'completed'])->with(['program:id,title', 'teacher:id,name', 'school:id,name'])
             ->get()->map(fn (TrainingRegistration $r) => [
                 'program' => $r->program?->title, 'teacher' => $r->teacher?->name,
                 'school' => $r->school?->name, 'attendance_status' => $r->status,
@@ -1189,20 +1226,34 @@ trait QueriesExtendedReports
 
     protected function rptTrainingFeedbackSummary(string $sahodayaId): Collection
     {
-        return TrainingProgram::where('tenant_id', $sahodayaId)->withCount('registrations')->get()
-            ->map(fn (TrainingProgram $p) => [
-                'program' => $p->title, 'registrations' => $p->registrations_count,
-                'completed' => TrainingRegistration::where('program_id', $p->id)->where('status', 'completed')->count(),
-                'completion_pct' => $p->registrations_count > 0
-                    ? round(TrainingRegistration::where('program_id', $p->id)->where('status', 'completed')->count() / $p->registrations_count * 100, 1).'%'
-                    : '—',
-            ]);
+        return TrainingProgram::where('tenant_id', $sahodayaId)
+            ->withCount(['registrations', 'feedback'])
+            ->withAvg('feedback', 'rating')
+            ->get()
+            ->map(function (TrainingProgram $p) {
+                $completed = TrainingRegistration::where('program_id', $p->id)
+                    ->where('status', 'completed')
+                    ->count();
+
+                return [
+                    'program' => $p->title,
+                    'registrations' => $p->registrations_count,
+                    'feedback_submitted' => $p->feedback_count,
+                    'avg_rating' => $p->feedback_avg_rating !== null
+                        ? round((float) $p->feedback_avg_rating, 1)
+                        : '—',
+                    'completed' => $completed,
+                    'completion_pct' => $p->registrations_count > 0
+                        ? round($completed / $p->registrations_count * 100, 1).'%'
+                        : '—',
+                ];
+            });
     }
 
     protected function rptTrainingNominationQueue(string $sahodayaId): Collection
     {
         return TrainingRegistration::whereIn('school_id', $this->schoolIds($sahodayaId))
-            ->whereIn('status', ['submitted', 'pending'])->with(['program:id,title', 'teacher:id,name', 'school:id,name'])
+            ->whereIn('status', ['registered'])->with(['program:id,title', 'teacher:id,name', 'school:id,name'])
             ->orderByDesc('created_at')->get()
             ->map(fn (TrainingRegistration $r) => [
                 'program' => $r->program?->title, 'teacher' => $r->teacher?->name,

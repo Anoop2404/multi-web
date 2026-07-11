@@ -63,6 +63,7 @@ use App\Http\Controllers\SchoolAdmin\StaffController;
 use App\Http\Controllers\SchoolAdmin\SiteBuilderController;
 use App\Http\Controllers\SchoolAdmin\SiteBuilderApiController;
 use App\Http\Controllers\SchoolAdmin\StudentController;
+use App\Http\Controllers\SchoolAdmin\StudentSportsController;
 use App\Models\SkinPreset;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Route;
@@ -302,6 +303,8 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/imports/{backup}/download', [\App\Http\Controllers\SchoolAdmin\ImportHistoryController::class, 'download'])->name('imports.download');
 
     Route::get('/students',                    [StudentController::class, 'index'])->name('students.index');
+    Route::get('/students/export',             [StudentController::class, 'export'])->name('students.export');
+    Route::get('/students/export-pdf',         [StudentController::class, 'exportPdf'])->name('students.export.pdf');
     Route::get('/students/import',             [StudentController::class, 'importForm'])->name('students.import');
     Route::get('/students/import/template',    [StudentController::class, 'importTemplate'])->name('students.import.template');
     Route::post('/students/import/preview',    [StudentController::class, 'importPreview'])->name('students.import.preview');
@@ -318,10 +321,10 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/students/pending-change-requests/{changeRequest}/approve', [\App\Http\Controllers\SchoolAdmin\StudentChangeRequestController::class, 'approve'])->name('students.pending-change-requests.approve');
     Route::post('/students/pending-change-requests/{changeRequest}/reject', [\App\Http\Controllers\SchoolAdmin\StudentChangeRequestController::class, 'reject'])->name('students.pending-change-requests.reject');
     Route::get('/students/{student}',                          [StudentController::class, 'show'])->name('students.show');
-    Route::post('/students/{student}/sports/events/{event}/register', [StudentController::class, 'registerSportsEvent'])->name('students.sports.register-event');
-    Route::post('/students/{student}/sports/events/{event}/items', [StudentController::class, 'registerSportsItems'])->name('students.sports.register-items');
-    Route::get('/students/{student}/sports/events/{event}/eligible-items', [StudentController::class, 'eligibleSportsItems'])->name('students.sports.eligible-items');
-    Route::get('/students/{student}/fest/{event}/id-card', [StudentController::class, 'festIdCard'])->name('students.fest.id-card');
+    Route::post('/students/{student}/sports/events/{event}/register', [StudentSportsController::class, 'registerSportsEvent'])->name('students.sports.register-event');
+    Route::post('/students/{student}/sports/events/{event}/items', [StudentSportsController::class, 'registerSportsItems'])->name('students.sports.register-items');
+    Route::get('/students/{student}/sports/events/{event}/eligible-items', [StudentSportsController::class, 'eligibleSportsItems'])->name('students.sports.eligible-items');
+    Route::get('/students/{student}/fest/{event}/id-card', [StudentSportsController::class, 'festIdCard'])->name('students.fest.id-card');
     Route::get('/students/{student}/edit',                     [StudentController::class, 'edit'])->name('students.edit');
     Route::put('/students/{student}',                          [StudentController::class, 'update'])->name('students.update');
     Route::delete('/students/{student}',                      [StudentController::class, 'destroy'])->name('students.destroy');
@@ -331,11 +334,6 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/students/photo-naming-list',                  [StudentController::class, 'photoNamingList'])->name('students.photo-naming-list');
     Route::post('/students/{student}/portal-login', [StudentController::class, 'provisionPortal'])->name('students.portal-login');
     Route::post('/students/{student}/reset-portal-password', [StudentController::class, 'resetPortalPassword'])->name('students.reset-portal-password');
-    Route::post('/students/bulk-portal-provision', [StudentController::class, 'bulkProvisionPortal'])->name('students.bulk-portal-provision');
-    Route::post('/students/bulk-verify', [StudentController::class, 'bulkVerify'])->name('students.bulk-verify');
-    Route::get('/students/verification-report', [StudentController::class, 'verificationReport'])->name('students.verification-report');
-    Route::get('/students/verification-report/export', [StudentController::class, 'verificationExport'])->name('students.verification-report.export');
-    Route::post('/students/{student}/verify', [StudentController::class, 'verify'])->name('students.verify');
 
     Route::get('/users/profile-change-requests', [\App\Http\Controllers\SchoolAdmin\UserProfileChangeRequestController::class, 'index'])->name('users.profile-change-requests');
     Route::post('/users/profile-change-requests/{changeRequest}/approve', [\App\Http\Controllers\SchoolAdmin\UserProfileChangeRequestController::class, 'approve'])->name('users.profile-change-requests.approve');
@@ -680,11 +678,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
 
         Route::get('/students/verification', [\App\Http\Controllers\SahodayaAdmin\StudentVerificationController::class, 'index'])->name('students.verification.index');
         Route::post('/students/verification/bulk-verify', [\App\Http\Controllers\SahodayaAdmin\StudentVerificationController::class, 'bulkVerify'])->name('students.verification.bulk');
+        Route::post('/students/verification/bulk-reject', [\App\Http\Controllers\SahodayaAdmin\StudentVerificationController::class, 'bulkReject'])->name('students.verification.bulk-reject');
         Route::get('/students/{student}', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'show'])->name('students.show');
         Route::get('/students/{student}/photo', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'showPhoto'])->name('students.photo');
         Route::post('/students/{student}/portal-login', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'provisionPortal'])->name('students.portal-login');
         Route::post('/students/{student}/reset-portal-password', [\App\Http\Controllers\SahodayaAdmin\StudentProfileController::class, 'resetPortalPassword'])->name('students.reset-portal-password');
         Route::post('/students/{student}/verify', [\App\Http\Controllers\SahodayaAdmin\StudentVerificationController::class, 'verify'])->name('students.verification.verify');
+        Route::post('/students/{student}/reject', [\App\Http\Controllers\SahodayaAdmin\StudentVerificationController::class, 'reject'])->name('students.verification.reject');
 
         Route::get('/teachers/verification', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'index'])->name('teachers.verification.index');
         Route::post('/teachers/verification/bulk-verify', [\App\Http\Controllers\SahodayaAdmin\TeacherVerificationController::class, 'bulkVerify'])->name('teachers.verification.bulk');
@@ -1105,6 +1105,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{program}/qr/regenerate', [TrainingProgramController::class, 'regenerateQr'])->name('qr.regenerate');
             Route::get('/{program}/qr-reports', [TrainingProgramController::class, 'qrReports'])->name('qr-reports');
             Route::get('/{program}/qr-reports/export', [TrainingProgramController::class, 'exportQrRegistrations'])->name('qr-reports.export');
+            Route::get('/{program}/feedback', [TrainingProgramController::class, 'feedback'])->name('feedback');
+            Route::post('/{program}/feedback/{feedback}/review', [TrainingProgramController::class, 'markFeedbackReviewed'])->name('feedback.review');
+            Route::post('/{program}/pending-schools/{pendingSchool}/link', [TrainingProgramController::class, 'linkPendingSchool'])->name('pending-schools.link');
+            Route::post('/{program}/pending-schools/{pendingSchool}/reject', [TrainingProgramController::class, 'rejectPendingSchool'])->name('pending-schools.reject');
             Route::get('/{program}/sessions/{session}/qr/{format}', [TrainingProgramController::class, 'downloadSessionAttendanceQr'])->name('sessions.qr');
         });
 
@@ -1235,6 +1239,7 @@ Route::prefix('portal/teacher/{tenantId}')
         Route::get('/training', [TeacherDashboardController::class, 'trainingPage'])->name('training');
         Route::post('/training/programs/{program}/register', [\App\Http\Controllers\Portal\TeacherTrainingRegistrationController::class, 'register'])->name('training.register');
         Route::post('/training/registrations/{registration}/payment', [\App\Http\Controllers\Portal\TeacherTrainingRegistrationController::class, 'uploadPayment'])->name('training.payment');
+        Route::post('/training/registrations/{registration}/feedback', [\App\Http\Controllers\Portal\TeacherTrainingRegistrationController::class, 'submitFeedback'])->name('training.feedback');
         Route::get('/fest', [TeacherDashboardController::class, 'festPage'])->name('fest');
         Route::get('/fest/schedule', [TeacherDashboardController::class, 'festSchedulePage'])->name('fest.schedule');
         Route::get('/results', [TeacherDashboardController::class, 'resultsPage'])->name('results');

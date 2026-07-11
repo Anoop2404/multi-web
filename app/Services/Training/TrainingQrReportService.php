@@ -53,6 +53,7 @@ class TrainingQrReportService
                     'contact_email' => $p->contact_email,
                     'contact_phone' => $p->contact_phone,
                     'status'        => $p->status,
+                    'linked_school_id' => $p->linked_school_id,
                     'created_at'    => $p->created_at?->toDateTimeString(),
                 ])->all(),
         ];

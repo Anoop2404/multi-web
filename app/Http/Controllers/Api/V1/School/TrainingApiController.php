@@ -38,7 +38,7 @@ class TrainingApiController extends SchoolApiController
         $teacher = Teacher::findOrFail($data['teacher_id']);
         abort_if($teacher->tenant_id !== $this->school->id, 403);
 
-        abort_unless($eligibility->isEligible($program, $teacher), 422, $eligibility->ineligibilityReason($program, $teacher) ?? 'Teacher not eligible');
+        $eligibility->assertTeacherEligible($program, $teacher);
 
         $registration = TrainingRegistration::firstOrCreate(
             ['program_id' => $program->id, 'teacher_id' => $teacher->id],

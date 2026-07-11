@@ -10,7 +10,7 @@ class ErpReportMeta
     /** @return list<string> */
     public static function excludedIds(): array
     {
-        return ['RPT-SPT-021'];
+        return ['RPT-SPT-021', 'RPT-STU-015'];
     }
 
     /** @return array<string, string> */
@@ -331,17 +331,18 @@ class ErpReportMeta
 
             // Training
             'RPT-TRN-001' => ['columns' => ['program', 'status', 'capacity', 'enrolled', 'fee']],
-            'RPT-TRN-002' => ['columns' => ['program', 'school', 'nominations', 'approved']],
+            'RPT-TRN-002' => ['columns' => ['program', 'school', 'nominations', 'confirmed']],
             'RPT-TRN-003' => ['columns' => ['program', 'teacher', 'school', 'reason', 'status', 'created_at']],
             'RPT-TRN-004' => ['columns' => ['program', 'school', 'teacher', 'amount', 'status']],
             'RPT-TRN-005' => ['columns' => ['program', 'teacher', 'school', 'attendance_status']],
             'RPT-TRN-006' => ['columns' => ['program', 'teacher', 'school', 'certificate_issued_at']],
-            'RPT-TRN-007' => ['columns' => ['teacher', 'school', 'program', 'status', 'year']],
-            'RPT-TRN-008' => ['columns' => ['program', 'registrations', 'completed', 'completion_pct']],
+            'RPT-TRN-007' => ['columns' => ['teacher', 'school', 'program', 'status', 'hours', 'year']],
+            'RPT-TRN-008' => ['columns' => ['program', 'registrations', 'feedback_submitted', 'avg_rating', 'completed', 'completion_pct']],
             'RPT-TRN-009' => ['columns' => ['program', 'capacity', 'enrolled', 'utilization_pct']],
             'RPT-TRN-010' => ['columns' => ['school', 'program', 'teacher', 'amount', 'status']],
             'RPT-TRN-011' => ['columns' => ['program', 'teacher', 'school', 'status', 'submitted_at']],
             'RPT-TRN-012' => ['columns' => ['program', 'resource_person', 'sessions', 'status']],
+            'RPT-TRN-013' => ['columns' => ['school', 'teachers', 'hours', 'sessions_present', 'year']],
 
             // Email
             'RPT-EML-001' => ['columns' => ['recipient', 'template_key', 'status', 'sent_at', 'error'], 'filters' => ['from', 'to']],

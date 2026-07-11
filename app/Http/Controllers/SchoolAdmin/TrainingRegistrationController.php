@@ -10,10 +10,13 @@ use App\Models\TrainingRegistration;
 use App\Models\TrainingSession;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Notifications\SahodayaAdminNotifier;
+use App\Services\Spreadsheet\SpreadsheetWriter;
 use App\Services\Training\TeacherTrainingEligibilityService;
+use App\Services\Training\TrainingRegistrationCsvImporter;
 use App\Services\Training\TrainingRegistrationLifecycle;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TrainingRegistrationController extends SchoolAdminController
 {
@@ -74,19 +77,185 @@ class TrainingRegistrationController extends SchoolAdminController
 
         app(\App\Services\Membership\SchoolMembershipGate::class)->assertPaid($this->school);
 
-        $program = TrainingProgram::findOrFail($data['program_id']);
-        abort_if($program->tenant_id !== $this->school->parent_id, 403);
-        abort_if(! in_array($program->status, ['published', 'ongoing'], true), 422, 'Registration is closed.');
-
+        $program = $this->assertProgramOpen($data['program_id']);
         $teacher = Teacher::with('teachingType')->findOrFail($data['teacher_id']);
         abort_if($teacher->tenant_id !== $this->school->id, 403);
 
-        abort_unless($eligibility->isEligible($program, $teacher), 422,
-            $eligibility->ineligibilityReason($program, $teacher) ?? 'Teacher is not eligible for this training.');
+        $eligibility->assertTeacherEligible($program, $teacher);
 
+        $this->registerTeacher($program, $teacher);
+
+        return back()->with('success', 'Teacher registered for training.');
+    }
+
+    public function bulkStore(Request $request, TeacherTrainingEligibilityService $eligibility)
+    {
+        $data = $request->validate([
+            'program_id'    => 'required|exists:training_programs,id',
+            'teacher_ids'   => 'required|array|min:1|max:500',
+            'teacher_ids.*' => 'integer|exists:teachers,id',
+        ]);
+
+        app(\App\Services\Membership\SchoolMembershipGate::class)->assertPaid($this->school);
+
+        $program = $this->assertProgramOpen($data['program_id']);
+        $teacherIds = array_values(array_unique($data['teacher_ids']));
+
+        $teachers = Teacher::with('teachingType')
+            ->where('tenant_id', $this->school->id)
+            ->whereIn('id', $teacherIds)
+            ->get()
+            ->keyBy('id');
+
+        $registered = 0;
+        $skipped = 0;
+        $errors = [];
+
+        foreach ($teacherIds as $teacherId) {
+            $teacher = $teachers->get($teacherId);
+            if (! $teacher) {
+                $errors[] = "Teacher #{$teacherId} not found in this school.";
+                continue;
+            }
+
+            if (TrainingRegistration::where('program_id', $program->id)->where('teacher_id', $teacher->id)->exists()) {
+                $skipped++;
+                continue;
+            }
+
+            if (! $eligibility->isEligible($program, $teacher)) {
+                $reason = $eligibility->ineligibilityReason($program, $teacher) ?? 'not eligible';
+                $errors[] = "{$teacher->name}: {$reason}";
+                continue;
+            }
+
+            $this->registerTeacher($program, $teacher);
+            $registered++;
+        }
+
+        if ($registered === 0 && $errors !== []) {
+            return back()->with('error', 'No teachers registered. '.implode(' ', array_slice($errors, 0, 3)));
+        }
+
+        $parts = ["Registered {$registered} teacher(s)."];
+        if ($skipped > 0) {
+            $parts[] = "{$skipped} already nominated.";
+        }
+        if ($errors !== []) {
+            $parts[] = count($errors).' skipped with errors.';
+        }
+
+        return back()->with('success', implode(' ', $parts));
+    }
+
+    public function importTemplate(Request $request)
+    {
+        $importer = new TrainingRegistrationCsvImporter(
+            $this->school,
+            app(TeacherTrainingEligibilityService::class),
+            app(TrainingRegistrationLifecycle::class),
+        );
+
+        if ($request->query('format') === 'csv') {
+            return response()->streamDownload(
+                fn () => print("\xEF\xBB\xBF".$importer->templateCsv()),
+                'training-nomination-template.csv',
+                ['Content-Type' => 'text/csv; charset=UTF-8'],
+            );
+        }
+
+        return response()->streamDownload(
+            fn () => print $importer->templateXlsx(),
+            'training-nomination-template.xlsx',
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
+    }
+
+    public function importStore(Request $request, TeacherTrainingEligibilityService $eligibility)
+    {
+        $data = $request->validate([
+            'program_id' => 'required|exists:training_programs,id',
+            'file'       => 'required|file|mimes:csv,txt,xlsx|max:5120',
+        ]);
+
+        app(\App\Services\Membership\SchoolMembershipGate::class)->assertPaid($this->school);
+
+        $program = $this->assertProgramOpen($data['program_id']);
+
+        $importer = new TrainingRegistrationCsvImporter($this->school, $eligibility, app(TrainingRegistrationLifecycle::class));
+        $result = $importer->import($request->file('file'), $program);
+
+        if (! $result['success'] && $result['imported'] === 0) {
+            return back()
+                ->with('importResult', $result)
+                ->with('error', 'Import rejected: fix the error(s) below and re-upload.');
+        }
+
+        if ($result['imported'] === 0 && $result['errors'] === []) {
+            return back()
+                ->with('importResult', $result)
+                ->with('info', 'No new nominations — all matched teachers were already registered.');
+        }
+
+        $message = "Imported {$result['imported']} nomination(s).";
+        if ($result['errors'] !== []) {
+            $message .= ' '.count($result['errors']).' row(s) had errors.';
+        }
+
+        return back()
+            ->with('importResult', $result)
+            ->with($result['errors'] === [] ? 'success' : 'warning', $message);
+    }
+
+    public function export(Request $request, string $tenantId, TrainingProgram $program): StreamedResponse
+    {
+        abort_if($program->tenant_id !== $this->school->parent_id, 403);
+
+        $importer = new TrainingRegistrationCsvImporter(
+            $this->school,
+            app(TeacherTrainingEligibilityService::class),
+            app(TrainingRegistrationLifecycle::class),
+        );
+        $rows = $importer->exportRows($program);
+
+        $format = $request->query('format') === 'csv' ? 'csv' : 'xlsx';
+        $slug = str($program->title)->slug()->limit(40, '')->toString() ?: 'training';
+        $filename = "{$slug}-nominations-".now()->format('Y-m-d').".{$format}";
+
+        if ($format === 'csv') {
+            return response()->streamDownload(function () use ($rows) {
+                $out = fopen('php://output', 'w');
+                fwrite($out, "\xEF\xBB\xBF");
+                foreach ($rows as $row) {
+                    fputcsv($out, $row);
+                }
+                fclose($out);
+            }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
+        $xlsx = SpreadsheetWriter::xlsx($rows);
+
+        return response()->streamDownload(
+            fn () => print $xlsx,
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
+    }
+
+    private function assertProgramOpen(int|string $programId): TrainingProgram
+    {
+        $program = TrainingProgram::findOrFail($programId);
+        abort_if($program->tenant_id !== $this->school->parent_id, 403);
+        abort_if(! in_array($program->status, ['published', 'ongoing'], true), 422, 'Registration is closed.');
+
+        return $program;
+    }
+
+    private function registerTeacher(TrainingProgram $program, Teacher $teacher): TrainingRegistration
+    {
         $lifecycle = app(TrainingRegistrationLifecycle::class);
 
-        TrainingRegistration::firstOrCreate(
+        return TrainingRegistration::firstOrCreate(
             ['program_id' => $program->id, 'teacher_id' => $teacher->id],
             [
                 'school_id'           => $this->school->id,
@@ -94,8 +263,6 @@ class TrainingRegistrationController extends SchoolAdminController
                 'registration_source' => 'school',
             ]
         );
-
-        return back()->with('success', 'Teacher registered for training.');
     }
 
     public function attendance(string $tenantId, TrainingProgram $program, TrainingRegistrationLifecycle $lifecycle)

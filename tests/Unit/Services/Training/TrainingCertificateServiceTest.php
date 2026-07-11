@@ -80,6 +80,51 @@ class TrainingCertificateServiceTest extends TestCase
         $service->assertEligible($registration->fresh());
     }
 
+    public function test_respects_min_attendance_percent(): void
+    {
+        [$sahodaya, $school] = $this->seedTenants();
+        $teacher = Teacher::create(['tenant_id' => $school->id, 'name' => 'Teacher B', 'status' => 'active']);
+
+        $program = TrainingProgram::create([
+            'tenant_id'              => $sahodaya->id,
+            'title'                  => 'Synergy 26',
+            'status'                 => 'ongoing',
+            'fee_type'               => 'none',
+            'min_attendance_percent' => 100,
+        ]);
+        $day1 = TrainingSession::create(['program_id' => $program->id, 'title' => 'Day 1']);
+        $day2 = TrainingSession::create(['program_id' => $program->id, 'title' => 'Day 2']);
+        $registration = TrainingRegistration::create([
+            'program_id' => $program->id,
+            'teacher_id' => $teacher->id,
+            'school_id'  => $school->id,
+            'status'     => 'confirmed',
+        ]);
+
+        TrainingAttendance::create([
+            'session_id'      => $day1->id,
+            'registration_id' => $registration->id,
+            'status'          => 'present',
+        ]);
+
+        $service = app(TrainingCertificateService::class);
+
+        try {
+            $service->assertEligible($registration->fresh()->load('program.sessions'));
+            $this->fail('Expected ValidationException for 100% attendance requirement');
+        } catch (ValidationException) {
+            // expected — 1 of 2 days
+        }
+
+        TrainingAttendance::create([
+            'session_id'      => $day2->id,
+            'registration_id' => $registration->id,
+            'status'          => 'present',
+        ]);
+
+        $service->assertEligible($registration->fresh()->load('program.sessions'));
+    }
+
     public function test_conducted_on_reflects_only_present_days(): void
     {
         [$sahodaya, $school] = $this->seedTenants();

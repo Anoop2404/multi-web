@@ -8,6 +8,10 @@
                       class="btn-secondary text-sm">
                     QR reports
                 </Link>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/feedback`"
+                      class="btn-secondary text-sm">
+                    Feedback
+                </Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/attendance`"
                       class="btn-secondary text-sm">
                     Attendance & report
@@ -122,7 +126,99 @@
                         <input :id="id" v-model="form.fee_amount" type="number" min="0" step="0.01" class="field">
                     </template>
                 </FormField>
+                <FormField label="Min attendance % for certificate">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.min_attendance_percent" type="number" min="0" max="100"
+                               class="field" placeholder="Blank = ≥1 day">
+                        <p class="text-xs text-gray-500 mt-1">Percent of program days required present. Blank or 0 keeps the default (≥1 day).</p>
+                    </template>
+                </FormField>
             </FormGrid>
+
+            <div class="border-t border-slate-100 pt-4 space-y-4">
+                <div>
+                    <h4 class="text-sm font-semibold text-slate-800">Eligibility rules</h4>
+                    <p class="text-xs text-gray-500 mt-0.5">Leave filters empty to allow all teachers (subject to verification / capacity).</p>
+                    <p v-if="form.errors.eligibility_config" class="text-xs text-red-600 mt-1">{{ form.errors.eligibility_config }}</p>
+                </div>
+                <FormGrid>
+                    <FormField label="Teaching categories" hint="Empty = any category" class-extra="sm:col-span-2">
+                        <div class="flex flex-wrap gap-3 max-h-32 overflow-y-auto border rounded-md p-2">
+                            <label v-for="t in eligibilityOptions.teaching_types || []" :key="t.id"
+                                   class="inline-flex items-center gap-1.5 text-sm text-slate-700">
+                                <input type="checkbox" class="rounded" :value="t.id"
+                                       v-model="form.eligibility_config.teaching_type_ids">
+                                {{ t.label }}
+                            </label>
+                            <p v-if="!(eligibilityOptions.teaching_types || []).length" class="text-xs text-gray-400">No teaching categories configured.</p>
+                        </div>
+                    </FormField>
+                    <FormField label="Subjects" hint="Must teach at least one selected subject" class-extra="sm:col-span-2">
+                        <div class="flex flex-wrap gap-3 max-h-32 overflow-y-auto border rounded-md p-2">
+                            <label v-for="s in eligibilityOptions.subjects || []" :key="s.id"
+                                   class="inline-flex items-center gap-1.5 text-sm text-slate-700">
+                                <input type="checkbox" class="rounded" :value="s.id"
+                                       v-model="form.eligibility_config.subject_ids">
+                                {{ s.label }}
+                            </label>
+                            <p v-if="!(eligibilityOptions.subjects || []).length" class="text-xs text-gray-400">No subjects configured.</p>
+                        </div>
+                    </FormField>
+                    <FormField label="Exclude designations" hint="These designations cannot register" class-extra="sm:col-span-2">
+                        <div class="flex flex-wrap gap-3 max-h-32 overflow-y-auto border rounded-md p-2">
+                            <label v-for="d in eligibilityOptions.designations || []" :key="d.id"
+                                   class="inline-flex items-center gap-1.5 text-sm text-slate-700">
+                                <input type="checkbox" class="rounded" :value="d.id"
+                                       v-model="form.eligibility_config.excluded_designation_ids">
+                                {{ d.label }}
+                            </label>
+                            <p v-if="!(eligibilityOptions.designations || []).length" class="text-xs text-gray-400">No designations configured.</p>
+                        </div>
+                    </FormField>
+                    <FormField label="Minimum experience (years)">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.eligibility_config.min_experience_years" type="number"
+                                   min="0" max="60" class="field" placeholder="Any">
+                        </template>
+                    </FormField>
+                    <FormField label="Prior training required">
+                        <template #default="{ id }">
+                            <label class="inline-flex items-center gap-2 text-sm">
+                                <input :id="id" v-model="form.eligibility_config.prior_training.required"
+                                       type="checkbox" class="rounded">
+                                Must have completed prior training
+                            </label>
+                        </template>
+                    </FormField>
+                    <FormField v-if="form.eligibility_config.prior_training.required"
+                               label="Required prior programme"
+                               hint="Blank = any prior completed programme"
+                               class-extra="sm:col-span-2">
+                        <template #default="{ id }">
+                            <select :id="id" v-model="form.eligibility_config.prior_training.program_id" class="field">
+                                <option :value="null">Any prior completed programme</option>
+                                <option v-for="p in eligibilityOptions.prior_programs || []" :key="p.id" :value="p.id">
+                                    {{ p.title }}
+                                </option>
+                            </select>
+                        </template>
+                    </FormField>
+                    <FormField v-if="(eligibilityOptions.regions || []).length"
+                               label="Eligible regions"
+                               hint="Empty = all regions. Uses school region assignments."
+                               class-extra="sm:col-span-2">
+                        <div class="flex flex-wrap gap-3 max-h-32 overflow-y-auto border rounded-md p-2">
+                            <label v-for="r in eligibilityOptions.regions" :key="r.id"
+                                   class="inline-flex items-center gap-1.5 text-sm text-slate-700">
+                                <input type="checkbox" class="rounded" :value="r.id"
+                                       v-model="form.eligibility_config.region_ids">
+                                {{ r.name }}
+                            </label>
+                        </div>
+                    </FormField>
+                </FormGrid>
+            </div>
+
             <FormActions>
                 <button type="submit" class="btn-primary" :disabled="form.processing">Save program</button>
             </FormActions>
@@ -233,8 +329,11 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     program: Object,
     attendanceMap: Object,
+    eligibilityOptions: { type: Object, default: () => ({}) },
     qr: Object,
 });
+
+const ec = props.program.eligibility_config ?? {};
 
 const form = useForm({
     title: props.program.title,
@@ -252,6 +351,18 @@ const form = useForm({
     status: props.program.status,
     fee_type: props.program.fee_type ?? 'none',
     fee_amount: props.program.fee_amount ?? '',
+    min_attendance_percent: props.program.min_attendance_percent ?? '',
+    eligibility_config: {
+        teaching_type_ids: [...(ec.teaching_type_ids || [])],
+        subject_ids: [...(ec.subject_ids || [])],
+        excluded_designation_ids: [...(ec.excluded_designation_ids || [])],
+        min_experience_years: ec.min_experience_years ?? '',
+        prior_training: {
+            required: !!(ec.prior_training?.required),
+            program_id: ec.prior_training?.program_id ?? null,
+        },
+        region_ids: [...(ec.region_ids || [])],
+    },
 });
 const sessionForm = useForm({
     title: '',

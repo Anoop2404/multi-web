@@ -8,9 +8,13 @@ class SahodayaAdminNotifier
 {
     public function notifyAdmins(string $sahodayaId, string $slug, array $replacements = [], ?string $actionUrl = null): void
     {
-        $users = User::role(['sahodaya_admin', 'sahodaya_staff'])
-            ->where('tenant_id', $sahodayaId)
-            ->get();
+        try {
+            $users = User::role(['sahodaya_admin', 'sahodaya_staff'])
+                ->where('tenant_id', $sahodayaId)
+                ->get();
+        } catch (\Throwable) {
+            return;
+        }
 
         $service = app(NotificationService::class);
 

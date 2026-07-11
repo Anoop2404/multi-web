@@ -16,6 +16,7 @@ class TrainingProgram extends Model
         'qr_registration_enabled', 'require_verified_teachers', 'allow_school_attendance',
         'attendance_qr_token', 'status',
         'fee_type', 'fee_amount', 'late_fee_amount', 'penalty_amount', 'eligibility_config',
+        'min_attendance_percent',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class TrainingProgram extends Model
         'late_fee_amount'    => 'decimal:2',
         'penalty_amount'     => 'decimal:2',
         'eligibility_config' => 'array',
+        'min_attendance_percent' => 'integer',
     ];
 
     protected static function booted(): void
@@ -69,6 +71,11 @@ class TrainingProgram extends Model
     public function registrations(): HasMany
     {
         return $this->hasMany(TrainingRegistration::class, 'program_id');
+    }
+
+    public function feedback(): HasMany
+    {
+        return $this->hasMany(TrainingFeedback::class, 'program_id');
     }
 
     /** Number of training days (from sessions, or from start/end date span). */

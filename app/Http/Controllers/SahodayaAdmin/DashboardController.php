@@ -19,6 +19,7 @@ use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\TrainingProgram;
 use App\Services\Membership\SahodayaSetupService;
+use App\Services\Training\TrainingCpdService;
 use App\Support\AcademicYear;
 use App\Support\TenancyDatabase;
 
@@ -26,10 +27,13 @@ class DashboardController extends SahodayaAdminController
 {
     use BuildsMembershipExports;
 
-    public function index(SahodayaSetupService $setup)
+    public function index(SahodayaSetupService $setup, TrainingCpdService $cpd)
     {
         $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
+        $yearId = AcademicYear::activeId();
+        $cpdHours = $cpd->totalHoursForSahodaya($this->sahodaya->id, $yearId);
+        $cpdSchools = $cpd->summaryForSahodaya($this->sahodaya->id, $yearId)->count();
         $fees = $this->paymentFeeSummary($this->sahodaya->id, $schoolIds, $year);
         $paymentSummary = $this->paymentStatusSummary($this->sahodaya->id, $schoolIds, $year);
 
@@ -118,6 +122,9 @@ class DashboardController extends SahodayaAdminController
                 : FestRegistration::whereIn('event_id', $festEventIds)->count(),
             'mcq_exams'          => McqExam::where('tenant_id', $this->sahodaya->id)->count(),
             'training_programs'  => TrainingProgram::where('tenant_id', $this->sahodaya->id)->count(),
+            'cpd_hours'          => $cpdHours,
+            'cpd_schools'        => $cpdSchools,
+            'cpd_year'           => $year,
         ];
 
         $recentCirculars = Circular::where('tenant_id', $this->sahodaya->id)

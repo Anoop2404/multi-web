@@ -25,11 +25,19 @@
                             </template>
                         </p>
                     </div>
-                    <Link v-if="program.allow_school_attendance !== false && ['published','ongoing','completed'].includes(program.status)"
-                          :href="`/school-admin/${school.id}/training/${program.id}/attendance`"
-                          class="btn-secondary text-sm">
-                        Mark attendance
-                    </Link>
+                    <div class="flex flex-wrap gap-2">
+                        <a v-if="registrations[program.id]?.length"
+                           :href="`/school-admin/${school.id}/training/${program.id}/export`"
+                           class="btn-secondary text-sm">Export (.xlsx)</a>
+                        <a v-if="registrations[program.id]?.length"
+                           :href="`/school-admin/${school.id}/training/${program.id}/export?format=csv`"
+                           class="btn-secondary text-sm">Export (.csv)</a>
+                        <Link v-if="program.allow_school_attendance !== false && ['published','ongoing','completed'].includes(program.status)"
+                              :href="`/school-admin/${school.id}/training/${program.id}/attendance`"
+                              class="btn-secondary text-sm">
+                            Mark attendance
+                        </Link>
+                    </div>
                 </div>
 
                 <ul v-if="registrations[program.id]?.length" class="text-sm divide-y mb-3">
@@ -66,18 +74,77 @@
                     </li>
                 </ul>
 
-                <form v-if="['published','ongoing'].includes(program.status)"
-                      @submit.prevent="register(program)" class="flex flex-wrap gap-2 items-end">
-                    <select v-model="forms[program.id]" class="field max-w-xs" required>
-                        <option value="">Select teacher</option>
-                        <option v-for="t in (eligibleByProgram[program.id] || [])" :key="t.id" :value="t.id">
-                            {{ t.name }}
-                            <template v-if="t.category"> ({{ t.category }})</template>
-                            <template v-if="!t.is_verified"> — unverified</template>
-                        </option>
-                    </select>
-                    <button class="btn-primary">Register</button>
-                </form>
+                <div v-if="['published','ongoing'].includes(program.status)" class="space-y-3">
+                    <!-- Bulk nominate -->
+                    <div v-if="availableTeachers(program).length" class="rounded-lg border border-slate-100 bg-slate-50/60 p-3 space-y-2">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <p class="text-xs font-semibold text-slate-700">Nominate teachers</p>
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                <button type="button" class="text-indigo-700 hover:underline" @click="selectAll(program)">Select all</button>
+                                <button type="button" class="text-slate-500 hover:underline" @click="clearSelection(program)">Clear</button>
+                            </div>
+                        </div>
+                        <div class="max-h-40 overflow-y-auto space-y-1">
+                            <label v-for="t in availableTeachers(program)" :key="t.id"
+                                   class="flex items-center gap-2 text-sm py-0.5 cursor-pointer">
+                                <input type="checkbox" :value="t.id" v-model="selections[program.id]" class="rounded border-slate-300">
+                                <span>{{ t.name }}</span>
+                                <span v-if="t.category" class="text-xs text-slate-400">({{ t.category }})</span>
+                                <span v-if="!t.is_verified" class="text-[10px] uppercase text-amber-700">unverified</span>
+                            </label>
+                        </div>
+                        <div class="flex flex-wrap gap-2 items-center">
+                            <button type="button" class="btn-primary text-sm"
+                                    :disabled="!(selections[program.id]?.length)"
+                                    @click="bulkRegister(program)">
+                                Register selected ({{ selections[program.id]?.length || 0 }})
+                            </button>
+                            <button type="button" class="btn-secondary text-sm"
+                                    @click="importOpen[program.id] = !importOpen[program.id]">
+                                Import CSV/Excel
+                            </button>
+                        </div>
+                    </div>
+                    <p v-else class="text-xs text-gray-400">All eligible teachers are already nominated.</p>
+
+                    <!-- Import panel -->
+                    <div v-if="importOpen[program.id]" class="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 space-y-3 text-sm">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <p class="font-semibold text-slate-800">Import nominations</p>
+                                <p class="text-xs text-slate-600 mt-0.5">
+                                    Match teachers by email, login_code, employee_code, or exact name. Already nominated rows are skipped.
+                                </p>
+                            </div>
+                            <button type="button" class="text-slate-400 hover:text-slate-600 text-lg leading-none"
+                                    @click="importOpen[program.id] = false">×</button>
+                        </div>
+                        <div class="flex flex-wrap gap-3 text-xs">
+                            <a :href="`/school-admin/${school.id}/training/import/template`"
+                               class="font-semibold text-indigo-800 hover:underline">↓ Excel template</a>
+                            <a :href="`/school-admin/${school.id}/training/import/template?format=csv`"
+                               class="font-semibold text-indigo-800 hover:underline">↓ CSV template</a>
+                        </div>
+                        <input type="file"
+                               accept=".csv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                               class="field text-xs"
+                               @change="e => importFiles[program.id] = e.target.files[0]">
+                        <div v-if="importResult?.errors?.length && lastImportProgramId === program.id"
+                             class="rounded border border-red-100 bg-red-50 p-2 max-h-28 overflow-y-auto">
+                            <p class="text-xs font-semibold text-red-700 mb-1">Row errors</p>
+                            <ul class="text-xs text-red-600 space-y-0.5">
+                                <li v-for="(err, i) in importResult.errors" :key="i">
+                                    Row {{ err.row }}: {{ err.message }}
+                                </li>
+                            </ul>
+                        </div>
+                        <button type="button" class="btn-primary text-sm"
+                                :disabled="!importFiles[program.id] || importing"
+                                @click="submitImport(program)">
+                            {{ importing ? 'Importing…' : 'Upload & nominate' }}
+                        </button>
+                    </div>
+                </div>
             </div>
             <p v-if="!programs.length" class="text-center text-gray-400 py-8">No training programs available.</p>
         </div>
@@ -85,26 +152,78 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { computed, reactive, ref } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 
 const props = defineProps({ school: Object, programs: Array, registrations: Object, eligibleByProgram: Object });
-const forms    = reactive({});
 const feeFiles = reactive({});
 const feeRefs  = reactive({});
-for (const p of props.programs) forms[p.id] = '';
+const selections = reactive({});
+const importOpen = reactive({});
+const importFiles = reactive({});
+const importing = ref(false);
+const lastImportProgramId = ref(null);
+
+for (const p of props.programs) {
+    selections[p.id] = [];
+    importOpen[p.id] = false;
+}
+
+const importResult = computed(() => usePage().props.flash?.importResult ?? null);
+
+function registeredIds(program) {
+    return new Set((props.registrations[program.id] || []).map(r => r.teacher?.id).filter(Boolean));
+}
+
+function availableTeachers(program) {
+    const taken = registeredIds(program);
+    return (props.eligibleByProgram[program.id] || []).filter(t => !taken.has(t.id));
+}
+
+function selectAll(program) {
+    selections[program.id] = availableTeachers(program).map(t => t.id);
+}
+
+function clearSelection(program) {
+    selections[program.id] = [];
+}
 
 function needsFeeUpload(registration) {
     const s = registration.fee_receipt?.status;
     return !s || s === 'rejected';
 }
 
-function register(program) {
-    router.post(`/school-admin/${props.school.id}/training`, {
+function bulkRegister(program) {
+    const ids = selections[program.id] || [];
+    if (!ids.length) return;
+
+    router.post(`/school-admin/${props.school.id}/training/bulk`, {
         program_id: program.id,
-        teacher_id: forms[program.id],
-    }, { preserveScroll: true, onSuccess: () => { forms[program.id] = ''; } });
+        teacher_ids: ids,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => { selections[program.id] = []; },
+    });
+}
+
+function submitImport(program) {
+    const file = importFiles[program.id];
+    if (!file) return;
+
+    const fd = new FormData();
+    fd.append('program_id', program.id);
+    fd.append('file', file);
+
+    importing.value = true;
+    lastImportProgramId.value = program.id;
+
+    router.post(`/school-admin/${props.school.id}/training/import`, fd, {
+        preserveScroll: true,
+        forceFormData: true,
+        onFinish: () => { importing.value = false; },
+        onSuccess: () => { importFiles[program.id] = null; },
+    });
 }
 
 function uploadFee(registration) {

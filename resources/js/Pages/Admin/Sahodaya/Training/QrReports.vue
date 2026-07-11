@@ -36,6 +36,7 @@
                         <th class="pb-2">Code</th>
                         <th class="pb-2">Contact</th>
                         <th class="pb-2">Status</th>
+                        <th class="pb-2 text-right">Resolve</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y">
@@ -44,6 +45,27 @@
                         <td class="py-2">{{ row.school_code || '—' }}</td>
                         <td class="py-2">{{ row.contact_name }} · {{ row.contact_email || row.contact_phone || '—' }}</td>
                         <td class="py-2 capitalize">{{ row.status }}</td>
+                        <td class="py-2 text-right">
+                            <div v-if="row.status === 'pending'" class="flex flex-wrap items-center justify-end gap-2">
+                                <select v-model="linkSchoolId[row.id]" class="field !py-1 !text-xs max-w-[180px]">
+                                    <option value="">Link to school…</option>
+                                    <option v-for="s in schools" :key="s.id" :value="s.id">
+                                        {{ s.name }}{{ s.school_prefix ? ` (${s.school_prefix})` : '' }}
+                                    </option>
+                                </select>
+                                <button type="button" class="btn-primary text-xs !min-h-0"
+                                        :disabled="!linkSchoolId[row.id] || linkingId === row.id"
+                                        @click="linkSchool(row)">
+                                    Link
+                                </button>
+                                <button type="button" class="btn-secondary text-xs !min-h-0 text-red-600"
+                                        :disabled="rejectingId === row.id"
+                                        @click="rejectSchool(row)">
+                                    Reject
+                                </button>
+                            </div>
+                            <span v-else class="text-xs text-gray-400">—</span>
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -88,14 +110,48 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
+import { reactive, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 
-defineProps({
+const props = defineProps({
     sahodaya: Object,
     publicUrl: String,
     pendingPaymentsCount: Number,
     program: Object,
     report: Object,
+    schools: { type: Array, default: () => [] },
 });
+
+const linkSchoolId = reactive({});
+const linkingId = ref(null);
+const rejectingId = ref(null);
+
+function linkSchool(row) {
+    const schoolId = linkSchoolId[row.id];
+    if (!schoolId) return;
+    linkingId.value = row.id;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/pending-schools/${row.id}/link`,
+        { school_id: schoolId },
+        {
+            preserveScroll: true,
+            onFinish: () => { linkingId.value = null; },
+        },
+    );
+}
+
+function rejectSchool(row) {
+    const reason = window.prompt(`Reject pending school "${row.school_name}"? Optional reason:`) ?? undefined;
+    if (reason === undefined) return;
+    rejectingId.value = row.id;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/pending-schools/${row.id}/reject`,
+        { reason: reason || null },
+        {
+            preserveScroll: true,
+            onFinish: () => { rejectingId.value = null; },
+        },
+    );
+}
 </script>

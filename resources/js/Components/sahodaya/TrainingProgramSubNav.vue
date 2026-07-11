@@ -22,5 +22,8 @@ const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/training/${prop
 
 const tabs = computed(() => [
     { key: 'overview', label: 'Overview', href: base.value },
+    { key: 'registrations', label: 'Registrations', href: `${base.value}/registrations` },
+    { key: 'feedback', label: 'Feedback', href: `${base.value}/feedback` },
+    { key: 'qr-reports', label: 'QR reports', href: `${base.value}/qr-reports` },
 ]);
 </script>

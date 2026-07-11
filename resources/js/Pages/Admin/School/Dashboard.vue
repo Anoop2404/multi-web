@@ -175,6 +175,18 @@
                 </div>
             </div>
 
+            <!-- CPD hours -->
+            <div v-if="cpd" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <DashboardStatCard
+                    label="CPD hours this year"
+                    :value="Number(cpd.hours ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 1 })"
+                    :hint="cpd.year ? `${cpd.teachers ?? 0} teachers · ${cpd.year}` : `${cpd.teachers ?? 0} teachers`"
+                    icon="⏱️"
+                    tone="green"
+                    :href="`${base}/training`"
+                />
+            </div>
+
             <!-- Extras: stats, actions, deadlines -->
             <div v-if="dashboardExtras && Object.keys(dashboardExtras).length" class="space-y-6">
                 <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -262,6 +274,7 @@ const props = defineProps({
     stats:  { type: Array, default: () => [] },
     programSummaries: { type: Array, default: () => [] },
     dashboardExtras: { type: Object, default: () => ({}) },
+    cpd: { type: Object, default: null },
     setup:  { type: Object, required: true },
     membershipComplete: { type: Object, default: null },
     leadershipContacts: { type: Object, default: null },

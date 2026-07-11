@@ -71,6 +71,52 @@
 
                 <a v-if="t.certificate_uuid" :href="`/portal/teacher/${school.id}/training/${t.id}/certificate`" target="_blank"
                    class="text-xs font-semibold text-indigo-600 mt-2 inline-block">Download certificate ↗</a>
+
+                <p v-if="t.feedback" class="text-xs text-slate-500 mt-2">
+                    Feedback submitted · {{ t.feedback.rating }}/5
+                    <span class="capitalize">({{ t.feedback.status }})</span>
+                </p>
+
+                <form v-if="t.can_submit_feedback" @submit.prevent="submitFeedback(t)"
+                      class="mt-3 space-y-2 border rounded-lg p-3 bg-slate-50">
+                    <p class="text-xs font-semibold text-slate-700">Share your feedback</p>
+                    <label class="block text-xs text-slate-600">
+                        Overall rating (1–5)
+                        <select v-model="feedbackForms[t.id].rating" required class="field text-xs mt-1">
+                            <option value="" disabled>Select…</option>
+                            <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+                        </select>
+                    </label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="block text-xs text-slate-600">
+                            Content
+                            <select v-model="feedbackForms[t.id].content_rating" class="field text-xs mt-1">
+                                <option value="">—</option>
+                                <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+                            </select>
+                        </label>
+                        <label class="block text-xs text-slate-600">
+                            Trainer
+                            <select v-model="feedbackForms[t.id].trainer_rating" class="field text-xs mt-1">
+                                <option value="">—</option>
+                                <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+                            </select>
+                        </label>
+                        <label class="block text-xs text-slate-600">
+                            Venue
+                            <select v-model="feedbackForms[t.id].venue_rating" class="field text-xs mt-1">
+                                <option value="">—</option>
+                                <option v-for="n in 5" :key="n" :value="n">{{ n }}</option>
+                            </select>
+                        </label>
+                    </div>
+                    <textarea v-model="feedbackForms[t.id].comments" rows="2" class="field text-xs"
+                              placeholder="Comments (optional)"></textarea>
+                    <button type="submit" class="btn-primary text-xs !min-h-0 !py-1.5"
+                            :disabled="!feedbackForms[t.id]?.rating || feedbackForms[t.id]?.processing">
+                        {{ feedbackForms[t.id]?.processing ? 'Submitting…' : 'Submit feedback' }}
+                    </button>
+                </form>
             </div>
             <p v-if="!training?.length" class="text-sm text-slate-400 py-3">You have not registered for any training yet.</p>
         </section>
@@ -94,9 +140,18 @@ const navItems = computed(() => teacherPortalNavItems(props.school.id));
 const registering = ref(null);
 
 const paymentForms = reactive({});
+const feedbackForms = reactive({});
 
 for (const t of props.training ?? []) {
     paymentForms[t.id] = { payment_proof: null, transaction_ref: '', amount: '', processing: false };
+    feedbackForms[t.id] = {
+        rating: '',
+        content_rating: '',
+        trainer_rating: '',
+        venue_rating: '',
+        comments: '',
+        processing: false,
+    };
 }
 
 function formatDate(d) {
@@ -144,6 +199,23 @@ function uploadPayment(registration) {
             form.transaction_ref = '';
             form.amount = '';
         },
+    });
+}
+
+function submitFeedback(registration) {
+    const form = feedbackForms[registration.id];
+    if (!form?.rating) return;
+    form.processing = true;
+
+    router.post(`/portal/teacher/${props.school.id}/training/registrations/${registration.id}/feedback`, {
+        rating: form.rating,
+        content_rating: form.content_rating || null,
+        trainer_rating: form.trainer_rating || null,
+        venue_rating: form.venue_rating || null,
+        comments: form.comments || null,
+    }, {
+        preserveScroll: true,
+        onFinish: () => { form.processing = false; },
     });
 }
 </script>

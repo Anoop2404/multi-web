@@ -79,4 +79,9 @@ class TrainingRegistration extends Model
     {
         return $this->belongsTo(TrainingPendingSchool::class, 'pending_school_id');
     }
+
+    public function feedback(): HasOne
+    {
+        return $this->hasOne(TrainingFeedback::class, 'registration_id');
+    }
 }

@@ -9,6 +9,7 @@ use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
 use App\Services\Membership\SchoolMembershipGate;
 use App\Services\Training\TeacherTrainingEligibilityService;
+use App\Services\Training\TrainingFeedbackService;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
@@ -29,8 +30,7 @@ class TeacherTrainingRegistrationController extends Controller
             'You are already registered for this programme.',
         );
 
-        abort_unless($eligibility->isEligible($program, $teacher), 422,
-            $eligibility->ineligibilityReason($program, $teacher) ?? 'You are not eligible for this programme.');
+        $eligibility->assertTeacherEligible($program, $teacher);
 
         TrainingRegistration::create([
             'program_id'          => $program->id,
@@ -82,5 +82,23 @@ class TeacherTrainingRegistrationController extends Controller
         $registration->update(['fee_receipt_id' => $receipt->id, 'fee_status' => 'proof_uploaded']);
 
         return back()->with('success', 'Payment proof uploaded. Awaiting Sahodaya verification.');
+    }
+
+    public function submitFeedback(Request $request, string $tenantId, TrainingRegistration $registration, TrainingFeedbackService $feedback)
+    {
+        $teacher = $request->attributes->get('portalTeacher');
+        abort_if($registration->teacher_id !== $teacher->id, 403);
+
+        $data = $request->validate([
+            'rating' => 'required|integer|min:1|max:5',
+            'comments' => 'nullable|string|max:2000',
+            'content_rating' => 'nullable|integer|min:1|max:5',
+            'trainer_rating' => 'nullable|integer|min:1|max:5',
+            'venue_rating' => 'nullable|integer|min:1|max:5',
+        ]);
+
+        $feedback->submit($registration, $data);
+
+        return back()->with('success', 'Thank you — your feedback was submitted.');
     }
 }

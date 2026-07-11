@@ -13,6 +13,7 @@ use App\Models\SchoolClass;
 use App\Models\SchoolDocument;
 use App\Models\Student;
 use App\Models\DataChangeLog;
+use App\Services\Training\TrainingCpdService;
 use App\Support\AcademicYear;
 use App\Support\ProgramRouteMap;
 
@@ -26,6 +27,10 @@ class DashboardController extends SchoolAdminController
         }
 
         $tid = $this->school->id;
+        $yearId = AcademicYear::activeId();
+        $cpd = app(TrainingCpdService::class);
+        $cpdHours = $cpd->totalHoursForSchool($tid, $yearId);
+        $cpdTeachers = $cpd->summaryForSchool($tid, $yearId)->count();
 
         return $this->inertia('School/Dashboard', [
             'stats' => [
@@ -37,6 +42,11 @@ class DashboardController extends SchoolAdminController
             'documentAlerts' => $this->documentAlerts($tid),
             'programSummaries' => $this->programSummaries(),
             'dashboardExtras'  => app(\App\Services\Events\ProgramHubDataService::class)->schoolDashboardExtras($this->school),
+            'cpd' => [
+                'hours' => $cpdHours,
+                'teachers' => $cpdTeachers,
+                'year' => AcademicYear::forSchool($this->school),
+            ],
             'setup' => $this->setupStatus(),
             'membershipComplete' => $this->membershipComplete(),
             'recentActivity' => $this->recentActivity(),

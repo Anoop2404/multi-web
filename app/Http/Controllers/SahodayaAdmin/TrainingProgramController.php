@@ -3,8 +3,13 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Support\AcademicYear;
+use App\Support\Training\TrainingProgramEligibilityConfig;
 use App\Support\Training\TrainingProgramPayload;
 use App\Models\Certificate;
+use App\Models\Region;
+use App\Models\Tenant;
+use App\Models\TrainingFeedback;
+use App\Models\TrainingPendingSchool;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
 use App\Models\TrainingSession;
@@ -13,8 +18,10 @@ use App\Services\Fees\OfflineProgramFeeOrchestrator;
 use App\Services\Fees\ProgramFeeReceiptService;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Ledger\LedgerAccountSetupService;
+use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Notifications\NotificationService;
 use App\Services\Training\TrainingCertificateService;
+use App\Services\Training\TrainingFeedbackService;
 use App\Services\Training\TrainingReportService;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
@@ -55,6 +62,7 @@ class TrainingProgramController extends SahodayaAdminController
             'allow_teacher_self_registration' => 'nullable|boolean',
             'fee_type'            => 'nullable|in:none,flat',
             'fee_amount'          => 'nullable|numeric|min:0',
+            'min_attendance_percent' => 'nullable|integer|min:0|max:100',
         ]);
 
         $data['tenant_id'] = $this->sahodaya->id;
@@ -90,9 +98,25 @@ class TrainingProgramController extends SahodayaAdminController
         $registrationUrl = $qr->registrationUrl($program);
         $attendanceUrl = $qr->attendanceUrl($program);
 
+        $resolver = app(EffectiveMasterDataResolver::class);
+        $eligibilityPrograms = TrainingProgram::where('tenant_id', $this->sahodaya->id)
+            ->where('id', '!=', $program->id)
+            ->orderBy('title')
+            ->get(['id', 'title', 'status']);
+
         return $this->inertia('Sahodaya/Training/Show', [
-            'program' => $program,
+            'program' => array_merge($program->toArray(), [
+                'eligibility_config' => TrainingProgramEligibilityConfig::normalize($program->eligibility_config),
+            ]),
             'attendanceMap' => $attendanceMap,
+            'eligibilityOptions' => [
+                'teaching_types' => $resolver->teachingTypes($this->sahodaya->id)->map->only(['id', 'label'])->values(),
+                'subjects' => $resolver->subjects($this->sahodaya->id)->map->only(['id', 'label'])->values(),
+                'designations' => $resolver->designations($this->sahodaya->id)->map->only(['id', 'label'])->values(),
+                'regions' => Region::forTenant($this->sahodaya->id)->active()->orderBy('sort_order')->orderBy('name')
+                    ->get(['id', 'name']),
+                'prior_programs' => $eligibilityPrograms,
+            ],
             'qr' => [
                 'registration_url' => $registrationUrl,
                 'attendance_url'   => $attendanceUrl,
@@ -128,12 +152,33 @@ class TrainingProgramController extends SahodayaAdminController
             'status'             => 'required|in:draft,published,ongoing,completed,cancelled',
             'fee_type'           => 'nullable|in:none,flat',
             'fee_amount'         => 'nullable|numeric|min:0',
+            'min_attendance_percent' => 'nullable|integer|min:0|max:100',
+            'eligibility_config' => 'nullable|array',
+            'eligibility_config.teaching_type_ids' => 'nullable|array',
+            'eligibility_config.teaching_type_ids.*' => 'integer',
+            'eligibility_config.subject_ids' => 'nullable|array',
+            'eligibility_config.subject_ids.*' => 'integer',
+            'eligibility_config.excluded_designation_ids' => 'nullable|array',
+            'eligibility_config.excluded_designation_ids.*' => 'integer',
+            'eligibility_config.min_experience_years' => 'nullable|integer|min:0|max:60',
+            'eligibility_config.prior_training' => 'nullable|array',
+            'eligibility_config.prior_training.required' => 'nullable|boolean',
+            'eligibility_config.prior_training.program_id' => 'nullable|integer',
+            'eligibility_config.region_ids' => 'nullable|array',
+            'eligibility_config.region_ids.*' => 'integer',
         ]);
 
         $data = TrainingProgramPayload::applyDefaults($data);
         $data['qr_registration_enabled'] = (bool) ($data['qr_registration_enabled'] ?? false);
         $data['require_verified_teachers'] = (bool) ($data['require_verified_teachers'] ?? false);
         $data['allow_school_attendance'] = (bool) ($data['allow_school_attendance'] ?? true);
+
+        if (array_key_exists('eligibility_config', $data)) {
+            if ($error = TrainingProgramEligibilityConfig::validationError($data['eligibility_config'])) {
+                return back()->withErrors(['eligibility_config' => $error]);
+            }
+            $data['eligibility_config'] = TrainingProgramEligibilityConfig::normalize($data['eligibility_config']);
+        }
 
         $program->update($data);
 
@@ -857,10 +902,60 @@ class TrainingProgramController extends SahodayaAdminController
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 
+        $schools = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'school_prefix']);
+
         return $this->inertia('Sahodaya/Training/QrReports', [
             'program' => $program->only('id', 'title', 'status'),
             'report'  => $reports->summary($program),
+            'schools' => $schools,
         ]);
+    }
+
+    public function linkPendingSchool(
+        Request $request,
+        string $tenantId,
+        TrainingProgram $program,
+        TrainingPendingSchool $pendingSchool,
+        \App\Services\Training\TrainingPendingSchoolResolver $resolver,
+    ) {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($pendingSchool->program_id !== $program->id, 404);
+
+        $data = $request->validate([
+            'school_id' => 'required|string',
+        ]);
+
+        $school = Tenant::where('id', $data['school_id'])
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->firstOrFail();
+
+        $resolver->link($pendingSchool, $school);
+
+        return back()->with('success', "Linked \"{$pendingSchool->school_name}\" to {$school->name}.");
+    }
+
+    public function rejectPendingSchool(
+        Request $request,
+        string $tenantId,
+        TrainingProgram $program,
+        TrainingPendingSchool $pendingSchool,
+        \App\Services\Training\TrainingPendingSchoolResolver $resolver,
+    ) {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($pendingSchool->program_id !== $program->id, 404);
+
+        $data = $request->validate([
+            'reason' => 'nullable|string|max:1000',
+        ]);
+
+        $resolver->reject($pendingSchool, $data['reason'] ?? null);
+
+        return back()->with('success', "Rejected pending school \"{$pendingSchool->school_name}\".");
     }
 
     public function exportQrRegistrations(string $tenantId, TrainingProgram $program, \App\Services\Training\TrainingQrReportService $reports)
@@ -868,5 +963,59 @@ class TrainingProgramController extends SahodayaAdminController
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 
         return $reports->exportQrRegistrations($program);
+    }
+
+    public function feedback(string $tenantId, TrainingProgram $program)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        $rows = TrainingFeedback::where('program_id', $program->id)
+            ->with(['teacher', 'registration.school'])
+            ->latest('id')
+            ->get()
+            ->map(fn (TrainingFeedback $f) => [
+                'id' => $f->id,
+                'teacher_name' => $f->teacher?->name,
+                'teacher_email' => $f->teacher?->email,
+                'school_name' => $f->registration?->school?->name,
+                'rating' => $f->rating,
+                'content_rating' => $f->content_rating,
+                'trainer_rating' => $f->trainer_rating,
+                'venue_rating' => $f->venue_rating,
+                'comments' => $f->comments,
+                'status' => $f->status,
+                'submitted_at' => $f->created_at?->toIso8601String(),
+                'reviewed_at' => $f->reviewed_at?->toIso8601String(),
+            ]);
+
+        $submitted = $rows->count();
+        $avgRating = $submitted > 0
+            ? round($rows->avg('rating'), 1)
+            : null;
+
+        return $this->inertia('Sahodaya/Training/Feedback', [
+            'program' => $program->only('id', 'title', 'status'),
+            'feedback' => $rows,
+            'stats' => [
+                'submitted' => $submitted,
+                'reviewed' => $rows->where('status', 'reviewed')->count(),
+                'avg_rating' => $avgRating,
+            ],
+        ]);
+    }
+
+    public function markFeedbackReviewed(
+        Request $request,
+        string $tenantId,
+        TrainingProgram $program,
+        TrainingFeedback $feedback,
+        TrainingFeedbackService $service,
+    ) {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($feedback->program_id !== $program->id, 404);
+
+        $service->markReviewed($feedback, $request->user()?->id);
+
+        return back()->with('success', 'Feedback marked as reviewed.');
     }
 }

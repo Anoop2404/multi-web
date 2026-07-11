@@ -19,6 +19,7 @@ class TrainingPublicRegistrationService
     public function __construct(
         private readonly TrainingQrService $qr,
         private readonly PlatformAuditLogger $audit,
+        private readonly TeacherTrainingEligibilityService $eligibility,
     ) {}
 
     /**
@@ -134,6 +135,8 @@ class TrainingPublicRegistrationService
             ]);
             $teacherCreated = true;
         }
+
+        $this->eligibility->assertTeacherEligible($program, $teacher);
 
         $registration = DB::transaction(function () use ($program, $teacher, $school, $pendingSchool, $data, $teacherCreated) {
             return TrainingRegistration::create([

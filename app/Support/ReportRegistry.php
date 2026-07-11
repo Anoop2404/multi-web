@@ -128,7 +128,7 @@ class ReportRegistry
             self::row('RPT-STU-012', 'Duplicate admission numbers', 'students', 'new', self::runnerHref($base, 'RPT-STU-012'), null, true),
             self::row('RPT-STU-013', 'New admissions monthly', 'students', 'new', self::runnerHref($base, 'RPT-STU-013'), null, true),
             self::row('RPT-STU-014', 'Alumni list', 'students', 'retain'),
-            self::row('RPT-STU-015', 'Transfer/TC log', 'students', 'retain'),
+            self::row('RPT-STU-015', 'Transfer/TC log', 'students', 'retain', null, 'Hidden — TC/Transfer Certificate workflow is out of product scope.'),
         ];
     }
 
@@ -384,6 +384,7 @@ class ReportRegistry
             self::row('RPT-TRN-010', 'Pending financial summary', 'training', 'new', self::runnerHref($base, 'RPT-TRN-010'), null, true),
             self::row('RPT-TRN-011', 'Nomination approval queue', 'training', 'retain', "{$base}/training"),
             self::row('RPT-TRN-012', 'Resource person assignment', 'training', 'new', "{$base}/training"),
+            self::row('RPT-TRN-013', 'School-wise CPD hours', 'training', 'new', self::runnerHref($base, 'RPT-TRN-013'), null, true),
         ];
     }
 

@@ -25,11 +25,35 @@ class TrainingCertificateService
             ]);
         }
 
-        if ($this->presentDaysCount($registration) < 1) {
+        $present = $this->presentDaysCount($registration);
+        $required = $this->requiredPresentDays($registration->program);
+
+        if ($present < $required) {
+            $message = $required <= 1
+                ? 'At least one training day must be marked present before issuing a certificate.'
+                : "Attendance requirement not met: {$present}/{$required} day(s) present.";
+
             throw ValidationException::withMessages([
-                'attendance' => 'At least one training day must be marked present before issuing a certificate.',
+                'attendance' => $message,
             ]);
         }
+    }
+
+    /** Days that must be marked present (from min_attendance_percent, or at least 1). */
+    public function requiredPresentDays(?TrainingProgram $program): int
+    {
+        if (! $program) {
+            return 1;
+        }
+
+        $percent = $program->min_attendance_percent;
+        $totalDays = max(1, $program->dayCount());
+
+        if ($percent === null || (int) $percent <= 0) {
+            return 1;
+        }
+
+        return max(1, (int) ceil($totalDays * ((int) $percent) / 100));
     }
 
     public function issue(TrainingRegistration $registration): Certificate

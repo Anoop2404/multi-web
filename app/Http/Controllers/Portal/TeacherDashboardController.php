@@ -387,7 +387,7 @@ class TeacherDashboardController extends Controller
     private function trainingRegistrations(Teacher $teacher, int $limit = 10): Collection
     {
         return TrainingRegistration::where('teacher_id', $teacher->id)
-            ->with(['program.sessions', 'certificate', 'feeReceipt'])
+            ->with(['program.sessions', 'certificate', 'feeReceipt', 'feedback'])
             ->latest()
             ->limit($limit)
             ->get()
@@ -396,6 +396,9 @@ class TeacherDashboardController extends Controller
                 $attendance = \App\Models\TrainingAttendance::where('registration_id', $reg->id)
                     ->get()
                     ->keyBy('session_id');
+
+                $canSubmitFeedback = in_array($reg->status, ['confirmed', 'completed'], true)
+                    && $reg->feedback === null;
 
                 return [
                     'id'               => $reg->id,
@@ -406,6 +409,12 @@ class TeacherDashboardController extends Controller
                     'program'          => $reg->program?->only('id', 'title', 'description', 'venue', 'fee_type', 'fee_amount'),
                     'feeReceipt'       => $reg->feeReceipt?->only('id', 'status', 'amount'),
                     'certificate_uuid' => $reg->certificate?->verification_uuid,
+                    'can_submit_feedback' => $canSubmitFeedback,
+                    'feedback'         => $reg->feedback ? [
+                        'rating' => $reg->feedback->rating,
+                        'status' => $reg->feedback->status,
+                        'submitted_at' => $reg->feedback->created_at?->toIso8601String(),
+                    ] : null,
                     'sessions'         => $sessions->map(fn ($s) => [
                         'id'           => $s->id,
                         'title'        => $s->title,
