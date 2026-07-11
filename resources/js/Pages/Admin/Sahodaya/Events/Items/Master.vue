@@ -132,6 +132,10 @@
                             <FormField label="Fee override (₹)" class-extra="sm:col-span-2" hint="Optional per-item fee">
                                 <input v-model.number="itemForm.fee_amount" type="number" min="0" class="field" placeholder="Leave blank for default">
                             </FormField>
+                            <FormField v-if="isSports" label="Free quota" class-extra="sm:col-span-2">
+                                <CheckboxField v-model="itemForm.quota_eligible"
+                                               label="Waivable by the head's free quota (Sports composite billing)" />
+                            </FormField>
                             <template v-if="['team', 'group'].includes(itemForm.participant_type)">
                                 <p class="sm:col-span-2 form-label">Squad / roster rules</p>
                                 <FormField label="Min on field"><input v-model.number="itemForm.min_playing" type="number" min="1" class="field"></FormField>
@@ -261,6 +265,10 @@
                                             </span>
                                             <span class="text-slate-400 text-xs block mt-0.5">
                                                 {{ itemTags(item) }}
+                                                <span v-if="item.quota_eligible"
+                                                      class="ml-1 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 align-middle">
+                                                    Free quota
+                                                </span>
                                             </span>
                                             <details v-if="itemDetails(item).length" class="mt-2 group/details">
                                                 <summary class="text-[11px] font-semibold text-indigo-600 cursor-pointer select-none list-none flex items-center gap-1">
@@ -393,6 +401,10 @@
                     </FormField>
                     <FormField label="Fee override (₹)" class-extra="sm:col-span-2">
                         <input v-model.number="editForm.fee_amount" type="number" min="0" class="field" placeholder="Leave blank for default">
+                    </FormField>
+                    <FormField v-if="isSports" label="Free quota" class-extra="sm:col-span-2">
+                        <CheckboxField v-model="editForm.quota_eligible"
+                                       label="Waivable by the head's free quota (Sports composite billing)" />
                     </FormField>
                 </FormGrid>
                 <div class="flex justify-end gap-2 pt-2">
@@ -528,13 +540,13 @@ const itemForm = useForm({
     title: '', participant_type: 'individual', stage_type: '', venue_type: '', head_id: selectedHeadFilter.value === 'other' ? '' : selectedHeadFilter.value,
     competition_format: '', sport_discipline: '', class_group: '', age_group: '', kids_band: '', gender: 'open',
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
-    fee_amount: null,
+    fee_amount: null, quota_eligible: false,
 });
 const editingItem = ref(null);
 const editForm = useForm({
     title: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
     venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', head_id: '',
-    qualify_count: null, max_per_school: null, fee_amount: null,
+    qualify_count: null, max_per_school: null, fee_amount: null, quota_eligible: false,
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
     min_group_size: null, max_group_size: null,
 });
@@ -560,6 +572,7 @@ function addItem() {
             itemForm.min_squad = null;
             itemForm.standbys = null;
             itemForm.fee_amount = null;
+            itemForm.quota_eligible = false;
         },
     });
 }
@@ -603,6 +616,7 @@ function openEditItem(item) {
     editForm.qualify_count = item.qualify_count ?? null;
     editForm.max_per_school = item.max_per_school ?? null;
     editForm.fee_amount = item.fee_amount ?? null;
+    editForm.quota_eligible = item.quota_eligible ?? false;
     editForm.min_playing = c.min_playing ?? null;
     editForm.max_subs = c.max_subs ?? null;
     editForm.max_squad = c.max_squad ?? item.max_group_size ?? null;

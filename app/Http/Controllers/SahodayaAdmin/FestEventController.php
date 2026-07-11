@@ -622,6 +622,7 @@ class FestEventController extends SahodayaAdminController
             'qualify_count'        => 'nullable|integer|min:1',
             'fee_amount'           => 'nullable|numeric|min:0',
             'head_id'              => 'nullable|exists:fest_item_heads,id',
+            'quota_eligible'       => 'nullable|boolean',
         ], $this->taxonomyValidationRules($registry, $event)));
 
         $data['participant_type'] = $data['participant_type'] ?? 'individual';
@@ -673,6 +674,7 @@ class FestEventController extends SahodayaAdminController
             'fee_amount'     => 'nullable|numeric|min:0',
             'is_enabled'     => 'nullable|boolean',
             'head_id'        => 'nullable|exists:fest_item_heads,id',
+            'quota_eligible' => 'nullable|boolean',
             'min_group_size' => 'nullable|integer|min:1',
             'max_group_size' => 'nullable|integer|min:1',
             'min_playing'    => 'nullable|integer|min:1',
