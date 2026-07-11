@@ -11,11 +11,14 @@ class McqRegistration extends Model
 {
     use BelongsToCentralTenant;
 
+    /** Attendance states where a student cannot receive marks or a certificate. */
+    public const BLOCKING_ATTENDANCE_STATUSES = ['absent', 'malpractice', 'withheld'];
+
     protected $fillable = [
         'exam_id', 'student_id', 'teacher_id', 'school_id',
         'hall_ticket_no', 'hall_room', 'seat_no',
         'status', 'approval_status', 'approved_at', 'approved_by_user_id',
-        'attendance_status', 'attendance_marked_at', 'attendance_marked_by',
+        'attendance_status', 'attendance_marked_at', 'attendance_marked_by', 'attendance_note',
         'fee_receipt_id',
         'started_at', 'submitted_at', 'draft_answers',
         'cancelled_at', 'cancelled_by_user_id',
@@ -44,6 +47,23 @@ class McqRegistration extends Model
     public function isCancelled(): bool
     {
         return $this->status === 'cancelled';
+    }
+
+    /** True when attendance is absent/malpractice/withheld — no marks or certificate should exist for this registration. */
+    public function blocksScoring(): bool
+    {
+        return in_array($this->attendance_status, self::BLOCKING_ATTENDANCE_STATUSES, true);
+    }
+
+    public function attendanceStatusLabel(): string
+    {
+        return match ($this->attendance_status) {
+            'present'     => 'Present',
+            'absent'      => 'Absent',
+            'malpractice' => 'Malpractice',
+            'withheld'    => 'Withheld',
+            default       => 'Pending',
+        };
     }
 
     /**

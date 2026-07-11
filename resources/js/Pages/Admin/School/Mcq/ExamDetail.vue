@@ -444,7 +444,7 @@
                             icon="🕒" class="py-6" />
             </div>
             <template v-else>
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid grid-cols-5 gap-3">
                     <div class="card card--muted !py-3 text-center">
                         <p class="text-lg font-bold text-emerald-700">{{ presentCount }}</p>
                         <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Present</p>
@@ -452,6 +452,14 @@
                     <div class="card card--muted !py-3 text-center">
                         <p class="text-lg font-bold text-rose-700">{{ absentCount }}</p>
                         <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Absent</p>
+                    </div>
+                    <div class="card card--muted !py-3 text-center">
+                        <p class="text-lg font-bold text-amber-700">{{ malpracticeCount }}</p>
+                        <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Malpractice</p>
+                    </div>
+                    <div class="card card--muted !py-3 text-center">
+                        <p class="text-lg font-bold text-amber-700">{{ withheldCount }}</p>
+                        <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Withheld</p>
                     </div>
                     <div class="card card--muted !py-3 text-center">
                         <p class="text-lg font-bold text-slate-500">{{ pendingCount }}</p>
@@ -465,7 +473,7 @@
                 </div>
                 <div class="card card--flush overflow-hidden">
                     <table class="data-table">
-                        <thead><tr><th>Hall ticket</th><th>Student</th><th>Class</th><th class="text-center">Attendance</th></tr></thead>
+                        <thead><tr><th>Hall ticket</th><th>Student</th><th>Class</th><th class="text-center">Attendance</th><th>Note</th></tr></thead>
                         <tbody>
                             <tr v-for="row in attendanceState" :key="row.id">
                                 <td class="font-mono text-xs">{{ row.hall_ticket_no || '—' }}</td>
@@ -480,9 +488,21 @@
                                                 :class="row.attendance_status === 'absent' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600'"
                                                 @click="row.attendance_status = 'absent'">Absent</button>
                                         <button type="button" class="px-3 py-1 border-l border-slate-200"
+                                                :class="row.attendance_status === 'malpractice' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600'"
+                                                @click="row.attendance_status = 'malpractice'">Malpractice</button>
+                                        <button type="button" class="px-3 py-1 border-l border-slate-200"
+                                                :class="row.attendance_status === 'withheld' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600'"
+                                                @click="row.attendance_status = 'withheld'">Withheld</button>
+                                        <button type="button" class="px-3 py-1 border-l border-slate-200"
                                                 :class="(!row.attendance_status || row.attendance_status === 'pending') ? 'bg-slate-500 text-white' : 'bg-white text-slate-600'"
                                                 @click="row.attendance_status = 'pending'">—</button>
                                     </div>
+                                </td>
+                                <td>
+                                    <input v-if="['malpractice','withheld'].includes(row.attendance_status)"
+                                           v-model="row.attendance_note" type="text" class="field text-xs"
+                                           placeholder="Reason (required)">
+                                    <span v-else class="text-slate-300 text-xs">—</span>
                                 </td>
                             </tr>
                         </tbody>
@@ -852,9 +872,11 @@ function uploadBatchFee() {
 }
 
 // --- Attendance ---
-const attendanceState = ref(props.attendanceRows.map(r => ({ ...r, attendance_status: r.attendance_status || 'pending' })));
+const attendanceState = ref(props.attendanceRows.map(r => ({ ...r, attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' })));
 const presentCount = computed(() => attendanceState.value.filter(r => r.attendance_status === 'present').length);
 const absentCount = computed(() => attendanceState.value.filter(r => r.attendance_status === 'absent').length);
+const malpracticeCount = computed(() => attendanceState.value.filter(r => r.attendance_status === 'malpractice').length);
+const withheldCount = computed(() => attendanceState.value.filter(r => r.attendance_status === 'withheld').length);
 const pendingCount = computed(() => attendanceState.value.filter(r => !r.attendance_status || r.attendance_status === 'pending').length);
 
 function markAll(status) {
@@ -862,10 +884,16 @@ function markAll(status) {
 }
 
 function saveAttendance() {
+    const missingNote = attendanceState.value.find(r => ['malpractice', 'withheld'].includes(r.attendance_status) && !r.attendance_note?.trim());
+    if (missingNote) {
+        alert('A reason/note is required for every student marked Malpractice or Withheld.');
+        return;
+    }
     router.post(`${base.value}/attendance`, {
         attendance: attendanceState.value.map(r => ({
             registration_id: r.id,
             attendance_status: r.attendance_status || 'pending',
+            attendance_note: r.attendance_note || null,
         })),
     }, { preserveScroll: true });
 }

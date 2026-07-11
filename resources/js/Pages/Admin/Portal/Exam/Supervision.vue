@@ -6,12 +6,14 @@
         accent="emerald"
         :nav-items="navItems"
     >
-        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+        <div class="grid grid-cols-2 sm:grid-cols-7 gap-3 mb-4">
             <div class="card text-center py-3"><p class="text-xs text-gray-500">Registered</p><p class="text-xl font-bold">{{ summary.total }}</p></div>
             <div class="card text-center py-3"><p class="text-xs text-gray-500">Present</p><p class="text-xl font-bold text-green-700">{{ summary.present }}</p></div>
             <div class="card text-center py-3"><p class="text-xs text-gray-500">Started</p><p class="text-xl font-bold text-indigo-700">{{ summary.started }}</p></div>
             <div class="card text-center py-3"><p class="text-xs text-gray-500">Submitted</p><p class="text-xl font-bold text-emerald-700">{{ summary.submitted }}</p></div>
             <div class="card text-center py-3"><p class="text-xs text-gray-500">Absent</p><p class="text-xl font-bold text-red-600">{{ summary.absent }}</p></div>
+            <div class="card text-center py-3"><p class="text-xs text-gray-500">Malpractice</p><p class="text-xl font-bold text-amber-600">{{ summary.malpractice }}</p></div>
+            <div class="card text-center py-3"><p class="text-xs text-gray-500">Withheld</p><p class="text-xl font-bold text-amber-600">{{ summary.withheld }}</p></div>
         </div>
 
         <div class="card overflow-x-auto">

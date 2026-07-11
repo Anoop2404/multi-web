@@ -269,7 +269,8 @@ class McqController extends SchoolAdminController
         $data = $request->validate([
             'attendance'                       => 'required|array|min:1',
             'attendance.*.registration_id'     => 'required|integer',
-            'attendance.*.attendance_status'   => 'required|in:present,absent,pending',
+            'attendance.*.attendance_status'   => 'required|in:present,absent,malpractice,withheld,pending',
+            'attendance.*.attendance_note'     => 'nullable|string|max:1000',
         ]);
 
         $registrations = McqRegistration::where('exam_id', $exam->id)
@@ -288,12 +289,13 @@ class McqController extends SchoolAdminController
             $status = $row['attendance_status'];
             $registration->update([
                 'attendance_status'    => $status === 'pending' ? null : $status,
+                'attendance_note'      => $status === 'pending' ? null : ($row['attendance_note'] ?? null),
                 'attendance_marked_at' => $status === 'pending' ? null : now(),
                 'attendance_marked_by' => $status === 'pending' ? null : $request->user()->id,
             ]);
 
-            // Clear any submitted marks if a student is now flagged absent.
-            if ($status === 'absent' && $registration->mark) {
+            // Clear any submitted marks if a student is now flagged absent/malpractice/withheld.
+            if ($registration->blocksScoring() && $registration->mark) {
                 $registration->mark()->delete();
                 $registration->update(['status' => 'registered', 'submitted_at' => null]);
             }

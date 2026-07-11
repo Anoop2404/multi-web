@@ -61,18 +61,20 @@ class ExamOpsController extends Controller
 
         $data = $request->validate([
             'registration_id'   => 'required|exists:mcq_registrations,id',
-            'attendance_status' => 'required|in:present,absent',
+            'attendance_status' => 'required|in:present,absent,malpractice,withheld',
+            'attendance_note'   => 'nullable|required_if:attendance_status,malpractice,withheld|string|max:1000',
         ]);
 
         $registration = McqRegistration::where('exam_id', $exam->id)->findOrFail($data['registration_id']);
 
         $registration->update([
             'attendance_status'      => $data['attendance_status'],
+            'attendance_note'        => $data['attendance_note'] ?? null,
             'attendance_marked_at'   => now(),
             'attendance_marked_by'   => $request->user()->id,
         ]);
 
-        if ($data['attendance_status'] === 'absent' && $registration->mark) {
+        if ($registration->blocksScoring() && $registration->mark) {
             $registration->mark()->delete();
             $registration->update(['status' => 'registered', 'submitted_at' => null]);
         }
@@ -154,11 +156,13 @@ class ExamOpsController extends Controller
             ]);
 
         $summary = [
-            'total'      => $registrations->count(),
-            'present'    => $registrations->where('attendance_status', 'present')->count(),
-            'started'    => $registrations->whereIn('status', ['started', 'submitted'])->count(),
-            'submitted'  => $registrations->where('status', 'submitted')->count(),
-            'absent'     => $registrations->where('attendance_status', 'absent')->count(),
+            'total'       => $registrations->count(),
+            'present'     => $registrations->where('attendance_status', 'present')->count(),
+            'started'     => $registrations->whereIn('status', ['started', 'submitted'])->count(),
+            'submitted'   => $registrations->where('status', 'submitted')->count(),
+            'absent'      => $registrations->where('attendance_status', 'absent')->count(),
+            'malpractice' => $registrations->where('attendance_status', 'malpractice')->count(),
+            'withheld'    => $registrations->where('attendance_status', 'withheld')->count(),
         ];
 
         return inertia('Portal/Exam/Supervision', [
@@ -195,15 +199,21 @@ class ExamOpsController extends Controller
                 continue;
             }
 
-            if (! in_array($data['attendance_status'], ['present', 'absent'], true)) {
+            if (! in_array($data['attendance_status'], ['present', 'absent', 'malpractice', 'withheld'], true)) {
                 continue;
             }
 
             $registration->update([
                 'attendance_status'    => $data['attendance_status'],
+                'attendance_note'      => $data['attendance_note'] ?? null,
                 'attendance_marked_at' => now(),
                 'attendance_marked_by' => $request->user()->id,
             ]);
+
+            if ($registration->blocksScoring() && $registration->mark) {
+                $registration->mark()->delete();
+                $registration->update(['status' => 'registered', 'submitted_at' => null]);
+            }
 
             app(PlatformAuditLogger::class)->mcqRegistration(
                 $registration->fresh(['exam']),

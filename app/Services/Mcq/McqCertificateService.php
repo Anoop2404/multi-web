@@ -16,9 +16,9 @@ class McqCertificateService
     {
         $registration->loadMissing(['exam', 'mark']);
 
-        if ($registration->attendance_status === 'absent') {
+        if ($registration->blocksScoring()) {
             throw ValidationException::withMessages([
-                'attendance' => 'Absent students are not eligible for certificates.',
+                'attendance' => 'Students marked '.$registration->attendanceStatusLabel().' are not eligible for certificates.',
             ]);
         }
 
@@ -64,7 +64,7 @@ class McqCertificateService
         $count = 0;
         McqRegistration::where('exam_id', $exam->id)
             ->where('status', 'submitted')
-            ->where('attendance_status', '!=', 'absent')
+            ->whereNotIn('attendance_status', McqRegistration::BLOCKING_ATTENDANCE_STATUSES)
             ->whereHas('mark')
             ->with(['exam', 'mark', 'student', 'school'])
             ->chunkById(100, function ($regs) use (&$count) {

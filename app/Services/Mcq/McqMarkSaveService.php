@@ -16,9 +16,9 @@ class McqMarkSaveService
     /** @param  array<string, mixed>  $data */
     public function save(McqExam $exam, McqRegistration $registration, array $data, int $userId): McqMark
     {
-        if ($registration->attendance_status === 'absent') {
+        if ($registration->blocksScoring()) {
             throw ValidationException::withMessages([
-                'attendance' => 'Marks cannot be entered for absent students.',
+                'attendance' => 'Marks cannot be entered for students marked '.$registration->attendanceStatusLabel().'.',
             ]);
         }
 

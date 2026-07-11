@@ -30,6 +30,8 @@ class McqExamOpsController extends SahodayaAdminController
                 + $registrations->where('attendance_status', 'pending')->count(),
             'present'      => $registrations->where('attendance_status', 'present')->count(),
             'absent'       => $registrations->where('attendance_status', 'absent')->count(),
+            'malpractice'  => $registrations->where('attendance_status', 'malpractice')->count(),
+            'withheld'     => $registrations->where('attendance_status', 'withheld')->count(),
             'marks_entered'=> $registrations->filter(fn ($r) => $r->mark !== null)->count(),
             'not_marked'   => $registrations->where('attendance_status', 'present')->filter(fn ($r) => $r->mark === null)->count(),
         ];
@@ -43,17 +45,19 @@ class McqExamOpsController extends SahodayaAdminController
 
         $data = $request->validate([
             'registration_id'   => 'required|exists:mcq_registrations,id',
-            'attendance_status' => 'required|in:present,absent',
+            'attendance_status' => 'required|in:present,absent,malpractice,withheld',
+            'attendance_note'   => 'nullable|required_if:attendance_status,malpractice,withheld|string|max:1000',
         ]);
 
         $registration = McqRegistration::where('exam_id', $exam->id)->findOrFail($data['registration_id']);
         $registration->update([
             'attendance_status'    => $data['attendance_status'],
+            'attendance_note'      => $data['attendance_note'] ?? null,
             'attendance_marked_at' => now(),
             'attendance_marked_by' => $request->user()->id,
         ]);
 
-        if ($data['attendance_status'] === 'absent' && $registration->mark) {
+        if ($registration->blocksScoring() && $registration->mark) {
             $registration->mark()->delete();
             $registration->update(['status' => 'registered', 'submitted_at' => null]);
         }
@@ -74,9 +78,10 @@ class McqExamOpsController extends SahodayaAdminController
             if (count($row) < 2) {
                 continue;
             }
+            $note = trim((string) ($row[2] ?? ''));
             [$ticket, $status] = $row;
             $status = strtolower(trim((string) $status));
-            if (! in_array($status, ['present', 'absent'], true)) {
+            if (! in_array($status, ['present', 'absent', 'malpractice', 'withheld'], true)) {
                 continue;
             }
 
@@ -89,11 +94,12 @@ class McqExamOpsController extends SahodayaAdminController
 
             $registration->update([
                 'attendance_status'    => $status,
+                'attendance_note'      => $note !== '' ? $note : null,
                 'attendance_marked_at' => now(),
                 'attendance_marked_by' => $request->user()->id,
             ]);
 
-            if ($status === 'absent' && $registration->mark) {
+            if ($registration->blocksScoring() && $registration->mark) {
                 $registration->mark()->delete();
                 $registration->update(['status' => 'registered', 'submitted_at' => null]);
             }
@@ -429,7 +435,7 @@ class McqExamOpsController extends SahodayaAdminController
                 continue;
             }
 
-            if ($registration->attendance_status === 'absent') {
+            if ($registration->blocksScoring()) {
                 continue;
             }
 

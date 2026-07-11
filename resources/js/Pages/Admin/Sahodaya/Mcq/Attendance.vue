@@ -9,6 +9,8 @@
             <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold">{{ summary.pending }}</p><p class="text-[10px] uppercase text-slate-500">Pending</p></div>
             <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold text-emerald-700">{{ summary.present }}</p><p class="text-[10px] uppercase text-slate-500">Present</p></div>
             <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold text-red-700">{{ summary.absent }}</p><p class="text-[10px] uppercase text-slate-500">Absent</p></div>
+            <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold text-amber-700">{{ summary.malpractice }}</p><p class="text-[10px] uppercase text-slate-500">Malpractice</p></div>
+            <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold text-amber-700">{{ summary.withheld }}</p><p class="text-[10px] uppercase text-slate-500">Withheld</p></div>
             <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold">{{ summary.marks_entered }}</p><p class="text-[10px] uppercase text-slate-500">Marks entered</p></div>
             <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold">{{ summary.not_marked }}</p><p class="text-[10px] uppercase text-slate-500">Present, not marked</p></div>
         </div>
@@ -21,7 +23,7 @@
                 <input ref="importFile" type="file" accept=".csv,.txt" class="text-sm" required>
                 <button type="submit" class="btn-secondary text-sm">Import attendance CSV</button>
             </form>
-            <p class="text-xs text-slate-500 w-full">CSV format: hall_ticket_no, present|absent</p>
+            <p class="text-xs text-slate-500 w-full">CSV format: hall_ticket_no, present|absent|malpractice|withheld, note (note required for malpractice/withheld)</p>
         </div>
 
         <div class="form-section overflow-hidden !p-0">
@@ -33,6 +35,7 @@
                             <th>Student</th>
                             <th>School</th>
                             <th>Attendance</th>
+                            <th>Note</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -46,12 +49,20 @@
                                     <option value="pending">Pending</option>
                                     <option value="present">Present</option>
                                     <option value="absent">Absent</option>
+                                    <option value="malpractice">Malpractice</option>
+                                    <option value="withheld">Withheld</option>
                                 </select>
+                            </td>
+                            <td>
+                                <input v-if="['malpractice','withheld'].includes(forms[r.id].attendance_status)"
+                                       v-model="forms[r.id].attendance_note" type="text" class="field text-xs"
+                                       placeholder="Reason (required)" :aria-label="`Note for ${r.student?.name}`">
+                                <span v-else class="text-slate-300 text-xs">—</span>
                             </td>
                             <td><button type="button" @click="save(r)" class="link-brand text-xs">Save</button></td>
                         </tr>
                         <tr v-if="!filteredRegistrations.length">
-                            <td colspan="5" class="p-6 text-center text-slate-400">No matching registrations.</td>
+                            <td colspan="6" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -71,7 +82,7 @@ const searchQuery = ref('');
 const importFile = ref(null);
 const forms = reactive({});
 for (const r of props.registrations) {
-    forms[r.id] = { attendance_status: r.attendance_status || 'pending' };
+    forms[r.id] = { attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' };
 }
 
 const filteredRegistrations = computed(() => {
@@ -85,9 +96,14 @@ const filteredRegistrations = computed(() => {
 function save(r) {
     const status = forms[r.id].attendance_status;
     if (status === 'pending') return;
+    if (['malpractice', 'withheld'].includes(status) && !forms[r.id].attendance_note?.trim()) {
+        alert('A reason/note is required when marking malpractice or withheld.');
+        return;
+    }
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/attendance`, {
         registration_id: r.id,
         attendance_status: status,
+        attendance_note: forms[r.id].attendance_note || null,
     }, { preserveScroll: true });
 }
 

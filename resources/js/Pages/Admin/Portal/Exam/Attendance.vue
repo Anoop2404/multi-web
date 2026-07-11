@@ -13,7 +13,7 @@
                     <input type="file" accept=".csv,text/csv" @change="e => csvFile = e.target.files[0]" class="text-xs" required>
                 </div>
                 <button type="submit" class="btn-secondary text-xs">Import attendance</button>
-                <p class="text-xs text-slate-500 w-full">Columns: registration_id or reg_no (hall_ticket_no) or student_id, attendance_status (present/absent)</p>
+                <p class="text-xs text-slate-500 w-full">Columns: registration_id or reg_no (hall_ticket_no) or student_id, attendance_status (present/absent/malpractice/withheld)</p>
             </form>
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
@@ -22,6 +22,7 @@
                         <th class="p-3">Student</th>
                         <th class="p-3">School</th>
                         <th class="p-3">Status</th>
+                        <th class="p-3">Note</th>
                         <th class="p-3"></th>
                     </tr>
                 </thead>
@@ -35,14 +36,22 @@
                                 <option value="pending">Pending</option>
                                 <option value="present">Present</option>
                                 <option value="absent">Absent</option>
+                                <option value="malpractice">Malpractice</option>
+                                <option value="withheld">Withheld</option>
                             </select>
+                        </td>
+                        <td class="p-3">
+                            <input v-if="['malpractice','withheld'].includes(forms[r.id].attendance_status)"
+                                   v-model="forms[r.id].attendance_note" type="text" class="field text-xs"
+                                   placeholder="Reason (required)">
+                            <span v-else class="text-gray-300 text-xs">—</span>
                         </td>
                         <td class="p-3">
                             <button @click="save(r)" class="text-xs font-semibold text-indigo-600">Save</button>
                         </td>
                     </tr>
                     <tr v-if="!registrations.length">
-                        <td colspan="5" class="p-6 text-center text-gray-400">No registrations.</td>
+                        <td colspan="6" class="p-6 text-center text-gray-400">No registrations.</td>
                     </tr>
                 </tbody>
             </table>
@@ -60,15 +69,20 @@ const props = defineProps({ sahodaya: Object, exam: Object, registrations: Array
 const csvFile = ref(null);
 const forms = reactive({});
 for (const r of props.registrations) {
-    forms[r.id] = { attendance_status: r.attendance_status || 'pending' };
+    forms[r.id] = { attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' };
 }
 
 function save(r) {
     const status = forms[r.id].attendance_status;
     if (status === 'pending') return;
+    if (['malpractice', 'withheld'].includes(status) && !forms[r.id].attendance_note?.trim()) {
+        alert('A reason/note is required when marking malpractice or withheld.');
+        return;
+    }
     router.post(`/portal/exam/${props.sahodaya.id}/exams/${props.exam.id}/attendance`, {
         registration_id: r.id,
         attendance_status: status,
+        attendance_note: forms[r.id].attendance_note || null,
     }, { preserveScroll: true });
 }
 
