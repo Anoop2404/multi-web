@@ -129,13 +129,14 @@ class FestEventReportAnalyticsService
 
         $schedule = $feeService->resolveSchedule($this->event);
         $itemResolver = app(FestItemFeeResolver::class);
+        $usesPerHeadBilling = $feeService->usesPerHeadBilling($this->event);
 
         $heads = FestItemHead::forTenant($this->event->tenant_id)
             ->forEvent($this->event->id)
             ->orderBy('sort_order')
             ->get();
 
-        return $heads->map(function (FestItemHead $head) use ($itemResolver, $schedule) {
+        return $heads->map(function (FestItemHead $head) use ($itemResolver, $schedule, $usesPerHeadBilling) {
             $items = FestEventItem::where('event_id', $this->event->id)
                 ->where('head_id', $head->id)
                 ->get();
@@ -147,7 +148,7 @@ class FestEventReportAnalyticsService
 
             $estimated = $items->sum(fn (FestEventItem $item) => $itemResolver->amountForItem($item, $schedule, $this->event));
 
-            return [
+            $row = [
                 'head_id'        => $head->id,
                 'head_name'      => $head->name,
                 'item_count'     => $items->count(),
@@ -156,6 +157,20 @@ class FestEventReportAnalyticsService
                 'extra_fee'      => $head->extra_item_fee !== null ? (float) $head->extra_item_fee : null,
                 'catalog_total'  => round($estimated, 2),
             ];
+
+            // When this event actually bills per-head, surface the real collected/pending
+            // amounts from the real FestSchoolEventFee rows for this head, rather than only
+            // the what-if catalog estimate above (which is still shown for non-billing context).
+            if ($usesPerHeadBilling) {
+                $headFees = FestSchoolEventFee::where('event_id', $this->event->id)->where('head_id', $head->id)->get();
+                $row['due_total'] = round((float) $headFees->sum('total_due'), 2);
+                $row['collected_total'] = round((float) $headFees->where('status', 'approved')->sum('total_due'), 2);
+                $row['pending_total'] = round((float) $headFees->whereNotIn('status', ['approved', 'waived'])->sum('total_due'), 2);
+                $row['schools_billed'] = $headFees->count();
+                $row['schools_paid'] = $headFees->filter(fn (FestSchoolEventFee $f) => $f->isFullyPaid())->count();
+            }
+
+            return $row;
         })->all();
     }
 

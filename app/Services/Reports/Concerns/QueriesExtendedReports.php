@@ -861,9 +861,20 @@ trait QueriesExtendedReports
             $collected = FestSchoolEventFee::where('event_id', $e->id)->where('status', 'approved')->sum('total_due');
             $pending = FestSchoolEventFee::where('event_id', $e->id)->whereNotIn('status', ['approved', 'waived'])->sum('total_due');
 
+            // "Schools paid" = schools with EVERY fee row for this event approved/waived, not
+            // just at least one. Under sports_composite per-head billing a school can have
+            // several rows (one per Event Head); counting distinct school_id on a single
+            // approved row would overcount schools that still owe money on another head.
+            $schoolsPaid = FestSchoolEventFee::where('event_id', $e->id)
+                ->select('school_id')
+                ->groupBy('school_id')
+                ->havingRaw("SUM(CASE WHEN status NOT IN ('approved', 'waived') THEN 1 ELSE 0 END) = 0")
+                ->get()
+                ->count();
+
             return [
                 'event' => $e->title, 'collected' => (float) $collected, 'pending' => (float) $pending,
-                'schools_paid' => FestSchoolEventFee::where('event_id', $e->id)->where('status', 'approved')->distinct('school_id')->count('school_id'),
+                'schools_paid' => $schoolsPaid,
             ];
         });
     }
