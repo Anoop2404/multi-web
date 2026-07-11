@@ -735,6 +735,27 @@ class FestSchoolEventFeeService
         return $fee->isFullyPaid();
     }
 
+    /**
+     * The fee-clearance check to use for a specific registration: for per-head events, only that
+     * registration's own Event Head needs to be paid (a school can have Athletics cleared while
+     * Chess is still pending); for every other event/fee model this is identical to isPaid().
+     */
+    public function isPaidForRegistration(FestEvent $event, FestRegistration $registration): bool
+    {
+        if (! $this->feeRequired($event)) {
+            return true;
+        }
+
+        $registration->loadMissing('item');
+        $headId = $registration->item?->head_id;
+
+        if ($headId && $this->usesPerHeadBilling($event)) {
+            return $this->isHeadPaid($event, $registration->school_id, $headId);
+        }
+
+        return $this->isPaid($event, $registration->school_id);
+    }
+
     private function applySchoolFeeCap(float $total, array $schedule): float
     {
         $cap = isset($schedule['school_fee_cap']) ? (float) $schedule['school_fee_cap'] : null;

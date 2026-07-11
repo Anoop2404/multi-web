@@ -147,9 +147,9 @@ class FestEventOpsController extends Controller
         $feeService = app(FestSchoolEventFeeService::class);
         if ($feeService->feeRequired($event)) {
             abort_unless(
-                $feeService->isPaid($event, $registration->school_id),
+                $feeService->isPaidForRegistration($event, $registration),
                 422,
-                'School event fee must be approved before registration approval.'
+                'The Event Head fee for this registration must be approved before registration approval.'
             );
         }
 

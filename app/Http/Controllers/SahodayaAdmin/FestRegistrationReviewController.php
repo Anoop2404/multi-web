@@ -194,9 +194,9 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
         if (($policy['require_fee_before_approval'] ?? true) && $feeService->feeRequired($event)) {
             abort_unless(
-                $feeService->isPaid($event, $registration->school_id),
+                $feeService->isPaidForRegistration($event, $registration),
                 422,
-                'School event fee must be approved before registration approval.'
+                'The Event Head fee for this registration must be approved before registration approval.'
             );
         }
 
