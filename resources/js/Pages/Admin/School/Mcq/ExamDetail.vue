@@ -471,9 +471,12 @@
                     <button type="button" class="btn-secondary text-xs" @click="markAll('absent')">Mark all absent</button>
                     <a :href="reportExports.attendance" class="btn-secondary text-xs ml-auto">Export attendance ↓</a>
                 </div>
+                <p v-if="exam.results_published" class="text-xs text-amber-700">
+                    Results are published for this exam. Attendance changes will be sent to the Sahodaya for approval instead of applying immediately.
+                </p>
                 <div class="card card--flush overflow-hidden">
                     <table class="data-table">
-                        <thead><tr><th>Hall ticket</th><th>Student</th><th>Class</th><th class="text-center">Attendance</th><th>Note</th></tr></thead>
+                        <thead><tr><th>Hall ticket</th><th>Student</th><th>Class</th><th class="text-center">Attendance</th><th>Note</th><th></th></tr></thead>
                         <tbody>
                             <tr v-for="row in attendanceState" :key="row.id">
                                 <td class="font-mono text-xs">{{ row.hall_ticket_no || '—' }}</td>
@@ -481,19 +484,19 @@
                                 <td class="text-xs">{{ row.class_name || row.student?.class_name || '—' }}</td>
                                 <td class="text-center">
                                     <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-xs">
-                                        <button type="button" class="px-3 py-1"
+                                        <button type="button" class="px-3 py-1" :disabled="!!row.pending_correction_status"
                                                 :class="row.attendance_status === 'present' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600'"
                                                 @click="row.attendance_status = 'present'">Present</button>
-                                        <button type="button" class="px-3 py-1 border-l border-slate-200"
+                                        <button type="button" class="px-3 py-1 border-l border-slate-200" :disabled="!!row.pending_correction_status"
                                                 :class="row.attendance_status === 'absent' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600'"
                                                 @click="row.attendance_status = 'absent'">Absent</button>
-                                        <button type="button" class="px-3 py-1 border-l border-slate-200"
+                                        <button type="button" class="px-3 py-1 border-l border-slate-200" :disabled="!!row.pending_correction_status"
                                                 :class="row.attendance_status === 'malpractice' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600'"
                                                 @click="row.attendance_status = 'malpractice'">Malpractice</button>
-                                        <button type="button" class="px-3 py-1 border-l border-slate-200"
+                                        <button type="button" class="px-3 py-1 border-l border-slate-200" :disabled="!!row.pending_correction_status"
                                                 :class="row.attendance_status === 'withheld' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600'"
                                                 @click="row.attendance_status = 'withheld'">Withheld</button>
-                                        <button type="button" class="px-3 py-1 border-l border-slate-200"
+                                        <button type="button" class="px-3 py-1 border-l border-slate-200" :disabled="!!row.pending_correction_status"
                                                 :class="(!row.attendance_status || row.attendance_status === 'pending') ? 'bg-slate-500 text-white' : 'bg-white text-slate-600'"
                                                 @click="row.attendance_status = 'pending'">—</button>
                                     </div>
@@ -501,8 +504,14 @@
                                 <td>
                                     <input v-if="['malpractice','withheld'].includes(row.attendance_status)"
                                            v-model="row.attendance_note" type="text" class="field text-xs"
+                                           :disabled="!!row.pending_correction_status"
                                            placeholder="Reason (required)">
                                     <span v-else class="text-slate-300 text-xs">—</span>
+                                </td>
+                                <td class="text-xs whitespace-nowrap">
+                                    <span v-if="row.pending_correction_status" class="text-amber-700 font-semibold">
+                                        Pending approval → {{ row.pending_correction_status }}
+                                    </span>
                                 </td>
                             </tr>
                         </tbody>
@@ -880,17 +889,18 @@ const withheldCount = computed(() => attendanceState.value.filter(r => r.attenda
 const pendingCount = computed(() => attendanceState.value.filter(r => !r.attendance_status || r.attendance_status === 'pending').length);
 
 function markAll(status) {
-    attendanceState.value.forEach(r => { r.attendance_status = status; });
+    attendanceState.value.forEach(r => { if (!r.pending_correction_status) r.attendance_status = status; });
 }
 
 function saveAttendance() {
-    const missingNote = attendanceState.value.find(r => ['malpractice', 'withheld'].includes(r.attendance_status) && !r.attendance_note?.trim());
+    const editable = attendanceState.value.filter(r => !r.pending_correction_status);
+    const missingNote = editable.find(r => ['malpractice', 'withheld'].includes(r.attendance_status) && !r.attendance_note?.trim());
     if (missingNote) {
         alert('A reason/note is required for every student marked Malpractice or Withheld.');
         return;
     }
     router.post(`${base.value}/attendance`, {
-        attendance: attendanceState.value.map(r => ({
+        attendance: editable.map(r => ({
             registration_id: r.id,
             attendance_status: r.attendance_status || 'pending',
             attendance_note: r.attendance_note || null,

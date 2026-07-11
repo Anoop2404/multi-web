@@ -15,6 +15,9 @@
                 <button type="submit" class="btn-secondary text-xs">Import attendance</button>
                 <p class="text-xs text-slate-500 w-full">Columns: registration_id or reg_no (hall_ticket_no) or student_id, attendance_status (present/absent/malpractice/withheld)</p>
             </form>
+            <p v-if="!isTrustedReviewer" class="text-xs text-slate-500 px-4 pt-3">
+                Changing attendance that has already been marked will be sent to the Sahodaya for approval.
+            </p>
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
@@ -32,7 +35,7 @@
                         <td class="p-3">{{ r.student?.name }}</td>
                         <td class="p-3 text-xs text-gray-500">{{ r.school?.name }}</td>
                         <td class="p-3">
-                            <select v-model="forms[r.id].attendance_status" class="field">
+                            <select v-model="forms[r.id].attendance_status" class="field" :disabled="!!r.pending_correction_status">
                                 <option value="pending">Pending</option>
                                 <option value="present">Present</option>
                                 <option value="absent">Absent</option>
@@ -43,11 +46,15 @@
                         <td class="p-3">
                             <input v-if="['malpractice','withheld'].includes(forms[r.id].attendance_status)"
                                    v-model="forms[r.id].attendance_note" type="text" class="field text-xs"
+                                   :disabled="!!r.pending_correction_status"
                                    placeholder="Reason (required)">
                             <span v-else class="text-gray-300 text-xs">—</span>
                         </td>
                         <td class="p-3">
-                            <button @click="save(r)" class="text-xs font-semibold text-indigo-600">Save</button>
+                            <span v-if="r.pending_correction_status" class="text-amber-700 text-xs font-semibold">
+                                Pending approval → {{ r.pending_correction_status }}
+                            </span>
+                            <button v-else @click="save(r)" class="text-xs font-semibold text-indigo-600">Save</button>
                         </td>
                     </tr>
                     <tr v-if="!registrations.length">
@@ -65,7 +72,7 @@ import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 
-const props = defineProps({ sahodaya: Object, exam: Object, registrations: Array });
+const props = defineProps({ sahodaya: Object, exam: Object, registrations: Array, isTrustedReviewer: { type: Boolean, default: false } });
 const csvFile = ref(null);
 const forms = reactive({});
 for (const r of props.registrations) {

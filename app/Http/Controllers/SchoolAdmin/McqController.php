@@ -6,6 +6,7 @@ use App\Models\McqExam;
 use App\Models\McqRegistration;
 use App\Models\McqSchoolFee;
 use App\Models\Student;
+use App\Services\Mcq\McqAttendanceCorrectionService;
 use App\Services\Mcq\McqEligibilityService;
 use App\Services\Mcq\McqRegistrationGateService;
 use App\Services\Mcq\McqReportService;
@@ -168,13 +169,21 @@ class McqController extends SchoolAdminController
 
         // Attendance can only be marked once hall tickets have been issued (fee approved).
         $attendanceRegistrations = $registrations->filter(fn ($r) => ! empty($r['hall_ticket_no']));
+        $pendingCorrectionsByReg = $tab === 'attendance'
+            ? \App\Models\McqAttendanceCorrectionRequest::where('exam_id', $exam->id)
+                ->where('status', 'pending')
+                ->whereIn('registration_id', $attendanceRegistrations->pluck('id'))
+                ->get()
+                ->keyBy('registration_id')
+            : collect();
         $attendanceRows = $tab === 'attendance'
             ? $attendanceRegistrations->map(fn ($r) => [
-                'id'                => $r['id'],
-                'hall_ticket_no'    => $r['hall_ticket_no'] ?? null,
-                'student'           => $r['student'] ?? null,
-                'class_name'        => $r['student']['class_name'] ?? null,
-                'attendance_status' => $r['attendance_status'] ?? 'pending',
+                'id'                       => $r['id'],
+                'hall_ticket_no'           => $r['hall_ticket_no'] ?? null,
+                'student'                  => $r['student'] ?? null,
+                'class_name'               => $r['student']['class_name'] ?? null,
+                'attendance_status'        => $r['attendance_status'] ?? 'pending',
+                'pending_correction_status'=> $pendingCorrectionsByReg->get($r['id'])?->requested_status,
             ])->values()
             : [];
         $attendanceGate = [
@@ -273,13 +282,16 @@ class McqController extends SchoolAdminController
             'attendance.*.attendance_note'     => 'nullable|string|max:1000',
         ]);
 
-        $registrations = McqRegistration::where('exam_id', $exam->id)
+        $registrations = McqRegistration::with('exam')
+            ->where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
             ->whereNotNull('hall_ticket_no')
             ->get()
             ->keyBy('id');
 
+        $correctionService = app(McqAttendanceCorrectionService::class);
         $marked = 0;
+        $queued = 0;
         foreach ($data['attendance'] as $row) {
             $registration = $registrations->get((int) $row['registration_id']);
             if (! $registration) {
@@ -287,6 +299,23 @@ class McqController extends SchoolAdminController
             }
 
             $status = $row['attendance_status'];
+            if ($status === (string) ($registration->attendance_status ?? 'pending')) {
+                continue;
+            }
+
+            if ($correctionService->requiresApproval($registration)) {
+                $correctionService->submit(
+                    $registration,
+                    $status,
+                    $status === 'pending' ? null : ($row['attendance_note'] ?? null),
+                    $request->user(),
+                    'school_admin',
+                );
+                $queued++;
+
+                continue;
+            }
+
             $registration->update([
                 'attendance_status'    => $status === 'pending' ? null : $status,
                 'attendance_note'      => $status === 'pending' ? null : ($row['attendance_note'] ?? null),
@@ -303,7 +332,12 @@ class McqController extends SchoolAdminController
             $marked++;
         }
 
-        return back()->with('success', "Attendance saved for {$marked} student(s).");
+        $message = "Attendance saved for {$marked} student(s).";
+        if ($queued > 0) {
+            $message .= " {$queued} change(s) already marked sent to the Sahodaya for approval.";
+        }
+
+        return back()->with('success', $message);
     }
 
     public function hallTicketsPdf(string $tenantId, McqExam $exam)

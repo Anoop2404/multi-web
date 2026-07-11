@@ -4,6 +4,12 @@
         <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Mark hall attendance before entering scores." />
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="attendance" />
 
+        <a v-if="pendingCorrectionsCount" :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance-corrections`"
+           class="card !py-3 mb-4 flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+            <span>{{ pendingCorrectionsCount }} attendance correction request(s) awaiting your approval.</span>
+            <span class="font-semibold">Review →</span>
+        </a>
+
         <div v-if="summary" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
             <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold">{{ summary.total }}</p><p class="text-[10px] uppercase text-slate-500">Total</p></div>
             <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold">{{ summary.pending }}</p><p class="text-[10px] uppercase text-slate-500">Pending</p></div>
@@ -77,7 +83,7 @@ import { router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 
-const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, summary: Object });
+const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, summary: Object, pendingCorrectionsCount: { type: Number, default: 0 } });
 const searchQuery = ref('');
 const importFile = ref(null);
 const forms = reactive({});

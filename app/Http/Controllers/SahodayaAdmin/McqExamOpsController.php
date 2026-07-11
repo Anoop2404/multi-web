@@ -36,7 +36,11 @@ class McqExamOpsController extends SahodayaAdminController
             'not_marked'   => $registrations->where('attendance_status', 'present')->filter(fn ($r) => $r->mark === null)->count(),
         ];
 
-        return $this->inertia('Sahodaya/Mcq/Attendance', compact('exam', 'registrations', 'summary'));
+        $pendingCorrectionsCount = \App\Models\McqAttendanceCorrectionRequest::where('exam_id', $exam->id)
+            ->where('status', 'pending')
+            ->count();
+
+        return $this->inertia('Sahodaya/Mcq/Attendance', compact('exam', 'registrations', 'summary', 'pendingCorrectionsCount'));
     }
 
     public function storeAttendance(Request $request, string $tenantId, McqExam $exam)
@@ -493,5 +497,78 @@ class McqExamOpsController extends SahodayaAdminController
         $activityLogs = app(\App\Services\Audit\McqExamActivityService::class)->forExam($exam, 100);
 
         return $this->inertia('Sahodaya/Mcq/Activity', compact('exam', 'activityLogs'));
+    }
+
+    public function attendanceCorrections(string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $requests = \App\Models\McqAttendanceCorrectionRequest::where('exam_id', $exam->id)
+            ->with(['registration.student', 'registration.school', 'requestedBy:id,name', 'reviewedBy:id,name'])
+            ->orderByRaw("status = 'pending' desc")
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($c) => [
+                'id'                => $c->id,
+                'status'            => $c->status,
+                'status_label'      => $c->statusLabel(),
+                'previous_status'   => $c->previous_status,
+                'requested_status'  => $c->requested_status,
+                'requested_note'    => $c->requested_note,
+                'requested_by'      => $c->requestedBy?->name,
+                'requested_by_role' => $c->requested_by_role,
+                'reviewed_by'       => $c->reviewedBy?->name,
+                'reviewed_at'       => $c->reviewed_at?->format('j M Y, g:i A'),
+                'review_note'       => $c->review_note,
+                'created_at'        => $c->created_at?->format('j M Y, g:i A'),
+                'student_name'      => $c->registration?->student?->name,
+                'school_name'       => $c->registration?->school?->name,
+                'hall_ticket_no'    => $c->registration?->hall_ticket_no,
+            ]);
+
+        return $this->inertia('Sahodaya/Mcq/AttendanceCorrections', [
+            'exam'     => $exam->only('id', 'title', 'results_published', 'delivery_mode'),
+            'requests' => $requests,
+        ]);
+    }
+
+    public function approveAttendanceCorrection(
+        Request $request,
+        string $tenantId,
+        McqExam $exam,
+        \App\Models\McqAttendanceCorrectionRequest $correctionRequest,
+    ) {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($correctionRequest->exam_id !== $exam->id, 403);
+
+        $data = $request->validate(['review_note' => 'nullable|string|max:1000']);
+
+        app(\App\Services\Mcq\McqAttendanceCorrectionService::class)->approve(
+            $correctionRequest,
+            $request->user(),
+            $data['review_note'] ?? null,
+        );
+
+        return back()->with('success', 'Correction approved and attendance updated.');
+    }
+
+    public function rejectAttendanceCorrection(
+        Request $request,
+        string $tenantId,
+        McqExam $exam,
+        \App\Models\McqAttendanceCorrectionRequest $correctionRequest,
+    ) {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($correctionRequest->exam_id !== $exam->id, 403);
+
+        $data = $request->validate(['review_note' => 'nullable|string|max:1000']);
+
+        app(\App\Services\Mcq\McqAttendanceCorrectionService::class)->reject(
+            $correctionRequest,
+            $request->user(),
+            $data['review_note'] ?? null,
+        );
+
+        return back()->with('success', 'Correction request rejected.');
     }
 }

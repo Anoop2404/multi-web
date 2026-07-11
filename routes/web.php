@@ -1045,6 +1045,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{exam}/attendance', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'storeAttendance'])->name('attendance.store');
             Route::post('/{exam}/attendance/import', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'importAttendance'])->name('attendance.import');
             Route::get('/{exam}/attendance/export', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'exportAttendance'])->name('attendance.export');
+            Route::get('/{exam}/attendance-corrections', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'attendanceCorrections'])->name('attendance-corrections');
+            Route::post('/{exam}/attendance-corrections/{correctionRequest}/approve', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'approveAttendanceCorrection'])->name('attendance-corrections.approve');
+            Route::post('/{exam}/attendance-corrections/{correctionRequest}/reject', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'rejectAttendanceCorrection'])->name('attendance-corrections.reject');
             Route::get('/{exam}/results', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'results'])->name('results');
             Route::get('/{exam}/hall-tickets', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'hallTickets'])->name('hall-tickets');
             Route::get('/{exam}/hall-tickets/preview', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'previewHallTicket'])->name('hall-tickets.preview');

@@ -200,6 +200,21 @@ class NotificationTemplatesSeeder extends Seeder
                 'title'         => 'Chest number revealed',
                 'body_template' => 'Chest number for {{participant_name}} at {{event_title}} has been revealed.',
             ],
+            [
+                'slug'          => 'mcq.attendance_correction.requested',
+                'title'         => 'Attendance correction requested',
+                'body_template' => '{{requested_by}} requested to change attendance for {{student_name}} ({{exam_title}}) to {{requested_status}}.',
+            ],
+            [
+                'slug'          => 'mcq.attendance_correction.approved',
+                'title'         => 'Attendance correction approved',
+                'body_template' => 'Your attendance correction request for {{student_name}} ({{exam_title}}) was approved. New status: {{requested_status}}.',
+            ],
+            [
+                'slug'          => 'mcq.attendance_correction.rejected',
+                'title'         => 'Attendance correction rejected',
+                'body_template' => 'Your attendance correction request for {{student_name}} ({{exam_title}}) was rejected. {{reason}}',
+            ],
         ];
     }
 }

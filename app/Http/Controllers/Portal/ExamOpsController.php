@@ -9,6 +9,7 @@ use App\Models\McqRegistration;
 use App\Models\McqMark;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Mcq\McqAttendanceCorrectionService;
 use Illuminate\Http\Request;
 
 class ExamOpsController extends Controller
@@ -48,10 +49,22 @@ class ExamOpsController extends Controller
             ->orderBy('hall_ticket_no')
             ->get();
 
+        $pendingCorrectionsByReg = \App\Models\McqAttendanceCorrectionRequest::where('exam_id', $exam->id)
+            ->where('status', 'pending')
+            ->get()
+            ->keyBy('registration_id');
+
+        $registrations = $registrations->map(function (McqRegistration $r) use ($pendingCorrectionsByReg) {
+            $r->setAttribute('pending_correction_status', $pendingCorrectionsByReg->get($r->id)?->requested_status);
+
+            return $r;
+        });
+
         return inertia('Portal/Exam/Attendance', [
-            'sahodaya'      => Tenant::findOrFail($tenantId)->only('id', 'name'),
-            'exam'          => $exam,
-            'registrations' => $registrations,
+            'sahodaya'          => Tenant::findOrFail($tenantId)->only('id', 'name'),
+            'exam'              => $exam,
+            'registrations'     => $registrations,
+            'isTrustedReviewer' => $this->isTrustedRole($request),
         ]);
     }
 
@@ -66,6 +79,20 @@ class ExamOpsController extends Controller
         ]);
 
         $registration = McqRegistration::where('exam_id', $exam->id)->findOrFail($data['registration_id']);
+
+        // Assigned exam-day staff (not Sahodaya admin/mark-entry-admin/exam-controller) can only
+        // freely mark attendance the first time; any change after that goes through approval.
+        if (! $this->isTrustedRole($request) && app(McqAttendanceCorrectionService::class)->requiresApproval($registration)) {
+            app(McqAttendanceCorrectionService::class)->submit(
+                $registration,
+                $data['attendance_status'],
+                $data['attendance_note'] ?? null,
+                $request->user(),
+                'exam_portal_staff',
+            );
+
+            return back()->with('success', 'This attendance change needs Sahodaya approval and has been submitted for review.');
+        }
 
         $registration->update([
             'attendance_status'      => $data['attendance_status'],
@@ -179,9 +206,13 @@ class ExamOpsController extends Controller
 
         $request->validate(['csv' => 'required|file|mimes:csv,txt|max:2048']);
 
+        $trusted = $this->isTrustedRole($request);
+        $correctionService = app(McqAttendanceCorrectionService::class);
+
         $handle = fopen($request->file('csv')->getRealPath(), 'r');
         $header = fgetcsv($handle);
         $imported = 0;
+        $queued = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
             $data = array_combine($header, $row);
@@ -200,6 +231,21 @@ class ExamOpsController extends Controller
             }
 
             if (! in_array($data['attendance_status'], ['present', 'absent', 'malpractice', 'withheld'], true)) {
+                continue;
+            }
+
+            $registration->setRelation('exam', $exam);
+
+            if (! $trusted && $correctionService->requiresApproval($registration)) {
+                $correctionService->submit(
+                    $registration,
+                    $data['attendance_status'],
+                    $data['attendance_note'] ?? null,
+                    $request->user(),
+                    'exam_portal_staff',
+                );
+                $queued++;
+
                 continue;
             }
 
@@ -226,7 +272,12 @@ class ExamOpsController extends Controller
 
         fclose($handle);
 
-        return back()->with('success', "Imported attendance for {$imported} registration(s).");
+        $message = "Imported attendance for {$imported} registration(s).";
+        if ($queued > 0) {
+            $message .= " {$queued} change(s) sent to the Sahodaya for approval.";
+        }
+
+        return back()->with('success', $message);
     }
 
     private function authorizeExam(Request $request, string $tenantId, McqExam $exam): void
@@ -234,11 +285,17 @@ class ExamOpsController extends Controller
         abort_if($exam->tenant_id !== $tenantId, 403);
 
         $user = $request->user();
-        if ($user->hasAnyRole(['sahodaya_admin', 'mark_entry_admin', 'exam_controller'])) {
+        if ($this->isTrustedRole($request)) {
             return;
         }
 
         $assigned = McqExamStaff::where('exam_id', $exam->id)->where('user_id', $user->id)->exists();
         abort_unless($assigned, 403);
+    }
+
+    /** Sahodaya-side trusted roles who may directly overwrite attendance/marks at any time. */
+    private function isTrustedRole(Request $request): bool
+    {
+        return $request->user()->hasAnyRole(['sahodaya_admin', 'mark_entry_admin', 'exam_controller']);
     }
 }
