@@ -251,8 +251,178 @@ class FestSchoolEventFeeService
             ->count();
     }
 
+    /**
+     * Whether this event bills sports_composite fees per Event Head (rather than one flat
+     * event-wide schedule). True only when the event actually has FestItemHead rows AND the
+     * fest_school_event_fees.head_id column exists (schema migrated).
+     */
+    public function usesPerHeadBilling(FestEvent $event): bool
+    {
+        if (($this->resolveSchedule($event)['fee_model'] ?? 'none') !== 'sports_composite') {
+            return false;
+        }
+
+        if (! Schema::hasColumn('fest_school_event_fees', 'head_id')) {
+            return false;
+        }
+
+        return FestItemHead::where('event_id', $event->id)->exists();
+    }
+
+    /** Heads under this event that this school has (or previously had) billable activity for. */
+    public function headsWithActivityForSchool(FestEvent $event, string $schoolId): \Illuminate\Support\Collection
+    {
+        return FestItemHead::where('event_id', $event->id)
+            ->orderBy('sort_order')
+            ->get()
+            ->filter(function (FestItemHead $head) use ($event, $schoolId) {
+                $hasRegistrations = FestRegistration::where('event_id', $event->id)
+                    ->where('school_id', $schoolId)
+                    ->whereIn('status', ['submitted', 'approved'])
+                    ->whereHas('item', fn ($q) => $q->where('head_id', $head->id))
+                    ->exists();
+
+                if ($hasRegistrations) {
+                    return true;
+                }
+
+                return FestSchoolEventFee::where('event_id', $event->id)
+                    ->where('school_id', $schoolId)
+                    ->where('head_id', $head->id)
+                    ->exists();
+            })
+            ->values();
+    }
+
+    /** Recalculate (and persist) the fee record for one specific Event Head for one school. */
+    public function recalculateForHead(FestEvent $event, string $schoolId, FestItemHead $head): FestSchoolEventFee
+    {
+        $composite = $this->sportsCompositeFeeService->calculateForHead($head, $schoolId);
+        $total = $composite['school_reg'] + $composite['student_reg'] + $composite['item_fee'] + $composite['team_fee'];
+
+        $record = FestSchoolEventFee::firstOrNew([
+            'event_id' => $event->id,
+            'school_id' => $schoolId,
+            'head_id' => $head->id,
+        ]);
+
+        // Only freeze records that already have a positive balance fully settled.
+        if ($record->exists && (float) $record->total_due > 0 && $record->isFullyPaid()) {
+            return $record;
+        }
+
+        $record->fill([
+            'school_registration_fee' => $composite['school_reg'],
+            'student_registration_fee' => $composite['student_reg'],
+            'participation_item_count' => $composite['student_count'],
+            'participation_fee' => $composite['item_fee'] + $composite['team_fee'],
+            'extra_item_fee' => $composite['team_fee'],
+            'total_due' => round($total, 2),
+            'status' => $record->fee_receipt_id ? ($record->status ?? 'proof_uploaded') : 'pending',
+        ]);
+
+        if ($total <= 0) {
+            $record->status = 'approved';
+        }
+
+        $record->save();
+
+        if ($total > 0 && (float) $record->amount_paid > 0) {
+            $record->refreshPaidState();
+        }
+
+        if ($this->supportsFeeLines()) {
+            $this->syncFeeLines($record, $composite['lines']);
+        }
+
+        return $record;
+    }
+
+    /**
+     * Recalculate every head this school has activity under for this event.
+     *
+     * @return \Illuminate\Support\Collection<int, FestSchoolEventFee>
+     */
+    public function recalculateAllHeadsForSchool(FestEvent $event, string $schoolId): \Illuminate\Support\Collection
+    {
+        return $this->headsWithActivityForSchool($event, $schoolId)
+            ->map(fn (FestItemHead $head) => $this->recalculateForHead($event, $schoolId, $head))
+            ->values();
+    }
+
+    /** Is the fee for one specific Event Head fully paid (or not due)? */
+    public function isHeadPaid(FestEvent $event, string $schoolId, int $headId): bool
+    {
+        $head = FestItemHead::find($headId);
+        if (! $head || $head->event_id !== $event->id) {
+            return true;
+        }
+
+        $fee = FestSchoolEventFee::where('event_id', $event->id)
+            ->where('school_id', $schoolId)
+            ->where('head_id', $headId)
+            ->first();
+
+        if (! $fee) {
+            $fee = $this->recalculateForHead($event, $schoolId, $head);
+        }
+
+        return $fee->isFullyPaid();
+    }
+
+    /** Upload a payment proof against one specific Event Head's fee record. */
+    public function attachPaymentForHead(
+        FestEvent $event,
+        string $schoolId,
+        int $headId,
+        UploadedFile $proof,
+        int $userId,
+        ?string $transactionRef = null,
+        ?string $bankName = null,
+        ?float $amount = null,
+    ): FestSchoolEventFee {
+        $head = FestItemHead::findOrFail($headId);
+        abort_if($head->event_id !== $event->id, 403);
+
+        $fee = $this->recalculateForHead($event, $schoolId, $head);
+        abort_if($fee->total_due <= 0, 422, 'No fee due for this Event Head.');
+        abort_if($fee->isFullyPaid(), 422, 'Fee already fully paid.');
+
+        $outstanding = $fee->outstandingBalance();
+        $payAmount = $amount !== null ? round($amount, 2) : $outstanding;
+        abort_if($payAmount <= 0, 422, 'Payment amount must be greater than zero.');
+        abort_if($payAmount > $outstanding, 422, 'Payment cannot exceed the outstanding balance of ₹'.number_format($outstanding, 2).'.');
+
+        $path = TenantStorage::storeUploadedFile($proof, "fest-payments/{$schoolId}");
+
+        FeeReceipt::supersedePriorForFeeable($fee);
+
+        $receipt = FeeReceipt::create([
+            'feeable_type' => FestSchoolEventFee::class,
+            'feeable_id' => $fee->id,
+            'file_path' => $path,
+            'transaction_ref' => $transactionRef,
+            'bank_name' => $bankName,
+            'payment_date' => now()->toDateString(),
+            'amount' => $payAmount,
+            'status' => 'uploaded',
+            'uploaded_by_user_id' => $userId,
+        ]);
+
+        $fee->update([
+            'fee_receipt_id' => $receipt->id,
+            'status' => 'proof_uploaded',
+        ]);
+
+        return $fee->fresh(['feeReceipt']);
+    }
+
     public function recalculate(FestEvent $event, string $schoolId): FestSchoolEventFee
     {
+        if ($this->usesPerHeadBilling($event)) {
+            return $this->recalculateAggregateForPerHeadEvent($event, $schoolId);
+        }
+
         $schedule = $this->resolveSchedule($event);
         $school = Tenant::findOrFail($schoolId);
         $itemCount = $this->billableItemCount($event, $schoolId, $schedule);
@@ -343,6 +513,47 @@ class FestSchoolEventFeeService
         } elseif ($this->supportsFeeLines()) {
             $record->lines()->delete();
         }
+
+        return $record;
+    }
+
+    /**
+     * For sports_composite events billed per Event Head, `recalculate()` no longer manages a
+     * single payable record — each head has its own fee record, paid independently (see
+     * recalculateForHead/attachPaymentForHead/isHeadPaid). This method keeps every per-head
+     * record in sync as a side effect, then returns a read-only, head_id=null "rollup" record
+     * (total_due = sum of all heads, status reflects whether all heads are settled) purely for
+     * legacy callers that still expect a single FestSchoolEventFee back for display purposes
+     * (dashboard tiles, reports, invoice generation). This rollup record is NOT itself payable —
+     * attachPayment() refuses to accept a proof against it once per-head billing is active.
+     */
+    private function recalculateAggregateForPerHeadEvent(FestEvent $event, string $schoolId): FestSchoolEventFee
+    {
+        $headFees = $this->recalculateAllHeadsForSchool($event, $schoolId);
+
+        $totalDue = round((float) $headFees->sum('total_due'), 2);
+        $totalPaid = round((float) $headFees->sum('amount_paid'), 2);
+        $schoolRegFee = round((float) $headFees->sum('school_registration_fee'), 2);
+        $studentRegFee = round((float) $headFees->sum('student_registration_fee'), 2);
+        $itemCount = (int) $headFees->sum('participation_item_count');
+        $allApproved = $headFees->isNotEmpty() && $headFees->every(fn (FestSchoolEventFee $f) => $f->isFullyPaid());
+
+        $record = FestSchoolEventFee::firstOrNew([
+            'event_id' => $event->id,
+            'school_id' => $schoolId,
+            'head_id' => null,
+        ]);
+
+        $record->fill([
+            'school_registration_fee' => $schoolRegFee,
+            'student_registration_fee' => $this->supportsSportsCompositeSchema() ? $studentRegFee : null,
+            'participation_item_count' => $itemCount,
+            'participation_fee' => round($totalDue - $schoolRegFee, 2),
+            'total_due' => $totalDue,
+            'amount_paid' => $totalPaid,
+            'status' => $allApproved ? 'approved' : ($totalPaid > 0 ? 'partial' : 'pending'),
+        ]);
+        $record->save();
 
         return $record;
     }
@@ -468,6 +679,12 @@ class FestSchoolEventFeeService
         ?string $bankName = null,
         ?float $amount = null,
     ): FestSchoolEventFee {
+        abort_if(
+            $this->usesPerHeadBilling($event),
+            422,
+            'This event bills fees per Event Head — upload payment against the specific head, not the whole event.',
+        );
+
         $fee = $this->recalculate($event, $schoolId);
         abort_if($fee->total_due <= 0, 422, 'No fee due for this event.');
         abort_if($fee->isFullyPaid(), 422, 'Fee already fully paid.');
