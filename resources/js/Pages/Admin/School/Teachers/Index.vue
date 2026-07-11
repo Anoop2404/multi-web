@@ -12,6 +12,8 @@
                 <button type="button" class="btn-secondary" :class="mode === 'import' ? 'ring-2 ring-[#041525]/20' : ''" @click="mode = 'import'">Import CSV/Excel</button>
                 <button type="button" class="btn-secondary" :class="mode === 'photos' ? 'ring-2 ring-[#041525]/20' : ''" @click="mode = 'photos'">Update photos (ZIP)</button>
                 <Link :href="`/school-admin/${school.id}/imports`" class="btn-secondary">Import history</Link>
+                <a :href="exportUrl('xlsx')" class="btn-secondary ml-auto">↓ Export (.xlsx)</a>
+                <a :href="exportUrl('csv')" class="btn-secondary">↓ Export (.csv)</a>
             </div>
 
             <!-- Bulk add -->
@@ -162,6 +164,33 @@
                 </div>
             </form>
 
+            <form class="card !p-4 flex flex-wrap gap-3 items-end" @submit.prevent="applyFilters">
+                <FormField label="Teacher category" class-extra="mb-0">
+                    <select v-model="f.teaching_type_id" class="field text-sm">
+                        <option value="">All categories</option>
+                        <option v-for="t in teachingTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
+                    </select>
+                </FormField>
+                <FormField label="Status" class-extra="mb-0">
+                    <select v-model="f.status" class="field text-sm">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="all">All</option>
+                    </select>
+                </FormField>
+                <FormField label="Verification" class-extra="mb-0">
+                    <select v-model="f.verification" class="field text-sm">
+                        <option value="all">All</option>
+                        <option value="unverified">Pending</option>
+                        <option value="verified">Verified</option>
+                    </select>
+                </FormField>
+                <FormField label="Search" class-extra="mb-0">
+                    <input v-model="f.search" type="search" class="field text-sm" placeholder="Name, email, mobile, login code">
+                </FormField>
+                <button type="submit" class="btn-secondary text-sm">Apply</button>
+            </form>
+
             <div class="card card--flush overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
@@ -176,7 +205,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="t in teachers" :key="t.id" class="border-t">
+                        <tr v-for="t in teachers.data" :key="t.id" class="border-t">
                             <td class="p-3">
                                 <img v-if="t.photo_url" :src="t.photo_url" :alt="t.name" class="h-10 w-10 rounded-full object-cover border">
                                 <span v-else class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xs font-bold">{{ initials(t.name) }}</span>
@@ -197,9 +226,17 @@
                                 <button type="button" @click="remove(t)" class="text-red-600 text-xs font-semibold">Deactivate</button>
                             </td>
                         </tr>
-                        <tr v-if="!teachers.length"><td colspan="7" class="p-6 text-center text-gray-400">No teachers yet.</td></tr>
+                        <tr v-if="!teachers.data.length"><td colspan="7" class="p-6 text-center text-gray-400">No teachers match the filters.</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div v-if="teachers.links?.length > 3" class="flex justify-center gap-1">
+                <Link v-for="link in teachers.links" :key="link.label"
+                      :href="link.url || '#'"
+                      class="px-3 py-1 rounded text-xs font-medium"
+                      :class="link.active ? 'bg-[#041525] text-white' : (link.url ? 'text-[#041525] hover:bg-gray-100' : 'text-gray-300 pointer-events-none')"
+                      v-html="link.label" />
             </div>
         </div>
 
@@ -272,7 +309,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { Link, useForm, router, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
@@ -284,13 +321,31 @@ import { useScrollToFirstError } from '@/composables/useScrollToFirstError.js';
 
 const props = defineProps({
     school: Object,
-    teachers: Array,
+    teachers: Object,
+    filters: { type: Object, default: () => ({}) },
     teachingTypes: Array,
     designations: Array,
     subjects: Array,
 });
 
 const importErrors = computed(() => usePage().props.flash?.importErrors ?? []);
+
+const f = reactive({
+    teaching_type_id: '',
+    status: 'active',
+    verification: 'all',
+    search: '',
+    ...props.filters,
+});
+
+function applyFilters() {
+    router.get(`/school-admin/${props.school.id}/teachers`, f, { preserveState: true, preserveScroll: true });
+}
+
+function exportUrl(format) {
+    const params = new URLSearchParams({ ...f, format });
+    return `/school-admin/${props.school.id}/teachers/export?${params.toString()}`;
+}
 
 const editingTeacher = ref(null);
 const provisionTeacher = ref(null);

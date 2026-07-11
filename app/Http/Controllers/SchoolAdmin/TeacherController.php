@@ -25,17 +25,22 @@ class TeacherController extends SchoolAdminController
 {
     use ManagesTeacherPortalCredentials;
 
-    public function index(EffectiveMasterDataResolver $resolver)
+    public function index(Request $request, EffectiveMasterDataResolver $resolver)
     {
         $sahodayaId = $this->school->parent_id;
 
         $subjectLabelMap = $resolver->subjects($sahodayaId)->pluck('label', 'id');
 
-        $teachers = Teacher::where('tenant_id', $this->school->id)
+        $filters = $this->validatedTeacherListFilters($request);
+        $sort = $filters['sort'] ?? 'name';
+        $dir = $filters['dir'] ?? 'asc';
+
+        $teachers = $this->teacherListQuery($filters)
             ->with(['teachingType', 'schoolClasses', 'user:id,username,plain_password,email'])
-            ->orderBy('name')
-            ->get()
-            ->map(function (Teacher $t) use ($subjectLabelMap) {
+            ->orderBy($sort, $dir)
+            ->paginate(25)
+            ->withQueryString()
+            ->through(function (Teacher $t) use ($subjectLabelMap) {
                 $subjectIds = $t->subject_ids ?? [];
 
                 return [
@@ -54,11 +59,108 @@ class TeacherController extends SchoolAdminController
 
         return $this->inertia('School/Teachers/Index', [
             'teachers'     => $teachers,
+            'filters'      => array_merge([
+                'status' => 'active',
+                'verification' => 'all',
+                'teaching_type_id' => '',
+                'search' => '',
+                'sort'   => 'name',
+                'dir'    => 'asc',
+            ], $filters),
             'teachingTypes'=> $resolver->teachingTypes($sahodayaId),
             'designations' => $resolver->designations($sahodayaId),
             'subjects'     => $resolver->subjects($sahodayaId),
             'schoolClasses'=> SchoolClass::where('tenant_id', $this->school->id)->orderBy('name')->get(['id', 'name']),
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function validatedTeacherListFilters(Request $request): array
+    {
+        return $request->validate([
+            'teaching_type_id' => 'nullable|integer',
+            'status'           => 'nullable|in:active,inactive,all',
+            'verification'     => 'nullable|in:all,verified,unverified',
+            'search'           => 'nullable|string|max:100',
+            'sort'             => 'nullable|in:name,email,status',
+            'dir'              => 'nullable|in:asc,desc',
+        ]);
+    }
+
+    /** @param  array<string, mixed>  $filters */
+    private function teacherListQuery(array $filters)
+    {
+        return Teacher::where('tenant_id', $this->school->id)
+            ->when(! empty($filters['teaching_type_id']), fn ($q) => $q->where('teaching_type_id', $filters['teaching_type_id']))
+            ->when(($filters['status'] ?? 'active') !== 'all', function ($q) use ($filters) {
+                $q->where('status', $filters['status'] ?? 'active');
+            })
+            ->when(($filters['verification'] ?? 'all') === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
+            ->when(($filters['verification'] ?? 'all') === 'unverified', fn ($q) => $q->whereNull('verified_at'))
+            ->when(! empty($filters['search']), function ($q) use ($filters) {
+                $term = '%'.$filters['search'].'%';
+                $q->where(function ($inner) use ($term) {
+                    $inner->where('name', 'like', $term)
+                        ->orWhere('email', 'like', $term)
+                        ->orWhere('login_code', 'like', $term)
+                        ->orWhere('mobile', 'like', $term);
+                });
+            });
+    }
+
+    public function export(Request $request)
+    {
+        $filters = $this->validatedTeacherListFilters($request);
+
+        $teachers = $this->teacherListQuery($filters)
+            ->with(['teachingType', 'verifiedBy:id,name,email'])
+            ->orderBy('name')
+            ->get();
+
+        $subjectLabelMap = app(EffectiveMasterDataResolver::class)->subjects($this->school->parent_id)->pluck('label', 'id');
+
+        $header = ['Name', 'Login Code', 'Email', 'Mobile', 'Designation', 'Teaching Type', 'Subjects', 'Status', 'Verification', 'Verified By'];
+        $rows = [$header];
+
+        foreach ($teachers as $t) {
+            $subjectLabels = collect($t->subject_ids ?? [])->map(fn ($id) => $subjectLabelMap->get($id))->filter()->implode('; ');
+
+            $rows[] = [
+                $t->name,
+                $t->login_code ?? '',
+                $t->email ?? '',
+                $t->mobile ?? '',
+                $t->designation ?? '',
+                $t->teachingType?->label ?? '',
+                $subjectLabels,
+                $t->status,
+                $t->isVerified() ? 'Verified' : 'Pending',
+                $t->verifiedBy?->name ?? '',
+            ];
+        }
+
+        $prefix = $this->school->school_prefix ?: 'school';
+        $format = $request->query('format') === 'csv' ? 'csv' : 'xlsx';
+        $filename = "{$prefix}-teachers-".now()->format('Y-m-d').".{$format}";
+
+        if ($format === 'csv') {
+            return response()->streamDownload(function () use ($rows) {
+                $out = fopen('php://output', 'w');
+                fwrite($out, "\xEF\xBB\xBF");
+                foreach ($rows as $row) {
+                    fputcsv($out, $row);
+                }
+                fclose($out);
+            }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
+        $xlsx = SpreadsheetWriter::xlsx($rows);
+
+        return response()->streamDownload(
+            fn () => print $xlsx,
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
     }
 
     public function store(Request $request, PlatformAuditLogger $audit)

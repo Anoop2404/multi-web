@@ -404,6 +404,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/houses/assign-students', [\App\Http\Controllers\SchoolAdmin\SchoolHouseController::class, 'assignStudents'])->name('houses.assign-students');
 
     Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');
+    Route::get('/teachers/export', [TeacherController::class, 'export'])->name('teachers.export');
     Route::post('/teachers', [TeacherController::class, 'store'])->name('teachers.store');
     Route::post('/teachers/bulk', [TeacherController::class, 'storeBulk'])->name('teachers.store.bulk');
     Route::get('/teachers/import/template', [TeacherController::class, 'importTemplate'])->name('teachers.import.template');
