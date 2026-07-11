@@ -19,6 +19,7 @@ class FestEventItem extends Model
         'fee_amount', 'is_enabled', 'is_mandatory', 'head_id', 'reg_start', 'reg_end',
         'competition_start', 'competition_end', 'competition_time',
         'results_published_at', 'item_reg_id_start', 'chest_no_start',
+        'quota_eligible',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class FestEventItem extends Model
         'competition_start' => 'date',
         'competition_end' => 'date',
         'results_published_at' => 'datetime',
+        'quota_eligible' => 'boolean',
     ];
 
     protected $appends = [
@@ -108,5 +110,11 @@ class FestEventItem extends Model
     public function isEditableBySchool(): bool
     {
         return $this->owner_level === 'school';
+    }
+
+    /** Team/group items are billed once per team via the head's team_registration_fee, not per member. */
+    public function isTeamItem(): bool
+    {
+        return in_array($this->participant_type, ['team', 'group'], true);
     }
 }
