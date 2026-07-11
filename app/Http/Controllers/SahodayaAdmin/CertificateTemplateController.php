@@ -17,6 +17,7 @@ class CertificateTemplateController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Certificates/Templates', [
             'templates'       => $templates,
             'defaultBody'     => CertificateTemplate::defaultTrainingBody(),
+            'defaultTopperBody' => CertificateTemplate::defaultTopperBody(),
             'defaultSignatories' => CertificateTemplate::defaultTrainingSignatories(),
         ]);
     }
@@ -58,9 +59,11 @@ class CertificateTemplateController extends SahodayaAdminController
         $signatories = $this->normalizeSignatories($request, $data['signatories'] ?? null, $baseDir.'/signatures', $disk);
 
         $dynamicFields = $data['dynamic_fields_json'] ?? $this->defaultTrainingFields();
-        $body = $data['body'] ?? ($data['event_type'] === 'training'
-            ? CertificateTemplate::defaultTrainingBody()
-            : null);
+        $body = $data['body'] ?? match ($data['event_type']) {
+            'training' => CertificateTemplate::defaultTrainingBody(),
+            'topper' => CertificateTemplate::defaultTopperBody(),
+            default => null,
+        };
 
         if ($data['is_active'] ?? true) {
             CertificateTemplate::where('tenant_id', $this->sahodaya->id)

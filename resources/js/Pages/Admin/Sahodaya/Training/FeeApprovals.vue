@@ -2,9 +2,7 @@
     <SahodayaAdminLayout :title="`${program.title} — Fee approvals`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="program.title" eyebrow="Fee approvals"
-                    :description="hasFee
-                        ? `Fees are collected at the venue. Teachers can attend first — record / approve payments here later.`
-                        : `This programme has no fee — registrations confirm automatically.`">
+                    :description="feeDescription">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations`"
                       class="btn-secondary text-sm">
@@ -36,6 +34,82 @@
             No fee configured for this programme. Registrations are confirmed on submit.
         </div>
 
+        <!-- School batch fees -->
+        <div v-else-if="usesSchoolBatchFee" class="card card--flush overflow-hidden mb-6">
+            <div class="px-4 py-3 border-b border-slate-100">
+                <h3 class="text-sm font-semibold text-slate-800">School batch fees</h3>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Total due = nominated teachers × ₹{{ fmt(program.fee_amount) }}. Approve to confirm all teachers from that school.
+                </p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="data-table min-w-[720px] text-sm">
+                    <thead>
+                        <tr>
+                            <th>School</th>
+                            <th>Teachers</th>
+                            <th>Due</th>
+                            <th>Proof</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="sf in schoolFees" :key="sf.id">
+                            <td class="font-medium">{{ sf.school_name || '—' }}</td>
+                            <td>{{ sf.teacher_count }}</td>
+                            <td class="font-mono text-xs">
+                                ₹{{ fmt(sf.total_due) }}
+                                <div v-if="sf.amount_paid > 0" class="text-green-700">Paid ₹{{ fmt(sf.amount_paid) }}</div>
+                                <div v-if="sf.outstanding > 0 && sf.amount_paid > 0" class="text-amber-700">
+                                    Bal ₹{{ fmt(sf.outstanding) }}
+                                </div>
+                            </td>
+                            <td>
+                                <span v-if="sf.receipt?.status === 'uploaded'" class="text-xs text-amber-700 font-semibold">Uploaded</span>
+                                <span v-else-if="sf.receipt?.status === 'approved'" class="text-xs text-green-700 font-semibold">Approved</span>
+                                <span v-else-if="sf.receipt?.status === 'rejected'" class="text-xs text-red-600 font-semibold">Rejected</span>
+                                <span v-else class="text-xs text-gray-400">No proof</span>
+                                <div v-if="sf.receipt?.transaction_ref" class="text-[10px] text-gray-400 mt-0.5">
+                                    {{ sf.receipt.transaction_ref }}
+                                </div>
+                            </td>
+                            <td class="capitalize text-gray-600 text-xs">{{ (sf.status || '').replace('_', ' ') }}</td>
+                            <td class="text-right">
+                                <div class="flex justify-end items-center gap-2 flex-wrap">
+                                    <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/school-fees/${sf.id}/invoice`"
+                                       target="_blank" rel="noopener"
+                                       class="text-xs text-indigo-600 font-semibold">
+                                        Invoice ↓
+                                    </a>
+                                    <a v-if="sf.receipt?.has_file"
+                                       :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/school-fees/${sf.id}/proof`"
+                                       target="_blank" rel="noopener"
+                                       class="text-xs text-indigo-600 font-semibold">
+                                        View proof ↗
+                                    </a>
+                                    <button v-if="sf.can_approve"
+                                            type="button" @click="approveSchool(sf)"
+                                            class="text-xs text-green-600 font-semibold">
+                                        Approve &amp; confirm
+                                    </button>
+                                    <button v-if="sf.can_reject"
+                                            type="button" @click="rejectSchool(sf)"
+                                            class="text-xs text-red-600 font-semibold">
+                                        Reject
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr v-if="!schoolFees.length">
+                            <td colspan="6" class="text-center text-gray-400 py-8">No school fees yet — fees appear when schools nominate teachers.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Per-teacher fees (flat) -->
         <div v-else class="card card--flush overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="data-table min-w-[760px] text-sm">
@@ -84,6 +158,11 @@
                             <td class="capitalize text-gray-600">{{ row.status }}</td>
                             <td class="text-right">
                                 <div class="flex justify-end items-center gap-2 flex-wrap">
+                                    <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations/${row.id}/invoice`"
+                                       target="_blank" rel="noopener"
+                                       class="text-xs text-indigo-600 font-semibold">
+                                        Invoice ↓
+                                    </a>
                                     <a v-if="row.receipt?.has_file"
                                        :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations/${row.id}/fee/proof`"
                                        target="_blank" rel="noopener"
@@ -115,10 +194,39 @@
                 </table>
             </div>
         </div>
+
+        <!-- Nominations reference when using school batch -->
+        <div v-if="usesSchoolBatchFee && rows.length" class="card card--flush overflow-hidden mt-6">
+            <div class="px-4 py-3 border-b border-slate-100">
+                <h3 class="text-sm font-semibold text-slate-800">Nominated teachers</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Covered by school batch fee — no per-teacher payment.</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="data-table min-w-[560px] text-sm">
+                    <thead>
+                        <tr>
+                            <th>Teacher</th>
+                            <th>School</th>
+                            <th>Fee status</th>
+                            <th>Reg status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in rows" :key="`ref-${row.id}`">
+                            <td>{{ row.teacher_name || `#${row.id}` }}</td>
+                            <td>{{ row.school_name || '—' }}</td>
+                            <td class="text-xs capitalize">{{ (row.fee_status || '—').replace('_', ' ') }}</td>
+                            <td class="capitalize text-gray-600">{{ row.status }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
@@ -129,8 +237,20 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     program: Object,
     hasFee: { type: Boolean, default: false },
+    usesSchoolBatchFee: { type: Boolean, default: false },
     rows: { type: Array, default: () => [] },
+    schoolFees: { type: Array, default: () => [] },
     counts: { type: Object, default: () => ({}) },
+});
+
+const feeDescription = computed(() => {
+    if (!props.hasFee) {
+        return 'This programme has no fee — registrations confirm automatically.';
+    }
+    if (props.usesSchoolBatchFee) {
+        return 'Schools pay one batch fee covering all nominated teachers. Approve school proof to confirm registrations.';
+    }
+    return 'Fees are collected at the venue. Teachers can attend first — record / approve payments here later.';
 });
 
 function fmt(v) {
@@ -163,6 +283,25 @@ function record(row) {
             transaction_ref: ref || 'Recorded by Sahodaya',
             amount: row.outstanding,
         },
+        { preserveScroll: true },
+    );
+}
+
+function approveSchool(sf) {
+    if (!window.confirm(`Approve batch fee and confirm all teachers from ${sf.school_name}?`)) return;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/school-fees/${sf.id}/approve`,
+        {},
+        { preserveScroll: true },
+    );
+}
+
+function rejectSchool(sf) {
+    const reason = window.prompt('Rejection reason:') ?? '';
+    if (reason === null) return;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/school-fees/${sf.id}/reject`,
+        { rejection_reason: reason || null },
         { preserveScroll: true },
     );
 }

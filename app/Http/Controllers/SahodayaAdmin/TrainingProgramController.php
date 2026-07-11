@@ -8,12 +8,15 @@ use App\Support\Training\TrainingProgramPayload;
 use App\Models\Certificate;
 use App\Models\Region;
 use App\Models\Tenant;
+use App\Models\TrainingCategory;
 use App\Models\TrainingFeedback;
 use App\Models\TrainingPendingSchool;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
+use App\Models\TrainingResourcePerson;
 use App\Models\TrainingSession;
 use App\Models\TrainingAttendance;
+use Illuminate\Validation\Rule;
 use App\Services\Fees\OfflineProgramFeeOrchestrator;
 use App\Services\Fees\ProgramFeeReceiptService;
 use App\Services\Audit\PlatformAuditLogger;
@@ -28,17 +31,34 @@ use Illuminate\Http\Request;
 
 class TrainingProgramController extends SahodayaAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
-        $programs = TrainingProgram::where('tenant_id', $this->sahodaya->id)
-            ->withCount(['registrations', 'sessions'])
-            ->orderByDesc('registration_open')
-            ->get();
+        TrainingCategory::ensureDefaults($this->sahodaya->id);
 
-        $openStatuses = ['published', 'registration_open', 'ongoing'];
+        $categoryId = $request->integer('category_id') ?: null;
+
+        $query = TrainingProgram::where('tenant_id', $this->sahodaya->id)
+            ->with(['category:id,label,code'])
+            ->withCount(['registrations', 'sessions'])
+            ->orderByDesc('registration_open');
+
+        if ($categoryId) {
+            $query->where('category_id', $categoryId);
+        }
+
+        $programs = $query->get();
+
+        $categories = TrainingCategory::forTenant($this->sahodaya->id)
+            ->orderBy('display_order')
+            ->orderBy('label')
+            ->get(['id', 'code', 'label', 'is_active', 'display_order']);
 
         return $this->inertia('Sahodaya/Training/Index', [
             'programs' => $programs,
+            'categories' => $categories,
+            'filters' => [
+                'category_id' => $categoryId,
+            ],
             'stats'    => [
                 'programs'      => $programs->count(),
                 'open'          => $programs->filter(fn ($p) => $p->registration_open && (! $p->registration_close || $p->registration_close >= now()))->count(),
@@ -52,7 +72,14 @@ class TrainingProgramController extends SahodayaAdminController
     {
         $data = $request->validate([
             'title'               => 'required|string|max:255',
+            'code'                => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('training_programs', 'code')->where('tenant_id', $this->sahodaya->id),
+            ],
             'description'         => 'nullable|string',
+            'banner_image'        => 'nullable|image|max:5120',
             'venue'               => 'nullable|string|max:255',
             'start_date'          => 'nullable|date',
             'end_date'            => 'nullable|date|after_or_equal:start_date',
@@ -60,16 +87,34 @@ class TrainingProgramController extends SahodayaAdminController
             'registration_close'  => 'nullable|date',
             'max_participants'    => 'nullable|integer|min:1',
             'allow_teacher_self_registration' => 'nullable|boolean',
-            'fee_type'            => 'nullable|in:none,flat',
+            'allow_school_nomination' => 'nullable|boolean',
+            'fee_type'            => 'nullable|in:none,flat,school',
             'fee_amount'          => 'nullable|numeric|min:0',
             'min_attendance_percent' => 'nullable|integer|min:0|max:100',
+            'category_id'         => [
+                'nullable',
+                'integer',
+                Rule::exists('training_categories', 'id')->where('tenant_id', $this->sahodaya->id),
+            ],
+            'certificate_type'    => ['nullable', 'string', Rule::in(TrainingProgram::CERTIFICATE_TYPES)],
         ]);
 
         $data['tenant_id'] = $this->sahodaya->id;
         $data['conductor_level'] = 'sahodaya';
         $data['status'] = 'draft';
         $data['academic_year_id'] = AcademicYear::activeId();
+        $data['category_id'] = $data['category_id'] ?: null;
+        $data['code'] = filled($data['code'] ?? null) ? trim($data['code']) : null;
+        $data['allow_school_nomination'] = (bool) ($data['allow_school_nomination'] ?? true);
+        unset($data['banner_image']);
         $data = TrainingProgramPayload::applyDefaults($data);
+
+        if ($request->hasFile('banner_image')) {
+            $data['banner_image_path'] = TenantStorage::storeUploadedFile(
+                $request->file('banner_image'),
+                "training-banners/{$this->sahodaya->id}"
+            );
+        }
 
         $program = TrainingProgram::create($data);
 
@@ -87,8 +132,19 @@ class TrainingProgramController extends SahodayaAdminController
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 
+        TrainingCategory::ensureDefaults($this->sahodaya->id);
+
         $qr->ensureProgramTokens($program);
-        $program->load(['sessions', 'registrations.teacher', 'registrations.school', 'registrations.feeReceipt', 'registrations.certificate', 'registrations.pendingSchool']);
+        $program->load([
+            'category',
+            'sessions.resourcePerson',
+            'resourcePersons',
+            'registrations.teacher',
+            'registrations.school',
+            'registrations.feeReceipt',
+            'registrations.certificate',
+            'registrations.pendingSchool',
+        ]);
 
         $attendanceMap = TrainingAttendance::whereIn(
             'registration_id',
@@ -104,10 +160,27 @@ class TrainingProgramController extends SahodayaAdminController
             ->orderBy('title')
             ->get(['id', 'title', 'status']);
 
+        $resourcePersons = TrainingResourcePerson::forTenant($this->sahodaya->id)
+            ->active()
+            ->orderBy('name')
+            ->get(['id', 'name', 'designation', 'email', 'mobile']);
+
+        $categories = TrainingCategory::forTenant($this->sahodaya->id)
+            ->active()
+            ->orderBy('display_order')
+            ->orderBy('label')
+            ->get(['id', 'code', 'label']);
+
         return $this->inertia('Sahodaya/Training/Show', [
             'program' => array_merge($program->toArray(), [
                 'eligibility_config' => TrainingProgramEligibilityConfig::normalize($program->eligibility_config),
+                'banner_image_url' => $program->banner_image_path
+                    ? TenantStorage::assetUrl($this->sahodaya, $program->banner_image_path)
+                    : null,
             ]),
+            'categories' => $categories,
+            'certificateTypes' => TrainingProgram::CERTIFICATE_TYPES,
+            'resourcePersons' => $resourcePersons,
             'attendanceMap' => $attendanceMap,
             'eligibilityOptions' => [
                 'teaching_types' => $resolver->teachingTypes($this->sahodaya->id)->map->only(['id', 'label'])->values(),
@@ -138,7 +211,17 @@ class TrainingProgramController extends SahodayaAdminController
 
         $data = $request->validate([
             'title'              => 'required|string|max:255',
+            'code'               => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('training_programs', 'code')
+                    ->where('tenant_id', $this->sahodaya->id)
+                    ->ignore($program->id),
+            ],
             'description'        => 'nullable|string',
+            'banner_image'       => 'nullable|image|max:5120',
+            'remove_banner_image'=> 'nullable|boolean',
             'venue'              => 'nullable|string|max:255',
             'start_date'         => 'nullable|date',
             'end_date'           => 'nullable|date|after_or_equal:start_date',
@@ -146,13 +229,20 @@ class TrainingProgramController extends SahodayaAdminController
             'registration_close' => 'nullable|date',
             'max_participants'   => 'nullable|integer|min:1',
             'allow_teacher_self_registration' => 'nullable|boolean',
+            'allow_school_nomination' => 'nullable|boolean',
             'qr_registration_enabled' => 'nullable|boolean',
             'require_verified_teachers' => 'nullable|boolean',
             'allow_school_attendance' => 'nullable|boolean',
             'status'             => 'required|in:draft,published,ongoing,completed,cancelled',
-            'fee_type'           => 'nullable|in:none,flat',
+            'fee_type'           => 'nullable|in:none,flat,school',
             'fee_amount'         => 'nullable|numeric|min:0',
             'min_attendance_percent' => 'nullable|integer|min:0|max:100',
+            'category_id'        => [
+                'nullable',
+                'integer',
+                Rule::exists('training_categories', 'id')->where('tenant_id', $this->sahodaya->id),
+            ],
+            'certificate_type'   => ['nullable', 'string', Rule::in(TrainingProgram::CERTIFICATE_TYPES)],
             'eligibility_config' => 'nullable|array',
             'eligibility_config.teaching_type_ids' => 'nullable|array',
             'eligibility_config.teaching_type_ids.*' => 'integer',
@@ -169,9 +259,30 @@ class TrainingProgramController extends SahodayaAdminController
         ]);
 
         $data = TrainingProgramPayload::applyDefaults($data);
+        $data['category_id'] = $data['category_id'] ?: null;
+        $data['code'] = filled($data['code'] ?? null) ? trim($data['code']) : null;
+        $data['allow_teacher_self_registration'] = (bool) ($data['allow_teacher_self_registration'] ?? false);
+        $data['allow_school_nomination'] = (bool) ($data['allow_school_nomination'] ?? true);
         $data['qr_registration_enabled'] = (bool) ($data['qr_registration_enabled'] ?? false);
         $data['require_verified_teachers'] = (bool) ($data['require_verified_teachers'] ?? false);
         $data['allow_school_attendance'] = (bool) ($data['allow_school_attendance'] ?? true);
+
+        unset($data['banner_image'], $data['remove_banner_image']);
+
+        if ($request->boolean('remove_banner_image') && $program->banner_image_path) {
+            \Illuminate\Support\Facades\Storage::disk(TenantStorage::uploadDisk())->delete($program->banner_image_path);
+            $data['banner_image_path'] = null;
+        }
+
+        if ($request->hasFile('banner_image')) {
+            if ($program->banner_image_path) {
+                \Illuminate\Support\Facades\Storage::disk(TenantStorage::uploadDisk())->delete($program->banner_image_path);
+            }
+            $data['banner_image_path'] = TenantStorage::storeUploadedFile(
+                $request->file('banner_image'),
+                "training-banners/{$this->sahodaya->id}"
+            );
+        }
 
         if (array_key_exists('eligibility_config', $data)) {
             if ($error = TrainingProgramEligibilityConfig::validationError($data['eligibility_config'])) {
@@ -264,9 +375,9 @@ class TrainingProgramController extends SahodayaAdminController
                     'payment_date' => $receipt->payment_date?->toDateString(),
                     'has_file' => filled($receipt->file_path),
                 ] : null,
-                'can_approve' => $receipt?->status === 'uploaded',
-                'can_reject' => $receipt?->status === 'uploaded',
-                'can_record' => $program->hasFee()
+                'can_approve' => ! $program->usesSchoolBatchFee() && $receipt?->status === 'uploaded',
+                'can_reject' => ! $program->usesSchoolBatchFee() && $receipt?->status === 'uploaded',
+                'can_record' => $program->usesPerTeacherFee()
                     && $outstanding > 0
                     && (
                         (! $receipt || in_array($receipt->status, ['rejected', 'superseded'], true))
@@ -275,16 +386,130 @@ class TrainingProgramController extends SahodayaAdminController
             ];
         })->values();
 
+        $schoolFeeRows = collect();
+        if ($program->usesSchoolBatchFee()) {
+            $schoolFeeRows = \App\Models\TrainingSchoolFee::where('program_id', $program->id)
+                ->with(['school', 'feeReceipt'])
+                ->orderBy('school_id')
+                ->get()
+                ->map(function (\App\Models\TrainingSchoolFee $sf) {
+                    $receipt = $sf->feeReceipt;
+
+                    return [
+                        'id' => $sf->id,
+                        'school_name' => $sf->school?->name,
+                        'teacher_count' => (int) $sf->teacher_count,
+                        'total_due' => (float) $sf->total_due,
+                        'amount_paid' => (float) ($sf->amount_paid ?? 0),
+                        'outstanding' => $sf->outstandingBalance(),
+                        'status' => $sf->status,
+                        'receipt' => $receipt ? [
+                            'id' => $receipt->id,
+                            'status' => $receipt->status,
+                            'amount' => (float) $receipt->amount,
+                            'transaction_ref' => $receipt->transaction_ref,
+                            'payment_date' => $receipt->payment_date?->toDateString(),
+                            'has_file' => filled($receipt->file_path),
+                            'rejection_reason' => $receipt->rejection_reason,
+                        ] : null,
+                        'can_approve' => $receipt?->status === 'uploaded',
+                        'can_reject' => $receipt?->status === 'uploaded',
+                    ];
+                })->values();
+        }
+
         return $this->inertia('Sahodaya/Training/FeeApprovals', [
             'program' => $program->only(['id', 'title', 'status', 'fee_type', 'fee_amount']),
             'hasFee' => $program->hasFee(),
+            'usesSchoolBatchFee' => $program->usesSchoolBatchFee(),
             'rows' => $rows,
+            'schoolFees' => $schoolFeeRows,
             'counts' => [
-                'awaiting_proof' => $rows->where('can_record', true)->count(),
-                'pending_approval' => $rows->where('can_approve', true)->count(),
-                'approved' => $rows->filter(fn ($r) => ($r['receipt']['status'] ?? null) === 'approved' || $r['status'] === 'confirmed')->count(),
+                'awaiting_proof' => $program->usesSchoolBatchFee()
+                    ? $schoolFeeRows->filter(fn ($r) => in_array($r['status'], ['pending', 'rejected'], true) && ($r['outstanding'] ?? 0) > 0)->count()
+                    : $rows->where('can_record', true)->count(),
+                'pending_approval' => $program->usesSchoolBatchFee()
+                    ? $schoolFeeRows->where('can_approve', true)->count()
+                    : $rows->where('can_approve', true)->count(),
+                'approved' => $program->usesSchoolBatchFee()
+                    ? $schoolFeeRows->where('status', 'approved')->count()
+                    : $rows->filter(fn ($r) => ($r['receipt']['status'] ?? null) === 'approved' || $r['status'] === 'confirmed')->count(),
             ],
         ]);
+    }
+
+    public function approveSchoolFee(Request $request, string $tenantId, TrainingProgram $program, \App\Models\TrainingSchoolFee $schoolFee)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($schoolFee->program_id !== $program->id, 403);
+        abort_unless($program->usesSchoolBatchFee(), 422, 'This programme does not use school batch fees.');
+
+        $count = app(\App\Services\Training\TrainingSchoolFeeService::class)->approve($schoolFee, $request->user()->id);
+
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.school_fee.approved',
+            "Training batch fee approved for {$schoolFee->school?->name}",
+            ['school_fee_id' => $schoolFee->id, 'school_id' => $schoolFee->school_id, 'confirmed' => $count],
+            $schoolFee,
+        );
+
+        return back()->with('success', $count > 0
+            ? "School batch fee approved. {$count} registration(s) confirmed."
+            : 'School batch fee approved.');
+    }
+
+    public function rejectSchoolFee(Request $request, string $tenantId, TrainingProgram $program, \App\Models\TrainingSchoolFee $schoolFee)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($schoolFee->program_id !== $program->id, 403);
+
+        $data = $request->validate(['rejection_reason' => 'nullable|string|max:500']);
+
+        app(\App\Services\Training\TrainingSchoolFeeService::class)->reject(
+            $schoolFee,
+            $request->user()->id,
+            $data['rejection_reason'] ?? 'Contact your Sahodaya for details.',
+        );
+
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.school_fee.rejected',
+            "Training batch fee rejected for {$schoolFee->school?->name}",
+            [
+                'school_fee_id' => $schoolFee->id,
+                'school_id' => $schoolFee->school_id,
+                'reason' => $data['rejection_reason'] ?? null,
+            ],
+            $schoolFee,
+        );
+
+        $schoolId = $schoolFee->school_id;
+        $service = app(NotificationService::class);
+        foreach (\App\Models\User::role(['school_admin', 'school_staff'])->where('tenant_id', $schoolId)->get() as $user) {
+            $service->notifyFromTemplate($user, 'training.fee.rejected', [
+                'program_title' => $program->title,
+                'reason'        => $data['rejection_reason'] ?? 'Contact your Sahodaya for details.',
+            ], "/school-admin/{$schoolId}/training");
+        }
+
+        return back()->with('success', 'School batch fee rejected. School can re-upload.');
+    }
+
+    public function schoolFeeProof(string $tenantId, TrainingProgram $program, \App\Models\TrainingSchoolFee $schoolFee)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($schoolFee->program_id !== $program->id, 403);
+
+        $path = $schoolFee->feeReceipt?->file_path;
+        abort_unless($path, 404);
+
+        $disk = config('filesystems.upload_disk', 'shared');
+        if (in_array($disk, ['s3', 'private'], true)) {
+            return redirect(\Illuminate\Support\Facades\Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(15)));
+        }
+
+        return TenantStorage::downloadResponse($this->sahodaya, $path);
     }
 
     public function recordPayment(Request $request, string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
@@ -292,6 +517,7 @@ class TrainingProgramController extends SahodayaAdminController
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
         abort_if($registration->program_id !== $program->id, 403);
         abort_unless($program->hasFee(), 422, 'This programme does not require a fee.');
+        abort_if($program->usesSchoolBatchFee(), 422, 'This programme uses a school batch fee — approve it from school fees.');
         abort_unless(
             in_array($registration->status, ['registered', 'confirmed'], true),
             422,
@@ -312,6 +538,8 @@ class TrainingProgramController extends SahodayaAdminController
         $amount = round((float) ($data['amount'] ?? $outstanding), 2);
 
         \App\Models\FeeReceipt::supersedePriorForFeeable($registration);
+
+        app(\App\Services\Training\TrainingInvoiceService::class)->ensureForRegistration($registration);
 
         $receipt = \App\Models\FeeReceipt::create([
             'feeable_type'        => TrainingRegistration::class,
@@ -339,6 +567,10 @@ class TrainingProgramController extends SahodayaAdminController
             $registration->fresh(['program', 'teacher', 'school']),
             $receipt->fresh(),
         );
+
+        if ($fullyPaid) {
+            app(\App\Services\Training\TrainingInvoiceService::class)->markPaidForRegistration($registration);
+        }
 
         app(OfflineProgramFeeOrchestrator::class)->notifyApproved(
             $registration->school,
@@ -374,12 +606,86 @@ class TrainingProgramController extends SahodayaAdminController
             'scheduled_at'     => 'nullable|date',
             'venue'            => 'nullable|string|max:255',
             'duration_minutes' => 'nullable|integer|min:15',
+            'resource_person_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('training_resource_persons', 'id')
+                    ->where('tenant_id', $this->sahodaya->id)
+                    ->where('is_active', true),
+            ],
         ]);
 
         $data['program_id'] = $program->id;
-        TrainingSession::create($data);
+        $session = TrainingSession::create($data);
+
+        if (! empty($data['resource_person_id'])) {
+            $program->resourcePersons()->syncWithoutDetaching([$data['resource_person_id']]);
+        }
+
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.session.created',
+            "Training session created: {$session->title}",
+            ['session_id' => $session->id],
+            $session,
+        );
 
         return back()->with('success', 'Session added.');
+    }
+
+    public function updateSession(Request $request, string $tenantId, TrainingProgram $program, TrainingSession $session)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($session->program_id !== $program->id, 404);
+
+        $data = $request->validate([
+            'title'            => 'required|string|max:255',
+            'scheduled_at'     => 'nullable|date',
+            'venue'            => 'nullable|string|max:255',
+            'duration_minutes' => 'nullable|integer|min:15',
+            'resource_person_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('training_resource_persons', 'id')
+                    ->where('tenant_id', $this->sahodaya->id)
+                    ->where('is_active', true),
+            ],
+        ]);
+
+        $session->update($data);
+
+        if (! empty($data['resource_person_id'])) {
+            $program->resourcePersons()->syncWithoutDetaching([$data['resource_person_id']]);
+        }
+
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.session.updated',
+            "Training session updated: {$session->title}",
+            ['session_id' => $session->id],
+            $session,
+        );
+
+        return back()->with('success', 'Session updated.');
+    }
+
+    public function destroySession(string $tenantId, TrainingProgram $program, TrainingSession $session)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($session->program_id !== $program->id, 404);
+
+        $title = $session->title;
+        $sessionId = $session->id;
+        $session->delete();
+
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.session.deleted',
+            "Training session deleted: {$title}",
+            ['session_id' => $sessionId],
+        );
+
+        return back()->with('success', 'Session deleted.');
     }
 
     public function confirmRegistration(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
@@ -389,11 +695,22 @@ class TrainingProgramController extends SahodayaAdminController
         abort_unless($registration->status === 'registered', 422, 'Only registered participants can be confirmed.');
 
         if ($program->hasFee()) {
-            abort_unless(
-                $registration->isFullyPaid(),
-                422,
-                'Training fee must be fully paid before confirming registration.'
-            );
+            if ($program->usesSchoolBatchFee()) {
+                $schoolFee = \App\Models\TrainingSchoolFee::where('program_id', $program->id)
+                    ->where('school_id', $registration->school_id)
+                    ->first();
+                abort_unless(
+                    $schoolFee?->isFullyPaid(),
+                    422,
+                    'School batch fee must be fully paid before confirming registration.'
+                );
+            } else {
+                abort_unless(
+                    $registration->isFullyPaid(),
+                    422,
+                    'Training fee must be fully paid before confirming registration.'
+                );
+            }
         }
 
         $registration->update(['status' => 'confirmed']);
@@ -428,10 +745,38 @@ class TrainingProgramController extends SahodayaAdminController
         return back()->with('success', 'Registration confirmed.');
     }
 
+    public function cancelRegistration(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->program_id !== $program->id, 403);
+        abort_if(
+            in_array($registration->status, ['cancelled', 'completed'], true),
+            422,
+            'This registration cannot be cancelled.'
+        );
+
+        app(\App\Services\Training\TrainingWaitlistService::class)->cancelAndPromote($registration);
+
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.registration.cancelled',
+            "Training registration cancelled for {$registration->teacher?->name}",
+            [
+                'registration_id' => $registration->id,
+                'school_id'       => $registration->school_id,
+                'teacher_id'      => $registration->teacher_id,
+            ],
+            $registration,
+        );
+
+        return back()->with('success', 'Registration cancelled. Waitlisted participants were promoted if a seat opened.');
+    }
+
     public function approveFee(Request $request, string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
         abort_if($registration->program_id !== $program->id, 403);
+        abort_if($program->usesSchoolBatchFee(), 422, 'This programme uses school batch fees.');
 
         $registration->loadMissing(['program', 'teacher', 'school']);
 
@@ -460,6 +805,10 @@ class TrainingProgramController extends SahodayaAdminController
             $registration->fresh(['program', 'teacher', 'school']),
             $receipt->fresh(),
         );
+
+        if ($fullyPaid) {
+            app(\App\Services\Training\TrainingInvoiceService::class)->markPaidForRegistration($registration);
+        }
 
         $registration->loadMissing('program');
         $schoolId = $registration->school_id;
@@ -590,15 +939,50 @@ class TrainingProgramController extends SahodayaAdminController
         );
 
         $data = $request->validate([
-            'status' => 'required|in:present,absent',
+            'status' => 'required|in:present,absent,late,with_permission',
+            'correction_reason' => 'nullable|string|max:500',
         ]);
 
-        TrainingAttendance::updateOrCreate(
-            ['session_id' => $session->id, 'registration_id' => $registration->id],
-            array_merge($data, ['marked_by' => auth()->id(), 'marked_at' => now()])
+        app(\App\Services\Training\TrainingAttendanceService::class)->updateAttendance(
+            $session,
+            $registration,
+            [
+                'status' => $data['status'],
+                'correction_reason' => $data['correction_reason'] ?? null,
+                'require_approval' => false,
+            ],
+            $request->user()?->id,
         );
 
         return back()->with('success', 'Attendance updated.');
+    }
+
+    public function reviewAttendanceCorrection(
+        Request $request,
+        string $tenantId,
+        TrainingProgram $program,
+        TrainingSession $session,
+        TrainingRegistration $registration,
+    ) {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($session->program_id !== $program->id, 403);
+        abort_if($registration->program_id !== $program->id, 403);
+
+        $data = $request->validate([
+            'decision' => 'required|in:approved,rejected',
+        ]);
+
+        $attendance = TrainingAttendance::where('session_id', $session->id)
+            ->where('registration_id', $registration->id)
+            ->firstOrFail();
+
+        app(\App\Services\Training\TrainingAttendanceService::class)->reviewCorrection(
+            $attendance,
+            $data['decision'],
+            $request->user()?->id,
+        );
+
+        return back()->with('success', 'Attendance correction '.$data['decision'].'.');
     }
 
     public function attendance(string $tenantId, TrainingProgram $program, TrainingReportService $reports)
@@ -703,6 +1087,40 @@ class TrainingProgramController extends SahodayaAdminController
             'sahodaya'     => $this->sahodaya,
             'fieldValues'  => $fieldValues,
         ]));
+    }
+
+    public function registrationInvoice(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->program_id !== $program->id, 403);
+
+        $service = app(\App\Services\Training\TrainingInvoiceService::class);
+        $invoice = $service->ensureForRegistration($registration);
+        abort_unless($invoice, 404, 'No invoice for this registration.');
+
+        return $service->download($invoice, $this->sahodaya);
+    }
+
+    public function schoolFeeInvoice(string $tenantId, TrainingProgram $program, \App\Models\TrainingSchoolFee $schoolFee)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($schoolFee->program_id !== $program->id, 403);
+
+        $service = app(\App\Services\Training\TrainingInvoiceService::class);
+        $invoice = $service->ensureForSchoolFee($schoolFee);
+        abort_unless($invoice, 404, 'No invoice for this school fee.');
+
+        return $service->download($invoice, $this->sahodaya);
+    }
+
+    public function registrationIdCard(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->program_id !== $program->id, 403);
+        abort_if(in_array($registration->status, ['cancelled', 'rejected'], true), 422, 'ID card not available for this registration.');
+
+        return app(\App\Services\Training\TrainingIdCardService::class)
+            ->download($registration, $this->sahodaya);
     }
 
     public function previewCertificate(string $tenantId, TrainingProgram $program)
@@ -912,6 +1330,16 @@ class TrainingProgramController extends SahodayaAdminController
             'program' => $program->only('id', 'title', 'status'),
             'report'  => $reports->summary($program),
             'schools' => $schools,
+        ]);
+    }
+
+    public function qrTeachers(string $tenantId, TrainingProgram $program, \App\Services\Training\TrainingQrReportService $reports)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        return $this->inertia('Sahodaya/Training/QrTeachers', [
+            'program' => $program->only('id', 'title', 'status'),
+            'teachers' => $reports->createdTeachers($program),
         ]);
     }
 

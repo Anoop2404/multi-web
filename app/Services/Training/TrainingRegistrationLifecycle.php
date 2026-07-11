@@ -26,21 +26,8 @@ class TrainingRegistrationLifecycle
 
     public function canMarkAttendance(TrainingRegistration $registration, ?TrainingProgram $program = null): bool
     {
-        $program ??= $registration->program;
-
-        if (in_array($registration->status, ['confirmed', 'completed'], true)) {
-            return true;
-        }
-
-        // QR (and fee-free leftovers) may attend even if still "registered".
-        if ($registration->status === 'registered') {
-            if ($registration->registration_source === 'qr') {
-                return true;
-            }
-
-            return $program && ! $program->hasFee();
-        }
-
-        return false;
+        // Confirmed/completed only — no bypass for "registered".
+        // QR and fee-free paths already get status=confirmed via initialStatus().
+        return in_array($registration->status, ['confirmed', 'completed'], true);
     }
 }

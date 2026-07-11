@@ -11,6 +11,7 @@ class TrainingProgramPayload
     {
         $data = PersistDefaults::coalesce($data, [
             'fee_type' => 'none',
+            'certificate_type' => 'participation',
         ]);
 
         $fee = (float) ($data['fee_amount'] ?? 0);
@@ -18,6 +19,8 @@ class TrainingProgramPayload
             $data['fee_type'] = 'none';
             $data['fee_amount'] = null;
         } elseif (($data['fee_type'] ?? 'none') === 'none') {
+            $data['fee_type'] = 'flat';
+        } elseif (! in_array($data['fee_type'] ?? 'none', ['none', 'flat', 'school'], true)) {
             $data['fee_type'] = 'flat';
         }
 

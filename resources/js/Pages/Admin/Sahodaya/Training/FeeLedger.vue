@@ -2,7 +2,9 @@
     <SahodayaAdminLayout :title="`${program.title} — Payment Ledger`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${program.title} — Payment Ledger`" eyebrow="Training finance"
-                    description="Teacher registration fee collections and ledger postings for this program only.">
+                    :description="program.fee_type === 'school'
+                        ? 'School batch fee collections and ledger postings for this program only.'
+                        : 'Teacher registration fee collections and ledger postings for this program only.'">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}`" class="btn-secondary text-sm">← Program</Link>
             </template>
@@ -40,7 +42,7 @@
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Teacher</th>
+                                <th>{{ program.fee_type === 'school' ? 'School / batch' : 'Teacher' }}</th>
                                 <th>School</th>
                                 <th>Status</th>
                                 <th class="text-right">Amount</th>

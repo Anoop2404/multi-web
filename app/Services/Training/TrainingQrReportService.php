@@ -84,4 +84,34 @@ class TrainingQrReportService
             $rows,
         );
     }
+
+    /**
+     * QR registrations where a new teacher record was created (teacher_created=true).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function createdTeachers(TrainingProgram $program): array
+    {
+        return TrainingRegistration::where('program_id', $program->id)
+            ->where('registration_source', 'qr')
+            ->where('teacher_created', true)
+            ->with(['teacher', 'school', 'pendingSchool'])
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (TrainingRegistration $r) => [
+                'id'              => $r->id,
+                'teacher_name'    => $r->teacher?->name,
+                'email'           => $r->teacher?->email,
+                'mobile'          => $r->teacher?->mobile,
+                'designation'     => $r->teacher?->designation,
+                'department'      => $r->department,
+                'school'          => $r->school?->name ?? $r->pendingSchool?->school_name,
+                'school_code'     => $r->school?->school_prefix ?? $r->pendingSchool?->school_code,
+                'status'          => $r->status,
+                'is_verified'     => $r->teacher?->isVerified() ?? false,
+                'verified_at'     => $r->teacher?->verified_at?->toDateTimeString(),
+                'created_at'      => $r->created_at?->toDateTimeString(),
+            ])
+            ->all();
+    }
 }

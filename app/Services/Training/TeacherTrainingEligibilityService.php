@@ -51,9 +51,7 @@ class TeacherTrainingEligibilityService
             return 'Training registration is closed.';
         }
 
-        if (! $this->hasCapacity($program)) {
-            return 'Maximum participant limit reached.';
-        }
+        // Capacity is handled via waitlist (TrainingWaitlistService), not hard-reject.
 
         return $this->configIneligibilityReason($program, $teacher);
     }
@@ -151,16 +149,9 @@ class TeacherTrainingEligibilityService
         return true;
     }
 
-    private function hasCapacity(TrainingProgram $program): bool
+    /** Seated capacity only — waitlisted rows do not occupy seats. */
+    public function hasCapacity(TrainingProgram $program): bool
     {
-        if (! $program->max_participants) {
-            return true;
-        }
-
-        $count = TrainingRegistration::where('program_id', $program->id)
-            ->whereNotIn('status', ['cancelled', 'rejected'])
-            ->count();
-
-        return $count < (int) $program->max_participants;
+        return app(TrainingWaitlistService::class)->hasOpenSeat($program);
     }
 }

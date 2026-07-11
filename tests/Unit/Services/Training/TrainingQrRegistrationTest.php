@@ -180,6 +180,65 @@ class TrainingQrRegistrationTest extends TestCase
         $this->assertSame($school->id, $hits[0]['id']);
     }
 
+    public function test_fuzzy_name_matches_existing_teacher_in_same_school(): void
+    {
+        [, $school, $program] = $this->seedProgram();
+
+        $teacher = Teacher::create([
+            'tenant_id' => $school->id,
+            'name'      => 'Anita Rao',
+            'email'     => 'anita.unique@school.test',
+            'mobile'    => '9000000001',
+            'status'    => 'active',
+        ]);
+
+        // Different email/mobile; near-identical name within same school.
+        $result = app(TrainingPublicRegistrationService::class)->register($program, [
+            'name'      => 'Anita Raoo', // levenshtein 1 / high similar_text
+            'email'     => 'other@school.test',
+            'phone'     => '9000000099',
+            'school_id' => $school->id,
+            'consent'   => '1',
+        ]);
+
+        $this->assertFalse($result['teacher_created']);
+        $this->assertSame($teacher->id, $result['teacher']->id);
+    }
+
+    public function test_fuzzy_name_does_not_match_across_schools(): void
+    {
+        [$sahodaya, $school, $program] = $this->seedProgram();
+
+        Teacher::create([
+            'tenant_id' => $school->id,
+            'name'      => 'Anita Rao',
+            'email'     => 'anita.a@school.test',
+            'mobile'    => '9000000002',
+            'status'    => 'active',
+        ]);
+
+        $otherSchool = Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'name'              => 'Other School',
+            'type'              => 'school',
+            'parent_id'         => $sahodaya->id,
+            'school_prefix'     => 'OTH',
+            'membership_status' => 'approved',
+            'is_active'         => true,
+        ]);
+
+        $result = app(TrainingPublicRegistrationService::class)->register($program, [
+            'name'      => 'Anita Raoo',
+            'email'     => 'cross@school.test',
+            'phone'     => '9000000088',
+            'school_id' => $otherSchool->id,
+            'consent'   => '1',
+        ]);
+
+        $this->assertTrue($result['teacher_created']);
+        $this->assertSame($otherSchool->id, $result['teacher']->tenant_id);
+    }
+
     public function test_attendance_check_in_requires_confirmed_for_paid_programs(): void
     {
         [, $school, $program] = $this->seedProgram([

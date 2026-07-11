@@ -4,19 +4,29 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TrainingProgram extends Model
 {
+    public const CERTIFICATE_TYPES = [
+        'participation',
+        'completion',
+        'appreciation',
+        'resource_person',
+        'organizer',
+    ];
+
     protected $fillable = [
-        'tenant_id', 'academic_year_id', 'title', 'description', 'venue',
+        'tenant_id', 'academic_year_id', 'category_id', 'title', 'code', 'description',
+        'banner_image_path', 'venue',
         'start_date', 'end_date', 'conductor_level',
         'registration_open', 'registration_close', 'max_participants',
-        'allow_teacher_self_registration', 'qr_registration_token',
+        'allow_teacher_self_registration', 'allow_school_nomination', 'qr_registration_token',
         'qr_registration_enabled', 'require_verified_teachers', 'allow_school_attendance',
         'attendance_qr_token', 'status',
         'fee_type', 'fee_amount', 'late_fee_amount', 'penalty_amount', 'eligibility_config',
-        'min_attendance_percent',
+        'min_attendance_percent', 'certificate_type',
     ];
 
     protected $casts = [
@@ -25,6 +35,7 @@ class TrainingProgram extends Model
         'start_date'         => 'date',
         'end_date'           => 'date',
         'allow_teacher_self_registration' => 'boolean',
+        'allow_school_nomination' => 'boolean',
         'qr_registration_enabled' => 'boolean',
         'require_verified_teachers' => 'boolean',
         'allow_school_attendance' => 'boolean',
@@ -44,13 +55,24 @@ class TrainingProgram extends Model
             if (! filled($program->attendance_qr_token)) {
                 $program->attendance_qr_token = \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(40));
             }
+            if (! filled($program->certificate_type)) {
+                $program->certificate_type = 'participation';
+            }
         });
 
         static::saving(function (self $program) {
             if ($program->fee_type === null) {
                 $program->fee_type = 'none';
             }
+            if (! filled($program->certificate_type)) {
+                $program->certificate_type = 'participation';
+            }
         });
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(TrainingCategory::class, 'category_id');
     }
 
     public function pendingSchools(): HasMany
@@ -63,9 +85,36 @@ class TrainingProgram extends Model
         return $this->fee_type !== 'none' && (float) $this->fee_amount > 0;
     }
 
+    /** School pays one batch fee covering all nominated teachers. */
+    public function usesSchoolBatchFee(): bool
+    {
+        return $this->fee_type === 'school' && $this->hasFee();
+    }
+
+    /** Per-teacher FeeReceipt path (existing flat fee). */
+    public function usesPerTeacherFee(): bool
+    {
+        return $this->fee_type === 'flat' && $this->hasFee();
+    }
+
+    public function schoolFees(): HasMany
+    {
+        return $this->hasMany(TrainingSchoolFee::class, 'program_id');
+    }
+
     public function sessions(): HasMany
     {
         return $this->hasMany(TrainingSession::class, 'program_id');
+    }
+
+    public function resourcePersons(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            TrainingResourcePerson::class,
+            'training_program_resource_person',
+            'program_id',
+            'resource_person_id'
+        )->withPivot(['honorarium', 'role'])->withTimestamps();
     }
 
     public function registrations(): HasMany

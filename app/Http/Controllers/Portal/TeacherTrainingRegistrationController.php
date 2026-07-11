@@ -32,15 +32,30 @@ class TeacherTrainingRegistrationController extends Controller
 
         $eligibility->assertTeacherEligible($program, $teacher);
 
-        TrainingRegistration::create([
+        $seat = app(\App\Services\Training\TrainingWaitlistService::class)
+            ->resolveCreateAttributes($program);
+
+        TrainingRegistration::create(array_merge([
             'program_id'          => $program->id,
             'teacher_id'          => $teacher->id,
             'school_id'           => $school->id,
-            'status'              => app(\App\Services\Training\TrainingRegistrationLifecycle::class)->initialStatus($program),
             'registration_source' => 'self',
-        ]);
+            'fee_status'          => $program->usesSchoolBatchFee() && $seat['status'] !== 'waitlisted'
+                ? 'auto_approved'
+                : null,
+        ], $seat));
 
-        return back()->with('success', 'Registered successfully. Upload payment proof if a fee applies.');
+        if ($program->usesSchoolBatchFee() && ($seat['status'] ?? null) !== 'waitlisted') {
+            app(\App\Services\Training\TrainingSchoolFeeService::class)->syncForSchool($program, $school);
+        }
+
+        $message = ($seat['status'] ?? null) === 'waitlisted'
+            ? 'Programme is full — you are on the waiting list (position '.$seat['waitlist_position'].').'
+            : ($program->usesSchoolBatchFee()
+                ? 'Registered successfully. Your school will pay the batch training fee.'
+                : 'Registered successfully. Upload payment proof if a fee applies.');
+
+        return back()->with('success', $message);
     }
 
     public function uploadPayment(Request $request, string $tenantId, TrainingRegistration $registration)
@@ -50,6 +65,7 @@ class TeacherTrainingRegistrationController extends Controller
 
         $program = $registration->program;
         abort_unless($program?->hasFee(), 422, 'This programme does not require a fee.');
+        abort_if($program->usesSchoolBatchFee(), 422, 'This programme uses a school batch fee paid by your school.');
 
         $outstanding = $registration->outstandingBalance();
         abort_if($outstanding <= 0, 422, 'Fee already fully paid.');
@@ -67,6 +83,8 @@ class TeacherTrainingRegistrationController extends Controller
         );
 
         FeeReceipt::supersedePriorForFeeable($registration);
+
+        app(\App\Services\Training\TrainingInvoiceService::class)->ensureForRegistration($registration);
 
         $receipt = FeeReceipt::create([
             'feeable_type'        => TrainingRegistration::class,

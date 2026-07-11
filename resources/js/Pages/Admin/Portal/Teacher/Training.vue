@@ -42,6 +42,7 @@
             <div v-for="t in training" :key="t.id" class="border-t first:border-0 pt-4 first:pt-0 mb-4 last:mb-0">
                 <p class="font-medium text-sm text-slate-900">{{ t.program?.title }}</p>
                 <p class="text-xs text-slate-500 capitalize">{{ t.status }}
+                    <span v-if="t.status === 'waitlisted' && t.waitlist_position"> · position #{{ t.waitlist_position }}</span>
                     <span v-if="t.fee_status"> · fee {{ t.fee_status.replace('_', ' ') }}</span>
                 </p>
                 <p v-if="t.program?.venue" class="text-xs text-slate-500">{{ t.program.venue }}</p>
@@ -160,7 +161,7 @@ function formatDate(d) {
 }
 
 function needsPayment(t) {
-    if (!t.program?.fee_type || t.program.fee_type === 'none') return false;
+    if (!t.program?.fee_type || t.program.fee_type === 'none' || t.program.fee_type === 'school') return false;
     if (t.status === 'confirmed' && t.fee_status === 'approved') return false;
     if (t.feeReceipt?.status === 'uploaded') return false;
     return (t.fee_total ?? 0) > 0 && balance(t) > 0;

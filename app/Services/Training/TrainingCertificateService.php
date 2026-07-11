@@ -8,6 +8,8 @@ use App\Models\Tenant;
 use App\Models\TrainingAttendance;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
+use App\Models\User;
+use App\Services\Notifications\NotificationService;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Illuminate\Support\Str;
@@ -70,14 +72,29 @@ class TrainingCertificateService
         }
 
         $template = $this->resolveTemplate($registration);
+        $certType = $this->resolveCertificateType($registration);
 
-        return Certificate::create([
+        $certificate = Certificate::create([
             'entity_type'       => TrainingRegistration::class,
             'entity_id'         => $registration->id,
             'template_id'       => $template?->id,
+            'cert_type'         => $certType,
             'verification_uuid' => (string) Str::uuid(),
             'generated_at'      => now(),
         ]);
+
+        $this->notifyCertificateAvailable($registration);
+
+        return $certificate;
+    }
+
+    public function resolveCertificateType(TrainingRegistration $registration): string
+    {
+        $type = $registration->program?->certificate_type ?: 'participation';
+
+        return in_array($type, TrainingProgram::CERTIFICATE_TYPES, true)
+            ? $type
+            : 'participation';
     }
 
     public function resolveTemplate(TrainingRegistration $registration): ?CertificateTemplate
@@ -87,6 +104,20 @@ class TrainingCertificateService
             return null;
         }
 
+        $certType = $this->resolveCertificateType($registration);
+
+        $template = CertificateTemplate::where('tenant_id', $program->tenant_id)
+            ->where('event_type', 'training')
+            ->where('certificate_type', $certType)
+            ->where('is_active', true)
+            ->latest()
+            ->first();
+
+        if ($template || $certType === 'participation') {
+            return $template;
+        }
+
+        // Fall back to participation template when the specific type has none.
         return CertificateTemplate::where('tenant_id', $program->tenant_id)
             ->where('event_type', 'training')
             ->where('certificate_type', 'participation')
@@ -104,6 +135,7 @@ class TrainingCertificateService
         $conductedOn = $this->formatConductedDates($presentSessions, $registration->program);
         $daysAttended = $presentSessions->count();
         $totalDays = $registration->program?->dayCount() ?: $daysAttended;
+        $trainingHours = $this->resolveTrainingHours($registration, $presentSessions);
 
         $venue = $registration->program?->venue
             ?? $presentSessions->first()?->venue
@@ -119,6 +151,7 @@ class TrainingCertificateService
             'venue'           => $venue,
             'days_attended'   => (string) $daysAttended,
             'total_days'      => (string) $totalDays,
+            'training_hours'  => (string) $trainingHours,
             'certificate_date'=> now()->format('j F Y'),
         ];
 
@@ -173,12 +206,25 @@ class TrainingCertificateService
     /** @return array{template: ?CertificateTemplate, fieldValues: array<string, string>, logoUrl: ?string, sealUrl: ?string, signatories: list<array>, certificate: object} */
     public function sampleRenderContext(TrainingProgram $program, Tenant $sahodaya): array
     {
+        $certType = in_array($program->certificate_type, TrainingProgram::CERTIFICATE_TYPES, true)
+            ? $program->certificate_type
+            : 'participation';
+
         $template = CertificateTemplate::where('tenant_id', $sahodaya->id)
             ->where('event_type', 'training')
-            ->where('certificate_type', 'participation')
+            ->where('certificate_type', $certType)
             ->where('is_active', true)
             ->latest()
             ->first();
+
+        if (! $template && $certType !== 'participation') {
+            $template = CertificateTemplate::where('tenant_id', $sahodaya->id)
+                ->where('event_type', 'training')
+                ->where('certificate_type', 'participation')
+                ->where('is_active', true)
+                ->latest()
+                ->first();
+        }
 
         $conductedOn = $program->start_date?->format('j F Y') ?? '11 July 2026';
         if ($program->start_date && $program->end_date && ! $program->start_date->isSameDay($program->end_date)) {
@@ -195,6 +241,7 @@ class TrainingCertificateService
             'venue'           => $program->venue ?? 'St. Alphonsa Public School, Oorakam',
             'days_attended'   => '1',
             'total_days'      => (string) max(1, $program->dayCount() ?: 1),
+            'training_hours'  => '6',
             'certificate_date'=> now()->format('j F Y'),
         ];
 
@@ -227,6 +274,53 @@ class TrainingCertificateService
         return $this->presentSessions($registration)->count();
     }
 
+    private function notifyCertificateAvailable(TrainingRegistration $registration): void
+    {
+        $registration->loadMissing(['teacher', 'program', 'school']);
+        $teacherUser = $registration->teacher?->user_id
+            ? User::find($registration->teacher->user_id)
+            : null;
+
+        if (! $teacherUser) {
+            return;
+        }
+
+        $schoolId = $registration->school_id;
+        $actionUrl = $schoolId
+            ? "/portal/teacher/{$schoolId}/training/{$registration->id}/certificate"
+            : null;
+
+        app(NotificationService::class)->notifyFromTemplate(
+            $teacherUser,
+            'training.certificate.available',
+            [
+                'program_title' => $registration->program?->title ?? 'Training',
+                'teacher_name' => $registration->teacher?->name ?? '',
+            ],
+            $actionUrl,
+        );
+    }
+
+    /**
+     * Prefer CPD hours from present session durations; fall back to days × assumed day length.
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\TrainingSession>  $presentSessions
+     */
+    private function resolveTrainingHours(TrainingRegistration $registration, $presentSessions): float
+    {
+        $hours = app(TrainingCpdService::class)->hoursForRegistration($registration->id);
+        if ($hours > 0) {
+            return $hours;
+        }
+
+        $minutes = $presentSessions->sum(fn ($s) => (int) ($s->duration_minutes ?? 0));
+        if ($minutes > 0) {
+            return round($minutes / 60, 2);
+        }
+
+        return 0.0;
+    }
+
     /** @return \Illuminate\Support\Collection<int, \App\Models\TrainingSession> */
     private function presentSessions(TrainingRegistration $registration)
     {
@@ -238,7 +332,11 @@ class TrainingCertificateService
         }
 
         $presentSessionIds = TrainingAttendance::where('registration_id', $registration->id)
-            ->where('status', 'present')
+            ->whereIn('status', TrainingAttendance::PRESENT_LIKE)
+            ->where(function ($q) {
+                $q->whereNull('approval_status')
+                    ->orWhere('approval_status', 'approved');
+            })
             ->pluck('session_id');
 
         return $sessions->whereIn('id', $presentSessionIds)->sortBy('scheduled_at')->values();

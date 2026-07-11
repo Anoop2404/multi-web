@@ -13,7 +13,14 @@
                             {{ program.status }}
                             <template v-if="program.fee_type !== 'none' && program.fee_amount">
                                 <span class="mx-1">·</span>
-                                <span class="font-semibold text-indigo-700">Fee: ₹{{ program.fee_amount }}</span>
+                                <span class="font-semibold text-indigo-700">
+                                    <template v-if="program.fee_type === 'school'">
+                                        School batch fee: ₹{{ program.fee_amount }} / teacher
+                                    </template>
+                                    <template v-else>
+                                        Fee: ₹{{ program.fee_amount }}
+                                    </template>
+                                </span>
                             </template>
                             <template v-if="program.sessions_count">
                                 <span class="mx-1">·</span>
@@ -40,6 +47,38 @@
                     </div>
                 </div>
 
+                <!-- School batch fee upload -->
+                <div v-if="program.fee_type === 'school' && program.fee_amount && registrations[program.id]?.length"
+                     class="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 mb-3 space-y-2 text-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <p class="font-semibold text-indigo-900">School batch fee</p>
+                            <p class="text-xs text-indigo-800 mt-0.5">
+                                {{ schoolFeeFor(program)?.teacher_count || registrations[program.id].length }} teacher(s)
+                                · Due ₹{{ fmt(schoolFeeFor(program)?.total_due ?? (registrations[program.id].length * Number(program.fee_amount))) }}
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <a :href="`/school-admin/${school.id}/training/${program.id}/school-fee/invoice`"
+                               target="_blank" rel="noopener"
+                               class="text-xs font-semibold text-indigo-700 hover:underline">Invoice ↓</a>
+                            <span v-if="schoolFeeFor(program)?.status === 'approved'" class="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded">Fee paid</span>
+                            <span v-else-if="schoolFeeFor(program)?.status === 'proof_uploaded' || schoolFeeFor(program)?.fee_receipt?.status === 'uploaded'" class="text-xs text-amber-700 font-semibold">Pending approval</span>
+                            <span v-else-if="schoolFeeFor(program)?.fee_receipt?.status === 'rejected'" class="text-xs text-red-600 font-semibold">Rejected — re-upload</span>
+                            <span v-else-if="schoolFeeFor(program)?.status === 'partial'" class="text-xs text-amber-700 font-semibold">Partial — balance due</span>
+                            <span v-else class="text-xs text-slate-500">Payment required</span>
+                        </div>
+                    </div>
+                    <form v-if="needsSchoolFeeUpload(program)"
+                          @submit.prevent="uploadSchoolFee(program)" class="flex flex-wrap gap-2 items-center">
+                        <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                               @change="e => schoolFeeFiles[program.id] = e.target.files[0]"
+                               class="text-xs" required>
+                        <input v-model="schoolFeeRefs[program.id]" class="field text-xs max-w-xs" placeholder="Transaction ref (optional)">
+                        <button class="btn-primary text-xs !min-h-0 !px-2 !py-1">Upload batch proof</button>
+                    </form>
+                </div>
+
                 <ul v-if="registrations[program.id]?.length" class="text-sm divide-y mb-3">
                     <li v-for="r in registrations[program.id]" :key="r.id" class="py-2">
                         <div class="flex justify-between items-start gap-2 flex-wrap">
@@ -55,15 +94,27 @@
                                 </span>
                             </div>
                             <div class="flex items-center gap-2 flex-wrap">
-                                <span class="text-gray-400 text-xs capitalize">{{ r.status }}</span>
-                                <template v-if="program.fee_type !== 'none' && program.fee_amount">
+                                <span class="text-gray-400 text-xs capitalize">{{ r.status }}
+                                    <span v-if="r.status === 'waitlisted' && r.waitlist_position"> #{{ r.waitlist_position }}</span>
+                                </span>
+                                <a v-if="!['cancelled','rejected'].includes(r.status)"
+                                   :href="`/school-admin/${school.id}/training/${r.id}/id-card`"
+                                   target="_blank" rel="noopener"
+                                   class="text-xs font-semibold text-slate-600 hover:underline">ID card ↓</a>
+                                <template v-if="program.fee_type === 'school' && program.fee_amount">
+                                    <span class="text-xs text-indigo-700">Covered by school fee</span>
+                                </template>
+                                <template v-else-if="program.fee_type !== 'none' && program.fee_amount">
+                                    <a :href="`/school-admin/${school.id}/training/${r.id}/invoice`"
+                                       target="_blank" rel="noopener"
+                                       class="text-xs font-semibold text-indigo-600 hover:underline">Invoice ↓</a>
                                     <span v-if="r.fee_receipt?.status === 'approved'" class="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded">Fee paid</span>
                                     <span v-else-if="r.fee_receipt?.status === 'uploaded'" class="text-xs text-yellow-700">Fee pending approval</span>
                                     <span v-else-if="r.fee_receipt?.status === 'rejected'" class="text-xs text-red-600">Fee rejected — re-upload</span>
                                 </template>
                             </div>
                         </div>
-                        <form v-if="program.fee_type !== 'none' && program.fee_amount && needsFeeUpload(r)"
+                        <form v-if="program.fee_type === 'flat' && program.fee_amount && needsFeeUpload(r)"
                               @submit.prevent="uploadFee(r)" class="flex flex-wrap gap-2 items-center mt-2">
                             <input type="file" accept=".pdf,.jpg,.jpeg,.png"
                                    @change="e => feeFiles[r.id] = e.target.files[0]"
@@ -74,7 +125,7 @@
                     </li>
                 </ul>
 
-                <div v-if="['published','ongoing'].includes(program.status)" class="space-y-3">
+                <div v-if="['published','ongoing'].includes(program.status) && program.allow_school_nomination !== false" class="space-y-3">
                     <!-- Bulk nominate -->
                     <div v-if="availableTeachers(program).length" class="rounded-lg border border-slate-100 bg-slate-50/60 p-3 space-y-2">
                         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -145,6 +196,10 @@
                         </button>
                     </div>
                 </div>
+                <p v-else-if="['published','ongoing'].includes(program.status) && program.allow_school_nomination === false"
+                   class="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1.5">
+                    School nomination is disabled for this programme. Teachers may still register via QR or portal if enabled.
+                </p>
             </div>
             <p v-if="!programs.length" class="text-center text-gray-400 py-8">No training programs available.</p>
         </div>
@@ -156,9 +211,17 @@ import { computed, reactive, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 
-const props = defineProps({ school: Object, programs: Array, registrations: Object, eligibleByProgram: Object });
+const props = defineProps({
+    school: Object,
+    programs: Array,
+    registrations: Object,
+    schoolFees: { type: Object, default: () => ({}) },
+    eligibleByProgram: Object,
+});
 const feeFiles = reactive({});
 const feeRefs  = reactive({});
+const schoolFeeFiles = reactive({});
+const schoolFeeRefs = reactive({});
 const selections = reactive({});
 const importOpen = reactive({});
 const importFiles = reactive({});
@@ -171,6 +234,14 @@ for (const p of props.programs) {
 }
 
 const importResult = computed(() => usePage().props.flash?.importResult ?? null);
+
+function fmt(v) {
+    return Number(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function schoolFeeFor(program) {
+    return props.schoolFees?.[program.id] ?? null;
+}
 
 function registeredIds(program) {
     return new Set((props.registrations[program.id] || []).map(r => r.teacher?.id).filter(Boolean));
@@ -192,6 +263,16 @@ function clearSelection(program) {
 function needsFeeUpload(registration) {
     const s = registration.fee_receipt?.status;
     return !s || s === 'rejected';
+}
+
+function needsSchoolFeeUpload(program) {
+    const sf = schoolFeeFor(program);
+    if (!sf) return true;
+    if (sf.status === 'approved' || (Number(sf.outstanding ?? 0) <= 0 && Number(sf.amount_paid ?? 0) > 0)) {
+        return false;
+    }
+    const receiptStatus = sf.fee_receipt?.status;
+    return !receiptStatus || receiptStatus === 'rejected' || sf.status === 'partial' || sf.status === 'pending' || sf.status === 'rejected';
 }
 
 function bulkRegister(program) {
@@ -237,6 +318,21 @@ function uploadFee(registration) {
     router.post(`/school-admin/${props.school.id}/training/${registration.id}/payment`, fd, {
         preserveScroll: true,
         onSuccess: () => { feeFiles[registration.id] = null; feeRefs[registration.id] = ''; },
+    });
+}
+
+function uploadSchoolFee(program) {
+    const file = schoolFeeFiles[program.id];
+    if (!file) return;
+
+    const fd = new FormData();
+    fd.append('payment_proof', file);
+    if (schoolFeeRefs[program.id]) fd.append('transaction_ref', schoolFeeRefs[program.id]);
+
+    router.post(`/school-admin/${props.school.id}/training/${program.id}/school-payment`, fd, {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => { schoolFeeFiles[program.id] = null; schoolFeeRefs[program.id] = ''; },
     });
 }
 </script>

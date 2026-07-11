@@ -141,7 +141,7 @@ class TrainingCpdService
     {
         $minutes = TrainingAttendance::query()
             ->where('training_attendance.registration_id', $registrationId)
-            ->where('training_attendance.status', 'present')
+            ->whereIn('training_attendance.status', \App\Models\TrainingAttendance::PRESENT_LIKE)
             ->join('training_sessions', 'training_sessions.id', '=', 'training_attendance.session_id')
             ->sum('training_sessions.duration_minutes');
 
@@ -163,7 +163,7 @@ class TrainingCpdService
 
         return TrainingAttendance::query()
             ->whereIn('training_attendance.registration_id', $ids)
-            ->where('training_attendance.status', 'present')
+            ->whereIn('training_attendance.status', \App\Models\TrainingAttendance::PRESENT_LIKE)
             ->join('training_sessions', 'training_sessions.id', '=', 'training_attendance.session_id')
             ->select([
                 'training_attendance.registration_id',
@@ -184,7 +184,7 @@ class TrainingCpdService
         $resolvedYearId = $this->resolveYearId($yearId);
 
         $query = TrainingAttendance::query()
-            ->where('training_attendance.status', 'present')
+            ->whereIn('training_attendance.status', \App\Models\TrainingAttendance::PRESENT_LIKE)
             ->join('training_registrations', 'training_registrations.id', '=', 'training_attendance.registration_id')
             ->join('training_sessions', 'training_sessions.id', '=', 'training_attendance.session_id')
             ->join('training_programs', 'training_programs.id', '=', 'training_registrations.program_id')

@@ -40,13 +40,15 @@ class TrainingApiController extends SchoolApiController
 
         $eligibility->assertTeacherEligible($program, $teacher);
 
+        $seat = app(\App\Services\Training\TrainingWaitlistService::class)
+            ->resolveCreateAttributes($program, 'school');
+
         $registration = TrainingRegistration::firstOrCreate(
             ['program_id' => $program->id, 'teacher_id' => $teacher->id],
-            [
+            array_merge([
                 'school_id'           => $this->school->id,
-                'status'              => app(\App\Services\Training\TrainingRegistrationLifecycle::class)->initialStatus($program),
                 'registration_source' => 'school',
-            ]
+            ], $seat)
         );
 
         return response()->json(['data' => $registration->load(['program', 'teacher'])], 201);

@@ -32,7 +32,7 @@
             </template>
         </PageHeader>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
             <div class="card text-center">
                 <p class="text-2xl font-bold">{{ registrations.length }}</p>
                 <p class="text-xs text-gray-500">Total</p>
@@ -44,6 +44,10 @@
             <div class="card text-center">
                 <p class="text-2xl font-bold text-green-700">{{ confirmedCount }}</p>
                 <p class="text-xs text-gray-500">Confirmed</p>
+            </div>
+            <div class="card text-center">
+                <p class="text-2xl font-bold text-slate-600">{{ countByStatus('waitlisted') }}</p>
+                <p class="text-xs text-gray-500">Waitlisted</p>
             </div>
             <div class="card text-center">
                 <p class="text-2xl font-bold text-indigo-700">{{ qrCount }}</p>
@@ -96,7 +100,13 @@
                                 </span>
                                 <span v-else class="text-xs text-gray-400 capitalize">{{ r.registration_source || 'portal' }}</span>
                             </td>
-                            <td class="capitalize text-gray-600">{{ r.status }}</td>
+                            <td class="capitalize text-gray-600">
+                                {{ r.status }}
+                                <span v-if="r.status === 'waitlisted' && r.waitlist_position"
+                                      class="block text-[10px] text-slate-500 normal-case">
+                                    Position #{{ r.waitlist_position }}
+                                </span>
+                            </td>
                             <td>
                                 <template v-if="hasFee">
                                     <span v-if="r.fee_receipt?.status === 'approved'" class="text-xs text-green-700 font-semibold">Approved</span>
@@ -114,6 +124,14 @@
                                           class="text-xs text-indigo-600 font-semibold">
                                         Fee approvals →
                                     </Link>
+                                    <a v-if="!['cancelled','rejected'].includes(r.status)"
+                                       :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations/${r.id}/id-card`"
+                                       target="_blank" rel="noopener"
+                                       class="text-xs text-slate-600 font-semibold">ID card ↓</a>
+                                    <a v-if="hasFee && program.fee_type === 'flat'"
+                                       :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations/${r.id}/invoice`"
+                                       target="_blank" rel="noopener"
+                                       class="text-xs text-indigo-600 font-semibold">Invoice ↓</a>
                                     <template v-if="r.status === 'confirmed'">
                                         <button type="button" @click="issueCertificate(r)"
                                                 class="text-xs text-purple-600 font-semibold">
@@ -124,6 +142,12 @@
                                            target="_blank" rel="noopener"
                                            class="text-xs text-indigo-600 font-semibold">Print ↗</a>
                                     </template>
+                                    <button v-if="canCancel(r)"
+                                            type="button"
+                                            @click="cancelRegistration(r)"
+                                            class="text-xs text-red-600 font-semibold">
+                                        Cancel
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -167,6 +191,21 @@ function countByStatus(status) {
 
 function schoolName(r) {
     return r.school?.name || r.teacher?.school_name || r.pending_school?.school_name || '—';
+}
+
+function canCancel(r) {
+    return !['cancelled', 'completed'].includes(r.status);
+}
+
+function cancelRegistration(registration) {
+    if (!confirm(`Cancel registration for ${registration.teacher?.name || 'this teacher'}? A waitlisted participant may be promoted.`)) {
+        return;
+    }
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/registrations/${registration.id}/cancel`,
+        {},
+        { preserveScroll: true },
+    );
 }
 
 function issueCertificate(registration) {

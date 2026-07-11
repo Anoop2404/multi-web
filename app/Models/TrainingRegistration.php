@@ -17,7 +17,7 @@ class TrainingRegistration extends Model
     use TracksPartialPayments;
 
     protected $fillable = [
-        'program_id', 'teacher_id', 'school_id', 'status', 'fee_status', 'amount_paid', 'fee_receipt_id',
+        'program_id', 'teacher_id', 'school_id', 'status', 'waitlist_position', 'fee_status', 'amount_paid', 'fee_receipt_id',
         'registration_source', 'consent_at', 'department', 'teacher_created', 'pending_school_id',
     ];
 
@@ -32,7 +32,8 @@ class TrainingRegistration extends Model
     {
         $this->loadMissing('program');
         $program = $this->program;
-        if (! $program) {
+        if (! $program || $program->usesSchoolBatchFee()) {
+            // School batch fee is billed on TrainingSchoolFee, not per teacher.
             return 0.0;
         }
 
@@ -83,5 +84,10 @@ class TrainingRegistration extends Model
     public function feedback(): HasOne
     {
         return $this->hasOne(TrainingFeedback::class, 'registration_id');
+    }
+
+    public function invoice(): HasOne
+    {
+        return $this->hasOne(TrainingInvoice::class, 'registration_id');
     }
 }

@@ -47,20 +47,12 @@
                                 <span v-else class="text-xs text-amber-700 font-semibold">Unverified</span>
                             </td>
                             <td>
-                                <div class="flex gap-1">
-                                    <button type="button" @click="setAttendance(session, r, 'present')"
+                                <div class="flex flex-wrap gap-1">
+                                    <button v-for="opt in statusOptions" :key="opt.value" type="button"
+                                            @click="setAttendance(session, r, opt.value)"
                                             class="px-2 py-0.5 rounded text-xs font-semibold"
-                                            :class="attendanceStatus(session.id, r.id) === 'present'
-                                                ? 'btn-primary !min-h-0 !px-2 !py-0.5 text-xs'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-green-100'">
-                                        Present
-                                    </button>
-                                    <button type="button" @click="setAttendance(session, r, 'absent')"
-                                            class="px-2 py-0.5 rounded text-xs font-semibold"
-                                            :class="attendanceStatus(session.id, r.id) === 'absent'
-                                                ? 'bg-red-500 text-white'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-red-100'">
-                                        Absent
+                                            :class="statusButtonClass(session.id, r.id, opt.value)">
+                                        {{ opt.label }}
                                     </button>
                                 </div>
                             </td>
@@ -88,6 +80,13 @@ const props = defineProps({
     attendanceMap: Object,
 });
 
+const statusOptions = [
+    { value: 'present', label: 'Present' },
+    { value: 'late', label: 'Late' },
+    { value: 'absent', label: 'Absent' },
+    { value: 'with_permission', label: 'Permission' },
+];
+
 const localAttendance = reactive({});
 for (const [sessionId, regMap] of Object.entries(props.attendanceMap ?? {})) {
     localAttendance[sessionId] = {};
@@ -106,6 +105,17 @@ function formatDate(value) {
 
 function attendanceStatus(sessionId, regId) {
     return localAttendance[sessionId]?.[regId] ?? null;
+}
+
+function statusButtonClass(sessionId, regId, value) {
+    const current = attendanceStatus(sessionId, regId);
+    if (current === value) {
+        if (value === 'absent') return 'bg-red-500 text-white';
+        if (value === 'late') return 'bg-amber-500 text-white';
+        if (value === 'with_permission') return 'bg-slate-600 text-white';
+        return 'btn-primary !min-h-0 !px-2 !py-0.5 text-xs';
+    }
+    return 'bg-gray-100 text-gray-600 hover:bg-gray-200';
 }
 
 function setAttendance(session, registration, status) {

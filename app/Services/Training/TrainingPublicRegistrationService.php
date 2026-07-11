@@ -34,15 +34,6 @@ class TrainingPublicRegistrationService
             ]);
         }
 
-        if ($program->max_participants) {
-            $count = $program->registrations()->whereIn('status', ['registered', 'confirmed'])->count();
-            if ($count >= $program->max_participants) {
-                throw ValidationException::withMessages([
-                    'registration' => 'This training programme is full.',
-                ]);
-            }
-        }
-
         $email = isset($data['email']) ? strtolower(trim((string) $data['email'])) : null;
         $mobile = isset($data['phone']) ? preg_replace('/\D+/', '', (string) $data['phone']) : null;
         $name = trim((string) $data['name']);
@@ -95,6 +86,8 @@ class TrainingPublicRegistrationService
                     'email' => 'This teacher is already registered for this programme.',
                 ]);
             }
+
+            $this->refreshExistingTeacherProfile($teacher, $data, $photo);
         } else {
             if (! $school) {
                 // Create teacher under Sahodaya tenant temporarily? Teachers belong to schools.
@@ -138,20 +131,25 @@ class TrainingPublicRegistrationService
 
         $this->eligibility->assertTeacherEligible($program, $teacher);
 
-        $registration = DB::transaction(function () use ($program, $teacher, $school, $pendingSchool, $data, $teacherCreated) {
-            return TrainingRegistration::create([
+        $seat = app(TrainingWaitlistService::class)->resolveCreateAttributes($program, 'qr');
+
+        $registration = DB::transaction(function () use ($program, $teacher, $school, $pendingSchool, $data, $teacherCreated, $seat) {
+            return TrainingRegistration::create(array_merge([
                 'program_id'          => $program->id,
                 'teacher_id'          => $teacher->id,
                 'school_id'           => $school?->id ?? $program->tenant_id,
-                'status'              => app(TrainingRegistrationLifecycle::class)->initialStatus($program, 'qr'),
                 'registration_source' => 'qr',
                 'consent_at'          => now(),
                 'department'          => $data['department'] ?? null,
                 'teacher_created'     => $teacherCreated,
                 'pending_school_id'   => $pendingSchool?->id,
-                'fee_status'          => $program->hasFee() ? 'auto_approved' : null,
-            ]);
+                'fee_status'          => $program->hasFee() && $seat['status'] !== 'waitlisted' ? 'auto_approved' : null,
+            ], $seat));
         });
+
+        if ($school && $program->usesSchoolBatchFee() && $registration->status !== 'waitlisted') {
+            app(TrainingSchoolFeeService::class)->syncForSchool($program, $school);
+        }
 
         $this->audit->training(
             $program,
@@ -310,8 +308,92 @@ class TrainingPublicRegistrationService
             if ($byNameSchool) {
                 return $byNameSchool;
             }
+
+            // Fuzzy name match within the same school only (email/mobile already missed).
+            // Threshold: similar_text percent >= 90, OR levenshtein distance <= 2 when
+            // both names are short (≤ 12 chars after normalize). Conservative to avoid
+            // false merges across distinct teachers.
+            $normalizedNeedle = $this->normalizeTeacherName($name);
+            if ($normalizedNeedle !== '') {
+                $candidates = Teacher::query()
+                    ->where('tenant_id', $school->id)
+                    ->get(['id', 'name']);
+
+                foreach ($candidates as $candidate) {
+                    $normalizedCandidate = $this->normalizeTeacherName((string) $candidate->name);
+                    if ($normalizedCandidate === '') {
+                        continue;
+                    }
+
+                    similar_text($normalizedNeedle, $normalizedCandidate, $percent);
+                    if ($percent >= 90.0) {
+                        return Teacher::query()->find($candidate->id);
+                    }
+
+                    $maxLen = max(strlen($normalizedNeedle), strlen($normalizedCandidate));
+                    if ($maxLen <= 12 && levenshtein($normalizedNeedle, $normalizedCandidate) <= 2) {
+                        return Teacher::query()->find($candidate->id);
+                    }
+                }
+            }
         }
 
         return null;
+    }
+
+    private function normalizeTeacherName(string $name): string
+    {
+        $name = strtolower(trim(preg_replace('/\s+/', ' ', $name) ?? ''));
+
+        return $name;
+    }
+
+    /**
+     * Refresh profile fields on a matched existing teacher from QR form data.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function refreshExistingTeacherProfile(Teacher $teacher, array $data, ?UploadedFile $photo = null): void
+    {
+        $updates = [];
+
+        if (! empty($data['dob'])) {
+            $updates['dob'] = $data['dob'];
+        }
+        if (! empty($data['gender'])) {
+            $updates['gender'] = $data['gender'];
+        }
+        if (isset($data['teaching_type_id']) && $data['teaching_type_id'] !== '' && $data['teaching_type_id'] !== null) {
+            $updates['teaching_type_id'] = (int) $data['teaching_type_id'];
+        }
+        if (isset($data['designation_id']) && $data['designation_id'] !== '' && $data['designation_id'] !== null) {
+            $designationId = (int) $data['designation_id'];
+            $updates['designation_id'] = $designationId;
+            $label = \App\Models\Designation::query()->whereKey($designationId)->value('label');
+            if ($label) {
+                $updates['designation'] = $label;
+            }
+        }
+        if (isset($data['experience']) && $data['experience'] !== '' && $data['experience'] !== null) {
+            $updates['experience_years'] = (int) $data['experience'];
+        }
+        if ($photo) {
+            $updates['photo'] = TenantStorage::storeTeacherPhoto($photo, $teacher->tenant_id);
+        }
+
+        if ($updates === []) {
+            return;
+        }
+
+        $material = array_intersect_key($updates, array_flip([
+            'dob', 'gender', 'teaching_type_id', 'designation_id', 'designation', 'experience_years', 'photo',
+        ]));
+
+        if ($material !== [] && $teacher->verified_at !== null) {
+            $updates['verified_at'] = null;
+            $updates['verified_by_user_id'] = null;
+        }
+
+        $teacher->update($updates);
     }
 }

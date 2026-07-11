@@ -137,4 +137,47 @@ class TrainingSchoolAttendanceFlowTest extends TestCase
 
         $this->assertSame('present', $attendance->status);
     }
+
+    public function test_paid_school_registration_cannot_mark_attendance_until_confirmed(): void
+    {
+        [, $school, $program] = $this->seedProgram([
+            'fee_type' => 'flat',
+            'fee_amount' => 100,
+        ]);
+        $teacher = Teacher::create([
+            'tenant_id' => $school->id,
+            'name' => 'Waiting',
+            'email' => 'wait@t.test',
+            'status' => 'active',
+        ]);
+        $registration = TrainingRegistration::create([
+            'program_id' => $program->id,
+            'teacher_id' => $teacher->id,
+            'school_id' => $school->id,
+            'status' => 'registered',
+            'registration_source' => 'school',
+        ]);
+
+        $this->assertFalse(app(TrainingRegistrationLifecycle::class)->canMarkAttendance($registration, $program));
+    }
+
+    public function test_registered_status_has_no_attendance_bypass(): void
+    {
+        [, $school, $program] = $this->seedProgram(['fee_type' => 'none']);
+        $teacher = Teacher::create([
+            'tenant_id' => $school->id,
+            'name' => 'Legacy',
+            'email' => 'legacy@t.test',
+            'status' => 'active',
+        ]);
+        $registration = TrainingRegistration::create([
+            'program_id' => $program->id,
+            'teacher_id' => $teacher->id,
+            'school_id' => $school->id,
+            'status' => 'registered',
+            'registration_source' => 'qr',
+        ]);
+
+        $this->assertFalse(app(TrainingRegistrationLifecycle::class)->canMarkAttendance($registration, $program));
+    }
 }

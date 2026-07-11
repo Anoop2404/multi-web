@@ -186,8 +186,54 @@ class TrainingCertificateServiceTest extends TestCase
         $this->assertSame('11 July 2026', $fields['conducted_on']);
         $this->assertSame('1', $fields['days_attended']);
         $this->assertSame('2', $fields['total_days']);
+        $this->assertArrayHasKey('training_hours', $fields);
         $this->assertSame('St. Alphonsa Public School, Oorakam', $fields['venue']);
         $this->assertSame('Jane Teacher', $fields['recipient_name']);
         $this->assertSame('PGT', $fields['designation']);
+    }
+
+    public function test_issue_uses_program_certificate_type(): void
+    {
+        [$sahodaya, $school] = $this->seedTenants();
+        $teacher = Teacher::create(['tenant_id' => $school->id, 'name' => 'Teacher C', 'status' => 'active']);
+
+        $program = TrainingProgram::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Completion Program',
+            'status' => 'ongoing',
+            'fee_type' => 'none',
+            'certificate_type' => 'completion',
+        ]);
+        $session = TrainingSession::create([
+            'program_id' => $program->id,
+            'title' => 'Day 1',
+            'duration_minutes' => 120,
+        ]);
+        $registration = TrainingRegistration::create([
+            'program_id' => $program->id,
+            'teacher_id' => $teacher->id,
+            'school_id' => $school->id,
+            'status' => 'confirmed',
+        ]);
+        TrainingAttendance::create([
+            'session_id' => $session->id,
+            'registration_id' => $registration->id,
+            'status' => 'present',
+        ]);
+
+        CertificateTemplate::create([
+            'tenant_id' => $sahodaya->id,
+            'event_type' => 'training',
+            'certificate_type' => 'completion',
+            'title' => 'Certificate of Completion',
+            'is_active' => true,
+        ]);
+
+        $service = app(TrainingCertificateService::class);
+        $certificate = $service->issue($registration->fresh(['program', 'teacher', 'school']));
+
+        $this->assertSame('completion', $certificate->cert_type);
+        $fields = $service->resolveFieldValues($registration->fresh(['program.sessions', 'teacher', 'school']), $sahodaya);
+        $this->assertSame('2', $fields['training_hours']);
     }
 }

@@ -28,6 +28,16 @@ The programme was designed to enhance professional competencies, strengthen peda
 BODY;
     }
 
+    /** Default body for topper congratulations certificates. */
+    public static function defaultTopperBody(): string
+    {
+        return <<<'BODY'
+Congratulations! This is to certify that {recipient_name} of {school_name} has excelled in the CBSE {examination_type} (Class {class}) examination for the academic year {academic_year}, securing {percentage} (Rank {rank}).
+
+We commend this outstanding academic achievement and wish continued success.
+BODY;
+    }
+
     /** @return list<array{name: string, designation: string, signature_path: ?string}> */
     public static function defaultTrainingSignatories(): array
     {

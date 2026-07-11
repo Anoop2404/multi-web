@@ -8,7 +8,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TrainingSession extends Model
 {
-    protected $fillable = ['program_id', 'title', 'scheduled_at', 'venue', 'duration_minutes', 'attendance_token'];
+    protected $fillable = [
+        'program_id',
+        'title',
+        'scheduled_at',
+        'venue',
+        'duration_minutes',
+        'attendance_token',
+        'resource_person_id',
+    ];
 
     protected $casts = [
         'scheduled_at' => 'datetime',
@@ -26,6 +34,11 @@ class TrainingSession extends Model
     public function program(): BelongsTo
     {
         return $this->belongsTo(TrainingProgram::class, 'program_id');
+    }
+
+    public function resourcePerson(): BelongsTo
+    {
+        return $this->belongsTo(TrainingResourcePerson::class, 'resource_person_id');
     }
 
     public function attendance(): HasMany

@@ -113,17 +113,25 @@ class TrainingRegistrationCsvImporter
                 continue;
             }
 
+            $seat = app(TrainingWaitlistService::class)->resolveCreateAttributes($program, 'school');
+
             TrainingRegistration::firstOrCreate(
                 ['program_id' => $program->id, 'teacher_id' => $teacher->id],
-                [
+                array_merge([
                     'school_id'           => $this->school->id,
-                    'status'              => $this->lifecycle->initialStatus($program),
                     'registration_source' => 'school',
-                ]
+                    'fee_status'          => $program->usesSchoolBatchFee() && $seat['status'] !== 'waitlisted'
+                        ? 'auto_approved'
+                        : null,
+                ], $seat)
             );
 
             $existingTeacherIds[$teacher->id] = true;
             $imported++;
+        }
+
+        if ($imported > 0 && $program->usesSchoolBatchFee()) {
+            app(\App\Services\Training\TrainingSchoolFeeService::class)->syncForSchool($program, $this->school);
         }
 
         if ($headerMap === null) {

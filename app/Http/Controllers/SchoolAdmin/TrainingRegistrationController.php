@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\FeeReceipt;
 use App\Models\Teacher;
+use App\Models\Tenant;
 use App\Models\TrainingAttendance;
 use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
@@ -37,6 +38,28 @@ class TrainingRegistrationController extends SchoolAdminController
             ->get()
             ->groupBy('program_id');
 
+        $schoolFees = \App\Models\TrainingSchoolFee::where('school_id', $this->school->id)
+            ->whereIn('program_id', $programs->pluck('id'))
+            ->with('feeReceipt')
+            ->get()
+            ->mapWithKeys(fn (\App\Models\TrainingSchoolFee $f) => [
+                $f->program_id => [
+                    'id' => $f->id,
+                    'program_id' => $f->program_id,
+                    'teacher_count' => (int) $f->teacher_count,
+                    'total_due' => (float) $f->total_due,
+                    'amount_paid' => (float) ($f->amount_paid ?? 0),
+                    'outstanding' => $f->outstandingBalance(),
+                    'status' => $f->status,
+                    'fee_receipt' => $f->feeReceipt ? [
+                        'id' => $f->feeReceipt->id,
+                        'status' => $f->feeReceipt->status,
+                        'amount' => (float) $f->feeReceipt->amount,
+                        'transaction_ref' => $f->feeReceipt->transaction_ref,
+                    ] : null,
+                ],
+            ]);
+
         $allTeachers = Teacher::where('tenant_id', $this->school->id)
             ->where('status', 'active')
             ->with(['teachingType'])
@@ -64,6 +87,7 @@ class TrainingRegistrationController extends SchoolAdminController
         return $this->inertia('School/Training/Index', [
             'programs'          => $programs,
             'registrations'     => $registrations,
+            'schoolFees'        => $schoolFees,
             'eligibleByProgram' => $eligibleByProgram,
         ]);
     }
@@ -78,6 +102,7 @@ class TrainingRegistrationController extends SchoolAdminController
         app(\App\Services\Membership\SchoolMembershipGate::class)->assertPaid($this->school);
 
         $program = $this->assertProgramOpen($data['program_id']);
+        abort_unless($program->allow_school_nomination ?? true, 422, 'School nomination is disabled for this programme.');
         $teacher = Teacher::with('teachingType')->findOrFail($data['teacher_id']);
         abort_if($teacher->tenant_id !== $this->school->id, 403);
 
@@ -99,6 +124,7 @@ class TrainingRegistrationController extends SchoolAdminController
         app(\App\Services\Membership\SchoolMembershipGate::class)->assertPaid($this->school);
 
         $program = $this->assertProgramOpen($data['program_id']);
+        abort_unless($program->allow_school_nomination ?? true, 422, 'School nomination is disabled for this programme.');
         $teacherIds = array_values(array_unique($data['teacher_ids']));
 
         $teachers = Teacher::with('teachingType')
@@ -181,6 +207,7 @@ class TrainingRegistrationController extends SchoolAdminController
         app(\App\Services\Membership\SchoolMembershipGate::class)->assertPaid($this->school);
 
         $program = $this->assertProgramOpen($data['program_id']);
+        abort_unless($program->allow_school_nomination ?? true, 422, 'School nomination is disabled for this programme.');
 
         $importer = new TrainingRegistrationCsvImporter($this->school, $eligibility, app(TrainingRegistrationLifecycle::class));
         $result = $importer->import($request->file('file'), $program);
@@ -253,16 +280,25 @@ class TrainingRegistrationController extends SchoolAdminController
 
     private function registerTeacher(TrainingProgram $program, Teacher $teacher): TrainingRegistration
     {
-        $lifecycle = app(TrainingRegistrationLifecycle::class);
+        $waitlist = app(\App\Services\Training\TrainingWaitlistService::class);
+        $seat = $waitlist->resolveCreateAttributes($program, 'school');
 
-        return TrainingRegistration::firstOrCreate(
+        $registration = TrainingRegistration::firstOrCreate(
             ['program_id' => $program->id, 'teacher_id' => $teacher->id],
-            [
+            array_merge([
                 'school_id'           => $this->school->id,
-                'status'              => $lifecycle->initialStatus($program),
                 'registration_source' => 'school',
-            ]
+                'fee_status'          => $program->usesSchoolBatchFee() && $seat['status'] !== 'waitlisted'
+                    ? 'auto_approved'
+                    : null,
+            ], $seat)
         );
+
+        if ($program->usesSchoolBatchFee() && $registration->status !== 'waitlisted') {
+            app(\App\Services\Training\TrainingSchoolFeeService::class)->syncForSchool($program, $this->school);
+        }
+
+        return $registration;
     }
 
     public function attendance(string $tenantId, TrainingProgram $program, TrainingRegistrationLifecycle $lifecycle)
@@ -321,12 +357,19 @@ class TrainingRegistrationController extends SchoolAdminController
         abort_unless($lifecycle->canMarkAttendance($registration, $program), 422, 'This registration cannot be marked for attendance yet.');
 
         $data = $request->validate([
-            'status' => 'required|in:present,absent',
+            'status' => 'required|in:present,absent,late,with_permission',
+            'correction_reason' => 'nullable|string|max:500',
         ]);
 
-        $attendance = TrainingAttendance::updateOrCreate(
-            ['session_id' => $session->id, 'registration_id' => $registration->id],
-            array_merge($data, ['marked_by' => $request->user()->id, 'marked_at' => now()])
+        $attendance = app(\App\Services\Training\TrainingAttendanceService::class)->updateAttendance(
+            $session,
+            $registration,
+            [
+                'status' => $data['status'],
+                'correction_reason' => $data['correction_reason'] ?? null,
+                'require_approval' => true,
+            ],
+            $request->user()->id,
         );
 
         $audit->training(
@@ -338,6 +381,7 @@ class TrainingRegistrationController extends SchoolAdminController
                 'registration_id' => $registration->id,
                 'school_id'       => $this->school->id,
                 'status'          => $data['status'],
+                'approval_status' => $attendance->approval_status,
             ],
             $attendance,
         );
@@ -387,6 +431,7 @@ class TrainingRegistrationController extends SchoolAdminController
         $program = $registration->program;
         abort_if($program->tenant_id !== $this->school->parent_id, 403);
         abort_unless($program->hasFee(), 422, 'This program does not require a fee.');
+        abort_if($program->usesSchoolBatchFee(), 422, 'This programme uses a school batch fee — upload payment from the program school fee section.');
 
         $outstanding = $registration->outstandingBalance();
         abort_if($outstanding <= 0, 422, 'This training fee is already fully paid.');
@@ -405,6 +450,8 @@ class TrainingRegistrationController extends SchoolAdminController
         $amount = round((float) ($data['amount'] ?? $outstanding), 2);
 
         FeeReceipt::supersedePriorForFeeable($registration);
+
+        app(\App\Services\Training\TrainingInvoiceService::class)->ensureForRegistration($registration);
 
         $receipt = FeeReceipt::create([
             'feeable_type'        => TrainingRegistration::class,
@@ -430,5 +477,98 @@ class TrainingRegistrationController extends SchoolAdminController
         );
 
         return back()->with('success', 'Payment proof uploaded.');
+    }
+
+    public function downloadInvoice(string $tenantId, TrainingRegistration $registration)
+    {
+        abort_if($registration->school_id !== $this->school->id, 403);
+        $program = $registration->program;
+        abort_if(! $program || $program->tenant_id !== $this->school->parent_id, 403);
+
+        $invoices = app(\App\Services\Training\TrainingInvoiceService::class);
+        $invoice = $invoices->ensureForRegistration($registration);
+        abort_unless($invoice, 404, 'No invoice for this registration.');
+
+        return $invoices->download($invoice, Tenant::find($this->school->parent_id));
+    }
+
+    public function downloadSchoolInvoice(string $tenantId, TrainingProgram $program)
+    {
+        abort_if($program->tenant_id !== $this->school->parent_id, 403);
+        abort_unless($program->usesSchoolBatchFee(), 422, 'This programme does not use a school batch fee.');
+
+        $feeService = app(\App\Services\Training\TrainingSchoolFeeService::class);
+        $schoolFee = $feeService->syncForSchool($program, $this->school);
+        $invoices = app(\App\Services\Training\TrainingInvoiceService::class);
+        $invoice = $schoolFee->fresh(['invoice'])->invoice
+            ?? $invoices->ensureForSchoolFee($schoolFee);
+        abort_unless($invoice, 404, 'No invoice for this school fee.');
+
+        return $invoices->download($invoice, Tenant::find($this->school->parent_id));
+    }
+
+    public function downloadIdCard(string $tenantId, TrainingRegistration $registration)
+    {
+        abort_if($registration->school_id !== $this->school->id, 403);
+        $program = $registration->program;
+        abort_if(! $program || $program->tenant_id !== $this->school->parent_id, 403);
+        abort_if(in_array($registration->status, ['cancelled', 'rejected'], true), 422, 'ID card not available for this registration.');
+
+        return app(\App\Services\Training\TrainingIdCardService::class)
+            ->download($registration, Tenant::find($this->school->parent_id));
+    }
+
+    public function uploadSchoolPayment(Request $request, string $tenantId, TrainingProgram $program)
+    {
+        abort_if($program->tenant_id !== $this->school->parent_id, 403);
+        abort_unless($program->usesSchoolBatchFee(), 422, 'This programme does not use a school batch fee.');
+
+        $feeService = app(\App\Services\Training\TrainingSchoolFeeService::class);
+        $schoolFee = $feeService->syncForSchool($program, $this->school);
+        abort_if($schoolFee->total_due <= 0, 422, 'No fee due for this programme.');
+
+        $outstanding = $schoolFee->outstandingBalance();
+        abort_if($outstanding <= 0, 422, 'This school batch fee is already fully paid.');
+
+        $data = $request->validate([
+            'payment_proof'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'transaction_ref' => 'nullable|string|max:100',
+            'amount'          => 'nullable|numeric|min:1|max:'.$outstanding,
+        ]);
+
+        $path = TenantStorage::storeUploadedFile(
+            $request->file('payment_proof'),
+            "training-payments/{$this->school->id}"
+        );
+
+        $amount = round((float) ($data['amount'] ?? $outstanding), 2);
+
+        $feeService->attachPaymentProof(
+            $schoolFee,
+            $path,
+            $data['transaction_ref'] ?? null,
+            $amount,
+            $request->user()->id,
+        );
+
+        app(SahodayaAdminNotifier::class)->notifyAdmins(
+            $this->school->parent_id,
+            'payment.proof.uploaded',
+            [
+                'school_name'   => $this->school->name,
+                'context_label' => $program->title.' training batch fee',
+            ],
+            "/sahodaya-admin/{$this->school->parent_id}/training/{$program->id}/payments"
+        );
+
+        app(PlatformAuditLogger::class)->training(
+            $program,
+            'training.school_fee.proof_uploaded',
+            "School {$this->school->name} uploaded training batch fee proof for {$program->title}",
+            ['school_id' => $this->school->id, 'school_fee_id' => $schoolFee->id, 'amount' => $amount],
+            $schoolFee,
+        );
+
+        return back()->with('success', 'School batch fee proof uploaded.');
     }
 }

@@ -11,7 +11,12 @@
 
         <div class="grid gap-4 sm:grid-cols-4 mb-6">
             <div class="card"><p class="text-xs text-gray-500">QR registrations</p><p class="text-2xl font-semibold">{{ report.qr_registrations }}</p></div>
-            <div class="card"><p class="text-xs text-gray-500">Teachers created</p><p class="text-2xl font-semibold">{{ report.teachers_created }}</p></div>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/qr-teachers`"
+                  class="card block hover:ring-2 hover:ring-indigo-200 transition">
+                <p class="text-xs text-gray-500">Teachers created</p>
+                <p class="text-2xl font-semibold">{{ report.teachers_created }}</p>
+                <p class="text-xs text-indigo-600 mt-1 font-semibold">View list →</p>
+            </Link>
             <div class="card"><p class="text-xs text-gray-500">Pending schools</p><p class="text-2xl font-semibold">{{ report.pending_schools }}</p></div>
             <div class="card"><p class="text-xs text-gray-500">All registrations</p><p class="text-2xl font-semibold">{{ report.total_registrations }}</p></div>
         </div>

@@ -5,7 +5,9 @@
                     description="Configure training and fest certificate layouts, logos, seals, and signatories." />
 
         <form @submit.prevent="upload" class="card mb-4 space-y-4">
-            <h3 class="section-title">{{ form.event_type === 'training' ? 'Training certificate template' : 'Upload template' }}</h3>
+            <h3 class="section-title">
+                {{ form.event_type === 'training' || form.event_type === 'topper' ? 'Certificate template' : 'Upload template' }}
+            </h3>
             <FormGrid>
                 <FormField label="Event type" required>
                     <template #default="{ id }">
@@ -15,23 +17,33 @@
                             <option value="kids_fest">Kids Fest</option>
                             <option value="teacher_fest">Teacher Fest</option>
                             <option value="training">Training</option>
+                            <option value="topper">Topper (Congratulations)</option>
                         </select>
                     </template>
                 </FormField>
-                <FormField label="Certificate type" hint="e.g. participation, winner" required>
+                <FormField label="Certificate type" hint="e.g. participation, congratulations" required>
                     <template #default="{ id }">
-                        <input :id="id" v-model="form.certificate_type" class="field" placeholder="participation" required>
+                        <select v-if="form.event_type === 'training'" :id="id" v-model="form.certificate_type" class="field" required>
+                            <option v-for="t in trainingCertificateTypes" :key="t" :value="t">{{ t.replaceAll('_', ' ') }}</option>
+                        </select>
+                        <select v-else-if="form.event_type === 'topper'" :id="id" v-model="form.certificate_type" class="field" required>
+                            <option value="congratulations">congratulations</option>
+                        </select>
+                        <input v-else :id="id" v-model="form.certificate_type" class="field" placeholder="participation" required>
                     </template>
                 </FormField>
 
-                <template v-if="form.event_type === 'training'">
+                <template v-if="form.event_type === 'training' || form.event_type === 'topper'">
                     <FormField label="Certificate title" class-extra="sm:col-span-2">
                         <template #default="{ id }">
-                            <input :id="id" v-model="form.title" class="field" placeholder="Certificate of Participation">
+                            <input :id="id" v-model="form.title" class="field"
+                                   :placeholder="form.event_type === 'topper' ? 'Certificate of Congratulations' : 'Certificate of Participation'">
                         </template>
                     </FormField>
                     <FormField label="Body text" class-extra="sm:col-span-2"
-                               hint="Placeholders: {recipient_name}, {designation}, {school_name}, {program_title}, {sahodaya_name}, {venue}, {conducted_on}, {days_attended}">
+                               :hint="form.event_type === 'topper'
+                                   ? 'Placeholders: {recipient_name}, {school_name}, {sahodaya_name}, {academic_year}, {class}, {examination_type}, {percentage}, {rank}'
+                                   : 'Placeholders: {recipient_name}, {designation}, {school_name}, {program_title}, {sahodaya_name}, {venue}, {conducted_on}, {days_attended}, {training_hours}'">
                         <template #default="{ id }">
                             <textarea :id="id" v-model="form.body" class="field font-mono text-xs" rows="8"></textarea>
                         </template>
@@ -59,7 +71,7 @@
                 <FormField v-else label="Template file" class-extra="sm:col-span-2" required>
                     <template #default="{ id }">
                         <input :id="id" type="file" accept=".pdf,.png,.jpg,.jpeg"
-                               class="field" :required="form.event_type !== 'training'"
+                               class="field" required
                                @change="e => form.template_file = e.target.files[0]">
                     </template>
                 </FormField>
@@ -116,8 +128,17 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     templates: { type: Array, default: () => [] },
     defaultBody: { type: String, default: '' },
+    defaultTopperBody: { type: String, default: '' },
     defaultSignatories: { type: Array, default: () => [] },
 });
+
+const trainingCertificateTypes = [
+    'participation',
+    'completion',
+    'appreciation',
+    'resource_person',
+    'organizer',
+];
 
 const form = useForm({
     event_type: 'training',
@@ -136,8 +157,16 @@ const form = useForm({
 });
 
 watch(() => form.event_type, (type) => {
-    if (type === 'training' && !form.body) {
+    if (type === 'training') {
+        if (!trainingCertificateTypes.includes(form.certificate_type)) {
+            form.certificate_type = 'participation';
+        }
+        form.title = 'Certificate of Participation';
         form.body = props.defaultBody;
+    } else if (type === 'topper') {
+        form.certificate_type = 'congratulations';
+        form.title = 'Certificate of Congratulations';
+        form.body = props.defaultTopperBody || '';
     }
 });
 
