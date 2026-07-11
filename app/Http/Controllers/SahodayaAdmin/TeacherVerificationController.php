@@ -25,9 +25,10 @@ class TeacherVerificationController extends SahodayaAdminController
     public function index(Request $request, EffectiveMasterDataResolver $resolver)
     {
         $filters = $request->validate([
-            'school_id'    => 'nullable|string',
-            'verification' => 'nullable|in:all,verified,unverified',
-            'search'       => 'nullable|string|max:100',
+            'school_id'      => 'nullable|string',
+            'verification'   => 'nullable|in:all,verified,unverified',
+            'search'         => 'nullable|string|max:100',
+            'teaching_type_id' => 'nullable|integer',
         ]);
 
         $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)
@@ -47,6 +48,7 @@ class TeacherVerificationController extends SahodayaAdminController
         $teachers = (clone $base)
             ->with(['teachingType', 'verifiedBy:id,name,email'])
             ->when(! empty($filters['school_id']), fn ($q) => $q->where('tenant_id', $filters['school_id']))
+            ->when(! empty($filters['teaching_type_id']), fn ($q) => $q->where('teaching_type_id', $filters['teaching_type_id']))
             ->when(($filters['verification'] ?? 'all') === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
             ->when(($filters['verification'] ?? 'all') === 'unverified', fn ($q) => $q->whereNull('verified_at'))
             ->when(! empty($filters['search']), function ($q) use ($filters) {
@@ -70,6 +72,7 @@ class TeacherVerificationController extends SahodayaAdminController
                 'school_id' => '',
                 'verification' => 'all',
                 'search' => '',
+                'teaching_type_id' => '',
             ], $filters),
             'schools'    => $schools,
             'teachingTypes' => $resolver->teachingTypes($this->sahodaya->id),
