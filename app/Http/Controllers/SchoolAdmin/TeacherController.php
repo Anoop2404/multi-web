@@ -165,6 +165,38 @@ class TeacherController extends SchoolAdminController
         );
     }
 
+    public function exportPdf(Request $request)
+    {
+        $filters = $this->validatedTeacherListFilters($request);
+
+        $teachers = $this->teacherListQuery($filters)
+            ->with(['teachingType', 'verifiedBy:id,name,email'])
+            ->orderBy('name')
+            ->get();
+
+        $subjectLabelMap = app(EffectiveMasterDataResolver::class)->subjects($this->school->parent_id)->pluck('label', 'id');
+
+        $rows = $teachers->map(fn (Teacher $t) => [
+            'name'           => $t->name,
+            'login_code'     => $t->login_code ?? '—',
+            'employee_code'  => $t->employee_code ?? '—',
+            'teaching_type'  => $t->teachingType?->label ?? '—',
+            'subjects'       => collect($t->subject_ids ?? [])->map(fn ($id) => $subjectLabelMap->get($id))->filter()->implode(', ') ?: '—',
+            'mobile'         => $t->mobile ?? '—',
+            'email'          => $t->email ?? '—',
+            'status'         => ucfirst($t->status),
+            'verification'   => $t->isVerified() ? 'Verified' : 'Pending',
+        ])->all();
+
+        $prefix = $this->school->school_prefix ?: 'school';
+        $filename = "{$prefix}-teachers-".now()->format('Y-m-d').".pdf";
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('school.teachers.roster', [
+            'school' => $this->school,
+            'rows'   => $rows,
+        ])->setPaper('a4', 'landscape')->download($filename);
+    }
+
     public function store(Request $request, PlatformAuditLogger $audit)
     {
         $data = $this->validatedTeacher($request);

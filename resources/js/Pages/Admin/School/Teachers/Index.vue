@@ -14,6 +14,7 @@
                 <Link :href="`/school-admin/${school.id}/imports`" class="btn-secondary">Import history</Link>
                 <a :href="exportUrl('xlsx')" class="btn-secondary ml-auto">↓ Export (.xlsx)</a>
                 <a :href="exportUrl('csv')" class="btn-secondary">↓ Export (.csv)</a>
+                <a :href="exportPdfUrl()" class="btn-secondary">↓ Print / PDF</a>
             </div>
 
             <!-- Bulk add -->
@@ -353,6 +354,11 @@ function applyFilters() {
 function exportUrl(format) {
     const params = new URLSearchParams({ ...f, format });
     return `/school-admin/${props.school.id}/teachers/export?${params.toString()}`;
+}
+
+function exportPdfUrl() {
+    const params = new URLSearchParams(f);
+    return `/school-admin/${props.school.id}/teachers/export-pdf?${params.toString()}`;
 }
 
 const editingTeacher = ref(null);
