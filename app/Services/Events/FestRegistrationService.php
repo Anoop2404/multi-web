@@ -12,6 +12,11 @@ class FestRegistrationService
     {
         abort_if($registration->event_id !== $event->id, 422);
         abort_if(in_array($registration->status, ['withdrawn', 'rejected'], true), 422, 'Registration is already closed.');
+        abort_if(
+            app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration),
+            422,
+            'This registration\'s fee has already been paid and approved — it can no longer be cancelled.',
+        );
 
         $registration->update(['status' => 'withdrawn']);
 
@@ -36,6 +41,10 @@ class FestRegistrationService
             return false;
         }
 
+        if (app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration)) {
+            return false;
+        }
+
         return $event->isRegistrationOpen() || $registration->status === 'submitted';
     }
 
@@ -45,7 +54,11 @@ class FestRegistrationService
             return false;
         }
 
-        return ! $event->results_published;
+        if ($event->results_published) {
+            return false;
+        }
+
+        return ! app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration);
     }
 
     /** Swap a performer with a standby on the same registration (pre-stage emergency). */

@@ -756,6 +756,32 @@ class FestSchoolEventFeeService
         return $this->isPaid($event, $registration->school_id);
     }
 
+    /**
+     * Whether an approved payment already exists against the fee record covering this
+     * registration (the specific Event Head's record for per-head billing, the single
+     * event-wide record otherwise). Used to lock cancellation — per the confirmed product
+     * rule, a registration may only be cancelled pre-payment-approval; once any amount has
+     * been approved against its fee record, cancellation is no longer allowed.
+     */
+    public function hasApprovedPaymentForRegistration(FestEvent $event, FestRegistration $registration): bool
+    {
+        $registration->loadMissing('item');
+        $headId = $registration->item?->head_id;
+
+        $query = FestSchoolEventFee::where('event_id', $event->id)
+            ->where('school_id', $registration->school_id);
+
+        if ($headId && $this->usesPerHeadBilling($event)) {
+            $query->where('head_id', $headId);
+        } else {
+            $query->whereNull('head_id');
+        }
+
+        $fee = $query->first();
+
+        return $fee && (float) $fee->amount_paid > 0;
+    }
+
     private function applySchoolFeeCap(float $total, array $schedule): float
     {
         $cap = isset($schedule['school_fee_cap']) ? (float) $schedule['school_fee_cap'] : null;

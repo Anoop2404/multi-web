@@ -195,7 +195,7 @@ class FestEventOpsController extends Controller
         abort_unless(
             app(FestRegistrationService::class)->canAdminCancel($registration, $event),
             422,
-            'Cannot cancel after results are published.'
+            'Cannot cancel — results are published or the fee for this registration has already been paid and approved.'
         );
 
         app(FestRegistrationService::class)->cancel($registration, $event);
