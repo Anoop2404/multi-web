@@ -75,6 +75,12 @@ class Teacher extends Model
             ->get();
     }
 
+    /**
+     * The only code path allowed to write the `subject` column. `subject` is a
+     * denormalized, comma-joined label string derived from `subject_ids` (kept
+     * around for CSV/XLSX export and legacy display) — writing it from anywhere
+     * else risks silently desyncing it from `subject_ids`.
+     */
     public function syncSubjectIds(array $subjectIds): void
     {
         $ids = array_values(array_unique(array_map('intval', array_filter($subjectIds, fn ($id) => filled($id)))));

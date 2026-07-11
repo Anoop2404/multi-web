@@ -187,7 +187,10 @@ class TeacherController extends SchoolAdminController
             'address'           => $data['address'] ?? null,
             'designation'       => $data['designation'] ?? null,
             'designation_id'    => $data['designation_id'] ?? null,
-            'subject'           => $data['subject'] ?? null,
+            // 'subject' is intentionally not set here — it's a denormalized label
+            // string derived from subject_ids and must only ever be written by
+            // Teacher::syncSubjectIds() (called just below via syncRelations()),
+            // otherwise it can silently drift from subject_ids.
             'teaching_type_id'  => $data['teaching_type_id'],
             'qualification'     => $data['qualification'] ?? null,
             'experience_years'  => $data['experience_years'] ?? null,
@@ -613,6 +616,10 @@ class TeacherController extends SchoolAdminController
         abort_if($teacher->tenant_id !== $this->school->id, 403);
 
         $data = $this->validatedTeacher($request, $teacher);
+        // 'subject' is a denormalized label string derived from subject_ids — never
+        // write it directly, only via Teacher::syncSubjectIds() (see syncRelations()
+        // below), otherwise it can silently drift from subject_ids.
+        unset($data['subject']);
         $before = $teacher->only(array_keys($data));
 
         $teacher->update($data);
