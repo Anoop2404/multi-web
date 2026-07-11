@@ -6,6 +6,9 @@
             :description="`${students.total ?? 0} ${(students.total ?? 0) === 1 ? 'student' : 'students'}${hasActiveFilters ? ' · filtered' : ''}`"
         >
             <template #actions>
+                <a :href="exportUrl('xlsx')" class="btn-secondary">↓ Export (.xlsx)</a>
+                <a :href="exportUrl('csv')" class="btn-secondary">↓ Export (.csv)</a>
+                <a :href="exportPdfUrl()" class="btn-secondary">↓ Print / PDF</a>
                 <Link v-if="pendingChangeRequests > 0"
                       :href="`/school-admin/${school.id}/students/pending-change-requests`"
                       class="btn-secondary text-sm">
@@ -720,8 +723,39 @@ function statusClass(status) {
 }
 
 function remove(student) {
-    if (!confirm(`Remove student "${student.name}"?`)) return;
+    if (!confirm(`Withdraw student "${student.name}"? The record will be soft-deleted.`)) return;
     router.delete(`/school-admin/${props.school.id}/students/${student.id}`);
+}
+
+function exportUrl(format) {
+    const params = new URLSearchParams();
+    const p = {
+        class_category_id: filterForm.class_category_id,
+        school_class_id: filterForm.school_class_id,
+        status: filterForm.status,
+        verification: filterForm.verification,
+        search: filterForm.search,
+        format,
+    };
+    Object.entries(p).forEach(([k, v]) => {
+        if (v != null && v !== '') params.set(k, v);
+    });
+    return `/school-admin/${props.school.id}/students/export?${params.toString()}`;
+}
+
+function exportPdfUrl() {
+    const params = new URLSearchParams();
+    const p = {
+        class_category_id: filterForm.class_category_id,
+        school_class_id: filterForm.school_class_id,
+        status: filterForm.status,
+        verification: filterForm.verification,
+        search: filterForm.search,
+    };
+    Object.entries(p).forEach(([k, v]) => {
+        if (v != null && v !== '') params.set(k, v);
+    });
+    return `/school-admin/${props.school.id}/students/export-pdf?${params.toString()}`;
 }
 
 function initials(name) {

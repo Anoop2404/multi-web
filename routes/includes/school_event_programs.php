@@ -289,8 +289,12 @@ Route::get('/mcq-exams', fn (string $tenantId) => redirect("/school-admin/{$tena
 
 Route::prefix('training')->name('training.')->group(function () {
     Route::get('/', [TrainingController::class, 'hub'])->name('index');
-    Route::post('/', [TrainingRegistrationController::class, 'store']);
-    Route::post('/{registration}/payment', [TrainingRegistrationController::class, 'uploadPayment']);
+    Route::post('/', [TrainingRegistrationController::class, 'store'])->name('store');
+    Route::post('/bulk', [TrainingRegistrationController::class, 'bulkStore'])->name('bulk');
+    Route::get('/import/template', [TrainingRegistrationController::class, 'importTemplate'])->name('import.template');
+    Route::post('/import', [TrainingRegistrationController::class, 'importStore'])->name('import');
+    Route::get('/{program}/export', [TrainingRegistrationController::class, 'export'])->name('export');
+    Route::post('/{registration}/payment', [TrainingRegistrationController::class, 'uploadPayment'])->name('payment');
     Route::get('/{program}/attendance', [TrainingRegistrationController::class, 'attendance'])->name('attendance');
     Route::post('/{program}/sessions/{session}/attendance', [TrainingRegistrationController::class, 'markAllPresent'])->name('sessions.attendance');
     Route::post('/{program}/sessions/{session}/attendance/{registration}', [TrainingRegistrationController::class, 'updateAttendance'])->name('sessions.attendance.update');

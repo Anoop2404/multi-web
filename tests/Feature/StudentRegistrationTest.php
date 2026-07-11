@@ -139,7 +139,7 @@ class StudentRegistrationTest extends TestCase
         ]);
 
         $this->assertSame('10', $student->fresh()->class_label);
-        $this->assertSame('Secondary', $student->fresh()->schoolClass->classCategory->label);
+        $this->assertSame($category->label, $student->fresh()->schoolClass->classCategory->label);
     }
 
     public function test_students_do_not_require_admission_number(): void
@@ -511,7 +511,7 @@ class StudentRegistrationTest extends TestCase
 
         $csv = (new \App\Services\Students\StudentCsvImporter($tenant))->templateCsvForSchool();
 
-        $this->assertStringContainsString('full_name,class_name,email', $csv);
+        $this->assertStringContainsString('full_name,class_name,admission_number,gender,dob,email', $csv);
         $this->assertStringContainsString($firstClass->name, $csv);
         $this->assertStringContainsString('Rahul Kumar', $csv);
     }

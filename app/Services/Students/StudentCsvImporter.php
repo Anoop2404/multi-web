@@ -3,6 +3,7 @@
 namespace App\Services\Students;
 
 use App\Models\SchoolClass;
+use App\Models\Student;
 use App\Models\Tenant;
 use App\Services\Spreadsheet\SpreadsheetReader;
 use App\Services\Spreadsheet\SpreadsheetWriter;
@@ -13,11 +14,12 @@ class StudentCsvImporter
 {
     /** @var array<string, list<string>> */
     private const HEADER_ALIASES = [
-        'name'   => ['full_name', 'full name', 'student name', 'student_name', 'name'],
-        'class'  => ['class_name', 'class name', 'class'],
-        'email'  => ['email', 'parent_email', 'parent email'],
-        'gender' => ['gender', 'sex'],
-        'dob'    => ['dob', 'date_of_birth', 'date of birth', 'birthdate', 'birth_date'],
+        'name'              => ['full_name', 'full name', 'student name', 'student_name', 'name'],
+        'class'             => ['class_name', 'class name', 'class'],
+        'admission_number'  => ['admission_number', 'admission number', 'admission_no', 'admission no', 'adm_no'],
+        'email'             => ['email', 'parent_email', 'parent email'],
+        'gender'            => ['gender', 'sex'],
+        'dob'               => ['dob', 'date_of_birth', 'date of birth', 'birthdate', 'birth_date'],
     ];
 
     public function __construct(private Tenant $school) {}
@@ -92,6 +94,10 @@ class StudentCsvImporter
                         'dob'             => $row['dob'],
                     ];
 
+                    if (! empty($row['admission_number'])) {
+                        $fields['admission_number'] = $row['admission_number'];
+                    }
+
                     if ($row['email'] !== null) {
                         $fields['parent_email'] = $row['email'];
                     }
@@ -129,12 +135,13 @@ class StudentCsvImporter
         $validation = $this->validateRows($path);
 
         $valid = array_map(fn (array $row) => [
-            'row'    => $row['row'],
-            'name'   => $row['name'],
-            'class'  => $row['class_name'],
-            'gender' => $row['gender'],
-            'dob'    => $row['dob'],
-            'email'  => $row['email'],
+            'row'               => $row['row'],
+            'name'              => $row['name'],
+            'class'             => $row['class_name'],
+            'admission_number'  => $row['admission_number'],
+            'gender'            => $row['gender'],
+            'dob'               => $row['dob'],
+            'email'             => $row['email'],
         ], array_slice($validation['rows'], 0, $limit));
 
         return [
@@ -242,14 +249,17 @@ class StudentCsvImporter
                 continue;
             }
 
+            $admissionNumber = isset($columns['admission_number']) ? trim((string) ($row[$columns['admission_number']] ?? '')) : '';
+
             $rows[] = [
-                'row'             => $rowNumber,
-                'school_class_id' => $schoolClass->id,
-                'name'            => $name,
-                'class_name'      => $className,
-                'gender'          => $gender,
-                'dob'             => $dob,
-                'email'           => $email !== '' ? $email : null,
+                'row'               => $rowNumber,
+                'school_class_id'   => $schoolClass->id,
+                'name'              => $name,
+                'class_name'        => $className,
+                'admission_number'  => $admissionNumber !== '' ? $admissionNumber : null,
+                'gender'            => $gender,
+                'dob'               => $dob,
+                'email'             => $email !== '' ? $email : null,
             ];
         }
 
@@ -261,14 +271,122 @@ class StudentCsvImporter
             ];
         }
 
+        $errors = array_merge($errors, $this->duplicateErrors($rows));
+
+        // Drop rows that failed duplicate checks so import stays all-or-nothing clean.
+        if ($errors !== []) {
+            $errorRows = collect($errors)->pluck('row')->unique()->all();
+            $rows = array_values(array_filter($rows, fn (array $r) => ! in_array($r['row'], $errorRows, true)));
+        }
+
         return ['rows' => $rows, 'errors' => $errors, 'total_rows' => $totalRows];
+    }
+
+    /**
+     * @param  list<array{row: int, name: string, dob: ?string, admission_number: ?string}>  $rows
+     * @return list<array{row: int, message: string}>
+     */
+    private function duplicateErrors(array $rows): array
+    {
+        $errors = [];
+        $seenNameDob = [];
+        $seenAdmission = [];
+
+        foreach ($rows as $row) {
+            $nameKey = strtolower(trim($row['name']));
+            $dobKey = $row['dob'] ?? '';
+            $combo = $nameKey.'|'.$dobKey;
+
+            if ($dobKey !== '') {
+                if (isset($seenNameDob[$combo])) {
+                    $errors[] = [
+                        'row' => $row['row'],
+                        'message' => "Duplicate name + date of birth in file (same as row {$seenNameDob[$combo]}): \"{$row['name']}\".",
+                    ];
+                } else {
+                    $seenNameDob[$combo] = $row['row'];
+                }
+            }
+
+            $adm = $row['admission_number'] ?? null;
+            if ($adm) {
+                $admKey = strtolower($adm);
+                if (isset($seenAdmission[$admKey])) {
+                    $errors[] = [
+                        'row' => $row['row'],
+                        'message' => "Duplicate admission number in file (same as row {$seenAdmission[$admKey]}): \"{$adm}\".",
+                    ];
+                } else {
+                    $seenAdmission[$admKey] = $row['row'];
+                }
+            }
+        }
+
+        // Against existing DB records for this school.
+        $nameDobPairs = [];
+        foreach ($rows as $row) {
+            if (! empty($row['dob'])) {
+                $nameDobPairs[] = [
+                    'row' => $row['row'],
+                    'name' => $row['name'],
+                    'dob' => $row['dob'],
+                ];
+            }
+        }
+
+        if ($nameDobPairs !== []) {
+            $existing = Student::query()
+                ->where('tenant_id', $this->school->id)
+                ->whereIn('dob', array_unique(array_column($nameDobPairs, 'dob')))
+                ->get(['id', 'name', 'dob']);
+
+            $existingKeys = [];
+            foreach ($existing as $student) {
+                $key = strtolower(trim($student->name)).'|'.optional($student->dob)->format('Y-m-d');
+                $existingKeys[$key] = true;
+            }
+
+            foreach ($nameDobPairs as $pair) {
+                $key = strtolower(trim($pair['name'])).'|'.$pair['dob'];
+                if (isset($existingKeys[$key])) {
+                    $errors[] = [
+                        'row' => $pair['row'],
+                        'message' => "Student \"{$pair['name']}\" with DOB {$pair['dob']} already exists in this school.",
+                    ];
+                }
+            }
+        }
+
+        $admissionNos = array_values(array_filter(array_column($rows, 'admission_number')));
+        if ($admissionNos !== []) {
+            $existingAdm = Student::query()
+                ->where('tenant_id', $this->school->id)
+                ->whereIn('admission_number', $admissionNos)
+                ->pluck('admission_number')
+                ->map(fn ($v) => strtolower((string) $v))
+                ->all();
+
+            $existingAdmSet = array_fill_keys($existingAdm, true);
+
+            foreach ($rows as $row) {
+                $adm = $row['admission_number'] ?? null;
+                if ($adm && isset($existingAdmSet[strtolower($adm)])) {
+                    $errors[] = [
+                        'row' => $row['row'],
+                        'message' => "Admission number \"{$adm}\" already exists in this school.",
+                    ];
+                }
+            }
+        }
+
+        return $errors;
     }
 
     public static function templateCsv(): string
     {
-        return "full_name,class_name,gender,dob,email\n"
-            ."Rahul Kumar,10,male,2012-05-01,\n"
-            ."Priya Nair,LKG,female,2018-03-15,parent@example.com\n";
+        return "full_name,class_name,admission_number,gender,dob,email\n"
+            ."Rahul Kumar,10,,male,2012-05-01,\n"
+            ."Priya Nair,LKG,,female,2018-03-15,parent@example.com\n";
     }
 
     public function templateCsvForSchool(): string
@@ -299,13 +417,13 @@ class StudentCsvImporter
         $class2 = (string) $classes->get(1, $class1);
 
         $rows = [
-            ['full_name', 'class_name', 'gender', 'dob', 'email'],
-            ['Rahul Kumar', $class1, 'male', '2012-05-01', ''],
-            ['Priya Nair', $class2, 'female', '2018-03-15', 'parent@example.com'],
+            ['full_name', 'class_name', 'admission_number', 'gender', 'dob', 'email'],
+            ['Rahul Kumar', $class1, '', 'male', '2012-05-01', ''],
+            ['Priya Nair', $class2, '', 'female', '2018-03-15', 'parent@example.com'],
         ];
 
         if ($classes->count() > 2) {
-            $rows[] = ['Anita Shah', (string) $classes->get(2), 'female', '2011-08-20', 'anita@example.com'];
+            $rows[] = ['Anita Shah', (string) $classes->get(2), '', 'female', '2011-08-20', 'anita@example.com'];
         }
 
         return $rows;

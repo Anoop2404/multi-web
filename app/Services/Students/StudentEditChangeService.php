@@ -237,6 +237,7 @@ class StudentEditChangeService
 
         if ($request->change_type === 'update') {
             $student = Student::where('tenant_id', $school->id)->findOrFail($request->student_id);
+            $wasVerified = $student->verified_at !== null;
             $before = $student->only(array_keys($changes));
 
             if ($request->photo_path) {
@@ -245,7 +246,15 @@ class StudentEditChangeService
 
             $student->update($changes);
 
-            $student->update(['verified_at' => null, 'verified_by_user_id' => null]);
+            $student->update([
+                'verified_at'         => null,
+                'verified_by_user_id' => null,
+                'rejection_reason'    => null,
+            ]);
+
+            if ($wasVerified) {
+                $this->notifyReverificationRequired($student->fresh(), $school);
+            }
 
             app(DataChangeLogger::class)->updated(
                 $student,
@@ -320,5 +329,29 @@ class StudentEditChangeService
         }
 
         return TenantStorage::storeStudentPhoto($request->file('photo'), $school->id);
+    }
+
+    private function notifyReverificationRequired(Student $student, Tenant $school): void
+    {
+        $notificationService = app(\App\Services\Notifications\NotificationService::class);
+        $replacements = ['student_name' => $student->name];
+
+        foreach (User::role(['school_admin', 'school_staff'])->where('tenant_id', $school->id)->get() as $user) {
+            $notificationService->notifyFromTemplate(
+                $user,
+                'student.verification.required',
+                $replacements,
+                '/school-admin/'.$school->id.'/students',
+            );
+        }
+
+        if ($school->parent_id) {
+            app(\App\Services\Notifications\SahodayaAdminNotifier::class)->notifyAdmins(
+                $school->parent_id,
+                'student.verification.pending',
+                $replacements,
+                "/sahodaya-admin/{$school->parent_id}/students/verification",
+            );
+        }
     }
 }

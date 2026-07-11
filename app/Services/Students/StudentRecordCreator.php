@@ -26,6 +26,10 @@ class StudentRecordCreator
 
         $payload['reg_no'] = app(StudentRegistrationNumberGenerator::class)->generate($school);
 
+        if (! empty($fields['admission_number'])) {
+            $payload['admission_number'] = trim((string) $fields['admission_number']);
+        }
+
         if (! empty($fields['parent_email'])) {
             $payload['parent_email'] = strtolower((string) $fields['parent_email']);
         } elseif (! empty($fields['email'])) {
@@ -47,6 +51,15 @@ class StudentRecordCreator
             'students',
             ['school_class_id' => $student->school_class_id],
         );
+
+        if ($school->parent_id) {
+            app(\App\Services\Notifications\SahodayaAdminNotifier::class)->notifyAdmins(
+                $school->parent_id,
+                'student.verification.pending',
+                ['student_name' => $student->name],
+                "/sahodaya-admin/{$school->parent_id}/students/verification",
+            );
+        }
 
         return $student;
     }

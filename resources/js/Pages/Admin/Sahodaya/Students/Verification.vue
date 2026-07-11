@@ -4,7 +4,7 @@
         <PageHeader :title="selectedSchool ? selectedSchool.name : 'Student verification'"
                     eyebrow="Membership"
                     :description="selectedSchool
-                        ? 'Review student details in the list and verify directly — no separate profile page needed.'
+                        ? 'Review student details, then verify or reject — no separate profile page needed.'
                         : 'Start with schools — pick a school to review students. Filter by verification status across all member schools.'">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/schools`" class="btn-secondary text-sm">
@@ -18,8 +18,18 @@
                         class="btn-primary text-sm" @click="bulkVerifyPage">
                     Verify all on this page
                 </button>
+                <button v-if="selectedSchool && pendingOnPage.length" type="button"
+                        class="btn-secondary text-sm text-red-700 border-red-200"
+                        @click="openBulkReject">
+                    Reject selected…
+                </button>
             </template>
         </PageHeader>
+
+        <div v-if="page.props.errors && Object.keys(page.props.errors).length"
+             class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {{ Object.values(page.props.errors).flat().join(' ') }}
+        </div>
 
         <div class="grid sm:grid-cols-3 gap-4 mb-6">
             <button type="button" class="card card--muted !py-4 text-center hover:ring-2 hover:ring-[#0f3d7a]/20 transition"
@@ -140,17 +150,27 @@
                 <table class="data-table min-w-[56rem]">
                     <thead>
                         <tr>
+                            <th class="w-10">
+                                <input type="checkbox" class="rounded"
+                                       :checked="allPendingSelected"
+                                       @change="toggleSelectAll($event.target.checked)">
+                            </th>
                             <th class="w-14">Photo</th>
                             <th>Student</th>
                             <th>Class</th>
                             <th>Gender / DOB</th>
                             <th>Parent / contact</th>
                             <th>Status</th>
-                            <th class="text-right w-28"></th>
+                            <th class="text-right w-36"></th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="row in students?.data ?? []" :key="row.id" class="align-top">
+                            <td class="py-3">
+                                <input v-if="!row.is_verified" type="checkbox" class="rounded"
+                                       :checked="selectedIds.includes(row.id)"
+                                       @change="toggleSelect(row.id, $event.target.checked)">
+                            </td>
                             <td class="py-3">
                                 <div class="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center shrink-0">
                                     <img v-if="row.photo_url" :src="row.photo_url" :alt="row.name" class="w-full h-full object-cover">
@@ -162,6 +182,7 @@
                                 <p v-if="row.reg_no" class="text-xs font-mono text-slate-500 mt-0.5">{{ row.reg_no }}</p>
                                 <p v-if="row.admission_number" class="text-xs text-slate-500 mt-0.5">Adm. {{ row.admission_number }}</p>
                                 <p v-if="row.roll_number" class="text-xs text-slate-500">Roll {{ row.roll_number }}</p>
+                                <p v-if="row.rejection_reason" class="text-xs text-red-600 mt-0.5">Rejected: {{ row.rejection_reason }}</p>
                             </td>
                             <td class="py-3 text-sm">
                                 <p class="font-medium text-gray-800">{{ row.class_name ?? '—' }}</p>
@@ -188,12 +209,14 @@
                                 </p>
                             </td>
                             <td class="py-3 text-right whitespace-nowrap">
-                                <button v-if="!row.is_verified" type="button" class="btn-primary text-xs"
+                                <button v-if="!row.is_verified" type="button" class="text-xs font-semibold text-emerald-700 mr-3"
                                         @click="verifyOne(row)">Verify</button>
+                                <button v-if="!row.is_verified" type="button" class="text-xs font-semibold text-red-600"
+                                        @click="openReject(row)">Reject</button>
                             </td>
                         </tr>
                         <tr v-if="!(students?.data?.length)">
-                            <td colspan="7" class="p-8 text-center text-slate-400">No students match the filters.</td>
+                            <td colspan="8" class="p-8 text-center text-slate-400">No students match the filters.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -206,12 +229,47 @@
                       v-html="link.label" />
             </div>
         </div>
+
+        <div v-if="rejectingStudent" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="closeReject">
+            <form class="card w-full max-w-md shadow-xl space-y-3" @submit.prevent="submitReject">
+                <h3 class="section-title">Reject verification</h3>
+                <p class="text-sm text-slate-600">{{ rejectingStudent.name }} — {{ rejectingStudent.school_name }}</p>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 block mb-1">Reason <span class="text-red-500">*</span></label>
+                    <textarea v-model="rejectReason" rows="3" class="field !py-2 !text-sm w-full" required maxlength="500"
+                              placeholder="Explain what needs to be corrected"></textarea>
+                </div>
+                <p v-if="rejectionErrors.length" class="text-xs text-red-600">{{ rejectionErrors.join(' ') }}</p>
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="button" class="btn-secondary text-sm" @click="closeReject">Cancel</button>
+                    <button type="submit" class="btn-primary text-sm bg-red-600 hover:bg-red-700">Reject</button>
+                </div>
+            </form>
+        </div>
+
+        <div v-if="bulkRejectOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="closeBulkReject">
+            <form class="card w-full max-w-md shadow-xl space-y-3" @submit.prevent="submitBulkReject">
+                <h3 class="section-title">Bulk reject</h3>
+                <p class="text-sm text-slate-600">
+                    Reject {{ selectedIds.length || pendingOnPage.length }} pending student(s) with the same reason.
+                </p>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 block mb-1">Reason <span class="text-red-500">*</span></label>
+                    <textarea v-model="bulkRejectReason" rows="3" class="field !py-2 !text-sm w-full" required maxlength="500"
+                              placeholder="Explain what needs to be corrected"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="button" class="btn-secondary text-sm" @click="closeBulkReject">Cancel</button>
+                    <button type="submit" class="btn-primary text-sm bg-red-600 hover:bg-red-700">Reject all</button>
+                </div>
+            </form>
+        </div>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { computed, reactive, ref } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import { formatAgeLabel } from '@/support/calendarDates.js';
@@ -228,10 +286,22 @@ const props = defineProps({
     schools: Array,
 });
 
+const page = usePage();
 const base = `/sahodaya-admin/${props.sahodaya.id}/students/verification`;
 const f = reactive({ ...props.filters });
+const selectedIds = ref([]);
+const rejectingStudent = ref(null);
+const rejectReason = ref('');
+const rejectionErrors = ref([]);
+const bulkRejectOpen = ref(false);
+const bulkRejectReason = ref('');
 
 const schoolPendingCount = computed(() => props.selectedSchool?.unverified ?? 0);
+const pendingOnPage = computed(() => (props.students?.data ?? []).filter((r) => !r.is_verified));
+const allPendingSelected = computed(() =>
+    pendingOnPage.value.length > 0
+    && pendingOnPage.value.every((r) => selectedIds.value.includes(r.id)),
+);
 
 function applyFilters() {
     router.get(base, { ...f }, { preserveState: true, preserveScroll: true });
@@ -245,11 +315,13 @@ function setVerification(value) {
 function openSchool(row) {
     f.school_id = row.id;
     f.search = '';
+    selectedIds.value = [];
     applyFilters();
 }
 
 function clearSchool() {
     f.school_id = '';
+    selectedIds.value = [];
     applyFilters();
 }
 
@@ -257,8 +329,76 @@ function verifyOne(row) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/students/${row.id}/verify`, {}, { preserveScroll: true });
 }
 
+function openReject(row) {
+    rejectingStudent.value = row;
+    rejectReason.value = '';
+    rejectionErrors.value = [];
+}
+
+function closeReject() {
+    rejectingStudent.value = null;
+    rejectReason.value = '';
+}
+
+function submitReject() {
+    if (!rejectReason.value.trim()) return;
+    const student = rejectingStudent.value;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/students/${student.id}/reject`, {
+        reason: rejectReason.value.trim(),
+    }, {
+        preserveScroll: true,
+        onSuccess: () => closeReject(),
+        onError: (errors) => { rejectionErrors.value = Object.values(errors).flat(); },
+    });
+}
+
+function openBulkReject() {
+    if (!selectedIds.value.length) {
+        selectedIds.value = pendingOnPage.value.map((r) => r.id);
+    }
+    if (!selectedIds.value.length) return;
+    bulkRejectReason.value = '';
+    bulkRejectOpen.value = true;
+}
+
+function closeBulkReject() {
+    bulkRejectOpen.value = false;
+    bulkRejectReason.value = '';
+}
+
+function submitBulkReject() {
+    if (!bulkRejectReason.value.trim() || !selectedIds.value.length) return;
+    router.post(`${base}/bulk-reject`, {
+        student_ids: selectedIds.value,
+        reason: bulkRejectReason.value.trim(),
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            selectedIds.value = [];
+            closeBulkReject();
+        },
+    });
+}
+
+function toggleSelect(id, checked) {
+    if (checked) {
+        selectedIds.value = [...new Set([...selectedIds.value, id])];
+    } else {
+        selectedIds.value = selectedIds.value.filter((x) => x !== id);
+    }
+}
+
+function toggleSelectAll(checked) {
+    const pendingIds = pendingOnPage.value.map((r) => r.id);
+    if (checked) {
+        selectedIds.value = [...new Set([...selectedIds.value, ...pendingIds])];
+    } else {
+        selectedIds.value = selectedIds.value.filter((id) => !pendingIds.includes(id));
+    }
+}
+
 function bulkVerifyPage() {
-    const ids = (props.students?.data ?? []).filter((r) => !r.is_verified).map((r) => r.id);
+    const ids = pendingOnPage.value.map((r) => r.id);
     if (!ids.length) return;
     router.post(`${base}/bulk-verify`, { student_ids: ids }, { preserveScroll: true });
 }

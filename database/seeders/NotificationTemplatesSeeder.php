@@ -131,6 +131,26 @@ class NotificationTemplatesSeeder extends Seeder
                 'body_template' => '{{teacher_name}} was edited and now requires re-verification by your Sahodaya.',
             ],
             [
+                'slug'          => 'student.verification.pending',
+                'title'         => 'Student awaiting verification',
+                'body_template' => '{{student_name}} has been added and is awaiting Sahodaya verification.',
+            ],
+            [
+                'slug'          => 'student.verification.approved',
+                'title'         => 'Student verified',
+                'body_template' => '{{student_name}} has been verified by your Sahodaya.',
+            ],
+            [
+                'slug'          => 'student.verification.rejected',
+                'title'         => 'Student verification rejected',
+                'body_template' => 'Verification for {{student_name}} was rejected. Reason: {{reason}}',
+            ],
+            [
+                'slug'          => 'student.verification.required',
+                'title'         => 'Student needs re-verification',
+                'body_template' => '{{student_name}} was edited and now requires re-verification by your Sahodaya.',
+            ],
+            [
                 'slug'          => 'circular.published',
                 'title'         => 'New circular',
                 'body_template' => 'A new circular "{{circular_title}}" has been issued by your Sahodaya.',

@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
-use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Membership\EffectiveMasterDataResolver;
+use App\Services\Notifications\NotificationService;
 use Illuminate\Http\Request;
 
 class StudentVerificationController extends SahodayaAdminController
@@ -144,6 +145,7 @@ class StudentVerificationController extends SahodayaAdminController
         $student->update([
             'verified_at'         => now(),
             'verified_by_user_id' => $request->user()?->id,
+            'rejection_reason'    => null,
         ]);
 
         app(DataChangeLogger::class)->event(
@@ -155,7 +157,41 @@ class StudentVerificationController extends SahodayaAdminController
             ['student_id' => $student->id, 'verified_by' => 'sahodaya'],
         );
 
+        $this->notifySchool($student->tenant_id, 'student.verification.approved', [
+            'student_name' => $student->name,
+        ]);
+
         return back()->with('success', "Verified {$student->name}.");
+    }
+
+    public function reject(Request $request, string $tenantId, Student $student)
+    {
+        $this->assertStaffCan('membership.manage');
+        abort_if($student->tenant?->parent_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate(['reason' => 'required|string|max:500']);
+
+        $student->update([
+            'verified_at'         => null,
+            'verified_by_user_id' => null,
+            'rejection_reason'    => $data['reason'],
+        ]);
+
+        app(DataChangeLogger::class)->event(
+            'rejected',
+            "Student verification rejected: {$student->name}",
+            $student->tenant_id,
+            'students',
+            $student,
+            ['student_id' => $student->id, 'reason' => $data['reason']],
+        );
+
+        $this->notifySchool($student->tenant_id, 'student.verification.rejected', [
+            'student_name' => $student->name,
+            'reason'       => $data['reason'],
+        ]);
+
+        return back()->with('success', "Rejected {$student->name}.");
     }
 
     public function bulkVerify(Request $request)
@@ -184,12 +220,69 @@ class StudentVerificationController extends SahodayaAdminController
             abort(422, 'Select students or choose verify all unverified.');
         }
 
+        $affected = (clone $query)->get(['id', 'tenant_id', 'name']);
+
         $count = $query->update([
             'verified_at'         => now(),
             'verified_by_user_id' => $request->user()?->id,
+            'rejection_reason'    => null,
         ]);
 
+        foreach ($affected->groupBy('tenant_id') as $schoolId => $students) {
+            $this->notifySchool((string) $schoolId, 'student.verification.approved', [
+                'student_name' => $students->count() === 1
+                    ? $students->first()->name
+                    : "{$students->count()} students",
+            ]);
+        }
+
         return back()->with('success', $count > 0 ? "Verified {$count} student(s)." : 'No unverified students matched.');
+    }
+
+    public function bulkReject(Request $request)
+    {
+        $this->assertStaffCan('membership.manage');
+        $data = $request->validate([
+            'student_ids'   => 'required|array|min:1',
+            'student_ids.*' => 'integer',
+            'reason'        => 'required|string|max:500',
+        ]);
+
+        $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id');
+
+        $query = Student::whereIn('tenant_id', $schoolIds)
+            ->where('status', 'active')
+            ->whereNull('verified_at')
+            ->whereIn('id', $data['student_ids']);
+
+        $affected = (clone $query)->get(['id', 'tenant_id', 'name']);
+
+        $count = $query->update([
+            'verified_at'         => null,
+            'verified_by_user_id' => null,
+            'rejection_reason'    => $data['reason'],
+        ]);
+
+        foreach ($affected->groupBy('tenant_id') as $schoolId => $students) {
+            $this->notifySchool((string) $schoolId, 'student.verification.rejected', [
+                'student_name' => $students->count() === 1
+                    ? $students->first()->name
+                    : "{$students->count()} students",
+                'reason' => $data['reason'],
+            ]);
+        }
+
+        return back()->with('success', $count > 0 ? "Rejected {$count} student(s)." : 'No pending students matched.');
+    }
+
+    /** Notify a school's admin/staff users from a NotificationTemplate slug. */
+    private function notifySchool(string $schoolId, string $slug, array $replacements = []): void
+    {
+        $service = app(NotificationService::class);
+
+        foreach (User::role(['school_admin', 'school_staff'])->where('tenant_id', $schoolId)->get() as $user) {
+            $service->notifyFromTemplate($user, $slug, $replacements, "/school-admin/{$schoolId}/students");
+        }
     }
 
     /** @return array<string, mixed> */
@@ -219,6 +312,7 @@ class StudentVerificationController extends SahodayaAdminController
             'verified_at'       => $student->verified_at?->toIso8601String(),
             'verified_at_display' => $student->verified_at?->format('j M Y'),
             'verified_by'       => $student->verifiedBy?->name ?? $student->verifiedBy?->email,
+            'rejection_reason'  => $student->rejection_reason,
         ];
     }
 }

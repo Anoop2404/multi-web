@@ -4,17 +4,19 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Student extends Model
 {
     use BelongsToCentralTenant;
+    use SoftDeletes;
 
     protected $fillable = [
         'tenant_id', 'user_id', 'academic_year_id', 'school_class_id', 'school_house_id',
         'admission_number', 'reg_no', 'roll_number', 'name', 'email', 'dob', 'gender', 'blood_group',
         'parent_name', 'parent_phone', 'parent_email', 'address',
         'admission_date', 'status', 'photo', 'notes',
-        'verified_at', 'verified_by_user_id',
+        'verified_at', 'verified_by_user_id', 'rejection_reason',
     ];
 
     protected $casts = [
