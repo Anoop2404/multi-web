@@ -11,8 +11,9 @@ class McqExam extends Model
     protected $fillable = [
         'tenant_id', 'academic_year_id', 'series_id', 'exam_level', 'parent_exam_id',
         'eligibility_mode', 'cutoff_score', 'top_rank_count', 'promotion_locked', 'promoted_student_ids',
-        'title', 'exam_type', 'delivery_mode', 'conductor_level',
-        'scheduled_at', 'venue', 'hall_instructions', 'question_paper_path', 'question_paper_label', 'next_hall_ticket_no',
+        'title', 'code', 'exam_type', 'delivery_mode', 'conductor_level',
+        'scheduled_at', 'registration_opens_at', 'registration_closes_at', 'result_date',
+        'venue', 'hall_instructions', 'question_paper_path', 'question_paper_label', 'next_hall_ticket_no',
         'duration_minutes', 'total_questions', 'pass_mark', 'status', 'settings_json',
         'fee_type', 'fee_amount', 'school_discount_amount',
         'payment_deadline', 'late_fee_amount', 'penalty_amount',
@@ -43,20 +44,59 @@ class McqExam extends Model
     }
 
     protected $casts = [
-        'scheduled_at'          => 'datetime',
-        'settings_json'         => 'array',
-        'eligibility_config'    => 'array',
-        'promoted_student_ids'  => 'array',
-        'fee_amount'            => 'decimal:2',
-        'school_discount_amount'=> 'decimal:2',
-        'payment_deadline'      => 'date',
-        'late_fee_amount'       => 'decimal:2',
-        'penalty_amount'        => 'decimal:2',
-        'cutoff_score'          => 'decimal:2',
-        'promotion_locked'      => 'boolean',
-        'results_published'     => 'boolean',
-        'results_published_at'  => 'datetime',
+        'scheduled_at'             => 'datetime',
+        'registration_opens_at'    => 'datetime',
+        'registration_closes_at'   => 'datetime',
+        'result_date'              => 'date',
+        'settings_json'            => 'array',
+        'eligibility_config'       => 'array',
+        'promoted_student_ids'     => 'array',
+        'fee_amount'               => 'decimal:2',
+        'school_discount_amount'   => 'decimal:2',
+        'payment_deadline'         => 'date',
+        'late_fee_amount'          => 'decimal:2',
+        'penalty_amount'           => 'decimal:2',
+        'cutoff_score'             => 'decimal:2',
+        'promotion_locked'         => 'boolean',
+        'results_published'        => 'boolean',
+        'results_published_at'     => 'datetime',
     ];
+
+    /**
+     * Whether registration is within an explicit date window (when set).
+     * If neither opens_at nor closes_at is set, returns null so callers fall back to status.
+     */
+    public function registrationWindowActive(?\Carbon\CarbonInterface $at = null): ?bool
+    {
+        $at ??= now();
+        $opens = $this->registration_opens_at;
+        $closes = $this->registration_closes_at;
+
+        if (! $opens && ! $closes) {
+            return null;
+        }
+
+        if ($opens && $at->lt($opens)) {
+            return false;
+        }
+
+        if ($closes && $at->gt($closes)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function isRegistrationOpen(?\Carbon\CarbonInterface $at = null): bool
+    {
+        if (! in_array($this->status, ['published', 'ongoing'], true)) {
+            return false;
+        }
+
+        $window = $this->registrationWindowActive($at);
+
+        return $window === null ? true : $window;
+    }
 
     public function series()
     {

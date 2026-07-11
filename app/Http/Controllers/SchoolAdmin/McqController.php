@@ -17,6 +17,7 @@ use App\Support\Mcq\McqExamEligibilityConfig;
 use App\Support\Mcq\McqExamLevelLabels;
 use App\Support\Mcq\McqRegistrationStatusPresenter;
 use App\Support\Mcq\McqResultPresenter;
+use App\Models\Tenant;
 use Illuminate\Http\Request;
 
 class McqController extends SchoolAdminController
@@ -55,7 +56,7 @@ class McqController extends SchoolAdminController
         $registrations = McqRegistration::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
             ->active()
-            ->with(['student.user:id,username', 'student.schoolClass:id,name', 'mark', 'feeReceipt'])
+            ->with(['student.user:id,username', 'student.schoolClass:id,name', 'teacher:id,name,employee_code,reg_no', 'mark', 'feeReceipt'])
             ->orderBy('hall_ticket_no')
             ->get()
             ->map(function (McqRegistration $reg) use ($exam) {
@@ -63,6 +64,11 @@ class McqController extends SchoolAdminController
                 $row['student'] = $reg->student
                     ? array_merge($reg->student->only('id', 'name', 'reg_no'), ['class_name' => $reg->student->schoolClass?->name])
                     : null;
+                $row['teacher'] = $reg->teacher
+                    ? $reg->teacher->only('id', 'name', 'employee_code', 'reg_no')
+                    : null;
+                $row['participant_name'] = $reg->participantName();
+                $row['is_teacher'] = $reg->isTeacherRegistration();
                 $row['portal_username'] = $reg->student?->user?->username;
                 $row['approval_status_label'] = $reg->approvalStatusLabel();
                 $row['lifecycle_status'] = McqRegistrationStatusPresenter::forRegistration($reg, $exam);
@@ -74,16 +80,34 @@ class McqController extends SchoolAdminController
                 return $row;
             });
 
+        $allowsStudents = McqExamEligibilityConfig::allowsStudents($exam->eligibility_config);
+        $allowsTeachers = McqExamEligibilityConfig::allowsTeachers($exam->eligibility_config);
+
         $cancelledStudentIds = McqRegistration::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
             ->where('status', 'cancelled')
+            ->whereNotNull('student_id')
             ->pluck('student_id')
             ->filter()
             ->flip();
 
+        $cancelledTeacherIds = McqRegistration::where('exam_id', $exam->id)
+            ->where('school_id', $this->school->id)
+            ->where('status', 'cancelled')
+            ->whereNotNull('teacher_id')
+            ->pluck('teacher_id')
+            ->filter()
+            ->flip();
+
         $cancellableStudentIds = $registrations
-            ->filter(fn ($r) => $r['can_cancel'] ?? false)
+            ->filter(fn ($r) => ($r['can_cancel'] ?? false) && ! empty($r['student_id']))
             ->pluck('student_id')
+            ->filter()
+            ->flip();
+
+        $cancellableTeacherIds = $registrations
+            ->filter(fn ($r) => ($r['can_cancel'] ?? false) && ! empty($r['teacher_id']))
+            ->pluck('teacher_id')
             ->filter()
             ->flip();
 
@@ -97,68 +121,96 @@ class McqController extends SchoolAdminController
 
         $eligibilityService = app(McqEligibilityService::class);
 
-        $studentQuery = Student::where('tenant_id', $this->school->id)
-            ->active()
-            ->with('schoolClass:id,name,class_category_id')
-            ->orderBy('name');
-
-        // Scope to the exam's eligible classes at the DB level so we never load a
-        // school's entire roster (300–2000 students) when only a few classes apply.
-        $eligibleClassIds = $eligibilityService->eligibleSchoolClassIds($exam, $this->school->id);
-        if ($eligibleClassIds !== null) {
-            if ($eligibleClassIds === []) {
-                $studentQuery->whereRaw('1 = 0');
-            } else {
-                $studentQuery->whereIn('school_class_id', $eligibleClassIds);
-            }
-        }
-
-        // Level 2 exams with a locked promotion list are limited to promoted students.
-        if ((int) ($exam->exam_level ?? 1) > 1
-            && $exam->promotion_locked
-            && ! empty($exam->promoted_student_ids)) {
-            $studentQuery->whereIn('id', $exam->promoted_student_ids);
-        }
-
-        $allStudents = $studentQuery->get(['id', 'name', 'reg_no', 'school_class_id', 'gender', 'user_id', 'verified_at']);
-
+        $students = collect();
+        $classOptions = collect();
         $registeredIds = $registrations->pluck('student_id')->filter()->all();
-        $registeredIdSet = array_flip($registeredIds);
+
+        if ($allowsStudents) {
+            $studentQuery = Student::where('tenant_id', $this->school->id)
+                ->active()
+                ->with('schoolClass:id,name,class_category_id')
+                ->orderBy('name');
+
+            $eligibleClassIds = $eligibilityService->eligibleSchoolClassIds($exam, $this->school->id);
+            if ($eligibleClassIds !== null) {
+                if ($eligibleClassIds === []) {
+                    $studentQuery->whereRaw('1 = 0');
+                } else {
+                    $studentQuery->whereIn('school_class_id', $eligibleClassIds);
+                }
+            }
+
+            if ((int) ($exam->exam_level ?? 1) > 1
+                && $exam->promotion_locked
+                && ! empty($exam->promoted_student_ids)) {
+                $studentQuery->whereIn('id', $exam->promoted_student_ids);
+            }
+
+            $allStudents = $studentQuery->get(['id', 'name', 'reg_no', 'school_class_id', 'gender', 'user_id', 'verified_at']);
+            $registeredIdSet = array_flip($registeredIds);
+
+            $students = $allStudents->map(function (Student $s) use ($exam, $registeredIdSet, $eligibilityService, $cancelledStudentIds, $cancellableStudentIds) {
+                $eligible = $eligibilityService->isEligible($exam, $s);
+                $registered = isset($registeredIdSet[$s->id]);
+
+                return [
+                    'id'                   => $s->id,
+                    'name'                 => $s->name,
+                    'reg_no'               => $s->reg_no,
+                    'gender'               => $s->gender,
+                    'class_name'           => $s->schoolClass?->name,
+                    'school_class_id'      => $s->school_class_id,
+                    'has_portal_login'     => (bool) $s->user_id,
+                    'registered'           => $registered,
+                    'previously_cancelled' => ! $registered && $cancelledStudentIds->has($s->id),
+                    'can_cancel'           => $registered && $cancellableStudentIds->has($s->id),
+                    'eligible'             => $eligible,
+                    'ineligible_reason'    => $eligible ? null : $eligibilityService->ineligibilityReason($exam, $s),
+                ];
+            })->values();
+
+            $classOptions = $this->schoolClasses()->map(function ($class) use ($students) {
+                $eligibleInClass = $students
+                    ->where('school_class_id', $class->id)
+                    ->where('eligible', true)
+                    ->where('registered', false);
+
+                return [
+                    'id'             => $class->id,
+                    'name'           => $class->name,
+                    'eligible_count' => $eligibleInClass->count(),
+                ];
+            })->values();
+        }
+
+        $teachers = collect();
+        $registeredTeacherIds = $registrations->pluck('teacher_id')->filter()->all();
+        if ($allowsTeachers) {
+            $registeredTeacherSet = array_flip($registeredTeacherIds);
+            $allTeachers = \App\Models\Teacher::where('tenant_id', $this->school->id)
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(['id', 'name', 'employee_code', 'reg_no', 'teaching_type_id', 'designation_id', 'subject_ids', 'experience_years', 'verified_at', 'user_id']);
+
+            $teachers = $allTeachers->map(function ($t) use ($exam, $registeredTeacherSet, $eligibilityService, $cancelledTeacherIds, $cancellableTeacherIds) {
+                $eligible = $eligibilityService->isTeacherEligible($exam, $t);
+                $registered = isset($registeredTeacherSet[$t->id]);
+
+                return [
+                    'id'                   => $t->id,
+                    'name'                 => $t->name,
+                    'employee_code'        => $t->employee_code,
+                    'reg_no'               => $t->reg_no,
+                    'registered'           => $registered,
+                    'previously_cancelled' => ! $registered && $cancelledTeacherIds->has($t->id),
+                    'can_cancel'           => $registered && $cancellableTeacherIds->has($t->id),
+                    'eligible'             => $eligible,
+                    'ineligible_reason'    => $eligible ? null : $eligibilityService->teacherIneligibilityReason($exam, $t),
+                ];
+            })->values();
+        }
+
         $ticketsIssuedCount = $registrations->filter(fn ($r) => ! empty($r['hall_ticket_no']))->count();
-
-        $students = $allStudents->map(function (Student $s) use ($exam, $registeredIdSet, $eligibilityService, $cancelledStudentIds, $cancellableStudentIds) {
-            $eligible = $eligibilityService->isEligible($exam, $s);
-            $registered = isset($registeredIdSet[$s->id]);
-
-            return [
-                'id'                   => $s->id,
-                'name'                 => $s->name,
-                'reg_no'               => $s->reg_no,
-                'gender'               => $s->gender,
-                'class_name'           => $s->schoolClass?->name,
-                'school_class_id'      => $s->school_class_id,
-                'has_portal_login'     => (bool) $s->user_id,
-                'registered'           => $registered,
-                'previously_cancelled' => ! $registered && $cancelledStudentIds->has($s->id),
-                'can_cancel'           => $registered && $cancellableStudentIds->has($s->id),
-                'eligible'             => $eligible,
-                'ineligible_reason'    => $eligible ? null : $eligibilityService->ineligibilityReason($exam, $s),
-            ];
-        })->values();
-
-        $classOptions = $this->schoolClasses()->map(function ($class) use ($students) {
-            $eligibleInClass = $students
-                ->where('school_class_id', $class->id)
-                ->where('eligible', true)
-                ->where('registered', false);
-
-            return [
-                'id'             => $class->id,
-                'name'           => $class->name,
-                'eligible_count' => $eligibleInClass->count(),
-            ];
-        })->values();
-
         $canRegister = ! $gate['blocked'] && in_array($exam->status, ['published', 'ongoing'], true);
 
         $reportService = app(McqReportService::class);
@@ -181,6 +233,8 @@ class McqController extends SchoolAdminController
                 'id'                       => $r['id'],
                 'hall_ticket_no'           => $r['hall_ticket_no'] ?? null,
                 'student'                  => $r['student'] ?? null,
+                'teacher'                  => $r['teacher'] ?? null,
+                'participant_name'         => $r['participant_name'] ?? ($r['student']['name'] ?? null),
                 'class_name'               => $r['student']['class_name'] ?? null,
                 'attendance_status'        => $r['attendance_status'] ?? 'pending',
                 'pending_correction_status'=> $pendingCorrectionsByReg->get($r['id'])?->requested_status,
@@ -206,26 +260,37 @@ class McqController extends SchoolAdminController
                 'exam_type_label'        => McqExamLevelLabels::examTypeLabel($exam->exam_type),
                 'eligibility_summary'    => McqExamEligibilityConfig::summaryLabel($exam->eligibility_config, $exam->tenant_id),
                 'delivery_mode_label'    => $exam->isOnlineDelivery() ? 'Online' : 'Offline',
-                'registration_open'      => in_array($exam->status, ['published', 'ongoing'], true),
+                'registration_open'      => $exam->isRegistrationOpen(),
+                'code'                   => $exam->code,
+                'registration_opens_at'  => $exam->registration_opens_at?->toIso8601String(),
+                'registration_closes_at' => $exam->registration_closes_at?->toIso8601String(),
+                'result_date'            => $exam->result_date?->toDateString(),
                 'status_label'           => McqExamLevelLabels::statusLabel($exam->status),
                 'series_title'           => $exam->series?->title,
                 'parent_exam_title'      => $exam->parentExam?->title,
                 'require_verified_students' => app(StudentVerificationGate::class)->requiredForMcq($exam),
+                'allows_students'           => $allowsStudents,
+                'allows_teachers'           => $allowsTeachers,
             ]),
             'tab'                    => $tab,
             'registrations'          => $registrations,
             'schoolFee'              => $schoolFee,
             'feeBreakdown'           => $feeBreakdown,
             'students'               => $students,
+            'teachers'               => $teachers,
             'classOptions'           => $classOptions,
             'registeredStudentIds'   => $registeredIds,
+            'registeredTeacherIds'   => $registeredTeacherIds,
             'ticketsIssuedCount'     => $ticketsIssuedCount,
             'registerStats'          => [
-                'eligible'    => $students->where('eligible', true)->count(),
-                'available'   => $students->where('eligible', true)->where('registered', false)->count(),
+                'eligible'    => $students->where('eligible', true)->count() + $teachers->where('eligible', true)->count(),
+                'available'   => $students->where('eligible', true)->where('registered', false)->count()
+                    + $teachers->where('eligible', true)->where('registered', false)->count(),
                 'registered'  => $registrations->count(),
                 'batch_due'   => (float) ($schoolFee?->total_due ?? 0),
                 'can_register'=> $canRegister,
+                'allows_students' => $allowsStudents,
+                'allows_teachers' => $allowsTeachers,
             ],
             'registrationGate'       => $gate,
             'downloadGate'           => $downloadGate,
@@ -259,6 +324,20 @@ class McqController extends SchoolAdminController
         $request->merge(['exam_id' => $exam->id]);
 
         return app(McqRegistrationController::class)->bulkStore($request);
+    }
+
+    public function registerTeacher(Request $request, string $tenantId, McqExam $exam)
+    {
+        $request->merge(['exam_id' => $exam->id]);
+
+        return app(McqRegistrationController::class)->storeTeacher($request);
+    }
+
+    public function bulkRegisterTeachers(Request $request, string $tenantId, McqExam $exam)
+    {
+        $request->merge(['exam_id' => $exam->id]);
+
+        return app(McqRegistrationController::class)->bulkStoreTeachers($request);
     }
 
     public function cancelRegistration(Request $request, string $tenantId, McqExam $exam)
@@ -354,5 +433,14 @@ class McqController extends SchoolAdminController
             ->get();
 
         return view('mcq.hall-tickets-bulk', compact('exam', 'registrations'));
+    }
+
+    public function registrationInvoice(string $tenantId, McqExam $exam, McqRegistration $registration, \App\Services\Mcq\McqRegistrationInvoiceService $invoices)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_if($registration->exam_id !== $exam->id, 404);
+        abort_if($registration->school_id !== $this->school->id, 403);
+
+        return $invoices->download($registration, Tenant::find($this->school->parent_id));
     }
 }

@@ -45,9 +45,26 @@
                     Grade bands: {{ gradeBands.map(b => `${b.label} (${b.min_percentage}-${b.max_percentage}%)`).join(' · ') }}
                 </p>
             </div>
+            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/result-sheet.pdf`" target="_blank" class="btn-secondary text-sm">Result sheet PDF ↓</a>
+            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/mark-sheet.pdf`" target="_blank" class="btn-secondary text-sm">Mark sheet PDF ↓</a>
             <button v-if="!exam.results_published" type="button" @click="publishResults" class="btn-primary text-sm">Publish results</button>
             <button v-else type="button" @click="unpublishResults" class="btn-secondary text-sm">Unpublish (reopen for correction)</button>
             <button v-if="exam.results_published" type="button" @click="generateCertificates" class="btn-secondary text-sm">Generate certificates</button>
+        </div>
+
+        <div v-if="!exam.results_published" class="card mb-6 space-y-3">
+            <h3 class="section-title !mb-0">Bulk import marks</h3>
+            <p class="text-xs text-slate-500">CSV or Excel: hall_ticket_no, correct, wrong, unanswered. Optional: score, marks_per_correct, negative_per_wrong.</p>
+            <form @submit.prevent="importMarks" class="flex flex-wrap gap-2 items-center">
+                <input ref="marksFile" type="file" accept=".csv,.txt,.xlsx,.xls" class="text-sm" required>
+                <button type="submit" class="btn-secondary text-sm">Import marks (CSV/Excel)</button>
+            </form>
+            <div v-if="importErrors?.length" class="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+                <p class="font-semibold">Import issues ({{ importErrors.length }})</p>
+                <ul class="list-disc pl-5 text-xs space-y-0.5 max-h-40 overflow-y-auto">
+                    <li v-for="(err, i) in importErrors.slice(0, 20)" :key="i">Row {{ err.row }}: {{ err.message }}</li>
+                </ul>
+            </div>
         </div>
 
         <section class="card overflow-hidden !p-0">
@@ -90,6 +107,8 @@
                                     <button type="button" @click="rejectFee(r.id)" class="text-red-600 font-semibold ml-1">Reject</button>
                                 </template>
                                 <span v-else class="text-gray-400">Pending</span>
+                                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/registrations/${r.id}/invoice`"
+                                   class="link-brand ml-2" target="_blank">Invoice</a>
                             </td>
                             <td>
                                 <input v-model.number="markForms[r.id].score" type="number" min="0" step="0.01"
@@ -123,13 +142,16 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, gradeBands: { type: Array, default: () => [] } });
 
 const regSearch = ref('');
+const marksFile = ref(null);
+const page = usePage();
+const importErrors = computed(() => page.props.flash?.import_errors ?? []);
 
 const markForms = reactive({});
 for (const r of props.registrations) {
@@ -157,6 +179,18 @@ const filteredRegistrations = computed(() => {
         [r.student?.name, r.hall_ticket_no, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
     );
 });
+
+function importMarks() {
+    const file = marksFile.value?.files?.[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/marks/bulk-import`, form, {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => { if (marksFile.value) marksFile.value.value = ''; },
+    });
+}
 
 function saveMark(registration) {
     router.post(

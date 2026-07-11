@@ -15,7 +15,7 @@ class McqReportService
     public function registrationRows(McqExam $exam, ?string $schoolId = null): array
     {
         $query = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student.schoolClass', 'school', 'mark', 'feeReceipt']);
+            ->with(['student.schoolClass', 'teacher', 'school', 'mark', 'feeReceipt']);
 
         if ($schoolId) {
             $query->where('school_id', $schoolId);
@@ -26,16 +26,19 @@ class McqReportService
             ->get()
             ->map(fn (McqRegistration $reg) => [
                 'hall_ticket_no'   => $reg->hall_ticket_no,
-                'student_name'     => $reg->student?->name,
-                'reg_no'           => $reg->student?->reg_no,
+                'student_name'     => $reg->participantName(),
+                'reg_no'           => $reg->student?->reg_no ?? $reg->teacher?->employee_code ?? $reg->teacher?->reg_no,
                 'class_name'       => $reg->student?->schoolClass?->name,
                 'school_name'      => $reg->school?->name,
                 'approval_status'  => $reg->approval_status,
                 'attendance_status'=> $reg->attendance_status,
+                'attendance_note'  => $reg->attendance_note,
                 'score'            => $reg->mark?->score,
+                'percentage'       => $reg->mark?->percentage,
                 'rank'             => $reg->mark?->rank,
                 'grade'            => $reg->mark?->grade,
                 'fee_status'       => $reg->feeReceipt?->status,
+                'is_teacher'       => $reg->isTeacherRegistration(),
             ])
             ->all();
     }
@@ -318,7 +321,7 @@ class McqReportService
     public function exportSessionStatus(McqExam $exam): StreamedResponse
     {
         $rows = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student', 'school', 'mark'])
+            ->with(['student', 'teacher', 'school', 'mark'])
             ->orderBy('hall_ticket_no')
             ->get()
             ->map(function (McqRegistration $reg) use ($exam) {
@@ -326,7 +329,7 @@ class McqReportService
 
                 return [
                     $reg->hall_ticket_no,
-                    $reg->student?->name,
+                    $reg->participantName(),
                     $reg->school?->name,
                     $status['label'],
                     $reg->started_at?->format('Y-m-d H:i'),
@@ -340,5 +343,180 @@ class McqReportService
             ['Hall ticket', 'Student', 'School', 'Session status', 'Started', 'Submitted', 'Score'],
             $rows,
         );
+    }
+
+    /** @return array<string, mixed> */
+    public function resultAnalysis(McqExam $exam): array
+    {
+        $regs = McqRegistration::where('exam_id', $exam->id)
+            ->whereHas('mark')
+            ->whereNotIn('attendance_status', McqRegistration::BLOCKING_ATTENDANCE_STATUSES)
+            ->with('mark')
+            ->get();
+
+        $scores = $regs->map(fn (McqRegistration $r) => (float) ($r->mark?->score ?? 0))->sort()->values();
+        $count = $scores->count();
+        $bands = app(McqGradeService::class)->bandsForExam($exam);
+        $passLabels = collect($bands)->filter(fn ($b) => ! empty($b['is_pass']))->pluck('label')->all();
+
+        $passed = $regs->filter(fn (McqRegistration $r) => in_array((string) $r->mark?->grade, $passLabels, true))->count();
+        $failed = max(0, $count - $passed);
+
+        $gradeHistogram = [];
+        foreach ($bands as $band) {
+            $label = (string) $band['label'];
+            $gradeHistogram[$label] = $regs->filter(fn ($r) => (string) $r->mark?->grade === $label)->count();
+        }
+
+        $percentiles = [];
+        foreach ([10, 25, 50, 75, 90, 95] as $p) {
+            $percentiles["p{$p}"] = $count === 0 ? null : $this->percentile($scores->all(), $p);
+        }
+
+        $mean = $count === 0 ? null : round($scores->avg(), 2);
+
+        return [
+            'examined' => $count,
+            'passed' => $passed,
+            'failed' => $failed,
+            'pass_rate' => $count === 0 ? null : round(($passed / $count) * 100, 1),
+            'fail_rate' => $count === 0 ? null : round(($failed / $count) * 100, 1),
+            'mean_score' => $mean,
+            'median_score' => $percentiles['p50'],
+            'min_score' => $count === 0 ? null : $scores->first(),
+            'max_score' => $count === 0 ? null : $scores->last(),
+            'percentiles' => $percentiles,
+            'grade_histogram' => $gradeHistogram,
+        ];
+    }
+
+    public function exportResultAnalysis(McqExam $exam): StreamedResponse
+    {
+        $analysis = $this->resultAnalysis($exam);
+        $rows = [
+            ['Examined', $analysis['examined']],
+            ['Passed', $analysis['passed']],
+            ['Failed', $analysis['failed']],
+            ['Pass rate %', $analysis['pass_rate']],
+            ['Fail rate %', $analysis['fail_rate']],
+            ['Mean score', $analysis['mean_score']],
+            ['Median score', $analysis['median_score']],
+            ['Min score', $analysis['min_score']],
+            ['Max score', $analysis['max_score']],
+        ];
+
+        foreach ($analysis['percentiles'] as $key => $value) {
+            $rows[] = [strtoupper($key), $value];
+        }
+        foreach ($analysis['grade_histogram'] as $grade => $count) {
+            $rows[] = ["Grade {$grade}", $count];
+        }
+
+        return ExcelExport::download(
+            'mcq-result-analysis-'.$exam->id,
+            ['Metric', 'Value'],
+            $rows,
+        );
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function schoolPerformanceRows(McqExam $exam): array
+    {
+        $bands = app(McqGradeService::class)->bandsForExam($exam);
+        $passLabels = collect($bands)->filter(fn ($b) => ! empty($b['is_pass']))->pluck('label')->all();
+
+        $regs = McqRegistration::where('exam_id', $exam->id)
+            ->where('status', '!=', 'cancelled')
+            ->with(['school:id,name', 'mark'])
+            ->get()
+            ->groupBy('school_id');
+
+        return $regs->map(function ($group) use ($passLabels) {
+            $first = $group->first();
+            $withMarks = $group->filter(fn (McqRegistration $r) => $r->mark !== null
+                && ! in_array($r->attendance_status, McqRegistration::BLOCKING_ATTENDANCE_STATUSES, true));
+            $examined = $withMarks->count();
+            $passed = $withMarks->filter(fn (McqRegistration $r) => in_array((string) $r->mark?->grade, $passLabels, true))->count();
+            $avg = $examined === 0 ? null : round($withMarks->avg(fn (McqRegistration $r) => (float) $r->mark->score), 2);
+
+            $rankBuckets = [
+                'top_10' => $withMarks->filter(fn ($r) => $r->mark?->rank !== null && (int) $r->mark->rank <= 10)->count(),
+                'top_50' => $withMarks->filter(fn ($r) => $r->mark?->rank !== null && (int) $r->mark->rank <= 50)->count(),
+                'ranked' => $withMarks->filter(fn ($r) => $r->mark?->rank !== null)->count(),
+            ];
+
+            return [
+                'school_name' => $first->school?->name,
+                'registered' => $group->count(),
+                'present' => $group->where('attendance_status', 'present')->count(),
+                'examined' => $examined,
+                'avg_score' => $avg,
+                'pass_rate' => $examined === 0 ? null : round(($passed / $examined) * 100, 1),
+                'top_10' => $rankBuckets['top_10'],
+                'top_50' => $rankBuckets['top_50'],
+                'ranked' => $rankBuckets['ranked'],
+            ];
+        })->sortByDesc('avg_score')->values()->all();
+    }
+
+    public function exportSchoolPerformance(McqExam $exam): StreamedResponse
+    {
+        $rows = $this->schoolPerformanceRows($exam);
+
+        return ExcelExport::download(
+            'mcq-school-performance-'.$exam->id,
+            ['School', 'Registered', 'Present', 'Examined', 'Avg score', 'Pass rate %', 'Top 10', 'Top 50', 'Ranked'],
+            collect($rows)->map(fn ($r) => [
+                $r['school_name'],
+                $r['registered'],
+                $r['present'],
+                $r['examined'],
+                $r['avg_score'],
+                $r['pass_rate'],
+                $r['top_10'],
+                $r['top_50'],
+                $r['ranked'],
+            ]),
+        );
+    }
+
+    public function exportMalpracticeList(McqExam $exam, ?string $schoolId = null): StreamedResponse
+    {
+        $rows = collect($this->registrationRows($exam, $schoolId))
+            ->filter(fn ($r) => in_array($r['attendance_status'] ?? '', ['malpractice', 'withheld'], true));
+
+        return ExcelExport::download(
+            'mcq-malpractice-'.$exam->id.($schoolId ? '-school' : ''),
+            ['Hall ticket', 'Participant', 'Reg. no', 'Class', 'School', 'Status', 'Note'],
+            $rows->map(fn ($r) => [
+                $r['hall_ticket_no'],
+                $r['student_name'],
+                $r['reg_no'],
+                $r['class_name'],
+                $r['school_name'],
+                $r['attendance_status'],
+                $r['attendance_note'] ?? '',
+            ]),
+        );
+    }
+
+    /** @param  list<float>  $sortedScores */
+    private function percentile(array $sortedScores, int $percentile): float
+    {
+        $n = count($sortedScores);
+        if ($n === 1) {
+            return round($sortedScores[0], 2);
+        }
+
+        $rank = ($percentile / 100) * ($n - 1);
+        $low = (int) floor($rank);
+        $high = (int) ceil($rank);
+        if ($low === $high) {
+            return round($sortedScores[$low], 2);
+        }
+
+        $weight = $rank - $low;
+
+        return round($sortedScores[$low] * (1 - $weight) + $sortedScores[$high] * $weight, 2);
     }
 }

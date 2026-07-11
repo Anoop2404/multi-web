@@ -37,6 +37,9 @@
                 <FormField label="Exam title" class-extra="sm:col-span-2" required>
                     <input v-model="form.title" class="field" placeholder="e.g. Sahodaya Talent Search 2026" required>
                 </FormField>
+                <FormField label="Exam code" hint="Optional unique code">
+                    <input v-model="form.code" class="field font-mono uppercase" maxlength="64" placeholder="e.g. TS-2026">
+                </FormField>
                 <FormField label="Type">
                     <select v-model="form.exam_type" class="field">
                         <option value="assessment">Assessment</option>
@@ -49,6 +52,15 @@
                 </FormField>
                 <FormField label="Scheduled date & time">
                     <input v-model="form.scheduled_at" type="datetime-local" class="field">
+                </FormField>
+                <FormField label="Registration opens">
+                    <input v-model="form.registration_opens_at" type="datetime-local" class="field">
+                </FormField>
+                <FormField label="Registration closes">
+                    <input v-model="form.registration_closes_at" type="datetime-local" class="field">
+                </FormField>
+                <FormField label="Result date">
+                    <input v-model="form.result_date" type="date" class="field">
                 </FormField>
                 <FormField label="Delivery mode">
                     <select v-model="form.delivery_mode" class="field">
@@ -74,6 +86,7 @@
                 <thead>
                     <tr>
                         <th>Title</th>
+                        <th>Code</th>
                         <th>Schedule</th>
                         <th>Fee</th>
                         <th>Level</th>
@@ -88,6 +101,7 @@
                 <tbody>
                     <tr v-for="exam in exams" :key="exam.id">
                         <td class="font-medium text-slate-900">{{ exam.title }}</td>
+                        <td class="font-mono text-xs text-slate-600">{{ exam.code || '—' }}</td>
                         <td class="text-xs text-slate-600 whitespace-nowrap">{{ formatSchedule(exam.scheduled_at) }}</td>
                         <td class="text-xs whitespace-nowrap" :class="formatFee(exam) === 'Free' ? 'text-slate-400' : 'font-semibold text-emerald-700'">
                             {{ formatFee(exam) }}
@@ -121,6 +135,9 @@
                     <FormField label="Exam title" class-extra="sm:col-span-2" required>
                         <input v-model="editForm.title" class="field" required>
                     </FormField>
+                    <FormField label="Exam code">
+                        <input v-model="editForm.code" class="field font-mono uppercase" maxlength="64">
+                    </FormField>
                     <FormField label="Type">
                         <select v-model="editForm.exam_type" class="field">
                             <option value="assessment">Assessment</option>
@@ -138,6 +155,15 @@
                     </FormField>
                     <FormField label="Scheduled date & time">
                         <input v-model="editForm.scheduled_at" type="datetime-local" class="field">
+                    </FormField>
+                    <FormField label="Registration opens">
+                        <input v-model="editForm.registration_opens_at" type="datetime-local" class="field">
+                    </FormField>
+                    <FormField label="Registration closes">
+                        <input v-model="editForm.registration_closes_at" type="datetime-local" class="field">
+                    </FormField>
+                    <FormField label="Result date">
+                        <input v-model="editForm.result_date" type="date" class="field">
                     </FormField>
                     <FormField label="Duration (min)">
                         <input v-model.number="editForm.duration_minutes" type="number" min="5" max="480" class="field">
@@ -188,17 +214,24 @@ const base = `/sahodaya-admin/${props.sahodaya.id}/mcq-exams`;
 const defaultEligibility = () => ({
     scope: 'all',
     assignment_type: 'all',
+    audience: 'students',
     class_category_ids: [],
     master_class_ids: [],
     class_groups: [],
     gender: 'open',
+    min_experience_years: null,
+    allow_teacher_self_registration: true,
 });
 
 const form = useForm({
     title: '',
+    code: '',
     exam_type: 'assessment',
     delivery_mode: 'offline',
     scheduled_at: '',
+    registration_opens_at: '',
+    registration_closes_at: '',
+    result_date: '',
     duration_minutes: 60,
     fee_amount: null,
     eligibility_config: defaultEligibility(),
@@ -207,10 +240,14 @@ const form = useForm({
 const editingExam = ref(null);
 const editForm = useForm({
     title: '',
+    code: '',
     exam_type: 'assessment',
     status: 'draft',
     delivery_mode: 'offline',
     scheduled_at: '',
+    registration_opens_at: '',
+    registration_closes_at: '',
+    result_date: '',
     duration_minutes: 60,
     fee_amount: null,
     eligibility_config: defaultEligibility(),
@@ -246,9 +283,13 @@ function createExam() {
     form.post(base, {
         preserveScroll: true,
         onSuccess: () => form.reset({
+            code: '',
             exam_type: 'assessment',
             delivery_mode: 'offline',
             scheduled_at: '',
+            registration_opens_at: '',
+            registration_closes_at: '',
+            result_date: '',
             duration_minutes: 60,
             fee_amount: null,
             eligibility_config: defaultEligibility(),
@@ -260,14 +301,19 @@ function openEdit(exam) {
     editingExam.value = exam;
     editForm.clearErrors();
     editForm.title = exam.title;
+    editForm.code = exam.code ?? '';
     editForm.exam_type = exam.exam_type ?? 'assessment';
     editForm.status = exam.status ?? 'draft';
     editForm.delivery_mode = exam.delivery_mode ?? 'offline';
     editForm.scheduled_at = toDatetimeLocal(exam.scheduled_at);
+    editForm.registration_opens_at = toDatetimeLocal(exam.registration_opens_at);
+    editForm.registration_closes_at = toDatetimeLocal(exam.registration_closes_at);
+    editForm.result_date = exam.result_date ? String(exam.result_date).slice(0, 10) : '';
     editForm.duration_minutes = exam.duration_minutes ?? 60;
     editForm.fee_amount = exam.fee_amount ?? null;
     const ec = exam.eligibility_config ?? {};
     editForm.eligibility_config = {
+        audience: ec.audience ?? 'students',
         scope: ec.scope ?? 'all',
         assignment_type: ec.assignment_type
             ?? (ec.class_category_ids?.length ? 'category' : (ec.master_class_ids?.length ? 'class' : 'all')),
@@ -275,6 +321,11 @@ function openEdit(exam) {
         master_class_ids: [...(ec.master_class_ids ?? [])],
         class_groups: [...(ec.class_groups ?? [])],
         gender: ec.gender ?? 'open',
+        min_experience_years: ec.min_experience_years ?? null,
+        allow_teacher_self_registration: ec.allow_teacher_self_registration ?? true,
+        teaching_type_ids: [...(ec.teaching_type_ids ?? [])],
+        subject_ids: [...(ec.subject_ids ?? [])],
+        excluded_designation_ids: [...(ec.excluded_designation_ids ?? [])],
     };
 }
 

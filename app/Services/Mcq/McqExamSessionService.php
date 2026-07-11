@@ -209,29 +209,50 @@ class McqExamSessionService
         $correct = 0;
         $wrong = 0;
         $storedAnswers = [];
+        $score = 0.0;
+        $maxScore = 0.0;
 
+        /*
+         * Scoring formula (per gradable question):
+         *   marks          = question.marks (default 1) — awarded when correct
+         *   negative_mark  = question.negative_mark (default 0) — deducted when wrong (answered incorrectly)
+         *   unanswered     = 0 contribution
+         *   score          = Σ (correct ? marks : (wrong ? −negative_mark : 0))
+         *   max_score      = Σ marks
+         *   percentage     = max_score > 0 ? (score / max_score) × 100 : 0  (clamped ≥ 0 for grading)
+         * Bulk CSV/XLSX import without answer keys uses the same defaults (1 mark / 0 negative)
+         * when only correct/wrong/unanswered counts are supplied.
+         */
         foreach ($gradable as $question) {
             $chosen = $normalizedAnswers[(string) $question->id] ?? null;
             $isCorrect = $chosen !== null && $chosen === (string) $question->correct_option_key;
+            $qMarks = $question->marksValue();
+            $qNeg = $question->negativeMarkValue();
+            $maxScore += $qMarks;
 
             if ($isCorrect) {
                 $correct++;
+                $score += $qMarks;
             } elseif ($chosen !== null) {
                 $wrong++;
+                $score -= $qNeg;
             }
 
             $storedAnswers[] = [
-                'question_id' => $question->id,
-                'chosen'      => $chosen,
-                'correct'     => $question->correct_option_key,
-                'is_correct'  => $isCorrect,
+                'question_id'   => $question->id,
+                'chosen'        => $chosen,
+                'correct'       => $question->correct_option_key,
+                'is_correct'    => $isCorrect,
+                'marks'         => $qMarks,
+                'negative_mark' => $qNeg,
             ];
         }
 
         $totalGradable = $gradable->count();
         $unanswered = max(0, $totalGradable - $correct - $wrong);
-        $score = $correct;
-        $percentage = $totalGradable > 0 ? round(($correct / $totalGradable) * 100, 2) : 0;
+        $score = round($score, 2);
+        $maxScore = round($maxScore, 2);
+        $percentage = $maxScore > 0 ? round((max(0, $score) / $maxScore) * 100, 2) : 0;
         $passMark = (int) ($registration->exam->pass_mark ?? 0);
         $gradeService = app(\App\Services\Mcq\McqGradeService::class);
         $grade = $gradeService->gradeForPercentage($registration->exam, $percentage);

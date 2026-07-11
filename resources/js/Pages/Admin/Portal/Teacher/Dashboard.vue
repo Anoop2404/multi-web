@@ -171,7 +171,8 @@ const quickLinks = computed(() => {
     return [
         { href: `${base}/training`, label: 'Training', icon: '📚' },
         { href: `${base}/fest`, label: 'Fest', icon: '🎭' },
-        { href: `${base}/question-banks`, label: 'Talent Search', icon: '📝' },
+        { href: `${base}/exams`, label: 'Talent Search', icon: '📝' },
+        { href: `${base}/question-banks`, label: 'Question banks', icon: '📚' },
         { href: `${base}/certificates`, label: 'Certificates', icon: '🏆' },
     ];
 });

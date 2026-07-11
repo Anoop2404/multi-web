@@ -48,13 +48,13 @@ class McqExamNotifier
 
     public function registrationConfirmed(McqRegistration $registration): void
     {
-        $registration->loadMissing(['exam', 'student']);
+        $registration->loadMissing(['exam', 'student', 'teacher']);
         $schoolId = $registration->school_id;
 
         $service = app(NotificationService::class);
         $replacements = [
             'exam_title'   => $registration->exam->title,
-            'student_name' => $registration->student?->name ?? 'Student',
+            'student_name' => $registration->participantName() ?: 'Participant',
         ];
 
         foreach (User::role(['school_admin', 'school_staff'])->where('tenant_id', $schoolId)->get() as $user) {
@@ -65,13 +65,13 @@ class McqExamNotifier
 
     public function registrationApproved(McqRegistration $registration): void
     {
-        $registration->loadMissing(['exam', 'student']);
+        $registration->loadMissing(['exam', 'student', 'teacher']);
         $schoolId = $registration->school_id;
 
         $service = app(NotificationService::class);
         $replacements = [
             'exam_title'     => $registration->exam->title,
-            'student_name'   => $registration->student?->name ?? 'Student',
+            'student_name'   => $registration->participantName() ?: 'Participant',
             'hall_ticket_no' => $registration->hall_ticket_no ?? '',
         ];
 
@@ -80,10 +80,19 @@ class McqExamNotifier
                 "/school-admin/{$schoolId}/mcq/{$registration->exam_id}/hall-tickets");
         }
 
-        $studentUser = $registration->student?->user;
-        if ($studentUser) {
-            $service->notifyFromTemplate($studentUser, 'mcq.hall_ticket.issued', $replacements,
-                "/portal/student/{$schoolId}/mcq");
+        if ($registration->isTeacherRegistration()) {
+            $userId = $registration->teacher?->user_id;
+            $user = $userId ? User::find($userId) : null;
+            if ($user) {
+                $service->notifyFromTemplate($user, 'mcq.hall_ticket.issued', $replacements,
+                    "/portal/teacher/{$schoolId}/exams");
+            }
+        } else {
+            $studentUser = $registration->student?->user;
+            if ($studentUser) {
+                $service->notifyFromTemplate($studentUser, 'mcq.hall_ticket.issued', $replacements,
+                    "/portal/student/{$schoolId}/mcq");
+            }
         }
     }
 
@@ -98,12 +107,102 @@ class McqExamNotifier
 
     public function feeRejected(McqRegistration $registration, ?string $reason = null): void
     {
-        $registration->loadMissing(['exam', 'student']);
+        $registration->loadMissing(['exam', 'student', 'teacher']);
         $this->notifySchoolAdmins($registration, 'mcq.fee.rejected', [
             'exam_title'   => $registration->exam->title,
-            'student_name' => $registration->student?->name ?? 'Student',
+            'student_name' => $registration->participantName() ?: 'Participant',
             'reason'       => $reason ?? 'Contact your Sahodaya for details.',
         ]);
+    }
+
+    public function examReminder(McqRegistration $registration): bool
+    {
+        $registration->loadMissing(['exam', 'student.user', 'teacher']);
+        $exam = $registration->exam;
+        if (! $exam?->scheduled_at) {
+            return false;
+        }
+
+        $service = app(NotificationService::class);
+        $replacements = [
+            'exam_title'   => $exam->title,
+            'scheduled_at' => $exam->scheduled_at->format('j F Y, g:i A'),
+            'venue'        => $exam->venue ?? '',
+            'student_name' => $registration->participantName() ?: 'Participant',
+        ];
+
+        $sent = false;
+
+        if ($registration->isTeacherRegistration()) {
+            $userId = $registration->teacher?->user_id;
+            $user = $userId ? User::find($userId) : null;
+            if ($user) {
+                $service->notifyFromTemplate(
+                    $user,
+                    'mcq.exam.reminder',
+                    $replacements,
+                    "/portal/teacher/{$registration->school_id}/exams",
+                );
+                $sent = true;
+            }
+        } else {
+            $studentUser = $registration->student?->user;
+            if ($studentUser) {
+                $service->notifyFromTemplate(
+                    $studentUser,
+                    'mcq.exam.reminder',
+                    $replacements,
+                    "/portal/student/{$registration->school_id}/mcq",
+                );
+                $sent = true;
+            }
+        }
+
+        foreach (User::role(['school_admin', 'school_staff'])->where('tenant_id', $registration->school_id)->get() as $user) {
+            $service->notifyFromTemplate(
+                $user,
+                'mcq.exam.reminder',
+                $replacements,
+                "/school-admin/{$registration->school_id}/mcq/{$exam->id}/hall-tickets",
+            );
+            $sent = true;
+        }
+
+        return $sent;
+    }
+
+    public function certificateReady(McqRegistration $registration): void
+    {
+        $registration->loadMissing(['exam', 'student.user', 'teacher']);
+        $exam = $registration->exam;
+        $service = app(NotificationService::class);
+        $replacements = [
+            'exam_title'   => $exam?->title ?? 'Talent Search exam',
+            'student_name' => $registration->participantName() ?: 'Participant',
+        ];
+
+        if ($registration->isTeacherRegistration()) {
+            $userId = $registration->teacher?->user_id;
+            $user = $userId ? User::find($userId) : null;
+            if ($user) {
+                $service->notifyFromTemplate(
+                    $user,
+                    'mcq.certificate.ready',
+                    $replacements,
+                    "/portal/teacher/{$registration->school_id}/exams",
+                );
+            }
+        } else {
+            $studentUser = $registration->student?->user;
+            if ($studentUser) {
+                $service->notifyFromTemplate(
+                    $studentUser,
+                    'mcq.certificate.ready',
+                    $replacements,
+                    "/portal/student/{$registration->school_id}/mcq",
+                );
+            }
+        }
     }
 
     private function notifySchoolAdmins(McqRegistration $registration, string $template, array $replacements): void

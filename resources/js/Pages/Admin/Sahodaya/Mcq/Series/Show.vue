@@ -212,12 +212,15 @@ const props = defineProps({
 });
 
 const defaultEligibility = () => ({
+    audience: 'students',
     scope: 'all',
     assignment_type: 'all',
     class_category_ids: [],
     master_class_ids: [],
     class_groups: [],
     gender: 'open',
+    min_experience_years: null,
+    allow_teacher_self_registration: true,
 });
 
 const levelForm = useForm({

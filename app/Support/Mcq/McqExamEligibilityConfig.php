@@ -11,12 +11,18 @@ class McqExamEligibilityConfig
     public static function defaults(): array
     {
         return [
-            'scope'              => 'all',
-            'assignment_type'    => 'all',
-            'class_category_ids' => [],
-            'master_class_ids'   => [],
-            'class_groups'       => [],
-            'gender'             => 'open',
+            'audience'                   => 'students',
+            'scope'                      => 'all',
+            'assignment_type'            => 'all',
+            'class_category_ids'         => [],
+            'master_class_ids'           => [],
+            'class_groups'               => [],
+            'gender'                     => 'open',
+            'teaching_type_ids'          => [],
+            'subject_ids'                => [],
+            'excluded_designation_ids'   => [],
+            'min_experience_years'       => null,
+            'allow_teacher_self_registration' => true,
         ];
     }
 
@@ -24,6 +30,11 @@ class McqExamEligibilityConfig
     public static function normalize(?array $config): array
     {
         $config = $config ?? [];
+
+        $audience = $config['audience'] ?? 'students';
+        if (! in_array($audience, ['students', 'teachers', 'both'], true)) {
+            $audience = 'students';
+        }
 
         $categoryIds = collect($config['class_category_ids'] ?? [])
             ->filter(fn ($id) => filled($id))
@@ -70,28 +81,68 @@ class McqExamEligibilityConfig
 
         $scope = $assignmentType === 'all' && $classGroups === [] ? 'all' : 'filtered';
 
+        $minExperience = $config['min_experience_years'] ?? null;
+        $minExperience = filled($minExperience) && (int) $minExperience > 0
+            ? (int) $minExperience
+            : null;
+
         return [
-            'scope'              => $scope,
-            'assignment_type'    => $assignmentType,
-            'class_category_ids' => $categoryIds,
-            'master_class_ids'   => $masterClassIds,
-            'class_groups'       => $classGroups,
-            'gender'             => in_array($config['gender'] ?? 'open', ['open', 'male', 'female'], true)
+            'audience'                 => $audience,
+            'scope'                    => $scope,
+            'assignment_type'          => $assignmentType,
+            'class_category_ids'       => $categoryIds,
+            'master_class_ids'         => $masterClassIds,
+            'class_groups'             => $classGroups,
+            'gender'                   => in_array($config['gender'] ?? 'open', ['open', 'male', 'female'], true)
                 ? ($config['gender'] ?? 'open')
                 : 'open',
+            'teaching_type_ids'        => self::intList($config['teaching_type_ids'] ?? []),
+            'subject_ids'              => self::intList($config['subject_ids'] ?? []),
+            'excluded_designation_ids' => self::intList(
+                $config['excluded_designation_ids'] ?? $config['designation_exclude'] ?? []
+            ),
+            'min_experience_years'     => $minExperience,
+            'allow_teacher_self_registration' => array_key_exists('allow_teacher_self_registration', $config)
+                ? (bool) $config['allow_teacher_self_registration']
+                : true,
         ];
+    }
+
+    public static function allowsStudents(?array $config): bool
+    {
+        $audience = self::normalize($config)['audience'];
+
+        return in_array($audience, ['students', 'both'], true);
+    }
+
+    public static function allowsTeachers(?array $config): bool
+    {
+        $audience = self::normalize($config)['audience'];
+
+        return in_array($audience, ['teachers', 'both'], true);
+    }
+
+    public static function allowTeacherSelfRegistration(?array $config): bool
+    {
+        return (bool) self::normalize($config)['allow_teacher_self_registration'];
     }
 
     public static function validationError(?array $config): ?string
     {
         $config = self::normalize($config);
 
-        if ($config['assignment_type'] === 'category' && $config['class_category_ids'] === []) {
+        if ($config['assignment_type'] === 'category' && $config['class_category_ids'] === []
+            && self::allowsStudents($config)) {
             return 'Select at least one class category.';
         }
 
-        if ($config['assignment_type'] === 'class' && $config['master_class_ids'] === []) {
+        if ($config['assignment_type'] === 'class' && $config['master_class_ids'] === []
+            && self::allowsStudents($config)) {
             return 'Select at least one class.';
+        }
+
+        if ($config['min_experience_years'] !== null && $config['min_experience_years'] > 60) {
+            return 'Minimum experience years must be 60 or less.';
         }
 
         return null;
@@ -101,10 +152,30 @@ class McqExamEligibilityConfig
     {
         $config = self::normalize($config);
 
+        $audienceLabel = match ($config['audience']) {
+            'teachers' => 'Teachers',
+            'both'     => 'Students & teachers',
+            default    => 'Students',
+        };
+
+        if ($config['audience'] === 'teachers') {
+            $parts = [$audienceLabel];
+            if ($config['min_experience_years'] !== null) {
+                $parts[] = "≥{$config['min_experience_years']} yrs experience";
+            }
+            if ($config['teaching_type_ids'] !== []) {
+                $parts[] = count($config['teaching_type_ids']).' teaching type(s)';
+            }
+
+            return implode(' · ', $parts);
+        }
+
         if ($config['assignment_type'] === 'all' && $config['class_groups'] === []) {
-            return $config['gender'] === 'open'
+            $base = $config['gender'] === 'open'
                 ? 'All classes'
                 : ucfirst($config['gender']).' only';
+
+            return $config['audience'] === 'both' ? "{$audienceLabel} · {$base}" : $base;
         }
 
         $parts = [];
@@ -143,6 +214,25 @@ class McqExamEligibilityConfig
             $parts[] = ucfirst($config['gender']).' only';
         }
 
+        if ($config['audience'] === 'both') {
+            array_unshift($parts, $audienceLabel);
+        }
+
         return implode(' · ', $parts);
+    }
+
+    /** @param  mixed  $values
+     * @return list<int>
+     */
+    private static function intList(mixed $values): array
+    {
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map('intval', $values),
+            fn (int $id) => $id > 0
+        )));
     }
 }

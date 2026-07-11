@@ -98,6 +98,27 @@ class McqRegistration extends Model
         return $this->belongsTo(Student::class);
     }
 
+    public function teacher(): BelongsTo
+    {
+        return $this->belongsTo(Teacher::class);
+    }
+
+    public function certificate(): HasOne
+    {
+        return $this->hasOne(McqCertificate::class, 'registration_id');
+    }
+
+    /** Display name for student or teacher registrations. */
+    public function participantName(): string
+    {
+        return (string) ($this->student?->name ?? $this->teacher?->name ?? '');
+    }
+
+    public function isTeacherRegistration(): bool
+    {
+        return $this->teacher_id !== null && $this->student_id === null;
+    }
+
     public function school(): BelongsTo
     {
         return $this->belongsToCentralTenant('school_id');

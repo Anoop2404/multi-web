@@ -8,7 +8,9 @@ use App\Models\McqMark;
 use App\Models\McqRegistration;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Models\Teacher;
 use App\Services\Students\StudentVerificationGate;
+use App\Services\Teachers\TeacherVerificationGate;
 use App\Support\FestStudentClassResolver;
 use App\Support\Mcq\McqExamEligibilityConfig;
 use Illuminate\Support\Collection;
@@ -20,6 +22,7 @@ class McqEligibilityService
 
     public function __construct(
         private StudentVerificationGate $verificationGate,
+        private TeacherVerificationGate $teacherVerificationGate,
     ) {}
 
     /**
@@ -98,19 +101,64 @@ class McqEligibilityService
 
     public function isEligible(McqExam $exam, Student $student): bool
     {
-        if (! $this->verificationGate->isEligible($student, null, $exam->tenant_id, $exam)) {
-            return false;
+        return $this->ineligibilityReason($exam, $student) === null;
+    }
+
+    public function isTeacherEligible(McqExam $exam, Teacher $teacher): bool
+    {
+        return $this->teacherIneligibilityReason($exam, $teacher) === null;
+    }
+
+    /** @return Collection<int, Teacher> */
+    public function eligibleTeachers(McqExam $exam, Collection $teachers): Collection
+    {
+        return $teachers->filter(fn (Teacher $t) => $this->isTeacherEligible($exam, $t))->values();
+    }
+
+    public function teacherIneligibilityReason(McqExam $exam, Teacher $teacher): ?string
+    {
+        if (! McqExamEligibilityConfig::allowsTeachers($exam->eligibility_config)) {
+            return 'This exam is not open to teachers.';
         }
 
-        if (! $this->passesBasicConfig($exam, $student)) {
-            return false;
+        if ($teacher->status !== 'active') {
+            return 'Teacher is not active.';
         }
 
-        if ((int) ($exam->exam_level ?? 1) <= 1) {
-            return true;
+        if ($reason = $this->teacherVerificationGate->ineligibilityReason($teacher, $exam->tenant_id)) {
+            return $reason;
         }
 
-        return $this->passesParentExamEligibility($exam, $student);
+        $config = McqExamEligibilityConfig::normalize($exam->eligibility_config);
+
+        $typeIds = $config['teaching_type_ids'];
+        if ($typeIds !== [] && ! in_array((int) $teacher->teaching_type_id, $typeIds, true)) {
+            return 'Teacher does not match required teaching category.';
+        }
+
+        $subjectIds = $config['subject_ids'];
+        if ($subjectIds !== []) {
+            $teacherSubjectIds = array_map('intval', $teacher->subject_ids ?? []);
+            if ($teacherSubjectIds === [] || array_intersect($teacherSubjectIds, $subjectIds) === []) {
+                return 'Teacher does not teach a required subject.';
+            }
+        }
+
+        $excluded = $config['excluded_designation_ids'];
+        if ($excluded !== [] && $teacher->designation_id !== null
+            && in_array((int) $teacher->designation_id, $excluded, true)) {
+            return 'This designation is not eligible for this exam.';
+        }
+
+        $minYears = $config['min_experience_years'];
+        if ($minYears !== null) {
+            $years = (int) ($teacher->experience_years ?? 0);
+            if ($years < $minYears) {
+                return "Teacher must have at least {$minYears} year(s) of experience.";
+            }
+        }
+
+        return null;
     }
 
     /** @return Collection<int, Student> */
@@ -121,6 +169,10 @@ class McqEligibilityService
 
     public function ineligibilityReason(McqExam $exam, Student $student): ?string
     {
+        if (! McqExamEligibilityConfig::allowsStudents($exam->eligibility_config)) {
+            return 'This exam is not open to students.';
+        }
+
         if (! $this->verificationGate->isEligible($student, null, $exam->tenant_id, $exam)) {
             return $this->verificationGate
                 ->ineligibilityReason($student, null, $exam->tenant_id, $exam)

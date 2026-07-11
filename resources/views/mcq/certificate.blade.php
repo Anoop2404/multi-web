@@ -35,6 +35,7 @@
             <br>{{ $fields['certificate_date'] ?? '' }}
         </p>
         <p class="meta" style="font-size:11px;">Verification: {{ $certificate->verification_uuid }}</p>
+        <p class="meta" style="font-size:10px;">Verify at: {{ url('/verify/'.$certificate->verification_uuid) }}</p>
     </div>
     <p class="no-print" style="text-align:center;margin-top:16px;"><button onclick="window.print()">Print</button></p>
 </body>

@@ -75,8 +75,12 @@ class McqExamController extends SahodayaAdminController
     {
         $data = $request->validate([
             'title'             => 'required|string|max:255',
+            'code'              => 'nullable|string|max:64',
             'exam_type'         => 'nullable|in:practice,assessment,competitive',
             'scheduled_at'      => 'nullable|date',
+            'registration_opens_at'  => 'nullable|date',
+            'registration_closes_at' => 'nullable|date|after_or_equal:registration_opens_at',
+            'result_date'       => 'nullable|date',
             'venue'             => 'nullable|string|max:255',
             'duration_minutes'  => 'nullable|integer|min:5|max:480',
             'total_questions'   => 'nullable|integer|min:1',
@@ -89,6 +93,18 @@ class McqExamController extends SahodayaAdminController
             'eligibility_config'=> 'nullable|array',
             'delivery_mode'     => 'nullable|in:offline,online',
         ]);
+
+        if (! empty($data['code'])) {
+            $data['code'] = strtoupper(trim((string) $data['code']));
+            $exists = McqExam::where('tenant_id', $this->sahodaya->id)
+                ->where('code', $data['code'])
+                ->exists();
+            if ($exists) {
+                return back()->withErrors(['code' => 'An exam with this code already exists.']);
+            }
+        } else {
+            $data['code'] = null;
+        }
 
         $fee = (float) ($data['fee_amount'] ?? 0);
         $discount = (float) ($data['school_discount_amount'] ?? 0);
@@ -196,8 +212,12 @@ class McqExamController extends SahodayaAdminController
 
         $data = $request->validate([
             'title'            => 'required|string|max:255',
+            'code'             => 'nullable|string|max:64',
             'exam_type'        => 'nullable|in:practice,assessment,competitive',
             'scheduled_at'     => 'nullable|date',
+            'registration_opens_at'  => 'nullable|date',
+            'registration_closes_at' => 'nullable|date|after_or_equal:registration_opens_at',
+            'result_date'      => 'nullable|date',
             'venue'            => 'nullable|string|max:255',
             'hall_instructions'=> 'nullable|string|max:2000',
             'next_hall_ticket_no' => 'nullable|integer|min:1|max:99999999',
@@ -215,6 +235,7 @@ class McqExamController extends SahodayaAdminController
             'late_fee_amount'  => 'nullable|numeric|min:0',
             'penalty_amount'   => 'nullable|numeric|min:0',
             'eligibility_config'=> 'nullable|array',
+            'eligibility_config.audience' => 'nullable|in:students,teachers,both',
             'eligibility_config.assignment_type' => 'nullable|in:all,category,class',
             'eligibility_config.scope' => 'nullable|in:all,filtered',
             'eligibility_config.class_category_ids' => 'nullable|array',
@@ -224,6 +245,14 @@ class McqExamController extends SahodayaAdminController
             'eligibility_config.class_groups' => 'nullable|array',
             'eligibility_config.class_groups.*' => 'string|max:20',
             'eligibility_config.gender' => 'nullable|in:open,male,female',
+            'eligibility_config.min_experience_years' => 'nullable|integer|min:1|max:60',
+            'eligibility_config.allow_teacher_self_registration' => 'nullable|boolean',
+            'eligibility_config.teaching_type_ids' => 'nullable|array',
+            'eligibility_config.teaching_type_ids.*' => 'integer',
+            'eligibility_config.subject_ids' => 'nullable|array',
+            'eligibility_config.subject_ids.*' => 'integer',
+            'eligibility_config.excluded_designation_ids' => 'nullable|array',
+            'eligibility_config.excluded_designation_ids.*' => 'integer',
             'delivery_mode'    => 'nullable|in:offline,online',
             'status'           => 'required|in:draft,published,ongoing,completed,cancelled',
             'requires_hall_ticket' => 'nullable|boolean',
@@ -232,6 +261,20 @@ class McqExamController extends SahodayaAdminController
             'certificate_template_id' => 'nullable|integer|exists:mcq_certificate_templates,id',
             'student_verification_mode' => 'nullable|in:inherit,required,optional',
         ]);
+
+        if (array_key_exists('code', $data)) {
+            $code = filled($data['code'] ?? null) ? strtoupper(trim((string) $data['code'])) : null;
+            if ($code !== null) {
+                $exists = McqExam::where('tenant_id', $this->sahodaya->id)
+                    ->where('code', $code)
+                    ->where('id', '!=', $exam->id)
+                    ->exists();
+                if ($exists) {
+                    return back()->withErrors(['code' => 'An exam with this code already exists.']);
+                }
+            }
+            $data['code'] = $code;
+        }
 
         $fee = (float) ($data['fee_amount'] ?? 0);
         $discount = (float) ($data['school_discount_amount'] ?? 0);

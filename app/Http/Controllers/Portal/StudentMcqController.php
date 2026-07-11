@@ -44,6 +44,17 @@ class StudentMcqController extends Controller
         ]);
     }
 
+    public function invoice(Request $request, string $tenantId, McqRegistration $registration, \App\Services\Mcq\McqRegistrationInvoiceService $invoices)
+    {
+        $student = $request->attributes->get('portalStudent');
+        abort_if($registration->school_id !== $tenantId || $registration->student_id !== $student->id, 403);
+
+        $registration->loadMissing('exam');
+        abort_unless($registration->exam?->hasFee(), 404, 'This exam has no fee.');
+
+        return $invoices->download($registration);
+    }
+
     public function showExam(Request $request, string $tenantId, McqRegistration $registration, McqExamSessionService $sessions)
     {
         $student = $request->attributes->get('portalStudent');

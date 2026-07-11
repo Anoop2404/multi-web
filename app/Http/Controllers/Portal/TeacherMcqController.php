@@ -82,6 +82,8 @@ class TeacherMcqController extends Controller
             'options.*.key' => 'required_with:options|string|max:10',
             'options.*.label' => 'required_with:options|string|max:500',
             'correct_option_key' => 'nullable|string|max:10',
+            'marks' => 'nullable|numeric|min:0.01|max:1000',
+            'negative_mark' => 'nullable|numeric|min:0|max:1000',
         ]);
 
         abort_if(! $data['body_text'] && ! $request->hasFile('document') && empty($data['options']), 422, 'Add question text, options, or upload a document.');
@@ -113,6 +115,8 @@ class TeacherMcqController extends Controller
             'correct_option_key' => filled($data['correct_option_key'] ?? null)
                 ? strtolower((string) $data['correct_option_key'])
                 : null,
+            'marks'              => isset($data['marks']) ? (float) $data['marks'] : 1,
+            'negative_mark'      => isset($data['negative_mark']) ? (float) $data['negative_mark'] : 0,
             'display_order'      => ($bank->questions()->max('display_order') ?? 0) + 1,
             'created_by_user_id' => $request->user()->id,
         ]);

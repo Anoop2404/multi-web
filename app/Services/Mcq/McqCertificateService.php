@@ -38,7 +38,7 @@ class McqCertificateService
     public function issue(McqRegistration $registration): McqCertificate
     {
         $this->assertEligible($registration);
-        $registration->loadMissing(['exam.series', 'student.schoolClass', 'school', 'mark']);
+        $registration->loadMissing(['exam.series', 'student.schoolClass', 'teacher', 'school', 'mark']);
 
         $existing = McqCertificate::where('registration_id', $registration->id)->first();
         if ($existing) {
@@ -48,13 +48,17 @@ class McqCertificateService
         $template = $this->resolveTemplate($registration->exam);
         $snapshot = $template?->design_json ?? $this->defaultDesign();
 
-        return McqCertificate::create([
+        $certificate = McqCertificate::create([
             'registration_id'          => $registration->id,
             'certificate_template_id'  => $template?->id,
             'design_snapshot_json'     => $snapshot,
             'verification_uuid'        => (string) Str::uuid(),
             'generated_at'             => now(),
         ]);
+
+        app(McqExamNotifier::class)->certificateReady($registration);
+
+        return $certificate;
     }
 
     public function issueBulk(McqExam $exam): int
@@ -66,12 +70,15 @@ class McqCertificateService
             ->where('status', 'submitted')
             ->whereNotIn('attendance_status', McqRegistration::BLOCKING_ATTENDANCE_STATUSES)
             ->whereHas('mark')
-            ->with(['exam', 'mark', 'student', 'school'])
+            ->with(['exam', 'mark', 'student', 'teacher', 'school'])
             ->chunkById(100, function ($regs) use (&$count) {
                 foreach ($regs as $registration) {
                     try {
+                        $before = McqCertificate::where('registration_id', $registration->id)->exists();
                         $this->issue($registration);
-                        $count++;
+                        if (! $before) {
+                            $count++;
+                        }
                     } catch (ValidationException) {
                         continue;
                     }
@@ -110,12 +117,12 @@ class McqCertificateService
     /** @return array<string, string> */
     public function fieldValues(McqRegistration $registration, ?Tenant $sahodaya = null): array
     {
-        $registration->loadMissing(['exam.series', 'student', 'school', 'mark']);
+        $registration->loadMissing(['exam.series', 'student', 'teacher', 'school', 'mark']);
         $exam = $registration->exam;
         $mark = $registration->mark;
 
         return [
-            'student_name'   => $registration->student?->name ?? '',
+            'student_name'   => $registration->participantName(),
             'school_name'    => $registration->school?->name ?? '',
             'exam_title'     => $exam?->title ?? '',
             'series_title'   => $exam?->series?->title ?? '',

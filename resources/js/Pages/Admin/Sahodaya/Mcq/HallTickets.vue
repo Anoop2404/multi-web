@@ -8,6 +8,7 @@
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/certificates/preview`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Sample certificate ↗</a>
                 <button type="button" @click="generate" class="btn-primary text-sm">Issue missing (approved only)</button>
+                <button type="button" @click="allocateSeats(false)" class="btn-secondary text-sm">Allocate seats</button>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/print-all`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Print all ↗</a>
             </template>
@@ -75,6 +76,30 @@
             </div>
         </div>
 
+        <div class="card mb-6 space-y-3">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h3 class="section-title !mb-0">Hall plan & seating</h3>
+                    <p class="section-desc">Optional halls with capacity. Auto-allocate seats by school/name within capacity; without halls, seat numbers are 1…N.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="btn-secondary text-sm" @click="addHall">Add hall</button>
+                    <button type="button" class="btn-primary text-sm" :disabled="hallsForm.processing" @click="saveHalls">Save halls</button>
+                    <button type="button" class="btn-secondary text-sm" @click="allocateSeats(true)">Re-allocate all</button>
+                </div>
+            </div>
+            <div v-for="(hall, idx) in hallsForm.halls" :key="idx" class="flex flex-wrap gap-2 items-end">
+                <FormField label="Hall / room" class-extra="min-w-[180px]">
+                    <input v-model="hall.name" class="field" placeholder="Hall A">
+                </FormField>
+                <FormField label="Capacity" class-extra="w-28">
+                    <input v-model.number="hall.capacity" type="number" min="1" class="field">
+                </FormField>
+                <button type="button" class="text-xs text-red-600 mb-2" @click="removeHall(idx)">Remove</button>
+            </div>
+            <p v-if="!hallsForm.halls.length" class="text-xs text-slate-500">No halls configured — seat allocation will use a single Main room.</p>
+        </div>
+
         <input v-model="searchQuery" type="search" class="field max-w-md mb-4" placeholder="Search ticket or student…">
 
         <div class="form-section overflow-hidden !p-0">
@@ -83,7 +108,7 @@
                     <thead>
                         <tr>
                             <th>Reg. no.</th>
-                            <th>Student</th>
+                            <th>Candidate</th>
                             <th>School</th>
                             <th>Approval</th>
                             <th>Hall / seat</th>
@@ -92,7 +117,7 @@
                     <tbody>
                         <tr v-for="r in filteredRegistrations" :key="r.id">
                             <td class="font-mono">{{ r.hall_ticket_no || '—' }}</td>
-                            <td>{{ r.student?.name }}</td>
+                            <td>{{ r.student?.name || r.teacher?.name }}</td>
                             <td class="text-xs">{{ r.school?.name }}</td>
                             <td class="text-xs capitalize">{{ (r.approval_status || 'pending').replaceAll('_', ' ') }}</td>
                             <td class="text-xs">{{ r.hall_room || '—' }} {{ r.seat_no ? `· Seat ${r.seat_no}` : '' }}</td>
@@ -114,6 +139,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqHallTicketPreview from '@/Components/sahodaya/McqHallTicketPreview.vue';
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
+import FormField from '@/Components/ui/FormField.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -125,11 +151,31 @@ const props = defineProps({
     logoUrl: String,
     previewSample: Object,
     ticketsIssued: Boolean,
+    halls: { type: Array, default: () => [] },
 });
 
 const searchQuery = ref('');
 const logoInput = ref(null);
 const localLogoPreview = ref(null);
+
+const hallsForm = useForm({
+    halls: (props.halls?.length ? props.halls : []).map(h => ({ name: h.name, capacity: h.capacity })),
+});
+
+function addHall() {
+    hallsForm.halls.push({ name: '', capacity: 40 });
+}
+function removeHall(idx) {
+    hallsForm.halls.splice(idx, 1);
+}
+function saveHalls() {
+    hallsForm.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/halls`, { preserveScroll: true });
+}
+function allocateSeats(reallocate = false) {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/allocate-seats`, {
+        reallocate: reallocate ? 1 : 0,
+    }, { preserveScroll: true });
+}
 
 const designForm = useForm({
     header_title: props.hallTicketDesign?.header_title ?? '',
@@ -174,7 +220,7 @@ const filteredRegistrations = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();
     if (!q) return props.registrations;
     return props.registrations.filter((r) =>
-        [r.hall_ticket_no, r.student?.name, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
+        [r.hall_ticket_no, r.student?.name, r.teacher?.name, r.school?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
     );
 });
 

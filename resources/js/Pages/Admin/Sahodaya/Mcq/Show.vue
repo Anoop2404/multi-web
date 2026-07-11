@@ -96,9 +96,29 @@
                         <input :id="id" v-model="form.title" class="field" required>
                     </template>
                 </FormField>
+                <FormField label="Exam code" hint="Short unique code (e.g. TS-2026-L1)">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.code" class="field font-mono uppercase" maxlength="64" placeholder="Optional">
+                    </template>
+                </FormField>
                 <FormField label="Scheduled at">
                     <template #default="{ id }">
                         <input :id="id" v-model="form.scheduled_at" type="datetime-local" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Registration opens">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.registration_opens_at" type="datetime-local" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Registration closes">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.registration_closes_at" type="datetime-local" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Result date" hint="Cue for publishing results">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.result_date" type="date" class="field">
                     </template>
                 </FormField>
                 <FormField label="Status">
@@ -301,11 +321,15 @@ const publicMcqPapersUrl = computed(() => {
 
 const form = useForm({
     title: props.exam.title,
+    code: props.exam.code ?? '',
     status: props.exam.status,
     delivery_mode: props.exam.delivery_mode ?? 'offline',
     requires_hall_ticket: !!(props.exam.settings_json?.requires_hall_ticket),
     student_verification_mode: studentVerificationModeFromExam(props.exam),
     scheduled_at: props.exam.scheduled_at ? props.exam.scheduled_at.slice(0, 16) : '',
+    registration_opens_at: props.exam.registration_opens_at ? String(props.exam.registration_opens_at).slice(0, 16) : '',
+    registration_closes_at: props.exam.registration_closes_at ? String(props.exam.registration_closes_at).slice(0, 16) : '',
+    result_date: props.exam.result_date ? String(props.exam.result_date).slice(0, 10) : '',
     fee_amount: props.exam.fee_amount ?? '',
     school_discount_amount: props.exam.school_discount_amount ?? '',
     payment_deadline: props.exam.payment_deadline ?? '',
@@ -313,6 +337,7 @@ const form = useForm({
     penalty_amount: props.exam.penalty_amount ?? '',
     next_hall_ticket_no: props.exam.next_hall_ticket_no ?? 100,
     eligibility_config: {
+        audience: eligibilityDefaults.audience ?? 'students',
         scope: eligibilityDefaults.scope ?? 'all',
         assignment_type: eligibilityDefaults.assignment_type
             ?? (eligibilityDefaults.class_category_ids?.length ? 'category'
@@ -321,6 +346,11 @@ const form = useForm({
         master_class_ids: [...(eligibilityDefaults.master_class_ids ?? [])],
         class_groups: [...(eligibilityDefaults.class_groups ?? [])],
         gender: eligibilityDefaults.gender ?? 'open',
+        min_experience_years: eligibilityDefaults.min_experience_years ?? null,
+        allow_teacher_self_registration: eligibilityDefaults.allow_teacher_self_registration ?? true,
+        teaching_type_ids: [...(eligibilityDefaults.teaching_type_ids ?? [])],
+        subject_ids: [...(eligibilityDefaults.subject_ids ?? [])],
+        excluded_designation_ids: [...(eligibilityDefaults.excluded_designation_ids ?? [])],
     },
     grade_master_id: props.exam.grade_master_id ?? '',
     hall_ticket_template_id: props.exam.hall_ticket_template_id ?? '',

@@ -41,12 +41,15 @@
                 <p class="section-desc">Hall ticket list for exam-day attendance marking.</p>
                 <a :href="exportBase + '/attendance/export'" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
                 <a :href="exportBase + '/absent/export'" class="btn-secondary text-sm mt-2 inline-block">Absent list ↓</a>
+                <a :href="exportBase + '/malpractice/export'" class="btn-secondary text-sm mt-2 inline-block">Malpractice register ↓</a>
             </div>
             <div class="card">
                 <h3 class="section-title">Marks & results</h3>
                 <p class="section-desc">Present students without marks, toppers, and grade bands.</p>
                 <a :href="exportBase + '/marks-pending/export'" class="btn-secondary text-sm mt-3 inline-block">Marks pending ↓</a>
                 <a v-if="exam.results_published" :href="exportBase + '/toppers/export'" class="btn-secondary text-sm mt-2 inline-block">Toppers ↓</a>
+                <a v-if="exam.results_published" :href="exportBase + '/result-analysis/export'" class="btn-secondary text-sm mt-2 inline-block">Result analysis ↓</a>
+                <a v-if="exam.results_published" :href="exportBase + '/school-performance/export'" class="btn-secondary text-sm mt-2 inline-block">School performance ↓</a>
                 <a :href="exportBase + '/grade-bands/export'" class="btn-secondary text-sm mt-2 inline-block">Grade bands ↓</a>
             </div>
             <div v-if="exam.delivery_mode === 'online'" class="card">
@@ -60,6 +63,53 @@
                 <a :href="exportBase + '/level2-qualifiers/export'" class="btn-secondary text-sm mt-3 inline-block">Qualifier list ↓</a>
             </div>
         </div>
+
+        <section v-if="resultAnalysis" class="card mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <div>
+                    <h3 class="section-title !mb-0">Result analysis</h3>
+                    <p class="section-desc">Pass/fail, mean score, percentiles, and grade histogram.</p>
+                </div>
+                <a :href="exportBase + '/result-analysis/export'" class="btn-secondary text-sm">Export ↓</a>
+            </div>
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 text-center">
+                <div class="rounded-lg bg-slate-50 p-3"><p class="text-lg font-bold">{{ resultAnalysis.examined }}</p><p class="text-[10px] uppercase text-slate-500">Examined</p></div>
+                <div class="rounded-lg bg-slate-50 p-3"><p class="text-lg font-bold text-emerald-700">{{ resultAnalysis.pass_rate ?? '—' }}%</p><p class="text-[10px] uppercase text-slate-500">Pass rate</p></div>
+                <div class="rounded-lg bg-slate-50 p-3"><p class="text-lg font-bold">{{ resultAnalysis.mean_score ?? '—' }}</p><p class="text-[10px] uppercase text-slate-500">Mean</p></div>
+                <div class="rounded-lg bg-slate-50 p-3"><p class="text-lg font-bold">{{ resultAnalysis.median_score ?? '—' }}</p><p class="text-[10px] uppercase text-slate-500">Median</p></div>
+                <div class="rounded-lg bg-slate-50 p-3"><p class="text-lg font-bold text-red-700">{{ resultAnalysis.fail_rate ?? '—' }}%</p><p class="text-[10px] uppercase text-slate-500">Fail rate</p></div>
+            </div>
+            <div class="mt-4 overflow-x-auto">
+                <table class="data-table">
+                    <thead><tr><th>Grade</th><th>Count</th></tr></thead>
+                    <tbody>
+                        <tr v-for="(count, grade) in resultAnalysis.grade_histogram" :key="grade">
+                            <td>{{ grade }}</td><td>{{ count }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section v-if="schoolPerformance?.length" class="card card--flush overflow-hidden mb-6">
+            <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <h3 class="section-title !mb-0">School-wise performance</h3>
+                <a :href="exportBase + '/school-performance/export'" class="btn-secondary text-sm">Export ↓</a>
+            </div>
+            <table class="data-table">
+                <thead><tr><th>School</th><th>Registered</th><th>Examined</th><th>Avg</th><th>Pass %</th><th>Top 10</th></tr></thead>
+                <tbody>
+                    <tr v-for="(row, i) in schoolPerformance" :key="i">
+                        <td>{{ row.school_name }}</td>
+                        <td>{{ row.registered }}</td>
+                        <td>{{ row.examined }}</td>
+                        <td>{{ row.avg_score ?? '—' }}</td>
+                        <td>{{ row.pass_rate ?? '—' }}</td>
+                        <td>{{ row.top_10 }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
 
         <section class="card card--flush overflow-hidden mb-6">
             <div class="p-4 border-b border-slate-100">
@@ -113,6 +163,8 @@ const props = defineProps({
     exam: Object,
     registrations: { type: Array, default: () => [] },
     feeSummary: { type: Array, default: () => [] },
+    resultAnalysis: { type: Object, default: null },
+    schoolPerformance: { type: Array, default: () => [] },
     stats: { type: Object, default: () => ({}) },
 });
 

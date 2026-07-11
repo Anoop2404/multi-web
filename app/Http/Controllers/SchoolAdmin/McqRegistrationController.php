@@ -151,6 +151,11 @@ class McqRegistrationController extends SchoolAdminController
 
         $exam = McqExam::findOrFail($data['exam_id']);
         abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_unless(
+            \App\Support\Mcq\McqExamEligibilityConfig::allowsStudents($exam->eligibility_config),
+            422,
+            'This exam is not open to students.',
+        );
 
         $student = Student::findOrFail($data['student_id']);
         abort_if($student->tenant_id !== $this->school->id, 403);
@@ -215,6 +220,11 @@ class McqRegistrationController extends SchoolAdminController
 
         $exam = McqExam::findOrFail($data['exam_id']);
         abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_unless(
+            \App\Support\Mcq\McqExamEligibilityConfig::allowsStudents($exam->eligibility_config),
+            422,
+            'This exam is not open to students.',
+        );
         app(McqRegistrationGateService::class)->assertSchoolCanAccess($this->school);
 
         $studentIds = collect($data['student_ids'] ?? []);
@@ -304,20 +314,165 @@ class McqRegistrationController extends SchoolAdminController
         );
     }
 
+    public function storeTeacher(Request $request)
+    {
+        $data = $request->validate([
+            'exam_id'    => 'required|exists:mcq_exams,id',
+            'teacher_id' => 'required|exists:teachers,id',
+        ]);
+
+        $exam = McqExam::findOrFail($data['exam_id']);
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+
+        $teacher = \App\Models\Teacher::findOrFail($data['teacher_id']);
+        abort_if($teacher->tenant_id !== $this->school->id, 403);
+
+        app(McqRegistrationGateService::class)->assertCanRegisterTeacher($exam, $this->school, $teacher);
+
+        $approvalStatus = app(McqRegistrationApprovalService::class)->initialApprovalStatus($exam);
+
+        $existing = McqRegistration::where('exam_id', $exam->id)
+            ->where('teacher_id', $teacher->id)
+            ->first();
+
+        if ($existing && ! $existing->isCancelled()) {
+            return back()->with('success', 'Teacher is already registered for this exam.');
+        }
+
+        if ($existing) {
+            $existing->update([
+                'school_id'            => $this->school->id,
+                'student_id'           => null,
+                'status'               => 'registered',
+                'approval_status'      => $approvalStatus,
+                'cancelled_at'         => null,
+                'cancelled_by_user_id' => null,
+            ]);
+            $registration = $existing->fresh();
+        } else {
+            $registration = McqRegistration::create([
+                'exam_id'         => $exam->id,
+                'teacher_id'      => $teacher->id,
+                'student_id'      => null,
+                'school_id'       => $this->school->id,
+                'status'          => 'registered',
+                'approval_status' => $approvalStatus,
+            ]);
+        }
+
+        app(McqSchoolFeeService::class)->syncForSchool($exam, $this->school);
+
+        app(PlatformAuditLogger::class)->mcqRegistration(
+            $registration,
+            'mcq.registration.created',
+            "School registered teacher {$teacher->name} for {$exam->title}",
+        );
+        app(\App\Services\Mcq\McqExamNotifier::class)->registrationConfirmed($registration);
+
+        return back()->with('success', 'Teacher registered for exam.');
+    }
+
+    public function bulkStoreTeachers(Request $request)
+    {
+        $data = $request->validate([
+            'exam_id'     => 'required|exists:mcq_exams,id',
+            'teacher_ids' => 'required|array|min:1|max:2000',
+            'teacher_ids.*' => 'integer|exists:teachers,id',
+        ]);
+
+        $exam = McqExam::findOrFail($data['exam_id']);
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_unless(
+            \App\Support\Mcq\McqExamEligibilityConfig::allowsTeachers($exam->eligibility_config),
+            422,
+            'This exam is not open to teachers.',
+        );
+        app(McqRegistrationGateService::class)->assertSchoolCanAccess($this->school);
+
+        $teacherIds = collect($data['teacher_ids'])->unique()->values();
+        $teachersById = \App\Models\Teacher::where('tenant_id', $this->school->id)
+            ->whereIn('id', $teacherIds)
+            ->where('status', 'active')
+            ->get()
+            ->keyBy('id');
+
+        $existingByTeacher = McqRegistration::where('exam_id', $exam->id)
+            ->whereIn('teacher_id', $teacherIds)
+            ->get()
+            ->keyBy('teacher_id');
+
+        $registered = 0;
+        $approvalStatus = app(McqRegistrationApprovalService::class)->initialApprovalStatus($exam);
+        $eligibility = app(McqEligibilityService::class);
+
+        foreach ($teacherIds as $teacherId) {
+            $teacher = $teachersById->get($teacherId);
+            if (! $teacher || ! $eligibility->isTeacherEligible($exam, $teacher)) {
+                continue;
+            }
+
+            $existing = $existingByTeacher->get($teacher->id);
+            if ($existing && ! $existing->isCancelled()) {
+                continue;
+            }
+
+            if ($existing) {
+                $existing->update([
+                    'school_id'            => $this->school->id,
+                    'student_id'           => null,
+                    'status'               => 'registered',
+                    'approval_status'      => $approvalStatus,
+                    'cancelled_at'         => null,
+                    'cancelled_by_user_id' => null,
+                ]);
+            } else {
+                McqRegistration::create([
+                    'exam_id'         => $exam->id,
+                    'teacher_id'      => $teacher->id,
+                    'student_id'      => null,
+                    'school_id'       => $this->school->id,
+                    'status'          => 'registered',
+                    'approval_status' => $approvalStatus,
+                ]);
+            }
+
+            $registered++;
+        }
+
+        app(McqSchoolFeeService::class)->syncForSchool($exam, $this->school);
+
+        app(PlatformAuditLogger::class)->mcq(
+            $exam,
+            'mcq.registration.bulk',
+            "School bulk-registered {$registered} teacher(s) for {$exam->title}",
+            ['school_id' => $this->school->id, 'count' => $registered, 'audience' => 'teachers'],
+        );
+
+        return back()->with('success', "{$registered} teacher(s) registered.");
+    }
+
     public function cancel(Request $request, string $tenantId, McqExam $exam)
     {
         $data = $request->validate([
-            'student_id' => 'required|integer|exists:students,id',
+            'student_id' => 'nullable|integer|exists:students,id',
+            'teacher_id' => 'nullable|integer|exists:teachers,id',
         ]);
 
         abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_if(empty($data['student_id']) && empty($data['teacher_id']), 422, 'Select a student or teacher to cancel.');
 
-        $registration = McqRegistration::where('exam_id', $exam->id)
-            ->where('student_id', $data['student_id'])
-            ->where('school_id', $this->school->id)
-            ->first();
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->where('school_id', $this->school->id);
 
-        abort_unless($registration, 422, 'Student is not registered for this exam.');
+        if (! empty($data['teacher_id'])) {
+            $query->where('teacher_id', $data['teacher_id']);
+        } else {
+            $query->where('student_id', $data['student_id']);
+        }
+
+        $registration = $query->first();
+
+        abort_unless($registration, 422, 'Registration not found for this exam.');
 
         if ($registration->isCancelled()) {
             return back()->with('success', 'Registration is already cancelled.');
@@ -335,16 +490,16 @@ class McqRegistrationController extends SchoolAdminController
             'cancelled_by_user_id' => $request->user()->id,
         ]);
 
-        // Recalculate the batch fee so the cancelled student is no longer billed.
         app(McqSchoolFeeService::class)->syncForSchool($exam, $this->school);
 
+        $name = $registration->participantName();
         app(PlatformAuditLogger::class)->mcqRegistration(
-            $registration->fresh(['exam', 'student']),
+            $registration->fresh(['exam', 'student', 'teacher']),
             'mcq.registration.cancelled',
-            "School cancelled registration for {$registration->student?->name} in {$exam->title}",
+            "School cancelled registration for {$name} in {$exam->title}",
         );
 
-        return back()->with('success', 'Registration cancelled. You can re-register this student later if needed.');
+        return back()->with('success', 'Registration cancelled. You can re-register later if needed.');
     }
 
     public function resetPortalPassword(Request $request, string $tenantId, McqExam $exam, Student $student)

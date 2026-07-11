@@ -73,46 +73,24 @@ class McqExamOpsController extends SahodayaAdminController
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        $request->validate(['file' => 'required|file|mimes:csv,txt']);
-        $handle = fopen($request->file('file')->getRealPath(), 'r');
-        fgetcsv($handle);
-        $imported = 0;
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
 
-        while (($row = fgetcsv($handle)) !== false) {
-            if (count($row) < 2) {
-                continue;
-            }
-            $note = trim((string) ($row[2] ?? ''));
-            [$ticket, $status] = $row;
-            $status = strtolower(trim((string) $status));
-            if (! in_array($status, ['present', 'absent', 'malpractice', 'withheld'], true)) {
-                continue;
-            }
+        $result = app(\App\Services\Mcq\McqMarksAttendanceImporter::class)
+            ->importAttendance($request->file('file'), $exam, $request->user()->id);
 
-            $registration = McqRegistration::where('exam_id', $exam->id)
-                ->where('hall_ticket_no', trim((string) $ticket))
-                ->first();
-            if (! $registration) {
-                continue;
-            }
+        if ($result['errors'] !== []) {
+            $preview = collect($result['errors'])->take(8)->map(fn ($e) => "Row {$e['row']}: {$e['message']}")->implode(' · ');
 
-            $registration->update([
-                'attendance_status'    => $status,
-                'attendance_note'      => $note !== '' ? $note : null,
-                'attendance_marked_at' => now(),
-                'attendance_marked_by' => $request->user()->id,
+            return back()->with([
+                'success' => $result['imported'] > 0
+                    ? "Imported attendance for {$result['imported']} registration(s)."
+                    : null,
+                'import_errors' => $result['errors'],
+                'warning' => $preview !== '' ? "Import issues: {$preview}" : null,
             ]);
-
-            if ($registration->blocksScoring() && $registration->mark) {
-                $registration->mark()->delete();
-                $registration->update(['status' => 'registered', 'submitted_at' => null]);
-            }
-
-            $imported++;
         }
-        fclose($handle);
 
-        return back()->with('success', "Imported attendance for {$imported} registration(s).");
+        return back()->with('success', "Imported attendance for {$result['imported']} registration(s).");
     }
 
     public function exportAttendance(string $tenantId, McqExam $exam, \App\Services\Mcq\McqReportService $reports)
@@ -120,6 +98,35 @@ class McqExamOpsController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         return $reports->exportAttendance($exam);
+    }
+
+    public function attendanceSheetPdf(string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $docs)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $docs->attendanceSheetPdf($exam, $this->sahodaya);
+    }
+
+    public function markSheetPdf(string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $docs)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $docs->markSheetPdf($exam, $this->sahodaya);
+    }
+
+    public function resultSheetPdf(string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $docs)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $docs->resultSheetPdf($exam, $this->sahodaya);
+    }
+
+    public function registrationInvoice(string $tenantId, McqExam $exam, McqRegistration $registration, \App\Services\Mcq\McqRegistrationInvoiceService $invoices)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->exam_id !== $exam->id, 404);
+
+        return $invoices->download($registration, $this->sahodaya);
     }
 
     public function results(string $tenantId, McqExam $exam)
@@ -141,13 +148,14 @@ class McqExamOpsController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         $registrations = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student', 'school'])
+            ->with(['student', 'teacher', 'school'])
             ->orderBy('hall_ticket_no')
             ->get();
 
         $design = McqHallTicketDesign::fromExam($exam);
         $logoUrl = McqHallTicketDesign::logoUrl($this->sahodaya, $design);
         $ticketsIssued = McqRegistration::where('exam_id', $exam->id)->whereNotNull('hall_ticket_no')->exists();
+        $seating = app(\App\Services\Mcq\McqSeatingService::class);
 
         return $this->inertia('Sahodaya/Mcq/HallTickets', [
             'exam'            => $exam,
@@ -156,6 +164,7 @@ class McqExamOpsController extends SahodayaAdminController
             'logoUrl'         => $logoUrl,
             'previewSample'   => McqHallTicketDesign::previewSample($exam),
             'ticketsIssued'   => $ticketsIssued,
+            'halls'           => $seating->normalizedHalls($exam),
         ]);
     }
 
@@ -248,7 +257,7 @@ class McqExamOpsController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         $registrations = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student', 'school'])
+            ->with(['student', 'teacher', 'school'])
             ->orderBy('hall_ticket_no')
             ->get();
 
@@ -262,6 +271,38 @@ class McqExamOpsController extends SahodayaAdminController
         $count = $service->issueBulk($exam);
 
         return back()->with('success', "{$count} hall ticket(s) generated.");
+    }
+
+    public function saveHalls(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'halls' => 'nullable|array|max:50',
+            'halls.*.name' => 'required_with:halls|string|max:80',
+            'halls.*.capacity' => 'required_with:halls|integer|min:1|max:5000',
+        ]);
+
+        app(\App\Services\Mcq\McqSeatingService::class)->saveHalls($exam, $data['halls'] ?? []);
+
+        return back()->with('success', 'Hall plan saved.');
+    }
+
+    public function allocateSeats(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'reallocate' => 'nullable|boolean',
+        ]);
+
+        $result = app(\App\Services\Mcq\McqSeatingService::class)
+            ->allocateForExam($exam, (bool) ($data['reallocate'] ?? false));
+
+        return back()->with(
+            'success',
+            "Allocated seats for {$result['allocated']} candidate(s) across {$result['halls_used']} hall(s).",
+        );
     }
 
     public function staff(string $tenantId, McqExam $exam)
@@ -422,56 +463,29 @@ class McqExamOpsController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
         abort_if($exam->results_published, 422, 'Results are published for this exam. Unpublish results before importing marks.');
 
-        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240']);
 
-        $handle = fopen($request->file('file')->getRealPath(), 'r');
-        $header = fgetcsv($handle);
-        $imported = 0;
+        $result = app(\App\Services\Mcq\McqMarksAttendanceImporter::class)
+            ->importMarks($request->file('file'), $exam);
 
-        while (($row = fgetcsv($handle)) !== false) {
-            if (count($row) < 4) {
-                continue;
-            }
-            [$ticket, $correct, $wrong, $unanswered] = $row;
-            $registration = McqRegistration::where('exam_id', $exam->id)
-                ->where('hall_ticket_no', trim($ticket))
-                ->first();
-            if (! $registration) {
-                continue;
-            }
+        if (! $result['success'] && $result['imported'] === 0) {
+            $first = $result['errors'][0]['message'] ?? 'Import failed.';
 
-            if ($registration->blocksScoring()) {
-                continue;
-            }
-
-            $correct = (int) $correct;
-            $wrong = (int) $wrong;
-            $unanswered = (int) $unanswered;
-            $total = $correct + $wrong + $unanswered;
-            $score = $correct;
-            $percentage = $total > 0 ? round(($correct / $total) * 100, 2) : 0;
-            $grade = app(\App\Services\Mcq\McqGradeService::class)->gradeForPercentage($exam, $percentage);
-
-            \App\Models\McqMark::updateOrCreate(
-                ['registration_id' => $registration->id],
-                [
-                    'correct_count'    => $correct,
-                    'wrong_count'      => $wrong,
-                    'unanswered_count' => $unanswered,
-                    'score'            => $score,
-                    'percentage'       => $percentage,
-                    'grade'            => $grade,
-                    'locked_at'        => now(),
-                ]
-            );
-            $registration->update(['status' => 'submitted', 'submitted_at' => now()]);
-            $imported++;
+            return back()->withErrors(['file' => $first])->with('import_errors', $result['errors']);
         }
-        fclose($handle);
 
-        app(\App\Services\Mcq\McqRankingService::class)->rankExam($exam);
+        $msg = "Imported marks for {$result['imported']} student(s).";
+        if ($result['errors'] !== []) {
+            $preview = collect($result['errors'])->take(8)->map(fn ($e) => "Row {$e['row']}: {$e['message']}")->implode(' · ');
 
-        return back()->with('success', "Imported marks for {$imported} student(s).");
+            return back()->with([
+                'success' => $msg,
+                'import_errors' => $result['errors'],
+                'warning' => $preview !== '' ? "Import issues: {$preview}" : null,
+            ]);
+        }
+
+        return back()->with('success', $msg);
     }
 
     public function computeRanking(string $tenantId, McqExam $exam)

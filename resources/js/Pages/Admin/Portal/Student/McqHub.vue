@@ -31,6 +31,10 @@
                            :href="`/portal/student/${school.id}/mcq/${r.registration_route_id}/hall-ticket`"
                            target="_blank"
                            class="text-xs font-semibold text-slate-600">Hall ticket ↗</a>
+                        <a v-if="r.invoice_url"
+                           :href="r.invoice_url"
+                           target="_blank"
+                           class="text-xs font-semibold text-slate-600">Invoice ↗</a>
                         <a v-if="r.certificate_url"
                            :href="r.certificate_url"
                            target="_blank"

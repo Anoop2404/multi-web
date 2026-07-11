@@ -272,6 +272,9 @@ class StudentDashboardController extends Controller
                             && $reg->mark
                             ? "/portal/student/{$reg->school_id}/mcq/{$reg->id}/certificate"
                             : null,
+                        'invoice_url' => $exam->hasFee()
+                            ? "/portal/student/{$reg->school_id}/mcq/{$reg->id}/invoice"
+                            : null,
                         'can_take_online'  => $exam->isOnlineDelivery()
                             && in_array($exam->status, ['published', 'ongoing'], true)
                             && $reg->status !== 'submitted'

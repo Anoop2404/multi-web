@@ -23,6 +23,17 @@
                 </div>
             </div>
 
+            <div class="flex flex-wrap gap-3">
+                <label class="text-xs text-gray-600">
+                    Marks
+                    <input v-model.number="qForm.marks" type="number" min="0.01" step="0.01" class="field w-24 mt-1" aria-label="Marks for correct answer">
+                </label>
+                <label class="text-xs text-gray-600">
+                    Negative mark
+                    <input v-model.number="qForm.negative_mark" type="number" min="0" step="0.01" class="field w-24 mt-1" aria-label="Negative mark for wrong answer">
+                </label>
+            </div>
+
             <input type="file" @change="onFile" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" class="text-sm" aria-label="Attach document">
             <button class="btn-primary" :disabled="qForm.processing">Add question</button>
         </form>
@@ -40,6 +51,10 @@
                                 <span v-if="opt.key === q.correct_option_key" class="text-xs">(correct)</span>
                             </li>
                         </ul>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Marks {{ Number(q.marks ?? 1) }}
+                            <span v-if="Number(q.negative_mark) > 0"> · Negative {{ Number(q.negative_mark) }}</span>
+                        </p>
                         <p v-if="q.document_path" class="text-xs text-indigo-600 mt-1">Document attached</p>
                     </div>
                     <button @click="removeQuestion(q)" class="text-xs text-red-600 shrink-0">Remove</button>
@@ -69,6 +84,8 @@ const qForm = useForm({
         { key: 'd', label: '' },
     ],
     correct_option_key: 'a',
+    marks: 1,
+    negative_mark: 0,
 });
 
 const bankLabel = computed(() => props.bank.title?.slice(0, 24) || 'Bank');
@@ -95,6 +112,8 @@ function addQuestion() {
                 { key: 'd', label: '' },
             ];
             qForm.correct_option_key = 'a';
+            qForm.marks = 1;
+            qForm.negative_mark = 0;
         },
     });
 }

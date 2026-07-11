@@ -81,7 +81,7 @@
 
             <div class="grid lg:grid-cols-3 gap-4">
                 <div class="lg:col-span-2 space-y-4">
-                    <div class="card card--flush overflow-hidden">
+                    <div v-if="allowsStudents" class="card card--flush overflow-hidden">
                         <div class="p-4 border-b border-slate-100 space-y-3">
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div>
@@ -206,10 +206,73 @@
                             </div>
                         </div>
                     </div>
+
+                    <div v-if="allowsTeachers" class="card card--flush overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 space-y-3">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h3 class="section-title !mb-0">Select teachers to register</h3>
+                                    <p class="text-xs text-slate-500 mt-0.5">Bulk-nominate eligible teachers for this Talent Search exam.</p>
+                                </div>
+                                <input v-model="teacherSearch" type="search" class="field text-sm min-w-[200px]"
+                                       placeholder="Search teacher…">
+                            </div>
+                        </div>
+                        <div v-if="teacherSelectionCount > 0"
+                             class="px-4 py-3 border-b border-indigo-100 bg-indigo-50/80 flex flex-wrap items-center justify-between gap-3">
+                            <p class="text-sm font-semibold text-indigo-900">{{ teacherSelectionCount }} teacher(s) selected</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" class="btn-secondary text-xs" @click="clearTeacherSelection">Clear</button>
+                                <button type="button" class="btn-primary text-sm"
+                                        :disabled="!canRegister || bulkRegisteringTeachers"
+                                        @click="registerSelectedTeachers">
+                                    {{ bulkRegisteringTeachers ? 'Registering…' : `Register ${teacherSelectionCount}` }}
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th class="w-10"><input type="checkbox" :checked="allVisibleTeachersSelected" @change="toggleAllVisibleTeachers"></th>
+                                        <th>Teacher</th>
+                                        <th>Code</th>
+                                        <th>Status</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="t in filteredTeachers" :key="t.id"
+                                        :class="{ 'bg-emerald-50/40': t.registered, 'bg-indigo-50/30': isTeacherSelected(t.id) }">
+                                        <td>
+                                            <input v-if="!t.registered && t.eligible && canRegister" type="checkbox"
+                                                   :checked="isTeacherSelected(t.id)" @change="toggleTeacher(t.id)">
+                                        </td>
+                                        <td>{{ t.name }}</td>
+                                        <td class="text-xs font-mono">{{ t.employee_code || t.reg_no || '—' }}</td>
+                                        <td>
+                                            <span v-if="t.registered" class="text-xs font-semibold text-emerald-700">Registered</span>
+                                            <span v-else-if="!t.eligible" class="text-xs text-amber-700" :title="t.ineligible_reason">Not eligible</span>
+                                            <span v-else class="text-xs text-slate-500">Available</span>
+                                        </td>
+                                        <td class="text-right">
+                                            <button v-if="!t.registered && t.eligible && canRegister" type="button"
+                                                    class="btn-secondary text-xs" @click="registerTeacherById(t.id)">Add</button>
+                                            <button v-else-if="t.registered && t.can_cancel" type="button"
+                                                    class="text-xs text-red-600" @click="cancelTeacher(t.id, t.name)">Cancel</button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="!filteredTeachers.length">
+                                        <td colspan="5" class="p-6 text-center text-slate-400">No matching teachers.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 <aside class="space-y-4">
-                    <div class="card space-y-3 bg-indigo-50/40 border-indigo-100">
+                    <div v-if="allowsStudents" class="card space-y-3 bg-indigo-50/40 border-indigo-100">
                         <h3 class="section-title !mb-0">Student portal logins</h3>
                         <p class="text-xs text-slate-600 leading-relaxed">
                             Each newly registered student gets a portal account automatically:
@@ -252,7 +315,7 @@
                         <div class="space-y-2 max-h-48 overflow-y-auto">
                             <div v-for="r in registrations.slice(0, 8)" :key="r.id"
                                  class="flex justify-between gap-2 text-sm border border-slate-100 rounded-lg px-3 py-2">
-                                <span class="truncate">{{ r.student?.name }}</span>
+                                <span class="truncate">{{ r.participant_name || r.student?.name || r.teacher?.name }}</span>
                                 <span class="text-xs capitalize shrink-0 text-slate-500">{{ r.approval_status_label || r.approval_status }}</span>
                             </div>
                         </div>
@@ -271,17 +334,18 @@
                 <thead><tr><th>Student</th><th>Approval</th><th>Exam reg. no.</th><th>Seat</th><th>Status</th><th class="text-right">Action</th></tr></thead>
                 <tbody>
                     <tr v-for="r in registrations" :key="r.id">
-                        <td>{{ r.student?.name }}</td>
+                        <td>{{ r.participant_name || r.student?.name || r.teacher?.name }}</td>
                         <td><span class="text-xs capitalize">{{ r.approval_status_label || r.approval_status }}</span></td>
                         <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
                         <td>{{ r.seat_no || '—' }}</td>
                         <td class="text-xs">
                             <span class="font-semibold" :class="lifecycleTone(r.lifecycle_status?.tone)">{{ r.lifecycle_status?.label || r.status }}</span>
                         </td>
-                        <td class="text-right">
+                        <td class="text-right whitespace-nowrap space-x-2">
+                            <a v-if="examHasFee" :href="`${base}/registrations/${r.id}/invoice`" target="_blank" class="text-xs font-semibold text-indigo-600 hover:underline">Invoice</a>
                             <button v-if="r.can_cancel && canRegister" type="button"
                                     class="text-xs font-semibold text-red-600 hover:text-red-700"
-                                    @click="cancelStudent(r.student_id, r.student?.name)">Cancel</button>
+                                    @click="r.teacher_id ? cancelTeacher(r.teacher_id, r.participant_name || r.teacher?.name) : cancelStudent(r.student_id, r.participant_name || r.student?.name)">Cancel</button>
                         </td>
                     </tr>
                 </tbody>
@@ -533,7 +597,7 @@
                 <thead><tr><th>Student</th><th>Score</th><th>Rank</th><th>Grade</th></tr></thead>
                 <tbody>
                     <tr v-for="r in registrations" :key="r.id">
-                        <td>{{ r.student?.name }}</td>
+                        <td>{{ r.participant_name || r.student?.name || r.teacher?.name }}</td>
                         <td>{{ r.mark?.score ?? '—' }}</td>
                         <td>{{ r.mark?.rank ?? '—' }}</td>
                         <td>{{ r.mark?.grade ?? '—' }}</td>
@@ -620,6 +684,7 @@ const props = defineProps({
     schoolFee: Object,
     feeBreakdown: { type: Object, default: () => ({ by_class: [] }) },
     students: { type: Array, default: () => [] },
+    teachers: { type: Array, default: () => [] },
     classOptions: { type: Array, default: () => [] },
     registeredStudentIds: { type: Array, default: () => [] },
     ticketsIssuedCount: { type: Number, default: 0 },
@@ -835,6 +900,60 @@ function lifecycleTone(tone) {
         danger: 'text-red-700',
         info: 'text-blue-700',
     })[tone] || 'text-slate-700';
+}
+
+const allowsStudents = computed(() => props.exam?.allows_students !== false && (props.registerStats?.allows_students ?? true));
+const allowsTeachers = computed(() => !!(props.exam?.allows_teachers || props.registerStats?.allows_teachers));
+const teacherSearch = ref('');
+const selectedTeacherIds = ref(new Set());
+const bulkRegisteringTeachers = ref(false);
+
+const filteredTeachers = computed(() => {
+    const q = teacherSearch.value.trim().toLowerCase();
+    return props.teachers.filter(t => {
+        if (!q) return true;
+        return t.name?.toLowerCase().includes(q)
+            || t.employee_code?.toLowerCase().includes(q)
+            || t.reg_no?.toLowerCase().includes(q);
+    });
+});
+
+const teacherSelectionCount = computed(() => selectedTeacherIds.value.size);
+const allVisibleTeachersSelected = computed(() => {
+    const available = filteredTeachers.value.filter(t => !t.registered && t.eligible && canRegister.value);
+    return available.length > 0 && available.every(t => selectedTeacherIds.value.has(t.id));
+});
+
+function isTeacherSelected(id) { return selectedTeacherIds.value.has(id); }
+function toggleTeacher(id) {
+    const next = new Set(selectedTeacherIds.value);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    selectedTeacherIds.value = next;
+}
+function clearTeacherSelection() { selectedTeacherIds.value = new Set(); }
+function toggleAllVisibleTeachers(e) {
+    const next = new Set(selectedTeacherIds.value);
+    const available = filteredTeachers.value.filter(t => !t.registered && t.eligible && canRegister.value);
+    if (e.target.checked) available.forEach(t => next.add(t.id));
+    else available.forEach(t => next.delete(t.id));
+    selectedTeacherIds.value = next;
+}
+function registerTeacherById(id) {
+    router.post(`${base.value}/register-teacher`, { teacher_id: id }, { preserveScroll: true });
+}
+function registerSelectedTeachers() {
+    const ids = [...selectedTeacherIds.value];
+    if (!ids.length || bulkRegisteringTeachers.value) return;
+    bulkRegisteringTeachers.value = true;
+    router.post(`${base.value}/register-teachers-bulk`, { teacher_ids: ids }, {
+        preserveScroll: true,
+        onSuccess: () => clearTeacherSelection(),
+        onFinish: () => { bulkRegisteringTeachers.value = false; },
+    });
+}
+function cancelTeacher(id, name) {
+    if (!window.confirm(`Cancel registration for ${name}?`)) return;
+    router.post(`${base.value}/cancel`, { teacher_id: id }, { preserveScroll: true });
 }
 
 function registerStudentById(id) {

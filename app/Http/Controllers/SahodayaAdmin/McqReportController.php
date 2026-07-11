@@ -19,9 +19,12 @@ class McqReportController extends SahodayaAdminController
             'exam'         => $exam->only('id', 'title', 'exam_level', 'status', 'results_published', 'delivery_mode'),
             'registrations'=> $reports->registrationRows($exam),
             'feeSummary'   => $feeSummary,
+            'resultAnalysis' => $exam->results_published ? $reports->resultAnalysis($exam) : null,
+            'schoolPerformance' => $exam->results_published ? $reports->schoolPerformanceRows($exam) : [],
             'stats'        => [
                 'registrations' => McqRegistration::where('exam_id', $exam->id)->count(),
                 'present'       => McqRegistration::where('exam_id', $exam->id)->where('attendance_status', 'present')->count(),
+                'malpractice'   => McqRegistration::where('exam_id', $exam->id)->whereIn('attendance_status', ['malpractice', 'withheld'])->count(),
                 'fee_collected' => collect($feeSummary)->where('status', 'approved')->sum('total_due'),
                 'fee_pending'   => collect($feeSummary)->whereIn('status', ['proof_uploaded', 'pending'])->sum('total_due'),
             ],
@@ -104,5 +107,28 @@ class McqReportController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         return $reports->exportSessionStatus($exam);
+    }
+
+    public function exportResultAnalysis(string $tenantId, McqExam $exam, McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless($exam->results_published, 422, 'Results are not published yet.');
+
+        return $reports->exportResultAnalysis($exam);
+    }
+
+    public function exportSchoolPerformance(string $tenantId, McqExam $exam, McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless($exam->results_published, 422, 'Results are not published yet.');
+
+        return $reports->exportSchoolPerformance($exam);
+    }
+
+    public function exportMalpractice(string $tenantId, McqExam $exam, McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportMalpracticeList($exam);
     }
 }

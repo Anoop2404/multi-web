@@ -25,11 +25,19 @@
 
         <div class="flex flex-wrap gap-2 mb-4">
             <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance/export`" class="btn-secondary text-sm">Export attendance CSV ↓</a>
+            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance/sheet.pdf`" class="btn-secondary text-sm" target="_blank">Attendance sheet PDF ↓</a>
+            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/mark-sheet.pdf`" class="btn-secondary text-sm" target="_blank">Mark sheet PDF ↓</a>
             <form @submit.prevent="importAttendance" class="flex flex-wrap gap-2 items-center">
-                <input ref="importFile" type="file" accept=".csv,.txt" class="text-sm" required>
-                <button type="submit" class="btn-secondary text-sm">Import attendance CSV</button>
+                <input ref="importFile" type="file" accept=".csv,.txt,.xlsx,.xls" class="text-sm" required>
+                <button type="submit" class="btn-secondary text-sm">Import attendance (CSV/Excel)</button>
             </form>
-            <p class="text-xs text-slate-500 w-full">CSV format: hall_ticket_no, present|absent|malpractice|withheld, note (note required for malpractice/withheld)</p>
+            <p class="text-xs text-slate-500 w-full">Columns: hall_ticket_no, present|absent|malpractice|withheld, note (note required for malpractice/withheld)</p>
+        </div>
+        <div v-if="importErrors?.length" class="card mb-4 !border-amber-200 bg-amber-50 text-sm text-amber-900 space-y-1">
+            <p class="font-semibold">Import issues ({{ importErrors.length }})</p>
+            <ul class="list-disc pl-5 text-xs space-y-0.5 max-h-40 overflow-y-auto">
+                <li v-for="(err, i) in importErrors.slice(0, 20)" :key="i">Row {{ err.row }}: {{ err.message }}</li>
+            </ul>
         </div>
 
         <div class="form-section overflow-hidden !p-0">
@@ -79,13 +87,15 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, registrations: Array, summary: Object, pendingCorrectionsCount: { type: Number, default: 0 } });
 const searchQuery = ref('');
 const importFile = ref(null);
+const page = usePage();
+const importErrors = computed(() => page.props.flash?.import_errors ?? []);
 const forms = reactive({});
 for (const r of props.registrations) {
     forms[r.id] = { attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' };
