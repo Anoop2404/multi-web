@@ -24,7 +24,7 @@ class BoardResultController extends SchoolAdminController
     public function index()
     {
         $results = BoardResult::where('tenant_id', $this->school->id)
-            ->with(['toppers', 'uploads' => fn ($q) => $q->orderByDesc('version')->limit(5)])
+            ->with(['toppers.subjectMarks', 'uploads' => fn ($q) => $q->orderByDesc('version')->limit(5)])
             ->orderByDesc('academic_year')
             ->orderByDesc('class')
             ->get();
@@ -33,7 +33,7 @@ class BoardResultController extends SchoolAdminController
             ->where('school_id', $this->school->id)
             ->whereIn('log_name', ['board_result', 'topper', 'achievement'])
             ->latest()
-            ->limit(50)
+            ->limit(75)
             ->get(['id', 'action', 'description', 'log_name', 'subject_type', 'subject_id', 'changes', 'created_at', 'causer_user_id']);
 
         return $this->inertia('School/BoardResults/Index', [

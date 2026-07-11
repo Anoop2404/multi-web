@@ -9,6 +9,7 @@ use App\Models\BoardResultRanking;
 use App\Models\ExamStream;
 use App\Models\Tenant;
 use App\Models\Topper;
+use App\Services\Audit\DataChangeLogger;
 use App\Support\AchievementCatalog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -55,6 +56,14 @@ class AwardsEngine
                 ->where('academic_year', $academicYear)
                 ->delete();
 
+            app(DataChangeLogger::class)->event(
+                'awards_recompute_started',
+                "Awards engine recomputing for {$academicYear}",
+                null,
+                'board_result',
+                null,
+                ['sahodaya_id' => $sahodayaId, 'academic_year' => $academicYear],
+            );
             $created += $this->awardFromRanking(
                 $sahodayaId,
                 $academicYear,
@@ -254,9 +263,25 @@ class AwardsEngine
             ];
 
             if ($existing) {
+                $before = $existing->only(['title', 'category', 'level', 'academic_year']);
                 $existing->update($payload);
+                app(DataChangeLogger::class)->updated(
+                    $existing,
+                    'System achievement updated from award',
+                    DataChangeLogger::diff($before, $existing->only(array_keys($before))),
+                    $award->tenant_id,
+                    'achievement',
+                    ['source_award_id' => $award->id],
+                );
             } else {
-                Achievement::create($payload);
+                $achievement = Achievement::create($payload);
+                app(DataChangeLogger::class)->created(
+                    $achievement,
+                    'System achievement created from award',
+                    $award->tenant_id,
+                    'achievement',
+                    ['source_award_id' => $award->id, 'title' => $achievement->title],
+                );
             }
             $synced++;
         }

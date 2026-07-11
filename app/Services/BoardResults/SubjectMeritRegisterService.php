@@ -4,15 +4,13 @@ namespace App\Services\BoardResults;
 
 use App\Models\BoardResult;
 use App\Models\Tenant;
-use App\Models\Topper;
-use App\Support\BoardExamSubjects;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
  * Subject-wise Merit Register (#147).
- * Prefers topper_subject_marks when present; otherwise aggregates subject_marks JSON.
+ * Reads exclusively from topper_subject_marks.
  */
 class SubjectMeritRegisterService
 {
@@ -45,12 +43,7 @@ class SubjectMeritRegisterService
 
         $names = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
 
-        $rows = $this->fromNormalizedTable($schoolIds, $academicYear, $class, $names);
-        if ($rows !== null) {
-            return $rows;
-        }
-
-        return $this->fromSubjectMarksJson($schoolIds, $academicYear, $class, $names);
+        return $this->fromNormalizedTable($schoolIds, $academicYear, $class, $names) ?? [];
     }
 
     /**
@@ -61,7 +54,7 @@ class SubjectMeritRegisterService
     private function fromNormalizedTable(array $schoolIds, string $academicYear, ?int $class, Collection $names): ?array
     {
         if (! Schema::hasTable('topper_subject_marks')) {
-            return null;
+            return [];
         }
 
         $query = DB::table('topper_subject_marks as tsm')
@@ -72,6 +65,7 @@ class SubjectMeritRegisterService
             ->whereIn('br.status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED])
             ->select([
                 'tsm.marks',
+                'tsm.subject_label as subject',
                 't.name as student_name',
                 't.percentage',
                 't.stream',
@@ -81,17 +75,6 @@ class SubjectMeritRegisterService
                 'br.class',
                 'br.academic_year',
             ]);
-
-        if (Schema::hasColumn('topper_subject_marks', 'subject_label')) {
-            $query->addSelect('tsm.subject_label as subject');
-        } elseif (Schema::hasColumn('topper_subject_marks', 'subject_name')) {
-            $query->addSelect('tsm.subject_name as subject');
-        } elseif (Schema::hasTable('subjects') && Schema::hasColumn('topper_subject_marks', 'subject_id')) {
-            $query->leftJoin('subjects as s', 's.id', '=', 'tsm.subject_id')
-                ->addSelect(DB::raw('COALESCE(s.name, tsm.subject_id::text) as subject'));
-        } else {
-            return null;
-        }
 
         if ($class !== null) {
             $query->where('br.class', $class);
@@ -113,56 +96,5 @@ class SubjectMeritRegisterService
             ])
             ->values()
             ->all();
-    }
-
-    /**
-     * @param  list<string>  $schoolIds
-     * @param  \Illuminate\Support\Collection<string, string>  $names
-     * @return list<array<string, mixed>>
-     */
-    private function fromSubjectMarksJson(array $schoolIds, string $academicYear, ?int $class, Collection $names): array
-    {
-        $toppers = Topper::query()
-            ->whereHas('boardResult', function ($q) use ($schoolIds, $academicYear, $class) {
-                $q->whereIn('tenant_id', $schoolIds)
-                    ->where('academic_year', $academicYear)
-                    ->whereIn('status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED]);
-                if ($class !== null) {
-                    $q->where('class', $class);
-                }
-            })
-            ->with(['boardResult:id,tenant_id,class,academic_year,status'])
-            ->get();
-
-        $rows = [];
-        foreach ($toppers as $topper) {
-            $marks = BoardExamSubjects::normalizeSubjectMarks($topper->subject_marks ?? []);
-            foreach ($marks as $subject => $mark) {
-                $rows[] = [
-                    'subject' => $subject,
-                    'student_name' => $topper->name,
-                    'school_id' => (string) $topper->tenant_id,
-                    'school_name' => $names[$topper->tenant_id] ?? (string) $topper->tenant_id,
-                    'marks' => $mark,
-                    'percentage' => $topper->percentage,
-                    'stream' => $topper->stream,
-                    'class' => $topper->boardResult?->class,
-                    'academic_year' => $topper->boardResult?->academic_year ?? $academicYear,
-                    'admission_no' => $topper->admission_no,
-                    'roll_no' => $topper->roll_no,
-                ];
-            }
-        }
-
-        usort($rows, function (array $a, array $b) {
-            $cmp = strcmp($a['subject'], $b['subject']);
-            if ($cmp !== 0) {
-                return $cmp;
-            }
-
-            return $b['marks'] <=> $a['marks'];
-        });
-
-        return $rows;
     }
 }

@@ -135,6 +135,19 @@
                             +{{ r.toppers.length - 6 }} more
                         </span>
                     </div>
+
+                    <div v-if="r.subject_stats && Object.keys(r.subject_stats).length"
+                         class="px-5 pb-4 border-t border-slate-50 pt-3">
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Subject stats</p>
+                        <div class="flex flex-wrap gap-2">
+                            <span v-for="(stat, subject) in r.subject_stats" :key="subject"
+                                  class="text-xs px-2.5 py-1 rounded-lg bg-slate-50 text-slate-700 border border-slate-100">
+                                {{ subject }}:
+                                <span class="font-semibold text-indigo-700">{{ stat.top_score }}</span>
+                                <span class="text-slate-400">({{ stat.topper_name }})</span>
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
                 <div v-if="!results.length"
@@ -144,10 +157,9 @@
             </div>
 
             <div class="card">
-                <div class="flex items-center gap-3 mb-4 border-b border-slate-100 pb-3">
-                    <button type="button" class="text-sm font-semibold px-3 py-1.5 rounded-lg"
-                            :class="auditTab === 'history' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500'"
-                            @click="auditTab = 'history'">Audit history</button>
+                <div class="mb-4 border-b border-slate-100 pb-3">
+                    <h3 class="text-sm font-semibold text-slate-800">Audit history</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Board result, topper, and achievement changes for this school.</p>
                 </div>
                 <div v-if="auditHistory?.length" class="divide-y divide-slate-50 max-h-80 overflow-y-auto">
                     <div v-for="entry in auditHistory" :key="entry.id" class="py-3 text-sm">
@@ -168,7 +180,6 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
 
 const props = defineProps({
     school: Object,
@@ -178,8 +189,6 @@ const props = defineProps({
     auditHistory: { type: Array, default: () => [] },
     topperCap: { type: Number, default: 5 },
 });
-
-const auditTab = ref('history');
 
 function formatAuditTime(iso) {
     if (!iso) return '';

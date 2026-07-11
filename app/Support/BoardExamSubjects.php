@@ -3,47 +3,44 @@
 namespace App\Support;
 
 use App\Models\ExamStream;
-use App\Models\Topper;
 use App\Services\BoardResults\TopperSubjectMarkService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 
 /**
- * Bridge for Class XII streams/subjects.
- * Prefers exam_streams master; falls back to built-in defaults when table missing.
+ * Class XII stream/subject helpers — reads exclusively from exam_streams master (#137).
  */
 class BoardExamSubjects
 {
     /** @return array<string, string> */
     public static function class12StreamLabels(?string $sahodayaId = null): array
     {
-        if (self::streamsTableReady()) {
-            $labels = ExamStream::labelsFor($sahodayaId);
-            if ($labels !== []) {
-                return $labels;
-            }
+        self::assertStreamsReady();
+
+        $labels = ExamStream::labelsFor($sahodayaId);
+        if ($labels === []) {
+            throw new RuntimeException('No active exam streams configured. Seed exam_streams before managing Class XII toppers.');
         }
 
-        return self::fallbackLabels();
+        return $labels;
     }
 
     /** @return list<string> */
     public static function subjectsForStream(?string $stream, ?string $sahodayaId = null): array
     {
-        if ($stream && self::streamsTableReady()) {
-            $row = ExamStream::findByCode($stream, $sahodayaId);
-            if ($row && is_array($row->default_subjects) && $row->default_subjects !== []) {
-                return $row->default_subjects;
-            }
+        if (! $stream) {
+            return [];
         }
 
-        return match ($stream) {
-            'bio_science' => ['English Core', 'Physics', 'Chemistry', 'Biology', 'Mathematics'],
-            'computer_science' => ['English Core', 'Physics', 'Chemistry', 'Mathematics', 'Computer Science'],
-            'commerce' => ['English Core', 'Accountancy', 'Business Studies', 'Economics', 'Mathematics'],
-            'humanities' => ['English Core', 'History', 'Geography', 'Political Science', 'Economics'],
-            default => ['English Core', 'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Computer Science', 'Accountancy', 'Business Studies', 'Economics'],
-        };
+        self::assertStreamsReady();
+
+        $row = ExamStream::findByCode($stream, $sahodayaId);
+        if (! $row) {
+            return [];
+        }
+
+        return is_array($row->default_subjects) ? array_values($row->default_subjects) : [];
     }
 
     public static function normalizeStream(?string $stream, ?string $sahodayaId = null): ?string
@@ -55,7 +52,7 @@ class BoardExamSubjects
         $key = strtolower(str_replace([' ', '-'], '_', $stream));
         $labels = self::class12StreamLabels($sahodayaId);
 
-        return array_key_exists($key, $labels) ? $key : 'other';
+        return array_key_exists($key, $labels) ? $key : (array_key_exists('other', $labels) ? 'other' : null);
     }
 
     public static function resolveStreamId(?string $streamKey, ?string $sahodayaId = null): ?int
@@ -97,6 +94,13 @@ class BoardExamSubjects
         return app(TopperSubjectMarkService::class)->subjectWiseLeaders($toppers);
     }
 
+    private static function assertStreamsReady(): void
+    {
+        if (! self::streamsTableReady()) {
+            throw new RuntimeException('exam_streams table is missing. Run tenant migrations.');
+        }
+    }
+
     private static function streamsTableReady(): bool
     {
         try {
@@ -104,17 +108,5 @@ class BoardExamSubjects
         } catch (\Throwable) {
             return false;
         }
-    }
-
-    /** @return array<string, string> */
-    private static function fallbackLabels(): array
-    {
-        return [
-            'bio_science' => 'Bio Science (PCB)',
-            'computer_science' => 'Computer Science (PCM + CS)',
-            'commerce' => 'Commerce',
-            'humanities' => 'Humanities / Arts',
-            'other' => 'Other / Mixed',
-        ];
     }
 }

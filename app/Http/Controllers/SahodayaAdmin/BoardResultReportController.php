@@ -13,6 +13,8 @@ class BoardResultReportController extends SahodayaAdminController
     {
         $year = $request->string('academic_year')->toString()
             ?: AcademicYear::forSahodaya($this->sahodaya->id);
+        $base = "/sahodaya-admin/{$this->sahodaya->id}";
+        $yearQ = urlencode($year);
 
         return $this->inertia('Sahodaya/BoardResults/Reports', [
             'filters' => [
@@ -21,14 +23,46 @@ class BoardResultReportController extends SahodayaAdminController
             ],
             'reports' => [
                 [
+                    'key' => 'RPT-BRD-001',
+                    'title' => 'School Result Summary',
+                    'description' => 'Appeared, passed, pass %, distinctions, highest mark by school.',
+                    'href' => "{$base}/reports/RPT-BRD-001?academic_year={$yearQ}",
+                ],
+                [
+                    'key' => 'RPT-BRD-002',
+                    'title' => 'Overall Ranking',
+                    'description' => 'Sahodaya-wide school rankings from the Ranking Engine.',
+                    'href' => "{$base}/reports/RPT-BRD-002?academic_year={$yearQ}",
+                ],
+                [
+                    'key' => 'RPT-BRD-003',
+                    'title' => 'Pass % Report',
+                    'description' => 'Approved/published results ordered by pass percentage.',
+                    'href' => "{$base}/reports/RPT-BRD-003?academic_year={$yearQ}",
+                ],
+                [
+                    'key' => 'RPT-BRD-004',
+                    'title' => 'Class X Merit Register',
+                    'description' => 'AISSE toppers across member schools.',
+                    'href' => "{$base}/reports/RPT-BRD-004?academic_year={$yearQ}",
+                ],
+                [
+                    'key' => 'RPT-BRD-005',
+                    'title' => 'Stream Merit Register',
+                    'description' => 'AISSCE toppers by stream.',
+                    'href' => "{$base}/reports/RPT-BRD-005?academic_year={$yearQ}",
+                ],
+                [
                     'key' => 'subject-merit',
                     'title' => 'Subject-wise Merit Register',
-                    'href' => "/sahodaya-admin/{$this->sahodaya->id}/board-results/reports/subject-merit?academic_year={$year}",
+                    'description' => 'Highest scorers per subject from normalized topper marks.',
+                    'href' => "{$base}/board-results/reports/subject-merit?academic_year={$yearQ}",
                 ],
                 [
                     'key' => 'excellence',
                     'title' => 'Academic Excellence + Historical Comparison',
-                    'href' => "/sahodaya-admin/{$this->sahodaya->id}/board-results/reports/excellence?academic_year={$year}",
+                    'description' => 'Awards and year-over-year pass % trends.',
+                    'href' => "{$base}/board-results/reports/excellence?academic_year={$yearQ}",
                 ],
             ],
         ]);
