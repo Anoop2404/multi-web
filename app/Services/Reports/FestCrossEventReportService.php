@@ -179,6 +179,7 @@ class FestCrossEventReportService
                 ]),
             'RPT-FST-002' => FestSchoolEventFee::query()
                 ->whereIn('event_id', $this->festEventIds($sahodayaId, $filters))
+                ->forAmountAggregation()
                 ->when(! empty($filters['school_id']), fn ($q) => $q->where('school_id', $filters['school_id']))
                 ->with(['event:id,title', 'school:id,name'])
                 ->orderByDesc('updated_at')

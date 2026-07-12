@@ -52,6 +52,7 @@ class ProgramHubDataService
 
         $fees = FestSchoolEventFee::where('school_id', $school->id)
             ->whereIn('event_id', $eventIds)
+            ->forAmountAggregation()
             ->get();
 
         $extra = [];
@@ -155,8 +156,8 @@ class ProgramHubDataService
                 'registrations'     => (int) $events->sum('registrations_count'),
                 'items'             => (int) $events->sum('items_count'),
                 'results_published' => $events->where('results_published', true)->count(),
-                'fees_collected'    => (float) FestSchoolEventFee::whereIn('event_id', $eventIds)->where('status', 'approved')->sum('total_due'),
-                'fees_pending'      => FestSchoolEventFee::whereIn('event_id', $eventIds)->whereIn('status', ['pending', 'proof_uploaded'])->count(),
+                'fees_collected'    => (float) FestSchoolEventFee::whereIn('event_id', $eventIds)->forAmountAggregation()->where('status', 'approved')->sum('total_due'),
+                'fees_pending'      => FestSchoolEventFee::whereIn('event_id', $eventIds)->forAmountAggregation()->whereIn('status', ['pending', 'proof_uploaded'])->count(),
                 'schools_registered'=> $registeredSchoolIds->count(),
                 'schools_total'     => $schoolIds->count(),
             ],
@@ -177,6 +178,7 @@ class ProgramHubDataService
         $festEventIds = FestEvent::where('tenant_id', $sahodayaId)->pluck('id');
         $pendingFees = FestSchoolEventFee::where('school_id', $school->id)
             ->whereIn('event_id', $festEventIds)
+            ->forAmountAggregation()
             ->whereIn('status', ['pending', 'proof_uploaded'])
             ->sum('total_due');
 
@@ -275,7 +277,7 @@ class ProgramHubDataService
 
         $financeSummary = [
             'membership' => (float) \App\Models\MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'approved')->sum('amount'),
-            'fest'       => (float) FestSchoolEventFee::whereIn('event_id', $festEventIds)->where('status', 'approved')->sum('total_due'),
+            'fest'       => (float) FestSchoolEventFee::whereIn('event_id', $festEventIds)->forAmountAggregation()->where('status', 'approved')->sum('total_due'),
             'mcq'        => (float) McqSchoolFee::whereHas('exam', fn ($q) => $q->where('tenant_id', $sahodaya->id))->where('status', 'approved')->sum('total_due'),
             'training'   => (float) \App\Models\FeeReceipt::query()
                 ->where('status', 'approved')

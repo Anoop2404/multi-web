@@ -129,6 +129,7 @@ class ErpReportQueryService
         $schoolIds = $this->schoolIds($sahodayaId);
 
         $rows = FestSchoolEventFee::whereIn('event_id', $eventIds)
+            ->forAmountAggregation()
             ->with(['event:id,title', 'school:id,name'])
             ->whereNotIn('status', ['approved', 'waived'])
             ->get()
@@ -714,7 +715,7 @@ class ErpReportQueryService
         $schoolIds = $this->schoolIds($sahodayaId);
 
         $metrics = [
-            'Fest outstanding'        => FestSchoolEventFee::whereIn('event_id', $eventIds)->whereNotIn('status', ['approved', 'waived'])->sum('total_due'),
+            'Fest outstanding'        => FestSchoolEventFee::whereIn('event_id', $eventIds)->forAmountAggregation()->whereNotIn('status', ['approved', 'waived'])->sum('total_due'),
             'Membership outstanding'  => MembershipPayment::whereIn('school_id', $schoolIds)->whereNotIn('status', ['verified', 'waived', 'superseded'])->sum('amount'),
             'Approved receipts (YTD)' => FeeReceipt::where('status', 'approved')->whereYear('payment_date', now()->year)->sum('amount'),
             'Waivers applied (YTD)'   => FeeReceipt::where('waiver_amount', '>', 0)->whereYear('updated_at', now()->year)->sum('waiver_amount'),
@@ -847,7 +848,7 @@ class ErpReportQueryService
 
         $modules = [
             'membership' => (float) MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'verified')->sum('amount'),
-            'fest'       => (float) FestSchoolEventFee::whereIn('event_id', $eventIds)->where('status', 'approved')->sum('total_due'),
+            'fest'       => (float) FestSchoolEventFee::whereIn('event_id', $eventIds)->forAmountAggregation()->where('status', 'approved')->sum('total_due'),
             'mcq'        => (float) FeeReceipt::where('status', 'approved')->where('feeable_type', (new \App\Models\McqSchoolFee)->getMorphClass())->sum('amount'),
             'training'   => (float) FeeReceipt::where('status', 'approved')->where('feeable_type', (new TrainingRegistration)->getMorphClass())->sum('amount'),
         ];

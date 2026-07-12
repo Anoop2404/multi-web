@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
 use App\Models\Concerns\TracksPartialPayments;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class FestSchoolEventFee extends Model
 {
@@ -28,6 +30,39 @@ class FestSchoolEventFee extends Model
         'amount_paid' => 'decimal:2',
         'override_amount' => 'decimal:2',
     ];
+
+    /**
+     * When an event has per-head fee rows, exclude the head_id-null rollup so
+     * sum(total_due) does not double-count sports_composite (and similar) billing.
+     */
+    public function scopeForAmountAggregation(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query->where(function (Builder $inner) use ($table) {
+            $inner->whereNotNull("{$table}.head_id")
+                ->orWhereNotExists(function ($sub) use ($table) {
+                    $sub->selectRaw('1')
+                        ->from("{$table} as head_fees")
+                        ->whereColumn('head_fees.event_id', "{$table}.event_id")
+                        ->whereNotNull('head_fees.head_id');
+                });
+        });
+    }
+
+    /** @param  Collection<int, self>  $fees */
+    public static function withoutDuplicateRollups(Collection $fees): Collection
+    {
+        $eventsWithHeads = $fees->whereNotNull('head_id')->pluck('event_id')->unique();
+
+        return $fees->filter(function (self $fee) use ($eventsWithHeads) {
+            if ($fee->head_id !== null) {
+                return true;
+            }
+
+            return ! $eventsWithHeads->contains($fee->event_id);
+        })->values();
+    }
 
     public function event(): BelongsTo
     {

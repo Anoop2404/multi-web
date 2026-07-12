@@ -101,10 +101,14 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function feeCollectionRows(): array
     {
-        $schoolIds = FestSchoolEventFee::where('event_id', $this->event->id)->pluck('school_id')->unique();
+        $schoolIds = FestSchoolEventFee::where('event_id', $this->event->id)
+            ->forAmountAggregation()
+            ->pluck('school_id')
+            ->unique();
         $schools = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
 
         return FestSchoolEventFee::where('event_id', $this->event->id)
+            ->forAmountAggregation()
             ->with('feeReceipt')
             ->orderBy('school_id')
             ->get()

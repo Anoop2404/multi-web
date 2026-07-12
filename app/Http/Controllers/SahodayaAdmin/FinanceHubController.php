@@ -27,6 +27,7 @@ class FinanceHubController extends SahodayaAdminController
             ->count();
 
         $festOutstanding = FestSchoolEventFee::whereIn('event_id', $eventIds)
+            ->forAmountAggregation()
             ->whereNotIn('status', ['approved', 'waived'])
             ->sum('total_due');
 

@@ -26,7 +26,8 @@ class FestEventFeesController extends SahodayaAdminController
             ->each(fn (string $schoolId) => $feeService->recalculate($event, $schoolId));
 
         $schoolFees = FestSchoolEventFee::where('event_id', $event->id)
-            ->with(['school', 'feeReceipt'])
+            ->forAmountAggregation()
+            ->with(['school', 'feeReceipt', 'head'])
             ->orderBy('school_id')
             ->get()
             ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event) {
@@ -40,6 +41,8 @@ class FestEventFeesController extends SahodayaAdminController
                     'id' => $fee->id,
                     'school' => $fee->school?->name ?? $fee->school_id,
                     'school_id' => $fee->school_id,
+                    'head' => $fee->head?->name,
+                    'head_id' => $fee->head_id,
                     'status' => $fee->status,
                     'total_due' => $fee->total_due,
                     'participation_item_count' => $fee->participation_item_count,
@@ -96,7 +99,8 @@ class FestEventFeesController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $rows = FestSchoolEventFee::where('event_id', $event->id)
-            ->with(['school', 'feeReceipt'])
+            ->forAmountAggregation()
+            ->with(['school', 'feeReceipt', 'head'])
             ->orderBy('school_id')
             ->get();
 
@@ -104,11 +108,12 @@ class FestEventFeesController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows, $event) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Event', 'School', 'Status', 'School reg fee', 'Participation fee', 'Total due', 'Receipt #', 'Payment date', 'Transaction ref']);
+            fputcsv($out, ['Event', 'School', 'Head', 'Status', 'School reg fee', 'Participation fee', 'Total due', 'Receipt #', 'Payment date', 'Transaction ref']);
             foreach ($rows as $fee) {
                 fputcsv($out, [
                     $event->title,
                     $fee->school?->name ?? $fee->school_id,
+                    $fee->head?->name ?? '',
                     $fee->status,
                     $fee->school_registration_fee,
                     $fee->participation_fee,

@@ -210,11 +210,13 @@ class LedgerReportingService
             : collect();
 
         $schoolPayments = FestSchoolEventFee::where('event_id', $event->id)
-            ->with(['school', 'feeReceipt'])
+            ->forAmountAggregation()
+            ->with(['school', 'feeReceipt', 'head'])
             ->orderBy('school_id')
             ->get()
             ->map(fn (FestSchoolEventFee $fee) => [
                 'school'          => $fee->school?->name ?? $fee->school_id,
+                'head'            => $fee->head?->name,
                 'status'          => $fee->status,
                 'total_due'       => (float) $fee->total_due,
                 'receipt_number'  => $fee->feeReceipt?->receipt_number,
