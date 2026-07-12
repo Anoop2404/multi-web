@@ -50,15 +50,19 @@ class BoardResultMastersController extends SahodayaAdminController
             'default_subjects.*' => 'string|max:120',
         ]);
 
+        $code = strtoupper(trim($data['code']));
+
         ExamStream::create([
             'sahodaya_id' => $this->sahodaya->id,
-            'code' => strtoupper(trim($data['code'])),
+            'code' => $code,
             'label' => $data['label'],
             'examination_type' => $data['examination_type'] ?? 'board',
             'sort_order' => $data['sort_order'] ?? 0,
             'is_active' => $data['is_active'] ?? true,
             'default_subjects' => $data['default_subjects'] ?? [],
         ]);
+
+        ExamStream::forgetCache($code, $this->sahodaya->id);
 
         return back()->with('success', 'Exam stream created for this Sahodaya.');
     }
@@ -92,6 +96,9 @@ class BoardResultMastersController extends SahodayaAdminController
                 ]
             );
 
+            ExamStream::forgetCache($stream->code, $this->sahodaya->id);
+            ExamStream::forgetCache($stream->code, null);
+
             return back()->with('success', 'Sahodaya override saved for global stream.');
         }
 
@@ -112,6 +119,8 @@ class BoardResultMastersController extends SahodayaAdminController
             'default_subjects' => $data['default_subjects'] ?? $stream->default_subjects,
         ]);
 
+        ExamStream::forgetCache($stream->code, $this->sahodaya->id);
+
         return back()->with('success', 'Exam stream updated.');
     }
 
@@ -119,14 +128,18 @@ class BoardResultMastersController extends SahodayaAdminController
     {
         abort_if($stream->sahodaya_id !== $this->sahodaya->id, 403, 'Global streams cannot be deleted here.');
 
+        $code = $stream->code;
+
         if (Topper::query()->where('stream_id', $stream->id)->exists()
             || TopperCountConfig::query()->where('stream_id', $stream->id)->exists()) {
             $stream->update(['is_active' => false]);
+            ExamStream::forgetCache($code, $this->sahodaya->id);
 
             return back()->with('success', 'Stream deactivated (still referenced by toppers/config).');
         }
 
         $stream->delete();
+        ExamStream::forgetCache($code, $this->sahodaya->id);
 
         return back()->with('success', 'Exam stream removed.');
     }

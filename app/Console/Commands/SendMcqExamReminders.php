@@ -6,6 +6,7 @@ use App\Models\McqExam;
 use App\Models\McqRegistration;
 use App\Models\Tenant;
 use App\Services\Mcq\McqExamNotifier;
+use App\Support\ReminderDedupGuard;
 use App\Support\TenancyDatabase;
 use Illuminate\Console\Command;
 
@@ -42,6 +43,10 @@ class SendMcqExamReminders extends Command
                         ->get();
 
                     foreach ($registrations as $registration) {
+                        if (! ReminderDedupGuard::claim('mcq:exam-reminders', $sahodaya->id, $registration->id)) {
+                            continue;
+                        }
+
                         if ($notifier->examReminder($registration)) {
                             $sent++;
                         }

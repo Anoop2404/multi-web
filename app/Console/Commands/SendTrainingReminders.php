@@ -7,6 +7,7 @@ use App\Models\TrainingProgram;
 use App\Models\TrainingRegistration;
 use App\Models\User;
 use App\Services\Notifications\NotificationService;
+use App\Support\ReminderDedupGuard;
 use App\Support\TenancyDatabase;
 use Illuminate\Console\Command;
 
@@ -168,6 +169,10 @@ class SendTrainingReminders extends Command
 
         $user = User::find($userId);
         if (! $user) {
+            return false;
+        }
+
+        if (! ReminderDedupGuard::claim('training:reminders', $slug, $registration->id, $userId)) {
             return false;
         }
 

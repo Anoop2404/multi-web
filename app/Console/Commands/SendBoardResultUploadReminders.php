@@ -6,6 +6,7 @@ use App\Models\BoardResult;
 use App\Models\Tenant;
 use App\Services\BoardResults\BoardResultNotifier;
 use App\Support\AcademicYear;
+use App\Support\ReminderDedupGuard;
 use App\Support\TenancyDatabase;
 use Illuminate\Console\Command;
 
@@ -42,6 +43,10 @@ class SendBoardResultUploadReminders extends Command
                     ->get();
 
                 foreach ($drafts as $draft) {
+                    if (! ReminderDedupGuard::claim('board-results:upload-reminders', $sahodaya->id, $draft->id)) {
+                        continue;
+                    }
+
                     $notifier->uploadReminder($draft);
                     $sent++;
                 }

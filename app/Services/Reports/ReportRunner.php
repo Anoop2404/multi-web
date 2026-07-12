@@ -31,6 +31,13 @@ class ReportRunner
             return $user->hasAnyRole(['sahodaya_admin']);
         }
 
+        if ($reportId === 'RPT-FIN-021') {
+            // Fee receipt <-> ledger reconciliation surfaces raw cross-school discrepancies —
+            // stricter than routine finance reports, so it's admin-only rather than shared
+            // with the broader finance role.
+            return $user->hasAnyRole(['sahodaya_admin']);
+        }
+
         if (str_starts_with($reportId, 'RPT-FIN-') || str_starts_with($reportId, 'RPT-PAY-')) {
             return $user->hasAnyRole(['sahodaya_admin', 'sahodaya_finance']);
         }

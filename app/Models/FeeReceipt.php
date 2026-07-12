@@ -24,6 +24,7 @@ class FeeReceipt extends Model
     protected $fillable = [
         'feeable_type', 'feeable_id', 'receipt_number', 'file_path', 'generated_receipt_path', 'transaction_ref', 'bank_name',
         'payment_date', 'amount', 'waiver_amount', 'waiver_reason', 'waived_by_user_id', 'status', 'rejection_reason',
+        'rejection_history',
         'uploaded_by_user_id', 'reviewed_by', 'reviewed_at',
         'reversed_by', 'reversed_at', 'reversal_reason',
         'receipt_emailed_at', 'receipt_email_status', 'receipt_email_error', 'receipt_email_resend_count',
@@ -36,6 +37,7 @@ class FeeReceipt extends Model
         'reviewed_at'  => 'datetime',
         'reversed_at'  => 'datetime',
         'receipt_emailed_at' => 'datetime',
+        'rejection_history' => 'array',
     ];
 
     public function feeable(): MorphTo
@@ -76,6 +78,19 @@ class FeeReceipt extends Model
     public function isReversed(): bool
     {
         return $this->status === self::STATUS_REVERSED;
+    }
+
+    /** Append a rejection event to the history array, mirroring BoardResult::correction_history. */
+    public function appendRejectionHistory(string $reason, ?int $userId): array
+    {
+        $history = $this->rejection_history ?? [];
+        $history[] = [
+            'at'     => now()->toIso8601String(),
+            'by'     => $userId,
+            'reason' => $reason,
+        ];
+
+        return $history;
     }
 
     /** Mark prior uploaded/rejected proofs inactive when a school re-uploads. */

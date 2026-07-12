@@ -119,10 +119,11 @@ class McqSchoolFeeService
         abort_unless($receipt && $receipt->status === 'uploaded', 422, 'No uploaded proof to reject.');
 
         $receipt->update([
-            'status'           => 'rejected',
-            'rejection_reason' => $reason,
-            'reviewed_by'      => $userId,
-            'reviewed_at'      => now(),
+            'status'            => 'rejected',
+            'rejection_reason'  => $reason,
+            'rejection_history' => $receipt->appendRejectionHistory($reason, $userId),
+            'reviewed_by'       => $userId,
+            'reviewed_at'       => now(),
         ]);
 
         // Fall back to whatever has already been paid (partial) or pending.

@@ -4,9 +4,8 @@
     <meta charset="utf-8">
     <title>ID Cards — {{ $eventTitle }}</title>
     <style>
+        @include('partials.id-card-base-styles')
         @page { size: A4 portrait; margin: 6mm; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #0f172a; }
         .sheet-title { text-align: center; font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 4mm; }
         .grid { width: 100%; border-collapse: separate; border-spacing: 3mm 3mm; }
         .grid td { width: 50%; vertical-align: top; padding: 0; }
@@ -31,7 +30,6 @@
         .card__head--volunteer { background: #047857; }
         .card__head--staff { background: #7c2d12; }
         .card__org { display: table-cell; font-size: 6.5px; font-weight: bold; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: middle; width: 58%; }
-        .card__role { display: table-cell; font-size: 7px; font-weight: bold; text-align: right; vertical-align: middle; letter-spacing: 0.08em; }
         .card__qr-head { display: table-cell; width: 12mm; vertical-align: middle; text-align: right; }
         .card__qr-head img { width: 10mm; height: 10mm; }
         .card__body { display: table; width: 100%; padding: 2.5mm 2.5mm 1.5mm; min-height: 28mm; }
@@ -40,17 +38,6 @@
             width: 18mm;
             height: 18mm;
             vertical-align: top;
-        }
-        .card__avatar-inner {
-            width: 18mm;
-            height: 18mm;
-            border-radius: 50%;
-            background: #e2e8f0;
-            color: #0f3d7a;
-            font-size: 11px;
-            font-weight: bold;
-            text-align: center;
-            line-height: 18mm;
         }
         .card__photo {
             width: 18mm;
@@ -73,7 +60,6 @@
             background: #f8fafc;
         }
         .card__id-block { display: table-cell; width: 50%; vertical-align: top; }
-        .card__id-label { font-size: 5.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; }
         .card__id-value { font-size: 9px; font-weight: bold; font-family: DejaVu Sans Mono, monospace; color: #0f3d7a; }
         .card__foot {
             font-size: 5.5px;
