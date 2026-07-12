@@ -8,7 +8,7 @@ class NotificationLog extends Model
 {
     protected $fillable = [
         'template_key', 'notifiable_type', 'notifiable_id',
-        'to', 'subject', 'status', 'error', 'attempts', 'sent_at',
+        'to', 'subject', 'body', 'status', 'error', 'attempts', 'sent_at',
     ];
 
     protected $casts = [

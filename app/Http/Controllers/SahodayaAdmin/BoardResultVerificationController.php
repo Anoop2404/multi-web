@@ -11,6 +11,7 @@ use App\Services\BoardResults\BoardResultPublishPipeline;
 use App\Services\BoardResults\TopperCountService;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class BoardResultVerificationController extends SahodayaAdminController
@@ -76,24 +77,28 @@ class BoardResultVerificationController extends SahodayaAdminController
     public function verify(Request $request, BoardResult $boardResult)
     {
         $this->assertInScope($boardResult);
-        abort_unless($boardResult->status === BoardResult::STATUS_SUBMITTED, 422, 'Only submitted results can be verified.');
 
-        $boardResult->update([
-            'status' => BoardResult::STATUS_VERIFIED,
-            'verified_by' => $request->user()->id,
-            'verified_at' => now(),
-            'reviewed_by_user_id' => $request->user()->id,
-            'reviewed_at' => now(),
-            'rejection_reason' => null,
-        ]);
+        DB::transaction(function () use ($request, $boardResult) {
+            $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
+            abort_unless($locked->status === BoardResult::STATUS_SUBMITTED, 422, 'Only submitted results can be verified.');
 
-        app(DataChangeLogger::class)->event(
-            'verified',
-            'Board result verified',
-            $boardResult->tenant_id,
-            'board_result',
-            $boardResult,
-        );
+            $locked->update([
+                'status' => BoardResult::STATUS_VERIFIED,
+                'verified_by' => $request->user()->id,
+                'verified_at' => now(),
+                'reviewed_by_user_id' => $request->user()->id,
+                'reviewed_at' => now(),
+                'rejection_reason' => null,
+            ]);
+
+            app(DataChangeLogger::class)->event(
+                'verified',
+                'Board result verified',
+                $locked->tenant_id,
+                'board_result',
+                $locked,
+            );
+        });
 
         return back()->with('success', 'Board result marked verified.');
     }
@@ -101,32 +106,34 @@ class BoardResultVerificationController extends SahodayaAdminController
     public function approve(Request $request, BoardResult $boardResult)
     {
         $this->assertInScope($boardResult);
-        abort_unless(
-            in_array($boardResult->status, [BoardResult::STATUS_SUBMITTED, BoardResult::STATUS_VERIFIED], true),
-            422,
-            'Only submitted or verified results can be approved.'
-        );
 
-        $boardResult->update([
-            'status' => BoardResult::STATUS_APPROVED,
-            'approved_by' => $request->user()->id,
-            'approved_at' => now(),
-            'verified_by' => $boardResult->verified_by ?? $request->user()->id,
-            'verified_at' => $boardResult->verified_at ?? now(),
-            'reviewed_by_user_id' => $request->user()->id,
-            'reviewed_at' => now(),
-            'rejection_reason' => null,
-        ]);
+        DB::transaction(function () use ($request, $boardResult) {
+            $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
+            abort_unless(
+                $locked->status === BoardResult::STATUS_VERIFIED,
+                422,
+                'Verify the result before approving.'
+            );
 
-        app(DataChangeLogger::class)->event(
-            'approved',
-            'Board result approved',
-            $boardResult->tenant_id,
-            'board_result',
-            $boardResult,
-        );
+            $locked->update([
+                'status' => BoardResult::STATUS_APPROVED,
+                'approved_by' => $request->user()->id,
+                'approved_at' => now(),
+                'reviewed_by_user_id' => $request->user()->id,
+                'reviewed_at' => now(),
+                'rejection_reason' => null,
+            ]);
 
-        app(BoardResultNotifier::class)->approved($boardResult);
+            app(DataChangeLogger::class)->event(
+                'approved',
+                'Board result approved',
+                $locked->tenant_id,
+                'board_result',
+                $locked,
+            );
+
+            app(BoardResultNotifier::class)->approved($locked->fresh());
+        });
 
         return back()->with('success', 'Board result approved.');
     }
@@ -134,50 +141,58 @@ class BoardResultVerificationController extends SahodayaAdminController
     public function reject(Request $request, BoardResult $boardResult)
     {
         $this->assertInScope($boardResult);
-        abort_unless(
-            in_array($boardResult->status, [
-                BoardResult::STATUS_SUBMITTED,
-                BoardResult::STATUS_VERIFIED,
-                BoardResult::STATUS_APPROVED,
-            ], true),
-            422,
-            'This result cannot be rejected in its current status.'
-        );
 
         $data = $request->validate([
             'rejection_reason' => 'required|string|max:2000',
         ]);
 
-        $history = $boardResult->correction_history ?? [];
-        $history[] = [
-            'at' => now()->toIso8601String(),
-            'by' => $request->user()->id,
-            'action' => 'rejected',
-            'reason' => $data['rejection_reason'],
-            'from_status' => $boardResult->status,
-            'submission_count' => (int) ($boardResult->submission_count ?? 0),
-            'pdf_path' => $boardResult->result_pdf_path,
-        ];
+        DB::transaction(function () use ($request, $boardResult, $data) {
+            $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
+            abort_unless(
+                in_array($locked->status, [
+                    BoardResult::STATUS_SUBMITTED,
+                    BoardResult::STATUS_VERIFIED,
+                    BoardResult::STATUS_APPROVED,
+                ], true),
+                422,
+                'This result cannot be rejected in its current status.'
+            );
 
-        $boardResult->update([
-            'status' => BoardResult::STATUS_REJECTED,
-            'rejection_reason' => $data['rejection_reason'],
-            'correction_history' => $history,
-            'reviewed_by_user_id' => $request->user()->id,
-            'reviewed_at' => now(),
-            'published_at' => null,
-        ]);
+            $history = $locked->correction_history ?? [];
+            $history[] = [
+                'at' => now()->toIso8601String(),
+                'by' => $request->user()->id,
+                'action' => 'rejected',
+                'reason' => $data['rejection_reason'],
+                'from_status' => $locked->status,
+                'submission_count' => (int) ($locked->submission_count ?? 0),
+                'pdf_path' => $locked->result_pdf_path,
+            ];
 
-        app(DataChangeLogger::class)->event(
-            'rejected',
-            'Board result rejected',
-            $boardResult->tenant_id,
-            'board_result',
-            $boardResult,
-            ['reason' => $data['rejection_reason']],
-        );
+            $locked->update([
+                'status' => BoardResult::STATUS_REJECTED,
+                'rejection_reason' => $data['rejection_reason'],
+                'correction_history' => $history,
+                'reviewed_by_user_id' => $request->user()->id,
+                'reviewed_at' => now(),
+                'published_at' => null,
+                'verified_by' => null,
+                'verified_at' => null,
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
 
-        app(BoardResultNotifier::class)->rejected($boardResult);
+            app(DataChangeLogger::class)->event(
+                'rejected',
+                'Board result rejected',
+                $locked->tenant_id,
+                'board_result',
+                $locked,
+                ['reason' => $data['rejection_reason']],
+            );
+
+            app(BoardResultNotifier::class)->rejected($locked->fresh());
+        });
 
         return back()->with('success', 'Board result rejected and school notified.');
     }
@@ -185,53 +200,61 @@ class BoardResultVerificationController extends SahodayaAdminController
     public function publish(Request $request, BoardResult $boardResult, BoardResultPublishPipeline $pipeline)
     {
         $this->assertInScope($boardResult);
-        abort_unless(
-            in_array($boardResult->status, [BoardResult::STATUS_APPROVED, BoardResult::STATUS_VERIFIED], true),
-            422,
-            'Approve the result before publishing.'
-        );
 
-        if (! $boardResult->hasResultPdf()) {
-            throw ValidationException::withMessages([
-                'result_pdf' => 'Cannot publish without a CBSE result PDF on file.',
+        DB::transaction(function () use ($request, $boardResult, $pipeline) {
+            $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
+            abort_unless(
+                $locked->status === BoardResult::STATUS_APPROVED,
+                422,
+                'Approve the result before publishing.'
+            );
+
+            if (! $locked->hasResultPdf()) {
+                throw ValidationException::withMessages([
+                    'result_pdf' => 'Cannot publish without a CBSE result PDF on file.',
+                ]);
+            }
+
+            $locked->update([
+                'status' => BoardResult::STATUS_PUBLISHED,
+                'published_at' => now(),
+                'reviewed_by_user_id' => $request->user()->id,
+                'reviewed_at' => now(),
             ]);
-        }
 
-        $boardResult->update([
-            'status' => BoardResult::STATUS_PUBLISHED,
-            'published_at' => now(),
-            'approved_by' => $boardResult->approved_by ?? $request->user()->id,
-            'approved_at' => $boardResult->approved_at ?? now(),
-            'reviewed_by_user_id' => $request->user()->id,
-            'reviewed_at' => now(),
-        ]);
+            $pipeline->run($this->sahodaya->id, $locked->academic_year, $locked->fresh());
 
-        $pipeline->run($this->sahodaya->id, $boardResult->academic_year, $boardResult);
+            app(DataChangeLogger::class)->event(
+                'published',
+                'Board result published (ranking + API + awards + topper certificates)',
+                $locked->tenant_id,
+                'board_result',
+                $locked,
+            );
 
-        app(DataChangeLogger::class)->event(
-            'published',
-            'Board result published (ranking + API + awards + topper certificates)',
-            $boardResult->tenant_id,
-            'board_result',
-            $boardResult,
-        );
+            app(BoardResultNotifier::class)->published($locked->fresh());
+        });
 
-        app(BoardResultNotifier::class)->published($boardResult);
-
-        return back()->with('success', 'Board result published; rankings, API scores, awards, and topper certificates updated.');
+        return back()->with('success', 'Board result published.');
     }
 
-    public function downloadPdf(BoardResult $boardResult)
+    public function downloadPdf(Request $request, BoardResult $boardResult)
     {
         $this->assertInScope($boardResult);
-        abort_unless($boardResult->hasResultPdf(), 404);
 
-        $upload = $boardResult->uploads()->where('file_type', 'pdf')->orderByDesc('version')->first();
+        $version = $request->integer('version') ?: null;
+        $uploadQuery = $boardResult->uploads()->where('file_type', 'pdf');
+        $upload = $version
+            ? (clone $uploadQuery)->where('version', $version)->first()
+            : (clone $uploadQuery)->orderByDesc('version')->first();
+
+        $path = $upload?->file_path ?? $boardResult->result_pdf_path;
+        abort_unless($path, 404);
 
         return TenantStorage::downloadPrivate(
-            $boardResult->result_pdf_path,
+            $path,
             $boardResult->result_pdf_disk ?? $upload?->storage_disk,
-            $upload?->file_name ?? 'board-result.pdf'
+            $upload?->file_name ?? ('board-result-v'.($upload?->version ?? 'latest').'.pdf')
         );
     }
 

@@ -104,7 +104,7 @@ class SendTrainingReminders extends Command
                 if ($this->notifyTeacher(
                     $notifier,
                     $registration,
-                    'training.reminder',
+                    'training.registration.closing',
                     [
                         'program_title' => $program->title,
                         'start_date' => $program->start_date?->format('j F Y') ?? '',

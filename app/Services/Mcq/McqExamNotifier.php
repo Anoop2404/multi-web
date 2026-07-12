@@ -4,6 +4,7 @@ namespace App\Services\Mcq;
 
 use App\Models\McqExam;
 use App\Models\McqRegistration;
+use App\Models\McqSchoolFee;
 use App\Models\User;
 use App\Services\Notifications\NotificationService;
 
@@ -113,6 +114,48 @@ class McqExamNotifier
             'student_name' => $registration->participantName() ?: 'Participant',
             'reason'       => $reason ?? 'Contact your Sahodaya for details.',
         ]);
+    }
+
+    public function schoolBatchFeeApproved(McqSchoolFee $schoolFee): void
+    {
+        $schoolFee->loadMissing(['exam', 'school']);
+        $schoolId = $schoolFee->school_id;
+        $service = app(NotificationService::class);
+        $replacements = [
+            'exam_title'   => $schoolFee->exam?->title ?? 'Talent Search Exam',
+            'student_name' => $schoolFee->school?->name ?? 'School',
+            'reason'       => '',
+        ];
+
+        foreach (User::role(['school_admin', 'school_staff'])->where('tenant_id', $schoolId)->get() as $user) {
+            $service->notifyFromTemplate(
+                $user,
+                'mcq.fee.approved',
+                $replacements,
+                "/school-admin/{$schoolId}/mcq/{$schoolFee->exam_id}/fee",
+            );
+        }
+    }
+
+    public function schoolBatchFeeRejected(McqSchoolFee $schoolFee, ?string $reason = null): void
+    {
+        $schoolFee->loadMissing(['exam', 'school']);
+        $schoolId = $schoolFee->school_id;
+        $service = app(NotificationService::class);
+        $replacements = [
+            'exam_title'   => $schoolFee->exam?->title ?? 'Talent Search Exam',
+            'student_name' => $schoolFee->school?->name ?? 'School',
+            'reason'       => $reason ?? 'Contact your Sahodaya for details.',
+        ];
+
+        foreach (User::role(['school_admin', 'school_staff'])->where('tenant_id', $schoolId)->get() as $user) {
+            $service->notifyFromTemplate(
+                $user,
+                'mcq.fee.rejected',
+                $replacements,
+                "/school-admin/{$schoolId}/mcq/{$schoolFee->exam_id}/fee",
+            );
+        }
     }
 
     public function examReminder(McqRegistration $registration): bool

@@ -1023,13 +1023,9 @@ trait QueriesExtendedReports
     {
         $schoolIds = $this->schoolIds($sahodayaId);
         $rows = collect();
+        $receiptService = app(\App\Services\Fees\ProgramFeeReceiptService::class);
 
-        $approved = FeeReceipt::query()
-            ->where('status', FeeReceipt::STATUS_APPROVED)
-            ->orderByDesc('id')
-            ->limit(2000)
-            ->get();
-
+        // Tenant-first: only ledger rows for this Sahodaya, then reconcile receipts.
         $postedByReceipt = LedgerTransaction::query()
             ->where('tenant_id', $sahodayaId)
             ->where('reference_type', FeeReceipt::class)
@@ -1038,12 +1034,41 @@ trait QueriesExtendedReports
             ->groupBy('reference_id')
             ->pluck('total', 'reference_id');
 
-        foreach ($approved as $receipt) {
-            $schoolId = app(\App\Services\Fees\ProgramFeeReceiptService::class)->schoolIdForReceipt($receipt);
-            if (! $schoolId || ! $schoolIds->contains($schoolId)) {
-                continue;
-            }
+        $ledgerReceiptIds = $postedByReceipt->keys()->map(fn ($id) => (int) $id)->all();
 
+        $approved = FeeReceipt::query()
+            ->where('status', FeeReceipt::STATUS_APPROVED)
+            ->where(function ($q) use ($schoolIds, $ledgerReceiptIds) {
+                // Prefer receipts already posted to this tenant's ledger, then widen via feeable school.
+                if ($ledgerReceiptIds !== []) {
+                    $q->whereIn('id', $ledgerReceiptIds);
+                }
+                $q->orWhereHasMorph('feeable', [
+                    \App\Models\MembershipPayment::class,
+                    \App\Models\FestSchoolEventFee::class,
+                    \App\Models\FestRegistration::class,
+                    \App\Models\McqSchoolFee::class,
+                    \App\Models\McqRegistration::class,
+                    \App\Models\TrainingRegistration::class,
+                    \App\Models\TrainingSchoolFee::class,
+                ], function ($morph) use ($schoolIds) {
+                    $morph->whereIn('school_id', $schoolIds->all() ?: ['__none__']);
+                });
+            })
+            ->with('feeable')
+            ->orderByDesc('id')
+            ->limit(5000)
+            ->get()
+            ->filter(function (FeeReceipt $receipt) use ($receiptService, $schoolIds) {
+                $schoolId = $receiptService->schoolIdForReceipt($receipt);
+
+                return $schoolId && $schoolIds->contains($schoolId);
+            })
+            ->values();
+
+        $approvedIds = $approved->pluck('id')->all();
+
+        foreach ($approved as $receipt) {
             $ledgerAmount = (float) ($postedByReceipt[$receipt->id] ?? 0);
             $receiptAmount = (float) $receipt->amount;
 
@@ -1072,24 +1097,20 @@ trait QueriesExtendedReports
             }
         }
 
-        $orphanLedgerIds = LedgerTransaction::query()
-            ->where('tenant_id', $sahodayaId)
-            ->where('reference_type', FeeReceipt::class)
-            ->whereNotIn('reference_id', $approved->pluck('id')->all() ?: [0])
-            ->distinct()
-            ->pluck('reference_id');
+        $orphanLedgerIds = collect($ledgerReceiptIds)
+            ->diff($approvedIds)
+            ->values();
 
         foreach ($orphanLedgerIds as $receiptId) {
-            $receipt = FeeReceipt::find($receiptId);
+            $receipt = FeeReceipt::with('feeable')->find($receiptId);
             if ($receipt && $receipt->status === FeeReceipt::STATUS_APPROVED) {
-                continue;
+                $schoolId = $receiptService->schoolIdForReceipt($receipt);
+                if ($schoolId && $schoolIds->contains($schoolId)) {
+                    continue;
+                }
             }
-            $ledgerAmount = (float) ($postedByReceipt[$receiptId] ?? LedgerTransaction::query()
-                ->where('tenant_id', $sahodayaId)
-                ->where('reference_type', FeeReceipt::class)
-                ->where('reference_id', $receiptId)
-                ->where('entry_type', 'credit')
-                ->sum('amount'));
+
+            $ledgerAmount = (float) ($postedByReceipt[$receiptId] ?? 0);
 
             $rows->push([
                 'issue' => $receipt ? 'ledger_without_approved_receipt' : 'ledger_orphaned_receipt',
@@ -1204,13 +1225,17 @@ trait QueriesExtendedReports
     /** @param  array<string, mixed>  $filters */
     protected function rptMcqQuestionAnalysis(string $sahodayaId, array $filters): Collection
     {
-        $examId = $filters['exam_id'] ?? McqExam::where('tenant_id', $sahodayaId)->value('id');
+        $examQuery = McqExam::where('tenant_id', $sahodayaId);
+        if (! empty($filters['exam_id'])) {
+            $examQuery->where('id', (int) $filters['exam_id']);
+        }
+        $examId = $examQuery->value('id');
         if (! $examId) {
             return collect();
         }
 
         return McqRegistration::where('exam_id', $examId)->whereNotNull('submitted_at')
-            ->with('exam:id,title')->limit(200)->get()
+            ->with('exam:id,title')->limit(500)->get()
             ->flatMap(function (McqRegistration $r) {
                 $answers = $r->draft_answers ?? [];
 

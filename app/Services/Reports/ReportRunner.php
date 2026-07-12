@@ -22,12 +22,17 @@ class ReportRunner
             return true;
         }
 
-        if (! $user->hasAnyRole(['sahodaya_admin', 'secretary', 'finance_manager', 'finance_clerk'])) {
+        // Seeded Sahodaya roles (RolesAndPermissionsSeeder) — not legacy secretary/finance_clerk names.
+        if (! $user->hasAnyRole(['sahodaya_admin', 'sahodaya_staff', 'sahodaya_finance'])) {
             return false;
         }
 
         if (str_starts_with($reportId, 'RPT-AUTH-')) {
-            return $user->hasAnyRole(['sahodaya_admin', 'secretary']);
+            return $user->hasAnyRole(['sahodaya_admin']);
+        }
+
+        if (str_starts_with($reportId, 'RPT-FIN-') || str_starts_with($reportId, 'RPT-PAY-')) {
+            return $user->hasAnyRole(['sahodaya_admin', 'sahodaya_finance']);
         }
 
         return true;

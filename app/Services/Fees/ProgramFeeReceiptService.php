@@ -227,8 +227,11 @@ class ProgramFeeReceiptService
             $feeable instanceof McqSchoolFee,
             $feeable instanceof McqRegistration,
             $feeable instanceof TrainingRegistration,
-            $feeable instanceof TrainingSchoolFee => (string) $feeable->school_id,
-            default => null,
+            $feeable instanceof TrainingSchoolFee,
+            $feeable instanceof FestSchoolEventFee,
+            $feeable instanceof FestRegistration => (string) $feeable->school_id,
+            $feeable instanceof \App\Models\MembershipPayment => (string) $feeable->school_id,
+            default => $feeable->school_id ?? null,
         };
     }
 

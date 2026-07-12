@@ -6,6 +6,8 @@ use App\Models\TrainingAttendance;
 use App\Models\TrainingRegistration;
 use App\Models\TrainingSession;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class TrainingAttendanceService
 {
@@ -38,10 +40,16 @@ class TrainingAttendanceService
             $payload['correction_reason'] = $input['correction_reason'] ?? $existing->correction_reason;
             $payload['corrected_by'] = $actorUserId;
             $payload['approval_status'] = $requireApproval ? 'pending' : 'approved';
+            if (Schema::hasColumn('training_attendance', 'previous_status')) {
+                $payload['previous_status'] = $existing->status;
+            }
         } elseif (! $existing) {
             $payload['correction_reason'] = null;
             $payload['corrected_by'] = null;
             $payload['approval_status'] = null;
+            if (Schema::hasColumn('training_attendance', 'previous_status')) {
+                $payload['previous_status'] = null;
+            }
         }
 
         return TrainingAttendance::updateOrCreate(
@@ -53,16 +61,24 @@ class TrainingAttendanceService
     public function reviewCorrection(TrainingAttendance $attendance, string $decision, ?int $actorUserId = null): TrainingAttendance
     {
         abort_unless(in_array($decision, ['approved', 'rejected'], true), 422, 'Invalid decision.');
-        abort_unless($attendance->approval_status === 'pending', 422, 'No pending correction to review.');
 
-        $attendance->update([
-            'approval_status' => $decision,
-            'corrected_by' => $actorUserId ?? Auth::id(),
-        ]);
+        return DB::transaction(function () use ($attendance, $decision, $actorUserId) {
+            $locked = TrainingAttendance::query()->whereKey($attendance->id)->lockForUpdate()->firstOrFail();
+            abort_unless($locked->approval_status === 'pending', 422, 'No pending correction to review.');
 
-        // On reject, revert is left to a follow-up mark — MVP keeps the corrected status
-        // but flags rejection so Sahodaya can re-mark.
+            $updates = [
+                'approval_status' => $decision,
+                'corrected_by' => $actorUserId ?? Auth::id(),
+            ];
 
-        return $attendance->fresh();
+            if ($decision === 'rejected' && Schema::hasColumn('training_attendance', 'previous_status') && $locked->previous_status) {
+                $updates['status'] = $locked->previous_status;
+                $updates['previous_status'] = null;
+            }
+
+            $locked->update($updates);
+
+            return $locked->fresh();
+        });
     }
 }

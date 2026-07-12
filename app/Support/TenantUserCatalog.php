@@ -319,6 +319,10 @@ class TenantUserCatalog
             return 'membership.manage';
         }
 
+        if (str_contains($path, '/board-results')) {
+            return 'membership.manage';
+        }
+
         if (str_contains($path, '/mcq')) {
             if (str_contains($path, '/attendance')) {
                 return 'mcq.attendance';

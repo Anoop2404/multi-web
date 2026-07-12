@@ -190,6 +190,9 @@ class CertificateTemplateController extends SahodayaAdminController
             ['key' => 'school_name', 'source' => 'school_name', 'label' => 'School name'],
             ['key' => 'venue', 'source' => 'venue', 'label' => 'Venue'],
             ['key' => 'days_attended', 'source' => 'days_attended', 'label' => 'Days attended'],
+            ['key' => 'training_hours', 'source' => 'training_hours', 'label' => 'Training hours'],
+            ['key' => 'total_days', 'source' => 'total_days', 'label' => 'Total days'],
+            ['key' => 'certificate_date', 'source' => 'certificate_date', 'label' => 'Certificate date'],
         ];
     }
 }

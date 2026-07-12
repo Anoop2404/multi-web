@@ -2,7 +2,12 @@
     <SahodayaAdminLayout title="Board result verification" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader title="Board result verification" eyebrow="Academic Results"
-                    description="Review CBSE board results submitted by member schools — verify, approve, reject, or publish." />
+                    description="Review CBSE board results submitted by member schools — verify, approve, reject, or publish.">
+            <template #actions>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/masters`" class="btn-secondary text-sm">Masters</Link>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/reports`" class="btn-secondary text-sm">Reports</Link>
+            </template>
+        </PageHeader>
 
         <div class="flex flex-wrap gap-2 mb-4">
             <Link v-for="(label, value) in statusOptions" :key="value"
@@ -56,25 +61,28 @@
                             <span v-if="r.toppers?.length"> · {{ r.toppers.length }} toppers</span>
                         </p>
                         <p v-if="r.rejection_reason" class="text-xs text-red-600 mt-1">{{ r.rejection_reason }}</p>
-                        <p v-if="r.uploads?.length" class="text-xs text-slate-400 mt-1">
-                            PDF versions: {{ r.uploads.map(u => `v${u.version}`).join(', ') }}
+                        <p v-if="r.uploads?.length" class="text-xs text-slate-500 mt-1 flex flex-wrap gap-2 items-center">
+                            <span class="text-slate-400">PDF versions:</span>
+                            <a v-for="u in r.uploads" :key="u.id"
+                               :href="`/sahodaya-admin/${sahodaya.id}/board-results/${r.id}/pdf?version=${u.version}`"
+                               class="underline text-indigo-700 hover:text-indigo-900">
+                                v{{ u.version }}
+                            </a>
                         </p>
                     </div>
                     <div class="flex flex-wrap gap-2 items-center">
                         <a v-if="r.result_pdf_path"
                            :href="`/sahodaya-admin/${sahodaya.id}/board-results/${r.id}/pdf`"
                            class="px-3 py-1.5 border border-slate-300 text-xs font-semibold rounded-lg hover:bg-slate-50">
-                            Download PDF
+                            Latest PDF
                         </a>
                         <template v-if="r.status === 'submitted'">
                             <button type="button" class="btn-secondary text-xs" @click="act(r, 'verify')">Verify</button>
-                            <button type="button" class="btn-primary text-xs" @click="act(r, 'approve')">Approve</button>
                             <button type="button" class="px-3 py-1.5 border border-red-300 text-red-700 text-xs font-semibold rounded-lg"
                                     @click="reject(r)">Reject</button>
                         </template>
                         <template v-else-if="r.status === 'verified'">
                             <button type="button" class="btn-primary text-xs" @click="act(r, 'approve')">Approve</button>
-                            <button type="button" class="btn-secondary text-xs" @click="act(r, 'publish')">Publish</button>
                             <button type="button" class="px-3 py-1.5 border border-red-300 text-red-700 text-xs font-semibold rounded-lg"
                                     @click="reject(r)">Reject</button>
                         </template>

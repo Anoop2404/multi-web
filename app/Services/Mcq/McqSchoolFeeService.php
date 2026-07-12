@@ -59,7 +59,10 @@ class McqSchoolFeeService
         abort_unless($receipt && $receipt->status === 'uploaded', 422, 'No uploaded proof to approve.');
 
         return DB::transaction(function () use ($schoolFee, $receipt, $userId) {
-            $receipt->update([
+            $lockedReceipt = \App\Models\FeeReceipt::query()->whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+            abort_unless($lockedReceipt->status === 'uploaded', 422, 'No uploaded proof to approve.');
+
+            $lockedReceipt->update([
                 'status'      => 'approved',
                 'reviewed_by' => $userId,
                 'reviewed_at' => now(),
@@ -71,7 +74,7 @@ class McqSchoolFeeService
 
             $issued = app(ProgramFeeReceiptService::class)->issueMcqSchoolBatch(
                 $schoolFee->fresh(['exam', 'school']),
-                $receipt->fresh(),
+                $lockedReceipt->fresh(),
             );
 
             // Hall tickets are only issued once the batch fee is fully settled.
@@ -96,13 +99,15 @@ class McqSchoolFeeService
                     "Talent Search batch fee approved for {$schoolFee->school?->name}",
                     [
                         'school_id' => $schoolFee->school_id,
-                        'fee_receipt_id' => $receipt->id,
-                        'amount' => $receipt->amount,
+                        'fee_receipt_id' => $lockedReceipt->id,
+                        'amount' => $lockedReceipt->amount,
                         'registrations_confirmed' => $count,
                     ],
                     $schoolFee,
                 );
             }
+
+            app(McqExamNotifier::class)->schoolBatchFeeApproved($schoolFee->fresh(['exam', 'school']));
 
             return $count;
         });
@@ -134,6 +139,8 @@ class McqSchoolFeeService
                 $schoolFee,
             );
         }
+
+        app(McqExamNotifier::class)->schoolBatchFeeRejected($schoolFee, $reason);
     }
 
     private function pendingReceipt(McqSchoolFee $schoolFee): ?\App\Models\FeeReceipt

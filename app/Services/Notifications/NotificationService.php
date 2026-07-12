@@ -75,12 +75,12 @@ class NotificationService
     private function sendEmail(User $user, string $title, string $body, ?string $templateKey = null): void
     {
         if (! $user->email) {
-            $this->logWriter->skipped($user, $title, 'No recipient email', $templateKey);
+            $this->logWriter->skipped($user, $title, 'No recipient email', $templateKey, $body);
 
             return;
         }
 
-        $log = $this->logWriter->queued($user, $title, $templateKey, $user->email);
+        $log = $this->logWriter->queued($user, $title, $templateKey, $user->email, $body);
 
         try {
             $sahodayaId = $this->resolveSahodayaId($user);

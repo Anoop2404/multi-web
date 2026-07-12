@@ -7,9 +7,9 @@ use App\Models\User;
 
 class NotificationLogWriter
 {
-    public function queued(?User $user, string $subject, ?string $templateKey = null, ?string $to = null): NotificationLog
+    public function queued(?User $user, string $subject, ?string $templateKey = null, ?string $to = null, ?string $body = null): NotificationLog
     {
-        return $this->write('queued', $user, $subject, $templateKey, $to);
+        return $this->write('queued', $user, $subject, $templateKey, $to, $body);
     }
 
     public function sent(NotificationLog $log): void
@@ -31,7 +31,7 @@ class NotificationLogWriter
         ]);
     }
 
-    public function skipped(?User $user, string $subject, string $reason, ?string $templateKey = null): NotificationLog
+    public function skipped(?User $user, string $subject, string $reason, ?string $templateKey = null, ?string $body = null): NotificationLog
     {
         return NotificationLog::create([
             'template_key'    => $templateKey,
@@ -39,12 +39,13 @@ class NotificationLogWriter
             'notifiable_id'   => $user?->id,
             'to'              => $user?->email,
             'subject'         => $subject,
+            'body'            => $body,
             'status'          => 'skipped',
             'error'           => mb_substr($reason, 0, 500),
         ]);
     }
 
-    private function write(string $status, ?User $user, string $subject, ?string $templateKey, ?string $to): NotificationLog
+    private function write(string $status, ?User $user, string $subject, ?string $templateKey, ?string $to, ?string $body = null): NotificationLog
     {
         return NotificationLog::create([
             'template_key'    => $templateKey,
@@ -52,6 +53,7 @@ class NotificationLogWriter
             'notifiable_id'   => $user?->id,
             'to'              => $to ?? $user?->email,
             'subject'         => $subject,
+            'body'            => $body,
             'status'          => $status,
         ]);
     }

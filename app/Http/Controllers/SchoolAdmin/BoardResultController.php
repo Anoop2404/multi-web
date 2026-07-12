@@ -16,6 +16,7 @@ use App\Support\BoardExamSubjects;
 use App\Support\PersistDefaults;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -174,6 +175,11 @@ class BoardResultController extends SchoolAdminController
             'rejection_reason' => null,
             'reviewed_by_user_id' => null,
             'reviewed_at' => null,
+            'verified_by' => null,
+            'verified_at' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+            'published_at' => null,
         ]);
 
         app(DataChangeLogger::class)->event(
@@ -463,23 +469,33 @@ class BoardResultController extends SchoolAdminController
         if ($request->hasFile('result_pdf')) {
             $file = $request->file('result_pdf');
             $path = TenantStorage::storeUploadedFile($file, $dir, $disk);
-            $nextVersion = (int) $result->uploads()->where('file_type', 'pdf')->max('version') + 1;
 
-            BoardResultUpload::create([
-                'board_result_id' => $result->id,
-                'tenant_id' => $this->school->id,
-                'version' => max(1, $nextVersion),
-                'file_path' => $path,
-                'storage_disk' => $disk,
-                'file_name' => $file->getClientOriginalName(),
-                'file_type' => 'pdf',
-                'uploaded_by' => $request->user()?->id,
-            ]);
+            DB::transaction(function () use ($result, $path, $disk, $file, $request) {
+                // Lock the parent BoardResult to serialize concurrent uploads for the same result,
+                // so two simultaneous uploads can't compute and insert the same version number.
+                BoardResult::query()->whereKey($result->id)->lockForUpdate()->first();
 
-            $result->update([
-                'result_pdf_path' => $path,
-                'result_pdf_disk' => $disk,
-            ]);
+                $nextVersion = (int) BoardResultUpload::query()
+                    ->where('board_result_id', $result->id)
+                    ->where('file_type', 'pdf')
+                    ->max('version') + 1;
+
+                BoardResultUpload::create([
+                    'board_result_id' => $result->id,
+                    'tenant_id' => $this->school->id,
+                    'version' => max(1, $nextVersion),
+                    'file_path' => $path,
+                    'storage_disk' => $disk,
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_type' => 'pdf',
+                    'uploaded_by' => $request->user()?->id,
+                ]);
+
+                $result->update([
+                    'result_pdf_path' => $path,
+                    'result_pdf_disk' => $disk,
+                ]);
+            });
         }
 
         if ($request->hasFile('attachments')) {
@@ -491,17 +507,25 @@ class BoardResultController extends SchoolAdminController
                     'disk' => $disk,
                     'name' => $file->getClientOriginalName(),
                 ];
-                $nextVersion = (int) $result->uploads()->where('file_type', 'attachment')->max('version') + 1;
-                BoardResultUpload::create([
-                    'board_result_id' => $result->id,
-                    'tenant_id' => $this->school->id,
-                    'version' => max(1, $nextVersion),
-                    'file_path' => $path,
-                    'storage_disk' => $disk,
-                    'file_name' => $file->getClientOriginalName(),
-                    'file_type' => 'attachment',
-                    'uploaded_by' => $request->user()?->id,
-                ]);
+                DB::transaction(function () use ($result, $path, $disk, $file, $request) {
+                    BoardResult::query()->whereKey($result->id)->lockForUpdate()->first();
+
+                    $nextVersion = (int) BoardResultUpload::query()
+                        ->where('board_result_id', $result->id)
+                        ->where('file_type', 'attachment')
+                        ->max('version') + 1;
+
+                    BoardResultUpload::create([
+                        'board_result_id' => $result->id,
+                        'tenant_id' => $this->school->id,
+                        'version' => max(1, $nextVersion),
+                        'file_path' => $path,
+                        'storage_disk' => $disk,
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_type' => 'attachment',
+                        'uploaded_by' => $request->user()?->id,
+                    ]);
+                });
             }
             $result->update(['attachment_paths' => $paths]);
         }

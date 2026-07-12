@@ -191,6 +191,16 @@ class NotificationTemplatesSeeder extends Seeder
                 'body_template' => '{{student_name}} has been registered for {{exam_title}}.',
             ],
             [
+                'slug'          => 'mcq.registration.submitted',
+                'title'         => 'Talent Search registration submitted',
+                'body_template' => '{{student_name}} submitted a registration for {{exam_title}} and is awaiting fee confirmation.',
+            ],
+            [
+                'slug'          => 'mcq.hall_ticket.issued',
+                'title'         => 'Talent Search hall ticket issued',
+                'body_template' => 'Hall ticket {{hall_ticket_no}} for {{student_name}} ({{exam_title}}) is ready.',
+            ],
+            [
                 'slug'          => 'mcq.fee.approved',
                 'title'         => 'MCQ fee approved',
                 'body_template' => 'Fee proof for {{student_name}} ({{exam_title}}) was approved.',
@@ -199,6 +209,16 @@ class NotificationTemplatesSeeder extends Seeder
                 'slug'          => 'mcq.fee.rejected',
                 'title'         => 'MCQ fee rejected',
                 'body_template' => 'Fee proof for {{student_name}} ({{exam_title}}) was rejected. {{reason}}',
+            ],
+            [
+                'slug'          => 'training.pending_school.linked',
+                'title'         => 'Training school linked',
+                'body_template' => 'Your pending school "{{pending_school_name}}" was linked to {{school_name}} for {{program_title}}.',
+            ],
+            [
+                'slug'          => 'training.pending_school.rejected',
+                'title'         => 'Training school request rejected',
+                'body_template' => 'Your pending school "{{pending_school_name}}" for {{program_title}} was rejected. {{reason}}',
             ],
             [
                 'slug'          => 'membership.payment.approved',
@@ -239,6 +259,11 @@ class NotificationTemplatesSeeder extends Seeder
                 'slug'          => 'training.reminder',
                 'title'         => 'Training program reminder',
                 'body_template' => 'Reminder: {{program_title}} starts on {{start_date}}. Venue: {{venue}}.',
+            ],
+            [
+                'slug'          => 'training.registration.closing',
+                'title'         => 'Training registration closing soon',
+                'body_template' => 'Registration for {{program_title}} closes on {{close_date}} ({{days_left}} day(s) left). Venue: {{venue}}. Start date: {{start_date}}.',
             ],
             [
                 'slug'          => 'training.session.reminder',

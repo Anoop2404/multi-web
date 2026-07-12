@@ -491,23 +491,55 @@ class ErpReportQueryService
     /** @param  array<string, mixed>  $filters */
     private function mcqIpAudit(string $sahodayaId, array $filters): Collection
     {
-        $examIds = McqExam::where('tenant_id', $sahodayaId)->pluck('id');
+        $examIds = McqExam::where('tenant_id', $sahodayaId)->pluck('id')->map(fn ($id) => (int) $id);
+        if ($examIds->isEmpty()) {
+            return collect();
+        }
+
+        $examIdFilter = ! empty($filters['exam_id']) ? (int) $filters['exam_id'] : null;
+        if ($examIdFilter && ! $examIds->contains($examIdFilter)) {
+            return collect();
+        }
+
+        $scopedExamIds = $examIdFilter ? collect([$examIdFilter]) : $examIds;
+        $examTitles = McqExam::whereIn('id', $scopedExamIds)->pluck('title', 'id');
+        $examIdSet = $scopedExamIds->flip();
 
         return AuditLog::query()
             ->where('category', 'mcq')
             ->whereBetween('created_at', [now()->subMonths(3), now()])
             ->orderByDesc('created_at')
-            ->limit(1000)
+            ->limit(3000)
             ->get()
-            ->map(fn (AuditLog $log) => [
-                'exam'       => McqExam::find($filters['exam_id'] ?? null)?->title ?? '—',
-                'student'    => $log->properties['student'] ?? $log->description,
-                'school'     => $log->properties['school'] ?? '—',
-                'action'     => $log->action,
-                'ip_address' => $log->ip_address,
-                'created_at' => $log->created_at?->toDateTimeString(),
-            ])
-            ->values();
+            ->filter(function (AuditLog $log) use ($examIdSet) {
+                $propsExamId = isset($log->properties['exam_id']) ? (int) $log->properties['exam_id'] : null;
+                if ($propsExamId && $examIdSet->has($propsExamId)) {
+                    return true;
+                }
+
+                if (in_array($log->subject_type, [McqExam::class, 'App\\Models\\McqExam'], true)
+                    && $examIdSet->has((int) $log->subject_id)) {
+                    return true;
+                }
+
+                return false;
+            })
+            ->take(1000)
+            ->values()
+            ->map(function (AuditLog $log) use ($examTitles) {
+                $examId = isset($log->properties['exam_id'])
+                    ? (int) $log->properties['exam_id']
+                    : (int) $log->subject_id;
+
+                return [
+                    'exam'       => $examTitles[$examId] ?? '—',
+                    'student'    => $log->properties['student'] ?? $log->description,
+                    'school'     => $log->properties['school'] ?? '—',
+                    'action'     => $log->action,
+                    'ip_address' => $log->ip_address,
+                    'created_at' => $log->created_at?->toDateTimeString(),
+                ];
+            });
     }
 
     /** @param  array<string, mixed>  $filters */

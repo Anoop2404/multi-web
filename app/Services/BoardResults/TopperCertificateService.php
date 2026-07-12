@@ -72,10 +72,16 @@ class TopperCertificateService
      */
     public function renderContext(Topper $topper, Tenant $sahodaya): array
     {
-        $topper->loadMissing(['boardResult', 'tenant']);
+        $topper->loadMissing(['boardResult', 'tenant', 'subjectMarks']);
         $template = $this->resolveTemplate($sahodaya->id);
         $school = $topper->tenant;
         $boardResult = $topper->boardResult;
+
+        $subjectMarksText = $topper->subjectMarks
+            ->sortBy('subject_label')
+            ->map(fn ($m) => trim(($m->subject_label ?? '').': '.number_format((float) $m->marks, 1)))
+            ->filter()
+            ->implode('; ');
 
         $fieldValues = [
             'recipient_name' => $topper->name,
@@ -89,6 +95,7 @@ class TopperCertificateService
             'stream' => $topper->stream ?? '—',
             'admission_no' => $topper->admission_no ?? '—',
             'roll_no' => $topper->roll_no ?? '—',
+            'subject_marks' => $subjectMarksText !== '' ? $subjectMarksText : '—',
         ];
 
         $branding = TenantBranding::for($sahodaya);
@@ -103,8 +110,9 @@ class TopperCertificateService
         return [
             'template' => $template,
             'fieldValues' => $fieldValues,
-            'logoUrl' => $template?->logo_path ?: ($branding['logo_url'] ?? null),
-            'sealUrl' => $template?->seal_path,
+            'logoUrl' => \App\Support\TenantStorage::logoUrl($sahodaya, $template?->logo_path)
+                ?: ($branding['logo_url'] ?? null),
+            'sealUrl' => \App\Support\TenantStorage::logoUrl($sahodaya, $template?->seal_path),
             'signatories' => $signatories,
             'topper' => $topper,
             'school' => $school,

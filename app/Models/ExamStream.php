@@ -48,9 +48,11 @@ class ExamStream extends Model
     /** @return array<string, string> code => label */
     public static function labelsFor(?string $sahodayaId = null): array
     {
+        // Prefer Sahodaya-specific overrides over global defaults (same rule as findByCode).
         return static::query()
             ->active()
             ->forSahodaya($sahodayaId)
+            ->orderByRaw('sahodaya_id is null')
             ->orderBy('sort_order')
             ->orderBy('label')
             ->get()

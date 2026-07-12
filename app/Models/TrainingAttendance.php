@@ -15,7 +15,7 @@ class TrainingAttendance extends Model
     public const PRESENT_LIKE = ['present', 'late'];
 
     protected $fillable = [
-        'session_id', 'registration_id', 'status', 'marked_by', 'marked_at',
+        'session_id', 'registration_id', 'status', 'previous_status', 'marked_by', 'marked_at',
         'correction_reason', 'corrected_by', 'approval_status',
     ];
 

@@ -45,7 +45,9 @@ class EmailDeliveryReportController extends SahodayaAdminController
         $notifications->notifyEmailOnly(
             $user,
             $notificationLog->subject ?? 'Notification',
-            'This is a resent notification from the delivery log.',
+            filled($notificationLog->body)
+                ? $notificationLog->body
+                : 'This is a resent notification from the delivery log.',
             $notificationLog->template_key,
         );
 

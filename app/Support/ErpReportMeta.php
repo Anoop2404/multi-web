@@ -328,7 +328,7 @@ class ErpReportMeta
             'RPT-MCQ-012' => ['columns' => ['exam', 'tier', 'cutoff_score', 'promoted_count'], 'filters' => ['exam_id']],
             'RPT-MCQ-013' => ['columns' => ['exam', 'student', 'school', 'action', 'ip_address', 'created_at'], 'filters' => ['exam_id']],
             'RPT-MCQ-014' => ['columns' => ['bank', 'questions', 'created_at']],
-            'RPT-MCQ-015' => ['columns' => ['exam', 'status', 'registration_opens', 'registration_closes', 'registered']],
+            'RPT-MCQ-015' => ['columns' => ['exam', 'status', 'registration_opens', 'registration_closes', 'result_date', 'registered']],
             'RPT-MCQ-016' => ['columns' => ['exam', 'examined', 'pass_rate', 'mean_score', 'median_score'], 'filters' => ['exam_id']],
             'RPT-MCQ-017' => ['columns' => ['hall_ticket', 'participant', 'school', 'status', 'note'], 'filters' => ['exam_id']],
 
