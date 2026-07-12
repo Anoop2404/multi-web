@@ -74,6 +74,12 @@
                                     <option value="off_stage">Off Stage</option>
                                 </select>
                             </FormField>
+                            <FormField v-if="!isSports" label="Category">
+                                <select v-model="itemForm.category" class="field">
+                                    <option value="">Category</option>
+                                    <option v-for="(label, key) in taxonomy.arts_category" :key="key" :value="key">{{ label }}</option>
+                                </select>
+                            </FormField>
                             <template v-if="isSports">
                                 <FormField v-if="itemHeads.length" label="Item head">
                                     <select v-model="itemForm.head_id" class="field">
@@ -363,6 +369,12 @@
                             <option v-for="(label, key) in taxonomy.class_group" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </FormField>
+                    <FormField v-if="!isSports" label="Category">
+                        <select v-model="editForm.category" class="field">
+                            <option value="">Category</option>
+                            <option v-for="(label, key) in taxonomy.arts_category" :key="key" :value="key">{{ label }}</option>
+                        </select>
+                    </FormField>
                     <FormField label="Participant type">
                         <select v-model="editForm.participant_type" class="field">
                             <option v-for="(label, key) in taxonomy.participant_type" :key="key" :value="key">{{ label }}</option>
@@ -539,6 +551,7 @@ function clearFilters() {
 const itemForm = useForm({
     title: '', participant_type: 'individual', stage_type: '', venue_type: '', head_id: selectedHeadFilter.value === 'other' ? '' : selectedHeadFilter.value,
     competition_format: '', sport_discipline: '', class_group: '', age_group: '', kids_band: '', gender: 'open',
+    category: '',
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
     fee_amount: null, quota_eligible: false,
 });
@@ -546,6 +559,7 @@ const editingItem = ref(null);
 const editForm = useForm({
     title: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
     venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', head_id: '',
+    category: '',
     qualify_count: null, max_per_school: null, fee_amount: null, quota_eligible: false,
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
     min_group_size: null, max_group_size: null,
@@ -566,6 +580,7 @@ function addItem() {
             itemForm.age_group = '';
             itemForm.kids_band = '';
             itemForm.gender = 'open';
+            itemForm.category = '';
             itemForm.min_playing = null;
             itemForm.max_subs = null;
             itemForm.max_squad = null;
@@ -611,6 +626,7 @@ function openEditItem(item) {
     editForm.venue_type = item.venue_type ?? '';
     editForm.sport_discipline = item.sport_discipline ?? '';
     editForm.competition_format = item.competition_format ?? '';
+    editForm.category = item.category ?? '';
     editForm.head_id = item.head_id ?? '';
     editForm.participant_type = item.participant_type ?? 'individual';
     editForm.qualify_count = item.qualify_count ?? null;

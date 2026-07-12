@@ -608,7 +608,6 @@ class FestEventController extends SahodayaAdminController
         $data = $request->validate(array_merge([
             'title'                => 'required|string|max:255',
             'item_code'            => 'nullable|string|max:20',
-            'category'             => 'nullable|in:music,dance,drama,literary,sports,general',
             'duration_minutes'     => 'nullable|integer|min:1|max:480',
             'max_per_school'       => 'nullable|integer|min:1',
             'min_group_size'       => 'nullable|integer|min:1',
@@ -841,6 +840,7 @@ class FestEventController extends SahodayaAdminController
         $kidsKeys = array_keys(\App\Support\FestKidsFestBand::labels());
 
         return [
+            'category'           => ['nullable', $registry->validationRule('arts_category')],
             'stage_type'         => ['nullable', $registry->validationRule('stage_type')],
             'venue_type'         => ['nullable', $registry->validationRule('venue_type')],
             'competition_format' => ['nullable', $registry->validationRule('competition_format')],
