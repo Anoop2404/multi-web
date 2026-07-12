@@ -47,7 +47,7 @@ class FeeReceiptService
             return;
         }
 
-        $receipt->update([
+        $updates = [
             'file_path'       => $payment->payment_proof_path,
             'transaction_ref' => $payment->transaction_ref,
             'bank_name'       => $payment->payment_method,
@@ -60,7 +60,16 @@ class FeeReceiptService
             'rejection_reason' => $payment->rejection_reason,
             'reviewed_by'      => $payment->verified_by_user_id,
             'reviewed_at'      => $payment->verified_at,
-        ]);
+        ];
+
+        if ($payment->status === 'rejected' && filled($payment->rejection_reason)) {
+            $updates['rejection_history'] = $receipt->appendRejectionHistory(
+                (string) $payment->rejection_reason,
+                $payment->verified_by_user_id,
+            );
+        }
+
+        $receipt->update($updates);
 
         if ($receipt->status === 'approved') {
             $school = $payment->school ?? \App\Models\Tenant::find($payment->school_id);

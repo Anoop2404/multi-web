@@ -12,6 +12,7 @@ use App\Support\SahodayaHomepageContent;
 use App\Support\SchoolApplicationForm;
 use App\Support\TenantBranding;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -69,27 +70,31 @@ class SchoolApplicationController extends Controller
 
         $schoolPrefix = strtoupper(trim($data['school_prefix'] ?? ''));
 
-        $school = Tenant::create([
-            'id'                  => (string) Str::uuid(),
-            'type'                => 'school',
-            'name'                => $data['school_name'],
-            'parent_id'           => $sahodaya->id,
-            'subdomain'           => $data['requested_subdomain'] ?? null,
-            'school_prefix'       => $schoolPrefix,
-            'membership_status'   => 'pending',
-            'is_active'           => true,
-            'application_payload' => $payload,
-        ]);
+        [$school, $user, $plainPassword] = DB::transaction(function () use ($data, $payload, $schoolPrefix, $sahodaya, $email) {
+            $school = Tenant::create([
+                'id'                  => (string) Str::uuid(),
+                'type'                => 'school',
+                'name'                => $data['school_name'],
+                'parent_id'           => $sahodaya->id,
+                'subdomain'           => $data['requested_subdomain'] ?? null,
+                'school_prefix'       => $schoolPrefix,
+                'membership_status'   => 'pending',
+                'is_active'           => true,
+                'application_payload' => $payload,
+            ]);
 
-        $plainPassword = Str::password(12);
+            $plainPassword = Str::password(12);
 
-        $user = User::create([
-            'tenant_id'      => $school->id,
-            'name'           => $data['school_name'],
-            'email'          => $email,
-            'password'       => Hash::make($plainPassword),
-        ]);
-        $user->assignRole('school_admin');
+            $user = User::create([
+                'tenant_id' => $school->id,
+                'name'      => $data['school_name'],
+                'email'     => $email,
+                'password'  => Hash::make($plainPassword),
+            ]);
+            $user->assignRole('school_admin');
+
+            return [$school, $user, $plainPassword];
+        });
 
         $mailer = SahodayaMailer::for($sahodaya->id);
         $mailFailed = false;

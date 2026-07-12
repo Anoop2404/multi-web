@@ -58,9 +58,10 @@ class UpdateMembershipStatusCommand extends Command
                         ->orderByDesc('academic_year')
                         ->first();
 
+                    // Update renewal_status only — never auto-deactivate. Deactivation is an
+                    // admin action; nightly overwrite of is_active raced with manual overrides.
                     $school->update([
                         'renewal_status' => $lastCompleted ? 'lapsed' : null,
-                        'is_active'      => $lastCompleted ? false : $school->is_active,
                     ]);
                 }
             });

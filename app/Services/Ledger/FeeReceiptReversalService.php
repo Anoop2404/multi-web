@@ -4,9 +4,11 @@ namespace App\Services\Ledger;
 
 use App\Models\FeeReceipt;
 use App\Models\MembershipPayment;
+use App\Models\Registration;
 use App\Models\TrainingRegistration;
 use App\Models\User;
 use App\Observers\FeeReceiptObserver;
+use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -79,10 +81,40 @@ class FeeReceiptReversalService
         }
 
         if ($feeable instanceof MembershipPayment && $feeable->status === 'verified') {
+            $reasonText = 'Payment reversed'.($reason ? ": {$reason}" : '');
             $feeable->update([
                 'status'           => 'rejected',
-                'rejection_reason' => 'Payment reversed'.($reason ? ": {$reason}" : ''),
+                'rejection_reason' => $reasonText,
             ]);
+
+            $receipt = $feeable->feeReceipt ?? $receipt;
+            if ($receipt && filled($reasonText)) {
+                $receipt->update([
+                    'rejection_history' => $receipt->appendRejectionHistory(
+                        $reasonText,
+                        $receipt->reversed_by,
+                    ),
+                ]);
+            }
+
+            $registration = $feeable->registration
+                ?? Registration::query()
+                    ->where('school_id', $feeable->school_id)
+                    ->where('academic_year', $feeable->academic_year)
+                    ->first();
+
+            if ($registration && in_array($registration->registration_status, ['completed', 'approved'], true)) {
+                $regBefore = $registration->registration_status;
+                $registration->update(['registration_status' => 'payment_rejected']);
+                app(DataChangeLogger::class)->updated(
+                    $registration,
+                    "Registration reverted after membership payment reversal for {$feeable->school?->name}",
+                    ['registration_status' => ['old' => $regBefore, 'new' => 'payment_rejected']],
+                    $feeable->school_id,
+                    'membership',
+                    ['reason' => $reasonText],
+                );
+            }
         }
     }
 }
