@@ -220,10 +220,28 @@ user=www-data
 
 ### Periodic commands
 
+Source of truth: `routes/console.php` (all entries use `withoutOverlapping()`).
+
 | Schedule | Command | Purpose |
 |----------|---------|---------|
 | After deploy | `php artisan permissions:sync-staff` | Backfill staff permissions per tenant DB |
+| After deploy | `php artisan sahodaya:provision-databases --no-create` | Apply pending tenant migrations to all Sahodayas |
+| Weekly Mon 09:30 | `board-results:upload-reminders` | Board result upload nudges |
+| Daily 09:00 | `fest:registration-reminders` | Fest registration window reminders |
+| Every 15 min | `fest:schedule-reminders` | Upcoming schedule reminders |
+| Daily 09:15 | `training:reminders --payment` | Training payment reminders |
+| Hourly | `training:session-reminders` | Upcoming session reminders |
+| Every 5 min | `mcq:auto-submit-expired` | Auto-submit expired MCQ attempts |
+| Every 15 min | `mcq:transition-exam-windows` | Open/close MCQ windows |
+| Hourly | `mcq:exam-reminders` | MCQ exam reminders |
+| Daily 02:00 | `membership:update-renewal-status` | Renewal status from annual registration |
+| Daily 08:30 | `membership:send-reminders` | Membership renewal reminders |
+| Hourly | `erp:retry-failed-receipt-emails` | Retry failed fee receipt emails |
+| Daily 08:00 | `erp:school-document-expiry-reminders` | Document expiry nudges |
+| Daily 02:30 | `erp:mark-school-documents-expired` | Mark expired school documents |
 | Weekly | `php artisan platform:readiness` | Config drift check |
+
+Require `CACHE_STORE=redis` in production — reminder dedup and scheduler overlap locks rely on atomic cache operations.
 
 ---
 

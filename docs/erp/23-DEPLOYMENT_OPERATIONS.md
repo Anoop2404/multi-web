@@ -50,15 +50,29 @@ Failed jobs: `php artisan queue:failed` + Horizon dashboard (if used).
 
 ## 4. Scheduler (Cron)
 
+Source of truth: `routes/console.php`. All scheduled commands use `withoutOverlapping()` so a hung run cannot stack with the next tick.
+
 | Schedule | Command |
 |----------|---------|
-| Daily 00:05 | Membership expiry check |
-| Daily 06:00 | Document expiry reminders |
-| Daily 07:00 | Dashboard counter refresh |
-| Hourly | Retry failed receipt emails |
-| Weekly | Log rotation archive |
+| Weekly Mon 09:30 | `board-results:upload-reminders` |
+| Daily 09:00 | `fest:registration-reminders` |
+| Every 15 min | `fest:schedule-reminders` |
+| Daily 09:15 | `training:reminders --payment` |
+| Hourly | `training:session-reminders` |
+| Every 5 min | `mcq:auto-submit-expired` |
+| Every 15 min | `mcq:transition-exam-windows` |
+| Hourly | `mcq:exam-reminders` |
+| Daily 02:00 | `membership:update-renewal-status` |
+| Daily 08:30 | `membership:send-reminders` |
+| Hourly | `erp:retry-failed-receipt-emails` |
+| Daily 08:00 | `erp:school-document-expiry-reminders` |
+| Daily 02:30 | `erp:mark-school-documents-expired` |
 
 Single cron: `* * * * * php artisan schedule:run`
+
+**Cache:** Reminder dedup (`ReminderDedupGuard`) and concurrent scheduler safety assume an atomic cache backend. Production must set `CACHE_STORE=redis` (config default is now `redis`; do not leave this unset on database-only installs without understanding weaker atomicity).
+
+**Tenant migrations:** After central `migrate`, run `php artisan sahodaya:provision-databases --no-create` (or the project’s tenants migrate-all path) so new tenant migrations (e.g. notification body, training attendance previous status, fee receipt rejection history) apply to every existing Sahodaya DB.
 
 ---
 
@@ -113,7 +127,7 @@ Tools: CloudWatch, Sentry (errors), uptime ping, Laravel log channels.
 3. Tag release `vX.Y.Z`  
 4. Maintenance window (if migrations) — notify tenants  
 5. `php artisan migrate --force`  
-6. `php artisan tenants:migrate --force`  
+6. `php artisan sahodaya:provision-databases --no-create` (preferred over raw `tenants:migrate`)  
 7. `php artisan config:cache && route:cache && view:cache`  
 8. Restart queue workers  
 9. Production smoke: login, payment verify, receipt email  
