@@ -311,16 +311,40 @@ class TenantUserCatalog
             return 'fest.finance';
         }
 
-        if (str_contains($path, '/student-change-requests') || str_contains($path, '/students/verification')) {
+        // Sahodaya finance hub (payables, waiver, bank recon, unified payments, etc.).
+        if (str_contains($path, '/finance')) {
+            return 'fest.finance';
+        }
+
+        if (str_contains($path, '/student-change-requests')
+            || str_contains($path, '/students/verification')
+            || str_contains($path, '/teachers/verification')) {
             return 'membership.manage';
         }
 
-        if (str_contains($path, '/membership') || str_contains($path, '/circulars') || str_contains($path, '/academic-years')) {
+        if (str_contains($path, '/membership')
+            || str_contains($path, '/circulars')
+            || str_contains($path, '/academic-years')
+            || str_contains($path, '/schools')
+            || str_contains($path, '/documents')) {
+            return 'membership.manage';
+        }
+
+        // School annual registration (not "/annual-registration").
+        if (str_contains($path, 'school-admin') && str_contains($path, '/registration')) {
             return 'membership.manage';
         }
 
         if (str_contains($path, '/board-results')) {
             return 'membership.manage';
+        }
+
+        if (str_contains($path, '/training')) {
+            if (str_contains($path, '/ledger')) {
+                return 'fest.finance';
+            }
+
+            return 'training.manage';
         }
 
         if (str_contains($path, '/mcq')) {
@@ -329,6 +353,9 @@ class TenantUserCatalog
             }
             if (str_contains($path, '/marks')) {
                 return 'mcq.marks';
+            }
+            if (str_contains($path, '/ledger')) {
+                return 'fest.finance';
             }
 
             return 'mcq.manage';
@@ -344,7 +371,7 @@ class TenantUserCatalog
             if (str_contains($path, '/results')) {
                 return 'fest.results';
             }
-            if (str_contains($path, '/finance') || str_contains($path, '/school-fees') || str_contains($path, '/fees')) {
+            if (str_contains($path, '/finance') || str_contains($path, '/school-fees') || str_contains($path, '/fees') || str_contains($path, '/ledger')) {
                 return 'fest.finance';
             }
             if (str_contains($path, '/schedule')) {
@@ -383,7 +410,7 @@ class TenantUserCatalog
             return 'fest.manage';
         }
 
-        if (preg_match('#/(events|kalotsav|sports-meet|kids-fest|fest-programs|fest/|training)#', $path)) {
+        if (preg_match('#/(events|kalotsav|sports-meet|kids-fest|fest-programs|fest/)#', $path)) {
             return 'fest.manage';
         }
 
@@ -391,6 +418,9 @@ class TenantUserCatalog
             if (preg_match('#/(programs|fest-programs|fest/|training)#', $path)) {
                 if (str_contains($path, '/catering') || str_contains($path, '/food-coupons')) {
                     return 'fest.catering';
+                }
+                if (str_contains($path, '/training')) {
+                    return 'training.manage';
                 }
 
                 return 'fest.manage';
