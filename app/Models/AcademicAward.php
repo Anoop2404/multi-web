@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ScopesBySahodaya;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AcademicAward extends Model
 {
+    use ScopesBySahodaya;
     public const TYPE_BEST_ACADEMIC_SCHOOL = 'best_academic_school';
 
     public const TYPE_BEST_CLASS_X = 'best_class_x';

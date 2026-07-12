@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ScopesBySahodaya;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BoardResultRanking extends Model
 {
+    use ScopesBySahodaya;
     protected $fillable = [
         'sahodaya_id',
         'academic_year',

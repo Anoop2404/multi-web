@@ -14,6 +14,7 @@ use App\Services\Fees\OfflineProgramFeeOrchestrator;
 use App\Services\Exports\CsvExportDispatcher;
 use App\Services\Fees\ProgramFeeReceiptService;
 use App\Services\Fees\SchoolPaymentHistoryService;
+use App\Services\Ledger\FeeReceiptReversalService;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\MembershipReceiptService;
 use Illuminate\Http\Request;
@@ -115,6 +116,20 @@ class UnifiedPaymentsController extends SahodayaAdminController
         abort_if(! $html, 404, 'Receipt not yet generated.');
 
         return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
+
+    public function reverseReceipt(Request $request, string $tenantId, FeeReceipt $feeReceipt, FeeReceiptReversalService $reversals, ProgramFeeReceiptService $receiptService)
+    {
+        $schoolId = $receiptService->schoolIdForReceipt($feeReceipt);
+        abort_unless($schoolId && Tenant::find($schoolId)?->parent_id === $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $reversals->reverse($feeReceipt, $request->user(), $data['reason'] ?? null);
+
+        return back()->with('success', 'Fee receipt reversed and compensating ledger entries posted.');
     }
 
     public function resendReceipt(

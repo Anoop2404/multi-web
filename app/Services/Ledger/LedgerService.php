@@ -9,7 +9,7 @@ class LedgerService
 {
     public function postFeeReceipt(FeeReceipt $receipt, string $tenantId, bool $forceRepost = false): void
     {
-        if ($receipt->status !== 'approved') {
+        if ($receipt->status !== 'approved' && $receipt->status !== FeeReceipt::STATUS_APPROVED) {
             return;
         }
 
@@ -22,5 +22,10 @@ class LedgerService
             'Membership fee receipt #'.$receipt->id,
             $forceRepost
         );
+    }
+
+    public function postReversal(FeeReceipt $receipt, string $tenantId): void
+    {
+        app(LedgerPostingService::class)->postReceiptReversal($receipt, $tenantId);
     }
 }

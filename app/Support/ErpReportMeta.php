@@ -217,6 +217,7 @@ class ErpReportMeta
             'RPT-FIN-018' => ['columns' => ['bank_account', 'statement_date', 'status', 'matched', 'unmatched']],
             'RPT-FIN-019' => ['columns' => ['account', 'opening_balance', 'financial_year']],
             'RPT-FIN-020' => ['columns' => ['voucher_no', 'date', 'type', 'amount', 'narration'], 'filters' => ['from', 'to']],
+            'RPT-FIN-021' => ['columns' => ['issue', 'receipt_id', 'receipt_status', 'receipt_amount', 'ledger_amount', 'feeable_type', 'feeable_id', 'payment_date']],
 
             // Fest hub
             'RPT-FST-001' => ['columns' => ['event', 'type', 'status', 'starts', 'registrations'], 'filters' => ['event_id']],

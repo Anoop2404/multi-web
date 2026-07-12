@@ -121,6 +121,7 @@ trait QueriesExtendedReports
             'RPT-FIN-018' => $this->rptBankReconciliation($sahodayaId),
             'RPT-FIN-019' => $this->rptOpeningBalances($sahodayaId),
             'RPT-FIN-020' => $this->rptVoucherListing($sahodayaId, $filters),
+            'RPT-FIN-021' => $this->rptFeeLedgerReconciliation($sahodayaId),
 
             'RPT-MCQ-001' => $this->rptMcqRegistrationBySchool($sahodayaId, $filters),
             'RPT-MCQ-002' => $this->rptMcqRegistrationByTier($sahodayaId, $filters),
@@ -1013,6 +1014,96 @@ trait QueriesExtendedReports
             'voucher_no' => $t->journal_id, 'date' => $t->transaction_date?->format('Y-m-d'),
             'type' => $t->entry_type, 'amount' => (float) $t->amount, 'narration' => $t->description,
         ]);
+    }
+
+    /**
+     * Approved FeeReceipts missing ledger rows, and ledger FeeReceipt refs missing/mismatched receipts.
+     */
+    protected function rptFeeLedgerReconciliation(string $sahodayaId): Collection
+    {
+        $schoolIds = $this->schoolIds($sahodayaId);
+        $rows = collect();
+
+        $approved = FeeReceipt::query()
+            ->where('status', FeeReceipt::STATUS_APPROVED)
+            ->orderByDesc('id')
+            ->limit(2000)
+            ->get();
+
+        $postedByReceipt = LedgerTransaction::query()
+            ->where('tenant_id', $sahodayaId)
+            ->where('reference_type', FeeReceipt::class)
+            ->where('entry_type', 'credit')
+            ->selectRaw('reference_id, SUM(amount) as total')
+            ->groupBy('reference_id')
+            ->pluck('total', 'reference_id');
+
+        foreach ($approved as $receipt) {
+            $schoolId = app(\App\Services\Fees\ProgramFeeReceiptService::class)->schoolIdForReceipt($receipt);
+            if (! $schoolId || ! $schoolIds->contains($schoolId)) {
+                continue;
+            }
+
+            $ledgerAmount = (float) ($postedByReceipt[$receipt->id] ?? 0);
+            $receiptAmount = (float) $receipt->amount;
+
+            if ($ledgerAmount <= 0) {
+                $rows->push([
+                    'issue' => 'approved_without_ledger',
+                    'receipt_id' => $receipt->id,
+                    'receipt_status' => $receipt->status,
+                    'receipt_amount' => $receiptAmount,
+                    'ledger_amount' => 0.0,
+                    'feeable_type' => class_basename((string) $receipt->feeable_type),
+                    'feeable_id' => $receipt->feeable_id,
+                    'payment_date' => $receipt->payment_date?->format('Y-m-d'),
+                ]);
+            } elseif (abs($ledgerAmount - $receiptAmount) > 0.01) {
+                $rows->push([
+                    'issue' => 'amount_mismatch',
+                    'receipt_id' => $receipt->id,
+                    'receipt_status' => $receipt->status,
+                    'receipt_amount' => $receiptAmount,
+                    'ledger_amount' => $ledgerAmount,
+                    'feeable_type' => class_basename((string) $receipt->feeable_type),
+                    'feeable_id' => $receipt->feeable_id,
+                    'payment_date' => $receipt->payment_date?->format('Y-m-d'),
+                ]);
+            }
+        }
+
+        $orphanLedgerIds = LedgerTransaction::query()
+            ->where('tenant_id', $sahodayaId)
+            ->where('reference_type', FeeReceipt::class)
+            ->whereNotIn('reference_id', $approved->pluck('id')->all() ?: [0])
+            ->distinct()
+            ->pluck('reference_id');
+
+        foreach ($orphanLedgerIds as $receiptId) {
+            $receipt = FeeReceipt::find($receiptId);
+            if ($receipt && $receipt->status === FeeReceipt::STATUS_APPROVED) {
+                continue;
+            }
+            $ledgerAmount = (float) ($postedByReceipt[$receiptId] ?? LedgerTransaction::query()
+                ->where('tenant_id', $sahodayaId)
+                ->where('reference_type', FeeReceipt::class)
+                ->where('reference_id', $receiptId)
+                ->where('entry_type', 'credit')
+                ->sum('amount'));
+
+            $rows->push([
+                'issue' => $receipt ? 'ledger_without_approved_receipt' : 'ledger_orphaned_receipt',
+                'receipt_id' => (int) $receiptId,
+                'receipt_status' => $receipt?->status ?? 'missing',
+                'receipt_amount' => (float) ($receipt?->amount ?? 0),
+                'ledger_amount' => $ledgerAmount,
+                'feeable_type' => $receipt ? class_basename((string) $receipt->feeable_type) : '—',
+                'feeable_id' => $receipt?->feeable_id,
+                'payment_date' => $receipt?->payment_date?->format('Y-m-d'),
+            ]);
+        }
+
+        return $rows->values();
     }
 
     /** @param  array<string, mixed>  $filters */

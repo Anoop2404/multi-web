@@ -702,6 +702,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/payments/export', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'export'])->name('payments.export');
             Route::get('/payments/receipts/{feeReceipt}', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'programReceipt'])->name('payments.receipt');
             Route::post('/payments/resend-receipt', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'resendReceipt'])->name('payments.resend-receipt');
+            Route::post('/payments/receipts/{feeReceipt}/reverse', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'reverseReceipt'])->name('payments.reverse');
             Route::get('/receipt-emails', [\App\Http\Controllers\SahodayaAdmin\ReceiptEmailReportController::class, 'index'])->name('receipt-emails');
             Route::get('/email-delivery', [\App\Http\Controllers\SahodayaAdmin\EmailDeliveryReportController::class, 'index'])->name('email-delivery');
             Route::post('/email-delivery/{notificationLog}/retry', [\App\Http\Controllers\SahodayaAdmin\EmailDeliveryReportController::class, 'retry'])->name('email-delivery.retry');
@@ -1378,15 +1379,15 @@ Route::prefix('portal/student/{tenantId}')
     });
 
 Route::get('/certificates/verify/{uuid}', [PublicCertificateController::class, 'verify'])
-    ->middleware('web')
+    ->middleware(['web', 'throttle:60,1'])
     ->name('certificates.verify');
 
 Route::get('/certificates/print/{uuid}', [PublicCertificateController::class, 'print'])
-    ->middleware('web')
+    ->middleware(['web', 'throttle:60,1'])
     ->name('certificates.print');
 
 Route::get('/verify/{uuid}', [PublicCertificateController::class, 'verify'])
-    ->middleware('web')
+    ->middleware(['web', 'throttle:60,1'])
     ->name('verify');
 
 // ── Live display screens (Phase 20) ──────────────────────────────────────────

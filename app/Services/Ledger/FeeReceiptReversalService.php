@@ -1,0 +1,88 @@
+<?php
+
+namespace App\Services\Ledger;
+
+use App\Models\FeeReceipt;
+use App\Models\MembershipPayment;
+use App\Models\TrainingRegistration;
+use App\Models\User;
+use App\Observers\FeeReceiptObserver;
+use App\Services\Audit\PlatformAuditLogger;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class FeeReceiptReversalService
+{
+    public function reverse(FeeReceipt $receipt, User $actor, ?string $reason = null): FeeReceipt
+    {
+        return DB::transaction(function () use ($receipt, $actor, $reason) {
+            /** @var FeeReceipt $locked */
+            $locked = FeeReceipt::query()->whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === FeeReceipt::STATUS_REVERSED) {
+                return $locked;
+            }
+
+            if ($locked->status !== FeeReceipt::STATUS_APPROVED) {
+                throw ValidationException::withMessages([
+                    'receipt' => 'Only approved fee receipts can be reversed.',
+                ]);
+            }
+
+            $tenantId = app(FeeReceiptObserver::class)->resolveTenantIdPublic($locked);
+            if (! $tenantId) {
+                throw ValidationException::withMessages([
+                    'receipt' => 'Cannot resolve tenant for ledger reversal. Fix the feeable link and retry.',
+                ]);
+            }
+
+            app(FeeReceiptLedgerDispatcher::class)->postReversal($locked, $tenantId);
+
+            $locked->update([
+                'status'          => FeeReceipt::STATUS_REVERSED,
+                'reversed_by'     => $actor->id,
+                'reversed_at'     => now(),
+                'reversal_reason' => $reason,
+            ]);
+
+            $this->syncFeeableAfterReversal($locked->fresh(['feeable']), $reason);
+
+            app(PlatformAuditLogger::class)->log(
+                action: 'fee_receipt.reversed',
+                description: "Fee receipt #{$locked->id} reversed".($reason ? ": {$reason}" : ''),
+                subject: $locked,
+                properties: [
+                    'feeable_type' => $locked->feeable_type,
+                    'feeable_id'   => $locked->feeable_id,
+                    'amount'       => $locked->amount,
+                    'reason'       => $reason,
+                ],
+                category: 'finance',
+            );
+
+            return $locked->fresh();
+        });
+    }
+
+    private function syncFeeableAfterReversal(FeeReceipt $receipt, ?string $reason): void
+    {
+        $feeable = $receipt->feeable;
+        if (! $feeable) {
+            return;
+        }
+
+        if (method_exists($feeable, 'refreshPaidState')) {
+            $feeable->refresh();
+            $feeable->refreshPaidState(
+                $feeable instanceof TrainingRegistration ? 'fee_status' : 'status'
+            );
+        }
+
+        if ($feeable instanceof MembershipPayment && $feeable->status === 'verified') {
+            $feeable->update([
+                'status'           => 'rejected',
+                'rejection_reason' => 'Payment reversed'.($reason ? ": {$reason}" : ''),
+            ]);
+        }
+    }
+}

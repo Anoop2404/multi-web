@@ -328,7 +328,11 @@ class AwardsEngine
         array $streamCodes,
         string $title,
     ): int {
-        $streamIds = ExamStream::query()->whereIn('code', $streamCodes)->pluck('id')->all();
+        $streamIds = ExamStream::query()
+            ->forSahodaya($sahodayaId)
+            ->whereIn('code', $streamCodes)
+            ->pluck('id')
+            ->all();
         if ($streamIds === [] || $schoolIds === []) {
             return 0;
         }

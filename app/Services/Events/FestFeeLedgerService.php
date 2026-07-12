@@ -53,6 +53,11 @@ class FestFeeLedgerService
         return $rows[1] ?? $rows[0] ?? null;
     }
 
+    public function postReversal(FeeReceipt $receipt, string $tenantId): void
+    {
+        app(LedgerPostingService::class)->postReceiptReversal($receipt, $tenantId);
+    }
+
     /** @return array{0: ?string, 1: ?string, 2: ?string} */
     private function schoolEventFeeContext(FeeReceipt $receipt): array
     {

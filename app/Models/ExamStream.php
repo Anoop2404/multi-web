@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ScopesBySahodaya;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ExamStream extends Model
 {
+    use ScopesBySahodaya;
     protected $fillable = [
         'sahodaya_id',
         'code',

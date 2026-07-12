@@ -6,6 +6,7 @@ use App\Models\McqExam;
 use App\Models\McqRegistration;
 use App\Models\McqSchoolFee;
 use App\Models\Tenant;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Fees\OfflineProgramFeeOrchestrator;
 use App\Services\Fees\ProgramFeeReceiptService;
 use Illuminate\Support\Facades\DB;
@@ -87,6 +88,22 @@ class McqSchoolFeeService
                 adminPath: 'payments',
             );
 
+            $schoolFee->loadMissing(['exam', 'school']);
+            if ($schoolFee->exam) {
+                app(PlatformAuditLogger::class)->mcq(
+                    $schoolFee->exam,
+                    'mcq.fee.approved',
+                    "Talent Search batch fee approved for {$schoolFee->school?->name}",
+                    [
+                        'school_id' => $schoolFee->school_id,
+                        'fee_receipt_id' => $receipt->id,
+                        'amount' => $receipt->amount,
+                        'registrations_confirmed' => $count,
+                    ],
+                    $schoolFee,
+                );
+            }
+
             return $count;
         });
     }
@@ -106,6 +123,17 @@ class McqSchoolFeeService
         // Fall back to whatever has already been paid (partial) or pending.
         $schoolFee->refresh();
         $schoolFee->refreshPaidState();
+
+        $schoolFee->loadMissing(['exam', 'school']);
+        if ($schoolFee->exam) {
+            app(PlatformAuditLogger::class)->mcq(
+                $schoolFee->exam,
+                'mcq.fee.rejected',
+                "Talent Search batch fee rejected for {$schoolFee->school?->name}",
+                ['school_id' => $schoolFee->school_id, 'reason' => $reason],
+                $schoolFee,
+            );
+        }
     }
 
     private function pendingReceipt(McqSchoolFee $schoolFee): ?\App\Models\FeeReceipt

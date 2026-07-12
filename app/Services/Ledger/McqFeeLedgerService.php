@@ -34,6 +34,11 @@ class McqFeeLedgerService
         };
     }
 
+    public function postReversal(FeeReceipt $receipt, string $tenantId): void
+    {
+        app(LedgerPostingService::class)->postReceiptReversal($receipt, $tenantId);
+    }
+
     private function postRegistrationReceipt(FeeReceipt $receipt, bool $forceRepost): ?LedgerTransaction
     {
         $registration = McqRegistration::with(['exam', 'student'])->find($receipt->feeable_id);

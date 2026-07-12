@@ -82,28 +82,33 @@ class LedgerPostingService
         bool $forceRepost = false,
         ?int $financialYearId = null,
     ): array {
-        if ($referenceType && $referenceId) {
-            $existing = LedgerTransaction::where('reference_type', $referenceType)
-                ->where('reference_id', $referenceId)
-                ->orderBy('id')
-                ->get();
-
-            if ($existing->isNotEmpty()) {
-                if (! $forceRepost) {
-                    return $existing->all();
-                }
-
-                LedgerTransaction::where('reference_type', $referenceType)
-                    ->where('reference_id', $referenceId)
-                    ->delete();
+        return DB::transaction(function () use ($tenantId, $lines, $referenceType, $referenceId, $transactionDate, $postedBy, $forceRepost, $financialYearId) {
+            // Serialize concurrent approve/repost races for the same receipt (#FRD-06 #4).
+            if ($referenceType === FeeReceipt::class && $referenceId) {
+                FeeReceipt::query()->whereKey($referenceId)->lockForUpdate()->first();
             }
-        }
 
-        $journalId = (string) Str::uuid();
-        $date = $transactionDate ?? now()->toDateString();
-        $yearId = $financialYearId ?? FinancialYear::currentId();
+            if ($referenceType && $referenceId) {
+                $existing = LedgerTransaction::where('reference_type', $referenceType)
+                    ->where('reference_id', $referenceId)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
 
-        return DB::transaction(function () use ($tenantId, $lines, $journalId, $referenceType, $referenceId, $date, $postedBy, $financialYearId, $yearId) {
+                if ($existing->isNotEmpty()) {
+                    if (! $forceRepost) {
+                        return $existing->all();
+                    }
+
+                    LedgerTransaction::where('reference_type', $referenceType)
+                        ->where('reference_id', $referenceId)
+                        ->delete();
+                }
+            }
+
+            $journalId = (string) Str::uuid();
+            $date = $transactionDate ?? now()->toDateString();
+            $yearId = $financialYearId ?? FinancialYear::currentId();
             $created = [];
 
             foreach ($lines as $line) {
@@ -138,6 +143,62 @@ class LedgerPostingService
             ['code' => 'CASH-BANK', 'entry_type' => 'debit', 'amount' => $amount, 'description' => $description],
             ['code' => $incomeCode, 'entry_type' => 'credit', 'amount' => $amount, 'description' => $description],
         ], FeeReceipt::class, $receipt->id, $date, $receipt->reviewed_by, $forceRepost);
+    }
+
+    /**
+     * Post compensating entries that invert an existing FeeReceipt income journal.
+     *
+     * @return list<LedgerTransaction>
+     */
+    public function postReceiptReversal(FeeReceipt $receipt, string $tenantId, ?int $postedBy = null): array
+    {
+        return DB::transaction(function () use ($receipt, $tenantId, $postedBy) {
+            FeeReceipt::query()->whereKey($receipt->id)->lockForUpdate()->first();
+
+            $existingReversal = LedgerTransaction::where('reference_type', FeeReceipt::REVERSAL_REFERENCE)
+                ->where('reference_id', $receipt->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($existingReversal->isNotEmpty()) {
+                return $existingReversal->all();
+            }
+
+            $original = LedgerTransaction::where('reference_type', FeeReceipt::class)
+                ->where('reference_id', $receipt->id)
+                ->with('accountHead:id,code')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($original->isEmpty()) {
+                throw new \RuntimeException("No ledger rows found to reverse for fee receipt #{$receipt->id}.");
+            }
+
+            $lines = $original->map(function (LedgerTransaction $row) {
+                $code = $row->accountHead?->code;
+                if (! $code) {
+                    throw new \RuntimeException("Missing account head for ledger row #{$row->id}.");
+                }
+
+                return [
+                    'code'        => $code,
+                    'entry_type'  => $row->entry_type === 'debit' ? 'credit' : 'debit',
+                    'amount'      => $row->amount,
+                    'description' => 'Reversal of receipt #'.$row->reference_id.($row->description ? " — {$row->description}" : ''),
+                ];
+            })->all();
+
+            return $this->postJournal(
+                $tenantId,
+                $lines,
+                FeeReceipt::REVERSAL_REFERENCE,
+                $receipt->id,
+                now()->toDateString(),
+                $postedBy ?? $receipt->reversed_by ?? $receipt->reviewed_by,
+            );
+        });
     }
 
     /** @return list<LedgerTransaction> */

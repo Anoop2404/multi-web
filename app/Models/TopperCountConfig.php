@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ScopesBySahodaya;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TopperCountConfig extends Model
 {
+    use ScopesBySahodaya;
     public const SCOPE_OVERALL = 'overall';
 
     public const SCOPE_STREAM = 'stream';

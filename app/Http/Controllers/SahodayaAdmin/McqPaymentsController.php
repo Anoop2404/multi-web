@@ -90,13 +90,6 @@ class McqPaymentsController extends SahodayaAdminController
 
         app(McqSchoolFeeService::class)->reject($schoolFee, $request->user()->id, $data['rejection_reason']);
 
-        app(\App\Services\Audit\PlatformAuditLogger::class)->mcq(
-            $schoolFee->exam,
-            'mcq.fee.rejected',
-            "Talent Search batch fee rejected for {$schoolFee->school?->name}",
-            ['school_id' => $schoolFee->school_id, 'reason' => $data['rejection_reason']],
-        );
-
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Payment proof rejected. School can re-upload.']);
         }

@@ -34,6 +34,11 @@ class TrainingFeeLedgerService
         };
     }
 
+    public function postReversal(FeeReceipt $receipt, string $tenantId): void
+    {
+        app(LedgerPostingService::class)->postReceiptReversal($receipt, $tenantId);
+    }
+
     private function postRegistrationReceipt(FeeReceipt $receipt, bool $forceRepost): ?LedgerTransaction
     {
         $registration = TrainingRegistration::with(['program', 'teacher', 'school'])->find($receipt->feeable_id);

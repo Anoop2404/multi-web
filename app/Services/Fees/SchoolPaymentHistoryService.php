@@ -113,6 +113,7 @@ class SchoolPaymentHistoryService
             'receipt_email_status' => $p->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $p->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
             'fee_receipt_id'       => $p->feeReceipt?->id,
+            'receipt_status'       => $p->feeReceipt?->status,
             'rejection_reason'     => null,
         ];
     }
@@ -144,6 +145,7 @@ class SchoolPaymentHistoryService
             'receipt_email_status' => $f->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $f->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
             'fee_receipt_id'       => $f->feeReceipt?->id,
+            'receipt_status'       => $f->feeReceipt?->status,
             'rejection_reason'     => $f->feeReceipt?->status === 'rejected' ? $f->feeReceipt->rejection_reason : null,
         ];
     }
@@ -175,6 +177,7 @@ class SchoolPaymentHistoryService
             'receipt_email_status' => $r->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $r->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
             'fee_receipt_id'       => $r->feeReceipt?->id,
+            'receipt_status'       => $r->feeReceipt?->status,
             'rejection_reason'     => $r->feeReceipt?->status === 'rejected' ? $r->feeReceipt->rejection_reason : null,
         ];
     }
@@ -206,6 +209,7 @@ class SchoolPaymentHistoryService
             'receipt_email_status' => $f->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $f->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
             'fee_receipt_id'       => $f->feeReceipt?->id,
+            'receipt_status'       => $f->feeReceipt?->status,
             'rejection_reason'     => $f->feeReceipt?->status === 'rejected' ? $f->feeReceipt->rejection_reason : null,
         ];
     }
@@ -237,6 +241,7 @@ class SchoolPaymentHistoryService
             'receipt_email_status' => $f->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $f->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
             'fee_receipt_id'       => $f->feeReceipt?->id,
+            'receipt_status'       => $f->feeReceipt?->status,
             'rejection_reason'     => $f->feeReceipt?->status === 'rejected' ? $f->feeReceipt->rejection_reason : null,
         ];
     }
@@ -266,6 +271,7 @@ class SchoolPaymentHistoryService
             'receipt_email_status' => $r->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $r->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
             'fee_receipt_id'       => $r->feeReceipt?->id,
+            'receipt_status'       => $r->feeReceipt?->status,
             'rejection_reason'     => $r->feeReceipt?->status === 'rejected' ? $r->feeReceipt->rejection_reason : null,
         ];
     }

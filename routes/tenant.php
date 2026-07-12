@@ -78,7 +78,7 @@ Route::middleware([
         Route::get('/papers/{exam}/download', [McqArchiveController::class, 'download'])->name('archive.download');
     });
 
-    Route::prefix('academic-results')->name('tenant.academic-results.')->group(function () {
+    Route::prefix('academic-results')->name('tenant.academic-results.')->middleware('throttle:60,1')->group(function () {
         Route::get('/', [\App\Http\Controllers\Public\AcademicResultsPortalController::class, 'index'])->name('index');
         Route::get('/merit-list.pdf', [\App\Http\Controllers\Public\AcademicResultsPortalController::class, 'meritListPdf'])->name('merit-list');
     });

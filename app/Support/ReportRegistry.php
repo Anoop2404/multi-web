@@ -203,6 +203,7 @@ class ReportRegistry
             self::row('RPT-FIN-018', 'Bank reconciliation status', 'finance', 'new', "{$base}/finance/bank-reconciliation"),
             self::row('RPT-FIN-019', 'Opening balance sheet', 'finance', 'new', "{$base}/ledger/opening-balances"),
             self::row('RPT-FIN-020', 'Voucher listing', 'finance', 'retain', "{$base}/ledger/export"),
+            self::row('RPT-FIN-021', 'Fee receipt ↔ ledger reconciliation', 'finance', 'new', self::runnerHref($base, 'RPT-FIN-021'), null, true),
         ];
     }
 

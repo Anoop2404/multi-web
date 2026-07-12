@@ -34,6 +34,7 @@ class TopperSubjectMarkService
                 $subjectId = $subjectIds[$label] ?? $this->resolveSubjectId($label);
                 TopperSubjectMark::create([
                     'topper_id' => $topper->id,
+                    'tenant_id' => $topper->tenant_id,
                     'subject_id' => $subjectId,
                     'subject_label' => $label,
                     'marks' => $value,

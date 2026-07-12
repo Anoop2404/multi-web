@@ -90,6 +90,10 @@
                             :disabled="resending === rowKey(p)" @click="resend(p)">
                         {{ resending === rowKey(p) ? 'Sending…' : 'Resend email' }}
                     </button>
+                    <button v-if="canReverse(p)" type="button" class="btn-secondary text-xs !py-1.5 !px-3 text-red-700 border-red-200"
+                            :disabled="reversing === rowKey(p)" @click="reverseReceipt(p)">
+                        {{ reversing === rowKey(p) ? 'Reversing…' : 'Reverse' }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -114,6 +118,7 @@ const props = defineProps({
 
 const page = usePage();
 const resending = ref(null);
+const reversing = ref(null);
 
 const form = reactive({
     type: props.filters?.type ?? 'all',
@@ -148,7 +153,7 @@ function typeClass(type) {
 
 function statusClass(status) {
     if (['verified', 'approved'].includes(status)) return 'bg-green-100 text-green-800';
-    if (['rejected'].includes(status)) return 'bg-red-100 text-red-800';
+    if (['rejected', 'reversed'].includes(status)) return 'bg-red-100 text-red-800';
     return 'bg-amber-100 text-amber-800';
 }
 
@@ -159,11 +164,30 @@ function emailStatusClass(status) {
 }
 
 function canResend(p) {
-    return ['verified', 'approved'].includes(p.status) && p.receipt_url;
+    return ['verified', 'approved'].includes(p.status) && p.receipt_url && p.receipt_status === 'approved';
+}
+
+function canReverse(p) {
+    return !!p.fee_receipt_id && p.receipt_status === 'approved';
 }
 
 function rowKey(p) {
     return `${p.type}-${p.id}`;
+}
+
+function reverseReceipt(p) {
+    if (!p.fee_receipt_id) return;
+    const reason = window.prompt('Reason for reversal (optional):');
+    if (reason === null) return;
+    if (!window.confirm('Reverse this approved receipt and post compensating ledger entries?')) return;
+
+    reversing.value = rowKey(p);
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/finance/payments/receipts/${p.fee_receipt_id}/reverse`, {
+        reason: reason || null,
+    }, {
+        preserveScroll: true,
+        onFinish: () => { reversing.value = null; },
+    });
 }
 
 function resend(p) {

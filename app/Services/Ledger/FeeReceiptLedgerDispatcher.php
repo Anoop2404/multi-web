@@ -24,4 +24,15 @@ class FeeReceiptLedgerDispatcher
             default => null,
         };
     }
+
+    public function postReversal(FeeReceipt $receipt, string $tenantId): void
+    {
+        match ($receipt->feeable_type) {
+            MembershipPayment::class => app(LedgerService::class)->postReversal($receipt, $tenantId),
+            FestSchoolEventFee::class, FestRegistration::class => app(FestFeeLedgerService::class)->postReversal($receipt, $tenantId),
+            TrainingRegistration::class, TrainingSchoolFee::class => app(TrainingFeeLedgerService::class)->postReversal($receipt, $tenantId),
+            McqRegistration::class, McqSchoolFee::class => app(McqFeeLedgerService::class)->postReversal($receipt, $tenantId),
+            default => app(LedgerPostingService::class)->postReceiptReversal($receipt, $tenantId),
+        };
+    }
 }
