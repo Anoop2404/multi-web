@@ -24,7 +24,7 @@ class SendTrainingSessionReminders extends Command
         $sahodayas = Tenant::query()->sahodayas()->where('is_active', true)->get();
 
         foreach ($sahodayas as $sahodaya) {
-            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($notifier, $hours, &$sent) {
+            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($notifier, $hours, &$sent, $sahodaya) {
                 $windowStart = now();
                 $windowEnd = now()->addHours($hours);
 
@@ -55,6 +55,15 @@ class SendTrainingSessionReminders extends Command
 
                         $user = User::find($userId);
                         if (! $user) {
+                            continue;
+                        }
+
+                        if (! \App\Support\ReminderDedupGuard::claim(
+                            'training:session-reminders',
+                            $sahodaya->id,
+                            $session->id,
+                            $user->id,
+                        )) {
                             continue;
                         }
 

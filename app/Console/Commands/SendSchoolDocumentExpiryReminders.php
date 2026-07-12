@@ -6,6 +6,8 @@ use App\Models\SchoolDocument;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Notifications\NotificationService;
+use App\Support\ReminderDedupGuard;
+use App\Support\TenancyDatabase;
 use Illuminate\Console\Command;
 
 class SendSchoolDocumentExpiryReminders extends Command
@@ -19,19 +21,25 @@ class SendSchoolDocumentExpiryReminders extends Command
         $windows = [30, 7];
         $sent = 0;
 
-        foreach ($windows as $days) {
-            $target = now()->addDays($days)->toDateString();
+        $sahodayas = Tenant::query()->sahodayas()->where('is_active', true)->get();
 
-            SchoolDocument::where('status', 'approved')
-                ->whereDate('valid_to', $target)
-                ->with('documentType')
-                ->chunkById(100, function ($documents) use ($days, &$sent) {
-                    foreach ($documents as $document) {
-                        if ($this->notifySchool($document, $days)) {
-                            $sent++;
-                        }
-                    }
-                });
+        foreach ($sahodayas as $sahodaya) {
+            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($windows, $sahodaya, &$sent) {
+                foreach ($windows as $days) {
+                    $target = now()->addDays($days)->toDateString();
+
+                    SchoolDocument::where('status', 'approved')
+                        ->whereDate('valid_to', $target)
+                        ->with('documentType')
+                        ->chunkById(100, function ($documents) use ($days, $sahodaya, &$sent) {
+                            foreach ($documents as $document) {
+                                if ($this->notifySchool($document, $days, $sahodaya->id)) {
+                                    $sent++;
+                                }
+                            }
+                        });
+                }
+            });
         }
 
         $this->info("Sent {$sent} document expiry reminder(s).");
@@ -39,10 +47,10 @@ class SendSchoolDocumentExpiryReminders extends Command
         return self::SUCCESS;
     }
 
-    private function notifySchool(SchoolDocument $document, int $days): bool
+    private function notifySchool(SchoolDocument $document, int $days, string $sahodayaId): bool
     {
         $school = Tenant::find($document->school_id);
-        if (! $school) {
+        if (! $school || $school->parent_id !== $sahodayaId) {
             return false;
         }
 
@@ -52,6 +60,10 @@ class SendSchoolDocumentExpiryReminders extends Command
             ->first();
 
         if (! $admin) {
+            return false;
+        }
+
+        if (! ReminderDedupGuard::claim('erp:school-document-expiry', $sahodayaId, $document->id, $days)) {
             return false;
         }
 

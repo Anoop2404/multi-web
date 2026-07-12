@@ -24,7 +24,7 @@ class SendMcqExamReminders extends Command
         $sahodayas = Tenant::query()->sahodayas()->where('is_active', true)->get();
 
         foreach ($sahodayas as $sahodaya) {
-            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($notifier, $hours, &$sent) {
+            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($notifier, $hours, &$sent, $sahodaya) {
                 $windowStart = now()->addHours($hours - 1);
                 $windowEnd = now()->addHours($hours);
 

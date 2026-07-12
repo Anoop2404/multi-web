@@ -26,7 +26,7 @@ class SendBoardResultUploadReminders extends Command
 
         $sent = 0;
         foreach ($sahodayas as $sahodaya) {
-            TenancyDatabase::withTenantDatabase($sahodaya, function () use ($sahodaya, $notifier, &$sent) {
+            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($sahodaya, $notifier, &$sent) {
                 $year = AcademicYear::forSahodaya($sahodaya->id);
                 $schoolIds = Tenant::query()
                     ->where('parent_id', $sahodaya->id)

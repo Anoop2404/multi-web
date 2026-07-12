@@ -25,12 +25,12 @@ class SendTrainingReminders extends Command
         $sahodayas = Tenant::query()->sahodayas()->where('is_active', true)->get();
 
         foreach ($sahodayas as $sahodaya) {
-            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($notifier, $includePayment, &$sent) {
-                $sent += $this->sendProgramStartReminders($notifier);
-                $sent += $this->sendRegistrationClosingReminders($notifier);
+            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($notifier, $includePayment, &$sent, $sahodaya) {
+                $sent += $this->sendProgramStartReminders($notifier, $sahodaya->id);
+                $sent += $this->sendRegistrationClosingReminders($notifier, $sahodaya->id);
 
                 if ($includePayment) {
-                    $sent += $this->sendPaymentReminders($notifier);
+                    $sent += $this->sendPaymentReminders($notifier, $sahodaya->id);
                 }
             });
         }
@@ -40,7 +40,7 @@ class SendTrainingReminders extends Command
         return self::SUCCESS;
     }
 
-    private function sendProgramStartReminders(NotificationService $notifier): int
+    private function sendProgramStartReminders(NotificationService $notifier, string $sahodayaId): int
     {
         $sent = 0;
 
@@ -64,6 +64,7 @@ class SendTrainingReminders extends Command
             foreach ($registrations as $registration) {
                 if ($this->notifyTeacher(
                     $notifier,
+                    $sahodayaId,
                     $registration,
                     'training.reminder',
                     [
@@ -80,7 +81,7 @@ class SendTrainingReminders extends Command
         return $sent;
     }
 
-    private function sendRegistrationClosingReminders(NotificationService $notifier): int
+    private function sendRegistrationClosingReminders(NotificationService $notifier, string $sahodayaId): int
     {
         $sent = 0;
 
@@ -104,6 +105,7 @@ class SendTrainingReminders extends Command
             foreach ($registrations as $registration) {
                 if ($this->notifyTeacher(
                     $notifier,
+                    $sahodayaId,
                     $registration,
                     'training.registration.closing',
                     [
@@ -122,7 +124,7 @@ class SendTrainingReminders extends Command
         return $sent;
     }
 
-    private function sendPaymentReminders(NotificationService $notifier): int
+    private function sendPaymentReminders(NotificationService $notifier, string $sahodayaId): int
     {
         $sent = 0;
 
@@ -141,6 +143,7 @@ class SendTrainingReminders extends Command
 
             if ($this->notifyTeacher(
                 $notifier,
+                $sahodayaId,
                 $registration,
                 'training.payment.reminder',
                 [
@@ -158,6 +161,7 @@ class SendTrainingReminders extends Command
     /** @param  array<string, string>  $replacements */
     private function notifyTeacher(
         NotificationService $notifier,
+        string $sahodayaId,
         TrainingRegistration $registration,
         string $slug,
         array $replacements,
@@ -172,7 +176,7 @@ class SendTrainingReminders extends Command
             return false;
         }
 
-        if (! ReminderDedupGuard::claim('training:reminders', $slug, $registration->id, $userId)) {
+        if (! ReminderDedupGuard::claim('training:reminders', $sahodayaId, $slug, $registration->id, $userId)) {
             return false;
         }
 

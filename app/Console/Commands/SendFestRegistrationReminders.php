@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\FestEvent;
 use App\Models\Tenant;
 use App\Services\Events\FestEventNotifier;
+use App\Support\ReminderDedupGuard;
 use App\Support\TenancyDatabase;
 use Illuminate\Console\Command;
 
@@ -21,7 +22,7 @@ class SendFestRegistrationReminders extends Command
         $sahodayas = Tenant::query()->sahodayas()->where('is_active', true)->get();
 
         foreach ($sahodayas as $sahodaya) {
-            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($notifier, &$sent) {
+            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($notifier, $sahodaya, &$sent) {
                 $events = FestEvent::query()
                     ->whereNotNull('registration_close')
                     ->whereIn('status', ['published', 'registration_open'])
@@ -31,6 +32,10 @@ class SendFestRegistrationReminders extends Command
                     $daysLeft = (int) now()->startOfDay()->diffInDays($event->registration_close->startOfDay(), false);
 
                     if (! in_array($daysLeft, [1, 3], true)) {
+                        continue;
+                    }
+
+                    if (! ReminderDedupGuard::claim('fest:registration-reminders', $sahodaya->id, $event->id, $daysLeft)) {
                         continue;
                     }
 
