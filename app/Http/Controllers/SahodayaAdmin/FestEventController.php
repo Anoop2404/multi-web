@@ -839,8 +839,17 @@ class FestEventController extends SahodayaAdminController
         $classKeys = array_keys(FestClassGroupScheme::labels(null, $event));
         $kidsKeys = array_keys(\App\Support\FestKidsFestBand::labels());
 
+        // 'sports' was a valid value under the old hardcoded category enum
+        // (nullable|in:music,dance,drama,literary,sports,general) but isn't part of
+        // the arts_category taxonomy's default set. Keep accepting it so items saved
+        // before this change (on any event type, including pre-existing custom
+        // events) can still be edited/re-saved without a validation failure — every
+        // other old value (music/dance/drama/literary/general) is already covered by
+        // arts_category's defaults.
+        $categoryKeys = array_unique(array_merge($registry->activeKeys('arts_category'), ['sports']));
+
         return [
-            'category'           => ['nullable', $registry->validationRule('arts_category')],
+            'category'           => ['nullable', \Illuminate\Validation\Rule::in($categoryKeys)],
             'stage_type'         => ['nullable', $registry->validationRule('stage_type')],
             'venue_type'         => ['nullable', $registry->validationRule('venue_type')],
             'competition_format' => ['nullable', $registry->validationRule('competition_format')],
