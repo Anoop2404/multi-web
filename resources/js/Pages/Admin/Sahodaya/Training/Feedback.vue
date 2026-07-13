@@ -79,7 +79,7 @@
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import PageHeader from '@/Components/PageHeader.vue';
+import PageHeader from '@/Components/ui/PageHeader.vue';
 import TrainingProgramSubNav from '@/Components/sahodaya/TrainingProgramSubNav.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
