@@ -15,6 +15,7 @@ use App\Support\SahodayaSiteTemplate;
 use App\Support\TenancyDatabase;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
+use App\Services\Auth\UserCredentialService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -351,11 +352,10 @@ class TenantController extends Controller
             $user->fill([
                 'name'              => $data['name'],
                 'email'             => $data['email'],
-                'password'          => $data['password'],
                 'email_verified_at' => now(),
             ]);
-            $user->password_changed_at = now();
             $user->save();
+            app(UserCredentialService::class)->storePassword($user, $data['password'], mustChange: false);
             $user->syncRoles(['sahodaya_admin']);
         });
     }
@@ -406,14 +406,14 @@ class TenantController extends Controller
                 'email'             => $data['email'],
                 'email_verified_at' => now(),
             ];
-            if (! empty($data['password'])) {
-                // User::$casts hashes password — do not Hash::make here.
-                $payload['password'] = $data['password'];
-                $user->password_changed_at = now();
-            }
 
             $user->fill($payload);
             $user->save();
+
+            if (! empty($data['password'])) {
+                app(UserCredentialService::class)->storePassword($user, $data['password'], mustChange: false);
+            }
+
             $user->syncRoles([$role]);
 
             $message = $existingId ? "{$label} login updated." : "{$label} account created.";
@@ -488,14 +488,22 @@ class TenantController extends Controller
             'status' => 'nullable|in:active,inactive,all',
         ]);
 
+        $search = trim((string) ($filters['search'] ?? ''));
+        $loginMatchIds = $search !== ''
+            ? $this->tenantIdsMatchingPortalLogin($type, $search)
+            : [];
+
         $query = Tenant::query()
             ->where('type', $type)
-            ->when(! empty($filters['search']), function ($q) use ($filters) {
-                $term = '%'.$filters['search'].'%';
-                $q->where(function ($inner) use ($term) {
+            ->when($search !== '', function ($q) use ($search, $loginMatchIds) {
+                $term = '%'.$search.'%';
+                $q->where(function ($inner) use ($term, $loginMatchIds) {
                     $inner->where('name', 'like', $term)
                         ->orWhere('domain', 'like', $term)
                         ->orWhere('subdomain', 'like', $term);
+                    if ($loginMatchIds !== []) {
+                        $inner->orWhereIn('id', $loginMatchIds);
+                    }
                 });
             })
             ->when(($filters['status'] ?? 'all') === 'active', fn ($q) => $q->where('is_active', true))
@@ -508,8 +516,22 @@ class TenantController extends Controller
             $query->withCount('children');
         }
 
+        $role = $type === 'school' ? 'school_admin' : 'sahodaya_admin';
+        $tenants = $query->paginate(20)->withQueryString();
+        $tenants->setCollection(
+            $tenants->getCollection()->map(function (Tenant $tenant) use ($role) {
+                $admins = $this->portalAdmins($tenant, $role);
+                $primary = $admins[0] ?? null;
+                $tenant->setAttribute('login_username', $primary['username'] ?? null);
+                $tenant->setAttribute('login_password', $primary['password'] ?? null);
+                $tenant->setAttribute('portal_admins', $admins);
+
+                return $tenant;
+            })
+        );
+
         return inertia('Tenants/Index', [
-            'tenants'          => $query->paginate(20)->withQueryString(),
+            'tenants'          => $tenants,
             'tenantType'       => $type,
             'pageTitle'        => $pageTitle,
             'createUrl'        => $createUrl,
@@ -529,6 +551,70 @@ class TenantController extends Controller
             'defaultType'      => $type,
             'cancelUrl'        => $cancelUrl,
         ]);
+    }
+
+    /**
+     * Find tenant ids whose portal admin email/username matches the search term.
+     *
+     * @return list<string>
+     */
+    private function tenantIdsMatchingPortalLogin(string $type, string $search): array
+    {
+        $needle = strtolower($search);
+        $ids = [];
+
+        if ($type === 'sahodaya') {
+            foreach (Tenant::query()->where('type', 'sahodaya')->orderBy('name')->cursor() as $sahodaya) {
+                foreach ($this->portalAdmins($sahodaya, 'sahodaya_admin') as $admin) {
+                    $hay = strtolower(($admin['username'] ?? '').' '.($admin['email'] ?? '').' '.($admin['name'] ?? ''));
+                    if (str_contains($hay, $needle)) {
+                        $ids[] = $sahodaya->id;
+                        break;
+                    }
+                }
+            }
+
+            return $ids;
+        }
+
+        $schools = Tenant::query()->where('type', 'school')->get(['id', 'parent_id']);
+        foreach ($schools->groupBy('parent_id') as $parentId => $group) {
+            $parent = $parentId ? Tenant::query()->find($parentId) : null;
+            if (! $parent) {
+                continue;
+            }
+
+            $schoolIds = $group->pluck('id')->all();
+            try {
+                $matched = TenantAuth::withTenantUsers($parent, function () use ($schoolIds, $needle) {
+                    if (! \Illuminate\Support\Facades\Schema::hasTable('users')
+                        || ! \Illuminate\Support\Facades\Schema::hasTable('roles')) {
+                        return [];
+                    }
+
+                    return User::role('school_admin')
+                        ->whereIn('tenant_id', $schoolIds)
+                        ->get(['id', 'tenant_id', 'name', 'email', 'username'])
+                        ->filter(function (User $user) use ($needle) {
+                            $hay = strtolower(($user->username ?: '').' '.($user->email ?: '').' '.($user->name ?: ''));
+
+                            return str_contains($hay, $needle);
+                        })
+                        ->pluck('tenant_id')
+                        ->unique()
+                        ->values()
+                        ->all();
+                }) ?? [];
+            } catch (\Throwable) {
+                $matched = [];
+            }
+
+            foreach ($matched as $id) {
+                $ids[] = $id;
+            }
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /** @return array{sections: array<int, array<string, mixed>>, settings: array<int, array<string, mixed>>} */
@@ -554,7 +640,7 @@ class TenantController extends Controller
         }
     }
 
-    /** @return list<array{id: int, name: string, email: string, created_at: ?string}> */
+    /** @return list<array{id: int, name: string, email: string, username: string, password: ?string, created_at: ?string}> */
     private function portalAdmins(Tenant $tenant, string $role): array
     {
         try {
@@ -564,14 +650,22 @@ class TenantController extends Controller
                     return [];
                 }
 
+                $hasPlain = \Illuminate\Support\Facades\Schema::hasColumn('users', 'plain_password');
+                $columns = ['id', 'name', 'email', 'username', 'created_at'];
+                if ($hasPlain) {
+                    $columns[] = 'plain_password';
+                }
+
                 return User::role($role)
                     ->where('tenant_id', $tenant->id)
                     ->orderBy('name')
-                    ->get(['id', 'name', 'email', 'created_at'])
+                    ->get($columns)
                     ->map(fn (User $user) => [
                         'id'         => $user->id,
                         'name'       => $user->name,
                         'email'      => $user->email,
+                        'username'   => $user->email ?: ($user->username ?? ''),
+                        'password'   => $hasPlain ? ($user->plain_password ?: null) : null,
                         'created_at' => $user->created_at?->toIso8601String(),
                     ])
                     ->all();

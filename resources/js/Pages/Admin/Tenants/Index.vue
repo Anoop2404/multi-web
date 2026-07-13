@@ -22,7 +22,7 @@
             <div class="flex flex-wrap gap-3 items-end">
                 <div class="flex-1 min-w-[200px]">
                     <label class="text-xs font-semibold text-gray-600">Search</label>
-                    <input v-model="filterForm.search" type="search" placeholder="Name, domain, subdomain…"
+                    <input v-model="filterForm.search" type="search" placeholder="Name, domain, subdomain, or login email…"
                            class="field mt-1 text-sm">
                 </div>
                 <div>
@@ -44,6 +44,8 @@
                         <th class="px-4 py-3 text-left">Name</th>
                         <th v-if="tenantType === 'school'" class="px-4 py-3 text-left">Sahodaya</th>
                         <th v-else class="px-4 py-3 text-left">Schools</th>
+                        <th class="px-4 py-3 text-left">Username</th>
+                        <th class="px-4 py-3 text-left">Password</th>
                         <th class="px-4 py-3 text-left">Custom Domain</th>
                         <th class="px-4 py-3 text-left">Subdomain</th>
                         <th class="px-4 py-3 text-left">Status</th>
@@ -52,7 +54,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <tr v-if="!tenants.data.length">
-                        <td colspan="7" class="px-4 py-8 text-center text-gray-400">
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-400">
                             No {{ tenantType === 'sahodaya' ? 'Sahodaya clusters' : 'schools' }} match your filters.
                         </td>
                     </tr>
@@ -63,6 +65,13 @@
                         </td>
                         <td v-else class="px-4 py-3 text-gray-500 text-xs">
                             {{ tenant.children_count ?? 0 }}
+                        </td>
+                        <td class="px-4 py-3 font-mono text-xs text-gray-800 select-all">
+                            {{ tenant.login_username || '—' }}
+                        </td>
+                        <td class="px-4 py-3 font-mono text-xs select-all">
+                            <span v-if="tenant.login_password" class="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">{{ tenant.login_password }}</span>
+                            <span v-else class="text-amber-600">—</span>
                         </td>
                         <td class="px-4 py-3">
                             <a v-if="tenant.domain" :href="tenantPublicUrl(tenant)" target="_blank" rel="noopener"

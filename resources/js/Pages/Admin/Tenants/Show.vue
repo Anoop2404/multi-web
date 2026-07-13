@@ -168,9 +168,10 @@
                         <input type="file" accept="image/*" @change="onLogoSelected"
                                class="text-sm text-gray-600 max-w-xs">
                         <button type="submit" :disabled="!logoForm.logo || logoForm.processing"
-                                class="px-4 py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-50">
-                            Upload
+                                class="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                            {{ logoForm.processing ? 'Saving…' : 'Save logo' }}
                         </button>
+                        <p v-if="logoForm.errors.logo" class="w-full text-xs text-red-500">{{ logoForm.errors.logo }}</p>
                     </form>
                 </div>
             </div>
@@ -298,14 +299,19 @@
                         <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                             <tr>
                                 <th class="px-4 py-2.5 font-semibold">Name</th>
-                                <th class="px-4 py-2.5 font-semibold">Email</th>
+                                <th class="px-4 py-2.5 font-semibold">Username (login)</th>
+                                <th class="px-4 py-2.5 font-semibold">Password</th>
                                 <th class="px-4 py-2.5 font-semibold text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
                             <tr v-for="admin in portalAdmins" :key="admin.id">
                                 <td class="px-4 py-3 font-medium text-gray-800">{{ admin.name }}</td>
-                                <td class="px-4 py-3 font-mono text-gray-600 text-xs">{{ admin.email }}</td>
+                                <td class="px-4 py-3 font-mono text-gray-800 text-xs select-all">{{ admin.username || admin.email }}</td>
+                                <td class="px-4 py-3 font-mono text-xs select-all">
+                                    <span v-if="admin.password" class="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">{{ admin.password }}</span>
+                                    <span v-else class="text-amber-700" title="Set or reset the password below to store a recoverable copy">Not stored — set a new password to show</span>
+                                </td>
                                 <td class="px-4 py-3 text-right space-x-2">
                                     <button type="button" @click="editAdmin(admin)"
                                             class="link-brand text-xs">
@@ -319,6 +325,9 @@
                             </tr>
                         </tbody>
                     </table>
+                    <p class="px-4 py-2 text-[11px] text-slate-500 bg-slate-50 border-t border-gray-100">
+                        Passwords are shown in plain text for superadmin recovery. Updating the password here stores a new recoverable copy.
+                    </p>
                 </div>
 
                 <form @submit.prevent="saveAdmin" class="space-y-4 max-w-lg">
