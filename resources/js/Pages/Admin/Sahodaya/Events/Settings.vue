@@ -9,10 +9,6 @@
 
         <EventSettingsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event" :active-tab="activeTab" />
 
-        <SportsSetupSubNav v-if="event.event_type === 'sports'"
-                           :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event"
-                           :active="sportsSetupActive" class="mb-4" />
-
         <ParticipationTab v-if="activeTab === 'participation'" />
         <EligibilityTab v-else-if="activeTab === 'eligibility'" />
         <LocksTab v-else-if="activeTab === 'locks'" />
@@ -53,7 +49,6 @@ import FeesTab from './Settings/Tabs/FeesTab.vue';
 import RegistrationTab from './Settings/Tabs/RegistrationTab.vue';
 import NumberingTab from './Settings/Tabs/NumberingTab.vue';
 import CloneTab from './Settings/Tabs/CloneTab.vue';
-import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -101,16 +96,6 @@ const props = defineProps({
 
 const ctx = useEventSettingsForms(props);
 const { settingsDescription, activeTab } = ctx;
-
-const sportsSetupActive = computed(() => {
-    const map = {
-        fees: 'fees',
-        points: 'rank-points',
-        registration: 'registration',
-        numbering: 'numbering',
-    };
-    return map[activeTab.value] ?? 'settings';
-});
 
 const isSports = computed(() => props.event.event_type === 'sports');
 const backHref = computed(() => (

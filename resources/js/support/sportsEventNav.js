@@ -1,6 +1,14 @@
 /**
  * Sports fest — sidebar sections (Sahodaya admin, inside one event).
- * Setup detail tabs live in SportsSetupSubNav (horizontal), not duplicated here.
+ *
+ * SportsSetupSubNav (horizontal) plays the same role for sports that EventSubNav
+ * plays for other event types, so its Setup hub/Item heads/Items/Item listing tabs
+ * intentionally mirror the "Competition" section below for pages that render it —
+ * keep labels identical between the two (see SportsSetupSubNav.vue) so the same
+ * destination never reads as two different things. It does NOT render on the
+ * Settings page — EventSettingsSubNav is the single nav there for Fee settings/
+ * Rank points/Registration windows/Chest numbering/etc, to avoid stacking two
+ * tab bars with overlapping links on the same screen.
  */
 
 import {
@@ -33,7 +41,7 @@ export function sportsEventSidebarNav(base, caps) {
     groups.push({
         section: 'Competition',
         items: [
-            { label: 'Item heads & scheduling', href: `${base}/competition`, icon: 'layers', permissions: FEST_VIEW },
+            { label: 'Item heads', href: `${base}/competition`, icon: 'layers', permissions: FEST_VIEW },
             { label: 'Items under heads', href: `${base}/items`, icon: 'list', permissions: FEST_SETTINGS },
             { label: 'Item listing', href: `${base}/items/list`, icon: 'clipboard', permissions: FEST_VIEW },
             { label: 'All registrations', href: `${base}/registrations`, icon: 'inbox', permissions: FEST_REGISTRATIONS },

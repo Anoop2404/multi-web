@@ -37,9 +37,13 @@ const tabs = computed(() => {
     }
 
     list.push(
+        // Labels below match EventSettingsSubNav's tab names exactly (see
+        // sahodayaEventCapabilities.js::settingsTabsForEvent) so following a link
+        // here lands on a Settings tab with the same name you clicked, not a
+        // differently-worded one.
         { key: 'rank-points', label: 'Rank points', href: `${base.value}/settings/points` },
-        { key: 'registration', label: 'Reg. windows', href: `${base.value}/settings/registration` },
-        { key: 'numbering', label: 'Numbering', href: `${base.value}/settings/numbering` },
+        { key: 'registration', label: 'Registration windows', href: `${base.value}/settings/registration` },
+        { key: 'numbering', label: 'Chest numbering', href: `${base.value}/settings/numbering` },
         { key: 'settings', label: 'All settings', href: `${base.value}/settings` },
     );
 
