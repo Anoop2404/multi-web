@@ -38,7 +38,8 @@
         </div>
 
         <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-            <table class="w-full text-sm">
+            <div class="overflow-x-auto">
+            <table class="w-full text-sm min-w-[900px]">
                 <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
                     <tr>
                         <th class="px-4 py-3 text-left">Name</th>
@@ -107,6 +108,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
             <div v-if="tenants.links?.length > 3" class="px-4 py-3 border-t border-gray-100 flex flex-wrap gap-1">
                 <Link v-for="link in tenants.links" :key="link.label"
                       :href="link.url || '#'"
