@@ -17,6 +17,7 @@
                           :selected-item-id="itemFilter"
                           :hub-url="`${programBase}/reports/${event.id}`"
                           :participant-counts-by-item="participantCountsByItem"
+                          :is-sports="event.event_type === 'sports'"
                           @view-participants="openParticipantsModal" />
 
         <div v-if="!headFilter" class="mb-4">
@@ -54,7 +55,7 @@
         </div>
 
         <section v-if="headSummary?.length && !headFilter" class="mb-8">
-            <h3 class="section-title mb-3">Summary by item head</h3>
+            <h3 class="section-title mb-3">{{ event.event_type === 'sports' ? 'Summary by Event Head' : 'Summary by item head' }}</h3>
             <div class="card overflow-hidden p-0">
                 <table class="data-table">
                     <thead>

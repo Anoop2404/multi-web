@@ -4,7 +4,7 @@
         <PageHeader :title="`${event.title} — Mark entry`" eyebrow="Scoring"
                     :description="filterDescription">
             <template #actions>
-                <Link v-if="competitionUrl" :href="competitionUrl" class="btn-secondary shrink-0 text-sm">← By item head</Link>
+                <Link v-if="competitionUrl" :href="competitionUrl" class="btn-secondary shrink-0 text-sm">← {{ isSports ? 'By Event Head' : 'By item head' }}</Link>
                 <Link :href="importUrl" class="btn-secondary shrink-0">Import marks</Link>
             </template>
         </PageHeader>
@@ -255,7 +255,7 @@ const filterDescription = computed(() => {
     }
     if (props.selectedHeadId) {
         return isSports.value
-            ? 'Filtered by item head — one heat sheet per item with attendance and measurements.'
+            ? 'Filtered by Event Head — one heat sheet per item with attendance and measurements.'
             : 'Filtered by item head — enter grades, points, and measurements for approved participants.';
     }
     return isSports.value

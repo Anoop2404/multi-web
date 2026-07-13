@@ -20,7 +20,7 @@
         </div>
         <div>
             @if(!empty($config['map_embed']))
-            <div class="rounded-xl overflow-hidden shadow-lg">{!! $config['map_embed'] !!}</div>
+            <div class="rounded-xl overflow-hidden shadow-lg">{!! \App\Support\HtmlSanitizer::embed($config['map_embed'] ?? '') !!}</div>
             @endif
         </div>
     </div>

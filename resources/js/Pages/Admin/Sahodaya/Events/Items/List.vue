@@ -2,11 +2,13 @@
     <SahodayaEventsLayout :title="`${event.title} — Item listing`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Item listing`" eyebrow="Items under heads"
-                    description="Review every item, see its master values, and move items between item heads.">
+                    :description="isSports
+                        ? 'Review every item, see its master values, and move items between Event Heads.'
+                        : 'Review every item, see its master values, and move items between item heads.'">
             <template #actions>
                 <button type="button" class="btn-primary text-xs" @click="openAddItem()">Add item</button>
-                <button v-if="isSports" type="button" class="btn-secondary text-xs" @click="openAddHead()">Add head</button>
-                <Link v-if="isSports" :href="`${base}/competition`" class="btn-secondary text-xs">Item heads & scheduling</Link>
+                <button v-if="isSports" type="button" class="btn-secondary text-xs" @click="openAddHead()">Add Event Head</button>
+                <Link v-if="isSports" :href="`${base}/competition`" class="btn-secondary text-xs">Event Heads & scheduling</Link>
                 <Link :href="`${base}/items`" class="btn-secondary text-xs">Add / edit items</Link>
                 <Link v-if="catalogMasterUrl" :href="catalogMasterUrl" class="btn-secondary text-xs">Catalog master</Link>
             </template>
@@ -30,7 +32,7 @@
                 <input v-model="searchQuery" type="search" class="field flex-1 min-w-[12rem] max-w-md"
                        placeholder="Search by item, code, head, venue, discipline…" autocomplete="off">
                 <select v-if="isSports" v-model="headFilter" class="field max-w-xs">
-                    <option value="">All item heads</option>
+                    <option value="">All Event Heads</option>
                     <option v-for="head in itemHeads" :key="head.id" :value="String(head.id)">{{ head.name }}</option>
                     <option value="other">Unassigned items</option>
                 </select>
@@ -49,7 +51,7 @@
             </div>
             <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span class="font-semibold text-slate-700">{{ filteredItems.length }} / {{ flatItems.length }} items</span>
-                <span v-if="isSports">Grouped by item head. Use “Move head” to transfer an item from one head to another.</span>
+                <span v-if="isSports">Grouped by Event Head. Use “Move Event Head” to transfer an item from one head to another.</span>
             </div>
         </section>
 
@@ -67,11 +69,11 @@
                         <div v-if="group.headId" class="flex flex-wrap items-center gap-3">
                             <button type="button" class="text-xs font-semibold text-slate-600 hover:text-indigo-700 hover:underline"
                                     @click="openEditHead(group.headId)">
-                                Edit head
+                                Edit Event Head
                             </button>
                             <button type="button" class="text-xs font-semibold text-indigo-600 hover:underline"
                                     @click="openAddItem(group.headId)">
-                                Add item under this head →
+                                Add item under this Event Head →
                             </button>
                         </div>
                     </div>
@@ -131,7 +133,7 @@
                                             Edit
                                         </button>
                                         <button v-if="canEdit(item)" type="button" class="text-xs font-semibold text-indigo-600" @click="openEdit(item, true)">
-                                            Move head
+                                            Move Event Head
                                         </button>
                                         <span v-else class="text-xs text-amber-600">State item</span>
                                     </td>
@@ -192,13 +194,13 @@
         <div v-if="headModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="closeHeadModal">
             <form @submit.prevent="saveHead" class="card w-full max-w-lg shadow-xl space-y-4">
                 <div>
-                    <h3 class="section-title">{{ editingHeadId ? 'Edit item head' : 'Add item head' }}</h3>
+                    <h3 class="section-title">{{ editingHeadId ? 'Edit Event Head' : 'Add Event Head' }}</h3>
                     <p class="section-desc text-xs mt-1">
                         Heads group sports items for ID cards, schedules, reports, and registration flow.
                     </p>
                 </div>
 
-                <FormField label="Head name">
+                <FormField label="Event Head name">
                     <input v-model="headForm.name" class="field" required placeholder="e.g. Athletics">
                 </FormField>
                 <FormField label="Sport discipline">
@@ -213,13 +215,13 @@
 
                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
                     After saving, add items under this head or schedule the head from
-                    <Link :href="`${base}/competition`" class="link-brand">Item heads & scheduling →</Link>
+                    <Link :href="`${base}/competition`" class="link-brand">Event Heads & scheduling →</Link>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" @click="closeHeadModal" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary" :disabled="headForm.processing">
-                        {{ editingHeadId ? 'Save head' : 'Add head' }}
+                        {{ editingHeadId ? 'Save Event Head' : 'Add Event Head' }}
                     </button>
                 </div>
             </form>
@@ -230,7 +232,7 @@
                 <div>
                     <h3 class="section-title">Add item</h3>
                     <p class="section-desc text-xs mt-1">
-                        Add an event-specific item and place it under the correct item head.
+                        Add an event-specific item and place it under the correct Event Head.
                     </p>
                 </div>
 
@@ -238,7 +240,7 @@
                     <FormField label="Item name" class-extra="sm:col-span-2">
                         <input v-model="addForm.title" class="field" required placeholder="e.g. U14 — 100m Girls">
                     </FormField>
-                    <FormField v-if="isSports && itemHeads.length" label="Item head">
+                    <FormField v-if="isSports && itemHeads.length" label="Event Head">
                         <select v-model="addForm.head_id" class="field">
                             <option value="">Unassigned</option>
                             <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
@@ -335,7 +337,7 @@
                     <FormField label="Enabled for this event">
                         <CheckboxField v-model="editForm.is_enabled" label="Schools can register for this item" />
                     </FormField>
-                    <FormField v-if="isSports && itemHeads.length" label="Item head">
+                    <FormField v-if="isSports && itemHeads.length" label="Event Head">
                         <select v-model="editForm.head_id" class="field">
                             <option value="">Unassigned</option>
                             <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
@@ -461,8 +463,8 @@ const dropdownMastersUrl = computed(() => `${props.taxonomyMastersUrl}?dimension
 
 const setupCards = computed(() => [
     {
-        eyebrow: '1. Item heads',
-        title: 'Item head master',
+        eyebrow: '1. Event Heads',
+        title: 'Event Head master',
         description: 'Create heads like Athletics, Chess, Aquatics and set head-level schedule.',
         href: `${base}/competition`,
     },

@@ -81,7 +81,7 @@ class AnnualRegistrationController extends SchoolAdminController
         $profilePayload = $profile ? array_merge($profile->toArray(), [
             'payment_details_text' => $profile->paymentDetailsText(),
             'membership_fee_configured' => $profile->membershipFeeConfigured($academicYear),
-            'requires_membership_payment' => $profile->requiresMembershipPayment(),
+            'requires_membership_payment' => $profile->requiresMembershipPaymentForSchool($this->school),
         ]) : null;
 
         $feeNotConfigured = $profile && ! $profile->membershipFeeConfigured($academicYear);

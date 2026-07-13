@@ -51,7 +51,7 @@ const steps = computed(() => {
             {
                 num: 2,
                 key: 'competition',
-                label: 'Item heads',
+                label: 'Event Heads',
                 href: `${eventBase.value}/competition`,
             },
             {

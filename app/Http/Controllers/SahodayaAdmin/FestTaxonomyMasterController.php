@@ -40,7 +40,7 @@ class FestTaxonomyMasterController extends SahodayaAdminController
         $data = $request->validate([
             'dimension'  => ['required', Rule::in(array_keys(FestTaxonomyMaster::DIMENSIONS))],
             'entry_key'  => [
-                'required', 'string', 'max:60', 'regex:/^[a-z0-9_]+$/',
+                'required', 'string', 'max:60', 'regex:/^[a-z0-9_.]+$/',
                 Rule::unique('fest_taxonomy_masters', 'entry_key')
                     ->where('tenant_id', $this->sahodaya->id)
                     ->where('dimension', $dimension),
@@ -115,6 +115,7 @@ class FestTaxonomyMasterController extends SahodayaAdminController
             'participant_type'   => 'participant_type',
             'stage_type'         => 'stage_type',
             'arts_category'      => 'category',
+            'class_group'        => 'class_group',
             'gender'             => 'gender',
             default              => null,
         };

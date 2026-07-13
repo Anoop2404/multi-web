@@ -187,7 +187,7 @@ class FestItemHeadController extends SahodayaAdminController
             'max_teams' => $intNullable('max_teams'),
         ]);
 
-        $audit->festEvent($event, FestPageActivity::SETTINGS, 'fest.item_head.created', "Item head created: {$head->name}", [
+        $audit->festEvent($event, FestPageActivity::SETTINGS, 'fest.item_head.created', "Event Head created: {$head->name}", [
             'head_id' => $head->id,
             'school_registration_fee' => $head->school_registration_fee,
             'student_registration_fee' => $head->student_registration_fee,
@@ -200,7 +200,7 @@ class FestItemHeadController extends SahodayaAdminController
             'max_teams' => $head->max_teams,
         ]);
 
-        return back()->with('success', 'Item head added with its fee settings.');
+        return back()->with('success', 'Event Head added with its fee settings.');
     }
 
     public function sync(string $tenantId, FestEvent $event, FestItemHeadService $service)
@@ -210,7 +210,7 @@ class FestItemHeadController extends SahodayaAdminController
         $service->ensureCatalogHeads($this->sahodaya->id, $event->event_type);
         $count = $service->syncEventHeads($event);
 
-        return back()->with('success', "Synced {$count} item head(s) to this event.");
+        return back()->with('success', "Synced {$count} Event Head(s) to this event.");
     }
 
     public function destroy(string $tenantId, FestEvent $event, FestItemHead $head, PlatformAuditLogger $audit)
@@ -224,11 +224,11 @@ class FestItemHeadController extends SahodayaAdminController
         $head->items()->where('event_id', $event->id)->update(['head_id' => null]);
         $head->delete();
 
-        $audit->festEvent($event, FestPageActivity::COMPETITION, 'fest.item_head.deleted', "Item head removed: {$name}");
+        $audit->festEvent($event, FestPageActivity::COMPETITION, 'fest.item_head.deleted', "Event Head removed: {$name}");
 
         return redirect()->route('sahodaya.events.competition.index', [
             'tenantId' => $tenantId,
             'event' => $event->id,
-        ])->with('success', 'Item head removed.');
+        ])->with('success', 'Event Head removed.');
     }
 }

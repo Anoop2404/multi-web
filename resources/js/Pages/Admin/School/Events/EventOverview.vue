@@ -51,8 +51,8 @@
             <HubCard :href="eventRegistrationHref" icon="📝"
                      :label="isSports ? 'Step 1 · Register students' : 'Register students'"
                      :hint="isSports ? 'Add athletes to this event & pay fees' : 'Add participants & pay fees'" />
-            <HubCard v-if="isSports" :href="itemRegistrationHref" icon="🏃" label="Step 2 · Register by item head"
-                     hint="Pick a head (Athletics, Field, Relay…) and add athletes to its items" />
+            <HubCard v-if="isSports" :href="itemRegistrationHref" icon="🏃" label="Step 2 · Register by Event Head"
+                     hint="Pick an Event Head (Athletics, Field, Relay…) and add athletes to its items" />
             <HubCard :href="reportsHref" icon="📋" label="Reports & ID cards" hint="Admit cards, ID cards, exports" />
             <HubCard :href="clashHref" icon="⚠️" label="Clash requests" hint="Report schedule conflicts" />
             <HubCard :href="substitutionHref" icon="🔄" label="Substitutions" hint="Request participant swaps" />
@@ -61,7 +61,7 @@
 
         <section v-if="eventHeadNav?.headItemGroups?.length" class="card space-y-4">
             <div>
-                <h3 class="section-title text-base">Item heads</h3>
+                <h3 class="section-title text-base">{{ isSports ? 'Event Heads' : 'Item heads' }}</h3>
                 <p class="text-sm text-slate-500 mt-1">
                     {{ isSports
                         ? 'Jump straight into registering students for a specific head, or view its reports.'

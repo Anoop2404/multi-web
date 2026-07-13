@@ -57,5 +57,16 @@ class FestSportsChecklistTest extends TestCase
         $this->assertTrue($heads['done']);
 
         $this->assertNull(collect($checklist)->firstWhere('key', 'state_remittance'));
+
+        $numbering = collect($checklist)->firstWhere('key', 'numbering');
+        $this->assertNotNull($numbering);
+        $this->assertFalse($numbering['done'], 'Unset numbering_settings must not count as configured');
+
+        $itemFees = collect($checklist)->firstWhere('key', 'item_fees');
+        $this->assertTrue($itemFees['optional'] ?? false);
+        $this->assertFalse($itemFees['done'], 'Optional item overrides should not pretend to be complete');
+
+        $feeOverride = collect($checklist)->firstWhere('key', 'fees');
+        $this->assertTrue($feeOverride['optional'] ?? false);
     }
 }

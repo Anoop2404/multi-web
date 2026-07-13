@@ -29,7 +29,7 @@
                 <section v-for="[catKey, items] in filteredGroups" :key="catKey" class="mb-8">
                     <h3 class="section-title mb-3 flex items-center gap-2">
                         <span aria-hidden="true">{{ categoryMeta[catKey]?.icon }}</span>
-                        {{ categoryMeta[catKey]?.label ?? catKey }}
+                        {{ reportCategoryLabel(catKey, event.event_type === 'sports') }}
                         <span class="text-xs font-normal text-slate-400">({{ items.length }})</span>
                     </h3>
                     <div class="space-y-3">
@@ -42,6 +42,7 @@
                                           :heads="heads"
                                           :stages="stages"
                                           :class-groups="classGroups"
+                                          :is-sports="event.event_type === 'sports'"
                                           @update:param="({ key, value }) => params[exp.id][key] = value" />
                     </div>
                 </section>
@@ -65,6 +66,7 @@ import {
     REPORT_PHASES,
     groupExportsByCategory,
     filterReportsByQuery,
+    reportCategoryLabel,
 } from '@/support/festReportCatalog.js';
 
 const props = defineProps({

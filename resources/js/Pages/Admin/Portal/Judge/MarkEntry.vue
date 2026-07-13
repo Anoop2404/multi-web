@@ -16,7 +16,8 @@
                           :base-url="marksBaseUrl"
                           :selected-head-id="selectedHeadId"
                           :selected-item-id="selectedItemId"
-                          :show-item-links="true" />
+                          :show-item-links="true"
+                          :is-sports="true" />
 
         <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
             You are entering <strong>your judge scores</strong>. When all judges for an item have scored a participant, the official mark is averaged automatically.
@@ -26,7 +27,7 @@
         </p>
 
         <p v-if="!registrations.length" class="text-sm text-slate-500 py-6 text-center">
-            No participants in this section. Pick another item head above.
+            No participants in this section. Pick another {{ isSports ? 'Event Head' : 'item head' }} above.
         </p>
 
         <div v-for="reg in registrations" :key="reg.id" class="card mb-4">

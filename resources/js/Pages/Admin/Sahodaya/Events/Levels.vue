@@ -19,7 +19,7 @@
                 </form>
                 <form v-if="event.conduct_levels?.includes('school') && schoolRoundCount > 0" @submit.prevent="promoteAllSchoolRounds" class="space-y-1">
                     <button type="submit" class="btn-primary w-full text-sm">Promote all school-round winners</button>
-                    <p class="form-hint">Only rounds with published results are included.</p>
+                    <p class="form-hint">Only rounds with published results are included. Per-item tie-break (lot draw / include ties / manual) is set on Items.</p>
                 </form>
                 <form v-if="event.conduct_levels?.includes('school')" @submit.prevent="spawnSchoolRounds">
                     <button type="submit" class="btn-secondary w-full text-sm">Create school rounds ({{ schoolRoundCount }} exist)</button>

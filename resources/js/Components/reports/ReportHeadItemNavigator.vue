@@ -124,7 +124,7 @@
 
         <!-- Invalid head in URL -->
         <section v-else-if="selectedHeadId && !selectedItemId && !selectedHead">
-            <EmptyState title="Section not found" description="That item head is missing or was removed." icon="📂">
+            <EmptyState title="Section not found" :description="isSports ? 'That Event Head is missing or was removed.' : 'That item head is missing or was removed.'" icon="📂">
                 <template #action>
                     <Link :href="baseUrl" class="btn-secondary text-sm inline-flex">← Back</Link>
                 </template>
@@ -160,6 +160,7 @@ const props = defineProps({
     showResultStats: { type: Boolean, default: false },
     hint: { type: String, default: '' },
     emptyHeadsText: { type: String, default: 'Add items to this event from the catalog, then return here.' },
+    isSports: { type: Boolean, default: false },
 });
 
 const { groups: navGroups, selectedHead, selectedItem } = useHeadItemNav(props);
@@ -182,7 +183,9 @@ const displayHint = computed(() => {
     }
     return flatItemsMode.value
         ? 'Select a competition item to continue.'
-        : 'Events are organized by item head — pick a section first, then an item.';
+        : (props.isSports
+            ? 'Events are organized by Event Head — pick a section first, then an item.'
+            : 'Events are organized by item head — pick a section first, then an item.');
 });
 
 function headUrl(headId) {

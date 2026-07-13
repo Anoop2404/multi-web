@@ -33,13 +33,14 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     protected $fillable = [
         'id', 'type', 'name', 'domain', 'subdomain',
         'parent_id', 'plan', 'is_active', 'fest_registration_closed',
-        'school_prefix', 'membership_status', 'renewal_status', 'application_payload', 'prefixes_locked',
+        'school_prefix', 'membership_status', 'is_non_affiliated', 'renewal_status', 'application_payload', 'prefixes_locked',
         'school_setup_wizard_dismissed', 'nav_overrides',
     ];
 
     protected $casts = [
         'is_active'                 => 'boolean',
         'fest_registration_closed'  => 'boolean',
+        'is_non_affiliated'         => 'boolean',
         'data'                      => 'array',
         'application_payload'       => 'array',
         'nav_overrides'             => 'array',
@@ -52,7 +53,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return [
             'id', 'type', 'name', 'domain', 'subdomain', 'parent_id', 'plan', 'is_active',
             'fest_registration_closed',
-            'school_prefix', 'membership_status', 'renewal_status', 'application_payload', 'prefixes_locked',
+            'school_prefix', 'membership_status', 'is_non_affiliated', 'renewal_status', 'application_payload', 'prefixes_locked',
             'school_setup_wizard_dismissed', 'nav_overrides',
         ];
     }

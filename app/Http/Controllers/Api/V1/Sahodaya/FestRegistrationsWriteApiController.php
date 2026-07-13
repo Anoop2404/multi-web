@@ -40,8 +40,15 @@ class FestRegistrationsWriteApiController extends SahodayaApiController
 
         EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
 
+        $registration->loadMissing('item');
+        $headId = $registration->item?->head_id;
+
         $registration->update(['status' => 'rejected']);
         app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
+
+        if ($headId) {
+            app(FestRegistrationApprovalService::class)->promoteNextWaitlisted($event, (int) $headId);
+        }
 
         return response()->json(['data' => ['status' => 'rejected']]);
     }

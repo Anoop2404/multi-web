@@ -4,7 +4,7 @@
             <Link v-if="isSports" :href="`${base}/reports/by-head`"
                   class="reports-tab"
                   :class="{ 'reports-tab--active': active === 'by-head' }">
-                <span aria-hidden="true">📂</span> By item head
+                <span aria-hidden="true">📂</span> By Event Head
             </Link>
             <Link :href="`${base}/reports${isSports ? '?all=1' : ''}`"
                   class="reports-tab"
@@ -29,7 +29,7 @@
         <Link v-if="active !== 'hub' && active !== 'by-head'"
               :href="isSports ? `${base}/reports/by-head` : `${base}/reports`"
               class="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-indigo-600">
-            ← {{ isSports ? 'Reports by item head' : 'All report types' }}
+            ← {{ isSports ? 'Reports by Event Head' : 'All report types' }}
         </Link>
     </div>
 </template>

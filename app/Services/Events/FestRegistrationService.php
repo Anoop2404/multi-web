@@ -18,9 +18,16 @@ class FestRegistrationService
             'This registration\'s fee has already been paid and approved — it can no longer be cancelled.',
         );
 
+        $registration->loadMissing('item');
+        $headId = $registration->item?->head_id;
+
         $registration->update(['status' => 'withdrawn']);
 
         app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
+
+        if ($headId) {
+            app(FestRegistrationApprovalService::class)->promoteNextWaitlisted($event, (int) $headId);
+        }
 
         if ($notify) {
             app(FestEventNotifier::class)->registrationWithdrawn($registration);
@@ -29,7 +36,7 @@ class FestRegistrationService
 
     public function canSchoolCancel(FestRegistration $registration, FestEvent $event): bool
     {
-        if (! in_array($registration->status, ['submitted', 'approved'], true)) {
+        if (! in_array($registration->status, ['submitted', 'approved', 'pending_approval', 'waitlisted'], true)) {
             return false;
         }
 

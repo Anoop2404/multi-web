@@ -274,6 +274,12 @@ class FestReportService
                 $request->integer('head_id') ?: null,
                 $request->input('school_id'),
             ),
+            'area-wise-participants' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportAreaWiseParticipants(
+                $request->input('area_id') !== null && $request->input('area_id') !== ''
+                    ? ($request->input('area_id') === 'other' ? 0 : $request->integer('area_id'))
+                    : null,
+                $request->input('school_id'),
+            ),
             'team-squad-sheets' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->teamSquadPdf($request->input('school_id')),
             'medal-tally' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->medalTallyPdf(),
             'assignment-completeness' => app(FestEventReportAnalyticsService::class, ['event' => $this->event])->exportAssignmentCompleteness($request->input('school_id')),

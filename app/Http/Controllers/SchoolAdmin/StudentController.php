@@ -503,7 +503,12 @@ class StudentController extends SchoolAdminController
         abort_if($student->tenant_id !== $this->school->id, 403);
         $this->assertCanEditStudents();
 
-        $data = $this->validatedStudentBasicUpdate($request);
+        $data = $this->validatedStudentBasicUpdate($request, $student);
+        if (array_key_exists('admission_number', $data)) {
+            $data['admission_number'] = filled($data['admission_number'] ?? null)
+                ? trim((string) $data['admission_number'])
+                : null;
+        }
         $before = $student->only(array_keys($data));
 
         if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
@@ -885,11 +890,12 @@ class StudentController extends SchoolAdminController
                 'required',
                 Rule::exists('school_classes', 'id')->where('tenant_id', $this->school->id),
             ],
-            'name'         => 'required|string|max:255',
-            'gender'       => 'required|in:male,female,other',
-            'dob'          => 'required|date|before:today',
-            'email'        => 'nullable|email|max:255',
-            'photo'        => 'required|image|max:2048',
+            'name'              => 'required|string|max:255',
+            'gender'            => 'required|in:male,female,other',
+            'dob'               => 'required|date|before:today',
+            'email'             => 'nullable|email|max:255',
+            'admission_number'  => $this->admissionNumberRules(),
+            'photo'             => 'required|image|max:2048',
         ]);
     }
 
@@ -899,20 +905,34 @@ class StudentController extends SchoolAdminController
         return app(StudentRecordCreator::class)->create($this->school, $fields, $photo);
     }
 
-    /** @return array{school_class_id: int, name: string, gender: string, dob: ?string, parent_email: ?string} */
-    private function validatedStudentBasicUpdate(Request $request): array
+    /** @return array{school_class_id: int, name: string, gender: string, dob: ?string, parent_email: ?string, admission_number?: ?string} */
+    private function validatedStudentBasicUpdate(Request $request, ?Student $student = null): array
     {
         return $request->validate([
             'school_class_id' => [
                 'required',
                 Rule::exists('school_classes', 'id')->where('tenant_id', $this->school->id),
             ],
-            'name'         => 'required|string|max:255',
-            'gender'       => 'required|in:male,female,other',
-            'dob'          => 'nullable|date|before_or_equal:today',
-            'parent_email' => 'nullable|email|max:255',
-            'photo'        => 'nullable|image|max:2048',
+            'name'             => 'required|string|max:255',
+            'gender'           => 'required|in:male,female,other',
+            'dob'              => 'nullable|date|before_or_equal:today',
+            'parent_email'     => 'nullable|email|max:255',
+            'admission_number' => $this->admissionNumberRules($student),
+            'photo'            => 'nullable|image|max:2048',
         ]);
+    }
+
+    /** @return list<mixed> */
+    private function admissionNumberRules(?Student $ignore = null): array
+    {
+        $unique = Rule::unique('students', 'admission_number')
+            ->where(fn ($q) => $q->where('tenant_id', $this->school->id)->whereNull('deleted_at'));
+
+        if ($ignore) {
+            $unique->ignore($ignore->id);
+        }
+
+        return ['nullable', 'string', 'max:50', $unique];
     }
 
     private function studentPayload(Student $student): array
@@ -933,8 +953,9 @@ class StudentController extends SchoolAdminController
             'id'               => $student->id,
             'school_class_id'  => $student->school_class_id,
             'name'             => $student->name,
-            'reg_no'         => $student->reg_no,
-            'roll_number'    => $student->roll_number,
+            'reg_no'            => $student->reg_no,
+            'admission_number'  => $student->admission_number,
+            'roll_number'       => $student->roll_number,
             'gender'         => $student->gender,
             'dob'            => $student->dob?->format('Y-m-d'),
             'dob_display'    => $student->dob?->format('j M Y'),

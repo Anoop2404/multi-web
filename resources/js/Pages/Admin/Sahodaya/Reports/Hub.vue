@@ -2,7 +2,7 @@
     <SahodayaAdminLayout title="Reports hub" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader title="Reports hub" eyebrow="Reports"
-                    description="Operational reports by purpose, or open event-dedicated reports with item-head navigation.">
+                    description="Operational reports by purpose, or open event-dedicated reports with head navigation.">
         </PageHeader>
 
         <div class="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-1">
@@ -34,7 +34,7 @@
         <!-- Event-dedicated reports -->
         <div v-show="activeTab === 'event'">
             <p class="text-sm text-slate-600 mb-4">
-                Fest, sports, and kalotsav reports are scoped to a single event. Select an event, then open reports by purpose or item head.
+                Fest, sports, and kalotsav reports are scoped to a single event. Select an event, then open reports by purpose or head.
             </p>
 
             <form class="card !p-4 mb-6 flex flex-wrap gap-3 items-end" @submit.prevent="loadEvent">
@@ -63,6 +63,7 @@
 
                 <ReportHeadHubSection v-if="headWiseReportBase && (hasItemHeads || headSummary.length)"
                                       compact
+                                      :is-sports="selectedEvent?.event_type === 'sports'"
                                       :heads="headSummary"
                                       :head-item-groups="headItemGroups"
                                       :head-report-base="headWiseReportBase"
@@ -85,7 +86,7 @@
             </template>
 
             <EmptyState v-else title="Select an event" icon="📅"
-                        description="Sports meet and kalotsav reports — registrations, item heads, schedules, results — all live inside the event workspace." />
+                        description="Sports meet and kalotsav reports — registrations, heads, schedules, results — all live inside the event workspace." />
         </div>
 
         <!-- Cross-event summaries -->

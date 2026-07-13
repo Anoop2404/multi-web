@@ -461,19 +461,28 @@
                         </div>
 
                         <!-- Save row -->
-                        <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
+                        <div class="flex items-center gap-3 pt-2 border-t border-gray-100 flex-wrap">
                             <button @click="saveSection(section)"
                                     :disabled="saving[section.id]"
                                     class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
-                                {{ saving[section.id] ? 'Saving…' : 'Save Changes' }}
+                                {{ saving[section.id] ? 'Saving…' : 'Save draft' }}
+                            </button>
+                            <button @click="publishSection(section)"
+                                    :disabled="saving[section.id]"
+                                    class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
+                                Publish
                             </button>
                             <button @click="expandedId = null"
                                     class="px-4 py-2.5 border border-gray-200 text-sm text-gray-500 rounded-xl hover:bg-gray-50 transition">
                                 Cancel
                             </button>
-                            <a v-if="publicUrl" :href="publicUrl" target="_blank"
+                            <span v-if="section.has_unpublished_changes || section.status === 'draft'"
+                                  class="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg">
+                                Unpublished changes
+                            </span>
+                            <a v-if="publicUrl" :href="`${publicUrl.replace(/\/$/, '')}/preview-site`" target="_blank"
                                class="ml-auto text-xs text-purple-600 hover:underline font-semibold">
-                                Preview changes ↗
+                                Preview drafts ↗
                             </a>
                         </div>
                     </div>
@@ -871,7 +880,21 @@ async function saveSection(section) {
     saving[section.id] = true;
     try {
         const config = editConfigs[section.id] ?? section.config ?? {};
-        const updated = await apiPatch(`/sections/${section.id}`, { config });
+        const updated = await apiPatch(`/sections/${section.id}`, { config, status: 'draft' });
+        const idx = sections.value.findIndex(s => s.id === section.id);
+        if (idx !== -1) Object.assign(sections.value[idx], updated);
+        expandedId.value = null;
+    } finally {
+        saving[section.id] = false;
+    }
+}
+
+async function publishSection(section) {
+    saving[section.id] = true;
+    try {
+        const config = editConfigs[section.id] ?? section.config ?? {};
+        await apiPatch(`/sections/${section.id}`, { config, status: 'draft' });
+        const updated = await apiPost(`/sections/${section.id}/publish`, {});
         const idx = sections.value.findIndex(s => s.id === section.id);
         if (idx !== -1) Object.assign(sections.value[idx], updated);
         expandedId.value = null;

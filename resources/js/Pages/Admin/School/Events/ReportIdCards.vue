@@ -3,7 +3,9 @@
         <PageHeader
             :title="`Student ID Cards — ${event.title}`"
             :eyebrow="programLabel"
-            description="Item cards, head cards (one per item head with items listed), or a single event participant pass for your school."
+            :description="event.event_type === 'sports'
+                ? 'Item cards, head cards (one per Event Head with items listed), or a single event participant pass for your school.'
+                : 'Item cards, head cards (one per item head with items listed), or a single event participant pass for your school.'"
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
@@ -23,7 +25,7 @@
         </div>
 
         <div class="notice-banner notice-banner--info mb-6 max-w-3xl text-sm">
-            <strong>Head ID card</strong> — one lanyard per student per item head (e.g. Literary), with all items under that head listed on the card.
+            <strong>Head ID card</strong> — one lanyard per student per {{ event.event_type === 'sports' ? 'Event Head' : 'item head' }} (e.g. {{ event.event_type === 'sports' ? 'Athletics' : 'Literary' }}), with all items under that head listed on the card.
         </div>
 
         <div class="card max-w-3xl space-y-4 mb-6">
@@ -71,9 +73,9 @@
                 </select>
             </FormField>
 
-            <FormField v-if="cardScope === 'head'" label="Item head" required>
+            <FormField v-if="cardScope === 'head'" :label="event.event_type === 'sports' ? 'Event Head' : 'Item head'" required>
                 <select v-model="headId" class="field text-sm" @change="loadPreview">
-                    <option value="">Select item head…</option>
+                    <option value="">Select {{ event.event_type === 'sports' ? 'Event Head' : 'item head' }}…</option>
                     <option v-for="head in heads" :key="head.id" :value="String(head.id)">
                         {{ head.name }} ({{ head.count }} cards)
                     </option>
@@ -102,7 +104,7 @@
             </div>
 
             <div v-else-if="cardScope === 'head' && !headId" class="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                Choose an item head. Each card lists all items your students registered under that head.
+                Choose {{ event.event_type === 'sports' ? 'an Event Head' : 'an item head' }}. Each card lists all items your students registered under that head.
             </div>
 
             <div v-else-if="loading" class="text-sm text-slate-500 py-4">Loading preview…</div>

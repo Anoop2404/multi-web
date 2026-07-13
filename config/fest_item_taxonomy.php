@@ -88,6 +88,23 @@ return [
         'open'   => 'Open',
     ],
 
+    'participant_type' => [
+        'individual' => 'Individual',
+        'pair'       => 'Pair',
+        'trio'       => 'Trio',
+        'group'      => 'Group',
+        'team'       => 'Team',
+    ],
+
+    'result_method' => [
+        'marks'     => 'Marks / score',
+        'time'      => 'Time (faster wins)',
+        'distance'  => 'Distance / measurement',
+        'rank'      => 'Rank only',
+        'pass_fail' => 'Pass / fail',
+        'points'    => 'Points',
+    ],
+
     'sort_order' => [
         'kalolsavam' => ['stage_type', 'category', 'class_group', 'gender', 'title'],
         'sports'     => ['head_key', 'age_group', 'gender', 'title'],

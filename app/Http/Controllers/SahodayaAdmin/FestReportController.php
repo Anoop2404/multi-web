@@ -332,6 +332,36 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
+    public function areaWiseParticipants(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type === 'sports', 404);
+
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $areaId = $request->input('area_id') !== null && $request->input('area_id') !== ''
+            ? ($request->input('area_id') === 'other' ? 0 : $request->integer('area_id'))
+            : null;
+        $schoolId = $request->input('school_id') ?: null;
+
+        $areas = \App\Models\FestCompetitionArea::where('event_id', $event->id)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return $this->inertia('Sahodaya/Events/Reports/AreaWiseParticipants', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'summary'        => $analytics->areaWiseSummary($schoolId),
+            'rows'           => $analytics->areaWiseParticipantRows($areaId, $schoolId),
+            'areas'          => $areas,
+            'schools'        => (new FestReportService($event))->schools(),
+            'filterAreaId'   => $request->input('area_id') ?: null,
+            'filterSchoolId' => $schoolId,
+            'xlsUrl'         => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/area-wise-participants?'.http_build_query(array_filter([
+                'area_id'   => $request->input('area_id'),
+                'school_id' => $schoolId,
+            ])),
+        ])));
+    }
+
     public function ageGroupMatrix(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

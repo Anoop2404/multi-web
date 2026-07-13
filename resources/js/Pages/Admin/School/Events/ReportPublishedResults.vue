@@ -23,7 +23,8 @@
                           :base-url="base"
                           :selected-head-id="filterHeadId ?? headFilter"
                           :selected-item-id="filterItemId ?? itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`" />
+                          :hub-url="`${programBase}/reports/${event.id}`"
+                          :is-sports="event.event_type === 'sports'" />
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="card text-center">

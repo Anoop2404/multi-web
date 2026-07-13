@@ -48,7 +48,7 @@ const steps = computed(() => {
     ];
 
     if (props.isSports) {
-        list.push({ num: 3, key: 'items', label: 'By item head', href: `${eventBase.value}/items` });
+        list.push({ num: 3, key: 'items', label: 'By Event Head', href: `${eventBase.value}/items` });
     }
 
     list.push({

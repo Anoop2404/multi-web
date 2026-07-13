@@ -8,7 +8,9 @@ use App\Models\FestGroup;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestQualification;
+use App\Models\FestQualificationLotDraw;
 use App\Models\FestRegistration;
+use Illuminate\Support\Str;
 
 class FestQualificationService
 {
@@ -24,15 +26,18 @@ class FestQualificationService
     $items = FestEventItem::where('event_id', $fromEvent->id)->get();
 
     foreach ($items as $item) {
-      $limit = $item->qualify_count ?? 3;
+      $limit = max(1, (int) ($item->qualify_count ?? 3));
+      $mode = $item->tiebreak_mode ?: 'none';
 
-      $marks = FestMark::where('event_id', $fromEvent->id)
+      $allMarks = FestMark::where('event_id', $fromEvent->id)
         ->where('item_id', $item->id)
         ->whereNotNull('position')
-        ->where('position', '<=', $limit)
         ->with(['participant.registration.participants', 'participant.registration.groups'])
         ->orderBy('position')
+        ->orderBy('id')
         ->get();
+
+      $marks = $this->selectMarksForPromotion($allMarks, $limit, $mode, $fromEvent, $item, $toEvent);
 
       $targetItem = $this->matchingItem($toEvent, $item);
 
@@ -80,6 +85,87 @@ class FestQualificationService
     }
 
     return compact('promoted', 'skipped');
+  }
+
+  /**
+   * Apply tie-break policy when selecting who promotes (FRD-08 Phase 5).
+   *
+   * @param  \Illuminate\Support\Collection<int, FestMark>  $allMarks
+   * @return \Illuminate\Support\Collection<int, FestMark>
+   */
+  private function selectMarksForPromotion($allMarks, int $limit, string $mode, FestEvent $fromEvent, FestEventItem $item, FestEvent $toEvent)
+  {
+    if ($mode === 'none' || $mode === '' || $mode === null) {
+      return $allMarks->where('position', '<=', $limit)->values();
+    }
+
+    if ($mode === 'include_all_ties') {
+      // Anyone at or better than the Nth unique rank position.
+      $cutoffRank = $allMarks->pluck('position')->unique()->sort()->values()->take($limit)->last();
+
+      return $cutoffRank === null
+        ? collect()
+        : $allMarks->where('position', '<=', $cutoffRank)->values();
+    }
+
+    if ($mode === 'exclude_ties') {
+      $selected = collect();
+      foreach ($allMarks->groupBy('position')->sortKeys() as $position => $group) {
+        if ($selected->count() >= $limit) {
+          break;
+        }
+        if ($group->count() > 1 && $selected->count() + $group->count() > $limit) {
+          // Skip contested rank that would overflow quota.
+          continue;
+        }
+        if ($selected->count() + $group->count() <= $limit) {
+          $selected = $selected->concat($group);
+        }
+      }
+
+      return $selected->values();
+    }
+
+    if ($mode === 'lot_draw') {
+      $definite = $allMarks->where('position', '<', $limit)->values();
+      $slotsLeft = max(0, $limit - $definite->count());
+      $contested = $allMarks->where('position', $limit)->values();
+
+      if ($slotsLeft <= 0 || $contested->isEmpty()) {
+        return $definite->take($limit)->values();
+      }
+
+      if ($contested->count() <= $slotsLeft) {
+        return $definite->concat($contested)->values();
+      }
+
+      $seed = (string) Str::uuid();
+      $shuffled = $contested->shuffle();
+      $picked = $shuffled->take($slotsLeft)->values();
+
+      FestQualificationLotDraw::create([
+        'event_id' => $toEvent->id,
+        'item_id' => $item->id,
+        'from_event_id' => $fromEvent->id,
+        'cutoff_position' => $limit,
+        'contested_participant_ids' => $contested->pluck('participant_id')->all(),
+        'selected_participant_ids' => $picked->pluck('participant_id')->all(),
+        'method' => 'auto_random',
+        'seed' => $seed,
+        'drawn_by' => auth()->id(),
+        'drawn_at' => now(),
+        'notes' => "Auto lot-draw for {$slotsLeft} of {$contested->count()} tied at position {$limit}.",
+      ]);
+
+      return $definite->concat($picked)->values();
+    }
+
+    if ($mode === 'manual') {
+      abort(422, "Item \"{$item->title}\" requires a manual tie-break before promotion (tiebreak_mode=manual).");
+    }
+
+    // secondary_score / unknown → fall back to legacy position cutoff
+    return $allMarks->where('position', '<=', $limit)->values();
   }
 
   /** @return array{promoted: int, skipped: int, rounds_processed: int, rounds_skipped: int} */

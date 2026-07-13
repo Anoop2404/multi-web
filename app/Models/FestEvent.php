@@ -152,14 +152,28 @@ class FestEvent extends Model
     }
 
     /** Fest program types that are unique (one per Sahodaya per academic year). */
-    public static function singletonEventTypes(): array
+    public static function singletonEventTypes(?string $tenantId = null): array
     {
-        return ['kalolsavam', 'sports', 'kids_fest', 'teacher_fest', 'english_fest', 'science_fest'];
+        if ($tenantId) {
+            try {
+                return app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+                    ->forTenant($tenantId)
+                    ->singletonKeys();
+            } catch (\Throwable) {
+                // Fall through to config defaults when the master table is unavailable.
+            }
+        }
+
+        return collect(config('fest_competition_types', []))
+            ->filter(fn ($meta) => (bool) ($meta['is_singleton'] ?? false))
+            ->keys()
+            ->values()
+            ->all();
     }
 
-    public static function isSingletonType(?string $eventType): bool
+    public static function isSingletonType(?string $eventType, ?string $tenantId = null): bool
     {
-        return $eventType !== null && in_array($eventType, self::singletonEventTypes(), true);
+        return $eventType !== null && in_array($eventType, self::singletonEventTypes($tenantId), true);
     }
 
     public function scopeVisibleToSchool($q, string $schoolId)

@@ -2,10 +2,10 @@
     <SahodayaEventsLayout :title="`${event.title} — Reports`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <div class="reports-shell">
             <PageHeader :title="`${event.title} — Reports`" eyebrow="Analytics"
-                        description="Browse reports by item head, download phase packs, or explore all report types.">
+                        description="Browse reports by Event Head, download phase packs, or explore all report types.">
                 <template #actions>
                     <Link v-if="event.event_type === 'sports'" :href="`${reportsBase}/by-head`" class="btn-primary text-sm">
-                        By item head →
+                        By Event Head →
                     </Link>
                     <span v-if="currentPhase" class="status-pill status-pill--published capitalize">{{ currentPhase }} phase</span>
                 </template>
@@ -32,7 +32,7 @@
                 <section v-for="{ catKey, items } in orderedGroups" :key="catKey">
                     <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                         <span aria-hidden="true">{{ categoryMeta[catKey]?.icon }}</span>
-                        {{ categoryMeta[catKey]?.label ?? catKey }}
+                        {{ reportCategoryLabel(catKey, event.event_type === 'sports') }}
                         <span class="text-xs font-normal text-slate-400">({{ items.length }})</span>
                     </h4>
                     <div class="reports-tile-grid">
@@ -49,14 +49,15 @@
 
             <ReportHeadHubSection v-if="hasItemHeads"
                                   compact
+                                  :is-sports="event.event_type === 'sports'"
                                   :heads="headSummary"
                                   :head-item-groups="headItemGroups"
                                   :head-report-base="headWiseReportBase"
                                   :export-base-url="headWiseExportUrl"
                                   :manage-url="itemHeadsManageUrl" />
 
-            <EmptyState v-else-if="event.event_type === 'sports'" title="No item heads yet" icon="📂" class="mb-2"
-                        description="Sync item heads from the competition hub, then reports will group by Athletics, Chess, etc.">
+            <EmptyState v-else-if="event.event_type === 'sports'" title="No Event Heads yet" icon="📂" class="mb-2"
+                        description="Sync Event Heads from the competition hub, then reports will group by Athletics, Chess, etc.">
                 <Link :href="itemHeadsManageUrl" class="btn-primary text-sm mt-4 inline-flex">Open competition hub</Link>
             </EmptyState>
 
@@ -83,6 +84,7 @@ import {
     REPORT_CATEGORY_ORDER,
     enrichInteractiveReport,
     filterReportsByQuery,
+    reportCategoryLabel,
 } from '@/support/festReportCatalog.js';
 
 const props = defineProps({
@@ -111,7 +113,7 @@ const categoryOptions = computed(() =>
 );
 
 const orderedGroups = computed(() => {
-    let list = (props.interactive ?? []).map(enrichInteractiveReport);
+    let list = (props.interactive ?? []).map((r) => enrichInteractiveReport(r, props.event?.event_type === 'sports'));
     if (props.hasItemHeads) {
         list = list.filter((p) => p.id !== 'head-wise-participants');
     }

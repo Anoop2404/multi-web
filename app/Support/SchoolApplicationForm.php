@@ -35,6 +35,17 @@ class SchoolApplicationForm
                 'default'     => ['enabled' => true, 'required' => true],
                 'locked'      => true,
             ],
+            'school_category' => [
+                'label'       => 'School type',
+                'group'       => 'school',
+                'hint'        => 'Choose whether this school is a CBSE-affiliated member or a non-affiliated school under this Sahodaya.',
+                'default'     => ['enabled' => false, 'required' => true],
+                'locked'      => true,
+                'options'     => [
+                    'affiliated'     => 'CBSE affiliated member school',
+                    'non_affiliated' => 'Non-affiliated school',
+                ],
+            ],
             'phone' => [
                 'label'       => 'Phone',
                 'group'       => 'school',
@@ -175,6 +186,7 @@ class SchoolApplicationForm
                 'placeholder' => $def['placeholder'] ?? null,
                 'hint'        => $def['hint'] ?? null,
                 'locked'      => $def['locked'] ?? false,
+                'options'     => $def['options'] ?? null,
             ];
         }
 
@@ -183,6 +195,15 @@ class SchoolApplicationForm
         $resolved['password']['required'] = false;
         $resolved['password_confirmation']['enabled'] = false;
         $resolved['password_confirmation']['required'] = false;
+
+        // Per-Sahodaya: only show non-affiliated option when enabled in membership fees settings.
+        if ($profile?->allow_non_affiliated_schools) {
+            $resolved['school_category']['enabled'] = true;
+            $resolved['school_category']['required'] = true;
+        } else {
+            $resolved['school_category']['enabled'] = false;
+            $resolved['school_category']['required'] = false;
+        }
 
         return $resolved;
     }
@@ -249,9 +270,20 @@ class SchoolApplicationForm
                 continue;
             }
 
-            if ($key === 'cbse_affiliation') {
+            if ($key === 'school_category') {
                 $rules[$key] = [
-                    'required',
+                    ($fields[$key]['required'] ?? true) ? 'required' : 'nullable',
+                    'in:affiliated,non_affiliated',
+                ];
+                continue;
+            }
+
+            if ($key === 'cbse_affiliation') {
+                $isNonAffiliated = ($fields['school_category']['enabled'] ?? false)
+                    && request()->input('school_category') === 'non_affiliated';
+
+                $rules[$key] = [
+                    $isNonAffiliated ? 'nullable' : 'required',
                     'string',
                     'max:100',
                     function (string $attribute, mixed $value, \Closure $fail) use ($sahodaya): void {
@@ -642,7 +674,7 @@ class SchoolApplicationForm
     private static function inputFieldKeys(): array
     {
         return [
-            'school_email', 'school_prefix', 'phone', 'cbse_affiliation', 'highest_class', 'website',
+            'school_email', 'school_prefix', 'school_category', 'phone', 'cbse_affiliation', 'highest_class', 'website',
             'address', 'district', 'principal_name', 'principal_email', 'principal_phone',
             'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
             'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
@@ -653,7 +685,7 @@ class SchoolApplicationForm
     private static function payloadFieldKeys(): array
     {
         return [
-            'school_email', 'school_prefix', 'phone', 'cbse_affiliation', 'highest_class', 'website',
+            'school_email', 'school_prefix', 'school_category', 'phone', 'cbse_affiliation', 'highest_class', 'website',
             'address', 'district', 'principal_name', 'principal_email', 'principal_phone',
             'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
             'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',

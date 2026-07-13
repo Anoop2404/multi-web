@@ -13,7 +13,7 @@
     $twoStep = $hasSchoolStep && $hasStep2 && ! $threeStep;
     $totalSteps = $threeStep ? 3 : ($twoStep ? 2 : 1);
 
-    $step1Fields = ['school_name', 'school_email', 'school_prefix', 'cbse_affiliation', 'phone', 'highest_class', 'website', 'address', 'district'];
+    $step1Fields = ['school_name', 'school_email', 'school_prefix', 'school_category', 'cbse_affiliation', 'phone', 'highest_class', 'website', 'address', 'district'];
     $step2Fields = [
         'principal_name', 'principal_email', 'principal_phone',
         'password', 'password_confirmation',
@@ -151,16 +151,40 @@
                             </div>
                             @endif
 
+                            @if($fields['school_category']['enabled'] ?? false)
+                            <div class="field-span-2">
+                                <label class="portal-label">{{ $fields['school_category']['label'] }}
+                                    <span class="portal-required">*</span>
+                                </label>
+                                @if(!empty($fields['school_category']['hint']))
+                                <p class="portal-hint">{{ $fields['school_category']['hint'] }}</p>
+                                @endif
+                                <div class="mt-2 space-y-2">
+                                    @foreach(($fields['school_category']['options'] ?? []) as $value => $label)
+                                    <label class="flex items-start gap-2 text-sm">
+                                        <input type="radio" name="school_category" value="{{ $value }}"
+                                               class="mt-1"
+                                               {{ old('school_category', 'affiliated') === $value ? 'checked' : '' }}
+                                               required
+                                               onchange="document.getElementById('cbse_affiliation') && (document.getElementById('cbse_affiliation').required = this.value !== 'non_affiliated'); document.getElementById('cbse-aff-req') && (document.getElementById('cbse-aff-req').style.display = this.value === 'non_affiliated' ? 'none' : '');">
+                                        <span>{{ $label }}</span>
+                                    </label>
+                                    @endforeach
+                                </div>
+                                @error('school_category')<p class="portal-error">{{ $message }}</p>@enderror
+                            </div>
+                            @endif
+
                             @if($fields['cbse_affiliation']['enabled'] ?? false)
                             <div>
                                 <label class="portal-label" for="cbse_affiliation">{{ $fields['cbse_affiliation']['label'] }}
-                                    <span class="portal-required">*</span>
+                                    <span id="cbse-aff-req" class="portal-required" @if(old('school_category') === 'non_affiliated') style="display:none" @endif>*</span>
                                 </label>
                                 <input id="cbse_affiliation" name="cbse_affiliation" type="text"
                                        value="{{ old('cbse_affiliation') }}"
                                        class="portal-input @error('cbse_affiliation') is-error @enderror"
                                        placeholder="{{ $fields['cbse_affiliation']['placeholder'] }}"
-                                       required>
+                                       @if(old('school_category') !== 'non_affiliated') required @endif>
                                 @error('cbse_affiliation')<p class="portal-error">{{ $message }}</p>@enderror
                             </div>
                             @endif

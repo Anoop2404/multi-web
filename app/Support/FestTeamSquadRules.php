@@ -15,6 +15,8 @@ namespace App\Support;
  */
 class FestTeamSquadRules
 {
+    public const MULTI_PERSON_TYPES = ['team', 'group', 'pair', 'trio'];
+
     public function __construct(
         public ?int $minPlaying = null,
         public ?int $maxPlaying = null,
@@ -24,9 +26,24 @@ class FestTeamSquadRules
         public ?int $standbys = null,
     ) {}
 
+    public static function isMultiPerson(?string $participantType): bool
+    {
+        return in_array($participantType, self::MULTI_PERSON_TYPES, true);
+    }
+
+    /** Default roster size for pair/trio when admin leaves squad fields blank. */
+    public static function defaultSizeFor(?string $participantType): ?int
+    {
+        return match ($participantType) {
+            'pair' => 2,
+            'trio' => 3,
+            default => null,
+        };
+    }
+
     public static function fromItem(\App\Models\FestEventItem $item): ?self
     {
-        if (! in_array($item->participant_type, ['team', 'group'], true)) {
+        if (! self::isMultiPerson($item->participant_type)) {
             return null;
         }
 
@@ -40,6 +57,16 @@ class FestTeamSquadRules
         $standbys = isset($c['standbys']) ? (int) $c['standbys'] : null;
 
         if (! $minSquad && ! $maxSquad && ! $minPlaying) {
+            $fixed = self::defaultSizeFor($item->participant_type);
+            if ($fixed) {
+                return new self(
+                    minPlaying: $fixed,
+                    maxPlaying: $fixed,
+                    maxSquad: $fixed,
+                    minSquad: $fixed,
+                );
+            }
+
             if ($item->min_group_size || $item->max_group_size) {
                 return new self(
                     minPlaying: $item->min_group_size,

@@ -194,6 +194,7 @@ const navGroups = computed(() => {
         pendingFestAppealsCount: props.pendingFestAppealsCount || page.props.pendingFestAppealsCount || 0,
         stateRemittancesEnabled: page.props.stateRemittancesEnabled !== false,
         navVisibility: page.props.navVisibility ?? null,
+        competitionPrograms: page.props.competitionPrograms ?? {},
     };
 
     const examId = detectSahodayaMcqExamIdFromUrl(page.url);

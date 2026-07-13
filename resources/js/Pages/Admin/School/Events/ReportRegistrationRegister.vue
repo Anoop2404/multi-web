@@ -26,7 +26,8 @@
                           :base-url="base"
                           :selected-head-id="headFilter"
                           :selected-item-id="itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`" />
+                          :hub-url="`${programBase}/reports/${event.id}`"
+                          :is-sports="event.event_type === 'sports'" />
 
         <div v-if="schoolSummary && totals.fee_required" class="grid sm:grid-cols-4 gap-3 mb-6">
             <div class="card card--muted !py-4 text-center">

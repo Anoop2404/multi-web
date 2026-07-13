@@ -44,8 +44,10 @@ class FestSportsSetupController extends SahodayaAdminController
 
         $feeService = app(FestSchoolEventFeeService::class);
         $schedule = $feeService->resolveSchedule($event);
-        $feeModel = $schedule['fee_model'] ?? $event->fee_settings['fee_model'] ?? null;
-        $feeConfigured = $feeModel && $feeModel !== 'none';
+        $storedFees = is_array($event->fee_settings) ? $event->fee_settings : [];
+        // Sports always has sports_composite — only count real event-wide overrides.
+        $feeConfigured = collect(['school_fee_cap', 'school_registration_fee', 'student_registration_fee', 'team_registration_fee', 'default_item_fee', 'extra_item_fee'])
+            ->contains(fn (string $key) => filled($storedFees[$key] ?? null) || filled($schedule[$key] ?? null));
 
         $headsFullyConfigured = $headCount > 0 && $headsWithCompositeFees === $headCount;
 
@@ -71,7 +73,7 @@ class FestSportsSetupController extends SahodayaAdminController
                 'href'  => "{$tenantBase}/sports/catalog?event_id={$event->id}",
             ],
             [
-                'label' => 'Item heads catalog',
+                'label' => 'Event Heads catalog',
                 'hint'  => 'Default head groups synced into each sports event (Athletics, Chess…).',
                 'href'  => "{$tenantBase}/sports/catalog/heads?event_id={$event->id}",
             ],
@@ -87,14 +89,20 @@ class FestSportsSetupController extends SahodayaAdminController
             ],
         ];
 
-        $doneCount = collect($checklist)->where('done', true)->count();
+        // Optional steps (item / event-wide fee overrides) must not inflate “complete”.
+        $required = collect($checklist)->reject(fn (array $step) => ! empty($step['optional']));
+        $doneCount = $required->where('done', true)->count();
+
+        $promoteStatus = $event->parent_event_id === null
+            ? app(\App\Services\Events\PromoteSportsHeadsToDisciplineEvents::class)->status($event)
+            : null;
 
         return $this->inertia('Sahodaya/Events/SportsSetup', $this->withEventActivity($event, FestPageActivity::SETTINGS, [
-            'event'          => $event->only('id', 'title', 'status', 'event_type', 'registration_open', 'registration_close', 'results_published'),
+            'event'          => $event->only('id', 'title', 'status', 'event_type', 'registration_open', 'registration_close', 'results_published', 'parent_event_id', 'partition_role'),
             'checklist'      => $checklist,
             'checklistProgress' => [
                 'done'  => $doneCount,
-                'total' => count($checklist),
+                'total' => $required->count(),
             ],
             'tenantMasters'  => $tenantMasters,
             'headItemGroups' => $nav['headItemGroups'] ?? [],
@@ -105,6 +113,8 @@ class FestSportsSetupController extends SahodayaAdminController
             ],
             'ageRuleSummary' => FestSportsAgeGroup::ageRuleSummary($event),
             'competitionUrl' => "{$base}/competition",
+            'sportsHubUrl'   => "{$tenantBase}/sports",
+            'promoteStatus'  => $promoteStatus,
         ]));
     }
 }

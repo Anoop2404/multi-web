@@ -158,7 +158,7 @@ Assign at **Portal users** or **Event → Event staff**:
 **Catalog workflow (once per program):**
 ```
 Resync CKSC master → Enable items & set fees → Assign items into event
-→ (Sports) Sync item heads on event
+→ (Sports) Sync Event Heads on event
 ```
 
 ### 4.3 Cross-fest tools
@@ -170,6 +170,14 @@ Resync CKSC master → Enable items & set fees → Assign items into event
 | Certificate templates | `/certificate-templates` |
 | Certificate search | `/events/certificates/search` |
 | Category masters | `/taxonomy-masters` |
+| Competition types | `/competition-types` |
+| Custom type hub | `/programs/{nav-slug}` (e.g. `/programs/robotics`) |
+| Event areas & eligibility | `/events/{id}/areas`, `/events/{id}/eligibility-rules` (non-sports) |
+| Area-wise participants report | `/events/{id}/reports/area-wise-participants` |
+
+Custom competition types can use **competition areas** (windows/fees), **eligibility rules** (gender/school/verified overlays), and per-item **tie-break modes** (`none`, `include_all_ties`, `exclude_ties`, `lot_draw`, `manual`) on promote. Sports continues to use Event Heads instead of areas.
+
+**Fest notifications (FRD-08):** templates `fest.registration.open`, `fest.payment.pending`, `fest.competition.reminder`, `fest.certificate.available` ship with the platform. Optional per-type overrides use `fest.{event_type}.{suffix}` (e.g. `fest.robotics.registration.open`). Scheduled: `fest:competition-reminders`, `fest:payment-reminders`. Seed types: `php artisan fest:ensure-competition-types`.
 
 ### 4.4 MCQ exams
 
@@ -199,7 +207,15 @@ Resync CKSC master → Enable items & set fees → Assign items into event
 
 ### 4.7 Website (if enabled)
 
-Site builder, public content, office bearers, circulars, notification templates.
+| Feature | Path |
+|---------|------|
+| Site builder (draft / publish / preview) | `/site-builder` |
+| Custom domains (TXT verify) | `/website/domains` |
+| Microsites | `/website/sites` → public `/m/{slug}` |
+| Forms builder + submissions | `/website/forms` → public `/forms/{slug}` |
+| Content / office bearers / circulars | `/public-content`, `/office-bearers`, `/circulars` |
+
+HTML in section configs is sanitized on save and render. Public homepage serves **published** section snapshots; `/preview-site` (auth) shows drafts. Permissions: `website.edit`, `website.publish` (plus existing `website.manage`).
 
 ### 4.8 Settings
 
@@ -248,7 +264,7 @@ Tracked on **Settings → Lifecycle**:
 
 **Publish results** is separate: set **Results published** on Overview (or Results page). That releases medals/rankings; it does not change the status field.
 
-Also set: **fest start/end dates**, **registration open/close** on Overview. Per-head `reg_start`/`reg_end` on Sports item heads further control when each discipline accepts entries.
+Also set: **fest start/end dates**, **registration open/close** on Overview. Per-head `reg_start`/`reg_end` on Sports Event Heads further control when each discipline accepts entries.
 
 ### 5.4 Event setup phases
 
@@ -256,7 +272,7 @@ Also set: **fest start/end dates**, **registration open/close** on Overview. Per
 
 1. Create event from program hub or `/events`
 2. **Catalog → Assign to event** — import enabled master items
-3. **Event → Item heads** (sports) — sync from catalog
+3. **Event → Event Heads** (sports) — sync from catalog
 4. **Event → Catalog & rules** — enable/disable items, fees per item
 5. **Settings** tabs:
 
@@ -329,7 +345,7 @@ Also set: **fest start/end dates**, **registration open/close** on Overview. Per
 
 ### 5.6 Sports Meet — program-level extras
 
-Sports Meet is a **season hub** listing **discipline events** (Athletics, Chess, …). Each Event Head can be promoted to its own `FestEvent` (`partition_role=sports_discipline`) with independent status, venue, dates, and always-on **sports composite** fees (no fee-model dropdown on Sports).
+Sports Meet is a **season hub** listing **discipline events** (Athletics, Chess, …). Each **Event Head** can be promoted to its own `FestEvent` (`partition_role=sports_discipline`) with independent status, venue, dates, and always-on **sports composite** fees (no fee-model dropdown on Sports).
 
 | Feature | Path |
 |---------|------|
@@ -340,7 +356,7 @@ Sports Meet is a **season hub** listing **discipline events** (Athletics, Chess,
 | House championship | `/sports/championship` |
 | Results / rankings | `/sports/results`, `/sports/rankings` |
 
-Promote multi-head hubs: `php artisan fest:promote-sports-heads --sahodaya=… [--dry-run]`.  
+**Promote Event Heads → discipline events:** on `/sports`, use **Promote Event Head(s) → discipline events** when heads are ready (idempotent — already linked heads are skipped). CLI still works: `php artisan fest:promote-sports-heads --sahodaya=… [--dry-run]`.  
 Backfill head fee columns: `php artisan fest:backfill-head-fees --sahodaya=… [--dry-run]`.
 
 ### 5.7 Kalotsav extras
@@ -367,6 +383,10 @@ Backfill head fee columns: `php artisan fest:backfill-head-fees --sahodaya=… [
 ```
 
 ### Item fee resolution (each billed item)
+
+**Sports (per Event Head):** items inherit head rates — per-item `fee_amount` is ignored. Use head student/team rates (and optional default/extra item fees). Over-cap registrations go to a waiting list and promote when a seat frees.
+
+**Other fest types:**
 
 1. Per-item override on event item  
 2. Item **head** default or extra fee  
@@ -602,12 +622,12 @@ During lock: school submits → school principal approves → Sahodaya approves 
 
 1. `/sports/age-groups` — configure U8–U19  
 2. `/sports/catalog` — resync master, enable items  
-3. `/sports` — create event  
-4. `/sports/catalog/assign` — import items  
-5. Event → Item heads → sync  
-6. Event → Settings → Fees → **Sports composite**  
-7. Event → Overview → dates + `registration_open`  
-8. Portal users → create fest_ops → assign to event  
+3. `/sports` — open season hub (auto-created for Sports)  
+4. `/sports/catalog/assign` — import items into the season  
+5. Season → Event Heads (Competition) — sync / add heads with composite fees  
+6. `/sports` → **Promote** Event Heads into discipline events  
+7. Each discipline → Overview → dates + `registration_open`  
+8. Portal users → create fest_ops / mark coordinators → assign per Event Head  
 9. Schools register → approve → verify fees  
 10. Schedule → publish → ongoing → marks → results  
 
@@ -656,7 +676,8 @@ During lock: school submits → school principal approves → Sahodaya approves 
 |------|---------|
 | **Master catalog** | Year-independent item list for a program |
 | **Event items** | Items imported into one fest event |
-| **Item head** | Grouping (Chess, Athletics) for sports |
+| **Event Head** | Sports grouping (Chess, Athletics); fee/policy unit; may be promoted to a discipline event |
+| **Item head** | Same concept for non-sports fests (section grouping) |
 | **Chest number** | Sports participant ID on fest day |
 | **Level round** | school / sahodaya / state |
 | **Conduct levels** | Which future rounds this event feeds |

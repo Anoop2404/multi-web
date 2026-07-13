@@ -42,11 +42,21 @@
                 <input type="checkbox" :value="school.id" v-model="selectedIds" class="rounded border-slate-300 shrink-0">
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/${school.id}`"
                       class="flex-1 min-w-0 group">
-                    <p class="font-bold text-gray-900 group-hover:text-[#0f3d7a]">{{ school.name }}</p>
+                    <p class="font-bold text-gray-900 group-hover:text-[#0f3d7a]">
+                        {{ school.name }}
+                        <span v-if="school.is_non_affiliated"
+                              class="ml-2 inline-flex align-middle rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                            Non-affiliated
+                        </span>
+                        <span v-else
+                              class="ml-2 inline-flex align-middle rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                            Affiliated
+                        </span>
+                    </p>
                     <p class="text-xs text-gray-500 mt-0.5">
                         Applied {{ formatDate(school.created_at) }}
                         <span v-if="school.contact_email"> · {{ school.contact_email }}</span>
-                        <span v-if="school.affiliation"> · {{ school.affiliation }}</span>
+                        <span v-if="school.affiliation"> · Aff. {{ school.affiliation }}</span>
                     </p>
                 </Link>
                 <div class="flex flex-wrap items-center gap-2 shrink-0">

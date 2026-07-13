@@ -22,6 +22,14 @@
                                   class="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                                 Code · {{ school.school_prefix }}
                             </span>
+                            <span v-if="school.is_non_affiliated"
+                                  class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">
+                                Non-affiliated school
+                            </span>
+                            <span v-else
+                                  class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-900">
+                                CBSE affiliated
+                            </span>
                             <span class="profile-status-pill"
                                   :class="membershipApproved ? 'profile-status-pill--done' : 'profile-status-pill--pending'">
                                 {{ membershipLabel }}

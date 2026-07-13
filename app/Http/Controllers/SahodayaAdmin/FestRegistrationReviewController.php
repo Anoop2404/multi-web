@@ -232,8 +232,16 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
         EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
 
+        $registration->loadMissing('item');
+        $headId = $registration->item?->head_id;
+
         $registration->update(['status' => 'rejected']);
         app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
+
+        if ($headId) {
+            app(FestRegistrationApprovalService::class)->promoteNextWaitlisted($event, (int) $headId);
+        }
+
         app(FestEventNotifier::class)->registrationRejected($registration);
         $audit->festRegistrationRejected($registration);
 

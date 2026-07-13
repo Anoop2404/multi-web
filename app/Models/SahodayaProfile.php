@@ -15,6 +15,7 @@ class SahodayaProfile extends Model
         'tenant_id', 'slug', 'prefix', 'cbse_region', 'address',
         'contact_email', 'contact_phone',
         'student_data_mode', 'membership_fee_type', 'fixed_membership_fee_amount',
+        'allow_non_affiliated_schools', 'non_affiliated_membership_fee_type', 'non_affiliated_fixed_membership_fee_amount',
         'teacher_registration_enabled', 'student_edit_lock_enabled', 'student_edit_lock_at',
         'require_student_verification', 'payment_instructions', 'prefixes_locked',
         'setup_wizard_complete', 'setup_wizard_dismissed_at',
@@ -31,6 +32,8 @@ class SahodayaProfile extends Model
 
     protected $casts = [
         'fixed_membership_fee_amount'  => 'decimal:2',
+        'allow_non_affiliated_schools' => 'boolean',
+        'non_affiliated_fixed_membership_fee_amount' => 'decimal:2',
         'teacher_registration_enabled' => 'boolean',
         'student_edit_lock_enabled'    => 'boolean',
         'student_edit_lock_at'         => 'datetime',
@@ -78,6 +81,18 @@ class SahodayaProfile extends Model
             'variable_by_student_count' => true,
             default => false,
         };
+    }
+
+    public function requiresMembershipPaymentForSchool(?Tenant $school = null): bool
+    {
+        if ($school?->is_non_affiliated && $this->allow_non_affiliated_schools) {
+            return match ($this->non_affiliated_membership_fee_type ?? 'fixed') {
+                'none' => false,
+                default => (float) ($this->non_affiliated_fixed_membership_fee_amount ?? 0) > 0,
+            };
+        }
+
+        return $this->requiresMembershipPayment();
     }
 
     /** Whether Sahodaya has explicitly configured the membership fee model for the active year. */

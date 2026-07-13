@@ -40,6 +40,14 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <h2 class="text-xl font-extrabold text-gray-900">{{ school.name }}</h2>
                             <StatusBadge :status="school.membership_status" />
+                            <span v-if="school.is_non_affiliated"
+                                  class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-200">
+                                Non-affiliated
+                            </span>
+                            <span v-else
+                                  class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200">
+                                Affiliated
+                            </span>
                         </div>
                         <p class="text-sm text-gray-500 mt-1">
                             <span v-if="school.school_prefix" class="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-xs mr-2">{{ school.school_prefix }}</span>

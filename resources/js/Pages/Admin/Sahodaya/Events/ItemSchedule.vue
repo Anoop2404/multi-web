@@ -34,7 +34,7 @@
             <input v-model="search" type="search" class="field flex-1 min-w-[12rem] !py-1.5 text-sm"
                    placeholder="Search items…" autocomplete="off">
             <select v-if="headOptions.length" v-model="headFilter" class="field text-sm max-w-[14rem]">
-                <option value="">All item heads</option>
+                <option value="">{{ event.event_type === 'sports' ? 'All Event Heads' : 'All item heads' }}</option>
                 <option v-for="h in headOptions" :key="h.id" :value="h.id">{{ h.name }}</option>
                 <option value="other">Unassigned</option>
             </select>

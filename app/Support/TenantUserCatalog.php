@@ -149,7 +149,8 @@ class TenantUserCatalog
     public static function sportsDutyLabels(): array
     {
         return array_merge(self::dutyLabels(), [
-            'marks' => 'Item head coordinator',
+            'marks' => 'Event Head coordinator',
+            'discipline' => 'Event Head admin',
         ]);
     }
 
@@ -196,6 +197,8 @@ class TenantUserCatalog
             'website.view',
             'website.news',
             'website.manage',
+            'website.edit',
+            'website.publish',
             'users.manage',
         ];
     }
@@ -465,7 +468,7 @@ class TenantUserCatalog
     public static function sahodayaNavPermissions(): array
     {
         return [
-            'website'    => ['website.view', 'website.manage', 'website.news'],
+            'website'    => ['website.view', 'website.manage', 'website.news', 'website.edit', 'website.publish'],
             'membership' => ['membership.view', 'membership.manage'],
             'fest'       => ['fest.view', 'fest.manage', 'fest.marks', 'fest.registrations', 'fest.results', 'fest.settings', 'fest.finance', 'fest.certificates', 'fest.catering', 'fest.schedule'],
             'mcq'        => ['mcq.view', 'mcq.manage', 'mcq.attendance', 'mcq.marks'],
@@ -486,7 +489,7 @@ class TenantUserCatalog
             'fest'       => ['fest.view', 'fest.manage'],
             'mcq'        => ['mcq.view', 'mcq.manage'],
             'training'   => ['training.view', 'training.manage', 'fest.view', 'fest.manage'],
-            'website'    => ['website.view', 'website.manage', 'website.news'],
+            'website'    => ['website.view', 'website.manage', 'website.news', 'website.edit', 'website.publish'],
             'users'      => ['users.manage'],
         ];
     }

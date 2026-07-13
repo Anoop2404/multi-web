@@ -14,16 +14,8 @@ class MembershipFeeCalculator
 {
     public function calculateAndApply(Registration $registration, SahodayaProfile $profile, SchoolYearSubmission $submission): void
     {
-        $amount = match ($profile->membership_fee_type) {
-            'none' => 0.0,
-            'fixed' => (float) $profile->fixed_membership_fee_amount,
-            'variable_by_student_count' => $this->fromSlabs(
-                $registration->school->parent_id,
-                $registration->academic_year,
-                $this->totalStudents($profile, $submission)
-            ),
-            default => 0.0,
-        };
+        $school = $registration->school;
+        $amount = $this->amountForSchool($profile, $school, $registration->academic_year, $submission);
 
         if ($registration->fee_override && isset($registration->fee_override['override_amount'])) {
             $amount = (float) $registration->fee_override['override_amount'];
@@ -31,10 +23,37 @@ class MembershipFeeCalculator
 
         $registration->update([
             'membership_fee_amount' => $amount,
-            'registration_status'   => $profile->requiresMembershipPayment() && $amount > 0
+            'registration_status'   => $profile->requiresMembershipPaymentForSchool($school) && $amount > 0
                 ? 'payment_pending'
                 : 'completed',
         ]);
+    }
+
+    public function amountForSchool(
+        SahodayaProfile $profile,
+        ?Tenant $school,
+        string $academicYear,
+        ?SchoolYearSubmission $submission = null,
+    ): float {
+        if ($school?->is_non_affiliated && $profile->allow_non_affiliated_schools) {
+            return match ($profile->non_affiliated_membership_fee_type ?? 'fixed') {
+                'none' => 0.0,
+                default => (float) ($profile->non_affiliated_fixed_membership_fee_amount ?? 0),
+            };
+        }
+
+        return match ($profile->membership_fee_type) {
+            'none' => 0.0,
+            'fixed' => (float) ($profile->fixed_membership_fee_amount ?? 0),
+            'variable_by_student_count' => $this->fromSlabs(
+                $school?->parent_id ?? $profile->tenant_id,
+                $academicYear,
+                $submission
+                    ? $this->totalStudents($profile, $submission)
+                    : ($school ? $this->estimateStudentCount($school, $academicYear) : 0)
+            ),
+            default => 0.0,
+        };
     }
 
     public function totalStudents(SahodayaProfile $profile, SchoolYearSubmission $submission): int
@@ -68,16 +87,7 @@ class MembershipFeeCalculator
             return 0.0;
         }
 
-        return match ($profile->membership_fee_type) {
-            'none' => 0.0,
-            'fixed' => (float) ($profile->fixed_membership_fee_amount ?? 0),
-            'variable_by_student_count' => $this->fromSlabs(
-                $school->parent_id,
-                $academicYear,
-                $this->estimateStudentCount($school, $academicYear)
-            ),
-            default => 0.0,
-        };
+        return $this->amountForSchool($profile, $school, $academicYear);
     }
 
     public function estimateStudentCount(Tenant $school, string $academicYear): int

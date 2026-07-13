@@ -93,6 +93,8 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
             { label: 'Overview', href: base, icon: 'grid', exact: true, permissions: FEST_VIEW },
             { label: 'Settings', href: `${base}/settings`, icon: 'settings', permissions: FEST_SETTINGS },
             { label: 'Items & catalog', href: `${base}/items`, icon: 'file-text', permissions: FEST_MANAGE },
+            { label: 'Competition areas', href: `${base}/areas`, icon: 'layers', permissions: FEST_MANAGE },
+            { label: 'Eligibility rules', href: `${base}/eligibility-rules`, icon: 'check-square', permissions: FEST_MANAGE },
             { label: 'Rounds & levels', href: `${base}/levels`, icon: 'repeat', permissions: FEST_MANAGE },
             { label: 'Activity log', href: `${base}/activity`, icon: 'clock', permissions: FEST_VIEW },
         ],

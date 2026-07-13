@@ -30,8 +30,11 @@
                                  :has-item-heads="hasItemHeads"
                                  :show-result-stats="true"
                                  :hint="hasItemHeads
-                                     ? 'Pick an item head (Athletics, Chess, …), then a competition item to review marks and publish results.'
-                                     : 'Select a competition item to review marks and publish results.'">
+                                     ? (isSports
+                                         ? 'Pick an Event Head (Athletics, Chess, …), then a competition item to review marks and publish results.'
+                                         : 'Pick an item head, then a competition item to review marks and publish results.')
+                                     : 'Select a competition item to review marks and publish results.'"
+                                 :is-sports="isSports">
 
             <template #head-detail="{ head }">
                 <FestHeadItemInfoPanel mode="head" :head="head" class="mb-4" />

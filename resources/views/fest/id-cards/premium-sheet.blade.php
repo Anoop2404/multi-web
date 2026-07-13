@@ -348,7 +348,7 @@
 <body>
 @if(!empty($isSample))
 <p style="text-align:center;font-family:system-ui,sans-serif;font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;padding:8px 12px;margin:0 0 3mm;border-radius:6px;">
-    <strong>Sample ID card</strong> — catalog item head preview for client demo (not tied to a live event).
+    <strong>Sample ID card</strong> — catalog Event Head preview for client demo (not tied to a live event).
 </p>
 @endif
 @if($showTitle ?? true)

@@ -1,9 +1,9 @@
 <template>
     <form class="card !p-4 mb-4 flex flex-wrap gap-3 items-end" @submit.prevent="$emit('apply')">
-        <FormField :label="label" class-extra="mb-0 min-w-[12rem]">
+        <FormField :label="resolvedLabel" class-extra="mb-0 min-w-[12rem]">
             <template #default="{ id }">
                 <select :id="id" :value="modelValue" class="field text-sm" @change="onChange">
-                    <option value="">{{ allLabel }}</option>
+                    <option value="">{{ resolvedAllLabel }}</option>
                     <option v-for="h in heads" :key="h.id" :value="h.id">{{ h.name }}</option>
                 </select>
             </template>
@@ -29,11 +29,15 @@ const props = defineProps({
     itemId: { type: [String, Number], default: '' },
     heads: { type: Array, default: () => [] },
     headItemGroups: { type: Array, default: () => [] },
-    label: { type: String, default: 'Item head' },
-    allLabel: { type: String, default: 'All heads' },
+    label: { type: String, default: null },
+    allLabel: { type: String, default: null },
+    isSports: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue', 'update:itemId', 'apply']);
+
+const resolvedLabel = computed(() => props.label ?? (props.isSports ? 'Event Head' : 'Item head'));
+const resolvedAllLabel = computed(() => props.allLabel ?? (props.isSports ? 'All Event Heads' : 'All heads'));
 
 const items = computed(() => {
     if (!props.modelValue) {

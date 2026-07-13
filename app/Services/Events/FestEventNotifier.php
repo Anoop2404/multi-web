@@ -5,6 +5,8 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\FestSchoolEventFee;
+use App\Models\NotificationTemplate;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Notifications\NotificationService;
@@ -12,15 +14,50 @@ use App\Support\TenancyDatabase;
 
 class FestEventNotifier
 {
+    /**
+     * Resolve a fest template slug with optional per-competition-type override.
+     * Tries fest.{event_type}.{suffix} first, then fest.{suffix}.
+     */
+    public function resolveTemplateSlug(?FestEvent $event, string $baseSlug): string
+    {
+        $suffix = str_starts_with($baseSlug, 'fest.')
+            ? substr($baseSlug, 5)
+            : $baseSlug;
+
+        $type = $event?->event_type;
+        if ($type) {
+            $typed = "fest.{$type}.{$suffix}";
+            if (NotificationTemplate::where('slug', $typed)->where('is_active', true)->exists()) {
+                return $typed;
+            }
+        }
+
+        return "fest.{$suffix}";
+    }
+
+    public function competitionLabel(FestEvent $event): string
+    {
+        try {
+            $labels = app(FestCompetitionTypeRegistry::class)
+                ->forTenant($event->tenant_id)
+                ->labels(false);
+
+            return $labels[$event->event_type] ?? $event->event_type ?? 'Competition';
+        } catch (\Throwable) {
+            return $event->event_type ?? 'Competition';
+        }
+    }
+
     public function registrationApproved(FestRegistration $registration): void
     {
         $registration->load(['event', 'item']);
         $this->notifySchool(
             $registration->school_id,
-            'fest.registration.approved',
+            $this->resolveTemplateSlug($registration->event, 'fest.registration.approved'),
             [
                 'event_title' => $registration->event->title,
-                'item_title'  => $registration->item?->title ?? 'General',
+                'item_title' => $registration->item?->title ?? 'General',
+                'competition_label' => $this->competitionLabel($registration->event),
             ]
         );
     }
@@ -30,8 +67,11 @@ class FestEventNotifier
         $registration->load('event');
         $this->notifySchool(
             $registration->school_id,
-            'fest.registration.rejected',
-            ['event_title' => $registration->event->title]
+            $this->resolveTemplateSlug($registration->event, 'fest.registration.rejected'),
+            [
+                'event_title' => $registration->event->title,
+                'competition_label' => $this->competitionLabel($registration->event),
+            ]
         );
     }
 
@@ -40,12 +80,115 @@ class FestEventNotifier
         $registration->load(['event', 'item']);
         $this->notifySchool(
             $registration->school_id,
-            'fest.registration.withdrawn',
+            $this->resolveTemplateSlug($registration->event, 'fest.registration.withdrawn'),
             [
                 'event_title' => $registration->event->title,
-                'item_title'  => $registration->item?->title ?? 'General',
+                'item_title' => $registration->item?->title ?? 'General',
+                'competition_label' => $this->competitionLabel($registration->event),
             ]
         );
+    }
+
+    public function registrationOpened(FestEvent $event): void
+    {
+        $schoolIds = Tenant::query()
+            ->where('parent_id', $event->tenant_id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->pluck('id');
+
+        $slug = $this->resolveTemplateSlug($event, 'fest.registration.open');
+        $replacements = [
+            'event_title' => $event->title,
+            'competition_label' => $this->competitionLabel($event),
+            'close_date' => $event->registration_close?->format('d M Y') ?? 'TBA',
+        ];
+
+        foreach ($schoolIds as $schoolId) {
+            $this->notifySchool($schoolId, $slug, $replacements);
+        }
+    }
+
+    public function paymentPending(FestEvent $event, string $schoolId, float $amount): void
+    {
+        $this->notifySchool(
+            $schoolId,
+            $this->resolveTemplateSlug($event, 'fest.payment.pending'),
+            [
+                'event_title' => $event->title,
+                'competition_label' => $this->competitionLabel($event),
+                'amount' => number_format($amount, 2),
+            ],
+            "/school-admin/{$schoolId}/fest/{$event->id}/fees"
+        );
+    }
+
+    public function competitionReminder(FestEvent $event): void
+    {
+        $schoolIds = FestRegistration::where('event_id', $event->id)
+            ->distinct()
+            ->pluck('school_id');
+
+        if ($schoolIds->isEmpty()) {
+            $schoolIds = Tenant::query()
+                ->where('parent_id', $event->tenant_id)
+                ->where('type', 'school')
+                ->where('membership_status', 'approved')
+                ->pluck('id');
+        }
+
+        $slug = $this->resolveTemplateSlug($event, 'fest.competition.reminder');
+        $replacements = [
+            'event_title' => $event->title,
+            'competition_label' => $this->competitionLabel($event),
+            'start_date' => $event->event_start?->format('d M Y') ?? 'TBA',
+            'venue' => $event->venue ?: 'TBA',
+        ];
+
+        foreach ($schoolIds as $schoolId) {
+            $this->notifySchool($schoolId, $slug, $replacements);
+            $this->notifyEventParticipants($event, $schoolId, $slug, $replacements);
+        }
+    }
+
+    public function certificatesAvailable(FestEvent $event, int $count): void
+    {
+        if ($count < 1) {
+            return;
+        }
+
+        $schoolIds = FestRegistration::where('event_id', $event->id)
+            ->distinct()
+            ->pluck('school_id');
+
+        $slug = $this->resolveTemplateSlug($event, 'fest.certificate.available');
+        $replacements = [
+            'event_title' => $event->title,
+            'competition_label' => $this->competitionLabel($event),
+            'count' => (string) $count,
+        ];
+
+        foreach ($schoolIds as $schoolId) {
+            $this->notifySchool($schoolId, $slug, $replacements);
+            $this->notifyEventParticipants($event, $schoolId, $slug, $replacements);
+        }
+    }
+
+    /** Notify schools that still have unpaid fest fees (used by scheduled reminder). */
+    public function paymentPendingReminders(FestEvent $event): int
+    {
+        $fees = FestSchoolEventFee::where('event_id', $event->id)
+            ->whereNotIn('status', ['approved', 'waived'])
+            ->where('total_due', '>', 0)
+            ->get();
+
+        $sent = 0;
+        foreach ($fees as $fee) {
+            $this->paymentPending($event, $fee->school_id, (float) $fee->total_due);
+            $sent++;
+        }
+
+        return $sent;
     }
 
     public function resultsPublished(FestEvent $event): void
@@ -54,10 +197,15 @@ class FestEventNotifier
             ->distinct()
             ->pluck('school_id');
 
+        $slug = $this->resolveTemplateSlug($event, 'fest.results.published');
+
         foreach ($schoolIds as $schoolId) {
-            $replacements = ['event_title' => $event->title];
-            $this->notifySchool($schoolId, 'fest.results.published', $replacements);
-            $this->notifyEventParticipants($event, $schoolId, 'fest.results.published', $replacements);
+            $replacements = [
+                'event_title' => $event->title,
+                'competition_label' => $this->competitionLabel($event),
+            ];
+            $this->notifySchool($schoolId, $slug, $replacements);
+            $this->notifyEventParticipants($event, $schoolId, $slug, $replacements);
         }
     }
 
@@ -69,10 +217,15 @@ class FestEventNotifier
             ->where('membership_status', 'approved')
             ->pluck('id');
 
+        $slug = $this->resolveTemplateSlug($event, 'fest.schedule.published');
+
         foreach ($schoolIds as $schoolId) {
-            $replacements = ['event_title' => $event->title];
-            $this->notifySchool($schoolId, 'fest.schedule.published', $replacements);
-            $this->notifyEventParticipants($event, $schoolId, 'fest.schedule.published', $replacements);
+            $replacements = [
+                'event_title' => $event->title,
+                'competition_label' => $this->competitionLabel($event),
+            ];
+            $this->notifySchool($schoolId, $slug, $replacements);
+            $this->notifyEventParticipants($event, $schoolId, $slug, $replacements);
         }
     }
 
@@ -83,7 +236,8 @@ class FestEventNotifier
             $replacements = [
                 'event_title' => $event->title,
                 'school_name' => $school->name,
-                'count'       => (string) $count,
+                'count' => (string) $count,
+                'competition_label' => $this->competitionLabel($event),
             ];
 
             foreach ($users as $user) {
@@ -99,9 +253,10 @@ class FestEventNotifier
 
     public function notifySchoolForChestReveal(FestEvent $event, string $schoolId, string $participantName): void
     {
-        $this->notifySchool($schoolId, 'fest.chest_numbers.revealed', [
-            'event_title'      => $event->title,
+        $this->notifySchool($schoolId, $this->resolveTemplateSlug($event, 'fest.chest_numbers.revealed'), [
+            'event_title' => $event->title,
             'participant_name' => $participantName,
+            'competition_label' => $this->competitionLabel($event),
         ], "/school-admin/{$schoolId}/fest-day/{$event->id}");
     }
 
@@ -110,14 +265,15 @@ class FestEventNotifier
         $this->withSahodayaUsers($event->tenant_id, ['sahodaya_admin', 'sahodaya_staff', 'event_coordinator'], function ($users) use ($event, $participantName) {
             $service = app(NotificationService::class);
             $replacements = [
-                'event_title'      => $event->title,
+                'event_title' => $event->title,
                 'participant_name' => $participantName,
+                'competition_label' => $this->competitionLabel($event),
             ];
 
             foreach ($users as $user) {
                 $service->notifyFromTemplate(
                     $user,
-                    'fest.appeal.received',
+                    $this->resolveTemplateSlug($event, 'fest.appeal.received'),
                     $replacements,
                     "/sahodaya-admin/{$event->tenant_id}/events/{$event->id}/appeals",
                 );
@@ -136,11 +292,13 @@ class FestEventNotifier
         $url = "/portal/judge/{$user->tenant_id}/events/{$assignment->event_id}/marks";
         $replacements = [
             'event_title' => $assignment->event->title,
-            'item_title'  => $assignment->item?->title ?? 'Item',
+            'item_title' => $assignment->item?->title ?? 'Item',
+            'competition_label' => $this->competitionLabel($assignment->event),
         ];
 
         $service = app(NotificationService::class);
-        if (! $service->notifyFromTemplate($user, 'fest.judge.assigned', $replacements, $url)) {
+        $slug = $this->resolveTemplateSlug($assignment->event, 'fest.judge.assigned');
+        if (! $service->notifyFromTemplate($user, $slug, $replacements, $url)) {
             $service->notify(
                 $user,
                 'New judging assignment',
@@ -163,11 +321,14 @@ class FestEventNotifier
                 ->pluck('school_id');
         }
 
+        $slug = $this->resolveTemplateSlug($toEvent, 'fest.promotion.completed');
+
         foreach ($schoolIds as $schoolId) {
-            $this->notifySchool($schoolId, 'fest.promotion.completed', [
+            $this->notifySchool($schoolId, $slug, [
                 'event_title' => $toEvent->title,
-                'count'       => (string) $count,
-                'from_title'  => $fromEvent?->title ?? 'previous round',
+                'count' => (string) $count,
+                'from_title' => $fromEvent?->title ?? 'previous round',
+                'competition_label' => $this->competitionLabel($toEvent),
             ]);
         }
     }
@@ -180,11 +341,14 @@ class FestEventNotifier
             ->where('membership_status', 'approved')
             ->pluck('id');
 
+        $slug = $this->resolveTemplateSlug($event, 'fest.registration.deadline');
+
         foreach ($schoolIds as $schoolId) {
-            $this->notifySchool($schoolId, 'fest.registration.deadline', [
+            $this->notifySchool($schoolId, $slug, [
                 'event_title' => $event->title,
-                'days_left'   => (string) $daysLeft,
-                'close_date'  => $event->registration_close?->format('d M Y') ?? '',
+                'days_left' => (string) $daysLeft,
+                'close_date' => $event->registration_close?->format('d M Y') ?? '',
+                'competition_label' => $this->competitionLabel($event),
             ]);
         }
     }

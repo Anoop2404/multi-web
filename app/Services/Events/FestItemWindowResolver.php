@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestCompetitionArea;
 use App\Models\FestItemHead;
 use Illuminate\Support\Carbon;
 
@@ -18,6 +19,11 @@ class FestItemWindowResolver
         $head = $this->head($item);
         if ($head?->reg_start && $this->usesHeadRegistrationWindows($item)) {
             return Carbon::parse($head->reg_start)->startOfDay();
+        }
+
+        $area = $this->area($item);
+        if ($area?->reg_start) {
+            return Carbon::parse($area->reg_start)->startOfDay();
         }
 
         $event = $this->event($item);
@@ -38,6 +44,11 @@ class FestItemWindowResolver
             return Carbon::parse($head->reg_end)->startOfDay();
         }
 
+        $area = $this->area($item);
+        if ($area?->reg_end) {
+            return Carbon::parse($area->reg_end)->startOfDay();
+        }
+
         $event = $this->event($item);
 
         return $event?->registration_close
@@ -47,18 +58,26 @@ class FestItemWindowResolver
 
     public function effectiveCompetitionStart(FestEventItem $item): ?Carbon
     {
-        return $this->firstDate($item->competition_start, $this->head($item)?->competition_start);
+        return $this->firstDate(
+            $item->competition_start,
+            $this->head($item)?->competition_start ?? $this->area($item)?->competition_start
+        );
     }
 
     public function effectiveCompetitionEnd(FestEventItem $item): ?Carbon
     {
-        return $this->firstDate($item->competition_end, $this->head($item)?->competition_end);
+        return $this->firstDate(
+            $item->competition_end,
+            $this->head($item)?->competition_end ?? $this->area($item)?->competition_end
+        );
     }
 
     /** Effective time-of-day ('HH:MM') for the item's competition, if set. */
     public function effectiveCompetitionTime(FestEventItem $item): ?string
     {
-        $raw = $item->competition_time ?: $this->head($item)?->competition_time;
+        $raw = $item->competition_time
+            ?: $this->head($item)?->competition_time
+            ?: $this->area($item)?->competition_time;
 
         return $raw ? substr((string) $raw, 0, 5) : null;
     }
@@ -133,6 +152,21 @@ class FestItemWindowResolver
         }
 
         return $item->head()->first(['id', 'name', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time']);
+    }
+
+    private function area(FestEventItem $item): ?FestCompetitionArea
+    {
+        if ($item->relationLoaded('area')) {
+            return $item->area;
+        }
+
+        if (! $item->area_id) {
+            return null;
+        }
+
+        return $item->area()->first([
+            'id', 'name', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time',
+        ]);
     }
 
     /** Sports and Kalotsav use per-head registration windows; other programs follow event dates unless the item sets its own. */

@@ -63,6 +63,7 @@ class FestReportCatalog
             ['id' => 'age-group-matrix', 'label' => 'Age Group Matrix (schools × age)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'fee-pending-schools', 'label' => 'Schools with Pending Fees', 'format' => 'xls', 'params' => [], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'head-wise-participants', 'label' => 'Head-wise Participant List', 'format' => 'xls', 'params' => ['head_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'area-wise-participants', 'label' => 'Area-wise Participant List', 'format' => 'xls', 'params' => ['area_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'team-squad-sheets', 'label' => 'Team / Group Squad Sheets', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'assignment-completeness', 'label' => 'Assignment Completeness', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'numbering-register', 'label' => 'Numbering Register (Fest ID / chest / item reg)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
@@ -83,6 +84,7 @@ class FestReportCatalog
 
         $pages = [
             ['id' => 'head-wise-participants', 'label' => 'Head-wise Participants', 'href' => "{$base}/head-wise-participants"],
+            ['id' => 'area-wise-participants', 'label' => 'Area-wise Participants', 'href' => "{$base}/area-wise-participants"],
             ['id' => 'school-detailed', 'label' => 'School Detailed Results', 'href' => "{$base}/school-detailed"],
             ['id' => 'overall-ranking', 'label' => 'Overall Ranking', 'href' => "{$base}/overall-ranking"],
             ['id' => 'house-detailed', 'label' => 'House Detailed', 'href' => "{$base}/house-detailed"],
@@ -102,7 +104,9 @@ class FestReportCatalog
             ['id' => 'item-wise', 'label' => 'Item-wise browser', 'href' => "{$base}/item-wise"],
         ];
 
-        if ($eventType !== null && $eventType !== 'sports') {
+        if ($eventType === 'sports') {
+            $pages = array_values(array_filter($pages, fn ($p) => $p['id'] !== 'area-wise-participants'));
+        } elseif ($eventType !== null) {
             $pages = array_values(array_filter($pages, fn ($p) => $p['id'] !== 'house-detailed'));
         }
 
@@ -129,6 +133,7 @@ class FestReportCatalog
             'item-participants', 'item-wise' => 'item-wise',
             'results' => 'overall-ranking',
             'head-wise-participants' => 'head-wise-participants',
+            'area-wise-participants' => 'area-wise-participants',
             'assignment-completeness' => 'assignment-completeness',
             'numbering-register' => 'numbering-register',
             'pending-approvals' => 'pending-approvals',

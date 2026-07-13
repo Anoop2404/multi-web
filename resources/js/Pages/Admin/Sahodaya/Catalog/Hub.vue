@@ -41,7 +41,7 @@
                 <p class="text-sm text-slate-500 mt-1">Enable/disable items, set fees, add custom entries — common across all years.</p>
             </Link>
             <Link v-if="isSports" :href="`${catalogBase}/heads${eventQuery}`" class="card hover:border-[color:var(--brand-blue)]/40 transition group !py-5">
-                <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-blue)]">Item heads</p>
+                <p class="font-semibold text-slate-900 group-hover:text-[color:var(--brand-blue)]">Event Heads</p>
                 <p class="text-sm text-slate-500 mt-1">Group track & field items under heads for registration and reports.</p>
             </Link>
             <Link :href="`${catalogBase}/list${eventQuery}`" class="card hover:border-[color:var(--brand-blue)]/40 transition group !py-5">
@@ -109,7 +109,7 @@ const sectionLinks = computed(() => props.sections.map((sec) => ({
 
 async function reseedCatalog() {
     const sportsNote = isSports.value
-        ? ' Sports event item heads will also be relinked.'
+        ? ' Sports Event Heads will also be relinked.'
         : '';
     const ok = await confirm({
         title: 'Resync master catalog',

@@ -8,7 +8,7 @@
             <div class="lg:col-span-2">
                 <h3 class="font-bold font-heading text-lg mb-4" style="color: var(--color-secondary)">Organizational Structure</h3>
                 <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                    {!! $config['org_chart'] !!}
+                    {!! \App\Support\HtmlSanitizer::rich($config['org_chart'] ?? '') !!}
                 </div>
             </div>
             @endif

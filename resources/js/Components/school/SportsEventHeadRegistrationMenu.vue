@@ -1,7 +1,7 @@
 <template>
     <div class="space-y-6">
         <div class="notice-banner notice-banner--info text-sm max-w-3xl">
-            <p class="font-semibold text-[#0f3d7a] mb-1">Choose an item head</p>
+            <p class="font-semibold text-[#0f3d7a] mb-1">Choose an Event Head</p>
             <p class="text-slate-700">
                 Each section (Athletics, Field events, etc.) has its own registration window.
                 Open a head to register athletes for its events.
@@ -27,8 +27,8 @@
             </div>
         </div>
 
-        <EmptyState v-if="!headItemGroups.length" title="No item heads yet" icon="📂"
-                    description="Sahodaya has not synced item heads for this event yet." />
+        <EmptyState v-if="!headItemGroups.length" title="No Event Heads yet" icon="📂"
+                    description="Sahodaya has not synced Event Heads for this event yet." />
 
         <div v-else class="space-y-4">
             <div v-for="head in headItemGroups" :key="head.head_id ?? 'other'"

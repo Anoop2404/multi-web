@@ -1,7 +1,9 @@
 <template>
     <SchoolAdminLayout :title="`Mark entry status — ${event.title}`" :school="school" :show-header-title="false">
         <PageHeader :title="`Mark entry status — ${event.title}`" :eyebrow="programLabel"
-                    description="Mark entry progress for your school's participants by item head and item.">
+                    :description="event.event_type === 'sports'
+                        ? 'Mark entry progress for your school\'s participants by Event Head and item.'
+                        : 'Mark entry progress for your school\'s participants by item head and item.'">
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
                 <ReportDownloadButtons :pdf-url="pdfUrl" :csv-url="csvUrl" />
@@ -13,7 +15,8 @@
                           :base-url="base"
                           :selected-head-id="headFilter"
                           :selected-item-id="itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`" />
+                          :hub-url="`${programBase}/reports/${event.id}`"
+                          :is-sports="event.event_type === 'sports'" />
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">

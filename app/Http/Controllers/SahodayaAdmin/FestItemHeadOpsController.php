@@ -111,7 +111,15 @@ class FestItemHeadOpsController extends SahodayaAdminController
         $registry = app(FestTaxonomyRegistry::class)->forTenant($this->sahodaya->id);
 
         return $this->inertia('Sahodaya/Events/ItemHeadOps', $this->withEventActivity($event, FestPageActivity::COMPETITION, array_merge($nav, [
-            'event'              => $event->only('id', 'title', 'status', 'event_type', 'results_published'),
+            'event'              => $event->only(
+                'id',
+                'title',
+                'status',
+                'event_type',
+                'results_published',
+                'parent_event_id',
+                'partition_role',
+            ),
             'selectedHeadId'     => $selectedHeadId,
             'selectedItemId'     => $itemId,
             'selectedItem'       => $selectedItem,
@@ -121,6 +129,10 @@ class FestItemHeadOpsController extends SahodayaAdminController
             'taxonomyMastersUrl' => "/sahodaya-admin/{$this->sahodaya->id}/taxonomy-masters?dimension=sport_discipline",
             'catalogUrl'         => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/items",
             'showHeadFees'       => $event->event_type === 'sports',
+            'sportsHubUrl'       => "/sahodaya-admin/{$this->sahodaya->id}/sports",
+            'promoteStatus'      => $event->event_type === 'sports' && $event->parent_event_id === null
+                ? app(\App\Services\Events\PromoteSportsHeadsToDisciplineEvents::class)->status($event)
+                : null,
         ])));
     }
 }

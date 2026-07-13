@@ -82,9 +82,69 @@
                                        :disabled="!isTruthy(form.layout_json.show_recipient_name)">
                             </template>
                         </FormField>
+                        <FormField label="Recipient — font size (px)">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="form.layout_json.recipient_name.font_size" type="number" min="6" max="96" class="field"
+                                       :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                            </template>
+                        </FormField>
+                        <FormField label="Recipient — font family">
+                            <template #default="{ id }">
+                                <select :id="id" v-model="form.layout_json.recipient_name.font_family" class="field"
+                                        :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                    <option v-for="font in fontFamilies" :key="font" :value="font">{{ font }}</option>
+                                </select>
+                            </template>
+                        </FormField>
+                        <FormField label="Recipient — style">
+                            <template #default="{ id }">
+                                <div :id="id" class="flex flex-wrap gap-4 pt-2 text-sm">
+                                    <label class="flex items-center gap-2">
+                                        <input v-model="form.layout_json.recipient_name.font_weight" type="checkbox"
+                                               true-value="bold" false-value="normal"
+                                               :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                        Bold
+                                    </label>
+                                    <label class="flex items-center gap-2">
+                                        <input v-model="form.layout_json.recipient_name.font_style" type="checkbox"
+                                               true-value="italic" false-value="normal"
+                                               :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                        Italic
+                                    </label>
+                                </div>
+                            </template>
+                        </FormField>
                         <FormField label="Body text — top %">
                             <template #default="{ id }">
                                 <input :id="id" v-model.number="form.layout_json.body.top" type="number" min="0" max="100" class="field">
+                            </template>
+                        </FormField>
+                        <FormField label="Body — font size (px)">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="form.layout_json.body.font_size" type="number" min="6" max="96" class="field">
+                            </template>
+                        </FormField>
+                        <FormField label="Body — font family">
+                            <template #default="{ id }">
+                                <select :id="id" v-model="form.layout_json.body.font_family" class="field">
+                                    <option v-for="font in fontFamilies" :key="font" :value="font">{{ font }}</option>
+                                </select>
+                            </template>
+                        </FormField>
+                        <FormField label="Body — style">
+                            <template #default="{ id }">
+                                <div :id="id" class="flex flex-wrap gap-4 pt-2 text-sm">
+                                    <label class="flex items-center gap-2">
+                                        <input v-model="form.layout_json.body.font_weight" type="checkbox"
+                                               true-value="bold" false-value="normal">
+                                        Bold
+                                    </label>
+                                    <label class="flex items-center gap-2">
+                                        <input v-model="form.layout_json.body.font_style" type="checkbox"
+                                               true-value="italic" false-value="normal">
+                                        Italic
+                                    </label>
+                                </div>
                             </template>
                         </FormField>
                         <FormField label="Date — top %">
@@ -95,6 +155,34 @@
                         <FormField label="Date — left %" hint="Side position (lower = further left)">
                             <template #default="{ id }">
                                 <input :id="id" v-model.number="form.layout_json.certificate_date.left" type="number" min="0" max="100" class="field">
+                            </template>
+                        </FormField>
+                        <FormField label="Date — font size (px)">
+                            <template #default="{ id }">
+                                <input :id="id" v-model.number="form.layout_json.certificate_date.font_size" type="number" min="6" max="96" class="field">
+                            </template>
+                        </FormField>
+                        <FormField label="Date — font family">
+                            <template #default="{ id }">
+                                <select :id="id" v-model="form.layout_json.certificate_date.font_family" class="field">
+                                    <option v-for="font in fontFamilies" :key="font" :value="font">{{ font }}</option>
+                                </select>
+                            </template>
+                        </FormField>
+                        <FormField label="Date — style">
+                            <template #default="{ id }">
+                                <div :id="id" class="flex flex-wrap gap-4 pt-2 text-sm">
+                                    <label class="flex items-center gap-2">
+                                        <input v-model="form.layout_json.certificate_date.font_weight" type="checkbox"
+                                               true-value="bold" false-value="normal">
+                                        Bold
+                                    </label>
+                                    <label class="flex items-center gap-2">
+                                        <input v-model="form.layout_json.certificate_date.font_style" type="checkbox"
+                                               true-value="italic" false-value="normal">
+                                        Italic
+                                    </label>
+                                </div>
                             </template>
                         </FormField>
                         <FormField label="OF PARTICIPATION cover — top %"
@@ -222,7 +310,12 @@ const props = defineProps({
     defaultTopperBody: { type: String, default: '' },
     defaultSignatories: { type: Array, default: () => [] },
     defaultLayout: { type: Object, default: () => ({}) },
+    fontFamilyOptions: { type: Array, default: () => [
+        'Times New Roman', 'Georgia', 'Arial', 'Helvetica', 'Verdana', 'Courier New', 'Palatino Linotype', 'Garamond',
+    ] },
 });
+
+const fontFamilies = props.fontFamilyOptions;
 
 const trainingCertificateTypes = [
     'participation',
@@ -238,6 +331,18 @@ function isTruthy(value) {
     return value === true || value === 1 || value === '1' || value === 'true';
 }
 
+function textFieldDefaults(src = {}, def = {}, fallback = {}) {
+    return {
+        top: src.top ?? def.top ?? fallback.top ?? 0,
+        left: src.left ?? def.left ?? fallback.left ?? 10,
+        width: src.width ?? def.width ?? fallback.width ?? 80,
+        font_size: src.font_size ?? def.font_size ?? fallback.font_size ?? 13,
+        font_family: src.font_family ?? def.font_family ?? fallback.font_family ?? 'Times New Roman',
+        font_weight: src.font_weight ?? def.font_weight ?? fallback.font_weight ?? 'normal',
+        font_style: src.font_style ?? def.font_style ?? fallback.font_style ?? 'normal',
+    };
+}
+
 function layoutDefaults(from = null) {
     const d = props.defaultLayout || {};
     const src = from || {};
@@ -245,12 +350,16 @@ function layoutDefaults(from = null) {
         show_recipient_name: src.show_recipient_name ?? d.show_recipient_name ?? false,
         show_participation_label: src.show_participation_label ?? d.show_participation_label ?? true,
         bold_variables: src.bold_variables ?? d.bold_variables ?? true,
-        recipient_name: { top: src.recipient_name?.top ?? d.recipient_name?.top ?? 38 },
-        body: { top: src.body?.top ?? d.body?.top ?? 48 },
+        recipient_name: textFieldDefaults(src.recipient_name, d.recipient_name, {
+            top: 38, left: 10, width: 80, font_size: 28, font_family: 'Georgia', font_weight: 'bold',
+        }),
+        body: textFieldDefaults(src.body, d.body, {
+            top: 48, left: 12, width: 76, font_size: 13, font_family: 'Times New Roman',
+        }),
         certificate_date: {
-            top: src.certificate_date?.top ?? d.certificate_date?.top ?? 72,
-            left: src.certificate_date?.left ?? d.certificate_date?.left ?? 8,
-            width: src.certificate_date?.width ?? d.certificate_date?.width ?? 42,
+            ...textFieldDefaults(src.certificate_date, d.certificate_date, {
+                top: 72, left: 8, width: 42, font_size: 12, font_family: 'Times New Roman',
+            }),
             align: src.certificate_date?.align ?? d.certificate_date?.align ?? 'left',
         },
         participation_label_cover: {

@@ -64,7 +64,7 @@ abstract class SchoolAdminController extends Controller
 
         return inertia($component, array_merge([
             'school' => array_merge(
-                $this->school->only('id', 'name', 'type', 'school_prefix', 'prefixes_locked', 'membership_status', 'fest_registration_closed'),
+                $this->school->only('id', 'name', 'type', 'school_prefix', 'prefixes_locked', 'membership_status', 'is_non_affiliated', 'fest_registration_closed'),
                 ['logo_url' => TenantBranding::logoUrl($this->school)],
             ),
             'publicUrl'  => TenantDomainSync::publicUrl($this->school),

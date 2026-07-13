@@ -33,12 +33,9 @@
             word-wrap: break-word;
         }
         .overlay-field.recipient {
-            font-weight: 700;
-            font-family: Georgia, "Times New Roman", serif;
             color: #0f172a;
         }
         .overlay-field.body {
-            font-size: 13px;
             line-height: 1.7;
             color: #334155;
         }
@@ -134,14 +131,14 @@
         @if($showRecipientName)
             @php $r = $layout['recipient_name'] ?? []; @endphp
             <div class="overlay-field recipient"
-                 style="top:{{ $r['top'] ?? 38 }}%;left:{{ $r['left'] ?? 10 }}%;width:{{ $r['width'] ?? 80 }}%;font-size:{{ $r['font_size'] ?? 28 }}px;">
+                 style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($r, ['top' => 38, 'left' => 10, 'width' => 80, 'font_size' => 28, 'font_family' => 'Georgia', 'font_weight' => 'bold']) }}">
                 {{ $fieldValues['recipient_with_title'] ?? $fieldValues['recipient_name'] ?? '' }}
             </div>
         @endif
 
         @php $b = $layout['body'] ?? []; @endphp
         <div class="overlay-field body"
-             style="top:{{ $b['top'] ?? 48 }}%;left:{{ $b['left'] ?? 12 }}%;width:{{ $b['width'] ?? 76 }}%;font-size:{{ $b['font_size'] ?? 13 }}px;">
+             style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($b, ['top' => 48, 'left' => 12, 'width' => 76, 'font_size' => 13, 'font_family' => 'Times New Roman']) }}">
             @foreach($paragraphs as $paragraph)
                 <p style="margin-bottom:8px;">{!! nl2br($paragraph) !!}</p>
             @endforeach
@@ -149,13 +146,10 @@
 
         @php
             $d = $layout['certificate_date'] ?? [];
-            $dateAlign = in_array($d['align'] ?? 'left', ['left', 'right', 'center'], true)
-                ? ($d['align'] ?? 'left')
-                : 'left';
             $dateValue = $fieldValues['certificate_date'] ?? now()->format('j F Y');
         @endphp
         <div class="overlay-field"
-             style="top:{{ $d['top'] ?? 72 }}%;left:{{ $d['left'] ?? 8 }}%;width:{{ $d['width'] ?? 42 }}%;font-size:{{ $d['font_size'] ?? 12 }}px;text-align:{{ $dateAlign }};">
+             style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($d, ['top' => 72, 'left' => 8, 'width' => 42, 'font_size' => 12, 'font_family' => 'Times New Roman', 'align' => 'left']) }}">
             @if($boldVariables)
                 <strong>Date :</strong> <strong>{{ $dateValue }}</strong>
             @else
@@ -165,7 +159,7 @@
 
         @php $u = $layout['uuid'] ?? []; @endphp
         <div class="overlay-field uuid"
-             style="top:{{ $u['top'] ?? 92 }}%;left:{{ $u['left'] ?? 5 }}%;width:{{ $u['width'] ?? 90 }}%;font-size:{{ $u['font_size'] ?? 8 }}px;">
+             style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($u, ['top' => 92, 'left' => 5, 'width' => 90, 'font_size' => 8, 'font_family' => 'Arial']) }}">
             Verification: {{ $certificate->verification_uuid }}
         </div>
     </div>

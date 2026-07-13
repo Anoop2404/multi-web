@@ -4,7 +4,7 @@
         <PageHeader :title="pageTitle" eyebrow="Operations"
                     :description="selectedItem
                         ? `${selectedItem.head_name ? selectedItem.head_name + ' · ' : ''}Chest starts at ${selectedItem.chest_no_start}`
-                        : 'Pick item head, then item — participants load only at the item level.'">
+                        : 'Pick Event Head, then item — participants load only at the item level.'">
             <template #actions>
                 <Link :href="numberingUrl" class="btn-secondary text-sm">Numbering settings</Link>
             </template>
@@ -15,8 +15,9 @@
                                  :selected-head-id="selectedHeadId"
                                  :selected-item-id="selectedItemId"
                                  :has-item-heads="hasItemHeads"
+                                 :is-sports="true"
                                  :hint="hasItemHeads
-                                     ? 'Sports events are organized by item head (Athletics, Chess, …) — choose a head, then an item.'
+                                     ? 'Sports events are organized by Event Head (Athletics, Chess, …) — choose a head, then an item.'
                                      : 'Select a competition item to assign chest numbers.'"
                                  empty-heads-text="No enabled items on this event yet. Import items from the catalog first.">
 

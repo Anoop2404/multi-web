@@ -35,7 +35,7 @@
                             Step 1 · Event registration
                         </Link>
                         <Link v-if="isSports" :href="`${programBase}/events/${ev.id}/items`" class="btn-secondary text-xs !min-h-0">
-                            Step 2 · Register by item head
+                            Step 2 · Register by Event Head
                         </Link>
                     </div>
                 </article>
@@ -52,9 +52,9 @@ import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import {
-    REPORT_CATEGORIES,
     REPORT_CATEGORY_ORDER,
     schoolReportsForProgram,
+    reportCategoryLabel,
 } from '@/support/festReportCatalog.js';
 
 const props = defineProps({
@@ -75,7 +75,7 @@ const reportCount = computed(() => allReports.value.length);
 const categoryPreview = computed(() =>
     REPORT_CATEGORY_ORDER
         .filter((key) => allReports.value.some((r) => r.category === key))
-        .map((key) => REPORT_CATEGORIES[key]?.label ?? key)
+        .map((key) => reportCategoryLabel(key, isSports.value))
         .join(' · '),
 );
 

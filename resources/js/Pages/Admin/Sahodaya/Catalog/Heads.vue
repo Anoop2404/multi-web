@@ -4,7 +4,7 @@
                          :program-events="events" :show-header-title="false">
         <PageHeader
             :title="pageTitle"
-            eyebrow="Item heads"
+            eyebrow="Event Heads"
             description="Main heads (Chess, Athletics…) group sub-items. One ID card per head — use Sample ID card to demo the layout to clients."
         >
             <template #actions>
@@ -76,7 +76,7 @@
                 </div>
                 <p v-else class="text-sm text-slate-400 italic">No items linked — sync CKSC items or assign head when adding items.</p>
             </div>
-            <EmptyState v-if="!heads.length" title="No item heads" description="Sync from CKSC definitions or add a head above." icon="📂" />
+            <EmptyState v-if="!heads.length" title="No Event Heads" description="Sync from CKSC definitions or add a head above." icon="📂" />
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
@@ -105,7 +105,7 @@ const props = defineProps({
 
 const catalogBase = computed(() => sahodayaCatalogHref(props.sahodaya.id, props.program.slug));
 const masterUrl = computed(() => `${catalogBase.value}/master`);
-const pageTitle = computed(() => `${props.program.label} — Item heads`);
+const pageTitle = computed(() => `${props.program.label} — Event Heads`);
 
 const form = useForm({ name: '', sport_discipline: '', is_team_heading: true });
 

@@ -171,6 +171,32 @@ Route::prefix('programs/custom/catalog')->name('programs.catalog.')->group(funct
     Route::post('/import/{event}', [FestCatalogController::class, 'importToEvent'])->name('import');
 });
 
+// Dynamic competition types (FRD-08 Phase 1) — any active FestCompetitionType nav_slug.
+$reservedProgramSlugs = 'kalotsav|sports-meet|kids-fest|teacher-fest|english-fest|science-fest|custom|mcq|fest|events|catalog|taxonomy-masters|competition-types';
+Route::get('/programs/{program}', [FestEventController::class, 'programIndex'])
+    ->where('program', '^(?!'.$reservedProgramSlugs.')[a-z0-9\-]+$')
+    ->name('programs.dynamic');
+
+Route::prefix('programs/{program}/catalog')->where(['program' => '^(?!'.$reservedProgramSlugs.')[a-z0-9\-]+$'])->name('programs.dynamic.catalog.')->group(function () {
+    Route::get('/', [FestCatalogController::class, 'index'])->name('index');
+    Route::get('/master/{section?}', [FestCatalogController::class, 'master'])
+        ->where('section', '[a-z0-9\-]+')
+        ->name('master');
+    Route::get('/list/{section?}', [FestCatalogController::class, 'list'])
+        ->where('section', '[a-z0-9\-]+')
+        ->name('list');
+    Route::get('/assign', [FestCatalogController::class, 'assign'])->name('assign');
+    Route::get('/browse/{section}', [FestCatalogController::class, 'section'])
+        ->where('section', '[a-z0-9\-]+')
+        ->name('section');
+    Route::post('/seed', [FestCatalogController::class, 'seed'])->name('seed');
+    Route::post('/items', [FestCatalogController::class, 'store'])->name('items.store');
+    Route::put('/items/{item}', [FestCatalogController::class, 'update'])->name('items.update');
+    Route::delete('/items/{item}', [FestCatalogController::class, 'destroy'])->name('items.destroy');
+    Route::post('/bulk', [FestCatalogController::class, 'bulk'])->name('bulk');
+    Route::post('/import/{event}', [FestCatalogController::class, 'importToEvent'])->name('import');
+});
+
 Route::get('/programs/{program}/{view}', function (string $tenantId, string $program, string $view) {
     abort_unless(in_array($view, ['registration', 'results'], true), 404);
     $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest', 'english-fest' => 'english-fest', 'science-fest' => 'science-fest'];
@@ -179,4 +205,4 @@ Route::get('/programs/{program}/{view}', function (string $tenantId, string $pro
     }
 
     return redirect("/sahodaya-admin/{$tenantId}/programs/{$program}");
-})->whereIn('view', ['registration', 'results'])->whereIn('program', ['kalotsav', 'sports-meet', 'kids-fest', 'teacher-fest', 'english-fest', 'science-fest', 'custom']);
+})->whereIn('view', ['registration', 'results'])->where('program', '[a-z0-9\-]+');

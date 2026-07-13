@@ -22,17 +22,6 @@ use Illuminate\Validation\Rule;
 
 class FestCatalogController extends SahodayaAdminController
 {
-    /** @var array<string, array{slug: string, eventType: string, label: string}> */
-    private const PROGRAMS = [
-        'kalotsav'     => ['slug' => 'kalotsav', 'eventType' => 'kalolsavam', 'label' => 'Kalotsav'],
-        'sports-meet'  => ['slug' => 'sports-meet', 'eventType' => 'sports', 'label' => 'Sports Meet'],
-        'kids-fest'    => ['slug' => 'kids-fest', 'eventType' => 'kids_fest', 'label' => 'Kids Fest'],
-        'teacher-fest' => ['slug' => 'teacher-fest', 'eventType' => 'teacher_fest', 'label' => 'Teacher Fest'],
-        'english-fest' => ['slug' => 'english-fest', 'eventType' => 'english_fest', 'label' => 'English Fest'],
-        'science-fest' => ['slug' => 'science-fest', 'eventType' => 'science_fest', 'label' => 'Science Fest'],
-        'custom'       => ['slug' => 'custom', 'eventType' => 'custom', 'label' => 'Custom Events'],
-    ];
-
     public function index(Request $request, string $tenantId, string $program, FestCatalogService $catalogService)
     {
         $ctx = $this->catalogContext($program, $catalogService);
@@ -243,7 +232,7 @@ class FestCatalogController extends SahodayaAdminController
         $program = $this->catalogProgramSlug($request);
         $section = (string) $request->route('section');
         $meta = $this->programMeta($program);
-        abort_unless(FestCatalogSections::find($meta['eventType'], $section) !== null, 404);
+        abort_unless(FestCatalogSections::find($meta['eventType'], $section, $this->sahodaya->id) !== null, 404);
 
         return redirect(ProgramRouteMap::sahodayaCatalogBase($tenantId, $program)."/master/{$section}");
     }
@@ -441,7 +430,7 @@ class FestCatalogController extends SahodayaAdminController
 
         $itemIds = $data['item_ids'] ?? null;
         if ($itemIds === null && filled($data['catalog_section'] ?? null) && ($data['catalog_section'] ?? 'all') !== 'all') {
-            $sectionMeta = FestCatalogSections::find($meta['eventType'], $data['catalog_section']);
+            $sectionMeta = FestCatalogSections::find($meta['eventType'], $data['catalog_section'], $this->sahodaya->id);
             if ($sectionMeta) {
                 $q = FestCatalogItem::forProgram($this->sahodaya->id, $meta['eventType'])
                     ->where('is_enabled', true);
@@ -506,7 +495,7 @@ class FestCatalogController extends SahodayaAdminController
             return ['slug' => 'all', 'label' => 'All items', 'description' => 'Complete catalog', 'filter' => []];
         }
 
-        $found = FestCatalogSections::find($eventType, $section);
+        $found = FestCatalogSections::find($eventType, $section, $this->sahodaya->id);
         abort_unless($found !== null, 404);
 
         return $found;
@@ -575,26 +564,37 @@ class FestCatalogController extends SahodayaAdminController
     /** @return array{slug: string, eventType: string, label: string} */
     private function programMeta(string $program): array
     {
-        abort_unless(isset(self::PROGRAMS[$program]), 404);
+        $meta = app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+            ->forTenant($this->sahodaya->id)
+            ->programMeta($program);
+        abort_unless($meta !== null, 404);
 
-        return self::PROGRAMS[$program];
+        return [
+            'slug' => $meta['slug'],
+            'eventType' => $meta['eventType'],
+            'label' => $meta['label'],
+        ];
     }
 
     /** @return array<string, mixed> */
     private function validateItem(Request $request, string $eventType): array
     {
+        $registry = app(FestTaxonomyRegistry::class)->forTenant($this->sahodaya->id);
+        $registry->ensureDefaults();
+
         $rules = [
             'title'              => 'required|string|max:255',
-            'participant_type'   => 'nullable|in:individual,group,team',
-            'gender'             => 'nullable|in:male,female,mixed,open',
+            'participant_type'   => ['nullable', $registry->validationRule('participant_type')],
+            'result_method'      => ['nullable', $registry->validationRule('result_method')],
+            'gender'             => ['nullable', $registry->validationRule('gender')],
             'class_group'        => 'nullable|in:lp,up,hs,hss,open',
             'age_group'          => 'nullable|in:u8,u10,u11,u12,u14,u17,u19,open',
             'kids_band'          => 'nullable|in:pre_kg,lkg,ukg,class1,class2,open',
             'qualify_count'      => 'nullable|integer|min:1',
             'max_per_school'     => 'nullable|integer|min:1',
             'fee_amount'         => 'nullable|numeric|min:0',
-            'stage_type'         => 'nullable|in:on_stage,off_stage',
-            'venue_type'         => 'nullable|in:indoor,outdoor',
+            'stage_type'         => ['nullable', $registry->validationRule('stage_type')],
+            'venue_type'         => ['nullable', $registry->validationRule('venue_type')],
             'competition_format' => 'nullable|string|max:30',
             'sport_discipline'   => 'nullable|string|max:40',
             'category'           => 'nullable|string|max:30',
@@ -617,7 +617,7 @@ class FestCatalogController extends SahodayaAdminController
             $data['category'] = 'sports';
         }
 
-        if (in_array($data['participant_type'], ['team', 'group'], true)) {
+        if (FestTeamSquadRules::isMultiPerson($data['participant_type'])) {
             $merged = FestTeamSquadRules::mergeIntoItem($request->only([
                 'min_playing', 'max_playing', 'max_subs', 'max_squad', 'min_squad', 'standbys',
             ]));
@@ -626,6 +626,11 @@ class FestCatalogController extends SahodayaAdminController
             }
             $data['min_group_size'] = $merged['min_group_size'];
             $data['max_group_size'] = $merged['max_group_size'];
+            $fixed = FestTeamSquadRules::defaultSizeFor($data['participant_type']);
+            if ($fixed && empty($data['min_group_size']) && empty($data['max_group_size'])) {
+                $data['min_group_size'] = $fixed;
+                $data['max_group_size'] = $fixed;
+            }
         }
 
         unset($data['min_playing'], $data['max_playing'], $data['max_subs'], $data['max_squad'], $data['min_squad'], $data['standbys']);

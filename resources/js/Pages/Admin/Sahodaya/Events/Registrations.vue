@@ -4,7 +4,7 @@
         <PageHeader :title="`${event.title} — Registrations`" eyebrow="Review"
                     :description="filterDescription">
             <template #actions>
-                <Link v-if="competitionUrl" :href="competitionUrl" class="btn-secondary text-xs">← By item head</Link>
+                <Link v-if="competitionUrl" :href="competitionUrl" class="btn-secondary text-xs">← {{ event.event_type === 'sports' ? 'By Event Head' : 'By item head' }}</Link>
                 <button type="button" class="btn-primary text-xs" @click="openOnBehalf">Register on behalf</button>
                 <Link :href="`${base}/registrations/import`" class="btn-secondary text-xs">Import CSV</Link>
                 <Link v-if="feeRequired" :href="`${base}/fees`" class="btn-secondary text-xs">Event fees</Link>
@@ -338,7 +338,9 @@ const filterDescription = computed(() => {
         return 'Review and approve registrations for a single competition item.';
     }
     if (props.selectedHeadId) {
-        return 'Filtered by item head — approve, reject, or register on behalf of schools.';
+        return props.event.event_type === 'sports'
+            ? 'Filtered by Event Head — approve, reject, or register on behalf of schools.'
+            : 'Filtered by item head — approve, reject, or register on behalf of schools.';
     }
     return 'Approve or reject school registrations. Register on behalf of a school when needed.';
 });

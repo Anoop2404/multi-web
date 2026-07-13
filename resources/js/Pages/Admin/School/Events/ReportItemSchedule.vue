@@ -17,6 +17,7 @@
                           :selected-head-id="headFilter"
                           :selected-item-id="itemFilter"
                           :hub-url="`${programBase}/reports/${event.id}`"
+                          :is-sports="event.event_type === 'sports'"
                           :preserve-query="scheduleQuery" />
 
         <form class="card mb-4 flex flex-wrap gap-3 items-end p-4" @submit.prevent="applyFilters">

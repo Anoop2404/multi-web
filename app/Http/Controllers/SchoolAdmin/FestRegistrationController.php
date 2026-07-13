@@ -698,8 +698,13 @@ class FestRegistrationController extends SchoolAdminController
         app(PlatformAuditLogger::class)->festRegistrationSubmitted($registration->fresh(['event', 'item']));
 
         $label = $event->event_type === 'teacher_fest' ? 'Teacher registration' : 'Registration';
+        $message = match ($registration->status) {
+            'waitlisted' => "{$label} added to the waiting list — a seat will open if capacity frees under this Event Head.",
+            'pending_approval' => "{$label} submitted and awaiting Sahodaya approval for this Event Head.",
+            default => "{$label} submitted for approval.",
+        };
 
-        return back()->with('success', "{$label} submitted for approval.");
+        return back()->with('success', $message);
     }
 
     public function uploadEventPayment(Request $request, string $tenantId, FestEvent $event, string $program)

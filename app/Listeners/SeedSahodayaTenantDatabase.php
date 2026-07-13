@@ -36,6 +36,13 @@ class SeedSahodayaTenantDatabase
             app(FestCatalogService::class)->ensureSeeded($tenant->id, 'teacher_fest');
             app(FestCatalogService::class)->ensureSeeded($tenant->id, 'english_fest');
             app(FestCatalogService::class)->ensureSeeded($tenant->id, 'science_fest');
+
+            app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+                ->forTenant($tenant->id)
+                ->ensureDefaults();
+            app(\App\Services\Events\FestTaxonomyRegistry::class)
+                ->forTenant($tenant->id)
+                ->ensureDefaults();
         });
     }
 }

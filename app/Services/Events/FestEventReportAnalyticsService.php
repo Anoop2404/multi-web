@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestCompetitionArea;
 use App\Models\FestItemHead;
 use App\Models\FestJudgeAssignment;
 use App\Models\FestMark;
@@ -197,7 +198,8 @@ class FestEventReportAnalyticsService
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
 
             $approved = (clone $regBase)->where('status', 'approved')->count();
-            $pending = (clone $regBase)->where('status', 'submitted')->count();
+            $pending = (clone $regBase)->whereIn('status', ['submitted', 'pending_approval'])->count();
+            $waitlisted = (clone $regBase)->where('status', 'waitlisted')->count();
 
             $participantCount = FestParticipant::query()
                 ->whereHas('registration', fn ($q) => $q
@@ -205,6 +207,15 @@ class FestEventReportAnalyticsService
                     ->whereIn('item_id', $itemIds)
                     ->active()
                     ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+                ->count();
+
+            $verifiedParticipants = FestParticipant::query()
+                ->whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $this->event->id)
+                    ->whereIn('item_id', $itemIds)
+                    ->active()
+                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+                ->whereHas('student', fn ($q) => $q->whereNotNull('verified_at'))
                 ->count();
 
             $perItemCounts = FestRegistration::query()
@@ -218,6 +229,12 @@ class FestEventReportAnalyticsService
 
             $maxItemReg = $perItemCounts->max() ?? 0;
 
+            $quota = max(0, (int) ($head->included_items_per_student ?? 0));
+            $headFees = FestSchoolEventFee::where('event_id', $this->event->id)
+                ->where('head_id', $head->id)
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+                ->get();
+
             return [
                 'head_id'             => $head->id,
                 'head_name'           => $head->name,
@@ -225,8 +242,17 @@ class FestEventReportAnalyticsService
                 'registration_count' => $approved + $pending,
                 'approved_count'      => $approved,
                 'pending_count'       => $pending,
+                'waitlisted_count'    => $waitlisted,
                 'participant_count'   => $participantCount,
+                'verified_count'      => $verifiedParticipants,
+                'unverified_count'    => max(0, $participantCount - $verifiedParticipants),
                 'max_item_reg_count'  => (int) $maxItemReg,
+                'included_quota'      => $quota,
+                'verification_policy' => $head->verification_policy ?? 'all_students',
+                'approval_policy'     => $head->approval_policy ?? 'auto',
+                'due_total'           => round((float) $headFees->sum('total_due'), 2),
+                'collected_total'     => round((float) $headFees->where('status', 'approved')->sum('total_due'), 2),
+                'pending_fee_total'   => round((float) $headFees->whereNotIn('status', ['approved', 'waived'])->sum('total_due'), 2),
                 'default_item_fee'    => $head->default_item_fee !== null ? (float) $head->default_item_fee : null,
                 'extra_item_fee'      => $head->extra_item_fee !== null ? (float) $head->extra_item_fee : null,
             ];
@@ -764,6 +790,175 @@ class FestEventReportAnalyticsService
         return ExcelExport::download(
             str($this->event->title)->slug()->limit(40).'-head-wise-participants',
             ['Head', 'School', 'Participant', 'School reg', 'Item', 'Fest ID', 'Item reg', 'Chest'],
+            $rows,
+        );
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function areaWiseSummary(?string $schoolId = null): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('fest_competition_areas')) {
+            return [];
+        }
+
+        $areas = FestCompetitionArea::where('event_id', $this->event->id)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $unassignedItems = FestEventItem::where('event_id', $this->event->id)->whereNull('area_id')->pluck('id');
+
+        $rows = $areas->map(function (FestCompetitionArea $area) use ($schoolId) {
+            return $this->summarizeAreaBucket(
+                $area->id,
+                $area->name,
+                FestEventItem::where('event_id', $this->event->id)->where('area_id', $area->id)->pluck('id'),
+                $schoolId,
+                $area->default_item_fee !== null ? (float) $area->default_item_fee : null,
+            );
+        })->values()->all();
+
+        if ($unassignedItems->isNotEmpty()) {
+            $rows[] = $this->summarizeAreaBucket(0, 'Unassigned items', $unassignedItems, $schoolId, null);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, int>|array<int, int>  $itemIds
+     * @return array<string, mixed>
+     */
+    private function summarizeAreaBucket(int $areaId, string $areaName, $itemIds, ?string $schoolId, ?float $defaultFee): array
+    {
+        $itemIds = collect($itemIds);
+        $regBase = FestRegistration::query()
+            ->where('event_id', $this->event->id)
+            ->whereIn('item_id', $itemIds)
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+
+        $approved = (clone $regBase)->where('status', 'approved')->count();
+        $pending = (clone $regBase)->whereIn('status', ['submitted', 'pending_approval'])->count();
+        $waitlisted = (clone $regBase)->where('status', 'waitlisted')->count();
+
+        $participantCount = FestParticipant::query()
+            ->whereHas('registration', fn ($q) => $q
+                ->where('event_id', $this->event->id)
+                ->whereIn('item_id', $itemIds)
+                ->active()
+                ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+            ->count();
+
+        return [
+            'area_id' => $areaId,
+            'area_name' => $areaName,
+            'item_count' => $itemIds->count(),
+            'registration_count' => $approved + $pending,
+            'approved_count' => $approved,
+            'pending_count' => $pending,
+            'waitlisted_count' => $waitlisted,
+            'participant_count' => $participantCount,
+            'default_item_fee' => $defaultFee,
+        ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function areaWiseParticipantRows(?int $areaId = null, ?string $schoolId = null): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('fest_competition_areas')) {
+            return [];
+        }
+
+        $areas = FestCompetitionArea::where('event_id', $this->event->id)
+            ->when($areaId !== null && $areaId > 0, fn ($q) => $q->where('id', $areaId))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $rows = [];
+        foreach ($areas as $area) {
+            $itemIds = FestEventItem::where('event_id', $this->event->id)
+                ->where('area_id', $area->id)
+                ->pluck('id');
+
+            $participants = FestParticipant::query()
+                ->whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $this->event->id)
+                    ->whereIn('item_id', $itemIds)
+                    ->active()
+                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+                ->with([
+                    'student:id,name,reg_no,tenant_id',
+                    'teacher:id,name,reg_no',
+                    'registration.school:id,name',
+                    'registration.item:id,title,area_id',
+                ])
+                ->get();
+
+            foreach ($participants as $p) {
+                $rows[] = [
+                    'area_id' => $area->id,
+                    'area_name' => $area->name,
+                    'item_id' => $p->registration?->item_id,
+                    'school' => $p->registration?->school?->name,
+                    'student' => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    'item' => $p->registration?->item?->title,
+                    'item_reg' => $p->item_registration_number,
+                    'chest_no' => $p->chest_no,
+                    'fest_id' => $p->level_registration_number,
+                    'status' => $p->registration?->status,
+                ];
+            }
+        }
+
+        if ($areaId === null || $areaId === 0) {
+            $itemIds = FestEventItem::where('event_id', $this->event->id)->whereNull('area_id')->pluck('id');
+            if ($itemIds->isNotEmpty() && ($areaId === null || $areaId === 0)) {
+                $participants = FestParticipant::query()
+                    ->whereHas('registration', fn ($q) => $q
+                        ->where('event_id', $this->event->id)
+                        ->whereIn('item_id', $itemIds)
+                        ->active()
+                        ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+                    ->with([
+                        'student:id,name,reg_no,tenant_id',
+                        'teacher:id,name,reg_no',
+                        'registration.school:id,name',
+                        'registration.item:id,title,area_id',
+                    ])
+                    ->get();
+
+                foreach ($participants as $p) {
+                    $rows[] = [
+                        'area_id' => 0,
+                        'area_name' => 'Unassigned items',
+                        'item_id' => $p->registration?->item_id,
+                        'school' => $p->registration?->school?->name,
+                        'student' => $p->student?->name ?? $p->teacher?->name,
+                        'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                        'item' => $p->registration?->item?->title,
+                        'item_reg' => $p->item_registration_number,
+                        'chest_no' => $p->chest_no,
+                        'fest_id' => $p->level_registration_number,
+                        'status' => $p->registration?->status,
+                    ];
+                }
+            }
+        }
+
+        return $rows;
+    }
+
+    public function exportAreaWiseParticipants(?int $areaId = null, ?string $schoolId = null): StreamedResponse
+    {
+        $rows = collect($this->areaWiseParticipantRows($areaId, $schoolId))->map(fn ($r) => [
+            $r['area_name'], $r['school'], $r['student'], $r['reg_no'], $r['item'], $r['fest_id'], $r['item_reg'], $r['chest_no'],
+        ]);
+
+        return ExcelExport::download(
+            str($this->event->title)->slug()->limit(40).'-area-wise-participants',
+            ['Area', 'School', 'Participant', 'School reg', 'Item', 'Fest ID', 'Item reg', 'Chest'],
             $rows,
         );
     }

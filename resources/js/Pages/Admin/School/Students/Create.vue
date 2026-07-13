@@ -37,6 +37,13 @@
                     <p v-if="form.errors.name" class="form-error">{{ form.errors.name }}</p>
                 </FormField>
 
+                <FormField label="School admission no.">
+                    <input v-model="form.admission_number" type="text" class="field" maxlength="50"
+                           placeholder="Your school’s own admission number (optional)">
+                    <p v-if="form.errors.admission_number" class="form-error">{{ form.errors.admission_number }}</p>
+                    <p class="text-xs text-gray-500 mt-1">Separate from the Sahodaya student ID assigned automatically.</p>
+                </FormField>
+
                 <FormGrid>
                     <FormField label="Gender" required>
                         <select v-model="form.gender" class="field" required>
@@ -102,6 +109,7 @@ const form = useForm({
     gender:          '',
     dob:             '',
     email:           '',
+    admission_number: '',
     photo:           null,
 });
 

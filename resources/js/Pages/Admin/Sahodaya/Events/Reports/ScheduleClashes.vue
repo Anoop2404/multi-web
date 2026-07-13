@@ -15,6 +15,7 @@
                           v-model:item-id="itemFilter"
                           :heads="headsForFilter"
                           :head-item-groups="headItemGroups"
+                          :is-sports="event.event_type === 'sports'"
                           @apply="applyFilter">
             <template #extra>
                 <FormField label="School" class-extra="mb-0 min-w-[12rem]">

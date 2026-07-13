@@ -86,6 +86,26 @@ class NotificationTemplatesSeeder extends Seeder
                 'body_template' => 'Registration for {{event_title}} closes on {{close_date}} ({{days_left}} day(s) left).',
             ],
             [
+                'slug'          => 'fest.registration.open',
+                'title'         => 'Event registration open',
+                'body_template' => 'Registration is now open for {{event_title}} ({{competition_label}}). Closes {{close_date}}.',
+            ],
+            [
+                'slug'          => 'fest.payment.pending',
+                'title'         => 'Event fee payment pending',
+                'body_template' => 'Payment of ₹{{amount}} is still pending for {{event_title}}. Please upload fee proof from the school portal.',
+            ],
+            [
+                'slug'          => 'fest.competition.reminder',
+                'title'         => 'Competition reminder',
+                'body_template' => 'Reminder: {{event_title}} starts on {{start_date}}. Venue: {{venue}}.',
+            ],
+            [
+                'slug'          => 'fest.certificate.available',
+                'title'         => 'Event certificates available',
+                'body_template' => '{{count}} certificate(s) for {{event_title}} are now available to download.',
+            ],
+            [
                 'slug'          => 'fest.record.broken',
                 'title'         => 'Athletic record broken',
                 'body_template' => '{{student_name}} ({{school_name}}) broke the record in {{item_title}} at {{event_title}} with {{new_value}} {{record_unit}}. Prize: {{prize_label}}.',

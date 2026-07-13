@@ -513,6 +513,33 @@
                     </FormGrid>
                 </FormSection>
 
+                <FormSection title="Non-affiliated schools (optional)"
+                             hint="Enable only if this Sahodaya admits non-affiliated schools with a different membership fee. Leave off for Sahodayas that do not need this — the registration form will hide the option.">
+                    <label class="flex items-start gap-3 text-sm">
+                        <input v-model="feeForm.allow_non_affiliated_schools" type="checkbox" class="mt-1 rounded border-slate-300">
+                        <span>
+                            <span class="font-medium text-slate-800">Allow non-affiliated schools</span>
+                            <span class="block text-xs text-slate-500 mt-0.5">
+                                Adds a “School type” choice on public registration. Non-affiliated schools use the fee below instead of the member fee / slabs.
+                            </span>
+                        </span>
+                    </label>
+
+                    <div v-if="feeForm.allow_non_affiliated_schools" class="grid sm:grid-cols-2 gap-4 pt-3">
+                        <FormField label="Non-affiliated fee type">
+                            <select v-model="feeForm.non_affiliated_membership_fee_type" class="field">
+                                <option value="fixed">Fixed amount</option>
+                                <option value="none">No fee (₹0)</option>
+                            </select>
+                        </FormField>
+                        <FormField v-if="feeForm.non_affiliated_membership_fee_type === 'fixed'"
+                                   label="Non-affiliated membership fee (₹)" required>
+                            <input v-model.number="feeForm.non_affiliated_fixed_membership_fee_amount"
+                                   type="number" step="0.01" min="0" class="field" placeholder="e.g. 3000">
+                        </FormField>
+                    </div>
+                </FormSection>
+
                 <FormSection v-if="feeForm.membership_fee_type === 'variable_by_student_count'"
                              :title="`Fee Slabs — ${academicYear}`"
                              hint="Schools are billed the slab matching their student count.">
@@ -1075,6 +1102,9 @@ const formFieldGroups = computed(() => {
 const feeForm = useForm({
     membership_fee_type: props.profile?.membership_fee_type ?? 'fixed',
     fixed_membership_fee_amount: props.profile?.fixed_membership_fee_amount ?? 0,
+    allow_non_affiliated_schools: !!props.profile?.allow_non_affiliated_schools,
+    non_affiliated_membership_fee_type: props.profile?.non_affiliated_membership_fee_type ?? 'fixed',
+    non_affiliated_fixed_membership_fee_amount: props.profile?.non_affiliated_fixed_membership_fee_amount ?? 0,
 });
 
 const paymentPreview = computed(() => {

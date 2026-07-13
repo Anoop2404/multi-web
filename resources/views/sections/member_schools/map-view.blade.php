@@ -4,7 +4,7 @@
         <h2 class="text-3xl md:text-4xl font-bold font-heading text-center mb-10" style="color: var(--color-primary)">{{ $config['heading'] }}</h2>
         @endif
         @if(!empty($config['map_embed']))
-        <div class="rounded-xl overflow-hidden shadow-lg mb-8">{!! $config['map_embed'] !!}</div>
+        <div class="rounded-xl overflow-hidden shadow-lg mb-8">{!! \App\Support\HtmlSanitizer::embed($config['map_embed'] ?? '') !!}</div>
         @endif
         @if(!empty($config['schools']) && is_array($config['schools']))
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

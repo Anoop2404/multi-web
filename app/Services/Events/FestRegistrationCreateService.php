@@ -94,8 +94,17 @@ class FestRegistrationCreateService
             ->validateStudents($event, $item, array_merge($performerIds, $standbyIds));
         abort_if($eligibilityErrors, 422, implode(' ', $eligibilityErrors));
 
+        $item->loadMissing('head');
+        $limitService = new FestParticipationLimitService($event);
+        $waitlisted = $event->event_type === 'sports' && $limitService->isHeadAtCapacity($item);
+        $initialStatus = match (true) {
+            $waitlisted => 'waitlisted',
+            $item->head?->requiresManualApproval() => 'pending_approval',
+            default => 'submitted',
+        };
+
         try {
-            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts) {
+            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $initialStatus) {
                 $eventRegService = app(FestEventRegistrationService::class);
                 foreach (array_merge($performerIds, $standbyIds) as $studentId) {
                     if ($eventRegService->requireEventRegistration($event) && $event->event_type !== 'sports') {
@@ -112,8 +121,8 @@ class FestRegistrationCreateService
                     'event_id'     => $event->id,
                     'item_id'      => $item->id,
                     'school_id'    => $school->id,
-                    'status'       => 'submitted',
-                    'submitted_at' => now(),
+                    'status'       => $initialStatus,
+                    'submitted_at' => $initialStatus === 'waitlisted' ? null : now(),
                 ]);
 
                 $groupId = null;
@@ -153,11 +162,13 @@ class FestRegistrationCreateService
 
                 app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
 
-                foreach ($registration->fresh(['participants'])->participants as $participant) {
-                    app(FestNumberingService::class)->assignParticipantNumbers($participant);
-                }
+                if ($initialStatus !== 'waitlisted') {
+                    foreach ($registration->fresh(['participants'])->participants as $participant) {
+                        app(FestNumberingService::class)->assignParticipantNumbers($participant);
+                    }
 
-                app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+                    app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+                }
 
                 return $registration->load(['participants.student', 'item']);
             });

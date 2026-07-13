@@ -10,7 +10,8 @@
                           :base-url="marksBaseUrl"
                           :selected-head-id="selectedHeadId"
                           :selected-item-id="selectedItemId"
-                          :show-item-links="true" />
+                          :show-item-links="true"
+                          :is-sports="true" />
 
         <p v-if="isSports && event.record_tracking_enabled" class="text-xs text-amber-800 bg-amber-50 border rounded-lg px-3 py-2 mb-3">
             Record tracking is on — new records may trigger prize labels when marks are saved.
@@ -25,7 +26,7 @@
         </p>
 
         <p v-if="!sections.length" class="text-sm text-slate-500 py-6 text-center">
-            No participants in this section. Pick another item head above.
+            No participants in this section. Pick another Event Head above.
         </p>
 
         <div class="space-y-4">

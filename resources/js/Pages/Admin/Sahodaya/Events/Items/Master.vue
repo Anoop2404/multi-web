@@ -21,7 +21,7 @@
                             <div>
                                 <h3 class="form-section-title">Event items</h3>
                                 <p class="form-section-hint">
-                                    Create or edit items under their item heads. Manage dropdown masters in
+                                    Create or edit items under their {{ isSports ? 'Event Heads' : 'item heads' }}. Manage dropdown masters in
                                     <Link :href="taxonomyMastersUrl" class="link-brand">Item category masters →</Link>
                                     or import from
                                     <Link :href="catalogUrl" class="link-brand">Items & fees catalog →</Link>
@@ -40,7 +40,7 @@
                         <form @submit.prevent="addItem" class="grid sm:grid-cols-2 gap-3 mb-5">
                             <div v-if="isSports && itemHeads.length" class="sm:col-span-2 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <span class="text-xs font-bold uppercase tracking-wide text-indigo-700">Item head</span>
+                                    <span class="text-xs font-bold uppercase tracking-wide text-indigo-700">Event Head</span>
                                     <button type="button"
                                             class="text-xs px-2.5 py-1 rounded-full border transition-colors"
                                             :class="!selectedHeadFilter ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-200'"
@@ -81,7 +81,7 @@
                                 </select>
                             </FormField>
                             <template v-if="isSports">
-                                <FormField v-if="itemHeads.length" label="Item head">
+                                <FormField v-if="itemHeads.length" label="Event Head">
                                     <select v-model="itemForm.head_id" class="field">
                                         <option value="">None</option>
                                         <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
@@ -135,6 +135,23 @@
                                     <option v-for="(label, key) in taxonomy.participant_type" :key="key" :value="key">{{ label }}</option>
                                 </select>
                             </FormField>
+                            <FormField label="Result method">
+                                <select v-model="itemForm.result_method" class="field">
+                                    <option value="">Default</option>
+                                    <option v-for="(label, key) in (taxonomy.result_method || {})" :key="key" :value="key">{{ label }}</option>
+                                </select>
+                            </FormField>
+                            <FormField v-if="!isSports && competitionAreas.length" label="Competition area">
+                                <select v-model="itemForm.area_id" class="field">
+                                    <option value="">None</option>
+                                    <option v-for="a in competitionAreas" :key="a.id" :value="a.id">{{ a.name }}</option>
+                                </select>
+                            </FormField>
+                            <FormField label="Tie-break on promote" hint="When ranks tie at the qualifier cutoff">
+                                <select v-model="itemForm.tiebreak_mode" class="field">
+                                    <option v-for="(label, key) in tiebreakModes" :key="key" :value="key">{{ label }}</option>
+                                </select>
+                            </FormField>
                             <FormField label="Fee override (₹)" class-extra="sm:col-span-2" hint="Optional per-item fee">
                                 <input v-model.number="itemForm.fee_amount" type="number" min="0" class="field" placeholder="Leave blank for default">
                             </FormField>
@@ -142,7 +159,7 @@
                                 <CheckboxField v-model="itemForm.quota_eligible"
                                                label="Waivable by the head's free quota (Sports composite billing)" />
                             </FormField>
-                            <template v-if="['team', 'group'].includes(itemForm.participant_type)">
+                            <template v-if="['team', 'group', 'pair', 'trio'].includes(itemForm.participant_type)">
                                 <p class="sm:col-span-2 form-label">Squad / roster rules</p>
                                 <FormField label="Min on field"><input v-model.number="itemForm.min_playing" type="number" min="1" class="field"></FormField>
                                 <FormField label="Max substitutes"><input v-model.number="itemForm.max_subs" type="number" min="0" class="field"></FormField>
@@ -320,7 +337,7 @@
                         <CheckboxField v-model="editForm.is_enabled" label="Schools can register for this item" />
                     </FormField>
                     <template v-if="isSports">
-                        <FormField v-if="itemHeads.length" label="Item head">
+                        <FormField v-if="itemHeads.length" label="Event Head">
                             <select v-model="editForm.head_id" class="field">
                                 <option value="">None</option>
                                 <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
@@ -380,7 +397,19 @@
                             <option v-for="(label, key) in taxonomy.participant_type" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </FormField>
-                    <template v-if="['team', 'group'].includes(editForm.participant_type)">
+                    <FormField label="Result method">
+                        <select v-model="editForm.result_method" class="field">
+                            <option value="">Default</option>
+                            <option v-for="(label, key) in (taxonomy.result_method || {})" :key="key" :value="key">{{ label }}</option>
+                        </select>
+                    </FormField>
+                    <FormField v-if="!isSports && competitionAreas.length" label="Competition area">
+                        <select v-model="editForm.area_id" class="field">
+                            <option value="">None</option>
+                            <option v-for="a in competitionAreas" :key="a.id" :value="a.id">{{ a.name }}</option>
+                        </select>
+                    </FormField>
+                    <template v-if="['team', 'group', 'pair', 'trio'].includes(editForm.participant_type)">
                         <p class="sm:col-span-2 form-label">Squad / roster rules</p>
                         <FormField label="Min on field">
                             <input v-model.number="editForm.min_playing" type="number" min="1" class="field">
@@ -407,6 +436,11 @@
                     </template>
                     <FormField label="Qualifiers to next level">
                         <input v-model.number="editForm.qualify_count" type="number" min="1" class="field">
+                    </FormField>
+                    <FormField label="Tie-break on promote" hint="Applied when ranks tie at the cutoff">
+                        <select v-model="editForm.tiebreak_mode" class="field">
+                            <option v-for="(label, key) in tiebreakModes" :key="key" :value="key">{{ label }}</option>
+                        </select>
                     </FormField>
                     <FormField label="Max per school">
                         <input v-model.number="editForm.max_per_school" type="number" min="1" class="field">
@@ -441,10 +475,19 @@ import { normalizeFestItemGender } from '@/support/festItemEligibility.js';
 
 const SPORTS_AGE_ORDER = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'];
 
+const tiebreakModes = {
+    none: 'Top N by position (default)',
+    include_all_ties: 'Include all tied at cutoff',
+    exclude_ties: 'Skip contested ranks that overflow',
+    lot_draw: 'Lot draw among ties at cutoff',
+    manual: 'Block promote until resolved manually',
+};
+
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, groupedItems: Object, taxonomy: Object,
     itemHeads: { type: Array, default: () => [] },
+    competitionAreas: { type: Array, default: () => [] },
     taxonomyMastersUrl: String,
     catalogSummary: Object, catalogUrl: String,
     levelLabels: Object, itemsByLevel: Object, ownerLevelLabels: Object,
@@ -549,17 +592,17 @@ function clearFilters() {
 }
 
 const itemForm = useForm({
-    title: '', participant_type: 'individual', stage_type: '', venue_type: '', head_id: selectedHeadFilter.value === 'other' ? '' : selectedHeadFilter.value,
+    title: '', participant_type: 'individual', result_method: '', stage_type: '', venue_type: '', head_id: selectedHeadFilter.value === 'other' ? '' : selectedHeadFilter.value,
     competition_format: '', sport_discipline: '', class_group: '', age_group: '', kids_band: '', gender: 'open',
-    category: '',
+    category: '', area_id: '', tiebreak_mode: 'none',
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
     fee_amount: null, quota_eligible: false,
 });
 const editingItem = ref(null);
 const editForm = useForm({
     title: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
-    venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', head_id: '',
-    category: '',
+    venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', result_method: '', head_id: '',
+    category: '', area_id: '', tiebreak_mode: 'none',
     qualify_count: null, max_per_school: null, fee_amount: null, quota_eligible: false,
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
     min_group_size: null, max_group_size: null,
@@ -581,6 +624,8 @@ function addItem() {
             itemForm.kids_band = '';
             itemForm.gender = 'open';
             itemForm.category = '';
+            itemForm.area_id = '';
+            itemForm.tiebreak_mode = 'none';
             itemForm.min_playing = null;
             itemForm.max_subs = null;
             itemForm.max_squad = null;
@@ -628,8 +673,11 @@ function openEditItem(item) {
     editForm.competition_format = item.competition_format ?? '';
     editForm.category = item.category ?? '';
     editForm.head_id = item.head_id ?? '';
+    editForm.area_id = item.area_id ?? '';
     editForm.participant_type = item.participant_type ?? 'individual';
+    editForm.result_method = item.result_method ?? '';
     editForm.qualify_count = item.qualify_count ?? null;
+    editForm.tiebreak_mode = item.tiebreak_mode || 'none';
     editForm.max_per_school = item.max_per_school ?? null;
     editForm.fee_amount = item.fee_amount ?? null;
     editForm.quota_eligible = item.quota_eligible ?? false;

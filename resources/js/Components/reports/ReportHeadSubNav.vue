@@ -2,7 +2,7 @@
     <section v-if="headItemGroups.length" class="mb-6">
         <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
             <div>
-                <h3 class="text-sm font-semibold text-slate-800">By item head</h3>
+                <h3 class="text-sm font-semibold text-slate-800">{{ isSports ? 'By Event Head' : 'By item head' }}</h3>
                 <p class="text-xs text-slate-500 mt-0.5">Pick a section — data below updates for that head.</p>
             </div>
             <Link v-if="hubUrl" :href="hubUrl" class="text-xs font-semibold text-indigo-600 hover:underline">← All sections</Link>
@@ -69,6 +69,7 @@ const props = defineProps({
     hubUrl: { type: String, default: null },
     preserveQuery: { type: Object, default: () => ({}) },
     participantCountsByItem: { type: Object, default: () => ({}) },
+    isSports: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['view-participants']);

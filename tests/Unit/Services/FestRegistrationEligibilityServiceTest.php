@@ -127,4 +127,25 @@ class FestRegistrationEligibilityServiceTest extends TestCase
 
         $this->assertSame([], $this->service->validateStudent($student, $event, $item));
     }
+
+    public function test_event_head_verified_only_policy_blocks_unverified_student(): void
+    {
+        $event = new FestEvent([
+            'event_type' => 'sports',
+            'event_start' => '2026-06-01',
+            'fee_settings' => ['require_verified_students' => false],
+        ]);
+        $head = new \App\Models\FestItemHead([
+            'name' => 'Athletics',
+            'verification_policy' => 'verified_only',
+        ]);
+        $item = new FestEventItem(['age_group' => 'open', 'gender' => 'male']);
+        $item->setRelation('head', $head);
+        $student = new Student(['name' => 'Arjun', 'gender' => 'male', 'dob' => '2013-06-01']);
+
+        $errors = $this->service->validateStudent($student, $event, $item);
+
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('Sahodaya-verified', $errors[0]);
+    }
 }

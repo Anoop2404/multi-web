@@ -2,7 +2,9 @@
     <SahodayaEventsLayout :title="`${event.title} — Mark entry status`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Mark entry status`" eyebrow="Reports"
-                    description="Track mark entry progress by item head and item." />
+                    :description="event.event_type === 'sports'
+                        ? 'Track mark entry progress by Event Head and item.'
+                        : 'Track mark entry progress by item head and item.'" />
 
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="mark-entry-status" />
 
@@ -11,6 +13,7 @@
                           v-model:item-id="itemFilter"
                           :heads="headsForFilter"
                           :head-item-groups="headItemGroups"
+                          :is-sports="event.event_type === 'sports'"
                           @apply="applyFilter" />
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">

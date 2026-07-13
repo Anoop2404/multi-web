@@ -12,14 +12,14 @@ class FestEventItem extends Model
 {
     protected $fillable = [
         'event_id', 'title', 'item_code', 'category', 'stage_type', 'venue_type',
-        'competition_format', 'sport_discipline', 'ranking_direction', 'duration_minutes', 'criteria_json',
+        'competition_format', 'sport_discipline', 'ranking_direction', 'result_method', 'duration_minutes', 'criteria_json',
         'participant_type', 'gender', 'class_group', 'age_group', 'kids_band',
         'max_per_school', 'min_group_size', 'max_group_size', 'qualify_count',
         'owner_level', 'state_program_item_id', 'inherited_from_item_id', 'display_order',
-        'fee_amount', 'is_enabled', 'is_mandatory', 'head_id', 'reg_start', 'reg_end',
+        'fee_amount', 'is_enabled', 'is_mandatory', 'head_id', 'area_id', 'reg_start', 'reg_end',
         'competition_start', 'competition_end', 'competition_time',
         'results_published_at', 'item_reg_id_start', 'chest_no_start',
-        'quota_eligible',
+        'quota_eligible', 'tiebreak_mode', 'tiebreak_secondary',
     ];
 
     protected $casts = [
@@ -72,6 +72,11 @@ class FestEventItem extends Model
         return $this->belongsTo(FestItemHead::class, 'head_id');
     }
 
+    public function area(): BelongsTo
+    {
+        return $this->belongsTo(FestCompetitionArea::class, 'area_id');
+    }
+
     public function registrations(): HasMany
     {
         return $this->hasMany(FestRegistration::class, 'item_id');
@@ -112,9 +117,9 @@ class FestEventItem extends Model
         return $this->owner_level === 'school';
     }
 
-    /** Team/group items are billed once per team via the head's team_registration_fee, not per member. */
+    /** Team/group/pair/trio items are billed once per entry via the head's team_registration_fee, not per member. */
     public function isTeamItem(): bool
     {
-        return in_array($this->participant_type, ['team', 'group'], true);
+        return FestTeamSquadRules::isMultiPerson($this->participant_type);
     }
 }

@@ -418,7 +418,7 @@ function applyBulkFee() {
 
 async function seedCatalog() {
     const sportsNote = isSports.value
-        ? ' Sports event item heads will also be relinked.'
+        ? ' Sports Event Heads will also be relinked.'
         : '';
     const ok = await confirm({
         title: 'Resync master catalog',

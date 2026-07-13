@@ -62,11 +62,11 @@
                            @input="emitParam('top_n', $event.target.value)">
                 </template>
             </FormField>
-            <FormField v-if="exp.params.includes('head_id')" label="Item head" class-extra="min-w-[12rem] mb-0">
+            <FormField v-if="exp.params.includes('head_id')" :label="isSports ? 'Event Head' : 'Item head'" class-extra="min-w-[12rem] mb-0">
                 <template #default="{ id }">
                     <select :id="id" :value="paramValues.head_id" class="field text-sm"
                             @change="emitParam('head_id', $event.target.value)">
-                        <option value="">All heads</option>
+                        <option value="">{{ isSports ? 'All Event Heads' : 'All heads' }}</option>
                         <option v-for="h in heads" :key="h.id" :value="h.id">{{ h.name }}</option>
                     </select>
                 </template>
@@ -108,6 +108,7 @@ const props = defineProps({
     stages: { type: Array, default: () => [] },
     classGroups: { type: Object, default: () => ({}) },
     downloadLabel: { type: String, default: 'Download' },
+    isSports: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:param']);

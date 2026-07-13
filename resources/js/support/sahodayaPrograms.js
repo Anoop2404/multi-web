@@ -1,10 +1,12 @@
 /**
  * Sahodaya fest program definitions (Kalotsav, Sports Meet, Kids Fest, Teacher Fest).
- * Each program has its own URL prefix, page, and sidebar.
+ * System programs are listed here; custom Competition Types are merged from Inertia
+ * `competitionPrograms` (FRD-08 Phase 1).
  */
 
 import { FEST_FINANCE, FEST_MANAGE, FEST_VIEW } from './sahodayaEventNavPermissions.js';
 import { isNavProgramVisible } from './sahodayaAdminNav.js';
+import { usePage } from '@inertiajs/vue3';
 
 export const SAHODAYA_PROGRAMS = {
     kalotsav: {
@@ -65,22 +67,46 @@ export const SAHODAYA_PROGRAMS = {
     },
 };
 
-export const PROGRAM_SLUGS = Object.keys(SAHODAYA_PROGRAMS);
+/** Merge DB-backed competition programs from Inertia shared props. */
+export function resolvedPrograms() {
+    let dynamic = {};
+    try {
+        dynamic = usePage().props.competitionPrograms || {};
+    } catch {
+        dynamic = {};
+    }
 
-const EVENT_TYPE_TO_SLUG = Object.fromEntries(
-    Object.values(SAHODAYA_PROGRAMS).map((p) => [p.eventType, p.slug]),
-);
+    const merged = { ...SAHODAYA_PROGRAMS };
+    Object.values(dynamic).forEach((p) => {
+        if (!p?.slug) return;
+        merged[p.slug] = {
+            slug: p.slug,
+            prefix: p.prefix || `programs/${p.slug}`,
+            eventType: p.eventType || p.event_type,
+            label: p.label,
+            icon: p.icon || 'calendar',
+            description: p.description || '',
+            is_system: p.is_system,
+            is_singleton: p.is_singleton,
+        };
+    });
+
+    return merged;
+}
+
+export const PROGRAM_SLUGS = Object.keys(SAHODAYA_PROGRAMS);
 
 export function programBySlug(slug) {
     if (!slug) {
         return null;
     }
 
-    if (SAHODAYA_PROGRAMS[slug]) {
-        return SAHODAYA_PROGRAMS[slug];
+    const programs = resolvedPrograms();
+    if (programs[slug]) {
+        return programs[slug];
     }
 
-    return Object.values(SAHODAYA_PROGRAMS).find((p) => p.prefix === slug) ?? null;
+    return Object.values(programs).find((p) => p.prefix === slug) ?? null;
 }
 
 /** Resolve canonical program slug from slug, prefix, or program object. */
@@ -105,8 +131,8 @@ export function resolveCatalogProgramSlug(programOrSlug) {
 }
 
 export function programForEventType(eventType) {
-    const slug = EVENT_TYPE_TO_SLUG[eventType];
-    return slug ? SAHODAYA_PROGRAMS[slug] : null;
+    const programs = resolvedPrograms();
+    return Object.values(programs).find((p) => p.eventType === eventType) ?? null;
 }
 
 /** Build program hub URL using dedicated prefix routes. */
@@ -227,6 +253,7 @@ export function programScopedNav(sahodayaId, programSlug, events = [], options =
     const setupItems = [
         { label: 'Overview', href: programBase, icon: 'grid', exact: true, permissions: FEST_VIEW },
         { label: 'Item catalog', href: sahodayaProgramHref(sahodayaId, programSlug, 'catalog'), icon: 'file-text', permissions: FEST_MANAGE },
+        { label: 'Competition types', href: `${base}/competition-types`, icon: 'layers', permissions: FEST_MANAGE },
         { label: 'Category masters', href: `${base}/taxonomy-masters?program=${programSlug}`, icon: 'settings', permissions: FEST_MANAGE },
     ];
 

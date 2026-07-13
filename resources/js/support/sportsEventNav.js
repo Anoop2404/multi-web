@@ -1,14 +1,8 @@
 /**
  * Sports fest — sidebar sections (Sahodaya admin, inside one event).
  *
- * SportsSetupSubNav (horizontal) plays the same role for sports that EventSubNav
- * plays for other event types, so its Setup hub/Item heads/Items/Item listing tabs
- * intentionally mirror the "Competition" section below for pages that render it —
- * keep labels identical between the two (see SportsSetupSubNav.vue) so the same
- * destination never reads as two different things. It does NOT render on the
- * Settings page — EventSettingsSubNav is the single nav there for Fee settings/
- * Rank points/Registration windows/Chest numbering/etc, to avoid stacking two
- * tab bars with overlapping links on the same screen.
+ * Horizontal SportsSetupSubNav mirrors the Competition section labels below.
+ * Settings pages use EventSettingsSubNav only (no stacked dual bars).
  */
 
 import {
@@ -41,7 +35,7 @@ export function sportsEventSidebarNav(base, caps) {
     groups.push({
         section: 'Competition',
         items: [
-            { label: 'Item heads', href: `${base}/competition`, icon: 'layers', permissions: FEST_VIEW },
+            { label: 'Event Heads', href: `${base}/competition`, icon: 'layers', permissions: FEST_VIEW },
             { label: 'Items under heads', href: `${base}/items`, icon: 'list', permissions: FEST_SETTINGS },
             { label: 'Item listing', href: `${base}/items/list`, icon: 'clipboard', permissions: FEST_VIEW },
             { label: 'All registrations', href: `${base}/registrations`, icon: 'inbox', permissions: FEST_REGISTRATIONS },
@@ -65,7 +59,7 @@ export function sportsEventSidebarNav(base, caps) {
         section: 'Schedule',
         items: [
             { label: 'Venue schedule', href: `${base}/schedule`, icon: 'calendar', permissions: FEST_SCHEDULE },
-            { label: 'Item-head schedule', href: `${base}/schedule/items`, icon: 'map-pin', permissions: FEST_SCHEDULE },
+            { label: 'Event Head schedule', href: `${base}/schedule/items`, icon: 'map-pin', permissions: FEST_SCHEDULE },
         ],
     });
 
@@ -86,7 +80,7 @@ export function sportsEventSidebarNav(base, caps) {
     groups.push({ section: 'Outputs', items: outputItems });
 
     const adminItems = [
-        { label: 'Item head coordinators', href: `${base}/event-staff`, icon: 'user-check', permissions: FEST_MANAGE },
+        { label: 'Event Head coordinators', href: `${base}/event-staff`, icon: 'user-check', permissions: FEST_MANAGE },
         { label: 'Appeals', href: `${base}/appeals`, icon: 'inbox', permissions: FEST_MANAGE },
         { label: 'School invoices', href: `${base}/finance`, icon: 'file-text', permissions: FEST_FINANCE },
         { label: 'Athletic records', href: `${base}/athletic-records`, icon: 'star', permissions: FEST_MANAGE },

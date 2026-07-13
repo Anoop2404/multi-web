@@ -9,7 +9,7 @@
         @endphp
         <div id="{{ $anchor }}" class="scroll-mt-24">
         @includeIf("sections.{$sectionType}.{$variant}", [
-            'config'  => $section->config ?? [],
+            'config'  => (!empty($previewMode) ? ($section->config ?? []) : $section->publicConfig()),
             'section' => $section,
             'tenant'  => $tenant,
             'logo'    => $logo ?? \App\Support\TenantBranding::logoUrl($tenant),

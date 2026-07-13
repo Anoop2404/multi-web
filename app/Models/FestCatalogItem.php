@@ -10,7 +10,7 @@ class FestCatalogItem extends Model
     protected $fillable = [
         'tenant_id', 'event_type', 'catalog_key', 'head_key', 'source', 'is_enabled', 'is_mandatory', 'fee_enabled',
         'title', 'item_code', 'category', 'stage_type', 'venue_type', 'competition_format',
-        'sport_discipline', 'duration_minutes', 'criteria_json', 'participant_type', 'gender',
+        'sport_discipline', 'duration_minutes', 'criteria_json', 'participant_type', 'result_method', 'gender',
         'class_group', 'age_group', 'kids_band', 'max_per_school', 'min_group_size',
         'max_group_size', 'qualify_count', 'fee_amount', 'display_order',
     ];
@@ -38,7 +38,7 @@ class FestCatalogItem extends Model
     {
         $attrs = collect($this->only([
             'title', 'item_code', 'category', 'stage_type', 'venue_type', 'competition_format',
-            'sport_discipline', 'duration_minutes', 'criteria_json', 'participant_type', 'gender',
+            'sport_discipline', 'duration_minutes', 'criteria_json', 'participant_type', 'result_method', 'gender',
             'class_group', 'age_group', 'kids_band', 'max_per_school', 'min_group_size',
             'max_group_size', 'qualify_count', 'display_order', 'is_mandatory',
         ]))->filter(fn ($v) => $v !== null)->all();

@@ -2,12 +2,14 @@
     <SahodayaEventsLayout :title="`${event.title} — Head-wise participants`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Head-wise participants`" eyebrow="Reports"
-                    description="Participants grouped by item head (Athletics, Chess, etc.).">
+                    :description="event.event_type === 'sports'
+                        ? 'Participants grouped by Event Head (Athletics, Chess, etc.).'
+                        : 'Participants grouped by item head.'">
             <template #actions>
                 <Link v-if="event.event_type === 'sports'"
                       :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/reports/by-head`"
                       class="btn-secondary text-sm">
-                    ← By item head
+                    ← By Event Head
                 </Link>
                 <Link v-else :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/reports`"
                       class="btn-secondary text-sm">
@@ -24,6 +26,7 @@
                           v-model:item-id="itemFilter"
                           :heads="headsForFilter"
                           :head-item-groups="headItemGroups"
+                          :is-sports="event.event_type === 'sports'"
                           @apply="applyFilter">
             <template #extra>
                 <FormField label="School" class-extra="mb-0 min-w-[14rem]">
@@ -48,7 +51,7 @@
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ totals.heads }}</p>
-                <p class="text-xs text-slate-500 mt-1">Item heads</p>
+                <p class="text-xs text-slate-500 mt-1">{{ event.event_type === 'sports' ? 'Event Heads' : 'Item heads' }}</p>
             </div>
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ totals.items }}</p>
@@ -79,7 +82,12 @@
                             <th>Regs</th>
                             <th>Approved</th>
                             <th>Pending</th>
+                            <th>Waitlist</th>
                             <th>Participants</th>
+                            <th>Verified</th>
+                            <th>Due ₹</th>
+                            <th>Collected ₹</th>
+                            <th>Pending ₹</th>
                             <th>Max item regs</th>
                         </tr>
                     </thead>
@@ -90,15 +98,27 @@
                             <td>{{ row.registration_count ?? 0 }}</td>
                             <td>{{ row.approved_count ?? 0 }}</td>
                             <td>{{ row.pending_count ?? 0 }}</td>
+                            <td>{{ row.waitlisted_count ?? 0 }}</td>
                             <td>{{ row.participant_count }}</td>
+                            <td>
+                                {{ row.verified_count ?? 0 }}
+                                <span v-if="(row.unverified_count ?? 0) > 0" class="text-xs text-amber-700">
+                                    / {{ row.unverified_count }} unverified
+                                </span>
+                            </td>
+                            <td>{{ Number(row.due_total ?? 0).toLocaleString('en-IN') }}</td>
+                            <td class="text-emerald-700">{{ Number(row.collected_total ?? 0).toLocaleString('en-IN') }}</td>
+                            <td class="text-amber-700">{{ Number(row.pending_fee_total ?? 0).toLocaleString('en-IN') }}</td>
                             <td>
                                 <span v-if="row.max_item_title" class="text-xs text-slate-500 block">{{ row.max_item_title }}</span>
                                 {{ row.busiest_item_regs ?? row.max_item_reg_count ?? 0 }}
                             </td>
                         </tr>
                         <tr v-if="!summary.length">
-                            <td colspan="7" class="p-6 text-center text-slate-400">
-                                No item heads on this event. Sync heads from Event settings → Item heads.
+                            <td colspan="12" class="p-6 text-center text-slate-400">
+                                {{ event.event_type === 'sports'
+                                    ? 'No Event Heads on this event. Sync heads from Event settings → Event Heads.'
+                                    : 'No item heads on this event. Sync heads from Event settings → Item heads.' }}
                             </td>
                         </tr>
                     </tbody>

@@ -52,6 +52,21 @@ class SiteBuilderApiController extends SchoolAdminController
         return app(BuilderApiController::class)->reorderSections($request, $this->school->id);
     }
 
+    public function publishSection(int $sectionId): JsonResponse
+    {
+        return app(BuilderApiController::class)->publishSection($this->school->id, $sectionId);
+    }
+
+    public function sectionVersions(int $sectionId): JsonResponse
+    {
+        return app(BuilderApiController::class)->sectionVersions($this->school->id, $sectionId);
+    }
+
+    public function restoreSectionVersion(int $sectionId, int $versionId): JsonResponse
+    {
+        return app(BuilderApiController::class)->restoreSectionVersion($this->school->id, $sectionId, $versionId);
+    }
+
     public function getNav(): JsonResponse
     {
         $config = $this->school->getSetting('nav_config', []);

@@ -109,11 +109,11 @@
         <div v-if="editingHead" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto py-8" @click.self="closeHeadEdit">
             <form @submit.prevent="saveHeadMeta" class="card w-full max-w-2xl shadow-xl space-y-4 my-auto">
                 <div>
-                    <h3 class="section-title">Edit item head</h3>
-                    <p class="section-desc text-xs mt-1">Same fee and policy layout as Add head.</p>
+                    <h3 class="section-title">Edit Event Head</h3>
+                    <p class="section-desc text-xs mt-1">Same fee and policy layout as Add Event Head.</p>
                 </div>
 
-                <FormField label="Head name">
+                <FormField label="Event Head name">
                     <input v-model="headForm.name" class="field" required>
                 </FormField>
                 <FormField label="Sport discipline">

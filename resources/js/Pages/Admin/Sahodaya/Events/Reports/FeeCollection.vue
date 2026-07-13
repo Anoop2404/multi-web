@@ -31,7 +31,7 @@
         </div>
 
         <section v-if="byHead?.length" class="mb-8">
-            <h3 class="section-title mb-3">Fee catalog by item head</h3>
+            <h3 class="section-title mb-3">{{ event.event_type === 'sports' ? 'Fee catalog by Event Head' : 'Fee catalog by item head' }}</h3>
             <div class="card overflow-hidden p-0">
                 <table class="data-table">
                     <thead>

@@ -2,7 +2,9 @@
     <SahodayaEventsLayout :title="`${event.title} — Item counts`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Item registration counts`" eyebrow="Reports"
-                    description="Registrations, participants, schools and fees per item — grouped by item head.">
+                    :description="event.event_type === 'sports'
+                        ? 'Registrations, participants, schools and fees per item — grouped by Event Head.'
+                        : 'Registrations, participants, schools and fees per item — grouped by item head.'">
             <template #actions>
                 <a :href="pdfUrl" target="_blank" class="btn-secondary text-sm">Export PDF ↓</a>
             </template>
@@ -15,6 +17,7 @@
                           v-model:item-id="itemFilter"
                           :heads="headsForFilter"
                           :head-item-groups="headItemGroups"
+                          :is-sports="event.event_type === 'sports'"
                           @apply="applyFilter" />
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -44,7 +47,7 @@
         </div>
 
         <section v-if="headSummary?.length" class="mb-8">
-            <h3 class="section-title mb-3">Summary by item head</h3>
+            <h3 class="section-title mb-3">{{ event.event_type === 'sports' ? 'Summary by Event Head' : 'Summary by item head' }}</h3>
             <div class="card overflow-hidden p-0">
                 <table class="data-table">
                     <thead>

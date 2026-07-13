@@ -13,7 +13,7 @@ class UserProfileChangeRequestController extends SahodayaAdminController
         $status = $request->input('status', 'pending');
 
         $base = UserProfileChangeRequest::query()
-            ->whereHas('school', fn ($q) => $q->where('parent_id', $this->sahodaya->id));
+            ->forSahodaya($this->sahodaya->id);
 
         $requests = (clone $base)
             ->when($status === 'pending', fn ($q) => $q->where('status', 'sahodaya_pending'))

@@ -17,7 +17,49 @@ use Illuminate\Support\Str;
 class PromoteSportsHeadsToDisciplineEvents
 {
     /**
-     * @return list<array{head_id: int, head_name: string, event_id: int, title: string}>
+     * @return array{
+     *     can_promote: bool,
+     *     pending_count: int,
+     *     linked_count: int,
+     *     head_count: int,
+     *     heads: list<array{id: int, name: string, status: string}>
+     * }
+     */
+    public function status(FestEvent $season): array
+    {
+        abort_unless($season->event_type === 'sports', 422, 'Only sports events can be promoted.');
+        abort_unless($season->parent_event_id === null, 422, 'Promote from the season hub event only.');
+
+        $heads = FestItemHead::where('event_id', $season->id)
+            ->whereNull('parent_id')
+            ->orderBy('sort_order')
+            ->get(['id', 'name', 'status', 'discipline_event_id']);
+
+        $linkedOnSeason = $heads->filter(fn (FestItemHead $h) => filled($h->discipline_event_id))->count();
+
+        $pending = $heads->filter(function (FestItemHead $h) {
+            if (! filled($h->discipline_event_id)) {
+                return true;
+            }
+
+            return ! FestEvent::whereKey($h->discipline_event_id)->exists();
+        });
+
+        return [
+            'can_promote' => $pending->isNotEmpty(),
+            'pending_count' => $pending->count(),
+            'linked_count' => $linkedOnSeason,
+            'head_count' => $heads->count(),
+            'heads' => $pending->map(fn (FestItemHead $h) => [
+                'id' => $h->id,
+                'name' => $h->name,
+                'status' => $h->status ?: 'draft',
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * @return list<array{head_id: int, head_name: string, event_id: int, title: string, skipped?: bool, dry_run?: bool}>
      */
     public function promote(FestEvent $season, bool $dryRun = false): array
     {

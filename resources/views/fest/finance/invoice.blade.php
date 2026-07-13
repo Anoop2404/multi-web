@@ -14,6 +14,7 @@ th{background:#1d3557;color:#fff}
 @php
     $participationLines = $participationLines ?? [];
     $showHeadColumn = collect($participationLines)->contains(fn ($line) => ! empty($line['head_name'] ?? null));
+    $headColumnLabel = ($event->event_type ?? null) === 'sports' ? 'Event Head' : 'Item head';
     $sl = 0;
 @endphp
 <div class="header">
@@ -31,7 +32,7 @@ th{background:#1d3557;color:#fff}
     <thead>
         <tr>
             @if($showHeadColumn)
-                <th>Item head</th>
+                <th>{{ $headColumnLabel }}</th>
                 <th>Item</th>
             @else
                 <th>Description</th>

@@ -31,6 +31,11 @@ class FestTaxonomyRegistry
         $dimensions = $dimension ? [$dimension] : array_keys(FestTaxonomyMaster::DIMENSIONS);
 
         foreach ($dimensions as $dim) {
+            if ($dim === 'catalog_section') {
+                $this->ensureCatalogSectionDefaults();
+                continue;
+            }
+
             if ($this->query($dim)->exists()) {
                 continue;
             }
@@ -47,6 +52,86 @@ class FestTaxonomyRegistry
                 ]);
             }
         }
+    }
+
+    /**
+     * Seed browse sections for every competition type (keyed as {event_type}.{slug}).
+     */
+    public function ensureCatalogSectionDefaults(): void
+    {
+        if (! $this->tableExists() || ! $this->tenantId) {
+            return;
+        }
+
+        if ($this->query('catalog_section')->exists()) {
+            return;
+        }
+
+        $sort = 0;
+        foreach (config('fest_catalog_sections', []) as $eventType => $sections) {
+            foreach ($sections as $section) {
+                FestTaxonomyMaster::create([
+                    'tenant_id'  => $this->tenantId,
+                    'dimension'  => 'catalog_section',
+                    'entry_key'  => $eventType.'.'.$section['slug'],
+                    'label'      => $section['label'],
+                    'sort_order' => $sort++,
+                    'is_active'  => true,
+                    'meta'       => [
+                        'event_type'  => $eventType,
+                        'slug'        => $section['slug'],
+                        'description' => $section['description'] ?? '',
+                        'filter'      => $section['filter'] ?? [],
+                    ],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @return list<array{slug: string, label: string, description: string, filter: array<string, string>}>
+     */
+    public function catalogSectionsForEventType(string $eventType): array
+    {
+        if (! $this->tenantId || ! $this->tableExists()) {
+            return $this->configCatalogSections($eventType);
+        }
+
+        $this->ensureCatalogSectionDefaults();
+
+        $rows = FestTaxonomyMaster::where('tenant_id', $this->tenantId)
+            ->where('dimension', 'catalog_section')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->get()
+            ->filter(function (FestTaxonomyMaster $row) use ($eventType) {
+                $metaType = $row->meta['event_type'] ?? null;
+                if ($metaType) {
+                    return $metaType === $eventType;
+                }
+
+                return str_starts_with($row->entry_key, $eventType.'.');
+            })
+            ->values();
+
+        if ($rows->isEmpty()) {
+            return $this->configCatalogSections($eventType);
+        }
+
+        return $rows->map(function (FestTaxonomyMaster $row) use ($eventType) {
+            $meta = $row->meta ?? [];
+            $slug = $meta['slug'] ?? (str_contains($row->entry_key, '.')
+                ? substr($row->entry_key, strlen($eventType) + 1)
+                : $row->entry_key);
+
+            return [
+                'slug'        => $slug,
+                'label'       => $row->label,
+                'description' => (string) ($meta['description'] ?? ''),
+                'filter'      => is_array($meta['filter'] ?? null) ? $meta['filter'] : [],
+            ];
+        })->all();
     }
 
     /** @return array<string, string> */
@@ -89,15 +174,24 @@ class FestTaxonomyRegistry
         $merged['kids_band'] = \App\Support\FestKidsFestBand::labels();
 
         foreach (array_keys(FestTaxonomyMaster::DIMENSIONS) as $dimension) {
+            if ($dimension === 'catalog_section') {
+                continue;
+            }
             $merged[$dimension] = $this->labels($dimension);
         }
 
         if (empty($merged['participant_type'])) {
             $merged['participant_type'] = [
                 'individual' => 'Individual',
+                'pair'       => 'Pair',
+                'trio'       => 'Trio',
                 'group'      => 'Group',
                 'team'       => 'Team',
             ];
+        }
+
+        if (empty($merged['result_method'])) {
+            $merged['result_method'] = $this->configLabels('result_method');
         }
 
         return $merged;
@@ -126,6 +220,7 @@ class FestTaxonomyRegistry
                     'sort_order' => 0,
                     'is_active'  => true,
                     'from_config'=> true,
+                    'meta'       => null,
                 ])
                 ->values()
                 ->all();
@@ -145,6 +240,7 @@ class FestTaxonomyRegistry
                 'sort_order' => $row->sort_order,
                 'is_active'  => $row->is_active,
                 'from_config'=> false,
+                'meta'       => $row->meta,
             ])
             ->all();
     }
@@ -155,12 +251,44 @@ class FestTaxonomyRegistry
         if ($dimension === 'participant_type') {
             return [
                 'individual' => 'Individual',
+                'pair'       => 'Pair',
+                'trio'       => 'Trio',
                 'group'      => 'Group',
                 'team'       => 'Team',
             ];
         }
 
+        if ($dimension === 'result_method') {
+            return [
+                'marks'     => 'Marks / score',
+                'time'      => 'Time (faster wins)',
+                'distance'  => 'Distance / measurement',
+                'rank'      => 'Rank only',
+                'pass_fail' => 'Pass / fail',
+                'points'    => 'Points',
+            ];
+        }
+
+        if ($dimension === 'catalog_section') {
+            $labels = [];
+            foreach (config('fest_catalog_sections', []) as $eventType => $sections) {
+                foreach ($sections as $section) {
+                    $labels[$eventType.'.'.$section['slug']] = $section['label'].' ('.$eventType.')';
+                }
+            }
+
+            return $labels;
+        }
+
         return config("fest_item_taxonomy.{$dimension}", []);
+    }
+
+    /**
+     * @return list<array{slug: string, label: string, description: string, filter: array<string, string>}>
+     */
+    private function configCatalogSections(string $eventType): array
+    {
+        return config("fest_catalog_sections.{$eventType}", []);
     }
 
     private function query(string $dimension)

@@ -57,6 +57,21 @@ class SiteBuilderApiController extends SahodayaAdminController
         return app(BuilderApiController::class)->reorderSections($request, $this->sahodaya->id);
     }
 
+    public function publishSection(int $sectionId): JsonResponse
+    {
+        return app(BuilderApiController::class)->publishSection($this->sahodaya->id, $sectionId);
+    }
+
+    public function sectionVersions(int $sectionId): JsonResponse
+    {
+        return app(BuilderApiController::class)->sectionVersions($this->sahodaya->id, $sectionId);
+    }
+
+    public function restoreSectionVersion(int $sectionId, int $versionId): JsonResponse
+    {
+        return app(BuilderApiController::class)->restoreSectionVersion($this->sahodaya->id, $sectionId, $versionId);
+    }
+
     public function getNav(): JsonResponse
     {
         $config = $this->sahodaya->getSetting('nav_config', []);

@@ -14,7 +14,8 @@
                           :selected-head-id="headFilter"
                           :selected-item-id="itemFilter"
                           :show-item-links="false"
-                          :hub-url="`${programBase}/reports/${event.id}`" />
+                          :hub-url="`${programBase}/reports/${event.id}`"
+                          :is-sports="event.event_type === 'sports'" />
 
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">

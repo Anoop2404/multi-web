@@ -32,7 +32,7 @@
                 </div>
             </div>
             <p v-if="hasHeadFilter && !filterForm.event_id" class="text-xs text-slate-500 mt-2">
-                Select an event first to filter by item head.
+                Select an event first to filter by head.
             </p>
         </form>
 
@@ -108,7 +108,7 @@ function selectPlaceholder(key) {
     return {
         event_id: 'All events',
         school_id: 'All schools',
-        head_id: 'All item heads',
+        head_id: 'All heads',
         exam_id: 'All exams',
     }[key] ?? 'All';
 }

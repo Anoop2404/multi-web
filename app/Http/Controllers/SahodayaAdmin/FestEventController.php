@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Support\AcademicYear;
 use App\Models\FestEvent;
+use App\Models\FestCompetitionArea;
 use App\Models\FestSchoolEventFee;
 use App\Models\FestEventItem;
 use App\Services\Audit\PlatformAuditLogger;
@@ -59,76 +60,28 @@ class FestEventController extends SahodayaAdminController
 
     public function programIndex(string $tenantId, string $program)
     {
-        $programs = [
-            'kalotsav' => [
-                'slug' => 'kalotsav',
-                'eventType' => 'kalolsavam',
-                'label' => 'Kalotsav',
-                'icon' => 'star',
-                'description' => 'Manage Kalotsav rounds, items, registrations, marks, and results for your cluster.',
-            ],
-            'sports-meet' => [
-                'slug' => 'sports-meet',
-                'eventType' => 'sports',
-                'label' => 'Sports Meet',
-                'icon' => 'award',
-                'description' => 'School, Sahodaya, and state sports meets — track events, marks, athletic records, and house points.',
-            ],
-            'kids-fest' => [
-                'slug' => 'kids-fest',
-                'eventType' => 'kids_fest',
-                'label' => 'Kids Fest',
-                'icon' => 'users',
-                'description' => 'Kids Fest programs by class band — registrations, scheduling, and results.',
-            ],
-            'teacher-fest' => [
-                'slug' => 'teacher-fest',
-                'eventType' => 'teacher_fest',
-                'label' => 'Teacher Fest',
-                'icon' => 'users',
-                'description' => 'Teacher fest programs — registrations, scheduling, marks, and results.',
-            ],
-            'english-fest' => [
-                'slug' => 'english-fest',
-                'eventType' => 'english_fest',
-                'label' => 'English Fest',
-                'icon' => 'book',
-                'description' => 'Standalone English literary fest — elocution, essay, quiz, and group items.',
-            ],
-            'science-fest' => [
-                'slug' => 'science-fest',
-                'eventType' => 'science_fest',
-                'label' => 'Science Fest',
-                'icon' => 'flask',
-                'description' => 'Standalone Science Fest — quiz, exhibition, models, and group science items.',
-            ],
-            'custom' => [
-                'slug' => 'custom',
-                'eventType' => 'custom',
-                'label' => 'Custom Events',
-                'icon' => 'layers',
-                'description' => 'One-off and custom fest programs — configure items and run independently.',
-            ],
-        ];
-
+        $registry = app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+            ->forTenant($this->sahodaya->id);
+        $programs = $registry->programsForNav();
         abort_unless(isset($programs[$program]), 404);
 
-        $eventType = $programs[$program]['eventType'];
+        $programMeta = $programs[$program];
+        $eventType = $programMeta['eventType'];
         $catalogService = app(FestCatalogService::class);
         $catalogService->ensureSeeded($this->sahodaya->id, $eventType);
 
         // Sports: season hub lists discipline events (heads-as-events). Other singletons
         // still open the one yearly hub event directly.
-        if (FestEvent::isSingletonType($eventType) && $eventType !== 'sports' && ! $this->isStaff) {
+        if (FestEvent::isSingletonType($eventType, $this->sahodaya->id) && $eventType !== 'sports' && ! $this->isStaff) {
             $event = app(\App\Services\Events\FestPrimaryEventResolver::class)
-                ->resolveOrCreate($this->sahodaya, $eventType, $programs[$program]['label']);
+                ->resolveOrCreate($this->sahodaya, $eventType, $programMeta['label']);
 
             return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}");
         }
 
         if ($eventType === 'sports' && ! $this->isStaff) {
             $season = app(\App\Services\Events\FestPrimaryEventResolver::class)
-                ->resolveOrCreate($this->sahodaya, 'sports', $programs[$program]['label']);
+                ->resolveOrCreate($this->sahodaya, 'sports', $programMeta['label']);
 
             $disciplineEvents = FestEvent::forTenant($this->sahodaya->id)
                 ->ofType('sports')
@@ -149,11 +102,13 @@ class FestEventController extends SahodayaAdminController
                 ->sahodayaProgramDashboard($this->sahodaya, $program, $eventType);
 
             return $this->inertia('Sahodaya/Events/ProgramIndex', [
-                'program' => $programs[$program],
+                'program' => $programMeta,
                 'events' => $events,
-                'seasonEvent' => $season->only('id', 'title', 'status'),
+                'seasonEvent' => $season->only('id', 'title', 'status', 'partition_role'),
                 'seasonRemittance' => app(\App\Services\Events\FestSportsChecklist::class)
                     ->seasonRemittanceBanner($this->sahodaya->id),
+                'promoteStatus' => app(\App\Services\Events\PromoteSportsHeadsToDisciplineEvents::class)
+                    ->status($season),
                 'levelLabels' => FestEvent::levelLabels(),
                 'stats' => $dashboard['stats'],
                 'schoolParticipation' => $dashboard['schoolParticipation'],
@@ -164,7 +119,7 @@ class FestEventController extends SahodayaAdminController
             ]);
         }
 
-        if (FestEvent::isSingletonType($eventType)) {
+        if (FestEvent::isSingletonType($eventType, $this->sahodaya->id)) {
             // View-only staff: open the existing hub event if one exists, else fall through
             // to the (read-only) program hub so nothing is created on a GET.
             $event = app(\App\Services\Events\FestPrimaryEventResolver::class)
@@ -184,7 +139,7 @@ class FestEventController extends SahodayaAdminController
             ->sahodayaProgramDashboard($this->sahodaya, $program, $eventType);
 
         return $this->inertia('Sahodaya/Events/ProgramIndex', [
-            'program' => $programs[$program],
+            'program' => $programMeta,
             'events' => $events,
             'levelLabels' => FestEvent::levelLabels(),
             'stats' => $dashboard['stats'],
@@ -200,7 +155,7 @@ class FestEventController extends SahodayaAdminController
     {
         $data = $request->validate([
             'title'              => 'required|string|max:255',
-            'event_type'         => 'required|in:kalolsavam,sports,kids_fest,teacher_fest,english_fest,science_fest,custom',
+            'event_type'         => ['required', app(\App\Services\Events\FestCompetitionTypeRegistry::class)->forTenant($this->sahodaya->id)->validationRule()],
             'level_round'        => 'nullable|in:state,sahodaya,school',
             'conduct_levels'     => 'nullable|array',
             'conduct_levels.*'   => 'in:state,sahodaya,school',
@@ -219,7 +174,7 @@ class FestEventController extends SahodayaAdminController
         $eventType = $data['event_type'];
 
         // Enforce one primary hub event per Sahodaya per year for singleton fest types.
-        if ($levelRound === 'sahodaya' && FestEvent::isSingletonType($eventType)) {
+        if ($levelRound === 'sahodaya' && FestEvent::isSingletonType($eventType, $this->sahodaya->id)) {
             $existing = app(\App\Services\Events\FestPrimaryEventResolver::class)
                 ->resolve($this->sahodaya->id, $eventType);
             if ($existing) {
@@ -361,7 +316,7 @@ class FestEventController extends SahodayaAdminController
 
         $rules = [
             'title'              => 'required|string|max:255',
-            'event_type'         => 'sometimes|required|in:kalolsavam,sports,kids_fest,teacher_fest,english_fest,science_fest,custom',
+            'event_type'         => ['sometimes', 'required', app(\App\Services\Events\FestCompetitionTypeRegistry::class)->forTenant($this->sahodaya->id)->validationRule()],
             'academic_year_id'   => 'nullable|exists:academic_years,id',
             'registration_open'  => 'nullable|date',
             'registration_close' => 'nullable|date',
@@ -412,7 +367,16 @@ class FestEventController extends SahodayaAdminController
             }
         }
 
+        $previousStatus = $event->status;
         $event->update($data);
+
+        if (($data['status'] ?? null) === 'registration_open' && $previousStatus !== 'registration_open') {
+            try {
+                app(FestEventNotifier::class)->registrationOpened($event->fresh());
+            } catch (\Throwable) {
+                // Notifications must never block event updates.
+            }
+        }
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,
@@ -656,13 +620,19 @@ class FestEventController extends SahodayaAdminController
             'qualify_count'        => 'nullable|integer|min:1',
             'fee_amount'           => 'nullable|numeric|min:0',
             'head_id'              => 'nullable|exists:fest_item_heads,id',
+            'area_id'              => [
+                'nullable', 'integer',
+                \Illuminate\Validation\Rule::exists('fest_competition_areas', 'id')->where('event_id', $event->id),
+            ],
+            'tiebreak_mode'        => 'nullable|in:none,include_all_ties,exclude_ties,lot_draw,manual,secondary_score',
+            'tiebreak_secondary'   => 'nullable|string|max:40',
             'quota_eligible'       => 'nullable|boolean',
         ], $this->taxonomyValidationRules($registry, $event)));
 
         $data['participant_type'] = $data['participant_type'] ?? 'individual';
         $data = FestEventItemPayload::applyDefaults($data);
 
-        if (in_array($data['participant_type'], ['team', 'group'], true)) {
+        if (FestTeamSquadRules::isMultiPerson($data['participant_type'])) {
             $merged = FestTeamSquadRules::mergeIntoItem($request->only([
                 'min_playing', 'max_playing', 'max_subs', 'max_squad', 'min_squad', 'standbys',
             ]));
@@ -674,6 +644,11 @@ class FestEventController extends SahodayaAdminController
             }
             if ($merged['max_group_size']) {
                 $data['max_group_size'] = $merged['max_group_size'];
+            }
+            $fixed = FestTeamSquadRules::defaultSizeFor($data['participant_type']);
+            if ($fixed && empty($data['min_group_size']) && empty($data['max_group_size'])) {
+                $data['min_group_size'] = $fixed;
+                $data['max_group_size'] = $fixed;
             }
         }
 
@@ -708,6 +683,12 @@ class FestEventController extends SahodayaAdminController
             'fee_amount'     => 'nullable|numeric|min:0',
             'is_enabled'     => 'nullable|boolean',
             'head_id'        => 'nullable|exists:fest_item_heads,id',
+            'area_id'        => [
+                'nullable', 'integer',
+                \Illuminate\Validation\Rule::exists('fest_competition_areas', 'id')->where('event_id', $event->id),
+            ],
+            'tiebreak_mode'  => 'nullable|in:none,include_all_ties,exclude_ties,lot_draw,manual,secondary_score',
+            'tiebreak_secondary' => 'nullable|string|max:40',
             'quota_eligible' => 'nullable|boolean',
             'min_group_size' => 'nullable|integer|min:1',
             'max_group_size' => 'nullable|integer|min:1',
@@ -721,7 +702,7 @@ class FestEventController extends SahodayaAdminController
 
         $participantType = $data['participant_type'] ?? $item->participant_type;
 
-        if (in_array($participantType, ['team', 'group'], true)) {
+        if (FestTeamSquadRules::isMultiPerson($participantType)) {
             $squadInput = $request->only([
                 'min_playing', 'max_playing', 'max_subs', 'max_squad', 'min_squad', 'standbys',
             ]);
@@ -741,6 +722,12 @@ class FestEventController extends SahodayaAdminController
             } elseif ($request->has('min_group_size') || $request->has('max_group_size')) {
                 $data['min_group_size'] = $request->input('min_group_size');
                 $data['max_group_size'] = $request->input('max_group_size');
+            } else {
+                $fixed = FestTeamSquadRules::defaultSizeFor($participantType);
+                if ($fixed && empty($data['min_group_size']) && empty($item->min_group_size)) {
+                    $data['min_group_size'] = $fixed;
+                    $data['max_group_size'] = $fixed;
+                }
             }
         }
 
@@ -822,11 +809,22 @@ class FestEventController extends SahodayaAdminController
                 ->all();
         }
 
+        $competitionAreas = [];
+        if ($event->event_type !== 'sports' && \Illuminate\Support\Facades\Schema::hasTable('fest_competition_areas')) {
+            $competitionAreas = FestCompetitionArea::where('event_id', $event->id)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug'])
+                ->all();
+        }
+
         return [
             'event'         => $event,
             'groupedItems'  => $catalogService->groupForDisplay($event->items, $event->event_type),
             'taxonomy'      => $taxonomy,
             'itemHeads'     => $itemHeads,
+            'competitionAreas' => $competitionAreas,
             'taxonomyMastersUrl' => "/sahodaya-admin/{$this->sahodaya->id}/taxonomy-masters",
             'classGroupScheme' => $classGroupScheme,
             'classGroupSchemeOptions' => FestClassGroupScheme::options(),
@@ -858,13 +856,10 @@ class FestEventController extends SahodayaAdminController
 
     private function programSlugFor(FestEvent $event): string
     {
-        return match ($event->event_type) {
-            'kalolsavam' => 'kalotsav',
-            'sports' => 'sports-meet',
-            'kids_fest' => 'kids-fest',
-            'teacher_fest' => 'teacher-fest',
-            default => 'custom',
-        };
+        return app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+            ->forTenant($this->sahodaya->id)
+            ->slugForEventType($event->event_type)
+            ?? 'custom';
     }
 
     /** @return array<string, mixed> */
@@ -890,6 +885,7 @@ class FestEventController extends SahodayaAdminController
             'competition_format' => ['nullable', $registry->validationRule('competition_format')],
             'sport_discipline'   => ['nullable', $registry->validationRule('sport_discipline')],
             'participant_type'   => ['nullable', $registry->validationRule('participant_type')],
+            'result_method'      => ['nullable', $registry->validationRule('result_method')],
             'gender'             => ['nullable', $registry->validationRule('gender')],
             'class_group'        => ['nullable', \Illuminate\Validation\Rule::in($classKeys)],
             'age_group'          => ['nullable', \Illuminate\Validation\Rule::in($ageKeys)],
@@ -899,15 +895,34 @@ class FestEventController extends SahodayaAdminController
 
     private function eventTypes(): array
     {
-        return [
-            'kalolsavam'   => 'Kalolsavam',
-            'sports'       => 'Sports Meet',
-            'kids_fest'    => 'Kids Fest',
-            'teacher_fest' => 'Teacher Fest',
-            'english_fest' => 'English Fest',
-            'science_fest' => 'Science Fest',
-            'custom'       => 'Custom',
-        ];
+        return app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+            ->forTenant($this->sahodaya->id)
+            ->labels(true);
+    }
+
+    public function promoteDisciplineEvents(
+        string $tenantId,
+        FestEvent $event,
+        \App\Services\Events\PromoteSportsHeadsToDisciplineEvents $promoter,
+    ) {
+        abort_unless($event->tenant_id === $this->sahodaya->id, 404);
+        abort_unless($event->event_type === 'sports', 422, 'Only Sports Meet season hubs can be promoted.');
+        abort_unless($event->parent_event_id === null, 422, 'Open the season hub to promote Event Heads.');
+
+        $rows = $promoter->promote($event, false);
+        $created = collect($rows)->filter(fn ($r) => empty($r['skipped']) && empty($r['dry_run']))->count();
+        $skipped = collect($rows)->filter(fn ($r) => ! empty($r['skipped']))->count();
+
+        $message = $created > 0
+            ? "Promoted {$created} Event Head(s) into discipline events."
+            : 'No new discipline events were created.';
+
+        if ($skipped > 0) {
+            $message .= " {$skipped} already linked.";
+        }
+
+        return redirect("/sahodaya-admin/{$this->sahodaya->id}/sports")
+            ->with('success', $message);
     }
 
     public function toggleNavHidden(FestEvent $event)

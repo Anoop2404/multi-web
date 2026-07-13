@@ -131,6 +131,12 @@
                         </div>
 
                         <div class="profile-field">
+                            <label class="form-label">School admission no.</label>
+                            <input v-model="editForm.admission_number" type="text" maxlength="50" class="field" placeholder="Optional">
+                            <p v-if="editForm.errors.admission_number" class="field-error">{{ editForm.errors.admission_number }}</p>
+                        </div>
+
+                        <div class="profile-field">
                             <label class="form-label">Full name *</label>
                             <input v-model="editForm.name" type="text" required class="field">
                             <p v-if="editForm.errors.name" class="field-error">{{ editForm.errors.name }}</p>
@@ -319,6 +325,7 @@ const editForm = useForm({
     gender: '',
     dob: '',
     parent_email: '',
+    admission_number: '',
     reason: '',
 });
 
@@ -367,6 +374,7 @@ const identityFields = computed(() => {
     const s = props.student;
     return [
         { label: 'Student ID', value: s.reg_no || '—' },
+        { label: 'School admission no.', value: s.admission_number || '—' },
         { label: 'Roll no', value: s.roll_number || '—' },
         { label: 'Gender', value: s.gender ? formatGender(s.gender) : '—' },
         { label: 'Blood group', value: s.blood_group || '—' },
@@ -396,6 +404,7 @@ function startEdit() {
     editForm.gender = props.student.gender ?? '';
     editForm.dob = calendarDateInputValue(props.student.dob);
     editForm.parent_email = props.student.parent_email ?? '';
+    editForm.admission_number = props.student.admission_number ?? '';
     editForm.reason = '';
     editPhotoFile.value = null;
     isEditing.value = true;

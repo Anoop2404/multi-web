@@ -111,6 +111,15 @@ Route::middleware([
 
         Route::post('/admission-enquiry', [AdmissionEnquiryController::class, 'store'])->name('admission-enquiry.store');
 
+        Route::get('/forms/{slug}', [\App\Http\Controllers\Public\SiteFormPublicController::class, 'show'])->name('tenant.forms.show');
+        Route::post('/forms/{slug}', [\App\Http\Controllers\Public\SiteFormPublicController::class, 'submit'])
+            ->middleware('throttle:20,1')
+            ->name('tenant.forms.submit');
+        Route::get('/preview-site', [\App\Http\Controllers\Public\PublicSiteController::class, 'preview'])
+            ->middleware('auth')
+            ->name('tenant.site.preview');
+        Route::get('/m/{slug}', [\App\Http\Controllers\Public\PublicSiteController::class, 'microsite'])->name('tenant.site.microsite');
+
         Route::get('/sitemap.xml', [SeoController::class, 'sitemap']);
         Route::get('/robots.txt', [SeoController::class, 'robots']);
     });

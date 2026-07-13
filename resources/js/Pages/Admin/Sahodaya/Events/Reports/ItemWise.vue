@@ -2,12 +2,14 @@
     <SahodayaEventsLayout :title="`${event.title} — Item-wise`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Item-wise browser`" eyebrow="Reports"
-                    description="Pick an item head and item to view all participants and marks.">
+                    :description="event.event_type === 'sports'
+                        ? 'Pick an Event Head and item to view all participants and marks.'
+                        : 'Pick an item head and item to view all participants and marks.'">
             <template #actions>
                 <Link v-if="event.event_type === 'sports'"
                       :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/reports/by-head`"
                       class="btn-secondary text-sm">
-                    ← By item head
+                    ← By Event Head
                 </Link>
                 <ReportDownloadButtons v-if="filterItemId" :pdf-url="pdfUrl" :xls-url="xlsUrl" />
             </template>
@@ -21,6 +23,7 @@
             :selected-head-id="filterHeadId"
             :selected-item-id="filterItemId"
             :has-item-heads="hasItemHeads"
+            :is-sports="event.event_type === 'sports'"
             hint="Select a competition item to view participants from all schools."
         >
             <template #default="{ item }">

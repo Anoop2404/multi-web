@@ -11,7 +11,22 @@
                                  :sahodaya-id="sahodaya.id"
                                  :event-id="event.id"
                                  :disciplines="disciplines"
-                                 :taxonomy-masters-url="taxonomyMastersUrl" />
+                                 :taxonomy-masters-url="taxonomyMastersUrl"
+                                 :sports-hub-url="sportsHubUrl"
+                                 :promote-status="promoteStatus" />
+
+        <div v-if="isSports && isRoot && promoteStatus?.can_promote"
+             class="rounded-lg border border-indigo-100 bg-indigo-50/80 px-4 py-3 mb-6 text-sm text-indigo-950">
+            <p class="font-semibold">
+                {{ promoteStatus.pending_count }} Event Head{{ promoteStatus.pending_count === 1 ? '' : 's' }} ready to promote
+            </p>
+            <p class="mt-1 text-xs text-indigo-900/80">
+                Turn each head into its own discipline event (own registration, fees, marks). Done from the Sports hub.
+            </p>
+            <Link :href="sportsHubUrl" class="inline-block mt-2 text-xs font-semibold underline">
+                Open Sports hub to promote →
+            </Link>
+        </div>
 
         <ReportHeadItemNavigator :groups="headItemGroups"
                                  :base-url="base"
@@ -19,8 +34,9 @@
                                  :selected-item-id="selectedItemId"
                                  :has-item-heads="hasItemHeads"
                                  :show-item-stats="true"
+                                 :is-sports="isSports"
                                  :hint="navHint"
-                                 empty-heads-text="Sync item heads from the catalog using the form above, then open a section.">
+                                 empty-heads-text="Sync Event Heads from the catalog using the form above, then open a section.">
 
             <template v-if="selectedHeadMeta && !selectedItemId" #head-detail="{ head }">
                 <FestHeadManagePanel v-if="head.head_id && selectedHeadRecord"
@@ -38,7 +54,8 @@
                                      :event-id="event.id"
                                      :item-config="itemConfig"
                                      :heads-for-assign="headsForFilter"
-                                     :catalog-url="catalogUrl" />
+                                     :catalog-url="catalogUrl"
+                                     :is-sports="isSports" />
                 <FestItemOpsPanel :sahodaya-id="sahodaya.id"
                                   :event="event"
                                   :item="item"
@@ -50,6 +67,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
@@ -73,6 +91,8 @@ const props = defineProps({
     taxonomyMastersUrl: { type: String, default: null },
     catalogUrl: { type: String, default: null },
     showHeadFees: { type: Boolean, default: true },
+    sportsHubUrl: { type: String, default: null },
+    promoteStatus: { type: Object, default: null },
 });
 
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/competition`);
@@ -99,14 +119,14 @@ const headerDescription = computed(() => {
         return 'Configure this item, then use the actions below for registrations, ranks, and results.';
     }
     if (props.selectedHeadId) {
-        return 'Set head dates and fees, then pick an item to manage registrations and results.';
+        return 'Set Event Head dates and fees, then pick an item to manage registrations and results.';
     }
-    return 'One place for item heads, dates, fees, and competition workflow — sync heads, open a section, pick an item.';
+    return 'One place for Event Heads, dates, fees, and competition workflow — sync heads, open a section, pick an item.';
 });
 
 const navHint = computed(() => {
     if (props.hasItemHeads) {
-        return 'Pick an item head (Athletics, Chess, …), set dates if needed, then choose an item.';
+        return 'Pick an Event Head (Athletics, Chess, …), set dates if needed, then choose an item.';
     }
     return 'Select a competition item to open admin actions.';
 });

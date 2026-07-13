@@ -2,19 +2,26 @@
     <div class="card space-y-4">
         <div>
             <h3 class="section-title">Item settings</h3>
-            <p class="section-desc text-xs">Override head dates, assign a different head, set fee, or disable this item on the event.</p>
+            <p class="section-desc text-xs">
+                {{ isSports
+                    ? 'Dates and Event Head assignment. Fees come from the Event Head (items inherit head rates).'
+                    : 'Override head dates, assign a different head, set fee, or disable this item on the event.' }}
+            </p>
         </div>
 
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <FormField label="Item head">
+            <FormField :label="isSports ? 'Event Head' : 'Item head'">
                 <select v-model="row.head_id" class="field text-sm">
                     <option value="">Unassigned</option>
                     <option v-for="h in headsForAssign" :key="h.id" :value="h.id">{{ h.name }}</option>
                 </select>
             </FormField>
-            <FormField label="Item fee (₹)">
+            <FormField v-if="!isSports" label="Item fee (₹)">
                 <input v-model.number="row.fee_amount" type="number" min="0" step="0.01" class="field text-sm" placeholder="Leave blank for head/default">
             </FormField>
+            <p v-else class="text-xs text-slate-500 pt-6 sm:col-span-1">
+                Item fee inherits from Event Head billing (school / student / team rates).
+            </p>
             <label class="flex items-center gap-2 text-sm pt-6">
                 <input v-model="row.is_enabled" type="checkbox">
                 <span>Enabled on this event</span>
@@ -65,6 +72,7 @@ const props = defineProps({
     itemConfig: { type: Object, required: true },
     headsForAssign: { type: Array, default: () => [] },
     catalogUrl: { type: String, default: null },
+    isSports: { type: Boolean, default: false },
 });
 
 const saving = ref(false);

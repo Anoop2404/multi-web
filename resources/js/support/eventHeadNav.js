@@ -1,4 +1,4 @@
-/** Shared item-head navigation link builders (Sahodaya + school fest events). */
+/** Shared Event Head / item-head navigation link builders (Sahodaya + school fest events). */
 
 export function headQueryParam(headId, itemId = null) {
     const params = new URLSearchParams();
@@ -21,7 +21,7 @@ export function sahodayaCompetitionBase(sahodayaId, eventId) {
     return `${sahodayaEventBase(sahodayaId, eventId)}/competition`;
 }
 
-/** Quick links for a single item head inside a Sahodaya event. */
+/** Quick links for a single Event Head / item head inside a Sahodaya event. */
 export function sahodayaHeadActionLinks(sahodayaId, eventId, headId, options = {}) {
     const { isSports = false, itemId = null } = options;
     const base = sahodayaEventBase(sahodayaId, eventId);
@@ -62,7 +62,7 @@ export function schoolProgramBase(schoolId, programPrefix) {
     return `/school-admin/${schoolId}/${programPrefix}`;
 }
 
-/** Quick links for a single item head inside a school fest event. */
+/** Quick links for a single Event Head / item head inside a school fest event. */
 export function schoolHeadActionLinks(schoolId, programPrefix, eventId, headId, options = {}) {
     const { isSports = false, itemId = null } = options;
     const eventBase = schoolEventBase(schoolId, programPrefix, eventId);
@@ -74,7 +74,7 @@ export function schoolHeadActionLinks(schoolId, programPrefix, eventId, headId, 
     ];
 
     if (isSports) {
-        links.push({ key: 'items', label: 'Register by item head', href: `${eventBase}/items${q}`, icon: 'layers' });
+        links.push({ key: 'items', label: 'Register by Event Head', href: `${eventBase}/items${q}`, icon: 'layers' });
     }
 
     links.push(

@@ -24,13 +24,13 @@ class FestSportsCompositeFeeService
      *  - Student Registration Fee: flat, charged once per student per head who has at least one
      *    individual (non-team) item registered under this head — added ON TOP of, not replacing,
      *    that student's per-item charges.
-     *  - Per individual item: charge = item.fee_amount override, else the head's
-     *    student_registration_fee is reused as the default per-item rate. If the item is
-     *    quota_eligible and the student still has a free individual-quota slot under this head,
-     *    the item is fully waived (0) regardless of override/default price, and a slot is consumed.
+     *  - Per individual item: charge the head's student_registration_fee as the per-item rate
+     *    (items inherit head fees — FRD-04 v2; per-item fee_amount is ignored for sports_composite).
+     *    If the item is quota_eligible and the student still has a free individual-quota slot under
+     *    this head, the item is fully waived (0), and a slot is consumed.
      *    Quota is consumed in registration order (first quota-eligible item registered wins).
      *  - Team items (participant_type team/group) are billed ONCE per team registration via the
-     *    head's team_registration_fee (item.fee_amount overrides it if set), not per team member,
+     *    head's team_registration_fee (item overrides ignored), not per team member,
      *    and are not subject to the individual Student Registration Fee. A separate team quota
      *    (included_teams) can waive the team fee the same way, consumed in registration order.
      *
@@ -87,9 +87,12 @@ class FestSportsCompositeFeeService
                     $individualQuotaUsed[$studentId] = $used + 1;
                     $amount = 0.0;
                 } else {
-                    $amount = $registration->item->fee_amount !== null
-                        ? (float) $registration->item->fee_amount
-                        : $studentRegRate;
+                    // FRD-04 v2: ignore item.fee_amount — inherit Event Head rates.
+                    $amount = (float) ($head->default_item_fee ?? $studentRegRate);
+                    if ($eligible && $individualQuota > 0 && $head->extra_item_fee !== null) {
+                        // Beyond free quota: prefer explicit extra rate when configured.
+                        $amount = (float) $head->extra_item_fee;
+                    }
                 }
 
                 $lines[] = [
@@ -125,9 +128,8 @@ class FestSportsCompositeFeeService
                 $teamQuotaUsed++;
                 $amount = 0.0;
             } else {
-                $amount = $registration->item->fee_amount !== null
-                    ? (float) $registration->item->fee_amount
-                    : $teamRegRate;
+                // FRD-04 v2: team items inherit the Event Head team registration fee.
+                $amount = $teamRegRate;
             }
 
             $lines[] = [

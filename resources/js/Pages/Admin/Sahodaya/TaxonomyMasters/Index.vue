@@ -3,7 +3,7 @@
                          :pendingPaymentsCount="pendingPaymentsCount" :program="program"
                          :program-events="programEvents" :show-header-title="false">
         <PageHeader title="Item category masters" eyebrow="Catalog"
-                    description="Manage dropdown values for sports and arts item forms — disciplines, venue types, formats, participant types, and more.">
+                    description="Manage dropdown values for sports and arts item forms — disciplines, venue types, formats, class categories, catalog browse sections, and more.">
             <template #actions>
                 <Link :href="sportsAgeGroupsUrl" class="btn-secondary text-sm">Sports age groups →</Link>
             </template>
@@ -19,7 +19,7 @@
 
         <form @submit.prevent="addEntry" class="card mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
             <FormField label="Key (slug)" hint="Lowercase, e.g. track">
-                <input v-model="form.entry_key" class="field" required pattern="[a-z0-9_]+" placeholder="track">
+                <input v-model="form.entry_key" class="field" required pattern="[a-z0-9_.]+" placeholder="track">
             </FormField>
             <FormField label="Display label">
                 <input v-model="form.label" class="field" required placeholder="Track (Running)">

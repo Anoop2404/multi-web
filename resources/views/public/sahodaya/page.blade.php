@@ -24,7 +24,7 @@
     <div class="max-w-5xl mx-auto px-4 sm:px-8 py-12 sm:py-20">
         @if(!empty($page['content_html']))
         <div class="prose prose-lg max-w-none text-gray-800 leading-relaxed cksc-page-content">
-            {!! $page['content_html'] !!}
+            {!! \App\Support\HtmlSanitizer::rich($page['content_html'] ?? '') !!}
         </div>
         @elseif(!empty($page['content']))
         <div class="prose prose-lg max-w-none text-gray-800 leading-relaxed">

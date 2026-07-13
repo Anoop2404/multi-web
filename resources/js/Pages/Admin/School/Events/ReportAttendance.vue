@@ -15,7 +15,8 @@
                           :base-url="base"
                           :selected-head-id="filterHeadId ?? headFilter"
                           :selected-item-id="filterItemId ?? itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`" />
+                          :hub-url="`${programBase}/reports/${event.id}`"
+                          :is-sports="event.event_type === 'sports'" />
 
         <div class="card overflow-hidden p-0">
             <table class="data-table">

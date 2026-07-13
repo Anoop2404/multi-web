@@ -44,10 +44,10 @@
             Add stages under <strong>Event settings → Venues & stages</strong> before scoping stage managers.
         </p>
         <p v-if="showHeadSelector && !heads.length" class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3 mb-4">
-            Sync item heads under <strong>Setup hub → Item heads master</strong> before assigning coordinators.
+            Sync Event Heads under <strong>Setup hub → Event Heads</strong> before assigning coordinators.
         </p>
         <p v-if="isSports" class="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-3 mb-4">
-            Item head coordinators enter marks and manage competition for their head (Athletics, Chess, …).
+            Event Head coordinators enter marks and manage competition for their head (Athletics, Chess, …).
             They sign in at <code>/portal/fest-coordinator/{{ sahodaya.id }}</code> or <code>/portal/fest-ops/{{ sahodaya.id }}</code>.
         </p>
 
@@ -91,12 +91,12 @@ const props = defineProps({
 const isSports = computed(() => props.event.event_type === 'sports');
 const pageTitle = computed(() => (
     isSports.value
-        ? `Item head coordinators — ${props.event.title}`
+        ? `Event Head coordinators — ${props.event.title}`
         : `Event staff — ${props.event.title}`
 ));
 const pageDescription = computed(() => (
     isSports.value
-        ? 'Assign one coordinator per item head — they enter marks and run day-of operations for that section.'
+        ? 'Assign one coordinator per Event Head — they enter marks and run day-of operations for that section.'
         : 'Assign fest ops and mark coordinators to duties.'
 ));
 const backHref = computed(() => (
@@ -126,7 +126,7 @@ const showHeadSelector = computed(() => (
 ));
 const headRequired = computed(() => isSports.value && form.duty === 'marks');
 const headFieldLabel = computed(() => (
-    isSports.value && form.duty === 'marks' ? 'Item head' : 'Item head (optional scope)'
+    isSports.value && form.duty === 'marks' ? 'Event Head' : 'Item head (optional scope)'
 ));
 
 function dutyLabel(duty) {

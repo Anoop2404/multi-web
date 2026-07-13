@@ -13,16 +13,54 @@ class FestItemFeeResolver
 {
     public function amountForItem(?FestEventItem $item, array $schedule, ?FestEvent $event = null, bool $extraQuotaItem = false): float
     {
-        if ($item?->fee_amount !== null) {
-            return (float) $item->fee_amount;
-        }
+        // Sports composite: items inherit Event Head rates (FRD-04 v2) — ignore item.fee_amount.
+        if (($schedule['fee_model'] ?? null) === 'sports_composite' || $event?->event_type === 'sports') {
+            if ($item?->head_id) {
+                $head = $item->relationLoaded('head')
+                    ? $item->head
+                    : $item->head()->first([
+                        'id',
+                        'student_registration_fee',
+                        'team_registration_fee',
+                        'default_item_fee',
+                        'extra_item_fee',
+                    ]);
+                if ($head) {
+                    if ($item->isTeamItem()) {
+                        return (float) ($head->team_registration_fee ?? $head->default_item_fee ?? 0);
+                    }
+                    if ($extraQuotaItem && $head->extra_item_fee !== null) {
+                        return (float) $head->extra_item_fee;
+                    }
 
-        if (($schedule['fee_model'] ?? null) === 'sports_composite') {
+                    return (float) ($head->default_item_fee ?? $head->student_registration_fee ?? 0);
+                }
+            }
+
             if (isset($schedule['default_item_fee']) && $schedule['default_item_fee'] !== '') {
                 return (float) $schedule['default_item_fee'];
             }
 
             return 0.0;
+        }
+
+        if ($item?->fee_amount !== null) {
+            return (float) $item->fee_amount;
+        }
+
+        // Competition area default fee (custom / non-sports types) — after item override, before head/schedule.
+        if ($item?->area_id) {
+            $area = $item->relationLoaded('area')
+                ? $item->area
+                : $item->area()->first(['id', 'default_item_fee', 'extra_item_fee']);
+            if ($area) {
+                if ($extraQuotaItem && $area->extra_item_fee !== null) {
+                    return (float) $area->extra_item_fee;
+                }
+                if (! $extraQuotaItem && $area->default_item_fee !== null) {
+                    return (float) $area->default_item_fee;
+                }
+            }
         }
 
         if ($item?->head_id) {

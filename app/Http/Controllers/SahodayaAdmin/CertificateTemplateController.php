@@ -7,6 +7,7 @@ use App\Services\Certificates\CertificateBackgroundConverter;
 use App\Services\Training\TrainingCertificateService;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class CertificateTemplateController extends SahodayaAdminController
 {
@@ -30,6 +31,7 @@ class CertificateTemplateController extends SahodayaAdminController
             'defaultTopperBody'  => CertificateTemplate::defaultTopperBody(),
             'defaultSignatories' => CertificateTemplate::defaultTrainingSignatories(),
             'defaultLayout'      => CertificateTemplate::defaultBackgroundLayout(),
+            'fontFamilyOptions'  => CertificateTemplate::fontFamilyOptions(),
         ]);
     }
 
@@ -68,10 +70,22 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.show_participation_label' => 'nullable|boolean',
             'layout_json.bold_variables' => 'nullable|boolean',
             'layout_json.recipient_name.top' => 'nullable|numeric|min:0|max:100',
+            'layout_json.recipient_name.font_size' => 'nullable|integer|min:6|max:96',
+            'layout_json.recipient_name.font_family' => ['nullable', 'string', Rule::in(CertificateTemplate::fontFamilyOptions())],
+            'layout_json.recipient_name.font_weight' => 'nullable|in:normal,bold',
+            'layout_json.recipient_name.font_style' => 'nullable|in:normal,italic',
             'layout_json.body.top' => 'nullable|numeric|min:0|max:100',
+            'layout_json.body.font_size' => 'nullable|integer|min:6|max:96',
+            'layout_json.body.font_family' => ['nullable', 'string', Rule::in(CertificateTemplate::fontFamilyOptions())],
+            'layout_json.body.font_weight' => 'nullable|in:normal,bold',
+            'layout_json.body.font_style' => 'nullable|in:normal,italic',
             'layout_json.certificate_date.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.certificate_date.left' => 'nullable|numeric|min:0|max:100',
             'layout_json.certificate_date.width' => 'nullable|numeric|min:0|max:100',
+            'layout_json.certificate_date.font_size' => 'nullable|integer|min:6|max:96',
+            'layout_json.certificate_date.font_family' => ['nullable', 'string', Rule::in(CertificateTemplate::fontFamilyOptions())],
+            'layout_json.certificate_date.font_weight' => 'nullable|in:normal,bold',
+            'layout_json.certificate_date.font_style' => 'nullable|in:normal,italic',
             'layout_json.certificate_date.align' => 'nullable|in:left,right,center',
             'layout_json.participation_label_cover.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.participation_label_cover.height' => 'nullable|numeric|min:1|max:30',
@@ -158,10 +172,22 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.show_participation_label' => 'nullable|boolean',
             'layout_json.bold_variables' => 'nullable|boolean',
             'layout_json.recipient_name.top' => 'nullable|numeric|min:0|max:100',
+            'layout_json.recipient_name.font_size' => 'nullable|integer|min:6|max:96',
+            'layout_json.recipient_name.font_family' => ['nullable', 'string', Rule::in(CertificateTemplate::fontFamilyOptions())],
+            'layout_json.recipient_name.font_weight' => 'nullable|in:normal,bold',
+            'layout_json.recipient_name.font_style' => 'nullable|in:normal,italic',
             'layout_json.body.top' => 'nullable|numeric|min:0|max:100',
+            'layout_json.body.font_size' => 'nullable|integer|min:6|max:96',
+            'layout_json.body.font_family' => ['nullable', 'string', Rule::in(CertificateTemplate::fontFamilyOptions())],
+            'layout_json.body.font_weight' => 'nullable|in:normal,bold',
+            'layout_json.body.font_style' => 'nullable|in:normal,italic',
             'layout_json.certificate_date.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.certificate_date.left' => 'nullable|numeric|min:0|max:100',
             'layout_json.certificate_date.width' => 'nullable|numeric|min:0|max:100',
+            'layout_json.certificate_date.font_size' => 'nullable|integer|min:6|max:96',
+            'layout_json.certificate_date.font_family' => ['nullable', 'string', Rule::in(CertificateTemplate::fontFamilyOptions())],
+            'layout_json.certificate_date.font_weight' => 'nullable|in:normal,bold',
+            'layout_json.certificate_date.font_style' => 'nullable|in:normal,italic',
             'layout_json.certificate_date.align' => 'nullable|in:left,right,center',
             'layout_json.participation_label_cover.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.participation_label_cover.height' => 'nullable|numeric|min:1|max:30',
@@ -281,10 +307,11 @@ class CertificateTemplateController extends SahodayaAdminController
             if (! isset($input[$key]) || ! is_array($input[$key])) {
                 continue;
             }
+            $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style'];
             $allowed = match ($key) {
                 'participation_label_cover' => ['top', 'left', 'width', 'height'],
-                'certificate_date' => ['top', 'left', 'width', 'font_size', 'align'],
-                default => ['top', 'left', 'width', 'font_size'],
+                'certificate_date' => [...$textKeys, 'align'],
+                default => $textKeys,
             };
             $layout[$key] = array_merge($layout[$key] ?? [], array_intersect_key(
                 $input[$key],

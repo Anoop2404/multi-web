@@ -181,7 +181,7 @@ class StateFestProgramController extends Controller
     {
         $data = $request->validate([
             'title'              => 'required|string|max:255',
-            'event_type'         => 'required|in:kalolsavam,sports,kids_fest,teacher_fest,custom',
+            'event_type'         => ['required', \Illuminate\Validation\Rule::in(array_keys(config('fest_competition_types', [])))],
             'conduct_levels'     => 'required|array|min:1',
             'conduct_levels.*'   => Rule::in(['state', 'sahodaya', 'school']),
             'academic_year'      => 'nullable|string|max:20',

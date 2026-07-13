@@ -35,6 +35,13 @@ class FestRegistrationEligibilityService
             ->ineligibilityReason($student, $event);
         if ($verifyError) {
             $errors[] = "{$student->name}: {$verifyError}";
+        } else {
+            $head = $item->relationLoaded('head')
+                ? $item->head
+                : ($item->head_id ? $item->head()->first() : null);
+            if ($head?->requiresVerifiedStudentsOnly() && ! $student->isVerified()) {
+                $errors[] = "{$student->name}: must be Sahodaya-verified to register under {$head->name}.";
+            }
         }
 
         $categoryError = $this->validateCategory($student, $event, $item);
@@ -45,6 +52,17 @@ class FestRegistrationEligibilityService
         $qualError = $this->validateSchoolQualification($student, $event);
         if ($qualError) {
             $errors[] = "{$student->name}: {$qualError}";
+        }
+
+        foreach (app(FestEligibilityRuleEngine::class)->validateStudent($student, $event, $item) as $ruleError) {
+            $errors[] = "{$student->name}: {$ruleError}";
+        }
+
+        $area = $item->relationLoaded('area')
+            ? $item->area
+            : ($item->area_id ? $item->area()->first() : null);
+        if ($area?->requiresVerifiedStudentsOnly() && ! $student->isVerified()) {
+            $errors[] = "{$student->name}: must be Sahodaya-verified to register under {$area->name}.";
         }
 
         return $errors;

@@ -79,6 +79,7 @@ class SchoolApplicationController extends Controller
                 'subdomain'           => $data['requested_subdomain'] ?? null,
                 'school_prefix'       => $schoolPrefix,
                 'membership_status'   => 'pending',
+                'is_non_affiliated'   => ($data['school_category'] ?? 'affiliated') === 'non_affiliated',
                 'is_active'           => true,
                 'application_payload' => $payload,
             ]);

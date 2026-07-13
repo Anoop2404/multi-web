@@ -453,6 +453,9 @@ Route::prefix('school-admin/{tenantId}')
         Route::delete('/sections/{sectionId}', [SiteBuilderApiController::class, 'deleteSection'])->name('sections.delete');
         Route::post('/sections/{sectionId}/toggle', [SiteBuilderApiController::class, 'toggleSection'])->name('sections.toggle');
         Route::post('/sections/reorder', [SiteBuilderApiController::class, 'reorderSections'])->name('sections.reorder');
+        Route::post('/sections/{sectionId}/publish', [SiteBuilderApiController::class, 'publishSection'])->name('sections.publish');
+        Route::get('/sections/{sectionId}/versions', [SiteBuilderApiController::class, 'sectionVersions'])->name('sections.versions');
+        Route::post('/sections/{sectionId}/versions/{versionId}/restore', [SiteBuilderApiController::class, 'restoreSectionVersion'])->name('sections.versions.restore');
         Route::get('/nav', [SiteBuilderApiController::class, 'getNav'])->name('nav.get');
         Route::post('/nav', [SiteBuilderApiController::class, 'saveNav'])->name('nav.save');
         Route::get('/footer', [SiteBuilderApiController::class, 'getFooter'])->name('footer.get');
@@ -590,6 +593,14 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{sportsAgeGroup}', [SportsAgeGroupController::class, 'destroy'])->name('destroy');
         });
 
+        Route::prefix('competition-types')->name('competition-types.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\SahodayaAdmin\FestCompetitionTypeController::class, 'index'])->name('index');
+            Route::post('/', [\App\Http\Controllers\SahodayaAdmin\FestCompetitionTypeController::class, 'store'])->name('store');
+            Route::post('/reset-defaults', [\App\Http\Controllers\SahodayaAdmin\FestCompetitionTypeController::class, 'resetDefaults'])->name('reset-defaults');
+            Route::put('/{competitionType}', [\App\Http\Controllers\SahodayaAdmin\FestCompetitionTypeController::class, 'update'])->name('update');
+            Route::delete('/{competitionType}', [\App\Http\Controllers\SahodayaAdmin\FestCompetitionTypeController::class, 'destroy'])->name('destroy');
+        });
+
         Route::prefix('taxonomy-masters')->name('taxonomy-masters.')->group(function () {
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\FestTaxonomyMasterController::class, 'index'])->name('index');
             Route::post('/', [\App\Http\Controllers\SahodayaAdmin\FestTaxonomyMasterController::class, 'store'])->name('store');
@@ -602,6 +613,19 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::middleware('website.enabled')->group(function () {
         Route::get('/site-builder', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderController::class, 'index'])->name('site-builder');
         Route::get('/site-builder/section-types', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderController::class, 'sectionTypes'])->name('site-builder.section-types');
+        Route::get('/website/domains', [\App\Http\Controllers\SahodayaAdmin\WebsiteDomainController::class, 'index'])->name('website.domains');
+        Route::post('/website/domains', [\App\Http\Controllers\SahodayaAdmin\WebsiteDomainController::class, 'store'])->name('website.domains.store');
+        Route::post('/website/domains/{domainId}/verify', [\App\Http\Controllers\SahodayaAdmin\WebsiteDomainController::class, 'verify'])->name('website.domains.verify');
+        Route::delete('/website/domains/{domainId}', [\App\Http\Controllers\SahodayaAdmin\WebsiteDomainController::class, 'destroy'])->name('website.domains.destroy');
+        Route::get('/website/sites', [\App\Http\Controllers\SahodayaAdmin\WebsiteSiteController::class, 'index'])->name('website.sites');
+        Route::post('/website/sites', [\App\Http\Controllers\SahodayaAdmin\WebsiteSiteController::class, 'store'])->name('website.sites.store');
+        Route::put('/website/sites/{site}', [\App\Http\Controllers\SahodayaAdmin\WebsiteSiteController::class, 'update'])->name('website.sites.update');
+        Route::delete('/website/sites/{site}', [\App\Http\Controllers\SahodayaAdmin\WebsiteSiteController::class, 'destroy'])->name('website.sites.destroy');
+        Route::get('/website/forms', [\App\Http\Controllers\SahodayaAdmin\SiteFormController::class, 'index'])->name('website.forms');
+        Route::post('/website/forms', [\App\Http\Controllers\SahodayaAdmin\SiteFormController::class, 'store'])->name('website.forms.store');
+        Route::put('/website/forms/{form}', [\App\Http\Controllers\SahodayaAdmin\SiteFormController::class, 'update'])->name('website.forms.update');
+        Route::delete('/website/forms/{form}', [\App\Http\Controllers\SahodayaAdmin\SiteFormController::class, 'destroy'])->name('website.forms.destroy');
+        Route::get('/website/forms/{form}/submissions', [\App\Http\Controllers\SahodayaAdmin\SiteFormController::class, 'submissions'])->name('website.forms.submissions');
 
         Route::prefix('site-builder/api')->name('site-builder.api.')->group(function () {
             Route::get('/sections', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'sections'])->name('sections.index');
@@ -617,6 +641,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/portal-links', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'ensurePortalLinks'])->name('portal-links.ensure');
             Route::post('/default-nav', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'ensureDefaultNav'])->name('default-nav.ensure');
             Route::post('/apply-cksc-template', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'applyCkscTemplate'])->name('cksc-template.apply');
+            Route::post('/sections/{sectionId}/publish', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'publishSection'])->name('sections.publish');
+            Route::get('/sections/{sectionId}/versions', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'sectionVersions'])->name('sections.versions');
+            Route::post('/sections/{sectionId}/versions/{versionId}/restore', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'restoreSectionVersion'])->name('sections.versions.restore');
             Route::get('/public-website', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'getPublicWebsite'])->name('public-website.get');
             Route::post('/public-website', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'savePublicWebsite'])->name('public-website.save');
             Route::get('/theme', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'getTheme'])->name('theme.get');
@@ -830,6 +857,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/submit-state-qualifiers', [\App\Http\Controllers\SahodayaAdmin\StateQualifierSubmissionController::class, 'store'])->name('submit-state-qualifiers');
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');
+            Route::post('/{event}/promote-discipline-events', [FestEventController::class, 'promoteDisciplineEvents'])->name('promote-discipline-events');
             Route::post('/{event}/promote-all-school-rounds', [FestEventController::class, 'promoteAllSchoolRounds'])->name('promote-all-school-rounds');
             Route::post('/{event}/items', [FestEventController::class, 'storeItem'])->name('items.store');
             Route::put('/{event}/items/{item}', [FestEventController::class, 'updateItem'])->name('items.update');
@@ -945,6 +973,16 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/item-heads/sync', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'sync'])->name('item-heads.sync');
             Route::patch('/{event}/item-heads/{head}/windows', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'updateWindows'])->name('item-heads.windows.update');
             Route::delete('/{event}/item-heads/{head}', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'destroy'])->name('item-heads.destroy');
+
+            Route::get('/{event}/areas', [\App\Http\Controllers\SahodayaAdmin\FestCompetitionAreaController::class, 'index'])->name('areas.index');
+            Route::post('/{event}/areas', [\App\Http\Controllers\SahodayaAdmin\FestCompetitionAreaController::class, 'store'])->name('areas.store');
+            Route::put('/{event}/areas/{area}', [\App\Http\Controllers\SahodayaAdmin\FestCompetitionAreaController::class, 'update'])->name('areas.update');
+            Route::delete('/{event}/areas/{area}', [\App\Http\Controllers\SahodayaAdmin\FestCompetitionAreaController::class, 'destroy'])->name('areas.destroy');
+
+            Route::get('/{event}/eligibility-rules', [\App\Http\Controllers\SahodayaAdmin\FestEligibilityRuleController::class, 'index'])->name('eligibility-rules.index');
+            Route::post('/{event}/eligibility-rules', [\App\Http\Controllers\SahodayaAdmin\FestEligibilityRuleController::class, 'store'])->name('eligibility-rules.store');
+            Route::put('/{event}/eligibility-rules/{eligibilityRule}', [\App\Http\Controllers\SahodayaAdmin\FestEligibilityRuleController::class, 'update'])->name('eligibility-rules.update');
+            Route::delete('/{event}/eligibility-rules/{eligibilityRule}', [\App\Http\Controllers\SahodayaAdmin\FestEligibilityRuleController::class, 'destroy'])->name('eligibility-rules.destroy');
             Route::put('/{event}/eligibility-settings', [FestEventSettingsController::class, 'updateEligibilitySettings'])->name('eligibility-settings.update');
             Route::post('/{event}/lifecycle-settings', [FestEventSettingsController::class, 'updateLifecycleSettings'])->name('lifecycle-settings.update');
             Route::put('/{event}/fee-settings', [FestEventSettingsController::class, 'updateFeeSettings'])->name('fee-settings.update');
@@ -1005,6 +1043,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/reports/item-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemCounts'])->name('reports.item-counts');
             Route::get('/{event}/reports/discipline-registration', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'disciplineRegistration'])->name('reports.discipline-registration');
             Route::get('/{event}/reports/head-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'headWiseParticipants'])->name('reports.head-wise-participants');
+            Route::get('/{event}/reports/area-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'areaWiseParticipants'])->name('reports.area-wise-participants');
             Route::get('/{event}/reports/age-group-matrix', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'ageGroupMatrix'])->name('reports.age-group-matrix');
             Route::get('/{event}/reports/fee-collection', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'feeCollection'])->name('reports.fee-collection');
             Route::get('/{event}/reports/registration-register', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'registrationRegister'])->name('reports.registration-register');

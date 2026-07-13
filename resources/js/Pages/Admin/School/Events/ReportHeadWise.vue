@@ -15,7 +15,8 @@
                           :base-url="base"
                           :selected-head-id="filterHeadId ?? headFilter"
                           :selected-item-id="filterItemId ?? itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`" />
+                          :hub-url="`${programBase}/reports/${event.id}`"
+                          :is-sports="true" />
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
@@ -74,7 +75,7 @@
                         </tr>
                         <tr v-if="!summary.length">
                             <td colspan="7" class="p-6 text-center text-slate-400">
-                                No item heads configured for this event yet.
+                                No Event Heads configured for this event yet.
                             </td>
                         </tr>
                     </tbody>

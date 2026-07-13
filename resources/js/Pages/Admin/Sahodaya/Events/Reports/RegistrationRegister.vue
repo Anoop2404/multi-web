@@ -2,7 +2,9 @@
     <SahodayaEventsLayout :title="`${event.title} — Registration Register`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Registration & Fees Register`" eyebrow="Reports"
-                    description="Grouped by item head — Fest ID, item reg, and chest numbers per item row.">
+                    :description="event.event_type === 'sports'
+                        ? 'Grouped by Event Head — Fest ID, item reg, and chest numbers per item row.'
+                        : 'Grouped by item head — Fest ID, item reg, and chest numbers per item row.'">
             <template #actions>
                 <a :href="exportUrl" class="btn-primary text-sm">Export CSV ↓</a>
                 <Link :href="feesUrl" class="btn-secondary text-sm">Event fees →</Link>
@@ -25,6 +27,7 @@
                           v-model:item-id="itemFilter"
                           :heads="headsForFilter"
                           :head-item-groups="headItemGroups"
+                          :is-sports="event.event_type === 'sports'"
                           @apply="applyFilter">
             <template #extra>
                 <FormField label="School" class-extra="mb-0 min-w-[12rem]">

@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SiteSection;
+use App\Models\SiteSectionVersion;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
+use App\Models\WebsiteSite;
+use App\Support\HtmlSanitizer;
 use App\Support\SectionFieldRegistry;
 use App\Support\SectionVariantResolver;
 use Illuminate\Support\Facades\Cache;
@@ -18,9 +21,23 @@ class BuilderApiController extends Controller
 
     public function sections(string $tenantId): JsonResponse
     {
+        $siteId = request()->integer('site_id') ?: null;
+        WebsiteSite::ensurePrimary($tenantId);
+
         $sections = SiteSection::where('tenant_id', $tenantId)
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->when(! $siteId, function ($q) use ($tenantId) {
+                $primary = WebsiteSite::where('tenant_id', $tenantId)->where('is_primary', true)->value('id');
+                $q->where(function ($inner) use ($primary) {
+                    $inner->whereNull('site_id');
+                    if ($primary) {
+                        $inner->orWhere('site_id', $primary);
+                    }
+                });
+            })
             ->orderBy('display_order')
-            ->get();
+            ->get()
+            ->map(fn (SiteSection $s) => $this->sectionPayload($s));
 
         return response()->json($sections);
     }
@@ -29,18 +46,31 @@ class BuilderApiController extends Controller
     {
         $data = $request->validate([
             'section_type' => 'required|string|max:50',
-            'variant'      => 'required|string|max:50',
-            'config'       => 'nullable|array',
-            'is_active'    => 'boolean',
+            'variant' => 'required|string|max:50',
+            'config' => 'nullable|array',
+            'is_active' => 'boolean',
+            'site_id' => 'nullable|integer',
+            'status' => 'nullable|in:draft,published',
         ]);
 
-        $data['tenant_id']     = $tenantId;
+        $primary = WebsiteSite::ensurePrimary($tenantId);
+        $data['tenant_id'] = $tenantId;
+        $data['site_id'] = $data['site_id'] ?? $primary->id;
         $data['display_order'] = SiteSection::where('tenant_id', $tenantId)->max('display_order') + 1;
+        $data['config'] = HtmlSanitizer::sanitizeConfig($data['config'] ?? []);
+        $data['status'] = $data['status'] ?? SiteSection::STATUS_DRAFT;
+        $data['updated_by'] = auth()->id();
+
+        if ($data['status'] === SiteSection::STATUS_PUBLISHED) {
+            $data['published_config'] = $data['config'];
+            $data['published_at'] = now();
+        }
 
         $section = SiteSection::create($data);
+        $section->recordVersion('Created');
         $this->bustCache($tenantId);
 
-        return response()->json($section, 201);
+        return response()->json($this->sectionPayload($section), 201);
     }
 
     public function updateSection(Request $request, string $tenantId, int $sectionId): JsonResponse
@@ -49,26 +79,79 @@ class BuilderApiController extends Controller
 
         $data = $request->validate([
             'section_type' => 'string|max:50',
-            'variant'      => 'string|max:50',
-            'config'       => 'nullable|array',
-            'is_active'    => 'boolean',
+            'variant' => 'string|max:50',
+            'config' => 'nullable|array',
+            'is_active' => 'boolean',
+            'status' => 'nullable|in:draft,published',
+            'site_id' => 'nullable|integer',
         ]);
 
-        // Archive current config when variant changes
+        if (array_key_exists('config', $data) && is_array($data['config'])) {
+            $data['config'] = HtmlSanitizer::sanitizeConfig($data['config']);
+        }
+
         $newVariant = $data['variant'] ?? $section->variant;
         if ($newVariant !== $section->variant) {
             $section->archiveCurrentConfig();
             $data['archived_configs'] = $section->archived_configs;
-            // Reset config for the new variant so editors start fresh
-            if (!isset($data['config']) || empty($data['config'])) {
+            if (! isset($data['config']) || empty($data['config'])) {
                 $data['config'] = [];
             }
         }
 
-        $section->update($data);
+        // Saving edits keeps draft until publish (unless explicitly publishing)
+        if (($data['status'] ?? null) !== SiteSection::STATUS_PUBLISHED) {
+            $data['status'] = SiteSection::STATUS_DRAFT;
+        }
+
+        $data['updated_by'] = auth()->id();
+        $section->fill($data);
+        $section->save();
+        $section->recordVersion('Updated');
+
+        if (($data['status'] ?? null) === SiteSection::STATUS_PUBLISHED) {
+            $section->publish();
+        }
+
         $this->bustCache($tenantId);
 
-        return response()->json($section);
+        return response()->json($this->sectionPayload($section->fresh()));
+    }
+
+    public function publishSection(string $tenantId, int $sectionId): JsonResponse
+    {
+        $section = SiteSection::where('tenant_id', $tenantId)->findOrFail($sectionId);
+        $section->config = HtmlSanitizer::sanitizeConfig($section->config ?? []);
+        $section->publish();
+        $this->bustCache($tenantId);
+
+        return response()->json($this->sectionPayload($section->fresh()));
+    }
+
+    public function sectionVersions(string $tenantId, int $sectionId): JsonResponse
+    {
+        $section = SiteSection::where('tenant_id', $tenantId)->findOrFail($sectionId);
+
+        return response()->json(
+            $section->versions()->limit(30)->get(['id', 'variant', 'note', 'created_by', 'created_at'])
+        );
+    }
+
+    public function restoreSectionVersion(string $tenantId, int $sectionId, int $versionId): JsonResponse
+    {
+        $section = SiteSection::where('tenant_id', $tenantId)->findOrFail($sectionId);
+        $version = SiteSectionVersion::where('site_section_id', $section->id)->findOrFail($versionId);
+
+        $section->recordVersion('Before restore #'.$versionId);
+        $section->update([
+            'variant' => $version->variant ?: $section->variant,
+            'config' => HtmlSanitizer::sanitizeConfig($version->config ?? []),
+            'status' => SiteSection::STATUS_DRAFT,
+            'updated_by' => auth()->id(),
+        ]);
+        $this->bustCache($tenantId);
+
+        return response()->json($this->sectionPayload($section->fresh()));
     }
 
     public function deleteSection(string $tenantId, int $sectionId): JsonResponse
@@ -82,10 +165,10 @@ class BuilderApiController extends Controller
     public function toggleSection(string $tenantId, int $sectionId): JsonResponse
     {
         $section = SiteSection::where('tenant_id', $tenantId)->findOrFail($sectionId);
-        $section->update(['is_active' => !$section->is_active]);
+        $section->update(['is_active' => ! $section->is_active]);
         $this->bustCache($tenantId);
 
-        return response()->json($section);
+        return response()->json($this->sectionPayload($section->fresh()));
     }
 
     public function reorderSections(Request $request, string $tenantId): JsonResponse
@@ -100,6 +183,14 @@ class BuilderApiController extends Controller
         $this->bustCache($tenantId);
 
         return response()->json(['reordered' => true]);
+    }
+
+    /** @return array<string, mixed> */
+    private function sectionPayload(SiteSection $section): array
+    {
+        return array_merge($section->toArray(), [
+            'has_unpublished_changes' => $section->hasUnpublishedChanges(),
+        ]);
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────

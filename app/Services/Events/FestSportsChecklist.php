@@ -77,6 +77,9 @@ class FestSportsChecklist
             $verifiedFees = $schoolFees->where('status', 'approved')->count();
         }
 
+        $numberingSettings = is_array($event->numbering_settings) ? $event->numbering_settings : [];
+        $numberingConfigured = $numberingSettings !== [];
+
         return [
             [
                 'key'   => 'event',
@@ -87,7 +90,7 @@ class FestSportsChecklist
             ],
             [
                 'key'    => 'heads',
-                'label'  => 'Item Heads configured',
+                'label'  => 'Event Heads configured',
                 'hint'   => 'Heads exist and each has school/student/team fees or policy set.',
                 'href'   => "{$base}/competition",
                 'done'   => $headsFullyConfigured,
@@ -97,7 +100,7 @@ class FestSportsChecklist
             ],
             [
                 'key'    => 'head_windows',
-                'label'  => 'Head schedule windows set',
+                'label'  => 'Event Head schedule windows set',
                 'hint'   => 'Registration and/or competition dates on each head.',
                 'href'   => "{$base}/competition",
                 'done'   => $headCount > 0 && $headsWithDates === $headCount,
@@ -106,7 +109,7 @@ class FestSportsChecklist
             [
                 'key'    => 'items',
                 'label'  => 'Items added',
-                'hint'   => 'Enabled items linked under heads.',
+                'hint'   => 'Enabled items linked under Event Heads.',
                 'href'   => "{$base}/items",
                 'done'   => $itemCount > 0 && $itemsWithHead === $itemCount,
                 'detail' => $itemCount > 0 ? "{$itemsWithHead}/{$itemCount} linked to a head" : null,
@@ -114,9 +117,9 @@ class FestSportsChecklist
             [
                 'key'      => 'item_fees',
                 'label'    => 'Item overrides (optional)',
-                'hint'     => 'Informational — per-item fee overrides never block progress.',
+                'hint'     => 'Per-item fee overrides — never required; defaults come from each Event Head.',
                 'href'     => "{$base}/competition",
-                'done'     => true,
+                'done'     => $itemsWithFees > 0,
                 'optional' => true,
                 'detail'   => $itemsWithFees > 0 ? "{$itemsWithFees} item(s) with custom fee" : 'Using head defaults',
             ],
@@ -125,7 +128,7 @@ class FestSportsChecklist
                 'label'    => 'Event-wide fee override (optional)',
                 'hint'     => 'Optional fallback or fee cap across heads. Composite billing is always on for Sports.',
                 'href'     => "{$base}/settings/fees",
-                'done'     => true,
+                'done'     => $feeConfigured,
                 'optional' => true,
                 'detail'   => $feeConfigured ? 'Fallback configured' : 'Using per-head fees only',
             ],
@@ -146,9 +149,10 @@ class FestSportsChecklist
             [
                 'key'   => 'numbering',
                 'label' => 'Numbering configured',
-                'hint'  => 'Chest number ranges / auto-assign on approval.',
+                'hint'  => 'Save chest / event-reg ranges and auto-assign under Settings → Chest numbering.',
                 'href'  => "{$base}/settings/numbering",
-                'done'  => true,
+                'done'  => $numberingConfigured,
+                'detail' => $numberingConfigured ? 'Custom numbering saved' : 'Using platform defaults until saved',
             ],
             [
                 'key'   => 'registrations',
@@ -254,6 +258,13 @@ class FestSportsChecklist
         $feeService = app(FestSchoolEventFeeService::class);
         $schedule = $feeService->resolveSchedule($event);
         $feeModel = $schedule['fee_model'] ?? $event->fee_settings['fee_model'] ?? null;
+        $storedFees = is_array($event->fee_settings) ? $event->fee_settings : [];
+
+        // Sports: fee_model is always sports_composite — only count real event-wide overrides.
+        $feeConfigured = $event->event_type === 'sports'
+            ? collect(['school_fee_cap', 'school_registration_fee', 'student_registration_fee', 'team_registration_fee', 'default_item_fee', 'extra_item_fee'])
+                ->contains(fn (string $key) => filled($storedFees[$key] ?? null) || filled($schedule[$key] ?? null))
+            : ($feeModel && $feeModel !== 'none');
 
         return [
             'headCount' => $headCount,
@@ -264,7 +275,7 @@ class FestSportsChecklist
             'headsFullyConfigured' => $headCount > 0 && $headsWithFees === $headCount,
             'itemsWithFees' => FestEventItem::where('event_id', $event->id)->where('is_enabled', true)->whereNotNull('fee_amount')->count(),
             'rankPointCount' => FestRankPoint::where('event_id', $event->id)->count(),
-            'feeConfigured' => $feeModel && $feeModel !== 'none',
+            'feeConfigured' => $feeConfigured,
         ];
     }
 }

@@ -10,7 +10,7 @@ th,td{border:1px solid #ccc;padding:3px 4px} th{background:#f3f4f6}
 <h2>{{ $event->title }}</h2>
 <p class="meta">{{ $school->name }} — Item registration &amp; fees</p>
 
-<p class="section">Summary by item head</p>
+<p class="section">Summary by {{ ($event->event_type ?? null) === 'sports' ? 'Event Head' : 'item head' }}</p>
 <table><thead><tr>
     <th>Head</th><th>Items</th><th>Regs</th><th>Approved</th><th>Pending</th><th>Participants</th><th>Max item regs</th><th>Est. fee</th>
 </tr></thead><tbody>

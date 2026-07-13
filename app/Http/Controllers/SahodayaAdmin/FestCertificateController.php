@@ -45,6 +45,12 @@ class FestCertificateController extends SahodayaAdminController
             'count' => count($created),
         ]);
 
+        try {
+            app(\App\Services\Events\FestEventNotifier::class)->certificatesAvailable($event, count($created));
+        } catch (\Throwable) {
+            // ignore notification failures
+        }
+
         return back()->with('success', count($created).' certificate(s) generated.');
     }
 

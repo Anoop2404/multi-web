@@ -1,5 +1,6 @@
 <template>
-    <nav class="flex flex-wrap gap-1.5 border-b border-slate-200 pb-3 mb-4 overflow-x-auto">
+    <nav class="flex flex-wrap gap-1.5 border-b border-slate-200 pb-3 mb-4 overflow-x-auto"
+         aria-label="Sports competition setup">
         <Link v-for="tab in tabs" :key="tab.key"
               :href="tab.href"
               :class="active === tab.key
@@ -11,9 +12,13 @@
 </template>
 
 <script setup>
+/**
+ * Horizontal strip for sports Competition pages only.
+ * Labels match sportsEventSidebarNav “This event” / “Competition” items —
+ * Settings tabs live under sidebar → Settings (EventSettingsSubNav), not here.
+ */
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
-import { eventHasFestFees } from '@/support/sahodayaEventCapabilities.js';
 
 const props = defineProps({
     sahodayaId: { type: [String, Number], required: true },
@@ -24,29 +29,10 @@ const props = defineProps({
 
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}`);
 
-const tabs = computed(() => {
-    const list = [
-        { key: 'setup', label: 'Overview / setup', href: `${base.value}/setup` },
-        { key: 'competition', label: 'Competition', href: `${base.value}/competition` },
-        { key: 'items', label: 'Items', href: `${base.value}/items` },
-        { key: 'items-list', label: 'Item listing', href: `${base.value}/items/list` },
-    ];
-
-    if (eventHasFestFees(props.event ?? {})) {
-        list.push({ key: 'fees', label: 'Fee overrides', href: `${base.value}/settings/fees` });
-    }
-
-    list.push(
-        // Labels below match EventSettingsSubNav's tab names exactly (see
-        // sahodayaEventCapabilities.js::settingsTabsForEvent) so following a link
-        // here lands on a Settings tab with the same name you clicked, not a
-        // differently-worded one.
-        { key: 'rank-points', label: 'Rank points', href: `${base.value}/settings/points` },
-        { key: 'registration', label: 'Registration windows', href: `${base.value}/settings/registration` },
-        { key: 'numbering', label: 'Chest numbering', href: `${base.value}/settings/numbering` },
-        { key: 'settings', label: 'All settings', href: `${base.value}/settings` },
-    );
-
-    return list;
-});
+const tabs = computed(() => [
+    { key: 'setup', label: 'Setup hub', href: `${base.value}/setup` },
+    { key: 'competition', label: 'Event Heads', href: `${base.value}/competition` },
+    { key: 'items', label: 'Items under heads', href: `${base.value}/items` },
+    { key: 'items-list', label: 'Item listing', href: `${base.value}/items/list` },
+]);
 </script>

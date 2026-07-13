@@ -144,7 +144,7 @@ class MemberSchoolsController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Schools/Show', [
             'school' => array_merge($school->only(
-                'id', 'name', 'school_prefix', 'membership_status', 'is_active',
+                'id', 'name', 'school_prefix', 'membership_status', 'is_non_affiliated', 'is_active',
                 'fest_registration_closed', 'subdomain', 'created_at', 'application_payload'
             ), [
                 'student_count'  => Student::where('tenant_id', $school->id)->where('status', 'active')->count(),

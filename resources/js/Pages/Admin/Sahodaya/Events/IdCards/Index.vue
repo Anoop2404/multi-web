@@ -2,7 +2,9 @@
     <SahodayaEventsLayout :title="`${event.title} — ID Cards`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — ID Card Creator`" eyebrow="Output"
-                    description="Item head passes for participants, plus staff and volunteer lanyards. Four cards per A4 sheet.">
+                    :description="isSports
+                        ? 'Event Head passes for participants, plus staff and volunteer lanyards. Four cards per A4 sheet.'
+                        : 'Item head passes for participants, plus staff and volunteer lanyards. Four cards per A4 sheet.'">
         </PageHeader>
 
         <div class="grid lg:grid-cols-3 gap-6">
@@ -25,9 +27,9 @@
 
                 <div v-if="audience === 'head'" class="card space-y-4">
                     <div>
-                        <h3 class="section-title text-sm">1. Item head & filters</h3>
+                        <h3 class="section-title text-sm">1. {{ isSports ? 'Event Head' : 'Item head' }} & filters</h3>
                         <p class="text-xs text-slate-500 mt-1">
-                            One lanyard per student per item head (e.g. Athletics). All items under that head are listed on the card.
+                            One lanyard per student per {{ isSports ? 'Event Head' : 'item head' }} (e.g. Athletics). All items under that head are listed on the card.
                         </p>
                     </div>
 
@@ -43,9 +45,9 @@
                     </div>
 
                     <div class="grid sm:grid-cols-2 gap-3">
-                        <FormField label="Item head" required>
+                        <FormField :label="isSports ? 'Event Head' : 'Item head'" required>
                             <select v-model="filters.head_id" class="field text-sm" required @change="loadPreview">
-                                <option value="">Select item head…</option>
+                                <option value="">Select {{ isSports ? 'Event Head' : 'item head' }}…</option>
                                 <option v-for="head in heads" :key="head.id" :value="String(head.id)">
                                     {{ head.name }} ({{ head.count }} cards)
                                 </option>
@@ -60,7 +62,7 @@
                     </div>
 
                     <div v-if="!filters.head_id" class="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                        Select an item head above, or download all heads as one PDF.
+                        Select {{ isSports ? 'an Event Head' : 'an item head' }} above, or download all heads as one PDF.
                     </div>
 
                     <div v-else-if="loading" class="text-sm text-slate-500 py-6 text-center">Loading preview…</div>
@@ -79,7 +81,7 @@
                     </div>
 
                     <EmptyState v-else title="No participants"
-                                description="No approved participants for this item head and school filter." icon="🪪" class="py-8" />
+                                :description="`No approved participants for this ${isSports ? 'Event Head' : 'item head'} and school filter.`" icon="🪪" class="py-8" />
                 </div>
 
                 <div v-else-if="audience === 'volunteer'" class="card space-y-4">
@@ -125,7 +127,7 @@
                 <div class="card space-y-3">
                     <h3 class="section-title text-sm">Layout</h3>
                     <ul class="text-xs text-slate-600 space-y-1.5 list-disc pl-4">
-                        <li><strong>Item head</strong> — one card per student per head; items listed on card</li>
+                        <li><strong>{{ isSports ? 'Event Head' : 'Item head' }}</strong> — one card per student per head; items listed on card</li>
                         <li><strong>Volunteers</strong> — event-day volunteer passes</li>
                         <li><strong>Staff</strong> — portal users on event staff duty</li>
                         <li>99 × 85 mm landscape cards</li>
@@ -137,7 +139,7 @@
                 <div class="card space-y-3">
                     <h3 class="section-title text-sm">Generate</h3>
                     <p v-if="audience === 'head' && !filters.head_id" class="text-xs text-amber-700">
-                        Select an item head for a single-head PDF, or use “All heads” below.
+                        Select {{ isSports ? 'an Event Head' : 'an item head' }} for a single-head PDF, or use “All heads” below.
                     </p>
                     <a :href="previewUrl" target="_blank" rel="noopener"
                        class="btn-secondary w-full text-sm text-center block"
@@ -181,17 +183,21 @@ const filters = reactive({ school_id: '', head_id: '' });
 const previewCards = ref([]);
 const loading = ref(false);
 
+const isSports = computed(() => props.event?.event_type === 'sports');
+
 const templates = [
     { id: 'premium', label: 'Premium' },
     { id: 'standard', label: 'Standard' },
 ];
 
-const types = [
+const types = computed(() => [
     {
         id: 'head',
-        label: 'Item head',
+        label: isSports.value ? 'Event Head' : 'Item head',
         countKey: 'heads',
-        hint: 'One card per student per item head — Fest ID, school, items under that head.',
+        hint: isSports.value
+            ? 'One card per student per Event Head — Fest ID, school, items under that head.'
+            : 'One card per student per item head — Fest ID, school, items under that head.',
     },
     {
         id: 'volunteer',
@@ -205,9 +211,9 @@ const types = [
         countKey: 'staff',
         hint: 'Portal users assigned as event staff.',
     },
-];
+]);
 
-const activeType = computed(() => types.find(t => t.id === audience.value) ?? types[0]);
+const activeType = computed(() => types.value.find(t => t.id === audience.value) ?? types.value[0]);
 
 const canGenerate = computed(() => {
     if (audience.value === 'head') {

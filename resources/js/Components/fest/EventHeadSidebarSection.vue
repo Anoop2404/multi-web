@@ -1,10 +1,10 @@
 <template>
     <div v-if="groups.length" class="event-head-sidebar">
-        <p class="event-head-sidebar__title">{{ title }}</p>
+        <p class="event-head-sidebar__title">{{ resolvedTitle }}</p>
         <Link :href="sectionBase"
               class="event-head-sidebar__link event-head-sidebar__link--hub"
               :class="{ 'event-head-sidebar__link--active': isHubActive }">
-            All item heads
+            All {{ isSports ? 'Event Heads' : 'item heads' }}
         </Link>
         <Link v-for="group in groups"
               :key="group.head_id ?? 'other'"
@@ -45,7 +45,12 @@ const props = defineProps({
     programPrefix: { type: String, default: 'sports' },
     eventId: { type: [String, Number], required: true },
     isSports: { type: Boolean, default: false },
-    title: { type: String, default: 'Item heads' },
+    title: { type: String, default: '' },
+});
+
+const resolvedTitle = computed(() => {
+    if (props.title) return props.title;
+    return props.isSports ? 'Event Heads' : 'Item heads';
 });
 
 const page = usePage();

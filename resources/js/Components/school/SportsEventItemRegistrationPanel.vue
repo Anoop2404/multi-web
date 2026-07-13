@@ -23,7 +23,7 @@
         </section>
         <p v-else
            class="text-sm text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3">
-            Pick students directly under each item head. Event registration number will be created automatically when you register an item.
+            Pick students directly under each Event Head. Event registration number will be created automatically when you register an item.
         </p>
 
         <div class="rounded-xl border border-emerald-200 bg-emerald-50/30 overflow-hidden">
@@ -455,7 +455,7 @@ function isItemFull(item) {
 
 function itemBlockReason(item) {
     if (!props.headRegistrationOpen) {
-        return 'Registration is closed for this item head.';
+        return 'Registration is closed for this Event Head.';
     }
     if (item.registration_open === false) {
         if (item.reg_start && new Date(`${item.reg_start}T12:00:00`) > new Date()) {

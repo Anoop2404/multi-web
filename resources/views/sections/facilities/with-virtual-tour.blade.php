@@ -7,7 +7,7 @@
             <div>
                 @if(!empty($config['tour_embed']))
                 <div class="aspect-video rounded-xl overflow-hidden shadow-lg">
-                    {!! $config['tour_embed'] !!}
+                    {!! \App\Support\HtmlSanitizer::embed($config['tour_embed'] ?? '') !!}
                 </div>
                 @elseif(!empty($config['youtube_id']))
                 <div class="aspect-video rounded-xl overflow-hidden shadow-lg">

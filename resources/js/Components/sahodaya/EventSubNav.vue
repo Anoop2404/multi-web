@@ -36,7 +36,7 @@ const tabs = computed(() => {
     if (resolvedEventType.value === 'sports') {
         list.splice(1, 0,
             { key: 'setup', label: 'Setup hub', href: `${base.value}/setup` },
-            { key: 'competition', label: 'Heads & items', href: `${base.value}/competition` },
+            { key: 'competition', label: 'Event Heads', href: `${base.value}/competition` },
         );
     }
     list.push({ key: 'activity', label: 'Log', href: `${base.value}/activity` });

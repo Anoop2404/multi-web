@@ -68,7 +68,7 @@ export function schoolProgramWorkflowItems(schoolId, programSlug) {
 
     if (programSlug === 'sports-meet') {
         items.splice(2, 0, {
-            label: 'Register by item head',
+            label: 'Register by Event Head',
             href: schoolProgramHref(schoolId, programSlug, 'item-registration'),
             icon: 'layers',
         });

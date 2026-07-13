@@ -3,6 +3,6 @@
         @if(!empty($config['heading']))
         <h2 style="color: var(--color-primary)" class="font-heading">{{ $config['heading'] }}</h2>
         @endif
-        {!! $config['content'] ?? '' !!}
+        {!! \App\Support\HtmlSanitizer::rich($config['content'] ?? '') !!}
     </div>
 </section>

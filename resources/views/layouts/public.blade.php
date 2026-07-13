@@ -30,6 +30,17 @@
     @endif
     <meta property="og:site_name"   content="{{ $tenant->name ?? '' }}">
 
+    <script type="application/ld+json">
+        {!! json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => ($tenant->type ?? null) === 'sahodaya' ? 'Organization' : 'EducationalOrganization',
+            'name' => $tenant->name ?? '',
+            'url' => $canonicalUrl,
+            'description' => $pageDesc,
+            'image' => $ogImage ?: null,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}
+    </script>
+
     {{-- Twitter Card --}}
     <meta name="twitter:card"        content="summary_large_image">
     <meta name="twitter:title"       content="{{ $pageTitle }}">

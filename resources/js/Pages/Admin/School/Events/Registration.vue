@@ -98,7 +98,7 @@
             <div class="px-4 pb-4 pt-0 border-t border-slate-100">
                 <ol class="list-decimal pl-4 space-y-1 text-slate-600 mt-3 mb-3">
                     <li><strong>Step 1 · Register for event</strong> — add athletes to the sports fest (event ID assigned).</li>
-                    <li><strong>Step 2 · Register by item head</strong> — pick a head (Athletics, Field, Relay…), then add athletes to each item inside it.</li>
+                    <li><strong>Step 2 · Register by Event Head</strong> — pick a head (Athletics, Field, Relay…), then add athletes to each item inside it.</li>
                     <li>Pay event + item fees in the billing section; Sahodaya approves → chest numbers on fest day.</li>
                 </ol>
                 <p class="text-xs text-slate-500">
@@ -229,15 +229,15 @@
 
                     <div class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <h4 class="text-sm font-bold text-emerald-950">Step 2 · Register by item head</h4>
+                            <h4 class="text-sm font-bold text-emerald-950">Step 2 · Register by Event Head</h4>
                             <p class="text-xs text-emerald-900/80 mt-0.5">
                                 <strong>{{ eventRegisteredCount(event) }}</strong> event athlete{{ eventRegisteredCount(event) === 1 ? '' : 's' }}
-                                · pick an item head (Athletics, Field events, Relay, etc.) and add them to its items.
+                                · pick an Event Head (Athletics, Field events, Relay, etc.) and add them to its items.
                             </p>
                         </div>
                         <Link :href="`${programBase}/item-registration?event=${event.id}`"
                               class="btn-primary text-sm !min-h-0 shrink-0">
-                            Register by item head →
+                            Register by Event Head →
                         </Link>
                     </div>
                 </div>

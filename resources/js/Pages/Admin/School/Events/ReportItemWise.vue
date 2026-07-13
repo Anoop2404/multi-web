@@ -3,7 +3,9 @@
         <PageHeader
             :title="`Item-wise — ${event.title}`"
             :eyebrow="programLabel"
-            description="Pick an item head, then an item, to view participants and marks."
+            :description="event.event_type === 'sports'
+                ? 'Pick an Event Head, then an item, to view participants and marks.'
+                : 'Pick an item head, then an item, to view participants and marks.'"
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← All reports</Link>
@@ -23,7 +25,8 @@
                           :base-url="base"
                           :selected-head-id="headFilter"
                           :selected-item-id="itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`" />
+                          :hub-url="`${programBase}/reports/${event.id}`"
+                          :is-sports="event.event_type === 'sports'" />
 
         <div v-if="!itemId" class="notice-banner notice-banner--info mb-4">
             Select a head and item above to view participants.

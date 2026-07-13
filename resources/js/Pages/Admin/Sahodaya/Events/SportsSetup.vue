@@ -2,9 +2,9 @@
     <SahodayaEventsLayout :title="`${event.title} — Setup`" :sahodaya="sahodaya" :event="event"
                          :show-header-title="false">
         <PageHeader :title="`${event.title} — Sports setup`" eyebrow="Setup"
-                    description="Configure this sports event end-to-end: fees, heads, items, rank points, then run competition by item head.">
+                    description="Configure this sports event end-to-end: fees, Event Heads, items, rank points, then run competition by head.">
             <template #actions>
-                <Link :href="competitionUrl" class="btn-primary text-sm">Open competition hub →</Link>
+                <Link :href="competitionUrl" class="btn-primary text-sm">Open Event Heads →</Link>
             </template>
         </PageHeader>
 
@@ -12,6 +12,19 @@
                                   event-type="sports" current-step="setup" />
 
         <SportsSetupSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="setup" />
+
+        <div v-if="promoteStatus?.can_promote && sportsHubUrl"
+             class="rounded-lg border border-indigo-100 bg-indigo-50/80 px-4 py-3 mb-6 text-sm text-indigo-950">
+            <p class="font-semibold">
+                Next step: promote {{ promoteStatus.pending_count }} Event Head{{ promoteStatus.pending_count === 1 ? '' : 's' }}
+            </p>
+            <p class="mt-1 text-xs text-indigo-900/80">
+                After fees and items are set, promote heads into separate discipline events from the Sports hub.
+            </p>
+            <Link :href="sportsHubUrl" class="inline-block mt-2 text-xs font-semibold underline">
+                Open Sports hub to promote →
+            </Link>
+        </div>
 
         <div class="grid lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-6">
@@ -34,14 +47,19 @@
                             class="rounded-xl border transition"
                             :class="step.done
                                 ? 'border-emerald-200 bg-emerald-50/50'
-                                : 'border-slate-200 bg-white hover:border-indigo-200'">
+                                : step.optional
+                                    ? 'border-slate-100 bg-slate-50/60'
+                                    : 'border-slate-200 bg-white hover:border-indigo-200'">
                             <Link :href="step.href" class="flex items-start gap-3 p-4 hover:no-underline group">
                                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold"
                                       :class="step.done ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'">
                                     {{ step.done ? '✓' : index + 1 }}
                                 </span>
                                 <div class="min-w-0 flex-1">
-                                    <p class="font-semibold text-slate-900 group-hover:text-indigo-800">{{ step.label }}</p>
+                                    <p class="font-semibold text-slate-900 group-hover:text-indigo-800">
+                                        {{ step.label }}
+                                        <span v-if="step.optional" class="ml-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">Optional</span>
+                                    </p>
                                     <p class="text-xs text-slate-600 mt-0.5">{{ step.hint }}</p>
                                     <p v-if="step.detail" class="text-xs font-medium text-indigo-700 mt-1">{{ step.detail }}</p>
                                 </div>
@@ -53,9 +71,9 @@
 
                 <section v-if="headItemGroups.length" class="card space-y-4">
                     <div>
-                        <h3 class="section-title">Competition by item head</h3>
+                        <h3 class="section-title">Competition by Event Head</h3>
                         <p class="section-desc">
-                            After setup, use head sections for day-of operations — dates, item fees, registrations, marks, and results.
+                            After setup, use each Event Head for day-of operations — dates, item fees, registrations, marks, and results.
                         </p>
                     </div>
                     <div class="reports-tile-grid">
@@ -81,7 +99,7 @@
                     <h4 class="section-title">This event</h4>
                     <dl class="text-sm space-y-2">
                         <div class="flex justify-between gap-2">
-                            <dt class="text-slate-500">Item heads</dt>
+                            <dt class="text-slate-500">Event Heads</dt>
                             <dd class="font-semibold">{{ stats.heads }}</dd>
                         </div>
                         <div class="flex justify-between gap-2">
@@ -151,6 +169,8 @@ const props = defineProps({
     stats: { type: Object, default: () => ({}) },
     ageRuleSummary: { type: String, default: null },
     competitionUrl: { type: String, default: null },
+    sportsHubUrl: { type: String, default: null },
+    promoteStatus: { type: Object, default: null },
 });
 
 const progressPct = computed(() => {
@@ -162,7 +182,7 @@ const progressPct = computed(() => {
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`);
 
 const organiserTools = computed(() => [
-    { label: 'Item head coordinators', href: `${base.value}/event-staff`, hint: 'Assign mark-entry staff per item head' },
+    { label: 'Event Head coordinators', href: `${base.value}/event-staff`, hint: 'Assign mark-entry staff per Event Head' },
     { label: 'ID cards', href: `${base.value}/id-cards`, hint: 'Generate participant & staff cards' },
     { label: 'Reports', href: `${base.value}/reports/by-head`, hint: 'By head, item-wise, schedules, exports' },
     { label: 'Sidebar visibility', href: `/sahodaya-admin/${props.sahodaya.id}/settings/nav-visibility`, hint: 'Show/hide programs & menus' },

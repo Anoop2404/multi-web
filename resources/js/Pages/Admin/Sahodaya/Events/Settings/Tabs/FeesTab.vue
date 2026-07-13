@@ -207,11 +207,11 @@
 
             <section v-if="event.event_type === 'sports' && !feeSettingsForm.head_fees.length && feeSettingsForm.fee_model !== 'sports_composite'" class="card space-y-3">
                 <div>
-                    <h3 class="section-title">Item head fees</h3>
+                    <h3 class="section-title">{{ event.event_type === 'sports' ? 'Event Head fees' : 'Item head fees' }}</h3>
                     <p class="section-desc">Per-head default and extra item rates (Chess, Athletics, …).</p>
                 </div>
                 <p class="text-sm text-slate-600">
-                    No item heads on this event yet.
+                    No Event Heads on this event yet.
                     <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/competition`" class="link-brand font-semibold">
                         Open competition hub →
                     </Link>
@@ -221,7 +221,7 @@
 
             <section v-else-if="feeSettingsForm.head_fees.length && feeSettingsForm.fee_model !== 'sports_composite'" class="card space-y-4">
                 <div>
-                    <h3 class="section-title">Item head fees</h3>
+                    <h3 class="section-title">{{ event.event_type === 'sports' ? 'Event Head fees' : 'Item head fees' }}</h3>
                     <p class="section-desc">
                         Per-head rates for item registrations — <strong>Default</strong> applies to each billed item (or all items when included quota is 0);
                         <strong>Extra</strong> applies only to items beyond the included count when quota is greater than 0.
@@ -337,7 +337,7 @@
                     <p class="section-desc">Per-head School/Student/Team fees, quotas and approval policy (Chess, Athletics, …).</p>
                 </div>
                 <p class="text-sm text-slate-600">
-                    No item heads on this event yet.
+                    No Event Heads on this event yet.
                     <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/competition`" class="link-brand font-semibold">
                         Open competition hub →
                     </Link>

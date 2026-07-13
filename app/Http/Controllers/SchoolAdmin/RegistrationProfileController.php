@@ -62,6 +62,10 @@ class RegistrationProfileController extends SchoolAdminController
         $readOnly = [
             ['label' => 'School Name', 'value' => $this->school->name],
             ['label' => 'School Code', 'value' => $this->school->school_prefix ?: '—'],
+            [
+                'label' => 'School type',
+                'value' => $this->school->is_non_affiliated ? 'Non-affiliated' : 'CBSE affiliated',
+            ],
             ['label' => 'CBSE Affiliation', 'value' => SchoolApplicationForm::schoolAffiliation($this->school) ?: '—'],
             ['label' => 'Membership Status', 'value' => ucfirst($this->school->membership_status ?? 'pending')],
         ];

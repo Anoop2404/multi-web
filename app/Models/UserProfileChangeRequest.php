@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
+use App\Support\TenancyDatabase;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -30,5 +32,17 @@ class UserProfileChangeRequest extends Model
     public function school(): BelongsTo
     {
         return $this->belongsToCentralTenant('school_id');
+    }
+
+    /** @param  Builder<self>  $query */
+    public function scopeForSahodaya(Builder $query, string $sahodayaId): Builder
+    {
+        $schoolIds = TenancyDatabase::schoolIdsFor($sahodayaId);
+
+        if ($schoolIds === []) {
+            return $query->whereRaw('0 = 1');
+        }
+
+        return $query->whereIn('school_id', $schoolIds);
     }
 }

@@ -13,7 +13,8 @@
                           :base-url="base"
                           :selected-head-id="headFilter"
                           :selected-item-id="itemFilter"
-                          :hub-url="`${programBase}/reports/${event.id}`" />
+                          :hub-url="`${programBase}/reports/${event.id}`"
+                          :is-sports="event.event_type === 'sports'" />
 
         <div v-if="totalClashes === 0" class="notice-banner notice-banner--success mb-6">
             No schedule clashes detected for your school.

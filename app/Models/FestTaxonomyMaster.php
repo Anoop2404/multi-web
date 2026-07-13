@@ -20,8 +20,11 @@ class FestTaxonomyMaster extends Model
         'venue_type'          => 'Venue type',
         'competition_format'  => 'Competition format',
         'participant_type'    => 'Participant type',
+        'result_method'       => 'Result method',
         'stage_type'          => 'Stage type',
         'arts_category'       => 'Arts category',
+        'class_group'         => 'Class category',
+        'catalog_section'     => 'Catalog browse section',
         'gender'              => 'Gender category',
     ];
 }

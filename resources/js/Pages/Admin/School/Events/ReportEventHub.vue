@@ -24,6 +24,7 @@
             </section>
 
             <ReportHeadHubSection v-if="hasItemHeads"
+                                  :is-sports="isSports"
                                   :heads="headSummary"
                                   :head-item-groups="headItemGroups"
                                   :head-report-base="headWiseReportBase"
@@ -65,7 +66,7 @@
                 <section v-for="{ catKey, items } in orderedGroups" :key="catKey">
                     <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                         <span aria-hidden="true">{{ categoryMeta[catKey]?.icon }}</span>
-                        {{ categoryMeta[catKey]?.label ?? catKey }}
+                        {{ reportCategoryLabel(catKey, isSports) }}
                         <span class="text-xs font-normal text-slate-400">({{ items.length }})</span>
                     </h4>
                     <div class="space-y-3">
@@ -108,6 +109,7 @@ import {
     filterReportsByPhase,
     schoolReportPdfHref,
     schoolReportDataHref,
+    reportCategoryLabel,
 } from '@/support/festReportCatalog.js';
 
 const props = defineProps({
@@ -124,6 +126,7 @@ const props = defineProps({
 });
 
 const { programSlug, programLabel, programBase } = useSchoolProgramContext(props);
+const isSports = computed(() => props.event?.event_type === 'sports' || programSlug.value === 'sports-meet');
 const categoryMeta = REPORT_CATEGORIES;
 const reportPhases = REPORT_PHASES;
 const searchQuery = ref('');

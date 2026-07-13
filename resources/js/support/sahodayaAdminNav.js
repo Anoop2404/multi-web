@@ -319,6 +319,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
         setupIncompleteCount = 0,
         stateRemittancesEnabled = true,
         navVisibility = null,
+        competitionPrograms = {},
     } = options;
 
     const base = `/sahodaya-admin/${sahodayaId}`;
@@ -340,6 +341,9 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
             section: 'Website',
             items: [
                 { label: 'Site Builder', href: `${base}/site-builder`, icon: 'layers' },
+                { label: 'Domains', href: `${base}/website/domains`, icon: 'globe' },
+                { label: 'Microsites', href: `${base}/website/sites`, icon: 'grid' },
+                { label: 'Forms', href: `${base}/website/forms`, icon: 'clipboard' },
                 { label: 'Content', href: `${base}/public-content`, icon: 'edit' },
                 { label: 'Office Bearers', href: `${base}/office-bearers`, icon: 'users' },
                 { label: 'Circulars', href: `${base}/circulars`, icon: 'file-text' },
@@ -385,6 +389,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
             programOn('english-fest') ? { label: 'English Fest', href: `${base}/english-fest`, icon: 'file-text' } : null,
             programOn('science-fest') ? { label: 'Science Fest', href: `${base}/science-fest`, icon: 'layers' } : null,
             { label: 'All events', href: `${base}/events`, icon: 'calendar', exact: true },
+            { label: 'Competition types', href: `${base}/competition-types`, icon: 'layers' },
             menuOn('fest_appeals') ? { label: 'Appeals queue', href: `${base}/fest/appeals`, icon: 'inbox', badge: pendingFestAppealsCount } : null,
             menuOn('fest_payments') ? { label: 'Fest payments', href: `${base}/fest/payments`, icon: 'credit-card' } : null,
             menuOn('display_screens') ? { label: 'Display screens', href: `${base}/display-screens`, icon: 'monitor' } : null,
@@ -392,6 +397,17 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
             { label: 'Find certificate', href: `${base}/events/certificates/search`, icon: 'file-text' },
             programOn('custom') ? { label: 'Custom events', href: `${base}/programs/custom`, icon: 'layers', hidden: true } : null,
         ].filter(Boolean);
+
+        // Dynamic competition types (non-system) from Inertia shared props.
+        Object.values(competitionPrograms || {}).forEach((p) => {
+            if (!p?.slug || p.is_system || p.slug === 'custom') return;
+            const insertAt = festItems.findIndex((i) => i.label === 'All events');
+            festItems.splice(insertAt >= 0 ? insertAt : festItems.length, 0, {
+                label: p.label,
+                href: `${base}/${p.prefix || `programs/${p.slug}`}`,
+                icon: p.icon || 'calendar',
+            });
+        });
 
         if (festItems.length) {
             groups.push({

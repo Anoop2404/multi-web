@@ -84,8 +84,18 @@
                         <div class="school-card-avatar">{{ schoolInitials(school.name) }}</div>
                         <div class="min-w-0 flex-1">
                             <p class="truncate font-semibold text-slate-900 group-hover:text-[#0f3d7a]">{{ school.name }}</p>
-                            <p v-if="school.school_prefix" class="mt-0.5 font-mono text-xs text-[#0f3d7a]">{{ school.school_prefix }}</p>
-                            <p v-else class="mt-0.5 text-xs text-slate-400">No code set</p>
+                            <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                                <p v-if="school.school_prefix" class="font-mono text-xs text-[#0f3d7a]">{{ school.school_prefix }}</p>
+                                <p v-else class="text-xs text-slate-400">No code set</p>
+                                <span v-if="school.is_non_affiliated"
+                                      class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                    Non-affiliated
+                                </span>
+                                <span v-else
+                                      class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                    Affiliated
+                                </span>
+                            </div>
                         </div>
                     </div>
 
@@ -93,6 +103,7 @@
                         <p v-if="school.contact_email" class="truncate">✉ {{ school.contact_email }}</p>
                         <p v-if="school.contact_phone">📞 {{ school.contact_phone }}</p>
                         <p v-if="school.affiliation" class="font-mono">Aff. {{ school.affiliation }}</p>
+                        <p v-else-if="school.is_non_affiliated" class="text-amber-700">No CBSE affiliation no.</p>
                     </div>
 
                     <div class="school-card-metrics">

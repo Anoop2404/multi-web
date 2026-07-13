@@ -38,7 +38,7 @@ const tabs = computed(() => {
     ];
 
     if (props.eventType === 'sports' || props.programSlug === 'sports-meet') {
-        items.splice(2, 0, { key: 'heads', label: 'Item heads', href: `${base.value}/heads${eventQuery.value}` });
+        items.splice(2, 0, { key: 'heads', label: 'Event Heads', href: `${base.value}/heads${eventQuery.value}` });
     }
 
     return items;

@@ -1,13 +1,20 @@
 /** Client-side mirror of export → interactive preview routes (Sahodaya event reports). */
 
 export const REPORT_CATEGORIES = {
-    heads: { label: 'By item head', icon: '📂' },
+    heads: { label: 'By item head', sportsLabel: 'By Event Head', icon: '📂' },
     registration: { label: 'Registration & fees', icon: '📋' },
     schedule: { label: 'Schedule & clashes', icon: '📅' },
     competition: { label: 'Marks & results', icon: '🏆' },
     finance: { label: 'Finance & catering', icon: '💳' },
     ops: { label: 'Operations & print', icon: '🖨️' },
 };
+
+/** Resolve a report category label, preferring sports wording when applicable. */
+export function reportCategoryLabel(key, isSports = false) {
+    const cat = REPORT_CATEGORIES[key];
+    if (!cat) return key;
+    return isSports && cat.sportsLabel ? cat.sportsLabel : cat.label;
+}
 
 export const REPORT_CATEGORY_ORDER = ['heads', 'registration', 'schedule', 'competition', 'finance', 'ops'];
 
@@ -35,11 +42,13 @@ export const EXPORT_PREVIEW_MAP = {
     'item-wise': 'item-wise',
     results: 'overall-ranking',
     'head-wise-participants': 'head-wise-participants',
+    'area-wise-participants': 'area-wise-participants',
 };
 
 /** Interactive page id → category */
 export const INTERACTIVE_CATEGORY_MAP = {
     'head-wise-participants': 'heads',
+    'area-wise-participants': 'heads',
     'school-detailed': 'competition',
     'overall-ranking': 'competition',
     'house-detailed': 'competition',
@@ -192,7 +201,8 @@ export function groupSchoolReports(reports) {
 
 /** Short descriptions for interactive Sahodaya report pages */
 export const INTERACTIVE_REPORT_META = {
-    'head-wise-participants': { icon: '📂', hint: 'Participants grouped by item head' },
+    'head-wise-participants': { icon: '📂', hint: 'Participants grouped by item head', sportsHint: 'Participants grouped by Event Head' },
+    'area-wise-participants': { icon: '🗂️', hint: 'Participants grouped by competition area' },
     'school-detailed': { icon: '🏫', hint: 'Detailed marks by school and item' },
     'overall-ranking': { icon: '🥇', hint: 'School ranking and total points' },
     'house-detailed': { icon: '🏠', hint: 'House-wise performance board' },
@@ -220,9 +230,10 @@ export const REPORT_PHASES = [
 
 export const FORMAT_LABELS = { pdf: 'PDF', csv: 'CSV', xls: 'Excel' };
 
-export function enrichInteractiveReport(report) {
+export function enrichInteractiveReport(report, isSports = false) {
     const meta = INTERACTIVE_REPORT_META[report.id] ?? { icon: '📊', hint: 'Open interactive report' };
-    return { ...report, ...meta };
+    const hint = isSports && meta.sportsHint ? meta.sportsHint : meta.hint;
+    return { ...report, ...meta, hint };
 }
 
 export function filterReportsByQuery(items, query, labelKey = 'label') {

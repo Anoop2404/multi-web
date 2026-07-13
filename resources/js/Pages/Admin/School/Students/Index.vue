@@ -279,6 +279,13 @@
                     </div>
 
                     <div>
+                        <label class="form-label mb-1.5">School admission no.</label>
+                        <input v-model="editForm.admission_number" type="text" maxlength="50"
+                               class="field" placeholder="Optional">
+                        <p v-if="editForm.errors.admission_number" class="text-xs text-red-500 mt-1">{{ editForm.errors.admission_number }}</p>
+                    </div>
+
+                    <div>
                         <label class="form-label mb-1.5">Full name *</label>
                         <input v-model="editForm.name" type="text" required
                                class="field">
@@ -544,6 +551,7 @@ const editForm = useForm({
     gender:          '',
     dob:             '',
     parent_email:    '',
+    admission_number: '',
     reason:          '',
 });
 
@@ -705,6 +713,7 @@ function openEditModal(student) {
     editForm.gender = student.gender ?? '';
     editForm.dob = dobInputValue(student.dob);
     editForm.parent_email = student.parent_email ?? '';
+    editForm.admission_number = student.admission_number ?? '';
     editForm.reason = '';
     showEdit.value = true;
 }

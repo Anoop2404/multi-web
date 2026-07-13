@@ -119,10 +119,10 @@
                                      :lifecycle="lifecycle" :suggested-status="suggestedStatus" />
 
                 <div v-if="eventHeadNav?.headItemGroups?.length" class="card space-y-3">
-                    <h4 class="section-title">{{ isSports ? 'Discipline heads' : 'Item heads' }}</h4>
+                    <h4 class="section-title">{{ isSports ? 'Event Heads' : 'Item heads' }}</h4>
                     <p class="text-xs text-slate-500">
                         {{ isSports
-                            ? 'Each head has its own schedule, fees, and status — open to configure or promote to a full discipline event.'
+                            ? 'Each Event Head has its own schedule, fees, and status — open to configure or promote to a full discipline event.'
                             : 'Quick access to registrations, marks, and reports by section.' }}
                     </p>
                     <div v-for="head in eventHeadNav.headItemGroups" :key="head.head_id ?? 'other'"

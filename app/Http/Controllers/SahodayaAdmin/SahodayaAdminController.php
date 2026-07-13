@@ -97,6 +97,9 @@ abstract class SahodayaAdminController extends Controller
             'stateRemittancesEnabled' => \App\Models\FestStateProgramPropagation::where('sahodaya_id', $this->sahodaya->id)->exists(),
             'setupIncompleteCount'    => $this->isStaff ? 0 : collect(app(SahodayaSetupService::class)->checklist($this->sahodaya))
                 ->where('done', false)->count(),
+            'competitionPrograms'     => app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+                ->forTenant($this->sahodaya->id)
+                ->programsForNav(),
         ], $props));
     }
 
@@ -108,17 +111,20 @@ abstract class SahodayaAdminController extends Controller
         return (bool) preg_match(
             '#/sahodaya-admin/[^/]+/(?:kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)(?:/(?:catalog|age-groups|records|championship|results|rankings|school-rounds)(?:/|$)|(?:/|$)|$)#',
             $path,
-        ) || str_contains($path, '/taxonomy-masters') || str_contains($path, '/programs/custom');
+        ) || str_contains($path, '/taxonomy-masters')
+            || str_contains($path, '/competition-types')
+            || (bool) preg_match('#/sahodaya-admin/[^/]+/programs/[^/]+#', $path);
     }
 
     /** @return array{program: array<string, mixed>, programEvents: list<\App\Models\FestEvent>} */
     protected function programNavProps(string $slug): array
     {
-        $prefix = ProgramRouteMap::prefixFromSlug($slug);
-        $meta = ProgramRouteMap::FEST_PROGRAMS[$prefix] ?? null;
+        $meta = app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+            ->forTenant($this->sahodaya->id)
+            ->programMeta($slug);
         abort_unless($meta !== null, 404);
 
-        $eventType = $meta['event_type'];
+        $eventType = $meta['eventType'];
 
         return [
             'program' => [
@@ -126,7 +132,7 @@ abstract class SahodayaAdminController extends Controller
                 'eventType' => $eventType,
                 'label'     => $meta['label'],
                 'icon'      => $meta['icon'],
-                'prefix'    => $prefix,
+                'prefix'    => $meta['prefix'],
             ],
             'programEvents' => FestEvent::forTenant($this->sahodaya->id)
                 ->ofType($eventType)
@@ -175,17 +181,22 @@ abstract class SahodayaAdminController extends Controller
         }
 
         if (! isset($props['program']) && ! empty($eventType)) {
-            $slugMap = [
-                'kalolsavam'   => ['slug' => 'kalotsav', 'label' => 'Kalotsav', 'icon' => 'star'],
-                'sports'       => ['slug' => 'sports-meet', 'label' => 'Sports Meet', 'icon' => 'award'],
-                'kids_fest'    => ['slug' => 'kids-fest', 'label' => 'Kids Fest', 'icon' => 'users'],
-                'teacher_fest' => ['slug' => 'teacher-fest', 'label' => 'Teacher Fest', 'icon' => 'users'],
-                'english_fest' => ['slug' => 'english-fest', 'label' => 'English Fest', 'icon' => 'book'],
-                'science_fest' => ['slug' => 'science-fest', 'label' => 'Science Fest', 'icon' => 'flask'],
-                'custom'       => ['slug' => 'custom', 'label' => 'Custom Events', 'icon' => 'layers'],
-            ];
-            if (isset($slugMap[$eventType])) {
-                $props['program'] = array_merge($slugMap[$eventType], ['eventType' => $eventType]);
+            $slug = app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+                ->forTenant($this->sahodaya->id)
+                ->slugForEventType($eventType);
+            $meta = $slug
+                ? app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+                    ->forTenant($this->sahodaya->id)
+                    ->programMeta($slug)
+                : null;
+            if ($meta) {
+                $props['program'] = [
+                    'slug' => $meta['slug'],
+                    'label' => $meta['label'],
+                    'icon' => $meta['icon'],
+                    'eventType' => $eventType,
+                    'prefix' => $meta['prefix'],
+                ];
             }
         }
 
