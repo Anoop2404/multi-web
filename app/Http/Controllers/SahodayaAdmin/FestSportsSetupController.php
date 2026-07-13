@@ -53,18 +53,18 @@ class FestSportsSetupController extends SahodayaAdminController
                 'done'    => filled($event->title) && filled($event->status),
             ],
             [
-                'key'     => 'fees',
-                'label'   => 'Event fee settings',
-                'hint'    => 'Sports composite billing — school fee, included items, standby rules.',
-                'href'    => "{$base}/settings/fees",
-                'done'    => $feeConfigured,
-            ],
-            [
                 'key'     => 'heads',
                 'label'   => 'Item heads & head scheduling',
-                'hint'    => 'Create/sync heads (Athletics, Chess…), then set head-level dates, time, venue flow, and fees.',
+                'hint'    => 'Create each head (Athletics, Chess…) — its fees, quota, and approval policy are set right there, like standing up its own event.',
                 'href'    => "{$base}/competition",
                 'done'    => $headCount > 0,
+            ],
+            [
+                'key'     => 'fees',
+                'label'   => 'Event fee settings (optional overrides)',
+                'hint'    => 'Billing model defaults to Sports composite automatically. Only visit this if you need event-wide fallback amounts or a fee cap — per-head fees set at head creation take priority.',
+                'href'    => "{$base}/settings/fees",
+                'done'    => $feeConfigured,
             ],
             [
                 'key'     => 'items',

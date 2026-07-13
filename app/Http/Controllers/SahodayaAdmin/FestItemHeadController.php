@@ -118,11 +118,26 @@ class FestItemHeadController extends SahodayaAdminController
             'sport_discipline' => 'nullable|string|max:60',
             'is_team_heading' => 'nullable|boolean',
             'parent_id' => 'nullable|exists:fest_item_heads,id',
+            // Event Head owns all registration/fee settings (FRD-04) — captured at
+            // creation time so a head is fully configured in one step, same as
+            // standing up an independent event.
+            'school_registration_fee' => 'nullable|numeric|min:0',
+            'student_registration_fee' => 'nullable|numeric|min:0',
+            'team_registration_fee' => 'nullable|numeric|min:0',
+            'included_items_per_student' => 'nullable|integer|min:0|max:50',
+            'included_teams' => 'nullable|integer|min:0|max:50',
+            'verification_policy' => 'nullable|in:verified_only,all_students',
+            'approval_policy' => 'nullable|in:auto,manual',
+            'max_participants' => 'nullable|integer|min:0',
+            'max_teams' => 'nullable|integer|min:0',
         ]);
 
         $order = (int) FestItemHead::forTenant($this->sahodaya->id)->forEvent($event->id)->max('sort_order') + 1;
 
-        FestItemHead::create([
+        $numeric = fn (string $key) => isset($data[$key]) && $data[$key] !== '' ? (float) $data[$key] : null;
+        $intNullable = fn (string $key) => isset($data[$key]) && $data[$key] !== '' ? (int) $data[$key] : null;
+
+        $head = FestItemHead::create([
             'tenant_id' => $this->sahodaya->id,
             'event_id' => $event->id,
             'event_type' => $event->event_type,
@@ -132,11 +147,31 @@ class FestItemHeadController extends SahodayaAdminController
             'sport_discipline' => $data['sport_discipline'] ?? null,
             'is_team_heading' => (bool) ($data['is_team_heading'] ?? true),
             'sort_order' => $order,
+            'school_registration_fee' => $numeric('school_registration_fee'),
+            'student_registration_fee' => $numeric('student_registration_fee'),
+            'team_registration_fee' => $numeric('team_registration_fee'),
+            'included_items_per_student' => (int) ($data['included_items_per_student'] ?? 0),
+            'included_teams' => (int) ($data['included_teams'] ?? 0),
+            'verification_policy' => $data['verification_policy'] ?? 'all_students',
+            'approval_policy' => $data['approval_policy'] ?? 'auto',
+            'max_participants' => $intNullable('max_participants'),
+            'max_teams' => $intNullable('max_teams'),
         ]);
 
-        $audit->festEvent($event, FestPageActivity::SETTINGS, 'fest.item_head.created', 'Item head created');
+        $audit->festEvent($event, FestPageActivity::SETTINGS, 'fest.item_head.created', "Item head created: {$head->name}", [
+            'head_id' => $head->id,
+            'school_registration_fee' => $head->school_registration_fee,
+            'student_registration_fee' => $head->student_registration_fee,
+            'team_registration_fee' => $head->team_registration_fee,
+            'included_items_per_student' => $head->included_items_per_student,
+            'included_teams' => $head->included_teams,
+            'verification_policy' => $head->verification_policy,
+            'approval_policy' => $head->approval_policy,
+            'max_participants' => $head->max_participants,
+            'max_teams' => $head->max_teams,
+        ]);
 
-        return back()->with('success', 'Item head added.');
+        return back()->with('success', 'Item head added with its fee settings.');
     }
 
     public function sync(string $tenantId, FestEvent $event, FestItemHeadService $service)
