@@ -354,7 +354,7 @@ class TenantController extends Controller
                 'email'             => $data['email'],
                 'email_verified_at' => now(),
             ]);
-            $user->save();
+            // Password is NOT NULL — set it before the first insert.
             app(UserCredentialService::class)->storePassword($user, $data['password'], mustChange: false);
             $user->syncRoles(['sahodaya_admin']);
         });
@@ -408,10 +408,12 @@ class TenantController extends Controller
             ];
 
             $user->fill($payload);
-            $user->save();
 
             if (! empty($data['password'])) {
+                // Password column is NOT NULL — must be set on insert, not in a second update.
                 app(UserCredentialService::class)->storePassword($user, $data['password'], mustChange: false);
+            } else {
+                $user->save();
             }
 
             $user->syncRoles([$role]);
