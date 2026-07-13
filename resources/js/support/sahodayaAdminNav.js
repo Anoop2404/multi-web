@@ -309,6 +309,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
     const {
         canNav = () => true,
         websiteEnabled = false,
+        publicWebsiteEnabled = true,
         approvedSchoolsCount = 0,
         pendingPaymentsCount = 0,
         pendingSubmissionsCount = 0,
@@ -336,7 +337,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
     });
 
     // ── Website (conditional) ─────────────────────────────────────────
-    if (websiteEnabled && canNav('website') && menuOn('website')) {
+    if (websiteEnabled && publicWebsiteEnabled && canNav('website') && menuOn('website')) {
         groups.push({
             section: 'Website',
             items: [
@@ -469,9 +470,12 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
         if (canNav('users')) {
             settingsItems.push({ label: 'Sidebar visibility', href: `${base}/settings/nav-visibility`, icon: 'layers' });
             settingsItems.push({ label: 'Portal users', href: `${base}/users`, icon: 'users' });
-            if (websiteEnabled) {
+            if (websiteEnabled && publicWebsiteEnabled) {
                 settingsItems.push({ label: 'Notification templates', href: `${base}/notification-templates`, icon: 'file-text' });
             }
+        }
+        if (websiteEnabled && !publicWebsiteEnabled && canNav('website')) {
+            settingsItems.push({ label: 'Portal landing', href: `${base}/public-content`, icon: 'globe' });
         }
         if (settingsItems.length) {
             groups.push({ section: 'Settings', items: settingsItems });

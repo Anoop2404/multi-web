@@ -262,6 +262,7 @@ export function schoolAdminNav(schoolId, options = {}) {
     const {
         canNav = () => true,
         websiteEnabled = false,
+        publicWebsiteEnabled = true,
         schoolHasPrefix = true,
         pendingChangeRequests = 0,
         navVisibility = null,
@@ -363,7 +364,7 @@ export function schoolAdminNav(schoolId, options = {}) {
     }
 
     // ── Website (collapses to single hub entry) ────────────────────────
-    if (websiteEnabled && canNav('website')) {
+    if (websiteEnabled && publicWebsiteEnabled && canNav('website')) {
         groups.push({
             section: 'Website',
             items: [
@@ -381,6 +382,15 @@ export function schoolAdminNav(schoolId, options = {}) {
                 { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star', hidden: true },
                 { label: 'Contact Page', href: `${base}/contact`, icon: 'file-text', hidden: true },
                 { label: 'Enquiries', href: `${base}/enquiries`, icon: 'inbox', hidden: true },
+            ],
+        });
+    }
+
+    if (websiteEnabled && !publicWebsiteEnabled && canNav('website')) {
+        groups.push({
+            section: 'Website',
+            items: [
+                { label: 'Portal settings', href: `${base}/settings`, icon: 'globe' },
             ],
         });
     }

@@ -67,6 +67,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'public.cache'    => \App\Http\Middleware\SetPublicCacheHeaders::class,
             'website.enabled' => \App\Http\Middleware\EnsureWebsiteEnabled::class,
             'public.website.enabled' => \App\Http\Middleware\EnsureTenantPublicWebsiteEnabled::class,
+            'public.website.admin.cms' => \App\Http\Middleware\EnsureTenantPublicWebsiteForAdminCms::class,
         ]);
 
         $middleware->redirectGuestsTo(fn (Request $request) => route('login').'?session=expired');

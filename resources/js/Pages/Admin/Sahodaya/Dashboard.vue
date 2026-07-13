@@ -221,10 +221,15 @@
                 <!-- Recent circulars -->
                 <div v-if="websiteEnabled && canSee('website')" class="card">
                     <div class="mb-4 flex items-center justify-between">
-                        <h3 class="section-title text-base">Recent circulars</h3>
-                        <Link :href="`/sahodaya-admin/${sahodaya.id}/circulars`" class="link-brand text-xs">View all →</Link>
+                        <h3 class="section-title text-base">{{ publicWebsiteEnabled ? 'Recent circulars' : 'Website disabled' }}</h3>
+                        <Link v-if="publicWebsiteEnabled" :href="`/sahodaya-admin/${sahodaya.id}/circulars`" class="link-brand text-xs">View all →</Link>
+                        <Link v-else :href="`/sahodaya-admin/${sahodaya.id}/public-content`" class="link-brand text-xs">Portal landing →</Link>
                     </div>
-                    <div v-if="recentCirculars.length" class="divide-y divide-slate-100">
+                    <div v-if="!publicWebsiteEnabled" class="text-sm text-slate-600">
+                        Public website is off — visitors see the registration portal only.
+                        <Link :href="`/sahodaya-admin/${sahodaya.id}/public-content`" class="font-semibold text-[#0f3d7a] hover:underline ml-1">Re-enable under Portal landing</Link>.
+                    </div>
+                    <div v-else-if="recentCirculars.length" class="divide-y divide-slate-100">
                         <div v-for="c in recentCirculars" :key="c.id" class="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
                             <span class="mt-0.5 text-lg">📄</span>
                             <div class="min-w-0 flex-1">
@@ -269,6 +274,7 @@ import { computed, defineComponent, h } from 'vue';
 
 const page = usePage();
 const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
+const publicWebsiteEnabled = computed(() => page.props.publicWebsiteEnabled ?? true);
 const isStaffUser = computed(() => page.props.isStaff);
 
 const STAFF_SECTIONS = {
@@ -408,7 +414,7 @@ const quickActions = computed(() => {
         items.push({ label: 'English Fest', description: 'Program hub', icon: '📚', href: `${base}/english-fest` });
         items.push({ label: 'Science Fest', description: 'Program hub', icon: '🔬', href: `${base}/science-fest` });
     }
-    if (canSee('website') && websiteEnabled.value) {
+    if (canSee('website') && websiteEnabled.value && publicWebsiteEnabled.value) {
         items.push({ label: 'Circulars', description: 'Publish notices', icon: '📄', href: `${base}/circulars` });
     }
     if (canSee('mcq')) {

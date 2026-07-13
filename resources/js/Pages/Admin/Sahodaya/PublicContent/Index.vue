@@ -14,7 +14,7 @@
                     <p class="text-sm text-gray-500 mt-1">
                         {{ publicSiteEnabled
                             ? 'Full marketing website is live. Disable to show only registration and login.'
-                            : 'Portal mode — visitors see School Registration and Admin Login at your domain.' }}
+                            : 'Portal mode — visitors see School Registration and Admin Login. The full CMS (site builder, circulars, etc.) is hidden until you re-enable.' }}
                     </p>
                 </div>
                 <label class="flex items-center gap-3 cursor-pointer shrink-0">

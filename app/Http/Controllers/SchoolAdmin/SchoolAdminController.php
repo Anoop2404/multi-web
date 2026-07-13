@@ -13,6 +13,7 @@ use App\Services\Students\SchoolClassProvisioner;
 use App\Support\SchoolContactRequirements;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
+use App\Support\TenantPublicSite;
 use App\Http\Controllers\SchoolAdmin\Concerns\BuildsSchoolFestEventContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -83,6 +84,7 @@ abstract class SchoolAdminController extends Controller
                 )
                 : SahodayaNavVisibility::defaults(),
             'membershipPaid' => app(\App\Services\Membership\SchoolMembershipGate::class)->isPaid($this->school),
+            'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->school),
         ], $props));
     }
 

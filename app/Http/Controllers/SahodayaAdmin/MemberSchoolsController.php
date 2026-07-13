@@ -13,6 +13,7 @@ use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\SchoolMembershipCancellationService;
+use App\Services\Tenancy\SchoolDataPurger;
 use App\Support\AcademicYear;
 use App\Support\ExcelExport;
 use App\Support\SchoolDetailFields;
@@ -329,6 +330,43 @@ class MemberSchoolsController extends SahodayaAdminController
         return back()->with('success', $closed
             ? 'Fest registration closed for this school.'
             : 'Fest registration reopened for this school.');
+    }
+
+    public function destroy(
+        Request $request,
+        string $tenantId,
+        Tenant $school,
+        SchoolDataPurger $purger,
+        PlatformAuditLogger $audit,
+    ) {
+        abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+
+        $data = $request->validate([
+            'confirm_name' => 'required|string|max:255',
+            'reason'       => 'required|string|max:1000',
+        ]);
+
+        abort_unless(trim($data['confirm_name']) === $school->name, 422, 'School name does not match.');
+
+        $name = $school->name;
+        $schoolId = $school->id;
+
+        $purger->purge($school);
+
+        $audit->log(
+            'membership.school.deleted',
+            "School permanently deleted: {$name}",
+            null,
+            [
+                'school_id'   => $schoolId,
+                'sahodaya_id' => $this->sahodaya->id,
+                'reason'      => $data['reason'],
+                'reviewer_id' => $request->user()?->id,
+            ],
+        );
+
+        return redirect("/sahodaya-admin/{$this->sahodaya->id}/schools")
+            ->with('success', "School \"{$name}\" permanently deleted.");
     }
 
     private function attachSchoolMetrics($schools): void

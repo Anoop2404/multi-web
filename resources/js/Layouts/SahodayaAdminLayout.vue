@@ -28,7 +28,7 @@
                         <p class="text-sm font-semibold text-white truncate mt-1 leading-tight">{{ sahodaya.name }}</p>
                     </div>
                 </div>
-                <a v-if="websiteEnabled && publicUrl" :href="publicUrl" target="_blank" rel="noopener"
+                <a v-if="showPublicSiteLink" :href="publicUrl" target="_blank" rel="noopener"
                    class="sa-portal-link mt-3 flex items-center gap-1.5 w-full rounded-lg px-3 py-2 text-xs font-medium transition group">
                     <SvgIcon name="external-link" class="w-3.5 h-3.5 shrink-0 opacity-70" />
                     <span class="flex-1 truncate font-mono text-[11px]">{{ publicUrl }}</span>
@@ -87,7 +87,7 @@
                     <slot name="header-suffix" />
                 </div>
                 <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-                    <a v-if="websiteEnabled && publicUrl" :href="publicUrl" target="_blank" rel="noopener"
+                    <a v-if="showPublicSiteLink" :href="publicUrl" target="_blank" rel="noopener"
                        class="sa-preview-btn inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-white text-xs font-semibold transition shadow-sm">
                         <SvgIcon name="external-link" class="w-3.5 h-3.5" />
                         <span class="hidden sm:inline">Preview Site</span>
@@ -156,6 +156,8 @@ const mobileNavOpen = ref(false);
 const navSearch = ref('');
 const isStaffUser = computed(() => props.isStaff || page.props.isStaff);
 const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
+const publicWebsiteEnabled = computed(() => page.props.publicWebsiteEnabled ?? true);
+const showPublicSiteLink = computed(() => websiteEnabled.value && publicWebsiteEnabled.value && props.publicUrl);
 
 const STAFF_NAV = {
     website: ['website.view', 'website.manage', 'website.news'],
@@ -184,6 +186,7 @@ const navGroups = computed(() => {
     const options = {
         canNav,
         websiteEnabled: websiteEnabled.value,
+        publicWebsiteEnabled: publicWebsiteEnabled.value,
         approvedSchoolsCount: props.approvedSchoolsCount,
         pendingPaymentsCount: props.pendingPaymentsCount,
         pendingSubmissionsCount: props.pendingSubmissionsCount || page.props.pendingSubmissionsCount || 0,

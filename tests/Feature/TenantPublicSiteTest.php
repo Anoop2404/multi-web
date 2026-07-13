@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Tenant;
 use App\Support\TenantPublicSite;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -84,5 +85,31 @@ class TenantPublicSiteTest extends TestCase
         $this->get('http://linkmode.sahodaya.test/school-register')->assertOk();
         $this->get('http://linkmode.sahodaya.test/school-login')->assertOk();
         $this->get('http://linkmode.sahodaya.test/login')->assertOk();
+    }
+
+    public function test_sahodaya_cms_routes_redirect_when_public_website_disabled(): void
+    {
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'Malappuram Sahodaya',
+            'subdomain' => 'cmsadmin',
+            'is_active' => true,
+        ]);
+        TenantPublicSite::setEnabled($sahodaya, false);
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $user = \App\Models\User::factory()->create([
+            'tenant_id' => $sahodaya->id,
+        ]);
+        $user->assignRole('sahodaya_admin');
+
+        $this->actingAs($user)
+            ->get("/sahodaya-admin/{$sahodaya->id}/site-builder")
+            ->assertRedirect("/sahodaya-admin/{$sahodaya->id}/public-content");
+
+        $this->actingAs($user)
+            ->get("/sahodaya-admin/{$sahodaya->id}/public-content")
+            ->assertOk();
     }
 }

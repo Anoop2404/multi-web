@@ -443,6 +443,10 @@ Route::prefix('school-admin/{tenantId}')
 
     // Website & CMS (disabled until WEBSITE_ENABLED=true)
     Route::middleware('website.enabled')->group(function () {
+    Route::get('/settings',   [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings',  [SettingsController::class, 'update'])->name('settings.update');
+
+    Route::middleware('public.website.admin.cms')->group(function () {
     Route::get('/site-builder', [SiteBuilderController::class, 'index'])->name('site-builder');
     Route::get('/site-builder/section-types', [SiteBuilderController::class, 'sectionTypes'])->name('site-builder.section-types');
 
@@ -518,10 +522,6 @@ Route::prefix('school-admin/{tenantId}')
     Route::put('/job-vacancies/{vacancy}',          [JobVacancyController::class, 'update'])->name('job-vacancies.update');
     Route::delete('/job-vacancies/{vacancy}',       [JobVacancyController::class, 'destroy'])->name('job-vacancies.destroy');
 
-    // Settings
-    Route::get('/settings',   [SettingsController::class, 'index'])->name('settings.index');
-    Route::post('/settings',  [SettingsController::class, 'update'])->name('settings.update');
-
     // Board Results
     Route::get('/board-results',                                   [BoardResultController::class, 'index'])->name('board-results.index');
     Route::post('/board-results',                                  [BoardResultController::class, 'store'])->name('board-results.store');
@@ -555,6 +555,7 @@ Route::prefix('school-admin/{tenantId}')
         ]);
     })->name('contact.index');
     Route::post('/contact',                                  [SettingsController::class, 'update'])->name('contact.update');
+    }); // public.website.admin.cms
     }); // website.enabled
 });
 
@@ -611,6 +612,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
 
         // Website & CMS (disabled until WEBSITE_ENABLED=true)
         Route::middleware('website.enabled')->group(function () {
+        Route::middleware('public.website.admin.cms')->group(function () {
         Route::get('/site-builder', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderController::class, 'index'])->name('site-builder');
         Route::get('/site-builder/section-types', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderController::class, 'sectionTypes'])->name('site-builder.section-types');
         Route::get('/website/domains', [\App\Http\Controllers\SahodayaAdmin\WebsiteDomainController::class, 'index'])->name('website.domains');
@@ -662,6 +664,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
 
         Route::get('/notification-templates', [\App\Http\Controllers\SahodayaAdmin\NotificationTemplateController::class, 'index'])->name('notification-templates.index');
         Route::put('/notification-templates/{template}', [\App\Http\Controllers\SahodayaAdmin\NotificationTemplateController::class, 'update'])->name('notification-templates.update');
+        }); // public.website.admin.cms
         }); // website.enabled
 
         // Portal & website content (portal always available; full website tabs when enabled)
@@ -687,6 +690,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/schools/{school}/reject', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'reject'])->name('schools.reject');
         Route::post('/schools/{school}/cancel-membership', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'cancelMembership'])->name('schools.cancel-membership');
         Route::post('/schools/{school}/toggle-fest-registration', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'toggleFestRegistration'])->name('schools.toggle-fest-registration');
+        Route::delete('/schools/{school}', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'destroy'])->name('schools.destroy');
 
         // Regions (Kalotsav) — State → Sahodaya → Region → School
         Route::get('/regions', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'index'])->name('regions.index');

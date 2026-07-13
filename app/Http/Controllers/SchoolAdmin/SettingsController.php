@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Support\FeatureFlags;
+use App\Support\TenantPublicSite;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -11,7 +13,11 @@ class SettingsController extends SchoolAdminController
     {
         $settings = $this->school->settings()->get()->pluck('value', 'key')->toArray();
 
-        return $this->inertia('School/Settings/Index', compact('settings'));
+        return $this->inertia('School/Settings/Index', [
+            'settings' => $settings,
+            'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->school),
+            'websiteFeatureEnabled' => FeatureFlags::websiteEnabled(),
+        ]);
     }
 
     public function update(Request $request)
@@ -30,6 +36,7 @@ class SettingsController extends SchoolAdminController
             'seo_keywords'    => 'nullable|string|max:500',
             'seo_tagline'     => 'nullable|string|max:200',
             'locale'          => 'nullable|string|in:en,ml',
+            'public_website_enabled' => 'nullable|boolean',
         ]);
 
         // Handle logo upload
@@ -79,6 +86,10 @@ class SettingsController extends SchoolAdminController
 
         if (! empty($data['locale'])) {
             $this->school->setSetting('locale', $data['locale']);
+        }
+
+        if (FeatureFlags::websiteEnabled() && $request->has('public_website_enabled')) {
+            TenantPublicSite::setEnabled($this->school, $request->boolean('public_website_enabled'));
         }
 
         Cache::forget("site:{$this->school->id}:home");

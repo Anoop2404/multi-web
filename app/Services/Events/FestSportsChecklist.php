@@ -216,8 +216,7 @@ class FestSportsChecklist
      */
     public function seasonRemittanceBanner(string $sahodayaId, ?string $academicYearLabel = null): array
     {
-        $yearLabel = $academicYearLabel
-            ?? AcademicYear::forSahodaya($sahodayaId)?->label;
+        $yearLabel = $academicYearLabel ?? AcademicYear::forSahodaya($sahodayaId);
 
         $done = StateRemittance::where('sahodaya_id', $sahodayaId)
             ->where('status', 'verified')

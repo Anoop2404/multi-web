@@ -28,7 +28,7 @@
                         <p v-if="school?.school_prefix" class="text-[10px] font-mono text-white/50 mt-0.5">{{ school.school_prefix }}</p>
                     </div>
                 </div>
-                <a v-if="websiteEnabled && publicUrl" :href="publicUrl" target="_blank" rel="noopener"
+                <a v-if="showPublicSiteLink" :href="publicUrl" target="_blank" rel="noopener"
                    class="sa-portal-link mt-3 flex items-center gap-1.5 w-full rounded-lg px-3 py-2 text-xs font-medium transition group">
                     <SahodayaSvgIcon name="external-link" class="w-3.5 h-3.5 shrink-0 opacity-70" />
                     <span class="flex-1 truncate font-mono text-[11px]">{{ publicUrl }}</span>
@@ -85,7 +85,7 @@
                     <slot name="header-suffix" />
                 </div>
                 <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-                    <a v-if="websiteEnabled && publicUrl" :href="publicUrl" target="_blank" rel="noopener"
+                    <a v-if="showPublicSiteLink" :href="publicUrl" target="_blank" rel="noopener"
                        class="sa-preview-btn inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-white text-xs font-semibold transition shadow-sm">
                         <SahodayaSvgIcon name="external-link" class="w-3.5 h-3.5" />
                         <span class="hidden sm:inline">Preview Site</span>
@@ -154,6 +154,8 @@ const school = computed(() => props.school ?? page.props.school);
 const tid = computed(() => school.value?.id ?? '');
 const publicUrl = computed(() => page.props.publicUrl ?? null);
 const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
+const publicWebsiteEnabled = computed(() => page.props.publicWebsiteEnabled ?? true);
+const showPublicSiteLink = computed(() => websiteEnabled.value && publicWebsiteEnabled.value && publicUrl.value);
 
 const STAFF_NAV = {
     students: ['fest.view', 'website.view', 'website.manage', 'membership.view'],
@@ -189,6 +191,7 @@ const navGroups = computed(() => {
     const options = {
         canNav,
         websiteEnabled: websiteEnabled.value,
+        publicWebsiteEnabled: publicWebsiteEnabled.value,
         schoolHasPrefix: Boolean(school.value?.school_prefix),
         pendingChangeRequests: props.pendingChangeRequests || page.props.pendingChangeRequests || 0,
         coordinatorMode: isEventCoordinatorUser.value,

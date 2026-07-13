@@ -5,6 +5,21 @@
 
 
         <div class="max-w-2xl space-y-6">
+            <div v-if="websiteFeatureEnabled" class="card flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h3 class="font-bold text-gray-800">Public school website</h3>
+                    <p class="text-sm text-gray-500 mt-1">
+                        {{ publicSiteEnabled
+                            ? 'Your marketing website and CMS are available in the sidebar.'
+                            : 'Portal mode only — the full CMS is hidden. Re-enable to manage news, gallery, and site builder.' }}
+                    </p>
+                </div>
+                <label class="flex items-center gap-3 cursor-pointer shrink-0">
+                    <span class="text-sm font-semibold text-gray-600">{{ publicSiteEnabled ? 'Enabled' : 'Disabled' }}</span>
+                    <input v-model="publicSiteEnabled" type="checkbox" class="w-5 h-5 rounded text-indigo-600">
+                </label>
+            </div>
+
             <div v-if="!school.school_prefix" class="notice-banner notice-banner--warning text-sm">
                 <p class="font-semibold">Set your school code first</p>
                 <p class="mt-1">
@@ -149,11 +164,16 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { Link, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
 
 const props = defineProps({
     school:   Object,
     settings: { type: Object, default: () => ({}) },
+    publicWebsiteEnabled: { type: Boolean, default: true },
+    websiteFeatureEnabled: { type: Boolean, default: false },
 });
+
+const publicSiteEnabled = ref(props.publicWebsiteEnabled ?? true);
 
 const contact = props.settings.contact ?? {};
 
@@ -176,6 +196,9 @@ const form = useForm({
 });
 
 function submit() {
-    form.post(`/school-admin/${props.school.id}/settings`, { forceFormData: true });
+    form.transform((data) => ({
+        ...data,
+        ...(props.websiteFeatureEnabled ? { public_website_enabled: publicSiteEnabled.value } : {}),
+    })).post(`/school-admin/${props.school.id}/settings`, { forceFormData: true });
 }
 </script>

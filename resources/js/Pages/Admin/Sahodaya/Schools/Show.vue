@@ -157,6 +157,38 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Danger zone -->
+            <div class="bg-white rounded-2xl border border-red-200 shadow-sm p-5">
+                <h3 class="font-bold text-red-800 mb-1">Delete school permanently</h3>
+                <p class="text-sm text-red-700/90 mb-4">
+                    Removes this school, all students, fest registrations, payments, portal users, and website content.
+                    This cannot be undone.
+                    <span v-if="school.student_count > 0" class="block mt-2 font-semibold">
+                        Warning: {{ school.student_count }} active student(s) will be deleted.
+                    </span>
+                </p>
+                <div class="space-y-3 max-w-md">
+                    <div>
+                        <label class="text-xs font-semibold text-gray-500 uppercase">Reason</label>
+                        <input v-model="deleteReason" type="text" class="field mt-1"
+                               placeholder="Why is this school being removed?">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-gray-500 uppercase">
+                            Type <span class="font-mono normal-case">{{ school.name }}</span> to confirm
+                        </label>
+                        <input v-model="deleteConfirmName" type="text" class="field mt-1"
+                               :placeholder="school.name">
+                    </div>
+                    <button type="button"
+                            class="btn-secondary text-sm text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
+                            :disabled="deleteProcessing || !canDeleteSchool"
+                            @click="deleteSchool">
+                        Delete school permanently
+                    </button>
+                </div>
+            </div>
         </div>
     </SahodayaAdminLayout>
 </template>
@@ -164,7 +196,7 @@
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
-import { defineComponent, h } from 'vue';
+import { computed, defineComponent, h, ref } from 'vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String,
@@ -173,6 +205,28 @@ const props = defineProps({
     school: Object, detailFields: Array, registration: Object,
     recentPayments: Array, academicYear: String,
 });
+
+const deleteReason = ref('');
+const deleteConfirmName = ref('');
+const deleteProcessing = ref(false);
+
+const canDeleteSchool = computed(() =>
+    deleteReason.value.trim() !== '' && deleteConfirmName.value === props.school.name,
+);
+
+function deleteSchool() {
+    if (!canDeleteSchool.value || deleteProcessing.value) return;
+    if (!confirm(`Permanently delete "${props.school.name}" and all related data? This cannot be undone.`)) return;
+
+    deleteProcessing.value = true;
+    router.delete(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}`, {
+        data: {
+            confirm_name: deleteConfirmName.value,
+            reason: deleteReason.value.trim(),
+        },
+        onFinish: () => { deleteProcessing.value = false; },
+    });
+}
 
 function toggleFestRegistration() {
     const action = props.school.fest_registration_closed ? 'reopen' : 'close';

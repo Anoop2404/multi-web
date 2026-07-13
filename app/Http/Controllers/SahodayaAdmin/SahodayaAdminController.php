@@ -15,6 +15,7 @@ use App\Support\SahodayaNavVisibility;
 use App\Support\TenancyDatabase;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
+use App\Support\TenantPublicSite;
 use Illuminate\Http\Request;
 
 abstract class SahodayaAdminController extends Controller
@@ -100,6 +101,7 @@ abstract class SahodayaAdminController extends Controller
             'competitionPrograms'     => app(\App\Services\Events\FestCompetitionTypeRegistry::class)
                 ->forTenant($this->sahodaya->id)
                 ->programsForNav(),
+            'publicWebsiteEnabled'    => TenantPublicSite::isEnabled($this->sahodaya),
         ], $props));
     }
 
