@@ -23,6 +23,7 @@ class FestEvent extends Model
         'record_tracking_enabled', 'default_record_prize_label', 'require_all_marks_before_publish',
         'require_event_registration', 'event_reg_start', 'event_reg_end', 'allow_student_self_register',
         'verification_day', 'manual_pdf_path',
+        'sport_discipline', 'source_head_id',
     ];
 
     protected $casts = [
@@ -127,11 +128,27 @@ class FestEvent extends Model
     {
         return $q->whereNull('parent_event_id')
             ->whereNull('conducting_school_id')
-            ->whereNull('partition_role')
+            ->where(function ($role) {
+                $role->whereNull('partition_role')
+                    ->orWhere('partition_role', 'sports_season');
+            })
             ->where(function ($inner) {
                 $inner->whereIn('level_round', ['sahodaya', 'state'])
                     ->orWhereNull('level_round');
             });
+    }
+
+    public function isSportsDisciplineEvent(): bool
+    {
+        return $this->event_type === 'sports'
+            && ($this->partition_role === 'sports_discipline' || $this->parent_event_id !== null);
+    }
+
+    public function isSportsSeasonEvent(): bool
+    {
+        return $this->event_type === 'sports'
+            && $this->parent_event_id === null
+            && ($this->partition_role === null || $this->partition_role === 'sports_season');
     }
 
     /** Fest program types that are unique (one per Sahodaya per academic year). */
@@ -156,6 +173,56 @@ class FestEvent extends Model
                     ->where('conducting_school_id', $schoolId);
             });
         });
+    }
+
+    /**
+     * Events schools may list (hub, nav switcher, registration, API).
+     * Sports: only once registration opens (draft/published stay Sahodaya-only).
+     * Other fest types: published preview remains allowed.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\FestEvent>  $q
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\FestEvent>
+     */
+    public function scopeListedForSchool($q, string $schoolId, ?string $eventType = null)
+    {
+        $q->visibleToSchool($schoolId);
+
+        if ($eventType === 'sports') {
+            return $q->whereIn('status', self::schoolListStatusesForType('sports'))
+                ->where(function ($inner) {
+                    // Prefer discipline events; hide season umbrella once partition_role is set.
+                    $inner->where('partition_role', 'sports_discipline')
+                        ->orWhereNull('partition_role')
+                        ->orWhere('partition_role', '!=', 'sports_season');
+                });
+        }
+
+        if ($eventType !== null) {
+            return $q->whereIn('status', self::schoolListStatusesForType($eventType));
+        }
+
+        // Mixed queries: sports rows require registration_open+; others keep published+.
+        return $q->where(function ($inner) {
+            $inner->where(function ($sports) {
+                $sports->where('event_type', 'sports')
+                    ->whereIn('status', self::schoolListStatusesForType('sports'));
+            })->orWhere(function ($other) {
+                $other->where(function ($nonSports) {
+                    $nonSports->whereNull('event_type')
+                        ->orWhere('event_type', '!=', 'sports');
+                })->whereIn('status', self::schoolListStatusesForType(null));
+            });
+        });
+    }
+
+    /** @return list<string> */
+    public static function schoolListStatusesForType(?string $eventType): array
+    {
+        if ($eventType === 'sports') {
+            return ['registration_open', 'ongoing', 'completed'];
+        }
+
+        return ['published', 'registration_open', 'ongoing', 'completed'];
     }
 
     public function conductsAt(string $level): bool

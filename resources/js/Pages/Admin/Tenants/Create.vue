@@ -67,6 +67,19 @@
                             </p>
                             <p v-if="form.errors.database_name" class="text-xs text-red-500 mt-1">{{ form.errors.database_name }}</p>
                         </div>
+                        <div class="grid sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="form-label mb-1.5">DB username <span class="font-normal text-gray-400">(optional)</span></label>
+                                <input v-model="form.db_username" type="text" class="field font-mono" autocomplete="off"
+                                       placeholder="Optional — blank uses central DB user">
+                            </div>
+                            <div>
+                                <label class="form-label mb-1.5">DB password <span class="font-normal text-gray-400">(optional)</span></label>
+                                <input v-model="form.db_password" type="password" class="field font-mono" autocomplete="new-password"
+                                       placeholder="Optional — blank uses central password">
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500">Only the database name is required. Username and password can be left empty.</p>
                     </div>
 
                     <div v-if="defaultType === 'school'">
@@ -122,6 +135,8 @@ const form = useForm({
     parent_id: '',
     plan: 'free',
     database_name: '',
+    db_username: '',
+    db_password: '',
 });
 
 const databaseNamePlaceholder = computed(() => {

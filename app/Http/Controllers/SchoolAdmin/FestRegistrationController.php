@@ -64,10 +64,9 @@ class FestRegistrationController extends SchoolAdminController
 
         $events = FestEvent::where('tenant_id', $sahodayaId)
             ->ofType($eventType)
-            ->visibleToSchool($this->school->id)
+            ->listedForSchool($this->school->id, $eventType)
             ->when($request->query('event'), fn ($q) => $q->where('id', $request->query('event')))
             ->when($view === 'results', fn ($q) => $q->where('results_published', true))
-            ->when($view === 'registration', fn ($q) => $q->whereIn('status', ['published', 'registration_open', 'ongoing']))
             ->with('items')
             ->with('academicYear:id,label,status')
             ->orderByDesc('event_start')
@@ -265,8 +264,7 @@ class FestRegistrationController extends SchoolAdminController
         $events = FestEvent::where('tenant_id', $this->school->parent_id)
             ->ofType($eventType)
             ->primaryHub()
-            ->visibleToSchool($this->school->id)
-            ->whereIn('status', ['published', 'registration_open', 'ongoing'])
+            ->listedForSchool($this->school->id, $eventType)
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'event_type', 'level_round', 'conducting_school_id', 'parent_event_id', 'partition_role', 'status', 'event_start'])
             ->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)
@@ -283,7 +281,7 @@ class FestRegistrationController extends SchoolAdminController
             ->whereKey($event->id)
             ->where('tenant_id', $this->school->parent_id)
             ->ofType($meta['eventType'])
-            ->visibleToSchool($this->school->id)
+            ->listedForSchool($this->school->id, $meta['eventType'])
             ->firstOrFail();
 
         $allowed = collect([$resolved])->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)
@@ -319,8 +317,7 @@ class FestRegistrationController extends SchoolAdminController
         $events = FestEvent::query()
             ->where('tenant_id', $this->school->parent_id)
             ->ofType('sports')
-            ->visibleToSchool($this->school->id)
-            ->whereIn('status', ['published', 'registration_open', 'ongoing'])
+            ->listedForSchool($this->school->id, 'sports')
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'status', 'event_start'])
             ->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)
@@ -364,8 +361,7 @@ class FestRegistrationController extends SchoolAdminController
         $event = FestEvent::query()
             ->where('id', $event->id)
             ->ofType('sports')
-            ->visibleToSchool($this->school->id)
-            ->whereIn('status', ['published', 'registration_open', 'ongoing'])
+            ->listedForSchool($this->school->id, 'sports')
             ->with('academicYear:id,label,status')
             ->firstOrFail();
 

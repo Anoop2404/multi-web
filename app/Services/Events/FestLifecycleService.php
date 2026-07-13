@@ -8,7 +8,6 @@ use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchedule;
 use App\Models\FestSchoolEventFee;
-use App\Models\StateRemittance;
 
 class FestLifecycleService
 {
@@ -19,10 +18,14 @@ class FestLifecycleService
         return new self($event);
     }
 
-    /** @return list<array{key: string, label: string, done: bool, hint: ?string}> */
+    /** @return list<array{key: string, label: string, done: bool, hint: ?string, href?: ?string, detail?: ?string, optional?: bool}> */
     public function checklist(): array
     {
         $e = $this->event;
+
+        if ($e->event_type === 'sports') {
+            return app(FestSportsChecklist::class)->forEvent($e);
+        }
 
         $approved = FestRegistration::where('event_id', $e->id)->where('status', 'approved')->count();
         $pending = FestRegistration::where('event_id', $e->id)->where('status', 'submitted')->count();
@@ -51,20 +54,6 @@ class FestLifecycleService
             $verifiedFees = $schoolFees->where('status', 'approved')->count();
         }
 
-        $remittanceDone = true;
-        $remittanceHint = null;
-        if ($e->level_round === 'sahodaya' && $e->state_program_id) {
-            $activeYear = \App\Support\AcademicYear::forSahodaya($e->tenant_id);
-            $yearLabel = $activeYear?->label ?? $e->academicYear?->label;
-            $remittanceDone = StateRemittance::where('sahodaya_id', $e->tenant_id)
-                ->where('status', 'verified')
-                ->when($yearLabel, fn ($q) => $q->where('academic_year', $yearLabel))
-                ->exists();
-            $remittanceHint = $remittanceDone
-                ? null
-                : 'Upload and verify state remittance under Tools → State remittances';
-        }
-
         return [
             [
                 'key'   => 'items',
@@ -76,7 +65,9 @@ class FestLifecycleService
                 'key'   => 'registrations',
                 'label' => 'Registrations reviewed',
                 'done'  => $pending === 0 && $approved > 0,
-                'hint'  => $pending > 0 ? "{$pending} pending approval" : ($approved === 0 ? 'No approved registrations' : null),
+                'hint'  => $pending > 0
+                    ? "{$pending} pending approval"
+                    : ($approved === 0 ? 'No approved registrations' : null),
             ],
             [
                 'key'   => 'school_fees',
@@ -85,12 +76,6 @@ class FestLifecycleService
                 'hint'  => ! $feeRequired
                     ? 'No fest fees for this round'
                     : ($pendingFees > 0 ? "{$pendingFees} payment(s) awaiting verification" : null),
-            ],
-            [
-                'key'   => 'state_remittance',
-                'label' => 'State remittance submitted & verified',
-                'done'  => $remittanceDone,
-                'hint'  => $remittanceHint,
             ],
             [
                 'key'   => 'schedule',
@@ -135,6 +120,16 @@ class FestLifecycleService
 
         if ($e->schedule_published && in_array($e->status, ['published', 'registration_open'], true)) {
             return 'ongoing';
+        }
+
+        if ($e->event_type === 'sports'
+            && in_array($e->status, ['draft', 'published'], true)
+            && $e->items()->exists()
+            && $e->registration_open
+            && now()->startOfDay()->gte($e->registration_open->copy()->startOfDay())
+            && (! $e->registration_close || now()->startOfDay()->lte($e->registration_close->copy()->startOfDay()))
+        ) {
+            return 'registration_open';
         }
 
         if ($e->isRegistrationOpen() && $e->status === 'published') {

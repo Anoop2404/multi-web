@@ -4,15 +4,17 @@
             <div>
                 <h3 class="section-title">{{ head.head_name }}</h3>
                 <p class="section-desc text-xs">
-                    Set registration and competition dates once — optionally apply to all {{ head.item_count }} linked item(s).
-                    Head fees apply when the event uses composite sports billing.
+                    Schedule, fees, and policy for this head — same fields as when the head was created.
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2 shrink-0">
                 <span v-if="headRecord?.is_team_heading" class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
                     ID card heading
                 </span>
-                <button type="button" class="btn-secondary text-sm" @click="openHeadEdit">Edit head</button>
+                <span v-if="headRecord?.status" class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 capitalize">
+                    {{ headRecord.status.replace('_', ' ') }}
+                </span>
+                <button type="button" class="btn-secondary text-sm" @click="openHeadEdit">Edit head &amp; fees</button>
             </div>
         </div>
 
@@ -22,6 +24,24 @@
             </FormField>
             <FormField label="Registration closes">
                 <input v-model="row.reg_end" type="date" class="field text-sm">
+            </FormField>
+            <FormField label="Venue">
+                <input v-model="row.venue" type="text" class="field text-sm" placeholder="Competition venue">
+            </FormField>
+            <FormField label="Status">
+                <select v-model="row.status" class="field text-sm">
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                    <option value="registration_open">Registration open</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </FormField>
+            <FormField label="Event start">
+                <input v-model="row.event_start" type="date" class="field text-sm">
+            </FormField>
+            <FormField label="Event end">
+                <input v-model="row.event_end" type="date" class="field text-sm">
             </FormField>
         </div>
 
@@ -47,9 +67,6 @@
                 <FormField label="Start time">
                     <input v-model="row.competition_time" type="time" class="field text-sm">
                 </FormField>
-                <p class="text-[11px] text-slate-500 self-end pb-2 lg:col-span-1 sm:col-span-2">
-                    Every item under this head runs together on this date and time.
-                </p>
             </div>
 
             <div v-else class="grid gap-3 sm:grid-cols-2">
@@ -59,20 +76,12 @@
                 <FormField label="Competition window end">
                     <input v-model="row.competition_end" type="date" class="field text-sm">
                 </FormField>
-                <p class="text-[11px] text-slate-500 sm:col-span-2">
-                    Items run on different days — set each item's date and time individually below.
-                    This window is just the overall span shown to schools.
-                </p>
             </div>
         </div>
 
-        <div v-if="showHeadFees" class="grid gap-3 sm:grid-cols-2 border-t border-slate-100 pt-4">
-            <FormField label="Default item fee (₹)">
-                <input v-model.number="row.default_item_fee" type="number" min="0" step="0.01" class="field text-sm" placeholder="Per billed item">
-            </FormField>
-            <FormField label="Extra item fee (₹)">
-                <input v-model.number="row.extra_item_fee" type="number" min="0" step="0.01" class="field text-sm" placeholder="Beyond included quota">
-            </FormField>
+        <div v-if="showHeadFees" class="border-t border-slate-100 pt-4 space-y-3">
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Fees &amp; policy</p>
+            <FestHeadFeeFields v-model="feeFields" :show-help="false" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
@@ -97,11 +106,11 @@
             </Link>
         </div>
 
-        <div v-if="editingHead" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="closeHeadEdit">
-            <form @submit.prevent="saveHeadMeta" class="card w-full max-w-lg shadow-xl space-y-4">
+        <div v-if="editingHead" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto py-8" @click.self="closeHeadEdit">
+            <form @submit.prevent="saveHeadMeta" class="card w-full max-w-2xl shadow-xl space-y-4 my-auto">
                 <div>
                     <h3 class="section-title">Edit item head</h3>
-                    <p class="section-desc text-xs mt-1">Rename this head or change its master discipline and ID-card use.</p>
+                    <p class="section-desc text-xs mt-1">Same fee and policy layout as Add head.</p>
                 </div>
 
                 <FormField label="Head name">
@@ -117,6 +126,11 @@
                     <input type="checkbox" v-model="headForm.is_team_heading"> Use as ID card heading
                 </label>
 
+                <div class="border-t border-slate-100 pt-4 space-y-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Fees &amp; policy</p>
+                    <FestHeadFeeFields v-model="editFeeFields" />
+                </div>
+
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" class="btn-secondary" @click="closeHeadEdit">Cancel</button>
                     <button type="submit" class="btn-primary" :disabled="headForm.processing">Save head</button>
@@ -129,6 +143,8 @@
 <script setup>
 import { reactive, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
+import FestHeadFeeFields from '@/Components/fest/FestHeadFeeFields.vue';
+import { emptyHeadFeeFields, headFeeFieldsFromRecord } from '@/support/festHeadFeeFields';
 
 const props = defineProps({
     sahodayaId: { type: [String, Number], required: true },
@@ -147,6 +163,8 @@ const headForm = useForm({
     sport_discipline: '',
     is_team_heading: true,
 });
+const feeFields = reactive(emptyHeadFeeFields());
+const editFeeFields = reactive(emptyHeadFeeFields());
 
 function toDateInput(value) {
     if (!value) return '';
@@ -161,17 +179,28 @@ function buildRow(source) {
         competition_end: toDateInput(source?.competition_end),
         schedule_mode: source?.schedule_mode === 'same_time' ? 'same_time' : 'different_days',
         competition_time: source?.competition_time ? String(source.competition_time).slice(0, 5) : '',
-        default_item_fee: source?.default_item_fee ?? '',
-        extra_item_fee: source?.extra_item_fee ?? '',
+        venue: source?.venue ?? '',
+        status: source?.status || 'draft',
+        event_start: toDateInput(source?.event_start),
+        event_end: toDateInput(source?.event_end),
         apply_to_items: true,
     };
 }
 
 const row = reactive(buildRow(props.headRecord ?? props.head));
 
+function syncFeeFields(source) {
+    Object.assign(feeFields, headFeeFieldsFromRecord(source ?? {}));
+}
+
+syncFeeFields(props.headRecord);
+
 watch(
     () => [props.headRecord, props.head],
-    () => Object.assign(row, buildRow(props.headRecord ?? props.head)),
+    () => {
+        Object.assign(row, buildRow(props.headRecord ?? props.head));
+        syncFeeFields(props.headRecord);
+    },
     { deep: true },
 );
 
@@ -183,6 +212,7 @@ function openHeadEdit() {
     headForm.name = props.headRecord?.name ?? props.head.head_name ?? '';
     headForm.sport_discipline = props.headRecord?.sport_discipline ?? '';
     headForm.is_team_heading = props.headRecord?.is_team_heading !== false;
+    Object.assign(editFeeFields, headFeeFieldsFromRecord(props.headRecord ?? {}));
     editingHead.value = true;
 }
 
@@ -191,8 +221,29 @@ function closeHeadEdit() {
     headForm.clearErrors();
 }
 
+function nullableNumber(value) {
+    return value === '' || value === null || value === undefined ? null : Number(value);
+}
+
+function feePayload(fields) {
+    return {
+        school_registration_fee: nullableNumber(fields.school_registration_fee),
+        student_registration_fee: nullableNumber(fields.student_registration_fee),
+        team_registration_fee: nullableNumber(fields.team_registration_fee),
+        included_items_per_student: fields.included_items_per_student === '' ? 0 : Number(fields.included_items_per_student ?? 0),
+        included_teams: fields.included_teams === '' ? 0 : Number(fields.included_teams ?? 0),
+        verification_policy: fields.verification_policy || 'all_students',
+        approval_policy: fields.approval_policy || 'auto',
+        max_participants: nullableNumber(fields.max_participants),
+        max_teams: nullableNumber(fields.max_teams),
+    };
+}
+
 function saveHeadMeta() {
-    headForm.patch(`/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}/item-heads/${props.head.head_id}/windows`, {
+    headForm.transform((data) => ({
+        ...data,
+        ...feePayload(editFeeFields),
+    })).patch(`/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}/item-heads/${props.head.head_id}/windows`, {
         preserveScroll: true,
         onSuccess: closeHeadEdit,
     });
@@ -208,9 +259,12 @@ function save() {
         competition_end: sameTime ? (row.competition_start || null) : (row.competition_end || null),
         schedule_mode: row.schedule_mode,
         competition_time: sameTime ? (row.competition_time || null) : null,
-        default_item_fee: row.default_item_fee === '' ? null : row.default_item_fee,
-        extra_item_fee: row.extra_item_fee === '' ? null : row.extra_item_fee,
         apply_to_items: row.apply_to_items,
+        venue: row.venue || null,
+        status: row.status || 'draft',
+        event_start: row.event_start || null,
+        event_end: row.event_end || null,
+        ...feePayload(feeFields),
     }, {
         preserveScroll: true,
         onFinish: () => { saving.value = false; },

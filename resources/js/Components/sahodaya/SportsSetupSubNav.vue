@@ -26,14 +26,14 @@ const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.
 
 const tabs = computed(() => {
     const list = [
-        { key: 'setup', label: 'Setup hub', href: `${base.value}/setup` },
-        { key: 'competition', label: 'Item heads', href: `${base.value}/competition` },
-        { key: 'items', label: 'Items under heads', href: `${base.value}/items` },
+        { key: 'setup', label: 'Overview / setup', href: `${base.value}/setup` },
+        { key: 'competition', label: 'Competition', href: `${base.value}/competition` },
+        { key: 'items', label: 'Items', href: `${base.value}/items` },
         { key: 'items-list', label: 'Item listing', href: `${base.value}/items/list` },
     ];
 
     if (eventHasFestFees(props.event ?? {})) {
-        list.push({ key: 'fees', label: 'Fee settings', href: `${base.value}/settings/fees` });
+        list.push({ key: 'fees', label: 'Fee overrides', href: `${base.value}/settings/fees` });
     }
 
     list.push(

@@ -29,7 +29,7 @@ class ProgramHubDataService
 
         $sahodayaEvents = FestEvent::where('tenant_id', $sahodayaId)
             ->ofType($meta['eventType'])
-            ->visibleToSchool($school->id)
+            ->listedForSchool($school->id, $meta['eventType'])
             ->withCount(['registrations' => fn ($q) => $q->where('school_id', $school->id)])
             ->orderByDesc('event_start')
             ->get();
@@ -42,7 +42,10 @@ class ProgramHubDataService
             ->orderByDesc('event_start')
             ->get();
 
-        $openEvents = $sahodayaEvents->whereIn('status', ['published', 'registration_open', 'ongoing']);
+        $openStatuses = $meta['eventType'] === 'sports'
+            ? ['registration_open', 'ongoing']
+            : ['published', 'registration_open', 'ongoing'];
+        $openEvents = $sahodayaEvents->whereIn('status', $openStatuses);
         $eventIds = $sahodayaEvents->pluck('id');
 
         $schoolRegistrations = FestRegistration::where('school_id', $school->id)

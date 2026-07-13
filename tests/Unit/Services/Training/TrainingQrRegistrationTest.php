@@ -138,6 +138,34 @@ class TrainingQrRegistrationTest extends TestCase
         $this->assertNotNull($result['pending_school']);
         $this->assertSame('Unknown Public School', $result['pending_school']->school_name);
         $this->assertSame($result['pending_school']->id, $result['registration']->pending_school_id);
+        $this->assertNull($result['registration']->school_id);
+        $this->assertSame('Unknown Public School', $result['registration']->displaySchoolName());
+    }
+
+    public function test_manual_school_rejects_sahodaya_name(): void
+    {
+        [$sahodaya, , $program] = $this->seedProgram();
+
+        $this->expectException(ValidationException::class);
+
+        app(TrainingPublicRegistrationService::class)->register($program, [
+            'name'               => 'Guest Teacher',
+            'email'              => 'guest2@example.test',
+            'manual_school_name' => $sahodaya->name,
+        ]);
+    }
+
+    public function test_manual_school_rejects_central_sahodaya_variant(): void
+    {
+        [, , $program] = $this->seedProgram();
+
+        $this->expectException(ValidationException::class);
+
+        app(TrainingPublicRegistrationService::class)->register($program, [
+            'name'               => 'Guest Teacher',
+            'email'              => 'guest3@example.test',
+            'manual_school_name' => 'Kannur Central Sahodaya',
+        ]);
     }
 
     public function test_duplicate_registration_rejected(): void

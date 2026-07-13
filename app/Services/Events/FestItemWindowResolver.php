@@ -140,7 +140,22 @@ class FestItemWindowResolver
     {
         $event = $this->event($item);
 
+        // Sports: Event Heads (or promoted discipline events) own reg windows.
+        // Prefer the head's own status when set (bridge toward head-as-event).
         return in_array($event?->event_type, ['sports', 'kalolsavam'], true);
+    }
+
+    public function headAllowsRegistration(?FestItemHead $head, ?FestEvent $event): bool
+    {
+        if (! $head) {
+            return in_array($event?->status, ['registration_open', 'ongoing'], true);
+        }
+
+        if (filled($head->status)) {
+            return in_array($head->status, ['registration_open', 'ongoing'], true);
+        }
+
+        return in_array($event?->status, ['registration_open', 'ongoing'], true);
     }
 
     private function firstDate(mixed $primary, mixed $fallback): ?Carbon

@@ -22,6 +22,17 @@
                 </div>
             </div>
 
+            <div v-else-if="school.can_cancel_membership"
+                 class="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <span>
+                    This school is <strong>approved</strong> but has <strong>no submitted/verified membership payment</strong>.
+                    You can cancel membership to remove it from the approved member list.
+                </span>
+                <button type="button" class="btn-secondary text-sm text-red-700 border-red-200 shrink-0" @click="cancelMembership">
+                    Cancel membership
+                </button>
+            </div>
+
             <!-- Header -->
             <div class="card">
                 <div class="flex flex-wrap items-start justify-between gap-4">
@@ -170,6 +181,15 @@ function rejectSchool() {
     const reason = prompt('Rejection reason:');
     if (!reason?.trim()) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/reject`, { reason }, { preserveScroll: true });
+}
+
+function cancelMembership() {
+    const reason = prompt(`Reason for cancelling membership — ${props.school.name}?`);
+    if (!reason?.trim()) return;
+    if (!confirm(`Cancel membership for "${props.school.name}"? They will be removed from approved member schools.`)) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/cancel-membership`, {
+        reason: reason.trim(),
+    }, { preserveScroll: true });
 }
 
 function formatDate(d) {

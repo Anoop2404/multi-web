@@ -27,7 +27,15 @@ class FestProgramController extends SchoolAdminController
 
         $parentEvents = FestEvent::where('tenant_id', $sahodayaId)
             ->whereIn('level_round', ['sahodaya', 'state'])
-            ->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing'])
+            ->where(function ($q) {
+                $q->where(function ($sports) {
+                    $sports->where('event_type', 'sports')
+                        ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed']);
+                })->orWhere(function ($other) {
+                    $other->where('event_type', '!=', 'sports')
+                        ->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing']);
+                });
+            })
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'event_type', 'level_round']);
 
@@ -63,7 +71,11 @@ class FestProgramController extends SchoolAdminController
             $data['parent_event_id'] = FestEvent::where('tenant_id', $sahodayaId)
                 ->where('event_type', $data['event_type'])
                 ->whereIn('level_round', ['sahodaya', 'state'])
-                ->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing'])
+                ->when(
+                    ($data['event_type'] ?? null) === 'sports',
+                    fn ($q) => $q->whereIn('status', ['published', 'registration_open', 'ongoing']),
+                    fn ($q) => $q->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing']),
+                )
                 ->orderByDesc('event_start')
                 ->value('id');
         }
@@ -127,7 +139,11 @@ class FestProgramController extends SchoolAdminController
             'parentEvents'     => FestEvent::where('tenant_id', $this->school->parent_id)
                 ->where('event_type', $festProgram->event_type)
                 ->whereIn('level_round', ['sahodaya', 'state'])
-                ->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing', 'completed'])
+                ->when(
+                    $festProgram->event_type === 'sports',
+                    fn ($q) => $q->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed']),
+                    fn ($q) => $q->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing', 'completed']),
+                )
                 ->orderByDesc('event_start')
                 ->get(['id', 'title', 'level_round', 'status']),
             'eventTypes'       => $this->eventTypes(),

@@ -38,9 +38,7 @@ class TrainingReportService
                     'teacher_name'   => $registration->teacher?->name ?? '',
                     'category'       => $registration->teacher?->teachingType?->label ?? '',
                     'designation'    => $registration->teacher?->designation ?? '',
-                    'school_name'    => $registration->school instanceof Tenant
-                        ? $registration->school->name
-                        : (Tenant::find($registration->school_id)?->name ?? ''),
+                    'school_name'    => $registration->displaySchoolName(),
                     'status'         => $registration->status,
                     'days_present'   => $presentCount,
                     'total_sessions' => $sessions->count(),
@@ -107,15 +105,11 @@ class TrainingReportService
             ->sortBy(fn (TrainingRegistration $r) => mb_strtolower($r->teacher?->name ?? ''))
             ->values()
             ->map(function (TrainingRegistration $r, int $index) {
-                $school = $r->school instanceof Tenant
-                    ? $r->school->name
-                    : ($r->pendingSchool?->school_name ?? '');
-
                 return [
                     'sl' => $index + 1,
                     'teacher' => $r->teacher?->name ?? '',
                     'category' => $r->teacher?->teachingType?->label ?? '',
-                    'school' => $school,
+                    'school' => $r->displaySchoolName() === '—' ? '' : $r->displaySchoolName(),
                 ];
             });
 
@@ -211,15 +205,11 @@ class TrainingReportService
         ]);
 
         return $program->registrations->values()->map(function (TrainingRegistration $r, int $index) {
-            $school = $r->school instanceof Tenant
-                ? $r->school->name
-                : ($r->pendingSchool?->school_name ?? '');
-
             return [
                 $index + 1,
                 $r->teacher?->name ?? '',
                 $r->teacher?->teachingType?->label ?? '',
-                $school,
+                $r->displaySchoolName() === '—' ? '' : $r->displaySchoolName(),
             ];
         });
     }

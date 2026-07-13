@@ -104,6 +104,19 @@ class TrainingCertificateService
             return null;
         }
 
+        if ($program->certificate_template_id) {
+            $chosen = CertificateTemplate::query()
+                ->where('tenant_id', $program->tenant_id)
+                ->where('event_type', 'training')
+                ->whereKey($program->certificate_template_id)
+                ->where('is_active', true)
+                ->first();
+
+            if ($chosen) {
+                return $chosen;
+            }
+        }
+
         $certType = $this->resolveCertificateType($registration);
 
         $template = CertificateTemplate::where('tenant_id', $program->tenant_id)
@@ -141,18 +154,27 @@ class TrainingCertificateService
             ?? $presentSessions->first()?->venue
             ?? '';
 
+        $nameFields = self::recipientNameFields(
+            $registration->teacher?->name,
+            $registration->teacher?->gender,
+        );
+
         $defaults = [
-            'recipient_name'  => $registration->teacher?->name ?? '',
-            'program_title'   => $registration->program?->title ?? '',
-            'sahodaya_name'   => strtoupper($sahodaya->name),
-            'conducted_on'    => $conductedOn,
-            'designation'     => $registration->teacher?->designation ?? '',
-            'school_name'     => $registration->school?->name ?? '',
-            'venue'           => $venue,
-            'days_attended'   => (string) $daysAttended,
-            'total_days'      => (string) $totalDays,
-            'training_hours'  => (string) $trainingHours,
-            'certificate_date'=> now()->format('j F Y'),
+            'salutation'           => $nameFields['salutation'],
+            'recipient_name'       => $nameFields['recipient_name'],
+            'recipient_with_title' => $nameFields['recipient_with_title'],
+            'program_title'        => $registration->program?->title ?? '',
+            'sahodaya_name'        => strtoupper($sahodaya->name),
+            'conducted_on'         => $conductedOn,
+            'designation'          => $registration->teacher?->designation ?? '',
+            'school_name'          => $registration->displaySchoolName() === '—'
+                ? ''
+                : $registration->displaySchoolName(),
+            'venue'                => $venue,
+            'days_attended'        => (string) $daysAttended,
+            'total_days'           => (string) $totalDays,
+            'training_hours'       => (string) $trainingHours,
+            'certificate_date'     => now()->format('j F Y'),
         ];
 
         $template = $this->resolveTemplate($registration);
@@ -175,7 +197,7 @@ class TrainingCertificateService
         return array_merge($defaults, $resolved);
     }
 
-    /** @return array{template: ?CertificateTemplate, fieldValues: array<string, string>, logoUrl: ?string, sealUrl: ?string, signatories: list<array>} */
+    /** @return array{template: ?CertificateTemplate, fieldValues: array<string, string>, logoUrl: ?string, sealUrl: ?string, signatories: list<array>, backgroundUrl: ?string, overlayLayout: array} */
     public function renderContext(TrainingRegistration $registration, Tenant $sahodaya): array
     {
         $registration->loadMissing(['program', 'teacher', 'school']);
@@ -190,6 +212,12 @@ class TrainingCertificateService
             ? TenantStorage::logoUrl($sahodaya, $template->seal_path)
             : null;
 
+        $backgroundUrl = $template?->background_path
+            ? TenantStorage::logoUrl($sahodaya, $template->background_path)
+            : null;
+
+        $overlayLayout = $template?->overlayLayout() ?? CertificateTemplate::defaultBackgroundLayout();
+
         $signatories = collect($template?->signatories ?? CertificateTemplate::defaultTrainingSignatories())
             ->map(fn ($s) => [
                 'name'           => $s['name'] ?? '',
@@ -199,15 +227,105 @@ class TrainingCertificateService
                     : null,
             ])->values()->all();
 
-        return compact('template', 'fieldValues', 'logoUrl', 'sealUrl', 'signatories');
+        return compact('template', 'fieldValues', 'logoUrl', 'sealUrl', 'signatories', 'backgroundUrl', 'overlayLayout');
     }
 
     /** Demo certificate context for client previews (no real registration). */
-    /** @return array{template: ?CertificateTemplate, fieldValues: array<string, string>, logoUrl: ?string, sealUrl: ?string, signatories: list<array>, certificate: object} */
-    public function sampleRenderContext(TrainingProgram $program, Tenant $sahodaya): array
+    /** @return array{template: ?CertificateTemplate, fieldValues: array<string, string>, logoUrl: ?string, sealUrl: ?string, signatories: list<array>, backgroundUrl: ?string, overlayLayout: array, certificate: object} */
+    public function sampleRenderContext(TrainingProgram $program, Tenant $sahodaya, ?int $templateId = null): array
     {
-        $certType = in_array($program->certificate_type, TrainingProgram::CERTIFICATE_TYPES, true)
-            ? $program->certificate_type
+        $template = $this->resolveSampleTemplate(
+            $sahodaya,
+            $templateId ?? $program->certificate_template_id,
+            $program->certificate_type,
+        );
+
+        $conductedOn = $program->start_date?->format('j F Y') ?? '11 July 2026';
+        if ($program->start_date && $program->end_date && ! $program->start_date->isSameDay($program->end_date)) {
+            $conductedOn = $program->start_date->format('j F Y').' – '.$program->end_date->format('j F Y');
+        }
+
+        return $this->buildSampleContext($template, $sahodaya, array_merge(
+            self::recipientNameFields('Sample Teacher', 'female'),
+            [
+                'designation'      => 'PGT Mathematics',
+                'school_name'      => 'Sample Model School',
+                'program_title'    => $program->title,
+                'sahodaya_name'    => strtoupper($sahodaya->name),
+                'conducted_on'     => $conductedOn,
+                'venue'            => $program->venue ?? 'St. Alphonsa Public School, Oorakam',
+                'days_attended'    => '1',
+                'total_days'       => (string) max(1, $program->dayCount() ?: 1),
+                'training_hours'   => '6',
+                'certificate_date' => now()->format('j F Y'),
+            ],
+        ));
+    }
+
+    /** Preview a saved training template with sample recipient data (no program required). */
+    /** @return array{template: ?CertificateTemplate, fieldValues: array<string, string>, logoUrl: ?string, sealUrl: ?string, signatories: list<array>, backgroundUrl: ?string, overlayLayout: array, certificate: object} */
+    public function sampleRenderContextForTemplate(CertificateTemplate $template, Tenant $sahodaya): array
+    {
+        return $this->buildSampleContext($template, $sahodaya, array_merge(
+            self::recipientNameFields('Sample Teacher', 'female'),
+            [
+                'designation'      => 'PGT Mathematics',
+                'school_name'      => 'Sample Model School',
+                'program_title'    => $template->title ?: 'Sample Training Program',
+                'sahodaya_name'    => strtoupper($sahodaya->name),
+                'conducted_on'     => now()->format('j F Y'),
+                'venue'            => 'Sample Venue',
+                'days_attended'    => '1',
+                'total_days'       => '1',
+                'training_hours'   => '6',
+                'certificate_date' => now()->format('j F Y'),
+            ],
+        ));
+    }
+
+    /**
+     * Resolve Mr./Mrs. (and plain name) from teacher gender for certificate text.
+     *
+     * @return array{salutation: string, recipient_name: string, recipient_with_title: string}
+     */
+    public static function recipientNameFields(?string $name, ?string $gender): array
+    {
+        $raw = trim((string) $name);
+        $stripped = trim((string) preg_replace('/^(mr|mrs|ms|miss|dr)\.?\s+/i', '', $raw));
+        $salutation = self::salutationForGender($gender);
+
+        return [
+            'salutation'           => $salutation,
+            'recipient_name'       => $stripped,
+            'recipient_with_title' => trim($salutation.' '.$stripped),
+        ];
+    }
+
+    public static function salutationForGender(?string $gender): string
+    {
+        return match (strtolower(trim((string) $gender))) {
+            'male', 'm' => 'Mr.',
+            'female', 'f' => 'Mrs.',
+            default => 'Mr./Ms.',
+        };
+    }
+
+    private function resolveSampleTemplate(Tenant $sahodaya, ?int $templateId, ?string $certificateType): ?CertificateTemplate
+    {
+        if ($templateId) {
+            $template = CertificateTemplate::query()
+                ->where('tenant_id', $sahodaya->id)
+                ->where('event_type', 'training')
+                ->whereKey($templateId)
+                ->where('is_active', true)
+                ->first();
+            if ($template) {
+                return $template;
+            }
+        }
+
+        $certType = in_array($certificateType, TrainingProgram::CERTIFICATE_TYPES, true)
+            ? $certificateType
             : 'participation';
 
         $template = CertificateTemplate::where('tenant_id', $sahodaya->id)
@@ -226,25 +344,15 @@ class TrainingCertificateService
                 ->first();
         }
 
-        $conductedOn = $program->start_date?->format('j F Y') ?? '11 July 2026';
-        if ($program->start_date && $program->end_date && ! $program->start_date->isSameDay($program->end_date)) {
-            $conductedOn = $program->start_date->format('j F Y').' – '.$program->end_date->format('j F Y');
-        }
+        return $template;
+    }
 
-        $fieldValues = [
-            'recipient_name'  => 'Mr./Ms. Sample Teacher',
-            'designation'     => 'PGT Mathematics',
-            'school_name'     => 'Sample Model School',
-            'program_title'   => $program->title,
-            'sahodaya_name'   => strtoupper($sahodaya->name),
-            'conducted_on'    => $conductedOn,
-            'venue'           => $program->venue ?? 'St. Alphonsa Public School, Oorakam',
-            'days_attended'   => '1',
-            'total_days'      => (string) max(1, $program->dayCount() ?: 1),
-            'training_hours'  => '6',
-            'certificate_date'=> now()->format('j F Y'),
-        ];
-
+    /**
+     * @param  array<string, string>  $fieldValues
+     * @return array{template: ?CertificateTemplate, fieldValues: array<string, string>, logoUrl: ?string, sealUrl: ?string, signatories: list<array>, backgroundUrl: ?string, overlayLayout: array, certificate: object}
+     */
+    private function buildSampleContext(?CertificateTemplate $template, Tenant $sahodaya, array $fieldValues): array
+    {
         $logoUrl = $template?->logo_path
             ? TenantStorage::logoUrl($sahodaya, $template->logo_path)
             : TenantBranding::logoUrl($sahodaya);
@@ -252,6 +360,12 @@ class TrainingCertificateService
         $sealUrl = $template?->seal_path
             ? TenantStorage::logoUrl($sahodaya, $template->seal_path)
             : null;
+
+        $backgroundUrl = $template?->background_path
+            ? TenantStorage::logoUrl($sahodaya, $template->background_path)
+            : null;
+
+        $overlayLayout = $template?->overlayLayout() ?? CertificateTemplate::defaultBackgroundLayout();
 
         $signatories = collect($template?->signatories ?? CertificateTemplate::defaultTrainingSignatories())
             ->map(fn ($s) => [
@@ -266,7 +380,7 @@ class TrainingCertificateService
             'verification_uuid' => 'SAMPLE-DEMO-0000',
         ];
 
-        return compact('template', 'fieldValues', 'logoUrl', 'sealUrl', 'signatories', 'certificate');
+        return compact('template', 'fieldValues', 'logoUrl', 'sealUrl', 'signatories', 'backgroundUrl', 'overlayLayout', 'certificate');
     }
 
     public function presentDaysCount(TrainingRegistration $registration): int

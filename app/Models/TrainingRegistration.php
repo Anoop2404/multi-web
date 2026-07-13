@@ -27,6 +27,15 @@ class TrainingRegistration extends Model
         'teacher_created' => 'boolean',
     ];
 
+    protected $appends = [
+        'display_school_name',
+    ];
+
+    public function getDisplaySchoolNameAttribute(): string
+    {
+        return $this->displaySchoolName();
+    }
+
     /** Training fee is defined on the program, not on the registration row. */
     public function feeTotalDue(): float
     {
@@ -79,6 +88,25 @@ class TrainingRegistration extends Model
     public function pendingSchool(): BelongsTo
     {
         return $this->belongsTo(TrainingPendingSchool::class, 'pending_school_id');
+    }
+
+    /**
+     * School label for UI/exports. Pending-school QR rows must not show the Sahodaya
+     * name (historically stored as a holding school_id placeholder).
+     */
+    public function displaySchoolName(): string
+    {
+        $this->loadMissing(['pendingSchool', 'school']);
+
+        if (filled($this->pendingSchool?->school_name)) {
+            return (string) $this->pendingSchool->school_name;
+        }
+
+        if ($this->school instanceof Tenant && $this->school->type === 'school') {
+            return (string) $this->school->name;
+        }
+
+        return '—';
     }
 
     public function feedback(): HasOne

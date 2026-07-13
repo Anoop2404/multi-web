@@ -26,7 +26,7 @@ trait BuildsSchoolFestEventContext
         $events = FestEvent::query()
             ->where('tenant_id', $this->school->parent_id)
             ->ofType($meta['eventType'])
-            ->visibleToSchool($this->school->id)
+            ->listedForSchool($this->school->id, $meta['eventType'])
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'status', 'event_start'])
             ->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)

@@ -29,11 +29,16 @@ class FestSportsSetupController extends SahodayaAdminController
                 $q->whereNotNull('reg_start')->orWhereNotNull('competition_start');
             })
             ->count();
-        $headsWithFees = FestItemHead::where('event_id', $event->id)
+        $headsWithCompositeFees = FestItemHead::where('event_id', $event->id)
             ->where(function ($q) {
-                $q->whereNotNull('default_item_fee')->orWhereNotNull('extra_item_fee');
+                $q->whereNotNull('school_registration_fee')
+                    ->orWhereNotNull('student_registration_fee')
+                    ->orWhereNotNull('team_registration_fee')
+                    ->orWhereNotNull('default_item_fee')
+                    ->orWhereNotNull('extra_item_fee');
             })
             ->count();
+        $headsWithFees = $headsWithCompositeFees;
         $itemsWithFees = FestEventItem::where('event_id', $event->id)->where('is_enabled', true)->whereNotNull('fee_amount')->count();
         $rankPointCount = FestRankPoint::where('event_id', $event->id)->count();
 
@@ -42,76 +47,22 @@ class FestSportsSetupController extends SahodayaAdminController
         $feeModel = $schedule['fee_model'] ?? $event->fee_settings['fee_model'] ?? null;
         $feeConfigured = $feeModel && $feeModel !== 'none';
 
+        $headsFullyConfigured = $headCount > 0 && $headsWithCompositeFees === $headCount;
+
         $nav = app(FestHeadItemNavigationService::class)->navigationForEvent($event);
 
-        $checklist = [
-            [
-                'key'     => 'event',
-                'label'   => 'Event details & dates',
-                'hint'    => 'Title, status, fest dates, registration open/close.',
-                'href'    => "{$base}?overview=1",
-                'done'    => filled($event->title) && filled($event->status),
-            ],
-            [
-                'key'     => 'heads',
-                'label'   => 'Item heads & head scheduling',
-                'hint'    => 'Create each head (Athletics, Chess…) — its fees, quota, and approval policy are set right there, like standing up its own event.',
-                'href'    => "{$base}/competition",
-                'done'    => $headCount > 0,
-            ],
-            [
-                'key'     => 'fees',
-                'label'   => 'Event fee settings (optional overrides)',
-                'hint'    => 'Billing model defaults to Sports composite automatically. Only visit this if you need event-wide fallback amounts or a fee cap — per-head fees set at head creation take priority.',
-                'href'    => "{$base}/settings/fees",
-                'done'    => $feeConfigured,
-            ],
-            [
-                'key'     => 'items',
-                'label'   => 'Items under heads',
-                'hint'    => 'List, create, import, enable/disable, and move items under their item heads.',
-                'href'    => "{$base}/items",
-                'done'    => $itemCount > 0,
-                'detail'  => $itemCount > 0 ? "{$itemsWithHead}/{$itemCount} linked to a head" : null,
-            ],
-            [
-                'key'     => 'head_windows',
-                'label'   => 'Head dates & head fees',
-                'hint'    => 'Registration/competition windows per head; default & extra item fee per head.',
-                'href'    => "{$base}/competition",
-                'done'    => $headsWithDates > 0 || $headsWithFees > 0,
-                'detail'  => $headCount > 0 ? "{$headsWithDates} head(s) with dates · {$headsWithFees} with fees" : null,
-            ],
-            [
-                'key'     => 'item_fees',
-                'label'   => 'Item-wise fee overrides',
-                'hint'    => 'Optional per-item fee on top of head defaults — set in competition hub or items catalog.',
-                'href'    => "{$base}/competition",
-                'done'    => $itemsWithFees > 0 || $headsWithFees > 0,
-                'detail'  => $itemsWithFees > 0 ? "{$itemsWithFees} item(s) with custom fee" : 'Using head/event defaults',
-            ],
-            [
-                'key'     => 'rank_points',
-                'label'   => 'Rank points master',
-                'hint'    => 'Fixed team points per rank (1st, 2nd…). Ties share the same rank and points.',
-                'href'    => "{$base}/settings/points",
-                'done'    => $rankPointCount > 0,
-            ],
-            [
-                'key'     => 'registration',
-                'label'   => 'Registration windows',
-                'hint'    => 'Event-level vs per-head registration open/close; student self-register.',
-                'href'    => "{$base}/settings/registration",
-                'done'    => filled($event->event_reg_start) || filled($event->event_reg_end) || $headsWithDates > 0,
-            ],
-            [
-                'key'     => 'numbering',
-                'label'   => 'Chest & item numbering',
-                'hint'    => 'Chest number ranges, auto-assign on approval.',
-                'href'    => "{$base}/settings/numbering",
-                'done'    => true,
-            ],
-        ];
+        $checklist = app(\App\Services\Events\FestSportsChecklist::class)->forSetupHub($event, [
+            'base' => $base,
+            'headCount' => $headCount,
+            'itemCount' => $itemCount,
+            'itemsWithHead' => $itemsWithHead,
+            'headsWithDates' => $headsWithDates,
+            'headsWithFees' => $headsWithFees,
+            'headsFullyConfigured' => $headsFullyConfigured,
+            'itemsWithFees' => $itemsWithFees,
+            'rankPointCount' => $rankPointCount,
+            'feeConfigured' => $feeConfigured,
+        ]);
 
         $tenantMasters = [
             [
@@ -155,10 +106,5 @@ class FestSportsSetupController extends SahodayaAdminController
             'ageRuleSummary' => FestSportsAgeGroup::ageRuleSummary($event),
             'competitionUrl' => "{$base}/competition",
         ]));
-    }
-
-    private function eventQuery(int $eventId): string
-    {
-        return "?event_id={$eventId}";
     }
 }

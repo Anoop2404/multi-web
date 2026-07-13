@@ -61,6 +61,8 @@ class FestHeadItemNavigationService
                 'head_name'          => $head->name,
                 'item_count'         => $headItems->count(),
                 'participant_count'  => $participantCount,
+                'status'             => $head->effectiveStatus(),
+                'venue'              => $head->venue,
                 'reg_start'          => $head->reg_start?->format('Y-m-d'),
                 'reg_end'            => $head->reg_end?->format('Y-m-d'),
                 'competition_start'  => $head->competition_start?->format('Y-m-d'),
@@ -153,6 +155,8 @@ class FestHeadItemNavigationService
                 'head_name'          => $head->name,
                 'item_count'         => count($headItems),
                 'participant_count'  => $participantCount,
+                'status'             => $head->effectiveStatus(),
+                'venue'              => $head->venue,
                 'reg_start'          => $head->reg_start?->format('Y-m-d'),
                 'reg_end'            => $head->reg_end?->format('Y-m-d'),
                 'competition_start'  => $head->competition_start?->format('Y-m-d'),
@@ -364,6 +368,10 @@ class FestHeadItemNavigationService
 
     private function headRegistrationOpen(FestItemHead $head): bool
     {
+        if (! $head->isRegistrationOpenForSchools()) {
+            return false;
+        }
+
         $today = now()->startOfDay();
 
         if ($head->reg_start && $today->lt($head->reg_start->startOfDay())) {

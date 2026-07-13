@@ -131,6 +131,7 @@ class TrainingCertificateServiceTest extends TestCase
         $teacher = Teacher::create([
             'tenant_id'   => $school->id,
             'name'        => 'Jane Teacher',
+            'gender'      => 'female',
             'designation' => 'PGT',
             'status'      => 'active',
         ]);
@@ -189,7 +190,20 @@ class TrainingCertificateServiceTest extends TestCase
         $this->assertArrayHasKey('training_hours', $fields);
         $this->assertSame('St. Alphonsa Public School, Oorakam', $fields['venue']);
         $this->assertSame('Jane Teacher', $fields['recipient_name']);
+        $this->assertSame('Mrs.', $fields['salutation']);
+        $this->assertSame('Mrs. Jane Teacher', $fields['recipient_with_title']);
         $this->assertSame('PGT', $fields['designation']);
+    }
+
+    public function test_salutation_follows_teacher_gender(): void
+    {
+        $this->assertSame('Mr.', TrainingCertificateService::salutationForGender('male'));
+        $this->assertSame('Mrs.', TrainingCertificateService::salutationForGender('female'));
+        $this->assertSame('Mr./Ms.', TrainingCertificateService::salutationForGender(null));
+        $this->assertSame(
+            ['salutation' => 'Mr.', 'recipient_name' => 'John Doe', 'recipient_with_title' => 'Mr. John Doe'],
+            TrainingCertificateService::recipientNameFields('Mr. John Doe', 'male'),
+        );
     }
 
     public function test_issue_uses_program_certificate_type(): void
@@ -235,5 +249,58 @@ class TrainingCertificateServiceTest extends TestCase
         $this->assertSame('completion', $certificate->cert_type);
         $fields = $service->resolveFieldValues($registration->fresh(['program.sessions', 'teacher', 'school']), $sahodaya);
         $this->assertSame('2', $fields['training_hours']);
+    }
+
+    public function test_resolve_template_prefers_program_certificate_template_id(): void
+    {
+        [$sahodaya, $school] = $this->seedTenants();
+        $teacher = Teacher::create(['tenant_id' => $school->id, 'name' => 'Teacher D', 'status' => 'active']);
+
+        $typeMatched = CertificateTemplate::create([
+            'tenant_id' => $sahodaya->id,
+            'event_type' => 'training',
+            'certificate_type' => 'participation',
+            'title' => 'Type Matched',
+            'is_active' => true,
+        ]);
+
+        $chosen = CertificateTemplate::create([
+            'tenant_id' => $sahodaya->id,
+            'event_type' => 'training',
+            'certificate_type' => 'appreciation',
+            'title' => 'Explicitly Chosen',
+            'background_path' => 'certificates/demo-bg.png',
+            'layout_json' => CertificateTemplate::defaultBackgroundLayout(),
+            'is_active' => true,
+        ]);
+
+        $program = TrainingProgram::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Chosen Template Program',
+            'status' => 'ongoing',
+            'fee_type' => 'none',
+            'certificate_type' => 'participation',
+            'certificate_template_id' => $chosen->id,
+        ]);
+
+        $registration = TrainingRegistration::create([
+            'program_id' => $program->id,
+            'teacher_id' => $teacher->id,
+            'school_id' => $school->id,
+            'status' => 'confirmed',
+        ]);
+
+        $service = app(TrainingCertificateService::class);
+        $resolved = $service->resolveTemplate($registration->fresh(['program']));
+
+        $this->assertNotNull($resolved);
+        $this->assertSame($chosen->id, $resolved->id);
+        $this->assertNotSame($typeMatched->id, $resolved->id);
+
+        $ctx = $service->sampleRenderContext($program->fresh(), $sahodaya);
+        $this->assertSame($chosen->id, $ctx['template']?->id);
+        $this->assertArrayHasKey('backgroundUrl', $ctx);
+        $this->assertArrayHasKey('overlayLayout', $ctx);
+        $this->assertArrayHasKey('recipient_name', $ctx['overlayLayout']);
     }
 }

@@ -22,8 +22,7 @@ class FestApiController extends SchoolApiController
     public function index()
     {
         $events = FestEvent::where('tenant_id', $this->school->parent_id)
-            ->visibleToSchool($this->school->id)
-            ->whereIn('status', ['published', 'registration_open', 'ongoing'])
+            ->listedForSchool($this->school->id)
             ->with('items')
             ->orderByDesc('event_start')
             ->get();

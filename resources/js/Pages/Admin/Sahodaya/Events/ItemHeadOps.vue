@@ -2,13 +2,7 @@
     <SahodayaEventsLayout :title="`${event.title} — Competition`" :sahodaya="sahodaya" :event="event"
                          :show-header-title="false">
         <PageHeader :title="pageTitle" eyebrow="Competition"
-                    :description="headerDescription">
-            <template #actions>
-                <Link v-if="isSports" :href="`${eventBase}/items`" class="btn-secondary text-xs">Items under heads</Link>
-                <Link v-if="isSports" :href="`${eventBase}/items/list`" class="btn-secondary text-xs">Item listing</Link>
-                <Link v-if="isSports" :href="`${eventBase}/setup`" class="btn-secondary text-xs">Setup hub</Link>
-            </template>
-        </PageHeader>
+                    :description="headerDescription" />
 
         <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
                            :event="event" active="competition" class="mb-4" />
@@ -56,7 +50,6 @@
 
 <script setup>
 import { computed } from 'vue';
-import { Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
@@ -83,7 +76,6 @@ const props = defineProps({
 });
 
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/competition`);
-const eventBase = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`);
 const isSports = computed(() => props.event.event_type === 'sports');
 const isRoot = computed(() => !props.selectedHeadId && !props.selectedItemId);
 

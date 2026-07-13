@@ -6,6 +6,7 @@ use App\Support\AcademicYear;
 use App\Support\Training\TrainingProgramEligibilityConfig;
 use App\Support\Training\TrainingProgramPayload;
 use App\Models\Certificate;
+use App\Models\CertificateTemplate;
 use App\Models\Region;
 use App\Models\Tenant;
 use App\Models\TrainingCategory;
@@ -97,6 +98,13 @@ class TrainingProgramController extends SahodayaAdminController
                 Rule::exists('training_categories', 'id')->where('tenant_id', $this->sahodaya->id),
             ],
             'certificate_type'    => ['nullable', 'string', Rule::in(TrainingProgram::CERTIFICATE_TYPES)],
+            'certificate_template_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('certificate_templates', 'id')
+                    ->where('tenant_id', $this->sahodaya->id)
+                    ->where('event_type', 'training'),
+            ],
         ]);
 
         $data['tenant_id'] = $this->sahodaya->id;
@@ -171,6 +179,19 @@ class TrainingProgramController extends SahodayaAdminController
             ->orderBy('label')
             ->get(['id', 'code', 'label']);
 
+        $certificateTemplates = CertificateTemplate::where('tenant_id', $this->sahodaya->id)
+            ->where('event_type', 'training')
+            ->where('is_active', true)
+            ->orderBy('certificate_type')
+            ->orderByDesc('id')
+            ->get(['id', 'title', 'certificate_type', 'background_path'])
+            ->map(fn (CertificateTemplate $t) => [
+                'id' => $t->id,
+                'title' => $t->title ?: 'Certificate',
+                'certificate_type' => $t->certificate_type,
+                'has_background' => filled($t->background_path),
+            ]);
+
         return $this->inertia('Sahodaya/Training/Show', [
             'program' => array_merge($program->toArray(), [
                 'eligibility_config' => TrainingProgramEligibilityConfig::normalize($program->eligibility_config),
@@ -180,6 +201,7 @@ class TrainingProgramController extends SahodayaAdminController
             ]),
             'categories' => $categories,
             'certificateTypes' => TrainingProgram::CERTIFICATE_TYPES,
+            'certificateTemplates' => $certificateTemplates,
             'resourcePersons' => $resourcePersons,
             'attendanceMap' => $attendanceMap,
             'eligibilityOptions' => [
@@ -243,6 +265,13 @@ class TrainingProgramController extends SahodayaAdminController
                 Rule::exists('training_categories', 'id')->where('tenant_id', $this->sahodaya->id),
             ],
             'certificate_type'   => ['nullable', 'string', Rule::in(TrainingProgram::CERTIFICATE_TYPES)],
+            'certificate_template_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('certificate_templates', 'id')
+                    ->where('tenant_id', $this->sahodaya->id)
+                    ->where('event_type', 'training'),
+            ],
             'eligibility_config' => 'nullable|array',
             'eligibility_config.teaching_type_ids' => 'nullable|array',
             'eligibility_config.teaching_type_ids.*' => 'integer',
@@ -305,24 +334,114 @@ class TrainingProgramController extends SahodayaAdminController
         return back()->with('success', 'Program updated.');
     }
 
-    public function registrations(string $tenantId, TrainingProgram $program)
+    public function registrations(Request $request, string $tenantId, TrainingProgram $program)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 
-        $program->load([
-            'registrations' => fn ($q) => $q->latest('id'),
-            'registrations.teacher.teachingType',
-            'registrations.school',
-            'registrations.feeReceipt',
-            'registrations.certificate',
-            'registrations.pendingSchool',
+        $filters = $request->validate([
+            'search'       => 'nullable|string|max:100',
+            'status'       => 'nullable|string|max:40',
+            'source'       => 'nullable|in:all,qr,portal,school',
+            'verification' => 'nullable|in:all,verified,unverified',
+            'sort'         => 'nullable|in:id,teacher,status,source',
+            'dir'          => 'nullable|in:asc,desc',
+            'per_page'     => 'nullable|integer|min:10|max:100',
         ]);
+
+        $base = TrainingRegistration::query()->where('training_registrations.program_id', $program->id);
+
+        $counts = [
+            'total'      => (clone $base)->count(),
+            'registered' => (clone $base)->where('training_registrations.status', 'registered')->count(),
+            'confirmed'  => (clone $base)->whereIn('training_registrations.status', ['confirmed', 'completed'])->count(),
+            'waitlisted' => (clone $base)->where('training_registrations.status', 'waitlisted')->count(),
+            'qr'         => (clone $base)->where('training_registrations.registration_source', 'qr')->count(),
+        ];
+
+        $sort = $filters['sort'] ?? 'id';
+        $dir = ($filters['dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        $perPage = (int) ($filters['per_page'] ?? 50);
+        $status = $filters['status'] ?? 'all';
+        $source = $filters['source'] ?? 'all';
+        $verification = $filters['verification'] ?? 'all';
+        $search = trim((string) ($filters['search'] ?? ''));
+
+        $query = (clone $base)
+            ->with([
+                'teacher.teachingType',
+                'school:id,name',
+                'feeReceipt',
+                'certificate',
+                'pendingSchool',
+            ])
+            ->when($status === 'confirmed', fn ($q) => $q->whereIn('training_registrations.status', ['confirmed', 'completed']))
+            ->when(
+                $status !== 'all' && $status !== '' && $status !== 'confirmed',
+                fn ($q) => $q->where('training_registrations.status', $status)
+            )
+            ->when($source !== 'all', fn ($q) => $q->where('training_registrations.registration_source', $source))
+            ->when($verification === 'verified', fn ($q) => $q->whereHas(
+                'teacher',
+                fn ($t) => $t->whereNotNull('verified_at')
+            ))
+            ->when($verification === 'unverified', fn ($q) => $q->whereHas(
+                'teacher',
+                fn ($t) => $t->whereNull('verified_at')
+            ))
+            ->when($search !== '', function ($q) use ($search) {
+                $term = '%'.$search.'%';
+                $matchedSchoolIds = Tenant::where('parent_id', $this->sahodaya->id)
+                    ->where('type', 'school')
+                    ->where('name', 'like', $term)
+                    ->pluck('id');
+
+                $q->where(function ($inner) use ($term, $matchedSchoolIds) {
+                    $inner->whereHas('teacher', function ($t) use ($term) {
+                        $t->where('name', 'like', $term)
+                            ->orWhere('email', 'like', $term)
+                            ->orWhere('reg_no', 'like', $term);
+                    })
+                        ->orWhereHas('pendingSchool', fn ($p) => $p->where('school_name', 'like', $term));
+
+                    if ($matchedSchoolIds->isNotEmpty()) {
+                        $inner->orWhereIn('training_registrations.school_id', $matchedSchoolIds);
+                    }
+                });
+            });
+
+        // School names live on the central tenants connection — avoid joining them here.
+        if ($sort === 'teacher') {
+            $query->leftJoin('teachers', 'teachers.id', '=', 'training_registrations.teacher_id')
+                ->orderBy('teachers.name', $dir)
+                ->orderBy('training_registrations.id', 'desc')
+                ->select('training_registrations.*');
+        } elseif ($sort === 'status') {
+            $query->orderBy('training_registrations.status', $dir)->orderByDesc('training_registrations.id');
+        } elseif ($sort === 'source') {
+            $query->orderBy('training_registrations.registration_source', $dir)->orderByDesc('training_registrations.id');
+        } else {
+            $query->orderBy('training_registrations.id', $dir);
+        }
+
+        $registrations = $query
+            ->paginate($perPage)
+            ->withQueryString();
 
         return $this->inertia('Sahodaya/Training/Registrations', [
             'program' => $program->only([
                 'id', 'title', 'status', 'fee_type', 'fee_amount',
             ]),
-            'registrations' => $program->registrations,
+            'registrations' => $registrations,
+            'counts' => $counts,
+            'filters' => [
+                'search'       => $search,
+                'status'       => $status === '' ? 'all' : $status,
+                'source'       => $source,
+                'verification' => $verification,
+                'sort'         => $sort,
+                'dir'          => $dir,
+                'per_page'     => $perPage,
+            ],
         ]);
     }
 
@@ -360,7 +479,7 @@ class TrainingProgramController extends SahodayaAdminController
                 'id' => $r->id,
                 'teacher_name' => $r->teacher?->name,
                 'teacher_email' => $r->teacher?->email,
-                'school_name' => $r->school?->name ?? $r->pendingSchool?->school_name,
+                'school_name' => $r->displaySchoolName() === '—' ? null : $r->displaySchoolName(),
                 'source' => $r->registration_source,
                 'status' => $r->status,
                 'fee_status' => $r->fee_status,
@@ -1123,11 +1242,13 @@ class TrainingProgramController extends SahodayaAdminController
             ->download($registration, $this->sahodaya);
     }
 
-    public function previewCertificate(string $tenantId, TrainingProgram $program)
+    public function previewCertificate(Request $request, string $tenantId, TrainingProgram $program)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 
-        $render = app(TrainingCertificateService::class)->sampleRenderContext($program, $this->sahodaya);
+        $templateId = $request->filled('template_id') ? (int) $request->input('template_id') : null;
+        $render = app(TrainingCertificateService::class)
+            ->sampleRenderContext($program, $this->sahodaya, $templateId);
 
         return view('training.certificate', array_merge($render, [
             'registration' => null,

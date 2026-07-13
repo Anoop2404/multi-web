@@ -540,6 +540,63 @@ class StudentController extends SchoolAdminController
         abort_if($student->tenant_id !== $this->school->id, 403);
         $this->assertCanEditStudents();
 
+        $this->withdrawStudent($student);
+
+        return back()->with('success', 'Student record withdrawn.');
+    }
+
+    /**
+     * Withdraw selected students, or all active students in a class (wrong upload cleanup).
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $this->assertCanEditStudents();
+
+        $data = $request->validate([
+            'scope'             => 'required|in:selected,class',
+            'student_ids'       => 'nullable|array|max:500',
+            'student_ids.*'     => 'integer',
+            'school_class_id'   => [
+                'nullable',
+                'integer',
+                Rule::exists('school_classes', 'id')->where('tenant_id', $this->school->id),
+            ],
+        ]);
+
+        $query = Student::query()->where('tenant_id', $this->school->id);
+
+        if ($data['scope'] === 'class') {
+            abort_unless(! empty($data['school_class_id']), 422, 'Choose a class to remove students from.');
+
+            $query->where('school_class_id', $data['school_class_id'])
+                ->where('status', 'active');
+        } else {
+            $ids = array_values(array_unique(array_map('intval', $data['student_ids'] ?? [])));
+            abort_if($ids === [], 422, 'Select at least one student to remove.');
+
+            $query->whereIn('id', $ids);
+        }
+
+        $students = $query->orderBy('id')->get();
+        $count = 0;
+
+        foreach ($students as $student) {
+            $this->withdrawStudent($student);
+            $count++;
+        }
+
+        if ($count === 0) {
+            return back()->with('info', 'No matching students to remove.');
+        }
+
+        return back()->with(
+            'success',
+            $count === 1 ? '1 student withdrawn.' : "{$count} students withdrawn."
+        );
+    }
+
+    private function withdrawStudent(Student $student): void
+    {
         $snapshot = $student->only(['id', 'name', 'school_class_id', 'status', 'parent_email']);
         $name = $student->name;
 
@@ -553,8 +610,6 @@ class StudentController extends SchoolAdminController
             'students',
             $snapshot,
         );
-
-        return back()->with('success', 'Student record withdrawn.');
     }
 
     public function export(Request $request)

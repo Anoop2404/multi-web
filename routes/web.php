@@ -315,6 +315,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/students/bulk',                               [StudentController::class, 'createBulk'])->name('students.create.bulk');
     Route::post('/students',                                   [StudentController::class, 'store'])->name('students.store');
     Route::post('/students/bulk',                              [StudentController::class, 'storeBulk'])->name('students.store.bulk');
+    Route::post('/students/bulk-delete',                       [StudentController::class, 'bulkDestroy'])->name('students.bulk-destroy');
     Route::post('/students/backfill-reg-numbers',             [StudentController::class, 'backfillRegNumbers'])->name('students.backfill-reg-numbers');
     Route::post('/students/change-request', [StudentController::class, 'submitCreateChangeRequest'])->name('students.change-request.create');
     Route::post('/students/{student}/change-request', [StudentController::class, 'submitChangeRequest'])->name('students.change-request');
@@ -649,6 +650,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/schools/applications', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'applications'])->name('schools.applications');
         Route::post('/schools/applications/bulk-approve', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkApprove'])->name('schools.applications.bulk-approve');
         Route::post('/schools/applications/bulk-reject', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkReject'])->name('schools.applications.bulk-reject');
+        Route::post('/schools/bulk-cancel-membership', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkCancelMembership'])->name('schools.bulk-cancel-membership');
         Route::get('/schools/export', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'export'])->name('schools.export');
         Route::get('/schools/{school}/students', [\App\Http\Controllers\SahodayaAdmin\SchoolStudentsController::class, 'show'])->name('schools.students');
         Route::get('/schools/{school}', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'show'])->name('schools.show');
@@ -656,6 +658,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/schools/{school}/lock-overrides', [\App\Http\Controllers\SahodayaAdmin\SchoolLockOverrideController::class, 'store'])->name('schools.lock-overrides.store');
         Route::post('/schools/{school}/approve', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'approve'])->name('schools.approve');
         Route::post('/schools/{school}/reject', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'reject'])->name('schools.reject');
+        Route::post('/schools/{school}/cancel-membership', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'cancelMembership'])->name('schools.cancel-membership');
         Route::post('/schools/{school}/toggle-fest-registration', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'toggleFestRegistration'])->name('schools.toggle-fest-registration');
 
         // Regions (Kalotsav) — State → Sahodaya → Region → School
@@ -797,6 +800,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{boardResult}/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'downloadPdf'])->name('pdf');
         });
         Route::get('/membership/reports/export/schools', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportSchools'])->name('membership.reports.export.schools');
+        Route::get('/membership/reports/export/approved-unpaid', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportApprovedUnpaid'])->name('membership.reports.export.approved-unpaid');
         Route::get('/membership/reports/export/payments-pending', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPaymentsPending'])->name('membership.reports.export.payments-pending');
         Route::get('/membership/reports/export/payment-due', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPaymentDue'])->name('membership.reports.export.payment-due');
         Route::get('/membership/reports/export/payments-done', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportPaymentsDone'])->name('membership.reports.export.payments-done');
@@ -1186,6 +1190,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::prefix('certificate-templates')->name('certificate-templates.')->group(function () {
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'index'])->name('index');
             Route::post('/', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'store'])->name('store');
+            Route::get('/{template}/preview', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'preview'])->name('preview');
             Route::put('/{template}', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'update'])->name('update');
             Route::delete('/{template}', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'destroy'])->name('destroy');
         });

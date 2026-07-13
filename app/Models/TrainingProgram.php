@@ -26,7 +26,7 @@ class TrainingProgram extends Model
         'qr_registration_enabled', 'require_verified_teachers', 'allow_school_attendance',
         'attendance_qr_token', 'status',
         'fee_type', 'fee_amount', 'late_fee_amount', 'penalty_amount', 'eligibility_config',
-        'min_attendance_percent', 'certificate_type',
+        'min_attendance_percent', 'certificate_type', 'certificate_template_id',
     ];
 
     protected $casts = [
@@ -73,6 +73,11 @@ class TrainingProgram extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(TrainingCategory::class, 'category_id');
+    }
+
+    public function certificateTemplate(): BelongsTo
+    {
+        return $this->belongsTo(CertificateTemplate::class, 'certificate_template_id');
     }
 
     public function pendingSchools(): HasMany

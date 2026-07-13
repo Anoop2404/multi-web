@@ -40,6 +40,19 @@ class FestItemHeadController extends SahodayaAdminController
             'apply_to_items'    => 'nullable|boolean',
             'default_item_fee'  => 'nullable|numeric|min:0',
             'extra_item_fee'    => 'nullable|numeric|min:0',
+            'school_registration_fee' => 'nullable|numeric|min:0',
+            'student_registration_fee' => 'nullable|numeric|min:0',
+            'team_registration_fee' => 'nullable|numeric|min:0',
+            'included_items_per_student' => 'nullable|integer|min:0|max:50',
+            'included_teams' => 'nullable|integer|min:0|max:50',
+            'verification_policy' => 'nullable|in:verified_only,all_students',
+            'approval_policy' => 'nullable|in:auto,manual',
+            'max_participants' => 'nullable|integer|min:0',
+            'max_teams' => 'nullable|integer|min:0',
+            'status' => 'nullable|in:draft,published,registration_open,ongoing,completed',
+            'venue' => 'nullable|string|max:255',
+            'event_start' => 'nullable|date',
+            'event_end' => 'nullable|date|after_or_equal:event_start',
         ]);
 
         $hasSchedulePayload = $request->hasAny([
@@ -78,6 +91,21 @@ class FestItemHeadController extends SahodayaAdminController
             $data['extra_item_fee'] = isset($data['extra_item_fee']) && $data['extra_item_fee'] !== ''
                 ? (float) $data['extra_item_fee']
                 : null;
+        }
+
+        foreach (['school_registration_fee', 'student_registration_fee', 'team_registration_fee'] as $feeKey) {
+            if (array_key_exists($feeKey, $data)) {
+                $data[$feeKey] = isset($data[$feeKey]) && $data[$feeKey] !== ''
+                    ? (float) $data[$feeKey]
+                    : null;
+            }
+        }
+        foreach (['max_participants', 'max_teams'] as $capKey) {
+            if (array_key_exists($capKey, $data)) {
+                $data[$capKey] = isset($data[$capKey]) && $data[$capKey] !== ''
+                    ? (int) $data[$capKey]
+                    : null;
+            }
         }
 
         $head->update($data);
@@ -154,6 +182,7 @@ class FestItemHeadController extends SahodayaAdminController
             'included_teams' => (int) ($data['included_teams'] ?? 0),
             'verification_policy' => $data['verification_policy'] ?? 'all_students',
             'approval_policy' => $data['approval_policy'] ?? 'auto',
+            'status' => 'draft',
             'max_participants' => $intNullable('max_participants'),
             'max_teams' => $intNullable('max_teams'),
         ]);

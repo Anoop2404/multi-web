@@ -7,10 +7,28 @@ use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
+use Stancl\Tenancy\DatabaseConfig;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
     use HasDatabase, HasDomains;
+
+    /**
+     * Skip empty DB username/password so Stancl keeps the central connection credentials.
+     * Password is optional when assigning a tenant database.
+     */
+    public function database(): DatabaseConfig
+    {
+        return new class($this) extends DatabaseConfig {
+            public function tenantConfig(): array
+            {
+                return array_filter(
+                    parent::tenantConfig(),
+                    static fn ($value) => $value !== null && $value !== '',
+                );
+            }
+        };
+    }
 
     protected $fillable = [
         'id', 'type', 'name', 'domain', 'subdomain',

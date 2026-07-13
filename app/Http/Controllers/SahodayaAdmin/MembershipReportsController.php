@@ -10,6 +10,7 @@ use App\Models\SchoolYearSubmission;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Services\Membership\EffectiveMasterDataResolver;
+use App\Services\Membership\SchoolMembershipCancellationService;
 use App\Support\AcademicYear;
 use App\Support\ExcelExport;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class MembershipReportsController extends SahodayaAdminController
 {
     use BuildsMembershipExports;
 
-    public function index(Request $request, EffectiveMasterDataResolver $resolver)
+    public function index(Request $request, EffectiveMasterDataResolver $resolver, SchoolMembershipCancellationService $cancellation)
     {
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
         $tab = $request->query('tab', 'schools');
@@ -28,15 +29,19 @@ class MembershipReportsController extends SahodayaAdminController
         $dateTo = $request->query('date_to');
         $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id');
 
-        $summary = $this->buildSummary($schoolIds, $year);
+        $approvedUnpaidIds = $cancellation->approvedWithoutPaymentIds($schoolIds);
+        $summary = $this->buildSummary($schoolIds, $year, count($approvedUnpaidIds));
 
         $schools = null;
+        $approvedUnpaid = null;
         $paymentsPending = null;
         $paymentsDone = null;
         $paymentDue = null;
 
         if ($tab === 'schools') {
-            $schools = $this->paginatedSchoolsReport($schoolIds, $year, $search, $dateFrom, $dateTo);
+            $schools = $this->paginatedSchoolsReport($schoolIds, $year, $search, $dateFrom, $dateTo, $cancellation);
+        } elseif ($tab === 'approved-unpaid') {
+            $approvedUnpaid = $this->paginatedApprovedUnpaidReport($approvedUnpaidIds, $year, $search, $dateFrom, $dateTo);
         } elseif ($tab === 'payment-due') {
             $paymentDue = $this->paginatedUnpaidRegistrations($schoolIds, $year, $search, $dateFrom, $dateTo);
         } elseif ($tab === 'payments-pending') {
@@ -53,6 +58,7 @@ class MembershipReportsController extends SahodayaAdminController
             'dateTo'          => $dateTo,
             'summary'         => $summary,
             'schools'         => $schools,
+            'approvedUnpaid'  => $approvedUnpaid,
             'paymentDue'      => $paymentDue,
             'paymentsPending' => $paymentsPending,
             'paymentsDone'    => $paymentsDone,
@@ -107,6 +113,40 @@ class MembershipReportsController extends SahodayaAdminController
         app(\App\Services\Audit\PlatformAuditLogger::class)->reportDownloaded('membership_report', ['type' => __FUNCTION__]);
         return ExcelExport::download('membership-schools', [
             'School', 'Membership Status', 'Payment Status', 'Amount', 'Prefix', 'Students', 'Classes', 'Joined',
+        ], $rows);
+    }
+
+    public function exportApprovedUnpaid(Request $request, SchoolMembershipCancellationService $cancellation): StreamedResponse
+    {
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
+        $filters = $this->schoolListFilters($request);
+        $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id');
+        $unpaidIds = $cancellation->approvedWithoutPaymentIds($schoolIds);
+
+        $schools = $this->allSchoolsQuery($this->sahodaya->id, $filters)
+            ->whereIn('id', $unpaidIds)
+            ->orderBy('name')
+            ->get();
+
+        $classCounts = $this->classCountsFor($schools->pluck('id'));
+        $activeStudentCounts = $this->activeStudentCountsFor($schools->pluck('id'));
+
+        $rows = $schools->map(function (Tenant $school) use ($classCounts, $activeStudentCounts) {
+            return [
+                $school->name,
+                $school->membership_status,
+                'No payment',
+                $school->school_prefix ?? '',
+                (int) ($activeStudentCounts[$school->id] ?? 0),
+                (int) ($classCounts[$school->id] ?? 0),
+                $school->created_at?->format('Y-m-d') ?? '',
+            ];
+        });
+
+        app(\App\Services\Audit\PlatformAuditLogger::class)->reportDownloaded('membership_report', ['type' => __FUNCTION__]);
+
+        return ExcelExport::download('membership-approved-without-payment-'.$year, [
+            'School', 'Membership Status', 'Payment', 'Prefix', 'Students', 'Classes', 'Joined',
         ], $rows);
     }
 
@@ -198,7 +238,7 @@ class MembershipReportsController extends SahodayaAdminController
         ], $rows);
     }
 
-    private function buildSummary($schoolIds, string $year): array
+    private function buildSummary($schoolIds, string $year, int $approvedWithoutPayment = 0): array
     {
         $allSchools = Tenant::whereIn('id', $schoolIds)->get(['id', 'membership_status']);
 
@@ -210,6 +250,7 @@ class MembershipReportsController extends SahodayaAdminController
             'total_schools'           => $allSchools->where('membership_status', 'approved')->count(),
             'pending_schools'         => $allSchools->where('membership_status', 'pending')->count(),
             'rejected_schools'        => $allSchools->where('membership_status', 'rejected')->count(),
+            'approved_without_payment'=> $approvedWithoutPayment,
             'payments_verified'       => MembershipPayment::whereIn('school_id', $schoolIds)->where('status', 'verified')->count(),
             'payments_pending'        => $paymentSummary['payments_pending_verification'],
             'payment_due'             => $paymentSummary['payment_not_done'],
@@ -224,7 +265,7 @@ class MembershipReportsController extends SahodayaAdminController
         ], $paymentSummary);
     }
 
-    private function paginatedSchoolsReport($schoolIds, string $year, string $search, ?string $dateFrom, ?string $dateTo)
+    private function paginatedSchoolsReport($schoolIds, string $year, string $search, ?string $dateFrom, ?string $dateTo, SchoolMembershipCancellationService $cancellation)
     {
         $filters = ['search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'sort' => 'name', 'dir' => 'asc'];
         $schools = $this->allSchoolsQuery($this->sahodaya->id, $filters)
@@ -233,6 +274,7 @@ class MembershipReportsController extends SahodayaAdminController
             ->withQueryString();
 
         $pageIds = $schools->pluck('id');
+        $cancellable = array_flip($cancellation->approvedWithoutPaymentIds($pageIds));
 
         $submissionsBySchool = SchoolYearSubmission::whereIn('school_id', $pageIds)
             ->where('academic_year', $year)
@@ -248,13 +290,56 @@ class MembershipReportsController extends SahodayaAdminController
             $year,
         );
 
-        $schools->getCollection()->transform(fn (Tenant $school) => $this->mapSchoolReportRow(
-            $school,
-            $submissionsBySchool->get($school->id),
-            (int) ($classCounts[$school->id] ?? 0),
-            (int) ($activeStudentCounts[$school->id] ?? 0),
-            $paymentStatuses[$school->id] ?? null,
-        ));
+        $schools->getCollection()->transform(function (Tenant $school) use (
+            $submissionsBySchool,
+            $classCounts,
+            $activeStudentCounts,
+            $paymentStatuses,
+            $cancellable,
+        ) {
+            $row = $this->mapSchoolReportRow(
+                $school,
+                $submissionsBySchool->get($school->id),
+                (int) ($classCounts[$school->id] ?? 0),
+                (int) ($activeStudentCounts[$school->id] ?? 0),
+                $paymentStatuses[$school->id] ?? null,
+            );
+            $row['can_cancel_membership'] = isset($cancellable[$school->id]);
+
+            return $row;
+        });
+
+        return $schools;
+    }
+
+    /** @param  list<string>  $unpaidIds */
+    private function paginatedApprovedUnpaidReport(array $unpaidIds, string $year, string $search, ?string $dateFrom, ?string $dateTo)
+    {
+        $filters = ['search' => $search, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'sort' => 'name', 'dir' => 'asc'];
+
+        $schools = $this->allSchoolsQuery($this->sahodaya->id, $filters)
+            ->when($unpaidIds === [], fn ($q) => $q->whereRaw('0 = 1'))
+            ->when($unpaidIds !== [], fn ($q) => $q->whereIn('id', $unpaidIds))
+            ->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
+
+        $pageIds = $schools->pluck('id');
+        $classCounts = $this->classCountsFor($pageIds);
+        $activeStudentCounts = $this->activeStudentCountsFor($pageIds);
+
+        $schools->getCollection()->transform(function (Tenant $school) use ($classCounts, $activeStudentCounts) {
+            $row = $this->mapSchoolReportRow(
+                $school,
+                null,
+                (int) ($classCounts[$school->id] ?? 0),
+                (int) ($activeStudentCounts[$school->id] ?? 0),
+                ['status' => 'none', 'label' => 'No payment', 'amount' => null],
+            );
+            $row['can_cancel_membership'] = true;
+
+            return $row;
+        });
 
         return $schools;
     }

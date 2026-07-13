@@ -16,7 +16,6 @@ use App\Support\TenancyDatabase;
 use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class TenantController extends Controller
@@ -64,16 +63,25 @@ class TenantController extends Controller
     {
         $validated = $request->validate(array_merge($this->rules(), [
             'database_name' => $this->databaseNameRules($request->input('type') === 'sahodaya'),
+            'db_username'   => 'nullable|string|max:120',
+            'db_password'   => 'nullable|string|max:255',
         ]));
 
         $databaseName = $validated['database_name'] ?? null;
-        unset($validated['database_name']);
+        $dbUsername = $validated['db_username'] ?? null;
+        $dbPassword = $validated['db_password'] ?? null;
+        unset($validated['database_name'], $validated['db_username'], $validated['db_password']);
 
         $tenant = Tenant::create(array_merge($validated, ['id' => \Str::uuid()]));
 
         if ($tenant->type === 'sahodaya' && config('tenancy.database_per_sahodaya', true)) {
-            if (filled($databaseName)) {
-                $databaseProvisioner->configure($tenant, $databaseName);
+            if (filled($databaseName) || filled($dbUsername) || filled($dbPassword)) {
+                $databaseProvisioner->configure(
+                    $tenant,
+                    $databaseName ?: $databaseProvisioner->suggestedName($tenant),
+                    $dbUsername,
+                    $dbPassword,
+                );
             }
         } elseif ($tenant->type === 'sahodaya' && ! config('tenancy.database_per_sahodaya', true)) {
             \App\Models\SahodayaProfile::create([
@@ -95,20 +103,26 @@ class TenantController extends Controller
         $database = null;
         $tenantOverview = ['sections' => [], 'settings' => []];
 
+        $databaseReady = false;
+
         if ($tenant->type === 'sahodaya' && config('tenancy.database_per_sahodaya', true)) {
             $database = array_merge(
                 $databaseProvisioner->status($tenant),
                 ['suggested_name' => $databaseProvisioner->suggestedName($tenant)]
             );
+            $databaseReady = (bool) ($database['ready'] ?? false);
 
-            if ($database['ready']) {
+            if ($databaseReady) {
                 $tenantOverview = $this->tenantOverview($tenant);
             }
         } elseif ($tenant->type === 'school' && $tenant->parent_id && config('tenancy.database_per_sahodaya', true)) {
             $parent = Tenant::query()->find($tenant->parent_id);
             if ($parent && $databaseProvisioner->status($parent)['ready']) {
+                $databaseReady = true;
                 $tenantOverview = $this->tenantOverview($tenant);
             }
+        } elseif (! config('tenancy.database_per_sahodaya', true)) {
+            $databaseReady = true;
         }
 
         return inertia('Tenants/Show', [
@@ -124,8 +138,12 @@ class TenantController extends Controller
                 : route('admin.schools.index'),
             'database'         => $database,
             'tenantOverview'   => $tenantOverview,
-            'sahodayaAdmins'   => $tenant->type === 'sahodaya' ? $this->portalAdmins($tenant, 'sahodaya_admin') : [],
-            'schoolAdmins'     => $tenant->type === 'school' ? $this->portalAdmins($tenant, 'school_admin') : [],
+            'sahodayaAdmins'   => ($tenant->type === 'sahodaya' && $databaseReady)
+                ? $this->portalAdmins($tenant, 'sahodaya_admin')
+                : [],
+            'schoolAdmins'     => ($tenant->type === 'school' && $databaseReady)
+                ? $this->portalAdmins($tenant, 'school_admin')
+                : [],
             'loginUrl'         => $this->portalLoginUrl($tenant),
             'navManager'       => $tenant->type === 'sahodaya' ? [
                 'programs'  => SahodayaNavVisibility::programLabels(),
@@ -188,10 +206,23 @@ class TenantController extends Controller
         abort_if($tenant->type === 'sahodaya' && $tenant->children()->exists(), 422, 'Remove member schools before deleting this Sahodaya.');
 
         $type = $tenant->type;
+        $name = $tenant->name;
 
-        TenantAuth::withTenantUsers($tenant, function () use ($tenant) {
+        // Portal users live in the Sahodaya DB. Skip cleanup when that DB was never
+        // created / migrated so the central tenant row can still be deleted.
+        TenancyDatabase::whenDatabaseReady($tenant, function () use ($tenant) {
+            if (! \Illuminate\Support\Facades\Schema::hasTable('users')) {
+                return;
+            }
+
             User::query()->where('tenant_id', $tenant->id)->each(function (User $user) {
-                $user->syncRoles([]);
+                try {
+                    if (\Illuminate\Support\Facades\Schema::hasTable('roles')) {
+                        $user->syncRoles([]);
+                    }
+                } catch (\Throwable) {
+                    // Role tables may be incomplete on a half-migrated DB.
+                }
                 $user->delete();
             });
         });
@@ -200,7 +231,7 @@ class TenantController extends Controller
 
         $route = $type === 'sahodaya' ? 'admin.sahodayas.index' : 'admin.schools.index';
 
-        return redirect()->route($route)->with('success', 'Tenant deleted.');
+        return redirect()->route($route)->with('success', "Tenant \"{$name}\" deleted.");
     }
 
     public function rejectMembership(Request $request, Tenant $tenant, MembershipNotifier $notifier)
@@ -244,12 +275,30 @@ class TenantController extends Controller
         abort_if($tenant->type !== 'sahodaya', 404);
 
         $data = $request->validate([
-            'database_name' => $this->databaseNameRules(),
+            'database_name'       => $this->databaseNameRules(),
+            'db_username'         => 'nullable|string|max:120',
+            'db_password'         => 'nullable|string|max:255',
+            'clear_db_password'   => 'nullable|boolean',
+            'admin_name'          => 'nullable|string|max:255',
+            'admin_email'         => 'nullable|email|max:255',
+            'admin_password'      => 'nullable|string|min:8|max:255|required_with:admin_email',
         ]);
 
-        $databaseProvisioner->configure($tenant, $data['database_name']);
+        $databaseProvisioner->configure(
+            $tenant,
+            $data['database_name'],
+            $data['db_username'] ?? null,
+            $data['db_password'] ?? null,
+            (bool) ($data['clear_db_password'] ?? false),
+        );
 
-        return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Database name saved.');
+        $request->session()->put("tenant.{$tenant->id}.pending_admin", array_filter([
+            'name'     => $data['admin_name'] ?? null,
+            'email'    => $data['admin_email'] ?? null,
+            'password' => $data['admin_password'] ?? null,
+        ]));
+
+        return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Database connection saved.');
     }
 
     public function migrateDatabase(Request $request, Tenant $tenant, SahodayaDatabaseProvisioner $databaseProvisioner)
@@ -258,11 +307,57 @@ class TenantController extends Controller
 
         try {
             $databaseProvisioner->migrate($tenant, (bool) $request->boolean('seed'));
+
+            $pending = $request->session()->pull("tenant.{$tenant->id}.pending_admin", []);
+            if (! empty($pending['email']) && ! empty($pending['password'])) {
+                $this->createInitialSahodayaAdmin($tenant, [
+                    'name'     => $pending['name'] ?: 'Sahodaya Admin',
+                    'email'    => $pending['email'],
+                    'password' => $pending['password'],
+                ]);
+            } elseif ($request->filled('admin_email') && $request->filled('admin_password')) {
+                $data = $request->validate([
+                    'admin_name'     => 'nullable|string|max:255',
+                    'admin_email'    => 'required|email|max:255',
+                    'admin_password' => 'required|string|min:8|max:255',
+                ]);
+                $this->createInitialSahodayaAdmin($tenant, [
+                    'name'     => $data['admin_name'] ?: 'Sahodaya Admin',
+                    'email'    => $data['admin_email'],
+                    'password' => $data['admin_password'],
+                ]);
+            }
         } catch (\Throwable $e) {
             return redirect()->route('admin.tenants.show', $tenant)->with('error', $e->getMessage());
         }
 
         return redirect()->route('admin.tenants.show', $tenant)->with('success', 'Sahodaya database migrations completed.');
+    }
+
+    /** @param  array{name: string, email: string, password: string}  $data */
+    private function createInitialSahodayaAdmin(Tenant $tenant, array $data): void
+    {
+        TenantAuth::withTenantUsers($tenant, function () use ($tenant, $data) {
+            if (! \Illuminate\Support\Facades\Schema::hasTable('users')
+                || ! \Illuminate\Support\Facades\Schema::hasTable('roles')) {
+                return;
+            }
+
+            $user = User::query()
+                ->where('tenant_id', $tenant->id)
+                ->where('email', $data['email'])
+                ->first() ?? new User(['tenant_id' => $tenant->id]);
+
+            $user->fill([
+                'name'              => $data['name'],
+                'email'             => $data['email'],
+                'password'          => $data['password'],
+                'email_verified_at' => now(),
+            ]);
+            $user->password_changed_at = now();
+            $user->save();
+            $user->syncRoles(['sahodaya_admin']);
+        });
     }
 
     public function saveSahodayaAdmin(Request $request, Tenant $tenant)
@@ -299,19 +394,25 @@ class TenantController extends Controller
                 'user_id'  => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', $tenant->id)],
                 'name'     => ['required', 'string', 'max:255'],
                 'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($existingId)],
-                'password' => ['required', 'string', 'min:8'],
+                'password' => [$existingId ? 'nullable' : 'required', 'string', 'min:8'],
             ]);
 
             $user = $existingId
                 ? User::query()->where('tenant_id', $tenant->id)->findOrFail($existingId)
                 : new User(['tenant_id' => $tenant->id]);
 
-            $user->fill([
+            $payload = [
                 'name'              => $data['name'],
                 'email'             => $data['email'],
-                'password'          => Hash::make($data['password']),
                 'email_verified_at' => now(),
-            ]);
+            ];
+            if (! empty($data['password'])) {
+                // User::$casts hashes password — do not Hash::make here.
+                $payload['password'] = $data['password'];
+                $user->password_changed_at = now();
+            }
+
+            $user->fill($payload);
             $user->save();
             $user->syncRoles([$role]);
 
@@ -456,19 +557,28 @@ class TenantController extends Controller
     /** @return list<array{id: int, name: string, email: string, created_at: ?string}> */
     private function portalAdmins(Tenant $tenant, string $role): array
     {
-        return TenantAuth::withTenantUsers($tenant, function () use ($tenant, $role) {
-            return User::role($role)
-                ->where('tenant_id', $tenant->id)
-                ->orderBy('name')
-                ->get(['id', 'name', 'email', 'created_at'])
-                ->map(fn (User $user) => [
-                    'id'         => $user->id,
-                    'name'       => $user->name,
-                    'email'      => $user->email,
-                    'created_at' => $user->created_at?->toIso8601String(),
-                ])
-                ->all();
-        }) ?? [];
+        try {
+            return TenantAuth::withTenantUsers($tenant, function () use ($tenant, $role) {
+                if (! \Illuminate\Support\Facades\Schema::hasTable('roles')
+                    || ! \Illuminate\Support\Facades\Schema::hasTable('users')) {
+                    return [];
+                }
+
+                return User::role($role)
+                    ->where('tenant_id', $tenant->id)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email', 'created_at'])
+                    ->map(fn (User $user) => [
+                        'id'         => $user->id,
+                        'name'       => $user->name,
+                        'email'      => $user->email,
+                        'created_at' => $user->created_at?->toIso8601String(),
+                    ])
+                    ->all();
+            }) ?? [];
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     private function portalLoginUrl(Tenant $tenant): ?string

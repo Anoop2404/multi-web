@@ -31,10 +31,12 @@ class TeacherVerificationController extends SahodayaAdminController
     public function index(Request $request, EffectiveMasterDataResolver $resolver)
     {
         $filters = $request->validate([
-            'school_id'      => 'nullable|string',
-            'verification'   => 'nullable|in:all,verified,unverified',
-            'search'         => 'nullable|string|max:100',
+            'school_id'        => 'nullable|string',
+            'verification'     => 'nullable|in:all,verified,unverified',
+            'search'           => 'nullable|string|max:100',
             'teaching_type_id' => 'nullable|integer',
+            'view'             => 'nullable|in:schools,list',
+            'page'             => 'nullable|integer|min:1',
         ]);
 
         $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)
@@ -81,7 +83,7 @@ class TeacherVerificationController extends SahodayaAdminController
             $schoolSummaries = $schoolSummaries->filter(fn (array $row) => $row['total'] > 0 && $row['unverified'] === 0);
         }
 
-        if (! empty($filters['search']) && empty($filters['school_id'])) {
+        if (! empty($filters['search']) && empty($filters['school_id']) && ($filters['view'] ?? 'schools') === 'schools') {
             $term = mb_strtolower($filters['search']);
             $schoolSummaries = $schoolSummaries->filter(
                 fn (array $row) => str_contains(mb_strtolower($row['name']), $term)
@@ -95,8 +97,15 @@ class TeacherVerificationController extends SahodayaAdminController
 
         $selectedSchool = null;
         $teachers = null;
+        $view = $filters['view'] ?? 'schools';
+
+        // Status filters without a school open the paginated teacher list (bulk + pages).
+        if (empty($filters['school_id']) && empty($filters['view']) && in_array($verification, ['unverified', 'verified'], true)) {
+            $view = 'list';
+        }
 
         if (! empty($filters['school_id'])) {
+            $view = 'list';
             $school = $schools->firstWhere('id', $filters['school_id']);
             if ($school) {
                 $row = $statsBySchool->get($school->id);
@@ -110,19 +119,30 @@ class TeacherVerificationController extends SahodayaAdminController
                     'unverified' => $unverified,
                 ];
             }
+        }
 
+        if ($view === 'list') {
             $teachers = (clone $base)
                 ->with(['teachingType', 'verifiedBy:id,name,email'])
-                ->where('tenant_id', $filters['school_id'])
+                ->when(! empty($filters['school_id']), fn ($q) => $q->where('tenant_id', $filters['school_id']))
                 ->when(! empty($filters['teaching_type_id']), fn ($q) => $q->where('teaching_type_id', $filters['teaching_type_id']))
                 ->when($verification === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
                 ->when($verification === 'unverified', fn ($q) => $q->whereNull('verified_at'))
-                ->when(! empty($filters['search']), function ($q) use ($filters) {
+                ->when(! empty($filters['search']), function ($q) use ($filters, $schools) {
                     $term = '%'.$filters['search'].'%';
-                    $q->where(fn ($inner) => $inner
-                        ->where('name', 'like', $term)
-                        ->orWhere('reg_no', 'like', $term)
-                        ->orWhere('email', 'like', $term));
+                    $q->where(function ($inner) use ($term, $filters, $schools) {
+                        $inner->where('name', 'like', $term)
+                            ->orWhere('reg_no', 'like', $term)
+                            ->orWhere('email', 'like', $term);
+                        if (empty($filters['school_id'])) {
+                            $matchedSchoolIds = $schools
+                                ->filter(fn (Tenant $s) => str_contains(mb_strtolower($s->name), mb_strtolower($filters['search'])))
+                                ->pluck('id');
+                            if ($matchedSchoolIds->isNotEmpty()) {
+                                $inner->orWhereIn('tenant_id', $matchedSchoolIds);
+                            }
+                        }
+                    });
                 })
                 ->orderBy('name')
                 ->paginate(50)
@@ -136,12 +156,13 @@ class TeacherVerificationController extends SahodayaAdminController
             'selectedSchool'  => $selectedSchool,
             'counts'          => $counts,
             'filters'         => array_merge([
-                'school_id' => '',
-                'verification' => 'all',
-                'search' => '',
+                'school_id'        => '',
+                'verification'     => 'all',
+                'search'           => '',
                 'teaching_type_id' => '',
-            ], $filters),
-            'schools'    => $schools,
+                'view'             => 'schools',
+            ], $filters, ['view' => $view]),
+            'schools'       => $schools,
             'teachingTypes' => $resolver->teachingTypes($this->sahodaya->id),
         ]);
     }

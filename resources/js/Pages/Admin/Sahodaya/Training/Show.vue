@@ -16,9 +16,9 @@
                       class="btn-secondary text-sm">
                     Attendance & report
                 </Link>
-                <a :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/certificate/preview`"
+                <a :href="certificatePreviewUrl"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">
-                    Sample certificate ↗
+                    Preview certificate ↗
                 </a>
                 <Link v-if="program.fee_type !== 'none' && program.fee_amount"
                       :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/ledger`"
@@ -75,11 +75,28 @@
                         </select>
                     </template>
                 </FormField>
-                <FormField label="Certificate type" hint="Template matched by type; falls back to participation">
+                <FormField label="Certificate type" hint="Used for eligibility labeling; template below overrides print layout">
                     <template #default="{ id }">
                         <select :id="id" v-model="form.certificate_type" class="field">
                             <option v-for="t in certificateTypes" :key="t" :value="t">{{ formatCertType(t) }}</option>
                         </select>
+                    </template>
+                </FormField>
+                <FormField label="Certificate template" hint="Choose a saved template (PDF/image background). Leave empty to match by type.">
+                    <template #default="{ id }">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <select :id="id" v-model="form.certificate_template_id" class="field flex-1">
+                                <option value="">— Match by certificate type —</option>
+                                <option v-for="t in certificateTemplates" :key="t.id" :value="t.id">
+                                    {{ t.title }} ({{ formatCertType(t.certificate_type) }}){{ t.has_background ? ' · background' : '' }}
+                                </option>
+                            </select>
+                            <a :href="certificatePreviewUrl"
+                               target="_blank" rel="noopener"
+                               class="btn-secondary text-sm whitespace-nowrap shrink-0">
+                                Preview ↗
+                            </a>
+                        </div>
                     </template>
                 </FormField>
                 <FormField label="Start date">
@@ -469,6 +486,7 @@ const props = defineProps({
         type: Array,
         default: () => ['participation', 'completion', 'appreciation', 'resource_person', 'organizer'],
     },
+    certificateTemplates: { type: Array, default: () => [] },
     resourcePersons: { type: Array, default: () => [] },
     attendanceMap: Object,
     eligibilityOptions: { type: Object, default: () => ({}) },
@@ -491,6 +509,7 @@ const form = useForm({
     venue: props.program.venue ?? '',
     category_id: props.program.category_id ?? '',
     certificate_type: props.program.certificate_type ?? 'participation',
+    certificate_template_id: props.program.certificate_template_id ?? '',
     start_date: props.program.start_date?.slice?.(0, 10) ?? props.program.start_date ?? '',
     end_date: props.program.end_date?.slice?.(0, 10) ?? props.program.end_date ?? '',
     registration_open: props.program.registration_open?.slice?.(0, 10) ?? props.program.registration_open ?? '',
@@ -524,6 +543,15 @@ const bannerPreview = computed(() => {
     }
     if (form.remove_banner_image) return null;
     return props.program.banner_image_url || null;
+});
+
+const certificatePreviewUrl = computed(() => {
+    const base = `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/certificate/preview`;
+    const tid = form.certificate_template_id;
+    if (tid !== '' && tid !== null && tid !== undefined) {
+        return `${base}?template_id=${tid}`;
+    }
+    return base;
 });
 
 function formatCertType(type) {
@@ -576,6 +604,11 @@ function save() {
         const payload = { ...data };
         if (!payload.banner_image) delete payload.banner_image;
         if (!payload.remove_banner_image) delete payload.remove_banner_image;
+        if (payload.certificate_template_id === '' || payload.certificate_template_id === null) {
+            payload.certificate_template_id = null;
+        } else {
+            payload.certificate_template_id = Number(payload.certificate_template_id);
+        }
         return payload;
     }).put(`/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}`, {
         preserveScroll: true,

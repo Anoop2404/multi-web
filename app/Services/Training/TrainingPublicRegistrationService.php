@@ -62,6 +62,13 @@ class TrainingPublicRegistrationService
                 ]);
             }
 
+            $sahodaya = Tenant::query()->find($program->tenant_id);
+            if ($sahodaya && $this->looksLikeSahodayaName($manualName, $sahodaya)) {
+                throw ValidationException::withMessages([
+                    'manual_school_name' => 'Enter your school name, not the Sahodaya / cluster name.',
+                ]);
+            }
+
             $pendingSchool = TrainingPendingSchool::create([
                 'program_id'    => $program->id,
                 'school_name'   => $manualName,
@@ -137,7 +144,7 @@ class TrainingPublicRegistrationService
             return TrainingRegistration::create(array_merge([
                 'program_id'          => $program->id,
                 'teacher_id'          => $teacher->id,
-                'school_id'           => $school?->id ?? $program->tenant_id,
+                'school_id'           => $school?->id,
                 'registration_source' => 'qr',
                 'consent_at'          => now(),
                 'department'          => $data['department'] ?? null,
@@ -267,6 +274,40 @@ class TrainingPublicRegistrationService
             'membership_status' => $school->membership_status,
             'label'             => $label,
         ];
+    }
+
+    private function looksLikeSahodayaName(string $manualName, Tenant $sahodaya): bool
+    {
+        $entered = $this->normalizeOrgName($manualName);
+        $cluster = $this->normalizeOrgName((string) $sahodaya->name);
+
+        if ($entered === '' || $cluster === '') {
+            return false;
+        }
+
+        if ($entered === $cluster) {
+            return true;
+        }
+
+        similar_text($entered, $cluster, $percent);
+        if ($percent >= 85.0) {
+            return true;
+        }
+
+        $hasSchoolToken = (bool) preg_match(
+            '/\b(school|vidyalaya|academy|college|convent|public|english medium|higher secondary|hs|hss)\b/',
+            $entered
+        );
+
+        return str_ends_with($entered, 'sahodaya') && ! $hasSchoolToken;
+    }
+
+    private function normalizeOrgName(string $name): string
+    {
+        $name = mb_strtolower(trim(preg_replace('/\s+/', ' ', $name) ?? ''));
+        $name = str_replace(['central ', 'cbse ', 'district '], '', $name);
+
+        return trim($name);
     }
 
     private function findExistingTeacher(

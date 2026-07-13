@@ -8,36 +8,57 @@
             </p>
         </div>
 
-        <div v-if="event.event_type === 'sports' && feeSettingsForm.fee_model !== 'sports_composite'"
-             class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            <p class="font-semibold">Sports meets need the composite billing model</p>
-            <p class="mt-1 text-xs text-amber-900/90">
-                <strong>Flat per item</strong> charges one rate for every registration only.
-                To bill <strong>each Event Head separately</strong> — school fee + student registration + per-item/team fees + free quotas —
-                switch billing model to
-                <button type="button" class="font-semibold underline" @click="feeSettingsForm.fee_model = 'sports_composite'">
-                    Sports composite
-                </button>.
-                Item head fees below apply only with Item catalog.
+        <div v-if="event.event_type === 'sports'"
+             class="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+            <p class="font-semibold">Sports composite billing (always on)</p>
+            <p class="mt-1 text-xs text-sky-900/90">
+                Each Event Head bills school / student / team fees independently.
+                Edit those on the Competition hub (same form as Add head). Settings below are optional event-wide fallbacks only.
             </p>
         </div>
 
         <form @submit.prevent="saveFeeSettings" class="space-y-6">
             <section class="card space-y-4">
                 <div>
-                    <h3 class="section-title">Fee model</h3>
-                    <p class="section-desc">How schools are billed for registrations in this event.</p>
+                    <h3 class="section-title">{{ event.event_type === 'sports' ? 'Event-wide fee override (optional)' : 'Fee model' }}</h3>
+                    <p class="section-desc">
+                        <template v-if="event.event_type === 'sports'">
+                            Billing is always Sports composite. Per-head fees on Competition take priority.
+                        </template>
+                        <template v-else>
+                            How schools are billed for registrations in this event.
+                        </template>
+                    </p>
                 </div>
 
-                <FormField label="Billing model">
+                <FormField v-if="event.event_type !== 'sports'" label="Billing model">
                     <template #default="{ id }">
                         <select :id="id" v-model="feeSettingsForm.fee_model" class="field mt-1">
                             <option v-for="(label, key) in feeModels" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </template>
                 </FormField>
+                <input v-else type="hidden" v-model="feeSettingsForm.fee_model">
 
-                <div v-if="feeSettingsForm.fee_model === 'cksc_tiered'" class="space-y-4 border-t border-slate-100 pt-4">
+                <div v-if="event.event_type === 'sports'" class="grid gap-3 sm:grid-cols-2 border-t border-slate-100 pt-4">
+                    <FormField label="Fallback school fee (₹)" hint="When a head has no school fee">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="feeSettingsForm.school_registration_flat" type="number" min="0" class="field" placeholder="—">
+                        </template>
+                    </FormField>
+                    <FormField label="Optional fee cap (₹)">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field" placeholder="—">
+                        </template>
+                    </FormField>
+                    <p class="sm:col-span-2 text-sm text-slate-600">
+                        <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/competition`" class="link-brand font-semibold">
+                            Edit head fees on Competition →
+                        </Link>
+                    </p>
+                </div>
+
+                <div v-else-if="feeSettingsForm.fee_model === 'cksc_tiered'" class="space-y-4 border-t border-slate-100 pt-4">
                     <p class="text-xs text-slate-600">
                         Tiered participation fees for this event only. Annual Sahodaya school membership is collected separately under Membership.
                     </p>
@@ -530,6 +551,10 @@ const {
     ageGroupLabels, defaultAgeGroupFees, defaultClassGroupFees, effectiveClassGroupLabels, saveFeeSettings,
     sahodaya, ledgerAccount,
 } = inject('eventSettings');
+
+if (event.event_type === 'sports') {
+    feeSettingsForm.fee_model = 'sports_composite';
+}
 
 const ledgerForm = useForm({ name: ledgerAccount?.name ?? '' });
 

@@ -14,6 +14,38 @@
             border: 10px double #1e3a8a;
             padding: 40px 52px 56px;
         }
+        .page.has-background {
+            border: none;
+            padding: 0;
+            width: 1123px;
+            height: 794px;
+            min-height: 794px;
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            overflow: hidden;
+        }
+        .overlay-field {
+            position: absolute;
+            text-align: center;
+            color: #1e293b;
+            line-height: 1.45;
+            word-wrap: break-word;
+        }
+        .overlay-field.recipient {
+            font-weight: 700;
+            font-family: Georgia, "Times New Roman", serif;
+            color: #0f172a;
+        }
+        .overlay-field.body {
+            font-size: 13px;
+            line-height: 1.7;
+            color: #334155;
+        }
+        .overlay-field.uuid {
+            color: #94a3b8;
+            letter-spacing: 0.02em;
+        }
         .corner { position: absolute; width: 48px; height: 48px; border-color: #c7a84a; }
         .corner-tl { top: 10px; left: 10px; border-top: 3px solid; border-left: 3px solid; }
         .corner-tr { top: 10px; right: 10px; border-top: 3px solid; border-right: 3px solid; }
@@ -56,24 +88,88 @@
         @media print {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .no-print { display: none; }
+            .page.has-background {
+                width: 100%;
+                height: 100vh;
+                min-height: 100vh;
+            }
         }
+        @page { size: landscape; margin: 0; }
     </style>
 </head>
 <body>
+@php
+    $title = $template?->title ?? 'Certificate of Participation';
+    $layout = $overlayLayout ?? \App\Models\CertificateTemplate::defaultBackgroundLayout();
+    $boldVariables = (bool) ($layout['bold_variables'] ?? true);
+    $showRecipientName = (bool) ($layout['show_recipient_name'] ?? false);
+    $showParticipationLabel = (bool) ($layout['show_participation_label'] ?? true);
+    $body = $template?->body ?? \App\Models\CertificateTemplate::defaultTrainingBody();
+    foreach ($fieldValues as $key => $value) {
+        $safe = e((string) $value);
+        if ($boldVariables && $safe !== '') {
+            $safe = '<strong>'.$safe.'</strong>';
+        }
+        $body = str_replace('{'.$key.'}', $safe, $body);
+    }
+    $paragraphs = array_filter(array_map('trim', preg_split('/\n\s*\n/', $body)));
+    $hasBackground = ! empty($backgroundUrl);
+@endphp
+
 @if(!empty($isSample))
     <p class="no-print" style="text-align:center;font-family:system-ui,sans-serif;font-size:13px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;padding:10px 16px;margin:16px auto;max-width:842px;border-radius:8px;">
         <strong>Sample certificate</strong> — for client demo only. Configure layout under Certificate Templates.
     </p>
 @endif
-    @php
-        $title = $template?->title ?? 'Certificate of Participation';
-        $body = $template?->body ?? \App\Models\CertificateTemplate::defaultTrainingBody();
-        foreach ($fieldValues as $key => $value) {
-            $body = str_replace('{'.$key.'}', e($value), $body);
-        }
-        $paragraphs = array_filter(array_map('trim', preg_split('/\n\s*\n/', $body)));
-    @endphp
 
+@if($hasBackground)
+    <div class="page has-background" style="background-image:url('{{ $backgroundUrl }}');">
+        @if(! $showParticipationLabel)
+            @php $c = $layout['participation_label_cover'] ?? []; @endphp
+            <div class="overlay-field"
+                 style="top:{{ $c['top'] ?? 28 }}%;left:{{ $c['left'] ?? 18 }}%;width:{{ $c['width'] ?? 64 }}%;height:{{ $c['height'] ?? 7 }}%;background:#f7f3e8;border-radius:2px;">
+            </div>
+        @endif
+
+        @if($showRecipientName)
+            @php $r = $layout['recipient_name'] ?? []; @endphp
+            <div class="overlay-field recipient"
+                 style="top:{{ $r['top'] ?? 38 }}%;left:{{ $r['left'] ?? 10 }}%;width:{{ $r['width'] ?? 80 }}%;font-size:{{ $r['font_size'] ?? 28 }}px;">
+                {{ $fieldValues['recipient_with_title'] ?? $fieldValues['recipient_name'] ?? '' }}
+            </div>
+        @endif
+
+        @php $b = $layout['body'] ?? []; @endphp
+        <div class="overlay-field body"
+             style="top:{{ $b['top'] ?? 48 }}%;left:{{ $b['left'] ?? 12 }}%;width:{{ $b['width'] ?? 76 }}%;font-size:{{ $b['font_size'] ?? 13 }}px;">
+            @foreach($paragraphs as $paragraph)
+                <p style="margin-bottom:8px;">{!! nl2br($paragraph) !!}</p>
+            @endforeach
+        </div>
+
+        @php
+            $d = $layout['certificate_date'] ?? [];
+            $dateAlign = in_array($d['align'] ?? 'left', ['left', 'right', 'center'], true)
+                ? ($d['align'] ?? 'left')
+                : 'left';
+            $dateValue = $fieldValues['certificate_date'] ?? now()->format('j F Y');
+        @endphp
+        <div class="overlay-field"
+             style="top:{{ $d['top'] ?? 72 }}%;left:{{ $d['left'] ?? 8 }}%;width:{{ $d['width'] ?? 42 }}%;font-size:{{ $d['font_size'] ?? 12 }}px;text-align:{{ $dateAlign }};">
+            @if($boldVariables)
+                <strong>Date :</strong> <strong>{{ $dateValue }}</strong>
+            @else
+                Date : {{ $dateValue }}
+            @endif
+        </div>
+
+        @php $u = $layout['uuid'] ?? []; @endphp
+        <div class="overlay-field uuid"
+             style="top:{{ $u['top'] ?? 92 }}%;left:{{ $u['left'] ?? 5 }}%;width:{{ $u['width'] ?? 90 }}%;font-size:{{ $u['font_size'] ?? 8 }}px;">
+            Verification: {{ $certificate->verification_uuid }}
+        </div>
+    </div>
+@else
     <div class="page">
         <div class="corner corner-tl"></div>
         <div class="corner corner-tr"></div>
@@ -126,6 +222,7 @@
 
         <p class="uuid">Verification: {{ $certificate->verification_uuid }}</p>
     </div>
+@endif
 
     <p class="no-print" style="text-align:center;margin-top:16px;font-family:sans-serif;font-size:13px;">
         <button type="button" onclick="window.print()" style="padding:8px 20px;background:#1e3a8a;color:#fff;border:none;border-radius:6px;cursor:pointer;">Print Certificate</button>

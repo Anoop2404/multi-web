@@ -41,7 +41,9 @@ class DemoTenantsSeeder extends Seeder
         }
 
         $this->seedMemberSchools($malappuram);
-        $this->seedUsers($malappuram);
+        $malappuram->run(function () use ($malappuram) {
+            $this->seedUsers($malappuram);
+        });
 
         $this->command?->info('Demo tenants seeded.');
         $this->command?->line('  Superadmin:  http://'.(config('tenancy.central_domains')[2] ?? 'superadmin.test').'/admin');
@@ -221,9 +223,7 @@ class DemoTenantsSeeder extends Seeder
 
         $amuSchool = Tenant::where('subdomain', 'amu-school')->where('parent_id', $sahodaya->id)->first();
         if ($amuSchool) {
-            $sahodaya->run(function () use ($amuSchool) {
-                app(\App\Services\Students\SchoolClassProvisioner::class)->ensureForSchool($amuSchool);
-            });
+            app(\App\Services\Students\SchoolClassProvisioner::class)->ensureForSchool($amuSchool);
 
             $schoolAdmin = User::firstOrCreate(
                 ['email' => 'admin@amu-school.test'],

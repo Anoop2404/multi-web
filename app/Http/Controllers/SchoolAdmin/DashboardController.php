@@ -159,8 +159,13 @@ class DashboardController extends SchoolAdminController
         ];
 
         return collect($programs)->map(function (array $p) use ($sahodayaId) {
-            $events = FestEvent::where('tenant_id', $sahodayaId)->ofType($p['type'])->visibleToSchool($this->school->id);
-            $open = (clone $events)->whereIn('status', ['published', 'registration_open', 'ongoing'])->count();
+            $events = FestEvent::where('tenant_id', $sahodayaId)
+                ->ofType($p['type'])
+                ->listedForSchool($this->school->id, $p['type']);
+            $openStatuses = $p['type'] === 'sports'
+                ? ['registration_open', 'ongoing']
+                : ['published', 'registration_open', 'ongoing'];
+            $open = (clone $events)->whereIn('status', $openStatuses)->count();
             $eventIds = (clone $events)->pluck('id');
             $regs = FestRegistration::where('school_id', $this->school->id)->whereIn('event_id', $eventIds)->whereIn('status', ['submitted', 'approved'])->count();
             $feesPending = FestSchoolEventFee::where('school_id', $this->school->id)->whereIn('event_id', $eventIds)->whereIn('status', ['pending', 'proof_uploaded'])->count();

@@ -28,7 +28,7 @@ class SchoolUserScopeService
         }
 
         $festEvents = FestEvent::where('tenant_id', $sahodayaId)
-            ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])
+            ->listedForSchool($schoolId)
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'event_type', 'status', 'event_start'])
             ->map(fn (FestEvent $e) => [

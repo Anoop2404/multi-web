@@ -179,7 +179,8 @@
             <div v-if="tenant.type === 'sahodaya' && database" class="card">
                 <h3 class="font-bold text-gray-900 mb-1">Database</h3>
                 <p class="text-sm text-gray-500 mb-4">
-                    Create the PostgreSQL database manually, enter its name here, then run migrations.
+                    Create the PostgreSQL database manually, then enter its name.
+                    Username and password are optional — leave both blank to connect with the central app DB user (same as today).
                 </p>
 
                 <div class="flex flex-wrap gap-2 mb-4">
@@ -188,22 +189,70 @@
                         {{ database.ready ? 'Ready' : database.exists ? 'Needs migrations' : database.configured ? 'Database not found' : 'Not configured' }}
                     </span>
                     <span v-if="database.name" class="text-xs font-mono text-gray-500 px-2 py-1 bg-gray-50 rounded">{{ database.name }}</span>
+                    <span v-if="database.username" class="text-xs font-mono text-gray-500 px-2 py-1 bg-gray-50 rounded">user: {{ database.username }}</span>
+                    <span v-if="database.has_password" class="text-xs font-mono text-emerald-700 px-2 py-1 bg-emerald-50 rounded">custom password set</span>
                 </div>
 
-                <form @submit.prevent="saveDatabase" class="flex flex-wrap items-end gap-3 mb-4">
-                    <div class="grow min-w-[16rem]">
-                        <label class="form-label mb-1.5">PostgreSQL database name</label>
-                        <input v-model="databaseForm.database_name" type="text" required
-                               :placeholder="database.suggested_name"
-                               class="field font-mono focus:ring-indigo-300">
-                        <p class="text-xs text-gray-400 mt-1">Lowercase letters, numbers, underscores. Suggested: {{ database.suggested_name }}</p>
-                        <p v-if="databaseForm.errors.database_name" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.database_name }}</p>
+                <form @submit.prevent="saveDatabase" class="space-y-4 mb-4">
+                    <div class="grid sm:grid-cols-3 gap-3">
+                        <div class="sm:col-span-3">
+                            <label class="form-label mb-1.5">PostgreSQL database name <span class="text-red-500">*</span></label>
+                            <input v-model="databaseForm.database_name" type="text" required
+                                   :placeholder="database.suggested_name"
+                                   class="field font-mono focus:ring-indigo-300">
+                            <p class="text-xs text-gray-400 mt-1">Lowercase letters, numbers, underscores. Suggested: {{ database.suggested_name }}</p>
+                            <p v-if="databaseForm.errors.database_name" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.database_name }}</p>
+                        </div>
+                        <div>
+                            <label class="form-label mb-1.5">DB username <span class="font-normal text-gray-400">(optional)</span></label>
+                            <input v-model="databaseForm.db_username" type="text" class="field font-mono" autocomplete="off"
+                                   placeholder="Optional — blank uses central DB user">
+                            <p v-if="databaseForm.errors.db_username" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.db_username }}</p>
+                        </div>
+                        <div>
+                            <label class="form-label mb-1.5">DB password <span class="font-normal text-gray-400">(optional)</span></label>
+                            <input v-model="databaseForm.db_password" type="password" class="field font-mono" autocomplete="new-password"
+                                   :placeholder="database.has_password ? '•••••••• (leave blank to keep)' : 'Optional — blank uses central password'">
+                            <p v-if="databaseForm.errors.db_password" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.db_password }}</p>
+                        </div>
+                        <div v-if="database.has_password" class="flex items-end">
+                            <label class="flex items-center gap-2 text-sm text-gray-600 pb-2.5">
+                                <input v-model="databaseForm.clear_db_password" type="checkbox" class="rounded">
+                                Remove custom password (use central)
+                            </label>
+                        </div>
                     </div>
                     <button type="submit" :disabled="databaseForm.processing"
                             class="px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-                        Save name
+                        Save database connection
                     </button>
                 </form>
+
+                <div class="rounded-lg border border-slate-100 bg-slate-50/70 p-4 mb-4 space-y-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        Optional: create first Sahodaya admin after migrations
+                    </p>
+                    <div class="grid sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="form-label mb-1.5">Admin name</label>
+                            <input v-model="databaseForm.admin_name" type="text" class="field" placeholder="Cluster admin">
+                        </div>
+                        <div>
+                            <label class="form-label mb-1.5">Admin email</label>
+                            <input v-model="databaseForm.admin_email" type="email" class="field" placeholder="admin@example.com" autocomplete="off">
+                            <p v-if="databaseForm.errors.admin_email" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.admin_email }}</p>
+                        </div>
+                        <div>
+                            <label class="form-label mb-1.5">Admin password <span class="font-normal text-gray-400">(optional)</span></label>
+                            <input v-model="databaseForm.admin_password" type="text" class="field font-mono" placeholder="Only if creating an admin" autocomplete="off">
+                            <p v-if="databaseForm.errors.admin_password" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.admin_password }}</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500">
+                        Only the database name is required. Save it, create the empty PostgreSQL database, then Run migrations.
+                        Fill admin email + password only if you want the first portal login created after migrate.
+                    </p>
+                </div>
 
                 <form @submit.prevent="runMigrations" class="flex flex-wrap items-center gap-3">
                     <label class="flex items-center gap-2 text-sm text-gray-600">
@@ -216,6 +265,10 @@
                     </button>
                 </form>
 
+                <p v-if="!database.ready && database.exists" class="text-sm text-amber-700 mt-3">
+                    Database exists but is not fully migrated (missing roles/users). Run migrations before creating portal admins.
+                </p>
+
                 <p class="text-xs text-gray-400 mt-3 font-mono">
                     CLI: php artisan sahodaya:provision-databases --tenant={{ tenant.id }} --create
                 </p>
@@ -226,6 +279,13 @@
                  :class="tenant.type === 'sahodaya' ? 'border-purple-100' : 'border-blue-100'">
                 <h3 class="font-bold text-gray-900 mb-1">{{ portalAdminTitle }}</h3>
                 <p class="text-sm text-gray-500 mb-4">{{ portalAdminHint }}</p>
+
+                <div v-if="tenant.type === 'sahodaya' && database && !database.ready"
+                     class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-4">
+                    Finish database setup (save name → create PostgreSQL DB → run migrations) before creating portal admins.
+                </div>
+
+                <template v-else>
 
                 <p v-if="loginUrl" class="text-sm mb-4">
                     <span class="text-gray-500">Login URL:</span>
@@ -279,9 +339,11 @@
                     </div>
                     <div>
                         <label class="form-label mb-1.5">Password</label>
-                        <input v-model="adminForm.password" type="text" required autocomplete="off"
+                        <input v-model="adminForm.password" type="text" :required="!adminForm.user_id" autocomplete="off"
                                class="field font-mono focus:ring-indigo-300">
-                        <p class="text-xs text-gray-400 mt-1">Stored in plain text for superadmin reference only.</p>
+                        <p class="text-xs text-gray-400 mt-1">
+                            {{ adminForm.user_id ? 'Leave blank to keep the current password.' : 'Required for new logins.' }}
+                        </p>
                         <p v-if="adminForm.errors.password" class="text-xs text-red-500 mt-1">{{ adminForm.errors.password }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
@@ -295,6 +357,7 @@
                         </button>
                     </div>
                 </form>
+                </template>
             </div>
 
             <!-- Sahodaya control center -->
@@ -422,8 +485,19 @@ const portalAdminEndpoint = computed(() =>
 const logoForm = useForm({ logo: null });
 const databaseForm = useForm({
     database_name: props.database?.name ?? props.database?.suggested_name ?? '',
+    db_username: props.database?.username ?? '',
+    db_password: '',
+    clear_db_password: false,
+    admin_name: '',
+    admin_email: '',
+    admin_password: '',
 });
-const migrateForm = useForm({ seed: true });
+const migrateForm = useForm({
+    seed: true,
+    admin_name: '',
+    admin_email: '',
+    admin_password: '',
+});
 const adminForm = useForm({
     user_id: null,
     name: '',
@@ -474,6 +548,9 @@ function saveDatabase() {
 }
 
 function runMigrations() {
+    migrateForm.admin_name = databaseForm.admin_name;
+    migrateForm.admin_email = databaseForm.admin_email;
+    migrateForm.admin_password = databaseForm.admin_password;
     migrateForm.post(`/admin/tenants/${props.tenant.id}/migrate`);
 }
 

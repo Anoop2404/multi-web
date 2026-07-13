@@ -25,6 +25,12 @@ class TenantObserver
                 $parent->database()->makeCredentials();
                 $tenant->setInternal('create_database', false);
                 $tenant->setInternal('db_name', $parent->database()->getName());
+                if (filled($parent->getInternal('db_username'))) {
+                    $tenant->setInternal('db_username', $parent->getInternal('db_username'));
+                }
+                if (filled($parent->getInternal('db_password'))) {
+                    $tenant->setInternal('db_password', $parent->getInternal('db_password'));
+                }
             }
         }
     }

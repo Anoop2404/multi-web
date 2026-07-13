@@ -25,6 +25,10 @@
                 <SummaryCard label="Total Registered" :value="summary.total_registered" color="navy" />
                 <SummaryCard label="Approved Schools" :value="summary.total_schools" color="green" />
                 <SummaryCard label="Pending Schools" :value="summary.pending_schools" color="amber" />
+                <SummaryCard label="Approved · no payment"
+                             :value="summary.approved_without_payment ?? 0"
+                             :hint="'Approved without submitted/verified fee — use report tab to cancel'"
+                             color="amber" />
             </div>
 
             <!-- Report tabs -->
@@ -33,6 +37,11 @@
                         @click="switchTab(t.key)"
                         :class="['tab-btn', tab === t.key ? 'tab-btn--active' : '']">
                     {{ t.label }}
+                    <span v-if="t.key === 'approved-unpaid' && (summary.approved_without_payment ?? 0) > 0"
+                          class="ml-1.5 text-xs px-1.5 py-0.5 rounded-full"
+                          :class="tab === t.key ? 'bg-white/20' : 'bg-amber-100 text-amber-800'">
+                        {{ summary.approved_without_payment }}
+                    </span>
                 </button>
             </div>
 
@@ -90,6 +99,11 @@
                                 <td class="td text-right text-gray-600">{{ s.classes_count }}</td>
                                 <td class="td text-gray-500 text-xs">{{ formatDate(s.created_at) }}</td>
                                 <td class="td text-right whitespace-nowrap">
+                                    <button v-if="s.can_cancel_membership" type="button"
+                                            class="text-xs font-semibold text-red-600 hover:underline mr-3"
+                                            @click="cancelOne(s)">
+                                        Cancel membership
+                                    </button>
                                     <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/${s.id}/students`"
                                           class="text-xs font-semibold text-[#0f3d7a] hover:underline mr-3">
                                         Students →
@@ -103,6 +117,73 @@
                 </div>
                 <p v-else class="text-sm text-gray-400 text-center py-10">No schools found.</p>
                 <PaginationLinks v-if="schools" :links="schools.links" />
+            </div>
+
+            <!-- Approved without payment -->
+            <div v-else-if="tab === 'approved-unpaid'" class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 class="font-bold text-gray-900">Approved without payment</h3>
+                        <p class="text-xs text-gray-400 mt-0.5">
+                            Member schools marked approved with no submitted or verified membership fee upload.
+                            Cancel membership to remove them from the approved list.
+                        </p>
+                    </div>
+                    <button v-if="selectedUnpaidIds.length" type="button"
+                            class="btn-secondary text-sm !border-red-200 !text-red-700 hover:!bg-red-50"
+                            @click="bulkCancelSelected">
+                        Cancel selected ({{ selectedUnpaidIds.length }})
+                    </button>
+                </div>
+                <div v-if="approvedUnpaid?.data?.length" class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="th w-10">
+                                    <input type="checkbox" class="rounded"
+                                           :checked="allUnpaidOnPageSelected"
+                                           @change="toggleSelectAllUnpaid($event.target.checked)">
+                                </th>
+                                <th class="th">School</th>
+                                <th class="th">Membership</th>
+                                <th class="th">Payment</th>
+                                <th class="th">Prefix</th>
+                                <th class="th text-right">Students</th>
+                                <th class="th text-right">Classes</th>
+                                <th class="th">Joined</th>
+                                <th class="th"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            <tr v-for="s in approvedUnpaid.data" :key="s.id" class="hover:bg-gray-50/50">
+                                <td class="td">
+                                    <input type="checkbox" class="rounded"
+                                           :checked="selectedUnpaidIds.includes(s.id)"
+                                           @change="toggleUnpaidSelect(s.id, $event.target.checked)">
+                                </td>
+                                <td class="td font-medium text-gray-800">{{ s.name }}</td>
+                                <td class="td"><StatusPill :status="s.membership_status" /></td>
+                                <td class="td">
+                                    <PaymentStatusPill :status="s.payment_status" :label="s.payment_status_label" :amount="s.payment_amount" />
+                                </td>
+                                <td class="td font-mono text-xs text-gray-500">{{ s.school_prefix || '—' }}</td>
+                                <td class="td text-right font-semibold text-[#0f3d7a]">{{ s.student_count.toLocaleString('en-IN') }}</td>
+                                <td class="td text-right text-gray-600">{{ s.classes_count }}</td>
+                                <td class="td text-gray-500 text-xs">{{ formatDate(s.created_at) }}</td>
+                                <td class="td text-right whitespace-nowrap">
+                                    <button type="button" class="text-xs font-semibold text-red-600 hover:underline mr-3"
+                                            @click="cancelOne(s)">
+                                        Cancel membership
+                                    </button>
+                                    <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/${s.id}`"
+                                          class="text-xs font-semibold text-slate-500 hover:underline">Details</Link>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p v-else class="text-sm text-gray-400 text-center py-10">No approved schools without payment.</p>
+                <PaginationLinks v-if="approvedUnpaid" :links="approvedUnpaid.links" />
             </div>
 
             <!-- Payment not done -->
@@ -179,7 +260,7 @@
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { Link, router } from '@inertiajs/vue3';
-import { reactive, computed, defineComponent, h } from 'vue';
+import { reactive, computed, defineComponent, h, ref, watch } from 'vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 
 const props = defineProps({
@@ -189,6 +270,7 @@ const props = defineProps({
     academicYear: String, tab: String, search: String,
     dateFrom: String, dateTo: String,
     summary: Object, schools: Object,
+    approvedUnpaid: Object,
     paymentDue: Object,
     paymentsPending: Object, paymentsDone: Object,
 });
@@ -199,16 +281,30 @@ const searchForm = reactive({
     date_to: props.dateTo ?? '',
 });
 
+const selectedUnpaidIds = ref([]);
+
+watch(() => props.approvedUnpaid?.data, () => {
+    selectedUnpaidIds.value = [];
+});
+
+const unpaidPageIds = computed(() => (props.approvedUnpaid?.data ?? []).map((s) => s.id));
+const allUnpaidOnPageSelected = computed(() =>
+    unpaidPageIds.value.length > 0
+    && unpaidPageIds.value.every((id) => selectedUnpaidIds.value.includes(id))
+);
+
 const reportTabs = [
     { key: 'schools',           label: 'Schools List' },
+    { key: 'approved-unpaid',   label: 'Approved · no payment' },
     { key: 'payment-due',       label: 'Payment Not Done' },
     { key: 'payments-pending',  label: 'Payments Pending' },
     { key: 'payments-done',     label: 'Payments Done' },
 ];
 
 const searchPlaceholder = computed(() => ({
-    schools:           'Search schools…',
-    'payment-due':     'Search by school name…',
+    schools:            'Search schools…',
+    'approved-unpaid':  'Search schools…',
+    'payment-due':      'Search by school name…',
     'payments-pending': 'Search by school name…',
     'payments-done':    'Search by school name…',
 }[props.tab] ?? 'Search…'));
@@ -224,6 +320,7 @@ function reportParams(overrides = {}) {
 }
 
 function switchTab(tab) {
+    selectedUnpaidIds.value = [];
     router.get(`/sahodaya-admin/${props.sahodaya.id}/membership/reports`, reportParams({ tab, search: '', date_from: '', date_to: '' }), {
         preserveState: true, replace: true,
     });
@@ -245,8 +342,9 @@ useDebouncedInertiaFilters(searchForm, applySearch, () => ({
 
 function exportUrl() {
     const type = {
-        schools:           'schools',
-        'payment-due':     'payment-due',
+        schools:            'schools',
+        'approved-unpaid':  'approved-unpaid',
+        'payment-due':      'payment-due',
         'payments-pending': 'payments-pending',
         'payments-done':    'payments-done',
     }[props.tab] ?? 'schools';
@@ -263,6 +361,58 @@ function exportUrl() {
 
     const qs = params.toString();
     return `/sahodaya-admin/${props.sahodaya.id}/membership/reports/export/${type}${qs ? `?${qs}` : ''}`;
+}
+
+function askCancelReason(label) {
+    const reason = window.prompt(`Reason for cancelling membership${label ? ` — ${label}` : ''}?`);
+    return reason?.trim() || null;
+}
+
+function cancelOne(school) {
+    const reason = askCancelReason(school.name);
+    if (!reason) return;
+    if (!confirm(`Cancel membership for "${school.name}"? They will be removed from approved member schools.`)) return;
+
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${school.id}/cancel-membership`, { reason }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            selectedUnpaidIds.value = selectedUnpaidIds.value.filter((id) => id !== school.id);
+        },
+    });
+}
+
+function toggleUnpaidSelect(id, checked) {
+    if (checked) {
+        if (!selectedUnpaidIds.value.includes(id)) {
+            selectedUnpaidIds.value = [...selectedUnpaidIds.value, id];
+        }
+    } else {
+        selectedUnpaidIds.value = selectedUnpaidIds.value.filter((x) => x !== id);
+    }
+}
+
+function toggleSelectAllUnpaid(checked) {
+    if (checked) {
+        selectedUnpaidIds.value = [...new Set([...selectedUnpaidIds.value, ...unpaidPageIds.value])];
+    } else {
+        const drop = new Set(unpaidPageIds.value);
+        selectedUnpaidIds.value = selectedUnpaidIds.value.filter((id) => !drop.has(id));
+    }
+}
+
+function bulkCancelSelected() {
+    if (!selectedUnpaidIds.value.length) return;
+    const reason = askCancelReason(`${selectedUnpaidIds.value.length} schools`);
+    if (!reason) return;
+    if (!confirm(`Cancel membership for ${selectedUnpaidIds.value.length} school(s)?`)) return;
+
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/bulk-cancel-membership`, {
+        school_ids: selectedUnpaidIds.value,
+        reason,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => { selectedUnpaidIds.value = []; },
+    });
 }
 
 function formatDate(d) {

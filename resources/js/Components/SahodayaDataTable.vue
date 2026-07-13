@@ -31,7 +31,7 @@
 
         <p v-if="!hasRows" class="px-4 py-12 text-center text-gray-400 text-sm">{{ empty }}</p>
 
-        <div v-if="links?.length > 3" class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-gray-100">
+        <div v-if="meta?.last_page > 1 || (links?.length > 3)" class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-gray-100">
             <p v-if="meta" class="text-xs text-gray-500">
                 Showing {{ meta.from ?? 0 }}–{{ meta.to ?? 0 }} of {{ meta.total ?? 0 }}
             </p>
@@ -42,6 +42,9 @@
                       :class="link.active ? 'bg-[#0f3d7a] text-white' : link.url ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 pointer-events-none'"
                       v-html="link.label" />
             </div>
+        </div>
+        <div v-else-if="meta?.total" class="px-4 py-2 border-t border-gray-100 text-xs text-gray-400 text-center">
+            Showing all {{ meta.total }} record{{ meta.total === 1 ? '' : 's' }}
         </div>
     </div>
 </template>

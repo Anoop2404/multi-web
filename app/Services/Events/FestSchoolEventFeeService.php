@@ -65,8 +65,10 @@ class FestSchoolEventFeeService
             $schedule = array_merge($schedule, $event->fee_settings);
         }
 
-        if ($event->event_type === 'sports' && ($schedule['fee_model'] ?? 'none') === 'none') {
-            $schedule = array_merge(config('fest_fees.level_defaults.sports', []), $schedule);
+        if ($event->event_type === 'sports') {
+            $sportsDefaults = config('fest_fees.level_defaults.sports', []);
+            $schedule = array_merge($sportsDefaults, $schedule);
+            $schedule['fee_model'] = 'sports_composite';
         }
 
         if (($schedule['fee_model'] ?? '') === 'item_catalog') {

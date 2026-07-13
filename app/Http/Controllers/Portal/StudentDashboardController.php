@@ -134,7 +134,7 @@ class StudentDashboardController extends Controller
 
         $sahodayaId = $school->parent_id;
         $upcomingEvents = FestEvent::where('tenant_id', $sahodayaId)
-            ->whereIn('status', ['registration_open', 'published', 'ongoing'])
+            ->listedForSchool($school->id)
             ->orderBy('event_start')
             ->limit(5)
             ->get(['id', 'title', 'event_type', 'event_start', 'status'])
@@ -369,8 +369,13 @@ class StudentDashboardController extends Controller
     /** @return list<array<string, mixed>> */
     private function admitCardEvents($student, string $tenantId): array
     {
-        return FestEvent::where('tenant_id', Tenant::find($tenantId)?->parent_id)
-            ->whereIn('status', ['published', 'registration_open', 'ongoing'])
+        $school = Tenant::find($tenantId);
+        if (! $school?->parent_id) {
+            return [];
+        }
+
+        return FestEvent::where('tenant_id', $school->parent_id)
+            ->listedForSchool($tenantId)
             ->whereHas('registrations', fn ($q) => $q
                 ->where('school_id', $tenantId)
                 ->where('status', 'approved')

@@ -117,18 +117,51 @@ class FestEventController extends SahodayaAdminController
         $catalogService = app(FestCatalogService::class);
         $catalogService->ensureSeeded($this->sahodaya->id, $eventType);
 
-        // Singleton fest programs (Kalotsav, Sports, Kids/Teacher/English/Science Fest)
-        // are unique per Sahodaya per year: the program IS the event. Go straight into it,
-        // creating the single yearly hub event on first visit. Custom events keep a list.
-        if (FestEvent::isSingletonType($eventType) && ! $this->isStaff) {
+        // Sports: season hub lists discipline events (heads-as-events). Other singletons
+        // still open the one yearly hub event directly.
+        if (FestEvent::isSingletonType($eventType) && $eventType !== 'sports' && ! $this->isStaff) {
             $event = app(\App\Services\Events\FestPrimaryEventResolver::class)
                 ->resolveOrCreate($this->sahodaya, $eventType, $programs[$program]['label']);
 
-            return redirect(
-                $eventType === 'sports'
-                    ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup"
-                    : "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}"
-            );
+            return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}");
+        }
+
+        if ($eventType === 'sports' && ! $this->isStaff) {
+            $season = app(\App\Services\Events\FestPrimaryEventResolver::class)
+                ->resolveOrCreate($this->sahodaya, 'sports', $programs[$program]['label']);
+
+            $disciplineEvents = FestEvent::forTenant($this->sahodaya->id)
+                ->ofType('sports')
+                ->where(function ($q) use ($season) {
+                    $q->where('parent_event_id', $season->id)
+                        ->orWhere('partition_role', 'sports_discipline');
+                })
+                ->withCount(['items', 'registrations'])
+                ->orderBy('title')
+                ->get();
+
+            // Until heads are promoted, also surface the season hub itself for setup.
+            $events = $disciplineEvents->isNotEmpty()
+                ? $disciplineEvents
+                : collect([$season->loadCount(['items', 'registrations'])]);
+
+            $dashboard = app(\App\Services\Events\ProgramHubDataService::class)
+                ->sahodayaProgramDashboard($this->sahodaya, $program, $eventType);
+
+            return $this->inertia('Sahodaya/Events/ProgramIndex', [
+                'program' => $programs[$program],
+                'events' => $events,
+                'seasonEvent' => $season->only('id', 'title', 'status'),
+                'seasonRemittance' => app(\App\Services\Events\FestSportsChecklist::class)
+                    ->seasonRemittanceBanner($this->sahodaya->id),
+                'levelLabels' => FestEvent::levelLabels(),
+                'stats' => $dashboard['stats'],
+                'schoolParticipation' => $dashboard['schoolParticipation'],
+                'eventsByLevel' => $dashboard['eventsByLevel'],
+                'catalogSummary' => $catalogService->summary($this->sahodaya->id, $eventType),
+                'catalogSections' => FestCatalogSections::summaries($this->sahodaya->id, $eventType),
+                'activityLogs' => $this->programActivityLogs($program),
+            ]);
         }
 
         if (FestEvent::isSingletonType($eventType)) {
@@ -136,12 +169,8 @@ class FestEventController extends SahodayaAdminController
             // to the (read-only) program hub so nothing is created on a GET.
             $event = app(\App\Services\Events\FestPrimaryEventResolver::class)
                 ->resolve($this->sahodaya->id, $eventType);
-            if ($event) {
-                return redirect(
-                    $eventType === 'sports'
-                        ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup"
-                        : "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}"
-                );
+            if ($event && $eventType !== 'sports') {
+                return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}");
             }
         }
 
@@ -151,8 +180,6 @@ class FestEventController extends SahodayaAdminController
             ->orderByDesc('event_start')
             ->get();
 
-        $activeStatuses = ['published', 'registration_open', 'ongoing'];
-        $eventIds = $events->pluck('id');
         $dashboard = app(\App\Services\Events\ProgramHubDataService::class)
             ->sahodayaProgramDashboard($this->sahodaya, $program, $eventType);
 
@@ -247,7 +274,15 @@ class FestEventController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         if ($event->event_type === 'sports' && ! request()->boolean('overview')) {
-            return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup");
+            $isDiscipline = $event->partition_role === 'sports_discipline' || $event->parent_event_id !== null;
+            if (! $isDiscipline) {
+                $hasDisciplineChildren = FestEvent::where('parent_event_id', $event->id)->exists();
+                if ($hasDisciplineChildren) {
+                    return redirect("/sahodaya-admin/{$this->sahodaya->id}/sports");
+                }
+
+                return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup");
+            }
         }
 
         $event->load(['academicYear', 'childEvents', 'parentEvent']);

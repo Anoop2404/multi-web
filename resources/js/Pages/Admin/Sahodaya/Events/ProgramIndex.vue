@@ -9,13 +9,36 @@
         />
 
         <div v-if="isSports" class="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 mb-6 text-sm text-sky-950">
-            <p class="font-semibold">Sports Meet workflow</p>
+            <p class="font-semibold">Sports Meet — discipline events</p>
             <p class="mt-1 text-xs text-sky-900/90">
-                <strong>1 Setup</strong> age groups & item catalog →
-                <strong>2 Create event</strong> from the list below →
-                <strong>3 Run day</strong> registrations, marks, results inside the event →
-                <strong>4 Records</strong> athletic records & house championship stay at program level.
+                Each Event Head (Athletics, Chess, …) is its own event with venue, dates, draft→complete, and composite fees.
+                <strong>1</strong> Age groups &amp; catalog →
+                <strong>2</strong> Open a discipline below (or promote heads via
+                <code class="text-[10px]">fest:promote-sports-heads</code>) →
+                <strong>3</strong> Register / marks / publish inside that event.
             </p>
+        </div>
+
+        <div v-if="isSports && seasonRemittance"
+             class="rounded-xl border px-4 py-3 mb-6 text-sm"
+             :class="seasonRemittance.done
+                 ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
+                 : 'border-amber-200 bg-amber-50 text-amber-950'">
+            <p class="font-semibold">{{ seasonRemittance.label }}</p>
+            <p class="mt-1 text-xs opacity-90">{{ seasonRemittance.hint }}</p>
+            <Link v-if="!seasonRemittance.done"
+                  :href="`/sahodaya-admin/${sahodaya.id}/state-remittances`"
+                  class="inline-block mt-2 text-xs font-semibold underline">
+                Open state remittances →
+            </Link>
+        </div>
+
+        <div v-if="isSports && seasonEvent" class="mb-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+            <span>Season hub:</span>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${seasonEvent.id}/setup`" class="font-semibold link-brand">
+                {{ seasonEvent.title }}
+            </Link>
+            <span class="status-pill text-xs" :class="statusClass(seasonEvent.status)">{{ seasonEvent.status }}</span>
         </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
@@ -295,13 +318,20 @@ const props = defineProps({
     event: { type: Object, default: null },
     schoolParticipation: { type: Array, default: () => [] },
     eventsByLevel: { type: Object, default: null },
+    seasonEvent: { type: Object, default: null },
+    seasonRemittance: { type: Object, default: null },
 });
 
 const isSports = computed(() => props.program.eventType === 'sports');
 
 function eventManageUrl(eventId) {
     const base = `/sahodaya-admin/${props.sahodaya.id}/events/${eventId}`;
-    return isSports.value ? `${base}/setup` : base;
+    // Discipline events open Overview; legacy season-only hub still uses setup.
+    if (!isSports.value) return base;
+    if (props.seasonEvent?.id && String(eventId) === String(props.seasonEvent.id)) {
+        return `${base}/setup`;
+    }
+    return `${base}?overview=1`;
 }
 
 const sidebarEvents = computed(() => (props.events ?? []).filter((ev) => !ev.nav_hidden));

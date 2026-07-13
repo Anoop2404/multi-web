@@ -333,6 +333,10 @@ class FestEventSettingsController extends SahodayaAdminController
             'item_fees.*.fee_amount' => 'nullable|numeric|min:0',
         ]);
 
+        if ($event->event_type === 'sports') {
+            $data['fee_model'] = 'sports_composite';
+        }
+
         $feeSettings = array_merge(
             app(FestEventFeeResolver::class)->normalizeEventFeeSettings($data, $this->sahodaya->id),
             array_filter([

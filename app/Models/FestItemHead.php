@@ -23,6 +23,7 @@ class FestItemHead extends Model
         'included_items_per_student', 'included_teams',
         'verification_policy', 'approval_policy',
         'max_participants', 'max_teams',
+        'status', 'venue', 'event_start', 'event_end', 'discipline_event_id',
     ];
 
     protected $casts = [
@@ -33,6 +34,8 @@ class FestItemHead extends Model
         'reg_end' => 'date',
         'competition_start' => 'date',
         'competition_end' => 'date',
+        'event_start' => 'date',
+        'event_end' => 'date',
         'school_registration_fee' => 'decimal:2',
         'student_registration_fee' => 'decimal:2',
         'team_registration_fee' => 'decimal:2',
@@ -41,6 +44,38 @@ class FestItemHead extends Model
         'max_participants' => 'integer',
         'max_teams' => 'integer',
     ];
+
+    public const STATUSES = ['draft', 'published', 'registration_open', 'ongoing', 'completed'];
+
+    /** Whether composite fee columns are configured for checklist readiness. */
+    public function hasFeesConfigured(): bool
+    {
+        return $this->school_registration_fee !== null
+            || $this->student_registration_fee !== null
+            || $this->team_registration_fee !== null
+            || $this->default_item_fee !== null
+            || $this->extra_item_fee !== null;
+    }
+
+    public function disciplineEvent(): BelongsTo
+    {
+        return $this->belongsTo(FestEvent::class, 'discipline_event_id');
+    }
+
+    /** Effective operational status: head status when set, else parent event. */
+    public function effectiveStatus(): string
+    {
+        if (filled($this->status)) {
+            return (string) $this->status;
+        }
+
+        return (string) ($this->event?->status ?? 'draft');
+    }
+
+    public function isRegistrationOpenForSchools(): bool
+    {
+        return in_array($this->effectiveStatus(), ['registration_open', 'ongoing'], true);
+    }
 
     public function event(): BelongsTo
     {

@@ -21,8 +21,10 @@ class TenancyDatabase
     /**
      * Run a callback against a Sahodaya PostgreSQL database without Stancl's
      * initialize/end cycle (safe for superadmin pages on the central domain).
+     *
+     * @param  array{username?: ?string, password?: ?string}|null  $credentials
      */
-    public static function usingDatabase(string $databaseName, callable $callback): mixed
+    public static function usingDatabase(string $databaseName, callable $callback, ?array $credentials = null): mixed
     {
         $connectionName = self::RUNTIME_CONNECTION;
         $central = (string) config('tenancy.database.central_connection', 'central');
@@ -34,8 +36,18 @@ class TenancyDatabase
             throw new InvalidArgumentException("No database connection template found for tenant runtime.");
         }
 
+        $overrides = ['database' => $databaseName];
+        if (is_array($credentials)) {
+            if (array_key_exists('username', $credentials) && filled($credentials['username'])) {
+                $overrides['username'] = (string) $credentials['username'];
+            }
+            if (array_key_exists('password', $credentials) && $credentials['password'] !== null && $credentials['password'] !== '') {
+                $overrides['password'] = (string) $credentials['password'];
+            }
+        }
+
         config([
-            "database.connections.{$connectionName}" => array_merge($template, ['database' => $databaseName]),
+            "database.connections.{$connectionName}" => array_merge($template, $overrides),
             'database.default' => $connectionName,
         ]);
 
@@ -75,7 +87,24 @@ class TenancyDatabase
             throw new InvalidArgumentException('Sahodaya database name is not configured.');
         }
 
-        return self::usingDatabase($dbName, fn () => $callback());
+        return self::usingDatabase($dbName, fn () => $callback(), self::credentialsFor($owner));
+    }
+
+    /** @return array{username?: string, password?: string} */
+    public static function credentialsFor(Tenant $owner): array
+    {
+        $credentials = [];
+        $username = $owner->getInternal('db_username');
+        $password = $owner->getInternal('db_password');
+
+        if (filled($username)) {
+            $credentials['username'] = (string) $username;
+        }
+        if ($password !== null && $password !== '') {
+            $credentials['password'] = (string) $password;
+        }
+
+        return $credentials;
     }
 
     /**
@@ -122,6 +151,21 @@ class TenancyDatabase
             } catch (\Throwable) {
                 // Fall through — show a clear error below if the DB is still missing.
             }
+        }
+
+        // Schools share the Sahodaya DB; copy name and only set optional login when present.
+        $tenant->setInternal('db_name', $owner->getInternal('db_name'));
+        $username = $owner->getInternal('db_username');
+        $password = $owner->getInternal('db_password');
+        if (filled($username)) {
+            $tenant->setInternal('db_username', $username);
+        } else {
+            $tenant->offsetUnset($tenant::internalPrefix().'db_username');
+        }
+        if (filled($password)) {
+            $tenant->setInternal('db_password', $password);
+        } else {
+            $tenant->offsetUnset($tenant::internalPrefix().'db_password');
         }
 
         try {

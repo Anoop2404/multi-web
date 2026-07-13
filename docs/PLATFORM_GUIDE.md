@@ -238,13 +238,17 @@ Tracked on **Settings → Lifecycle**:
 
 | Status | Meaning |
 |--------|---------|
-| `draft` | Not visible to schools |
-| `published` | Visible; registration may not be open yet |
-| `registration_open` | Schools can register |
-| `ongoing` | Fest in progress |
+| `draft` | Setup only — not listed for schools |
+| `published` | Optional announce; **Sports:** still Sahodaya-only (schools do not see it yet). Other fests may preview. |
+| `registration_open` | Schools can see the event and register (Sports first visibility) |
+| `ongoing` | Competition / marks in progress |
 | `completed` | Finished |
 
-Also set: **fest start/end dates**, **registration open/close** on Overview.
+**Sports school visibility:** schools list Sports events only when status is `registration_open`, `ongoing`, or `completed`. Draft and `published` stay Sahodaya-only.
+
+**Publish results** is separate: set **Results published** on Overview (or Results page). That releases medals/rankings; it does not change the status field.
+
+Also set: **fest start/end dates**, **registration open/close** on Overview. Per-head `reg_start`/`reg_end` on Sports item heads further control when each discipline accepts entries.
 
 ### 5.4 Event setup phases
 
@@ -325,13 +329,19 @@ Also set: **fest start/end dates**, **registration open/close** on Overview.
 
 ### 5.6 Sports Meet — program-level extras
 
+Sports Meet is a **season hub** listing **discipline events** (Athletics, Chess, …). Each Event Head can be promoted to its own `FestEvent` (`partition_role=sports_discipline`) with independent status, venue, dates, and always-on **sports composite** fees (no fee-model dropdown on Sports).
+
 | Feature | Path |
 |---------|------|
+| Season / discipline list | `/sports` |
 | Age groups (U8–U19) | `/sports/age-groups` |
 | Master catalog | `/sports/catalog` |
 | Athletic records | `/sports/records` |
 | House championship | `/sports/championship` |
 | Results / rankings | `/sports/results`, `/sports/rankings` |
+
+Promote multi-head hubs: `php artisan fest:promote-sports-heads --sahodaya=… [--dry-run]`.  
+Backfill head fee columns: `php artisan fest:backfill-head-fees --sahodaya=… [--dry-run]`.
 
 ### 5.7 Kalotsav extras
 
@@ -342,7 +352,9 @@ Also set: **fest start/end dates**, **registration open/close** on Overview.
 
 ## 6. Fest fee models (Sports composite)
 
-**Use billing model:** `Sports composite` for layered sports billing.
+**Sports:** billing is always `sports_composite` — there is no fee-model dropdown. Configure school / student / team fees on each Event Head (Competition hub). Optional event-wide fallbacks live under Settings → Fees.
+
+**Other fest types:** choose a billing model in Settings → Fees as needed.
 
 ### Fee stack (applied in order)
 

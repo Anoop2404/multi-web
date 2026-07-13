@@ -3,7 +3,11 @@
         <div class="flex items-start justify-between gap-3">
             <div>
                 <h4 class="section-title">Event progress</h4>
-                <p class="section-desc text-xs mt-0.5">Lifecycle checklist — complete each step before fest day.</p>
+                <p class="section-desc text-xs mt-0.5">
+                    {{ isSports
+                        ? 'Sports phases: Setup → Open registration (schools see event) → Ongoing → Publish results → Complete.'
+                        : 'Lifecycle checklist — complete each step before fest day.' }}
+                </p>
             </div>
             <Link :href="`${base}/settings/lifecycle`" class="text-xs link-brand shrink-0">Full checklist →</Link>
         </div>
@@ -18,7 +22,8 @@
                 <div class="flex-1 min-w-0">
                     <p class="font-medium text-slate-800">{{ step.label }}</p>
                     <p v-if="step.hint" class="text-xs text-slate-500 mt-0.5">{{ step.hint }}</p>
-                    <Link v-if="stepLink(step.key)" :href="stepLink(step.key)"
+                    <p v-if="step.detail" class="text-xs text-slate-400 mt-0.5">{{ step.detail }}</p>
+                    <Link v-if="step.href || stepLink(step.key)" :href="step.href || stepLink(step.key)"
                           class="inline-block mt-1.5 text-xs font-semibold link-brand">
                         Open →
                     </Link>
@@ -37,13 +42,23 @@ const props = defineProps({
     eventId: { type: [String, Number], required: true },
     lifecycle: { type: Array, default: () => [] },
     suggestedStatus: { type: String, default: null },
+    eventType: { type: String, default: '' },
 });
 
+const isSports = computed(() => props.eventType === 'sports');
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}`);
 const eventQuery = computed(() => `?event_id=${props.eventId}`);
 
 const links = computed(() => ({
+    event: `${base.value}?overview=1`,
+    heads: `${base.value}/competition`,
+    head_windows: `${base.value}/competition`,
     items: `${base.value}/items`,
+    item_fees: `${base.value}/competition`,
+    fees: `${base.value}/settings/fees`,
+    rank_points: `${base.value}/settings/points`,
+    registration: `${base.value}/settings/registration`,
+    numbering: `${base.value}/settings/numbering`,
     registrations: `${base.value}/registrations`,
     school_fees: `${base.value}/fees`,
     state_remittance: `/sahodaya-admin/${props.sahodayaId}/state-remittances${eventQuery.value}`,

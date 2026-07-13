@@ -378,8 +378,17 @@ class TenantStorage
 
         $relative = ltrim($path, '/');
 
-        if (Storage::disk('public')->exists($relative)) {
-            return Storage::disk('public')->url($relative);
+        // Prefer the central public disk (what /storage serves), even when tenancy remaps Storage::disk('public').
+        if (is_file(self::storageRoot('app/public/'.$relative))) {
+            return '/storage/'.$relative;
+        }
+
+        try {
+            if (Storage::disk('public')->exists($relative)) {
+                return Storage::disk('public')->url($relative);
+            }
+        } catch (\Throwable) {
+            // S3/tenancy disk probes can throw when MinIO is down.
         }
 
         $fromAsset = self::assetUrl($tenant, $relative);

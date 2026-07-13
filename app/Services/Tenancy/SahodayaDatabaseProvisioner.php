@@ -17,15 +17,72 @@ class SahodayaDatabaseProvisioner
         return config('tenancy.database.prefix').str_replace('-', '_', $sahodaya->getTenantKey());
     }
 
-    public function configure(Tenant $sahodaya, string $databaseName): void
-    {
+    public function configure(
+        Tenant $sahodaya,
+        string $databaseName,
+        ?string $username = null,
+        ?string $password = null,
+        bool $clearPassword = false,
+    ): void {
         $this->assertSahodaya($sahodaya);
 
         $databaseName = strtolower(trim($databaseName));
 
         $sahodaya->setInternal('db_name', $databaseName);
         $sahodaya->setInternal('create_database', false);
+
+        // Username/password are optional — blank keeps (or restores) the central DB login.
+        if ($username !== null) {
+            $username = trim($username);
+            if ($username !== '') {
+                $sahodaya->setInternal('db_username', $username);
+            } else {
+                $this->forgetInternal($sahodaya, 'db_username');
+            }
+        }
+
+        if ($clearPassword) {
+            $this->forgetInternal($sahodaya, 'db_password');
+        } elseif ($password !== null && $password !== '') {
+            $sahodaya->setInternal('db_password', $password);
+        }
+
         $sahodaya->save();
+        $this->syncConnectionToSchools($sahodaya);
+    }
+
+    /** Keep member schools on the same DB name + login as the Sahodaya owner. */
+    private function syncConnectionToSchools(Tenant $sahodaya): void
+    {
+        $dbName = $sahodaya->getInternal('db_name');
+        $username = $sahodaya->getInternal('db_username');
+        $password = $sahodaya->getInternal('db_password');
+
+        Tenant::query()
+            ->where('type', 'school')
+            ->where('parent_id', $sahodaya->id)
+            ->each(function (Tenant $school) use ($dbName, $username, $password) {
+                $school->setInternal('create_database', false);
+                $school->setInternal('db_name', $dbName);
+                $this->applyOptionalCredential($school, 'db_username', $username);
+                $this->applyOptionalCredential($school, 'db_password', $password);
+                $school->save();
+            });
+    }
+
+    private function applyOptionalCredential(Tenant $tenant, string $key, mixed $value): void
+    {
+        if (filled($value)) {
+            $tenant->setInternal($key, $value);
+        } else {
+            $this->forgetInternal($tenant, $key);
+        }
+    }
+
+    /** Remove a tenancy_* key so it is not serialized as null into the data column. */
+    private function forgetInternal(Tenant $tenant, string $key): void
+    {
+        $tenant->offsetUnset($tenant::internalPrefix().$key);
     }
 
     public function ensureConfigured(Tenant $sahodaya): void
@@ -70,17 +127,19 @@ class SahodayaDatabaseProvisioner
         $this->migrate($sahodaya, $seedDefaults);
     }
 
-    /** @return array{configured: bool, name: ?string, exists: bool, ready: bool} */
+    /** @return array{configured: bool, name: ?string, exists: bool, ready: bool, username: ?string, has_password: bool} */
     public function status(Tenant $sahodaya): array
     {
         $this->assertSahodaya($sahodaya);
 
         if (! config('tenancy.database_per_sahodaya', true)) {
             return [
-                'configured' => false,
-                'name'       => null,
-                'exists'     => false,
-                'ready'      => true,
+                'configured'   => false,
+                'name'         => null,
+                'exists'       => false,
+                'ready'        => true,
+                'username'     => null,
+                'has_password' => false,
             ];
         }
 
@@ -94,10 +153,12 @@ class SahodayaDatabaseProvisioner
         }
 
         return [
-            'configured' => (bool) $name,
-            'name'       => $name,
-            'exists'     => $exists,
-            'ready'      => $ready,
+            'configured'   => (bool) $name,
+            'name'         => $name,
+            'exists'       => $exists,
+            'ready'        => $ready,
+            'username'     => $sahodaya->getInternal('db_username') ?: null,
+            'has_password' => filled($sahodaya->getInternal('db_password')),
         ];
     }
 
@@ -121,11 +182,13 @@ class SahodayaDatabaseProvisioner
 
         (new MigrateDatabase($sahodaya))->handle();
 
+        // Roles/permissions are required before any portal admin can be created.
+        $sahodaya->run(function () {
+            (new \Database\Seeders\TenantRolesAndPermissionsSeeder)->run();
+        });
+
         if ($seedDefaults) {
             $this->seedDefaults($sahodaya);
-            $sahodaya->run(function () {
-                (new \Database\Seeders\TenantRolesAndPermissionsSeeder)->run();
-            });
         }
     }
 
@@ -152,6 +215,9 @@ class SahodayaDatabaseProvisioner
             return TenancyDatabase::usingDatabase(
                 $databaseName,
                 fn () => \Illuminate\Support\Facades\Schema::hasTable('sahodaya_profiles')
+                    && \Illuminate\Support\Facades\Schema::hasTable('roles')
+                    && \Illuminate\Support\Facades\Schema::hasTable('users'),
+                TenancyDatabase::credentialsFor($sahodaya),
             );
         } catch (\Throwable) {
             return false;

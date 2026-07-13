@@ -62,7 +62,12 @@ class FestItemHeadOpsController extends SahodayaAdminController
                 ->first(['id', 'name', 'catalog_key', 'is_team_heading', 'sport_discipline',
                     'reg_start', 'reg_end', 'competition_start', 'competition_end',
                     'schedule_mode', 'competition_time',
-                    'default_item_fee', 'extra_item_fee']);
+                    'default_item_fee', 'extra_item_fee',
+                    'school_registration_fee', 'student_registration_fee', 'team_registration_fee',
+                    'included_items_per_student', 'included_teams',
+                    'verification_policy', 'approval_policy',
+                    'max_participants', 'max_teams',
+                    'status', 'venue', 'event_start', 'event_end']);
 
             if ($head) {
                 $selectedHeadRecord = [
@@ -79,6 +84,19 @@ class FestItemHeadOpsController extends SahodayaAdminController
                     'competition_time'  => $head->competitionTimeShort(),
                     'default_item_fee'  => $head->default_item_fee,
                     'extra_item_fee'    => $head->extra_item_fee,
+                    'school_registration_fee' => $head->school_registration_fee,
+                    'student_registration_fee' => $head->student_registration_fee,
+                    'team_registration_fee' => $head->team_registration_fee,
+                    'included_items_per_student' => $head->included_items_per_student,
+                    'included_teams' => $head->included_teams,
+                    'verification_policy' => $head->verification_policy,
+                    'approval_policy' => $head->approval_policy,
+                    'max_participants' => $head->max_participants,
+                    'max_teams' => $head->max_teams,
+                    'status' => $head->status ?: 'draft',
+                    'venue' => $head->venue,
+                    'event_start' => $head->event_start?->format('Y-m-d'),
+                    'event_end' => $head->event_end?->format('Y-m-d'),
                     'can_remove'        => $head->catalog_key === null,
                 ];
             }

@@ -45,15 +45,20 @@
                             <FormField label="Title" class-extra="sm:col-span-2">
                                 <input v-model="form.title" class="field" :disabled="!!event.state_program_id" required>
                             </FormField>
-                            <FormField label="Status">
+                            <FormField label="Status" :hint="statusHint">
                                 <select v-model="form.status" class="field">
-                                    <option value="draft">Draft</option>
-                                    <option value="published">Published</option>
-                                    <option value="registration_open">Registration Open</option>
+                                    <option value="draft">Draft (setup — Sahodaya only)</option>
+                                    <option v-if="!isSports" value="published">Published</option>
+                                    <option v-if="isSports" value="published">Published (Sahodaya announce only)</option>
+                                    <option value="registration_open">Registration open</option>
                                     <option value="ongoing">Ongoing</option>
                                     <option value="completed">Completed</option>
                                 </select>
                             </FormField>
+                            <p v-if="isSports" class="sm:col-span-2 text-xs text-slate-500 -mt-2">
+                                Sports schools only see this event from <strong>Registration open</strong> onward.
+                                Use <strong>Results published</strong> below to release medals/rankings — that is separate from status.
+                            </p>
                             <FormField label="Academic year" hint="Only students enrolled in this year can register. Defaults to active year on create.">
                                 <select v-model="form.academic_year_id" class="field">
                                     <option :value="null">— Not scoped —</option>
@@ -110,21 +115,32 @@
 
             <aside class="space-y-4">
                 <EventLifecyclePanel :sahodaya-id="sahodaya.id" :event-id="event.id"
+                                     :event-type="event.event_type"
                                      :lifecycle="lifecycle" :suggested-status="suggestedStatus" />
 
                 <div v-if="eventHeadNav?.headItemGroups?.length" class="card space-y-3">
-                    <h4 class="section-title">Item heads</h4>
-                    <p class="text-xs text-slate-500">Quick access to registrations, marks, and reports by section.</p>
+                    <h4 class="section-title">{{ isSports ? 'Discipline heads' : 'Item heads' }}</h4>
+                    <p class="text-xs text-slate-500">
+                        {{ isSports
+                            ? 'Each head has its own schedule, fees, and status — open to configure or promote to a full discipline event.'
+                            : 'Quick access to registrations, marks, and reports by section.' }}
+                    </p>
                     <div v-for="head in eventHeadNav.headItemGroups" :key="head.head_id ?? 'other'"
                          class="rounded-lg border border-slate-100 bg-slate-50/80 p-3">
-                        <Link :href="`${base}/competition${headQuery(head.head_id)}`" class="text-sm font-semibold text-slate-900 hover:text-indigo-700">
-                            {{ head.head_name }}
-                        </Link>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <Link :href="`${base}/competition${headQuery(head.head_id)}`" class="text-sm font-semibold text-slate-900 hover:text-indigo-700">
+                                {{ head.head_name }}
+                            </Link>
+                            <span v-if="head.status" class="text-[10px] px-1.5 py-0.5 rounded-full bg-white border border-slate-200 capitalize">
+                                {{ String(head.status).replace('_', ' ') }}
+                            </span>
+                        </div>
                         <p class="text-[11px] text-slate-500 mt-0.5">
                             {{ head.item_count }} items · {{ head.participant_count }} participants
+                            <template v-if="head.venue"> · {{ head.venue }}</template>
                         </p>
                         <div class="flex flex-wrap gap-2 mt-2">
-                            <Link :href="`${base}/competition${headQuery(head.head_id)}`" class="link-brand text-xs font-semibold">Open items →</Link>
+                            <Link :href="`${base}/competition${headQuery(head.head_id)}`" class="link-brand text-xs font-semibold">Open →</Link>
                             <Link :href="`${base}/registrations${headQuery(head.head_id)}`" class="link-brand text-xs">Registrations</Link>
                             <Link :href="`${base}/marks${headQuery(head.head_id)}`" class="link-brand text-xs">Marks</Link>
                         </div>
@@ -183,6 +199,9 @@ const props = defineProps({
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const isSports = computed(() => props.event.event_type === 'sports');
+const statusHint = computed(() => (isSports.value
+    ? 'Setup → Registration open (schools see event) → Ongoing → Complete. Publish results separately.'
+    : 'Draft → Published → Registration open → Ongoing → Completed.'));
 
 function headQuery(headId) {
     if (headId == null) {

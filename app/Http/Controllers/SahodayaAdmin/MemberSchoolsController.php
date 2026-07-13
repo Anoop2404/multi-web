@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Membership\MembershipNotifier;
+use App\Services\Membership\SchoolMembershipCancellationService;
 use App\Support\AcademicYear;
 use App\Support\ExcelExport;
 use App\Support\SchoolDetailFields;
@@ -139,6 +140,8 @@ class MemberSchoolsController extends SahodayaAdminController
             ->get()
             ->each(fn ($payment) => $payment->setRelation('school', $school));
 
+        $cancellation = app(SchoolMembershipCancellationService::class);
+
         return $this->inertia('Sahodaya/Schools/Show', [
             'school' => array_merge($school->only(
                 'id', 'name', 'school_prefix', 'membership_status', 'is_active',
@@ -148,6 +151,7 @@ class MemberSchoolsController extends SahodayaAdminController
                 'classes_count'  => SchoolClass::where('tenant_id', $school->id)->where('is_active', true)->count(),
                 'has_login'      => User::where('tenant_id', $school->id)->exists(),
                 'login_email'    => User::where('tenant_id', $school->id)->value('email'),
+                'can_cancel_membership' => $cancellation->canCancel($school),
             ]),
             'detailFields'   => $fields,
             'registration'   => $registration,
@@ -173,6 +177,60 @@ class MemberSchoolsController extends SahodayaAdminController
         $notifier->schoolRejected($school, $data['reason']);
 
         return back()->with('success', 'School application rejected.');
+    }
+
+    public function cancelMembership(
+        Request $request,
+        string $tenantId,
+        Tenant $school,
+        SchoolMembershipCancellationService $cancellation,
+        MembershipNotifier $notifier,
+        PlatformAuditLogger $audit,
+    ) {
+        abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+
+        $data = $request->validate([
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        $cancellation->cancel($school, $data['reason'], $notifier, $audit, $request->user()?->id);
+
+        return back()->with('success', "Membership cancelled for {$school->name}.");
+    }
+
+    public function bulkCancelMembership(
+        Request $request,
+        SchoolMembershipCancellationService $cancellation,
+        MembershipNotifier $notifier,
+        PlatformAuditLogger $audit,
+    ) {
+        $data = $request->validate([
+            'school_ids'   => 'required|array|min:1|max:100',
+            'school_ids.*' => 'uuid',
+            'reason'       => 'required|string|max:1000',
+        ]);
+
+        $schools = Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->whereIn('id', $data['school_ids'])
+            ->get();
+
+        $count = $cancellation->cancelMany(
+            $schools,
+            $data['reason'],
+            $notifier,
+            $audit,
+            $request->user()?->id,
+        );
+
+        return back()->with(
+            'success',
+            $count === 0
+                ? 'No eligible schools cancelled (need approved + no payment upload).'
+                : "{$count} school membership(s) cancelled."
+        );
     }
 
     public function approve(string $tenantId, Tenant $school, MembershipNotifier $notifier, PlatformAuditLogger $audit)

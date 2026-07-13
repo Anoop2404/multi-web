@@ -69,7 +69,7 @@ class SportsMeetController extends SchoolAdminController
         $parentEvents = FestEvent::where('tenant_id', $this->school->parent_id)
             ->where('event_type', 'sports')
             ->whereIn('level_round', ['sahodaya', 'state'])
-            ->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing', 'completed'])
+            ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'level_round', 'status']);
 
