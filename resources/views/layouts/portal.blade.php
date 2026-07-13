@@ -378,6 +378,22 @@
         .portal-field-hint {
             font-size: .6875rem; color: #94a3b8; margin-top: .35rem; line-height: 1.4;
         }
+        .portal-radio-group {
+            display: flex; flex-direction: column; gap: .55rem; margin-top: .5rem;
+        }
+        .portal-radio-option {
+            display: flex; align-items: flex-start; gap: .55rem;
+            font-size: .8125rem; color: var(--navy-900); cursor: pointer;
+            border: 1.5px solid #e2e8f0; border-radius: .75rem;
+            padding: .6rem .8rem; background: #f8fafc;
+            transition: border-color .15s, background .15s;
+        }
+        .portal-radio-option:has(input:checked) {
+            border-color: var(--navy-600); background: #fff;
+            box-shadow: 0 0 0 3px rgba(30,90,168,.15);
+        }
+        .portal-radio-option input[type="radio"] { margin-top: .15rem; flex-shrink: 0; }
+        .portal-radio-option span { line-height: 1.35; }
         .portal-form-section-title {
             font-size: .6875rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
             color: #64748b; margin-top: .25rem;

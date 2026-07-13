@@ -159,11 +159,10 @@
                                 @if(!empty($fields['school_category']['hint']))
                                 <p class="portal-hint">{{ $fields['school_category']['hint'] }}</p>
                                 @endif
-                                <div class="mt-2 space-y-2">
+                                <div class="portal-radio-group">
                                     @foreach(($fields['school_category']['options'] ?? []) as $value => $label)
-                                    <label class="flex items-start gap-2 text-sm">
+                                    <label class="portal-radio-option">
                                         <input type="radio" name="school_category" value="{{ $value }}"
-                                               class="mt-1"
                                                {{ old('school_category', 'affiliated') === $value ? 'checked' : '' }}
                                                required
                                                onchange="document.getElementById('cbse_affiliation') && (document.getElementById('cbse_affiliation').required = this.value !== 'non_affiliated'); document.getElementById('cbse-aff-req') && (document.getElementById('cbse-aff-req').style.display = this.value === 'non_affiliated' ? 'none' : '');">
