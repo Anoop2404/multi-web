@@ -22,13 +22,32 @@ class SahodayaPublicData
     {
         $bearers = OfficeBearers::where('tenant_id', $tenantId)
             ->where('is_active', true)
+            ->orderBy('display_order')
+            ->orderBy('id')
             ->get();
 
-        return $bearers->sortBy(function ($b) {
-            $idx = array_search($b->role, self::BEARER_ROLE_ORDER, true);
+        return $bearers
+            ->groupBy('role')
+            ->map(fn (Collection $group) => $group
+                ->sortByDesc(fn (OfficeBearers $b) => sprintf(
+                    '%d-%010d-%04d',
+                    self::bearerHasPhoto($b) ? 1 : 0,
+                    $b->updated_at?->timestamp ?? 0,
+                    $b->display_order,
+                ))
+                ->first())
+            ->filter()
+            ->sortBy(fn (OfficeBearers $b) => [
+                ($idx = array_search($b->role, self::BEARER_ROLE_ORDER, true)) === false ? 999 : $idx,
+                $b->display_order,
+                $b->id,
+            ])
+            ->values();
+    }
 
-            return $idx === false ? 999 : $idx;
-        })->values();
+    private static function bearerHasPhoto(OfficeBearers $bearer): bool
+    {
+        return filled($bearer->photo) && $bearer->photo !== '0';
     }
 
     public static function memberSchools(string $tenantId): Collection

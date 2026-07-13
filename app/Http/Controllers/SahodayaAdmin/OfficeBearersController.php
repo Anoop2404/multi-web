@@ -37,7 +37,10 @@ class OfficeBearersController extends SahodayaAdminController
         $data = PersistDefaults::coalesce($data, ['display_order' => 0]);
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('sahodaya/' . $this->sahodaya->id . '/bearers', \App\Support\TenantStorage::uploadDisk());
+            $data['photo'] = TenantStorage::storeUploadedFile(
+                $request->file('photo'),
+                'sahodaya/'.$this->sahodaya->id.'/bearers'
+            );
         }
 
         OfficeBearers::create($data);
@@ -62,7 +65,10 @@ class OfficeBearersController extends SahodayaAdminController
         ]);
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('sahodaya/' . $this->sahodaya->id . '/bearers', \App\Support\TenantStorage::uploadDisk());
+            $data['photo'] = TenantStorage::storeUploadedFile(
+                $request->file('photo'),
+                'sahodaya/'.$this->sahodaya->id.'/bearers'
+            );
         }
 
         $data = PersistDefaults::coalesce($data, ['display_order' => $bearer->display_order ?? 0]);

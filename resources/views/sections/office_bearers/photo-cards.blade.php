@@ -14,8 +14,17 @@
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             @foreach($bearers as $bearer)
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center hover:shadow-md transition">
-                @if(!empty($bearer->photo ?? $bearer['photo'] ?? null))
-                <img loading="lazy" src="{{ $bearer->photo ?? $bearer['photo'] }}" alt="{{ $bearer->name ?? $bearer['name'] }}" class="w-24 h-24 rounded-full mx-auto object-cover mb-4">
+                @php
+                    $photoUrl = $bearer->photo_url ?? $bearer['photo_url'] ?? null;
+                    if (! $photoUrl) {
+                        $rawPhoto = $bearer->photo ?? $bearer['photo'] ?? null;
+                        if ($rawPhoto && (str_starts_with($rawPhoto, 'http') || str_starts_with($rawPhoto, '/'))) {
+                            $photoUrl = $rawPhoto;
+                        }
+                    }
+                @endphp
+                @if($photoUrl)
+                <img loading="lazy" src="{{ $photoUrl }}" alt="{{ $bearer->name ?? $bearer['name'] }}" class="w-24 h-24 rounded-full mx-auto object-cover mb-4">
                 @endif
                 <h3 class="font-bold font-heading text-gray-800">{{ $bearer->name ?? $bearer['name'] }}</h3>
                 <p class="text-sm" style="color: var(--color-primary)">{{ $bearer->role ?? $bearer['role'] ?? '' }}</p>

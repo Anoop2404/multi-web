@@ -12,8 +12,8 @@
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             @foreach($bearers as $bearer)
             <article class="bg-white rounded-2xl border border-gray-100 p-6 text-center shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
-                @if($bearer->photo)
-                <img src="{{ str_starts_with($bearer->photo, 'http') ? $bearer->photo : asset('storage/'.$bearer->photo) }}"
+                @if($bearer->photo_url)
+                <img src="{{ $bearer->photo_url }}"
                      alt="{{ $bearer->name }}" class="w-20 h-20 rounded-2xl mx-auto object-cover ring-4 ring-purple-50 mb-4">
                 @else
                 <div class="w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center text-white text-2xl font-bold"

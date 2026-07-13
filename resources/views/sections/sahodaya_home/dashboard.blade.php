@@ -139,8 +139,8 @@
                     @foreach($bearers as $bearer)
                     <article class="group relative bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-lg hover:border-purple-100 transition-all duration-300">
                         <div class="flex gap-4">
-                            @if($bearer->photo)
-                            <img src="{{ str_starts_with($bearer->photo, 'http') ? $bearer->photo : asset('storage/'.$bearer->photo) }}"
+                            @if($bearer->photo_url)
+                            <img src="{{ $bearer->photo_url }}"
                                  alt="{{ $bearer->name }}" class="w-16 h-16 rounded-xl object-cover shrink-0 ring-2 ring-purple-50">
                             @else
                             <div class="w-16 h-16 rounded-xl shrink-0 flex items-center justify-center text-white font-bold text-xl"

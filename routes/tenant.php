@@ -29,6 +29,9 @@ Route::middleware([
     // Portal landing (register + login options; always available)
     Route::get('/portal', RegistrationLandingController::class)->name('tenant.portal');
 
+    Route::get('/office-bearers/{bearer}/photo', [\App\Http\Controllers\Public\OfficeBearerPhotoController::class, 'show'])
+        ->name('tenant.office-bearers.photo');
+
     // School membership application (always available on Sahodaya tenants)
     Route::get('/school-register', [SchoolApplicationController::class, 'create'])->name('school-register.create');
     Route::post('/school-register', [SchoolApplicationController::class, 'store'])

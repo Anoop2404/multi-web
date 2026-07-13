@@ -55,6 +55,7 @@
                         <Field label="Photo">
                             <input type="file" accept="image/*" @change="form.photo = $event.target.files[0]"
                                    class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
+                            <p v-if="form.errors.photo" class="text-xs text-red-500 mt-1">{{ form.errors.photo }}</p>
                         </Field>
                         <Field label="Display Order">
                             <input v-model="form.display_order" type="number" min="0" class="field">
@@ -78,7 +79,7 @@
                      :class="editing === b.id ? 'border-purple-300 ring-2 ring-purple-200' : 'border-gray-100'">
                     <!-- Avatar -->
                     <div class="shrink-0">
-                        <img v-if="b.photo" :src="b.photo" alt=""
+                        <img v-if="b.photo_url" :src="b.photo_url" alt=""
                              class="w-14 h-14 rounded-xl object-cover border border-gray-100 shadow-sm">
                         <div v-else
                              class="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-xl font-extrabold shadow-sm">
@@ -158,18 +159,27 @@ function startEdit(b) {
 
 function cancelEdit() { editing.value = null; form.reset(); }
 
+function payloadWithoutEmptyPhoto(data) {
+    const payload = { ...data };
+    if (! payload.photo) {
+        delete payload.photo;
+    }
+    return payload;
+}
+
 function save() {
     if (editing.value) {
-        form.transform(d => ({ ...d, _method: 'PUT' }))
+        form.transform(d => ({ ...payloadWithoutEmptyPhoto(d), _method: 'PUT' }))
             .post(`/sahodaya-admin/${props.sahodaya.id}/office-bearers/${editing.value}`, {
                 forceFormData: true,
                 onSuccess: () => { editing.value = null; form.reset(); },
             });
     } else {
-        form.post(`/sahodaya-admin/${props.sahodaya.id}/office-bearers`, {
-            forceFormData: true,
-            onSuccess: () => form.reset(),
-        });
+        form.transform(payloadWithoutEmptyPhoto)
+            .post(`/sahodaya-admin/${props.sahodaya.id}/office-bearers`, {
+                forceFormData: true,
+                onSuccess: () => form.reset(),
+            });
     }
 }
 
