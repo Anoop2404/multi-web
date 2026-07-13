@@ -10,7 +10,8 @@ class PurgeTestSchools extends Command
 {
     protected $signature = 'schools:purge-test
                             {--sahodaya= : Sahodaya tenant ID or subdomain}
-                            {--pattern=test : Delete schools whose name contains this (case-insensitive)}
+                            {--pattern= : Delete schools whose name contains this (case-insensitive)}
+                            {--status= : Delete schools whose membership_status is in this comma-separated list (e.g. approved,rejected)}
                             {--school= : Purge one school by ID}
                             {--dry-run : List matches without deleting}
                             {--force : Delete without confirmation}';
@@ -19,6 +20,12 @@ class PurgeTestSchools extends Command
 
     public function handle(SchoolDataPurger $purger): int
     {
+        if (! $this->option('school') && ! $this->option('pattern') && ! $this->option('status')) {
+            $this->error('Refusing to run with no filter — pass --school=, --pattern=, and/or --status= so this cannot accidentally match every school in the Sahodaya.');
+
+            return self::FAILURE;
+        }
+
         $sahodaya = $this->resolveSahodaya();
         if (! $sahodaya) {
             $this->error('Sahodaya tenant not found.');
@@ -99,6 +106,19 @@ class PurgeTestSchools extends Command
         $pattern = trim((string) $this->option('pattern'));
         if ($pattern !== '') {
             $query->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($pattern).'%']);
+        }
+
+        $status = trim((string) $this->option('status'));
+        if ($status !== '') {
+            $statuses = array_values(array_filter(array_map('trim', explode(',', $status))));
+            $allowed = ['pending', 'approved', 'rejected'];
+            $invalid = array_diff($statuses, $allowed);
+            if ($invalid !== []) {
+                $this->error('Invalid --status value(s): '.implode(', ', $invalid).'. Allowed: '.implode(', ', $allowed));
+
+                return collect();
+            }
+            $query->whereIn('membership_status', $statuses);
         }
 
         return $query->orderBy('created_at')->get();
