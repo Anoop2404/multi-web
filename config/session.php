@@ -73,7 +73,9 @@ return [
     |
     */
 
-    'connection' => env('SESSION_CONNECTION'),
+    // Always use the central connection so superadmin sessions survive when
+    // /sahodaya-admin/{tenantId} switches the default DB to a tenant database.
+    'connection' => env('SESSION_CONNECTION', 'central'),
 
     /*
     |--------------------------------------------------------------------------

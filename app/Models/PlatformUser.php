@@ -52,7 +52,23 @@ class PlatformUser extends Authenticatable implements MustVerifyEmail
 
     public function isSuperAdmin(): bool
     {
-        return $this->hasRole('superadmin');
+        try {
+            if ($this->hasRole('superadmin')) {
+                return true;
+            }
+        } catch (\Throwable) {
+            // Spatie may hit a non-taggable tenant cache store; fall through to central DB.
+        }
+
+        // Fallback when Spatie cache is unavailable under a non-taggable tenant cache store.
+        return \Illuminate\Support\Facades\DB::connection(config('tenancy.database.central_connection', 'central'))
+            ->table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('roles.name', 'superadmin')
+            ->where('roles.guard_name', $this->guard_name)
+            ->where('model_has_roles.model_id', $this->id)
+            ->whereIn('model_has_roles.model_type', [self::class, User::class])
+            ->exists();
     }
 
     public function getRoleClass(): string

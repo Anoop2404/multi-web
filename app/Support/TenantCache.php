@@ -23,7 +23,7 @@ class TenantCache
 
     public static function flushTenant(string $tenantId): void
     {
-        foreach (['setting:theme', 'setting:nav_config', 'setting:footer_config', 'setting:widgets', 'setting:seo', 'setting:locale', 'setting:logo', 'site:layout'] as $key) {
+        foreach (['setting:theme', 'setting:nav_config', 'setting:footer_config', 'setting:widgets', 'setting:seo', 'setting:locale', 'setting:logo', 'site:layout', 'sitemap'] as $key) {
             self::forget($tenantId, $key);
         }
     }

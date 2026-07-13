@@ -89,8 +89,8 @@ class AuthAuditTest extends TestCase
             'user_id'     => $admin->id,
         ]);
 
-        $this->actingAs($admin)
-            ->get('/admin/audit-logs?category=auth')
+        $this->actingAs($admin, 'platform')
+            ->get('http://superadmin.test/admin/audit-logs?category=auth')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('filters.category', 'auth')

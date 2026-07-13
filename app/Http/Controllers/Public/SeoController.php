@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\GalleryAlbum;
 use App\Models\NewsArticle;
-use Illuminate\Support\Facades\Cache;
+use App\Support\TenantCache;
 
 class SeoController extends Controller
 {
@@ -15,9 +15,7 @@ class SeoController extends Controller
         $tenant = tenancy()->tenant;
         abort_if(!$tenant || !$tenant->is_active, 404);
 
-        $cacheKey = "site:{$tenant->id}:sitemap";
-
-        $urls = Cache::remember($cacheKey, now()->addHours(6), function () use ($tenant) {
+        $urls = TenantCache::remember($tenant->id, 'sitemap', now()->addHours(6), function () use ($tenant) {
             $base = 'https://' . $tenant->domain;
             $urls = [
                 ['loc' => $base, 'priority' => '1.0', 'changefreq' => 'weekly'],

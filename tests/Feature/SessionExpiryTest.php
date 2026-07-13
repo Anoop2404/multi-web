@@ -54,7 +54,7 @@ class SessionExpiryTest extends TestCase
 
     public function test_login_page_shows_session_expired_flag(): void
     {
-        $response = $this->get('/login?session=expired');
+        $response = $this->get('http://superadmin.test/login?session=expired');
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page

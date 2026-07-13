@@ -29,8 +29,9 @@ return [
     'tenant_base_domain' => env('TENANT_BASE_DOMAIN', 'sahodaya.test'),
 
     'central_domains' => array_values(array_unique(array_filter([
-        '127.0.0.1',
-        'localhost',
+        // Keep loopback as central in real apps; in PHPUnit relative URLs must stay on the web guard.
+        env('APP_ENV') === 'testing' ? null : '127.0.0.1',
+        env('APP_ENV') === 'testing' ? null : 'localhost',
         env('CENTRAL_DOMAIN', 'sahodaya.test'),
     ]))),
 
@@ -45,11 +46,15 @@ return [
     // Local dev: auto-create and migrate missing Sahodaya databases on first request.
     'auto_create_sahodaya_database' => env('TENANCY_AUTO_CREATE_DATABASE', env('APP_ENV') === 'local'),
 
+    // Cache tenancy tags require a taggable store (redis/memcached/array).
+    // File/database cache throws "This cache store does not support tagging".
     'bootstrappers' => array_values(array_filter([
         env('TENANCY_DATABASE_PER_SAHODAYA', true)
             ? Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper::class
             : null,
-        Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
+        in_array(env('CACHE_STORE', env('CACHE_DRIVER', 'database')), ['redis', 'memcached', 'dynamodb', 'array', 'octane'], true)
+            ? Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class
+            : null,
         Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper::class,
     ])),

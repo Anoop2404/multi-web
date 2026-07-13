@@ -18,7 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Tenant DB must be active before route model binding resolves tenant-scoped models.
+        // On central /sahodaya-admin/{tenantId} routes, tenancy must start AFTER the session
+        // (so database/file sessions stay on the central store) but BEFORE route model binding.
+        $middleware->prependToPriorityList(
+            \Illuminate\Session\Middleware\StartSession::class,
+            \App\Http\Middleware\InitializeTenancyByRouteTenant::class,
+        );
         $middleware->prependToPriorityList(
             \App\Http\Middleware\InitializeTenancyByRouteTenant::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,

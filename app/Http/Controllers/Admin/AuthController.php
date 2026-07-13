@@ -172,7 +172,10 @@ class AuthController extends Controller
             return self::authErrorResponse($request, $lockout->lockoutMessage($identifier));
         }
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        $guard = TenantDomainSync::isCentralHost($request->getHost()) ? 'platform' : 'web';
+        Auth::shouldUse($guard);
+
+        if (! Auth::guard($guard)->attempt($credentials, $request->boolean('remember'))) {
             $lockout->recordFailedAttempt($identifier);
             app(PlatformAuditLogger::class)->loginFailed(
                 $identifier,

@@ -32,7 +32,11 @@ class CentralRouteServiceProvider extends ServiceProvider
                         return redirect()->to(AuthController::homeFor(auth()->user()));
                     }
 
-                    TenantRequestResolver::initializeFromRequest($request);
+                    try {
+                        TenantRequestResolver::initializeFromRequest($request);
+                    } catch (\Stancl\Tenancy\Exceptions\TenantCouldNotBeIdentifiedOnDomainException) {
+                        abort(404, 'This portal domain is not registered. Ask superadmin to save the Sahodaya domain again, or run: php artisan tenants:sync-domains');
+                    }
 
                     if (\App\Support\TenantPublicSite::isEnabled(tenancy()->tenant)) {
                         return app(PublicSiteController::class)->home($request);
