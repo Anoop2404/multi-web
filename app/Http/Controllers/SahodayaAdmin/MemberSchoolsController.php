@@ -78,11 +78,25 @@ class MemberSchoolsController extends SahodayaAdminController
             ->paginate(20)
             ->withQueryString();
 
-        $schools->getCollection()->transform(function (Tenant $school) {
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
+
+        $schools->getCollection()->transform(function (Tenant $school) use ($year) {
             $payload = $school->application_payload ?? [];
             $school->setAttribute('contact_email', $payload['school_email'] ?? $payload['contact_email'] ?? null);
             $school->setAttribute('contact_phone', $payload['phone'] ?? $payload['contact_phone'] ?? null);
             $school->setAttribute('affiliation', $payload['cbse_affiliation'] ?? $payload['affiliation_number'] ?? null);
+
+            // Fetch the latest submitted/verified membership payment for this academic year
+            $payment = MembershipPayment::where('school_id', $school->id)
+                ->where('academic_year', $year)
+                ->whereIn('status', ['submitted', 'verified'])
+                ->latest()
+                ->first();
+
+            $school->setAttribute('has_payment', $payment !== null);
+            $school->setAttribute('payment_status', $payment?->status);
+            $school->setAttribute('payment_amount', $payment?->amount);
+            $school->setAttribute('payment_proof_url', $payment?->proof_url);
 
             return $school;
         });
@@ -143,6 +157,12 @@ class MemberSchoolsController extends SahodayaAdminController
 
         $cancellation = app(SchoolMembershipCancellationService::class);
 
+        $payment = MembershipPayment::where('school_id', $school->id)
+            ->where('academic_year', $year)
+            ->whereIn('status', ['submitted', 'verified'])
+            ->latest()
+            ->first();
+
         return $this->inertia('Sahodaya/Schools/Show', [
             'school' => array_merge($school->only(
                 'id', 'name', 'school_prefix', 'membership_status', 'is_non_affiliated', 'is_active',
@@ -153,6 +173,9 @@ class MemberSchoolsController extends SahodayaAdminController
                 'has_login'      => User::where('tenant_id', $school->id)->exists(),
                 'login_email'    => User::where('tenant_id', $school->id)->value('email'),
                 'can_cancel_membership' => $cancellation->canCancel($school),
+                'has_payment'    => $payment !== null,
+                'payment_proof_url' => $payment?->proof_url,
+                'payment_amount' => $payment?->amount,
             ]),
             'detailFields'   => $fields,
             'registration'   => $registration,
@@ -239,6 +262,14 @@ class MemberSchoolsController extends SahodayaAdminController
         abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
         abort_unless($school->membership_status === 'pending', 422, 'School is not pending approval.');
 
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
+        $hasPayment = MembershipPayment::where('school_id', $school->id)
+            ->where('academic_year', $year)
+            ->whereIn('status', ['submitted', 'verified'])
+            ->exists();
+
+        abort_unless($hasPayment, 422, "Cannot approve {$school->name} because no membership payment has been submitted.");
+
         $this->approveSchool($school, $notifier, $audit, request()->user()?->id);
 
         return back()->with('success', "{$school->name} approved.");
@@ -258,11 +289,26 @@ class MemberSchoolsController extends SahodayaAdminController
             ->whereIn('id', $data['school_ids'])
             ->get();
 
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
+        $approvedCount = 0;
+
         foreach ($schools as $school) {
-            $this->approveSchool($school, $notifier, $audit, $request->user()?->id);
+            $hasPayment = MembershipPayment::where('school_id', $school->id)
+                ->where('academic_year', $year)
+                ->whereIn('status', ['submitted', 'verified'])
+                ->exists();
+
+            if ($hasPayment) {
+                $this->approveSchool($school, $notifier, $audit, $request->user()?->id);
+                $approvedCount++;
+            }
         }
 
-        return back()->with('success', $schools->count().' school(s) approved.');
+        if ($approvedCount === 0) {
+            return back()->with('error', 'No schools could be approved because none of the selected schools have submitted membership payments.');
+        }
+
+        return back()->with('success', $approvedCount.' school(s) approved.');
     }
 
     public function bulkReject(Request $request, MembershipNotifier $notifier)

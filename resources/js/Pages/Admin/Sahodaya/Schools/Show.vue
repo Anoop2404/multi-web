@@ -12,12 +12,30 @@
 
             <div v-if="school.membership_status === 'pending'"
                  class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                <span>
-                    This school is <strong>pending approval</strong>. You can approve directly, or verify payment on
-                    <Link :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`" class="font-semibold text-[#0f3d7a] hover:underline">Payments</Link>.
-                </span>
+                <div class="space-y-1">
+                    <p>
+                        This school is <strong>pending approval</strong>. You can approve once payment is verified.
+                    </p>
+                    <div class="flex items-center gap-3 mt-1">
+                        <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+                              :class="school.has_payment ? 'bg-green-50 text-green-700 ring-1 ring-green-600/20' : 'bg-red-50 text-red-700 ring-1 ring-red-600/20'">
+                            <span class="h-1.5 w-1.5 rounded-full" :class="school.has_payment ? 'bg-green-600' : 'bg-red-600'"></span>
+                            {{ school.has_payment ? `Payment Uploaded (₹${Number(school.payment_amount).toLocaleString('en-IN')})` : 'Payment Not Uploaded' }}
+                        </span>
+                        <a v-if="school.payment_proof_url" :href="school.payment_proof_url" target="_blank" rel="noopener"
+                           class="inline-flex items-center gap-1 text-xs text-[#0f3d7a] font-semibold hover:underline">
+                            View Proof ↗
+                        </a>
+                    </div>
+                </div>
                 <div class="flex gap-2 shrink-0">
-                    <button type="button" class="btn-primary text-sm" @click="approveSchool">Approve school</button>
+                    <button type="button" 
+                            class="btn-primary text-sm" 
+                            :class="!school.has_payment ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''"
+                            :disabled="!school.has_payment"
+                            @click="approveSchool">
+                        Approve school
+                    </button>
                     <button type="button" class="btn-secondary text-sm text-red-700 border-red-200" @click="rejectSchool">Reject</button>
                 </div>
             </div>

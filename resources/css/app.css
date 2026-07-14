@@ -848,7 +848,7 @@ input:checked + .toggle-switch::after,
 :is(.sa-layout, .min-h-screen.bg-gray-100.flex, .min-h-screen.bg-gray-50.flex.flex-col)
     :is(button, a).bg-violet-600,
 :is(.sa-layout, .min-h-screen.bg-gray-100.flex, .min-h-screen.bg-gray-50.flex.flex-col)
-    :is(button, a).bg-[#0f3d7a] {
+    :is(button, a).bg-\[\#0f3d7a\] {
     background-color: var(--brand-navy) !important;
     color: #fff !important;
     border-radius: var(--field-radius) !important;
@@ -874,7 +874,7 @@ input:checked + .toggle-switch::after,
 :is(.sa-layout, .min-h-screen.bg-gray-100.flex, .min-h-screen.bg-gray-50.flex.flex-col)
     :is(button, a).bg-violet-600:hover,
 :is(.sa-layout, .min-h-screen.bg-gray-100.flex, .min-h-screen.bg-gray-50.flex.flex-col)
-    :is(button, a).bg-[#0f3d7a]:hover {
+    :is(button, a).bg-\[\#0f3d7a\]:hover {
     background-color: var(--brand-navy-hover) !important;
 }
 
@@ -931,8 +931,8 @@ input:checked + .toggle-switch::after,
     color: var(--brand-navy);
 }
 
-.sa-main a.text-[#0f3d7a],
-.min-h-screen.bg-gray-100.flex main a.text-[#0f3d7a] {
+.sa-main a.text-\[\#0f3d7a\],
+.min-h-screen.bg-gray-100.flex main a.text-\[\#0f3d7a\] {
     color: var(--brand-blue);
     font-weight: 600;
 }

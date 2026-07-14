@@ -58,9 +58,26 @@
                         <span v-if="school.contact_email"> · {{ school.contact_email }}</span>
                         <span v-if="school.affiliation"> · Aff. {{ school.affiliation }}</span>
                     </p>
+                    <div class="mt-2 flex items-center gap-3">
+                        <span class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
+                              :class="school.has_payment ? 'bg-green-50 text-green-700 ring-1 ring-green-600/20' : 'bg-red-50 text-red-700 ring-1 ring-red-600/20'">
+                            <span class="h-1.5 w-1.5 rounded-full" :class="school.has_payment ? 'bg-green-600' : 'bg-red-600'"></span>
+                            {{ school.has_payment ? `Payment Uploaded (₹${Number(school.payment_amount).toLocaleString('en-IN')})` : 'Payment Not Uploaded' }}
+                        </span>
+                        <a v-if="school.payment_proof_url" :href="school.payment_proof_url" target="_blank" rel="noopener"
+                           class="inline-flex items-center gap-1 text-xs text-[#0f3d7a] font-semibold hover:underline">
+                            View Proof ↗
+                        </a>
+                    </div>
                 </Link>
                 <div class="flex flex-wrap items-center gap-2 shrink-0">
-                    <button type="button" class="btn-primary text-xs py-1.5 px-3" @click="approveOne(school.id)">Approve</button>
+                    <button type="button" 
+                            class="btn-primary text-xs py-1.5 px-3" 
+                            :class="!school.has_payment ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''"
+                            :disabled="!school.has_payment"
+                            @click="approveOne(school.id)">
+                        Approve
+                    </button>
                     <button type="button" class="btn-secondary text-xs py-1.5 px-3 text-red-700 border-red-200" @click="rejectOne(school.id)">Reject</button>
                 </div>
             </div>
