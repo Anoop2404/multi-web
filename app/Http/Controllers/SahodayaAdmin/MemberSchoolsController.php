@@ -51,9 +51,7 @@ class MemberSchoolsController extends SahodayaAdminController
                 'total_students' => $approvedIds->isEmpty()
                     ? 0
                     : Student::whereIn('tenant_id', $approvedIds)->where('status', 'active')->count(),
-                'total_classes' => $approvedIds->isEmpty()
-                    ? 0
-                    : SchoolClass::whereIn('tenant_id', $approvedIds)->where('is_active', true)->count(),
+                'total_classes' => \App\Models\MasterClass::forSahodaya($this->sahodaya->id)->active()->count(),
             ],
         ]);
     }
@@ -69,7 +67,13 @@ class MemberSchoolsController extends SahodayaAdminController
                 $search = $filters['search'];
                 $q->where(function ($inner) use ($search) {
                     $inner->where('name', 'like', "%{$search}%")
-                        ->orWhere('school_prefix', 'like', "%{$search}%");
+                        ->orWhere('school_prefix', 'like', "%{$search}%")
+                        ->orWhere('application_payload->cbse_affiliation', 'like', "%{$search}%")
+                        ->orWhere('application_payload->affiliation_number', 'like', "%{$search}%")
+                        ->orWhere('application_payload->school_email', 'like', "%{$search}%")
+                        ->orWhere('application_payload->contact_email', 'like', "%{$search}%")
+                        ->orWhere('application_payload->phone', 'like', "%{$search}%")
+                        ->orWhere('application_payload->contact_phone', 'like', "%{$search}%");
                 });
             })
             ->when($filters['date_from'], fn ($q) => $q->whereDate('created_at', '>=', $filters['date_from']))

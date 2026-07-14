@@ -182,7 +182,13 @@ trait BuildsMembershipExports
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('school_prefix', 'like', "%{$search}%");
+                    ->orWhere('school_prefix', 'like', "%{$search}%")
+                    ->orWhere('application_payload->cbse_affiliation', 'like', "%{$search}%")
+                    ->orWhere('application_payload->affiliation_number', 'like', "%{$search}%")
+                    ->orWhere('application_payload->school_email', 'like', "%{$search}%")
+                    ->orWhere('application_payload->contact_email', 'like', "%{$search}%")
+                    ->orWhere('application_payload->phone', 'like', "%{$search}%")
+                    ->orWhere('application_payload->contact_phone', 'like', "%{$search}%");
             });
         }
 

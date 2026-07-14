@@ -1079,6 +1079,12 @@ function canWithdraw(reg) {
     const event = props.events.find(e => e.id === reg.event_id);
     if (!event) return reg.status === 'submitted';
     if (event.results_published || ['completed', 'cancelled'].includes(event.status)) return false;
+    // Mirrors the server-side rule (FestRegistrationService::canSchoolCancel): once the
+    // school has an approved/paid fee for this event, cancellation is blocked to avoid
+    // an out-of-sync fee ledger. Without this check the Cancel link was always shown and
+    // always failed with a 422 once payment was approved.
+    const fee = event.school_fee;
+    if (fee && (fee.status === 'approved' || Number(fee.amount_paid ?? 0) > 0)) return false;
     return event.status === 'registration_open' || reg.status === 'submitted';
 }
 
@@ -1126,17 +1132,17 @@ function itemBlockReason(event, item) {
     if (!quotas) return '';
 
     const limits = quotas.limits ?? {};
-    if (item.stage_type === 'on_stage' && limits.max_onstage_per_student != null
-        && quotas.used.on_stage >= limits.max_onstage_per_student) {
-        return `School on-stage participation limit reached (max ${limits.max_onstage_per_student}).`;
+    if (item.stage_type === 'on_stage' && limits.max_onstage_per_school != null
+        && quotas.used.on_stage >= limits.max_onstage_per_school) {
+        return `School on-stage participation limit reached (max ${limits.max_onstage_per_school}).`;
     }
-    if (item.stage_type === 'off_stage' && limits.max_offstage_per_student != null
-        && quotas.used.off_stage >= limits.max_offstage_per_student) {
-        return `School off-stage participation limit reached (max ${limits.max_offstage_per_student}).`;
+    if (item.stage_type === 'off_stage' && limits.max_offstage_per_school != null
+        && quotas.used.off_stage >= limits.max_offstage_per_school) {
+        return `School off-stage participation limit reached (max ${limits.max_offstage_per_school}).`;
     }
-    if (['group', 'team'].includes(item.participant_type) && limits.max_group_per_student != null
-        && quotas.used.group >= limits.max_group_per_student) {
-        return `School group/team participation limit reached (max ${limits.max_group_per_student}).`;
+    if (['group', 'team'].includes(item.participant_type) && limits.max_group_per_school != null
+        && quotas.used.group >= limits.max_group_per_school) {
+        return `School group/team participation limit reached (max ${limits.max_group_per_school}).`;
     }
 
     return '';
