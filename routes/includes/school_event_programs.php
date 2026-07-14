@@ -85,6 +85,9 @@ foreach ($festPrograms as $cfg) {
         Route::post('/registrations/{registration}/withdraw', [FestRegistrationController::class, 'withdraw'])
             ->defaults('program', $slug)
             ->name('registrations.withdraw');
+        Route::post('/registrations/{registration}/update', [FestRegistrationController::class, 'update'])
+            ->defaults('program', $slug)
+            ->name('registrations.update');
         Route::post('/events/{event}/payment', [FestRegistrationController::class, 'uploadEventPayment'])
             ->defaults('program', $slug)
             ->name('event.payment');

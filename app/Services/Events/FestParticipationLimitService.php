@@ -41,13 +41,20 @@ class FestParticipationLimitService
         ];
     }
 
-    /** @return list<string> */
-    public function validateRegistration(FestEventItem $item, string $schoolId, array $studentIds, array $standbyIds = []): array
+    /**
+     * @param  ?int  $excludeRegistrationId  When re-validating an EDIT of an existing
+     *                                        registration (not a brand new one), pass its
+     *                                        id so its own current participants/entry
+     *                                        aren't double-counted against school/student
+     *                                        quotas or the "already has an entry" check.
+     * @return list<string>
+     */
+    public function validateRegistration(FestEventItem $item, string $schoolId, array $studentIds, array $standbyIds = [], ?int $excludeRegistrationId = null): array
     {
         $errors = [];
         $policy = $this->policyFor($item->class_group);
 
-        if (($policy['one_entry_per_item_per_school'] ?? true) && $this->schoolHasItemEntry($schoolId, $item->id, $policy)) {
+        if (($policy['one_entry_per_item_per_school'] ?? true) && $this->schoolHasItemEntry($schoolId, $item->id, $policy, $excludeRegistrationId)) {
             $errors[] = 'Your school already has an entry for this item.';
         }
 
@@ -57,15 +64,16 @@ class FestParticipationLimitService
                 ->where('school_id', $schoolId)
                 ->where('item_id', $item->id)
                 ->whereIn('status', $this->countableStatuses($policy))
+                ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
                 ->count();
             if ($itemCount >= $maxPerSchool) {
                 $errors[] = "Maximum {$maxPerSchool} entr".($maxPerSchool === 1 ? 'y' : 'ies').' per school for this item.';
             }
         }
 
-        $errors = array_merge($errors, $this->validateHeadCapacity($item, $policy));
+        $errors = array_merge($errors, $this->validateHeadCapacity($item, $policy, $excludeRegistrationId));
 
-        $regs = $this->schoolRegistrations($schoolId, $policy);
+        $regs = $this->schoolRegistrations($schoolId, $policy, $excludeRegistrationId);
         $isOnStage = ($item->stage_type ?? '') === 'on_stage';
         $isOffStage = ($item->stage_type ?? '') === 'off_stage';
         $isGroup = in_array($item->participant_type, ['group', 'team'], true);
@@ -94,10 +102,10 @@ class FestParticipationLimitService
         $performerIds = array_values(array_diff($studentIds, $standbyIds));
 
         foreach ($performerIds as $sid) {
-            $errors = array_merge($errors, $this->validateStudent($sid, $item, $schoolId, $policy));
+            $errors = array_merge($errors, $this->validateStudent($sid, $item, $schoolId, $policy, $excludeRegistrationId));
         }
 
-        $errors = array_merge($errors, $this->validateComboProfiles($performerIds, $item, $schoolId, $policy));
+        $errors = array_merge($errors, $this->validateComboProfiles($performerIds, $item, $schoolId, $policy, $excludeRegistrationId));
 
         $errors = array_merge(
             $errors,
@@ -117,7 +125,7 @@ class FestParticipationLimitService
      *
      * @return list<string>
      */
-    private function validateHeadCapacity(FestEventItem $item, array $policy): array
+    private function validateHeadCapacity(FestEventItem $item, array $policy, ?int $excludeRegistrationId = null): array
     {
         if (! $item->head_id) {
             return [];
@@ -145,6 +153,7 @@ class FestParticipationLimitService
                 ->whereHas('item', fn ($q) => $q
                     ->where('head_id', $head->id)
                     ->whereIn('participant_type', ['team', 'group']))
+                ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
                 ->count();
 
             if ($teamCount >= $maxTeams) {
@@ -172,6 +181,7 @@ class FestParticipationLimitService
                     $q->whereNull('participant_type')
                         ->orWhereNotIn('participant_type', ['team', 'group']);
                 }))
+            ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
             ->count();
 
         if ($participantCount >= $maxParticipants) {
@@ -235,7 +245,7 @@ class FestParticipationLimitService
     }
 
     /** @return list<string> */
-    private function validateComboProfiles(array $performerIds, FestEventItem $item, string $schoolId, array $policy): array
+    private function validateComboProfiles(array $performerIds, FestEventItem $item, string $schoolId, array $policy, ?int $excludeRegistrationId = null): array
     {
         $profiles = $policy['combo_profiles'] ?? null;
         if (! is_array($profiles) || $profiles === []) {
@@ -244,7 +254,7 @@ class FestParticipationLimitService
 
         $errors = [];
         foreach ($performerIds as $studentId) {
-            $studentRegs = $this->studentRegistrations($studentId, $schoolId, $policy);
+            $studentRegs = $this->studentRegistrations($studentId, $schoolId, $policy, $excludeRegistrationId);
             $counts = [
                 'onstage' => $this->filterRegs($studentRegs, 'on_stage')->count(),
                 'offstage' => $this->filterRegs($studentRegs, 'off_stage')->count(),
@@ -288,10 +298,10 @@ class FestParticipationLimitService
     }
 
     /** @return list<string> */
-    private function validateStudent(int $studentId, FestEventItem $item, string $schoolId, array $policy): array
+    private function validateStudent(int $studentId, FestEventItem $item, string $schoolId, array $policy, ?int $excludeRegistrationId = null): array
     {
         $errors = [];
-        $studentRegs = $this->studentRegistrations($studentId, $schoolId, $policy);
+        $studentRegs = $this->studentRegistrations($studentId, $schoolId, $policy, $excludeRegistrationId);
 
         $isOnStage = ($item->stage_type ?? '') === 'on_stage';
         $isOffStage = ($item->stage_type ?? '') === 'off_stage';
@@ -332,27 +342,29 @@ class FestParticipationLimitService
         return $errors;
     }
 
-    private function schoolHasItemEntry(string $schoolId, int $itemId, array $policy): bool
+    private function schoolHasItemEntry(string $schoolId, int $itemId, array $policy, ?int $excludeRegistrationId = null): bool
     {
         return FestRegistration::where('event_id', $this->event->id)
             ->where('school_id', $schoolId)
             ->where('item_id', $itemId)
             ->whereIn('status', $this->countableStatuses($policy))
+            ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
             ->exists();
     }
 
     /** @return \Illuminate\Support\Collection<int, FestRegistration> */
-    private function schoolRegistrations(string $schoolId, array $policy)
+    private function schoolRegistrations(string $schoolId, array $policy, ?int $excludeRegistrationId = null)
     {
         return FestRegistration::where('event_id', $this->event->id)
             ->where('school_id', $schoolId)
             ->whereIn('status', $this->countableStatuses($policy))
+            ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
             ->with('item')
             ->get();
     }
 
     /** @return \Illuminate\Support\Collection<int, FestRegistration> */
-    private function studentRegistrations(int $studentId, string $schoolId, array $policy)
+    private function studentRegistrations(int $studentId, string $schoolId, array $policy, ?int $excludeRegistrationId = null)
     {
         $registrationIds = FestParticipant::where('student_id', $studentId)
             ->where('participant_role', 'performer')
@@ -360,6 +372,7 @@ class FestParticipationLimitService
                 ->where('event_id', $this->event->id)
                 ->where('school_id', $schoolId)
                 ->whereIn('status', $this->countableStatuses($policy)))
+            ->when($excludeRegistrationId, fn ($q) => $q->where('registration_id', '!=', $excludeRegistrationId))
             ->pluck('registration_id');
 
         return FestRegistration::whereIn('id', $registrationIds)->with('item')->get();

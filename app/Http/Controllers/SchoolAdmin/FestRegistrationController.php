@@ -707,6 +707,56 @@ class FestRegistrationController extends SchoolAdminController
         return back()->with('success', $message);
     }
 
+    public function update(Request $request, string $tenantId, FestRegistration $registration, string $program)
+    {
+        $event = FestEvent::findOrFail($registration->event_id);
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        abort_if($registration->school_id !== $this->school->id, 403);
+
+        $item = FestEventItem::findOrFail($registration->item_id);
+
+        $rules = [
+            'team_name'      => 'nullable|string|max:255',
+            'coach_name'     => 'nullable|string|max:255',
+            'coach_phone'    => 'nullable|string|max:40',
+            'manager_name'   => 'nullable|string|max:255',
+            'manager_phone'  => 'nullable|string|max:40',
+            'student_ids'    => $event->event_type === 'teacher_fest' ? 'nullable|array' : 'required|array|min:1',
+            'student_ids.*'  => 'exists:students,id',
+            'teacher_ids'    => $event->event_type === 'teacher_fest' ? 'required|array|min:1' : 'nullable|array',
+            'teacher_ids.*'  => 'exists:teachers,id',
+            'standby_ids'    => 'nullable|array|max:2',
+            'standby_ids.*'  => 'exists:students,id',
+        ];
+
+        $data = $request->validate($rules);
+
+        $standbyIds = $data['standby_ids'] ?? [];
+        $performerIds = $event->event_type === 'teacher_fest'
+            ? array_values(array_unique($data['teacher_ids'] ?? []))
+            : array_values(array_diff($data['student_ids'], $standbyIds));
+
+        $registration = app(\App\Services\Events\FestRegistrationCreateService::class)->updateForSchool(
+            $registration,
+            $event,
+            $item,
+            $this->school,
+            $performerIds,
+            $standbyIds,
+            $data['team_name'] ?? null,
+            teamContacts: [
+                'coach_name' => $data['coach_name'] ?? null,
+                'coach_phone' => $data['coach_phone'] ?? null,
+                'manager_name' => $data['manager_name'] ?? null,
+                'manager_phone' => $data['manager_phone'] ?? null,
+            ],
+        );
+
+        app(PlatformAuditLogger::class)->festRegistrationSubmitted($registration->fresh(['event', 'item']));
+
+        return back()->with('success', 'Registration updated.');
+    }
+
     public function uploadEventPayment(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);

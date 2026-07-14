@@ -179,6 +179,182 @@ class FestRegistrationCreateService
         }
     }
 
+    /**
+     * Edit the roster of an already-submitted registration in place, instead of
+     * withdrawing and re-registering. Re-runs the same squad/eligibility/quota
+     * validation as createForSchool(), but excludes this registration's own current
+     * participants from the "already has an entry" / per-school / per-student quota
+     * counts (otherwise every edit would immediately trip its own quota).
+     *
+     * @param  list<int>  $performerIds
+     * @param  list<int>  $standbyIds
+     * @param  array{coach_name?: ?string, coach_phone?: ?string, manager_name?: ?string, manager_phone?: ?string}|null  $teamContacts
+     */
+    public function updateForSchool(
+        FestRegistration $registration,
+        FestEvent $event,
+        FestEventItem $item,
+        Tenant $school,
+        array $performerIds,
+        array $standbyIds = [],
+        ?string $teamName = null,
+        ?array $teamContacts = null,
+    ): FestRegistration {
+        abort_if($registration->event_id !== $event->id, 403);
+        abort_if($registration->item_id !== $item->id, 403, 'Cannot change which item a registration belongs to — cancel and re-register instead.');
+        abort_if($registration->school_id !== $school->id, 403);
+        abort_if($school->parent_id !== $event->tenant_id, 403);
+
+        abort_unless(
+            app(FestRegistrationService::class)->canSchoolCancel($registration, $event),
+            422,
+            'This registration can no longer be edited — it may already be approved with payment, past results-publish, or the event has closed.'
+        );
+
+        abort_if($item->is_enabled === false, 422, 'This item is not open for registration.');
+        app(FestItemRegistrationGate::class)->assertOpen($item);
+        abort_if($event->schedule_published, 422, 'The squad cannot be changed once the fest-day schedule has been published.');
+
+        if ($event->event_type === 'teacher_fest') {
+            return $this->updateTeacherRegistration($registration, $event, $item, $school, $performerIds);
+        }
+
+        $standbyIds = array_values(array_unique($standbyIds));
+        $performerIds = array_values(array_diff(array_unique($performerIds), $standbyIds));
+
+        abort_if($performerIds === [], 422, 'Select at least one participant.');
+
+        $isGroup = in_array($item->participant_type, ['group', 'team'], true);
+        if ($isGroup) {
+            abort_if(! filled($teamName), 422, 'Team name is required for group items.');
+            $error = $item->validateSquadCount(count($performerIds));
+            abort_if($error, 422, $error);
+        } elseif (count($performerIds) > 1) {
+            abort(422, 'This item allows only one participant.');
+        }
+
+        $limitErrors = (new FestParticipationLimitService($event))
+            ->validateRegistration($item, $school->id, $performerIds, $standbyIds, $registration->id);
+        abort_if($limitErrors, 422, implode(' ', $limitErrors));
+
+        $eligibilityErrors = app(FestRegistrationEligibilityService::class)
+            ->validateStudents($event, $item, array_merge($performerIds, $standbyIds));
+        abort_if($eligibilityErrors, 422, implode(' ', $eligibilityErrors));
+
+        return DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts) {
+            $eventRegService = app(FestEventRegistrationService::class);
+            foreach (array_merge($performerIds, $standbyIds) as $studentId) {
+                if ($eventRegService->requireEventRegistration($event) && $event->event_type !== 'sports') {
+                    $eventRegService->assertStudentEligible($event, $studentId);
+                } else {
+                    $student = Student::find($studentId);
+                    if ($student) {
+                        $eventRegService->registerStudent($event, $student, $school);
+                    }
+                }
+            }
+
+            // Clear the old roster (and its numbering) before rebuilding it — the fest
+            // level registration number is per-student/per-event, not per-participant
+            // row, so re-syncing afterwards correctly reuses/reissues as needed.
+            $registration->participants()->delete();
+
+            $groupId = null;
+            if ($isGroup) {
+                $group = FestGroup::updateOrCreate(
+                    ['registration_id' => $registration->id],
+                    [
+                        'team_name'     => $teamName,
+                        'coach_name'    => filled($teamContacts['coach_name'] ?? null) ? trim((string) $teamContacts['coach_name']) : null,
+                        'coach_phone'   => filled($teamContacts['coach_phone'] ?? null) ? trim((string) $teamContacts['coach_phone']) : null,
+                        'manager_name'  => filled($teamContacts['manager_name'] ?? null) ? trim((string) $teamContacts['manager_name']) : null,
+                        'manager_phone' => filled($teamContacts['manager_phone'] ?? null) ? trim((string) $teamContacts['manager_phone']) : null,
+                    ],
+                );
+                $groupId = $group->id;
+            } else {
+                FestGroup::where('registration_id', $registration->id)->delete();
+            }
+
+            foreach ($performerIds as $studentId) {
+                abort_if(Student::where('id', $studentId)->where('tenant_id', $school->id)->doesntExist(), 403);
+                FestParticipant::create([
+                    'registration_id'  => $registration->id,
+                    'group_id'         => $groupId,
+                    'student_id'       => $studentId,
+                    'participant_type' => 'student',
+                    'participant_role' => 'performer',
+                ]);
+            }
+
+            foreach ($standbyIds as $studentId) {
+                abort_if(Student::where('id', $studentId)->where('tenant_id', $school->id)->doesntExist(), 403);
+                FestParticipant::create([
+                    'registration_id'  => $registration->id,
+                    'group_id'         => $groupId,
+                    'student_id'       => $studentId,
+                    'participant_type' => 'student',
+                    'participant_role' => 'standby',
+                ]);
+            }
+
+            // Editing the approved roster is a material change — send it back through
+            // Sahodaya review rather than silently keeping the old approval.
+            if ($registration->status === 'approved') {
+                $registration->update(['status' => 'submitted', 'submitted_at' => now()]);
+            }
+
+            app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
+
+            foreach ($registration->fresh(['participants'])->participants as $participant) {
+                app(FestNumberingService::class)->assignParticipantNumbers($participant);
+            }
+
+            app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+
+            return $registration->fresh(['participants.student', 'item']);
+        });
+    }
+
+    /** @param  list<int>  $teacherIds */
+    private function updateTeacherRegistration(
+        FestRegistration $registration,
+        FestEvent $event,
+        FestEventItem $item,
+        Tenant $school,
+        array $teacherIds,
+    ): FestRegistration {
+        $teacherIds = array_values(array_unique($teacherIds));
+        abort_if($teacherIds === [], 422, 'Select at least one teacher.');
+
+        if (count($teacherIds) > 1 && ! in_array($item->participant_type, ['group', 'team'], true)) {
+            abort(422, 'This item allows only one teacher.');
+        }
+
+        return DB::transaction(function () use ($registration, $event, $school, $teacherIds) {
+            $registration->participants()->delete();
+
+            foreach ($teacherIds as $teacherId) {
+                abort_if(Teacher::where('id', $teacherId)->where('tenant_id', $school->id)->doesntExist(), 403);
+                FestParticipant::create([
+                    'registration_id'  => $registration->id,
+                    'teacher_id'       => $teacherId,
+                    'participant_type' => 'teacher',
+                    'participant_role' => 'performer',
+                ]);
+            }
+
+            if ($registration->status === 'approved') {
+                $registration->update(['status' => 'submitted', 'submitted_at' => now()]);
+            }
+
+            app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
+            app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+
+            return $registration->fresh(['participants.teacher', 'item']);
+        });
+    }
+
     /** @param  list<int>  $teacherIds */
     private function createTeacherRegistration(
         FestEvent $event,
