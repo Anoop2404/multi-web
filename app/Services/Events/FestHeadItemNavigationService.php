@@ -35,7 +35,7 @@ class FestHeadItemNavigationService
             ->where('event_id', $event->id)
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id', 'name', 'sort_order', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time']);
+            ->get(['id', 'name', 'sort_order', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time', 'status']);
 
         $items = FestEventItem::query()
             ->where('event_id', $event->id)
@@ -123,7 +123,7 @@ class FestHeadItemNavigationService
             ->where('event_id', $event->id)
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id', 'name', 'sort_order', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time']);
+            ->get(['id', 'name', 'sort_order', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time', 'status']);
 
         $items = FestEventItem::query()
             ->where('event_id', $event->id)
