@@ -433,9 +433,9 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Category updated.');
     }
 
-    public function destroyCustomCategory(int $classCategoryId)
+    public function destroyCustomCategory($classCategoryId)
     {
-        $classCategory = $this->findCustomCategory($classCategoryId);
+        $classCategory = $this->findCustomCategory((int) $classCategoryId);
 
         $classCategory->delete();
 
@@ -487,9 +487,9 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Class updated.');
     }
 
-    public function destroyMasterClass(int $masterClassId)
+    public function destroyMasterClass($masterClassId)
     {
-        $masterClass = $this->findMasterClass($masterClassId);
+        $masterClass = $this->findMasterClass((int) $masterClassId);
 
         $masterClass->delete();
 
