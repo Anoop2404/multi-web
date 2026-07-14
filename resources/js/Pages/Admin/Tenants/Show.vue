@@ -183,6 +183,39 @@
                             </button>
                         </div>
                     </div>
+
+                    <div v-if="erasureBatches && erasureBatches.length" class="mt-4 max-w-lg">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Erasure history</p>
+                        <div class="space-y-2">
+                            <div v-for="batch in erasureBatches" :key="batch.id"
+                                 class="rounded-lg border p-3 text-xs"
+                                 :class="batch.restored_at ? 'border-gray-200 bg-gray-50' : 'border-red-200 bg-red-50'">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div>
+                                        <p class="font-semibold" :class="batch.restored_at ? 'text-gray-600' : 'text-red-800'">
+                                            {{ batch.student_count }} student(s) erased
+                                        </p>
+                                        <p class="text-gray-500 mt-0.5">
+                                            {{ formatDateTime(batch.erased_at) }}
+                                            <span v-if="batch.erased_by_name || batch.erased_by_email">
+                                                by {{ batch.erased_by_name || batch.erased_by_email }}
+                                            </span>
+                                        </p>
+                                        <p v-if="batch.restored_at" class="text-emerald-700 mt-0.5">
+                                            Restored {{ formatDateTime(batch.restored_at) }}
+                                            <span v-if="batch.restored_by_name">by {{ batch.restored_by_name }}</span>
+                                        </p>
+                                    </div>
+                                    <button v-if="!batch.restored_at" type="button"
+                                            @click="restoreErasure(batch)"
+                                            :disabled="restoringBatchId === batch.id"
+                                            class="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50">
+                                        {{ restoringBatchId === batch.id ? 'Restoring…' : 'Restore' }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -496,6 +529,7 @@ const props = defineProps({
     },
     loginUrl: { type: String, default: null },
     navManager: { type: Object, default: null },
+    erasureBatches: { type: Array, default: () => [] },
 });
 
 const websiteEnabled = computed(() => usePage().props.features?.website_enabled ?? false);
@@ -568,6 +602,27 @@ function eraseStudents() {
         onSuccess: () => {
             showEraseStudents.value = false;
             eraseStudentsForm.reset();
+        },
+    });
+}
+
+const restoringBatchId = ref(null);
+
+function formatDateTime(value) {
+    if (! value) return '';
+    return new Date(value).toLocaleString();
+}
+
+function restoreErasure(batch) {
+    if (! confirm(`Restore ${batch.student_count} erased student record(s) for "${props.tenant.name}"? This reinserts them exactly as they were.`)) {
+        return;
+    }
+
+    restoringBatchId.value = batch.id;
+    router.post(`/admin/tenants/${props.tenant.id}/erasure-batches/${batch.id}/restore`, {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            restoringBatchId.value = null;
         },
     });
 }

@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\FestIndividualChampionshipPoint;
+use App\Models\FestLevelRegistration;
 use App\Models\FestParticipant;
 use App\Models\FestSubstitutionRequest;
 use App\Models\McqRegistration;
 use App\Models\SiteSection;
 use App\Models\Student;
 use App\Models\StudentEditChangeRequest;
+use App\Models\StudentErasureBatch;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\User;
@@ -153,6 +156,9 @@ class TenantController extends Controller
             'schoolAdmins'     => ($tenant->type === 'school' && $databaseReady)
                 ? $this->portalAdmins($tenant, 'school_admin')
                 : [],
+            'erasureBatches'   => ($tenant->type === 'school' && $databaseReady)
+                ? $this->erasureBatches($tenant)
+                : [],
             'loginUrl'         => $this->portalLoginUrl($tenant),
             'navManager'       => $tenant->type === 'sahodaya' ? [
                 'programs'  => SahodayaNavVisibility::programLabels(),
@@ -246,7 +252,8 @@ class TenantController extends Controller
     /**
      * Super-admin-only: permanently hard-delete every student record (including
      * already-withdrawn ones) belonging to a single school, from the platform level.
-     * This bypasses SoftDeletes entirely — there is no recovery path afterwards.
+     * A full snapshot of every affected row is captured first into a
+     * StudentErasureBatch so the action can be reverted via restoreErasedStudents().
      */
     public function eraseStudents(Request $request, Tenant $tenant)
     {
@@ -265,8 +272,10 @@ class TenantController extends Controller
         $sahodaya = $tenant->parent_id ? Tenant::query()->find($tenant->parent_id) : null;
         abort_unless($sahodaya, 422, 'This school has no parent Sahodaya — cannot resolve its database.');
 
-        $count = TenancyDatabase::whenDatabaseReady($sahodaya, function () use ($tenant) {
-            return DB::transaction(function () use ($tenant) {
+        $actor = $request->user();
+
+        $count = TenancyDatabase::whenDatabaseReady($sahodaya, function () use ($tenant, $actor) {
+            return DB::transaction(function () use ($tenant, $actor) {
                 $studentIds = Student::withTrashed()
                     ->where('tenant_id', $tenant->id)
                     ->pluck('id');
@@ -275,20 +284,40 @@ class TenantController extends Controller
                     return 0;
                 }
 
-                // These reference student_id without a DB-level FK (or without a
-                // cascading one) — clean them up before the hard delete so nothing
-                // is left pointing at a row that no longer exists.
+                // Snapshot everything that will be deleted or nulled-out below,
+                // so restoreErasedStudents() can put it all back exactly as-is.
+                $snapshot = [
+                    'students'                             => Student::withTrashed()->whereIn('id', $studentIds)->get()->map->getAttributes()->all(),
+                    'fest_participants'                    => FestParticipant::whereIn('student_id', $studentIds)->get()->map->getAttributes()->all(),
+                    'mcq_registrations'                    => McqRegistration::whereIn('student_id', $studentIds)->get()->map->getAttributes()->all(),
+                    'student_edit_change_requests'         => StudentEditChangeRequest::whereIn('student_id', $studentIds)->get()->map->getAttributes()->all(),
+                    'fest_substitution_replacement_links'  => FestSubstitutionRequest::whereIn('replacement_student_id', $studentIds)
+                        ->get(['id', 'replacement_student_id'])->map(fn ($r) => ['id' => $r->id, 'replacement_student_id' => $r->replacement_student_id])->all(),
+                    // These two cascade-delete automatically when the student row is
+                    // forceDelete()'d, so they must be captured and manually reinserted
+                    // on restore rather than relying on any delete-time cleanup here.
+                    'fest_level_registrations'             => FestLevelRegistration::whereIn('student_id', $studentIds)->get()->map->getAttributes()->all(),
+                    'fest_individual_championship_points'  => FestIndividualChampionshipPoint::whereIn('student_id', $studentIds)->get()->map->getAttributes()->all(),
+                ];
+
                 FestParticipant::whereIn('student_id', $studentIds)->delete();
                 McqRegistration::whereIn('student_id', $studentIds)->delete();
                 StudentEditChangeRequest::whereIn('student_id', $studentIds)->delete();
                 FestSubstitutionRequest::whereIn('replacement_student_id', $studentIds)
                     ->update(['replacement_student_id' => null]);
 
-                // fest_level_registrations and fest_individual_championship_points
-                // have real cascadeOnDelete() foreign keys on student_id — no
-                // manual cleanup needed for those.
-
                 Student::withTrashed()->whereIn('id', $studentIds)->forceDelete();
+
+                StudentErasureBatch::create([
+                    'school_id'         => $tenant->id,
+                    'school_name'       => $tenant->name,
+                    'student_count'     => $studentIds->count(),
+                    'snapshot'          => $snapshot,
+                    'erased_by_user_id' => $actor?->id,
+                    'erased_by_name'    => $actor?->name,
+                    'erased_by_email'   => $actor?->email,
+                    'erased_at'         => now(),
+                ]);
 
                 app(DataChangeLogger::class)->event(
                     'students.erased_all',
@@ -312,8 +341,105 @@ class TenantController extends Controller
 
         return redirect()->route('admin.tenants.show', $tenant)->with(
             $count > 0 ? 'success' : 'info',
-            $count > 0 ? "Permanently erased {$count} student record(s)." : 'No student records found to erase.'
+            $count > 0 ? "Permanently erased {$count} student record(s). This can be restored from the Danger zone if needed." : 'No student records found to erase.'
         );
+    }
+
+    /**
+     * Super-admin-only: revert a previous eraseStudents() action by reinserting every
+     * row captured in its snapshot, preserving original IDs. Only usable once per batch.
+     */
+    public function restoreErasedStudents(Request $request, Tenant $tenant, int $batchId)
+    {
+        abort_if($tenant->type !== 'school', 404);
+
+        $sahodaya = $tenant->parent_id ? Tenant::query()->find($tenant->parent_id) : null;
+        abort_unless($sahodaya, 422, 'This school has no parent Sahodaya — cannot resolve its database.');
+
+        $actor = $request->user();
+
+        $result = TenancyDatabase::whenDatabaseReady($sahodaya, function () use ($tenant, $batchId, $actor) {
+            $batch = StudentErasureBatch::query()->where('school_id', $tenant->id)->find($batchId);
+
+            if (! $batch) {
+                return ['ok' => false, 'error' => 'Erasure batch not found.'];
+            }
+            if ($batch->isRestored()) {
+                return ['ok' => false, 'error' => 'This erasure has already been restored.'];
+            }
+
+            try {
+                return $this->applyRestore($batch, $actor);
+            } catch (\Throwable $e) {
+                return ['ok' => false, 'error' => 'Restore failed: '.$e->getMessage()];
+            }
+        });
+
+        if (! ($result['ok'] ?? false)) {
+            return redirect()->route('admin.tenants.show', $tenant)->with('error', $result['error'] ?? 'Unable to restore this batch.');
+        }
+
+        app(PlatformAuditLogger::class)->log(
+            'student.erasure_restored',
+            "Super admin restored {$result['count']} erased student(s) for school \"{$tenant->name}\"",
+            $tenant,
+            ['school_id' => $tenant->id, 'sahodaya_id' => $sahodaya->id, 'batch_id' => $batchId, 'count' => $result['count']],
+        );
+
+        return redirect()->route('admin.tenants.show', $tenant)->with('success', "Restored {$result['count']} student record(s).");
+    }
+
+    /** @return array{ok: bool, count: int} */
+    private function applyRestore(StudentErasureBatch $batch, ?User $actor): array
+    {
+        return DB::transaction(function () use ($batch, $actor) {
+            $snapshot = $batch->snapshot ?? [];
+
+            // Raw DB::table() writes, not Eloquent updateOrCreate/create: the
+            // snapshot rows carry their original primary keys, and 'id' is
+            // deliberately excluded from every model's $fillable, so an
+            // Eloquent create() here would silently drop it and mint new IDs —
+            // breaking every foreign key that still points at the old ones.
+            foreach (($snapshot['students'] ?? []) as $row) {
+                DB::table('students')->updateOrInsert(['id' => $row['id']], $row);
+            }
+            foreach (($snapshot['fest_participants'] ?? []) as $row) {
+                DB::table('fest_participants')->updateOrInsert(['id' => $row['id']], $row);
+            }
+            foreach (($snapshot['mcq_registrations'] ?? []) as $row) {
+                DB::table('mcq_registrations')->updateOrInsert(['id' => $row['id']], $row);
+            }
+            foreach (($snapshot['student_edit_change_requests'] ?? []) as $row) {
+                DB::table('student_edit_change_requests')->updateOrInsert(['id' => $row['id']], $row);
+            }
+            foreach (($snapshot['fest_level_registrations'] ?? []) as $row) {
+                DB::table('fest_level_registrations')->updateOrInsert(['id' => $row['id']], $row);
+            }
+            foreach (($snapshot['fest_individual_championship_points'] ?? []) as $row) {
+                DB::table('fest_individual_championship_points')->updateOrInsert(['id' => $row['id']], $row);
+            }
+            foreach (($snapshot['fest_substitution_replacement_links'] ?? []) as $row) {
+                DB::table('fest_substitution_requests')->where('id', $row['id'])
+                    ->update(['replacement_student_id' => $row['replacement_student_id']]);
+            }
+
+            $batch->update([
+                'restored_at'         => now(),
+                'restored_by_user_id' => $actor?->id,
+                'restored_by_name'    => $actor?->name,
+            ]);
+
+            app(DataChangeLogger::class)->event(
+                'students.erasure_restored',
+                "Super admin restored {$batch->student_count} previously erased student(s) for {$batch->school_name}",
+                $batch->school_id,
+                'students',
+                null,
+                ['batch_id' => $batch->id, 'count' => $batch->student_count],
+            );
+
+            return ['ok' => true, 'count' => $batch->student_count];
+        });
     }
 
     public function rejectMembership(Request $request, Tenant $tenant, MembershipNotifier $notifier)
@@ -753,6 +879,44 @@ class TenantController extends Controller
                     ])
                     ->all();
             }) ?? [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function erasureBatches(Tenant $tenant): array
+    {
+        if (! $tenant->parent_id) {
+            return [];
+        }
+
+        $sahodaya = Tenant::query()->find($tenant->parent_id);
+        if (! $sahodaya) {
+            return [];
+        }
+
+        try {
+            return TenancyDatabase::whenDatabaseReady($sahodaya, function () use ($tenant) {
+                if (! \Illuminate\Support\Facades\Schema::hasTable('student_erasure_batches')) {
+                    return [];
+                }
+
+                return StudentErasureBatch::query()
+                    ->where('school_id', $tenant->id)
+                    ->orderByDesc('erased_at')
+                    ->get(['id', 'student_count', 'erased_by_name', 'erased_by_email', 'erased_at', 'restored_at', 'restored_by_name'])
+                    ->map(fn (StudentErasureBatch $batch) => [
+                        'id'               => $batch->id,
+                        'student_count'    => $batch->student_count,
+                        'erased_by_name'   => $batch->erased_by_name,
+                        'erased_by_email'  => $batch->erased_by_email,
+                        'erased_at'        => $batch->erased_at?->toIso8601String(),
+                        'restored_at'      => $batch->restored_at?->toIso8601String(),
+                        'restored_by_name' => $batch->restored_by_name,
+                    ])
+                    ->all();
+            }, []) ?? [];
         } catch (\Throwable) {
             return [];
         }
