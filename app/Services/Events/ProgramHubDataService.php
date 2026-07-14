@@ -381,7 +381,11 @@ class ProgramHubDataService
                     'priority' => 1,
                     'count'    => $fees->count(),
                     'label'    => "{$label} fees awaiting upload",
-                    'url'      => "/school-admin/{$school->id}/{$slug}/registration",
+                    // schoolRegistrationUrl() converts the display slug (e.g. "sports-meet")
+                    // back to the actual route prefix (e.g. "sports") — the routes are
+                    // registered under the prefix, not the slug, so building the URL from
+                    // $slug directly (as before) 404'd every time.
+                    'url'      => ProgramRouteMap::schoolRegistrationUrl($school->id, $slug),
                 ];
             });
 
