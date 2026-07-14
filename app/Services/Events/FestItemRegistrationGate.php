@@ -13,7 +13,13 @@ class FestItemRegistrationGate
     public function isOpen(FestEventItem $item): bool
     {
         $event = $item->event ?? $item->event()->first();
-        if (! $event || ! $event->isRegistrationOpen()) {
+        if (! $event) {
+            return false;
+        }
+
+        // For sports, the event status is not used to check if the registration window is open;
+        // only the Event Head/Item registration windows decide.
+        if ($event->event_type !== 'sports' && ! $event->isRegistrationOpen()) {
             return false;
         }
 
@@ -34,7 +40,13 @@ class FestItemRegistrationGate
         abort_if(! ($item->is_enabled ?? true), 422, 'This item is not open for registration.');
 
         $event = $item->event ?? $item->event()->first();
-        abort_if(! $event || ! $event->isRegistrationOpen(), 422, 'Registration is closed for this event.');
+        if (! $event) {
+            abort(422, 'Event not found.');
+        }
+
+        if ($event->event_type !== 'sports' && ! $event->isRegistrationOpen()) {
+            abort(422, 'Registration is closed for this event.');
+        }
 
         if ($this->windows->isRegistrationOpen($item)) {
             return;

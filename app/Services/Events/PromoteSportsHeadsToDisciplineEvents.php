@@ -193,6 +193,6 @@ class PromoteSportsHeadsToDisciplineEvents
         $year = $season->academicYear?->label;
         $base = $head->name;
 
-        return $year ? "{$base} — {$year}" : $base;
+        return $year ? "{$base} {$year}" : $base;
     }
 }
