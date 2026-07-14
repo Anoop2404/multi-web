@@ -19,6 +19,11 @@
                         @click="showClassDelete = true">
                     Remove by class…
                 </button>
+                <button v-if="canBulkRemove" type="button"
+                        class="btn-secondary text-sm !border-red-200 !text-red-700 hover:!bg-red-50"
+                        @click="showRemoveAll = true">
+                    Remove all students…
+                </button>
                 <Link v-if="pendingChangeRequests > 0"
                       :href="`/school-admin/${school.id}/students/pending-change-requests`"
                       class="btn-secondary text-sm">
@@ -440,6 +445,40 @@
             </div>
         </div>
 
+        <!-- Remove ALL students in this school -->
+        <div v-if="showRemoveAll && canBulkRemove" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="closeRemoveAll"></div>
+            <div class="relative modal-shell max-w-md w-full">
+                <div class="modal-head">
+                    <div>
+                        <h3 class="font-bold text-red-700">Remove ALL students</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            Withdraws every <strong>active</strong> student in {{ school.name }} (soft-delete, all classes). This is not limited to one class.
+                        </p>
+                    </div>
+                    <button type="button" @click="closeRemoveAll" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                </div>
+                <form @submit.prevent="submitRemoveAll" class="p-6 space-y-4">
+                    <p class="text-xs text-red-800 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                        This removes every active student record across all classes in this school. Withdrawn records stay soft-deleted for audit but disappear from every active list, report, and export.
+                    </p>
+                    <div>
+                        <label class="form-label mb-1.5">
+                            Type the school name (<strong>{{ school.name }}</strong>) to confirm *
+                        </label>
+                        <input v-model="removeAllConfirmText" type="text" class="field" autocomplete="off">
+                    </div>
+                    <div class="flex justify-end gap-3 pt-1">
+                        <button type="button" class="text-sm text-gray-500" @click="closeRemoveAll">Cancel</button>
+                        <button type="submit" class="btn-primary !bg-red-600 hover:!bg-red-700"
+                                :disabled="bulkDeleteForm.processing || !removeAllConfirmMatches">
+                            {{ bulkDeleteForm.processing ? 'Removing…' : 'Remove all students' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- Quick photo update (click avatar in list) -->
         <StudentPhotoEditModal
             v-model="showPhotoEdit"
@@ -494,6 +533,8 @@ const showCreateRequest = ref(false);
 const showPhotoEdit = ref(false);
 const showClassDelete = ref(false);
 const classDeleteId = ref('');
+const showRemoveAll = ref(false);
+const removeAllConfirmText = ref('');
 const selectedIds = ref([]);
 const editingStudent = ref(null);
 const photoEditStudent = ref(null);
@@ -504,6 +545,7 @@ const bulkDeleteForm = useForm({
     scope: 'selected',
     student_ids: [],
     school_class_id: null,
+    confirm_school_name: '',
 });
 
 watch(() => props.students?.data, (rows) => {
@@ -849,15 +891,33 @@ function submitBulkDelete(payload) {
     bulkDeleteForm.scope = payload.scope;
     bulkDeleteForm.student_ids = payload.student_ids ?? [];
     bulkDeleteForm.school_class_id = payload.school_class_id ?? null;
+    bulkDeleteForm.confirm_school_name = payload.confirm_school_name ?? '';
     bulkDeleteForm.post(`/school-admin/${props.school.id}/students/bulk-delete`, {
         preserveScroll: true,
         onSuccess: () => {
             selectedIds.value = [];
             showClassDelete.value = false;
             classDeleteId.value = '';
+            showRemoveAll.value = false;
+            removeAllConfirmText.value = '';
             bulkDeleteForm.reset();
         },
     });
+}
+
+const removeAllConfirmMatches = computed(() =>
+    removeAllConfirmText.value.trim().toLowerCase() === (props.school?.name ?? '').trim().toLowerCase(),
+);
+
+function closeRemoveAll() {
+    showRemoveAll.value = false;
+    removeAllConfirmText.value = '';
+}
+
+function submitRemoveAll() {
+    if (!removeAllConfirmMatches.value) return;
+    if (!confirm(`Withdraw EVERY active student in ${props.school.name}? This covers all classes and cannot be undone from the active list.`)) return;
+    submitBulkDelete({ scope: 'all', confirm_school_name: removeAllConfirmText.value });
 }
 
 function bulkRemoveSelected() {

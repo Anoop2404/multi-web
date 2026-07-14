@@ -558,7 +558,7 @@ class StudentController extends SchoolAdminController
         $this->assertCanEditStudents();
 
         $data = $request->validate([
-            'scope'             => 'required|in:selected,class',
+            'scope'             => 'required|in:selected,class,all',
             'student_ids'       => 'nullable|array|max:500',
             'student_ids.*'     => 'integer',
             'school_class_id'   => [
@@ -566,6 +566,7 @@ class StudentController extends SchoolAdminController
                 'integer',
                 Rule::exists('school_classes', 'id')->where('tenant_id', $this->school->id),
             ],
+            'confirm_school_name' => 'required_if:scope,all|string',
         ]);
 
         $query = Student::query()->where('tenant_id', $this->school->id);
@@ -575,6 +576,17 @@ class StudentController extends SchoolAdminController
 
             $query->where('school_class_id', $data['school_class_id'])
                 ->where('status', 'active');
+        } elseif ($data['scope'] === 'all') {
+            // Extra server-side guard on top of the frontend confirmation: the typed
+            // name must match this school's name exactly (case-insensitive) before
+            // every active student in the school gets withdrawn in one go.
+            abort_unless(
+                mb_strtolower(trim($data['confirm_school_name'])) === mb_strtolower(trim($this->school->name)),
+                422,
+                'Type the school name exactly to confirm removing all students.'
+            );
+
+            $query->where('status', 'active');
         } else {
             $ids = array_values(array_unique(array_map('intval', $data['student_ids'] ?? [])));
             abort_if($ids === [], 422, 'Select at least one student to remove.');
