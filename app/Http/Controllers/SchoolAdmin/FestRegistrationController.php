@@ -481,6 +481,7 @@ class FestRegistrationController extends SchoolAdminController
             'id'                         => $event->id,
             'title'                      => $event->title,
             'status'                     => $event->status,
+            'schedule_published'         => (bool) ($event->schedule_published ?? false),
             'fee_required'               => (bool) ($event->fee_required ?? false),
             'require_event_registration' => (bool) ($event->require_event_registration ?? false),
             'require_verified_students'  => (bool) ($event->require_verified_students ?? true),

@@ -25,16 +25,25 @@
                       class="inline-flex items-center gap-1 max-w-full rounded-md bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[11px] text-emerald-900">
                     <span class="truncate font-medium">{{ registeredNames(reg) }}</span>
                     <span class="text-emerald-600/70 shrink-0">{{ reg.status }}</span>
+                    <button v-if="canEdit(reg)" type="button"
+                            class="shrink-0 text-indigo-600 font-semibold hover:underline"
+                            @click="$emit('edit', reg)">
+                        Edit
+                    </button>
                     <button v-if="canWithdraw(reg)" type="button"
                             class="shrink-0 text-red-600 font-semibold hover:underline"
                             @click="$emit('withdraw', reg.id)">
-                        ×
+                        Cancel
                     </button>
                 </span>
             </div>
             <span v-else class="text-xs text-slate-300">—</span>
         </td>
         <td class="px-3 py-2.5 align-middle">
+            <p v-if="isEditing" class="text-[10px] text-indigo-700 font-semibold mb-1 text-right">
+                Editing registration —
+                <button type="button" class="underline hover:no-underline" @click="$emit('cancel-edit')">discard</button>
+            </p>
             <div class="flex flex-wrap items-center justify-end gap-1.5">
                 <button type="button"
                         class="btn-secondary text-xs !min-h-0 !px-2.5 !py-1"
@@ -52,8 +61,8 @@
                 <button type="button"
                         class="btn-primary text-xs !min-h-0 !px-3 !py-1"
                         :disabled="blocked || !canSubmit"
-                        @click="$emit('register')">
-                    Register
+                        @click="submit">
+                    {{ isEditing ? 'Save changes' : 'Register' }}
                 </button>
             </div>
             <p v-if="selectedCount > 0" class="text-[10px] text-indigo-700 font-medium mt-1 text-right">
@@ -93,6 +102,11 @@
                 <div v-for="reg in registrations" :key="reg.id">
                     <span class="font-medium">{{ registeredNames(reg) }}</span>
                     <span class="text-gray-400"> · {{ reg.status }}</span>
+                    <button v-if="canEdit(reg)" type="button"
+                            class="ml-1 text-indigo-600 font-semibold hover:underline"
+                            @click="$emit('edit', reg)">
+                        Edit
+                    </button>
                     <button v-if="canWithdraw(reg)" type="button"
                             class="ml-1 text-red-600 font-semibold hover:underline"
                             @click="$emit('withdraw', reg.id)">
@@ -103,6 +117,10 @@
             <span v-else class="text-gray-400">—</span>
         </td>
         <td class="px-3 py-2">
+            <p v-if="isEditing" class="text-[10px] text-indigo-700 font-semibold mb-1">
+                Editing registration —
+                <button type="button" class="underline hover:no-underline" @click="$emit('cancel-edit')">discard</button>
+            </p>
             <div class="flex flex-wrap items-center gap-2">
                 <button type="button"
                         class="btn-secondary text-xs !min-h-0 !px-2 !py-1"
@@ -136,8 +154,8 @@
             <button type="button"
                     class="btn-primary text-xs !min-h-0 !px-2 !py-1.5"
                     :disabled="blocked || !canSubmit"
-                    @click="$emit('register')">
-                Register
+                    @click="submit">
+                {{ isEditing ? 'Save changes' : 'Register' }}
             </button>
         </td>
     </tr>
@@ -215,11 +233,19 @@ const props = defineProps({
     studentLabel: { type: Function, required: true },
     registeredNames: { type: Function, required: true },
     canWithdraw: { type: Function, required: true },
+    canEdit: { type: Function, default: () => false },
+    editingRegistrationId: { type: [Number, String], default: null },
     columnCount: { type: Number, default: 6 },
     layout: { type: String, default: 'default' },
 });
 
-const emit = defineEmits(['register', 'withdraw', 'add-student']);
+const emit = defineEmits(['register', 'update', 'withdraw', 'edit', 'cancel-edit', 'add-student']);
+
+const isEditing = computed(() => props.editingRegistrationId != null);
+
+watch(() => props.editingRegistrationId, (id) => {
+    if (id != null) pickerOpen.value = true;
+});
 
 const pickerOpen = ref(false);
 const standbyPickerOpen = ref(false);
@@ -382,6 +408,14 @@ function openPicker() {
 
 function handleMainPickerConfirm() {
     if (props.layout === 'sports' && canSubmit.value) {
+        submit();
+    }
+}
+
+function submit() {
+    if (isEditing.value) {
+        emit('update', props.editingRegistrationId);
+    } else {
         emit('register');
     }
 }

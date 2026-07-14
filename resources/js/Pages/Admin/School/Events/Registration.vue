@@ -284,9 +284,14 @@
                                         :student-label="studentOptionLabel"
                                         :registered-names="registeredNames"
                                         :can-withdraw="canWithdraw"
+                                        :can-edit="canEdit"
+                                        :editing-registration-id="editingRegistrationId[itemFormKey(event.id, item.id)]"
                                         :column-count="event.fee_required ? 6 : 5"
                                         @register="submitItem(event, item)"
+                                        @update="updateItem(event, item)"
                                         @withdraw="withdraw"
+                                        @edit="startEdit($event, event, item)"
+                                        @cancel-edit="cancelEdit(event, item)"
                                         @add-student="showAddStudent = true"
                                     />
                                 </tbody>
@@ -780,6 +785,7 @@ const eventPaymentFiles = reactive({});
 const eventPaymentRefs = reactive({});
 const headPaymentFiles = reactive({});
 const headPaymentRefs = reactive({});
+const editingRegistrationId = reactive({});
 
 function allItemsStatic(event) {
     return event?.items ?? [];
@@ -1091,6 +1097,104 @@ function canWithdraw(reg) {
 function withdraw(id) {
     if (!confirm('Cancel this registration?')) return;
     router.post(`${programBase.value}/registrations/${id}/withdraw`, {}, { preserveScroll: true });
+}
+
+// Editing is allowed under the same conditions the school can still cancel the
+// registration (mirrors FestRegistrationCreateService::updateForSchool's gate) —
+// once cancellation is blocked (e.g. fee already paid/approved), editing is too.
+// Also blocked once the fest-day schedule has been published for this event.
+function canEdit(reg) {
+    const event = props.events.find(e => e.id === reg.event_id);
+    if (event?.schedule_published) return false;
+    return canWithdraw(reg);
+}
+
+function resetItemForm(eventId, itemId) {
+    const key = itemFormKey(eventId, itemId);
+    itemForms[key] = {
+        team_name: '',
+        coach_name: '',
+        coach_phone: '',
+        manager_name: '',
+        manager_phone: '',
+        student_ids: [],
+        teacher_ids: [],
+        standby_ids: [],
+    };
+}
+
+function startEdit(reg, event, item) {
+    const key = itemFormKey(event.id, item.id);
+    const participants = reg.participants ?? [];
+    const performerIds = participants
+        .filter(p => p.participant_role !== 'standby')
+        .map(p => p.student_id ?? p.teacher_id)
+        .filter(Boolean);
+    const standbyIds = participants
+        .filter(p => p.participant_role === 'standby')
+        .map(p => p.student_id)
+        .filter(Boolean);
+    const group = participants.find(p => p.group)?.group;
+
+    itemForms[key] = {
+        team_name: group?.team_name ?? '',
+        coach_name: group?.coach_name ?? '',
+        coach_phone: group?.coach_phone ?? '',
+        manager_name: group?.manager_name ?? '',
+        manager_phone: group?.manager_phone ?? '',
+        student_ids: props.isTeacherFest ? [] : performerIds,
+        teacher_ids: props.isTeacherFest ? performerIds : [],
+        standby_ids: standbyIds,
+    };
+    editingRegistrationId[key] = reg.id;
+    delete itemErrors[key];
+}
+
+function cancelEdit(event, item) {
+    const key = itemFormKey(event.id, item.id);
+    delete editingRegistrationId[key];
+    resetItemForm(event.id, item.id);
+    delete itemErrors[key];
+}
+
+function updateItem(event, item) {
+    const key = itemFormKey(event.id, item.id);
+    const registrationId = editingRegistrationId[key];
+    if (!registrationId) return;
+    const form = itemForms[key];
+    const standby = (form.standby_ids ?? []).slice(0, 2);
+    delete itemErrors[key];
+
+    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > 1) {
+        itemErrors[key] = 'This item allows only one participant.';
+        scrollToItemRow(event.id, item.id);
+        return;
+    }
+
+    router.post(`${programBase.value}/registrations/${registrationId}/update`, {
+        team_name: form.team_name,
+        coach_name: form.coach_name || null,
+        coach_phone: form.coach_phone || null,
+        manager_name: form.manager_name || null,
+        manager_phone: form.manager_phone || null,
+        student_ids: form.student_ids,
+        teacher_ids: form.teacher_ids,
+        standby_ids: standby,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            delete itemErrors[key];
+            delete editingRegistrationId[key];
+            resetItemForm(event.id, item.id);
+        },
+        onError: (errors) => {
+            itemErrors[key] = extractItemErrors(errors, item.id)
+                || errors.registration
+                || page.props.flash?.error
+                || 'Could not update registration.';
+            scrollToItemRow(event.id, item.id);
+        },
+    });
 }
 
 function itemRegistrationCount(eventId, itemId) {

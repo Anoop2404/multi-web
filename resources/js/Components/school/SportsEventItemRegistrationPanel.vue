@@ -124,8 +124,13 @@
                                         :student-label="studentOptionLabel"
                                         :registered-names="registeredNames"
                                         :can-withdraw="canWithdraw"
+                                        :can-edit="canEdit"
+                                        :editing-registration-id="editingRegistrationId[itemFormKey(item.id)]"
                                         @register="submitItem(item)"
+                                        @update="updateItem(item)"
                                         @withdraw="withdraw"
+                                        @edit="startEdit($event, item)"
+                                        @cancel-edit="cancelEdit(item)"
                                         @add-student="$emit('add-student')"
                                     />
                                 </tbody>
@@ -190,6 +195,7 @@ const ageFilter = ref('');
 const itemFilter = ref('');
 const itemForms = reactive({});
 const itemErrors = reactive({});
+const editingRegistrationId = reactive({});
 const page = usePage();
 
 const headOptions = computed(() => props.event.head_navigation?.headsForFilter ?? []);
@@ -518,6 +524,97 @@ function canWithdraw(reg) {
 function withdraw(id) {
     if (!confirm('Cancel this registration?')) return;
     router.post(`${props.programBase}/registrations/${id}/withdraw`, {}, { preserveScroll: true });
+}
+
+// Editing is allowed under the same conditions the school can still cancel the
+// registration (mirrors FestRegistrationCreateService::updateForSchool's gate) —
+// once cancellation is blocked (e.g. fee already paid/approved), editing is too.
+function canEdit(reg) {
+    if (!props.event.schedule_published) return canWithdraw(reg);
+    return false;
+}
+
+function resetItemForm(item) {
+    const key = itemFormKey(item.id);
+    itemForms[key] = {
+        team_name: '',
+        coach_name: '',
+        coach_phone: '',
+        manager_name: '',
+        manager_phone: '',
+        student_ids: [],
+        teacher_ids: [],
+        standby_ids: [],
+    };
+}
+
+function startEdit(reg, item) {
+    const key = itemFormKey(item.id);
+    const participants = reg.participants ?? [];
+    const performerIds = participants
+        .filter((p) => p.participant_role !== 'standby')
+        .map((p) => p.student_id ?? p.teacher_id)
+        .filter(Boolean);
+    const standbyIds = participants
+        .filter((p) => p.participant_role === 'standby')
+        .map((p) => p.student_id)
+        .filter(Boolean);
+    const group = participants.find((p) => p.group)?.group;
+
+    itemForms[key] = {
+        team_name: group?.team_name ?? '',
+        coach_name: group?.coach_name ?? '',
+        coach_phone: group?.coach_phone ?? '',
+        manager_name: group?.manager_name ?? '',
+        manager_phone: group?.manager_phone ?? '',
+        student_ids: performerIds,
+        teacher_ids: [],
+        standby_ids: standbyIds,
+    };
+    editingRegistrationId[key] = reg.id;
+    delete itemErrors[key];
+}
+
+function cancelEdit(item) {
+    const key = itemFormKey(item.id);
+    delete editingRegistrationId[key];
+    resetItemForm(item);
+    delete itemErrors[key];
+}
+
+function updateItem(item) {
+    const key = itemFormKey(item.id);
+    const registrationId = editingRegistrationId[key];
+    if (!registrationId) return;
+    const form = itemForms[key];
+    delete itemErrors[key];
+
+    if (!['group', 'team'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > 1) {
+        itemErrors[key] = 'This item allows only one participant.';
+        return;
+    }
+
+    router.post(`${props.programBase}/registrations/${registrationId}/update`, {
+        team_name: form.team_name,
+        coach_name: form.coach_name || null,
+        coach_phone: form.coach_phone || null,
+        manager_name: form.manager_name || null,
+        manager_phone: form.manager_phone || null,
+        student_ids: form.student_ids,
+        teacher_ids: [],
+        standby_ids: (form.standby_ids ?? []).slice(0, 2),
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            delete itemErrors[key];
+            delete editingRegistrationId[key];
+            resetItemForm(item);
+            router.reload({ only: ['event', 'students', 'registrations'] });
+        },
+        onError: (errors) => {
+            itemErrors[key] = errors[`items.${item.id}`] || errors.registration || 'Could not update registration.';
+        },
+    });
 }
 
 function submitItem(item) {
