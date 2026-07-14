@@ -63,7 +63,7 @@ class WebsiteDomainController extends SahodayaAdminController
         return back()->with('success', 'Custom domain saved. Add the TXT record to verify ownership.');
     }
 
-    public function verify(int $domainId)
+    public function verify(string $tenantId, int $domainId)
     {
         $domain = $this->sahodaya->domains()->findOrFail($domainId);
         abort_unless($domain->dns_token, 422, 'No verification token.');
@@ -88,7 +88,7 @@ class WebsiteDomainController extends SahodayaAdminController
         return back()->with('success', 'Domain verified.');
     }
 
-    public function destroy(int $domainId)
+    public function destroy(string $tenantId, int $domainId)
     {
         $domain = $this->sahodaya->domains()->findOrFail($domainId);
         $wasCustom = $this->sahodaya->domain && $domain->domain === TenantDomainSync::normalizeCustomDomain($this->sahodaya->domain);

@@ -132,10 +132,10 @@ class TenantUserController extends SchoolAdminController
 
     public function updateCoordinatorContact(Request $request)
     {
-        return $this->updateLeadershipContact($request, 'event_coordinator');
+        return $this->updateLeadershipContact($request, (string) $this->school->id, 'event_coordinator');
     }
 
-    public function updateLeadershipContact(Request $request, string $roleKey)
+    public function updateLeadershipContact(Request $request, string $tenantId, string $roleKey)
     {
         $assignable = TenantUserCatalog::assignableRolesFor($request->user());
         abort_if($assignable === [], 403);
@@ -165,11 +165,12 @@ class TenantUserController extends SchoolAdminController
         SchoolUserScopeService $scopes,
         PlatformAuditLogger $audit,
     ) {
-        return $this->provisionLeadershipLogin($request, 'event_coordinator', $provisioner, $credentials, $notifications, $scopes, $audit);
+        return $this->provisionLeadershipLogin($request, (string) $this->school->id, 'event_coordinator', $provisioner, $credentials, $notifications, $scopes, $audit);
     }
 
     public function provisionLeadershipLogin(
         Request $request,
+        string $tenantId,
         string $roleKey,
         TenantUserProvisioner $provisioner,
         UserCredentialService $credentials,

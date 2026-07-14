@@ -411,7 +411,7 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Custom category added.');
     }
 
-    public function updateCustomCategory(Request $request, int $classCategoryId)
+    public function updateCustomCategory(Request $request, string $tenantId, int $classCategoryId)
     {
         $classCategory = $this->findCustomCategory($classCategoryId);
 
@@ -433,9 +433,9 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Category updated.');
     }
 
-    public function destroyCustomCategory($classCategoryId)
+    public function destroyCustomCategory(string $tenantId, int $classCategoryId)
     {
-        $classCategory = $this->findCustomCategory((int) $classCategoryId);
+        $classCategory = $this->findCustomCategory($classCategoryId);
 
         $classCategory->delete();
 
@@ -466,7 +466,7 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Class added.');
     }
 
-    public function updateMasterClass(Request $request, int $masterClassId, EffectiveMasterDataResolver $resolver)
+    public function updateMasterClass(Request $request, string $tenantId, int $masterClassId, EffectiveMasterDataResolver $resolver)
     {
         $masterClass = $this->findMasterClass($masterClassId);
 
@@ -487,9 +487,9 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Class updated.');
     }
 
-    public function destroyMasterClass($masterClassId)
+    public function destroyMasterClass(string $tenantId, int $masterClassId)
     {
-        $masterClass = $this->findMasterClass((int) $masterClassId);
+        $masterClass = $this->findMasterClass($masterClassId);
 
         $masterClass->delete();
 
@@ -520,7 +520,7 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Category visibility updated.');
     }
 
-    public function updateGlobalCategorySort(Request $request, int $classCategoryId)
+    public function updateGlobalCategorySort(Request $request, string $tenantId, int $classCategoryId)
     {
         $classCategory = $this->findGlobalCategory($classCategoryId);
 
