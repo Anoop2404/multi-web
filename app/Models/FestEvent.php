@@ -201,41 +201,16 @@ class FestEvent extends Model
     {
         $q->visibleToSchool($schoolId);
 
-        if ($eventType === 'sports') {
-            return $q->whereIn('status', self::schoolListStatusesForType('sports'))
-                ->where(function ($inner) {
-                    // Prefer discipline events; hide season umbrella once partition_role is set.
-                    $inner->where('partition_role', 'sports_discipline')
-                        ->orWhereNull('partition_role')
-                        ->orWhere('partition_role', '!=', 'sports_season');
-                });
-        }
-
         if ($eventType !== null) {
             return $q->whereIn('status', self::schoolListStatusesForType($eventType));
         }
 
-        // Mixed queries: sports rows require registration_open+; others keep published+.
-        return $q->where(function ($inner) {
-            $inner->where(function ($sports) {
-                $sports->where('event_type', 'sports')
-                    ->whereIn('status', self::schoolListStatusesForType('sports'));
-            })->orWhere(function ($other) {
-                $other->where(function ($nonSports) {
-                    $nonSports->whereNull('event_type')
-                        ->orWhere('event_type', '!=', 'sports');
-                })->whereIn('status', self::schoolListStatusesForType(null));
-            });
-        });
+        return $q->whereIn('status', self::schoolListStatusesForType(null));
     }
 
     /** @return list<string> */
     public static function schoolListStatusesForType(?string $eventType): array
     {
-        if ($eventType === 'sports') {
-            return ['registration_open', 'ongoing', 'completed'];
-        }
-
         return ['published', 'registration_open', 'ongoing', 'completed'];
     }
 
