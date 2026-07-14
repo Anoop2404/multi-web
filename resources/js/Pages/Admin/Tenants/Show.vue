@@ -140,13 +140,49 @@
 
                 <div class="space-y-2">
                     <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Danger zone</p>
-                    <button type="button" @click="deleteTenant"
-                            class="px-4 py-2 rounded-lg border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-50">
-                        Delete school permanently
-                    </button>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" @click="deleteTenant"
+                                class="px-4 py-2 rounded-lg border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-50">
+                            Delete school permanently
+                        </button>
+                        <button type="button" @click="showEraseStudents = !showEraseStudents"
+                                class="px-4 py-2 rounded-lg border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-50">
+                            Erase all students…
+                        </button>
+                    </div>
                     <p class="text-xs text-gray-400">
                         Removes the school, its admin login(s), and domain records. Tenant DB rows for this school are not purged.
                     </p>
+
+                    <div v-if="showEraseStudents" class="mt-3 max-w-lg rounded-lg border border-red-200 bg-red-50 p-4 space-y-3">
+                        <p class="text-sm font-semibold text-red-800">Permanently erase every student record</p>
+                        <p class="text-xs text-red-700">
+                            This is a hard delete, not a withdraw — it bypasses soft-delete entirely, including students already
+                            withdrawn. There is no recovery afterwards, and this reaches into {{ tenant.name }}'s Sahodaya database
+                            directly from Super Admin.
+                        </p>
+                        <div>
+                            <label class="text-xs font-semibold text-red-800 mb-1 block">
+                                Type the school name (<strong>{{ tenant.name }}</strong>) to confirm
+                            </label>
+                            <input v-model="eraseStudentsForm.confirm_school_name" type="text" autocomplete="off"
+                                   class="field focus:ring-red-300">
+                            <p v-if="eraseStudentsForm.errors.confirm_school_name" class="text-xs text-red-600 mt-1">
+                                {{ eraseStudentsForm.errors.confirm_school_name }}
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" @click="eraseStudents"
+                                    :disabled="eraseStudentsForm.processing || !eraseStudentsConfirmMatches"
+                                    class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
+                                {{ eraseStudentsForm.processing ? 'Erasing…' : 'Erase all students permanently' }}
+                            </button>
+                            <button type="button" @click="showEraseStudents = false; eraseStudentsForm.reset();"
+                                    class="text-sm text-gray-500 hover:text-gray-700">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -436,7 +472,7 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     tenant: Object,
@@ -514,6 +550,27 @@ const adminForm = useForm({
     password: '',
 });
 const rejectForm = useForm({ reason: '' });
+const showEraseStudents = ref(false);
+const eraseStudentsForm = useForm({ confirm_school_name: '' });
+
+const eraseStudentsConfirmMatches = computed(() =>
+    eraseStudentsForm.confirm_school_name.trim().toLowerCase() === (props.tenant?.name ?? '').trim().toLowerCase(),
+);
+
+function eraseStudents() {
+    if (! eraseStudentsConfirmMatches.value) return;
+    if (! confirm(`Permanently erase EVERY student record for "${props.tenant.name}"? This cannot be undone.`)) {
+        return;
+    }
+
+    eraseStudentsForm.delete(`/admin/tenants/${props.tenant.id}/erase-students`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showEraseStudents.value = false;
+            eraseStudentsForm.reset();
+        },
+    });
+}
 
 function membershipStatusClass(status) {
     return {

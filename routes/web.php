@@ -153,6 +153,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     Route::post('tenants/{tenant}/school-admin', [TenantController::class, 'saveSchoolAdmin'])->name('tenants.school-admin.store');
     Route::delete('tenants/{tenant}/school-admin/{user}', [TenantController::class, 'destroySchoolAdmin'])->name('tenants.school-admin.destroy');
     Route::post('tenants/{tenant}/reject-membership', [TenantController::class, 'rejectMembership'])->name('tenants.reject-membership');
+    Route::delete('tenants/{tenant}/erase-students', [TenantController::class, 'eraseStudents'])->name('tenants.erase-students');
     Route::put('tenants/{tenant}/nav-visibility', [TenantController::class, 'updateNavVisibility'])->name('tenants.nav-visibility.update');
 
     Route::get('/storage-migration', [\App\Http\Controllers\Admin\StorageMigrationController::class, 'index'])->name('storage-migration');

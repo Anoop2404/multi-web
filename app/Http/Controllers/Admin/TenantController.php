@@ -3,11 +3,18 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\FestParticipant;
+use App\Models\FestSubstitutionRequest;
+use App\Models\McqRegistration;
 use App\Models\SiteSection;
+use App\Models\Student;
+use App\Models\StudentEditChangeRequest;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\User;
 use App\Support\TenantAuth;
+use App\Services\Audit\DataChangeLogger;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Tenancy\SahodayaDatabaseProvisioner;
 use App\Support\SahodayaNavVisibility;
@@ -17,6 +24,7 @@ use App\Support\TenantBranding;
 use App\Support\TenantDomainSync;
 use App\Services\Auth\UserCredentialService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class TenantController extends Controller
@@ -233,6 +241,79 @@ class TenantController extends Controller
         $route = $type === 'sahodaya' ? 'admin.sahodayas.index' : 'admin.schools.index';
 
         return redirect()->route($route)->with('success', "Tenant \"{$name}\" deleted.");
+    }
+
+    /**
+     * Super-admin-only: permanently hard-delete every student record (including
+     * already-withdrawn ones) belonging to a single school, from the platform level.
+     * This bypasses SoftDeletes entirely — there is no recovery path afterwards.
+     */
+    public function eraseStudents(Request $request, Tenant $tenant)
+    {
+        abort_if($tenant->type !== 'school', 404);
+
+        $data = $request->validate([
+            'confirm_school_name' => 'required|string',
+        ]);
+
+        abort_unless(
+            mb_strtolower(trim($data['confirm_school_name'])) === mb_strtolower(trim($tenant->name)),
+            422,
+            'Type the school name exactly to confirm erasing its students.'
+        );
+
+        $sahodaya = $tenant->parent_id ? Tenant::query()->find($tenant->parent_id) : null;
+        abort_unless($sahodaya, 422, 'This school has no parent Sahodaya — cannot resolve its database.');
+
+        $count = TenancyDatabase::whenDatabaseReady($sahodaya, function () use ($tenant) {
+            return DB::transaction(function () use ($tenant) {
+                $studentIds = Student::withTrashed()
+                    ->where('tenant_id', $tenant->id)
+                    ->pluck('id');
+
+                if ($studentIds->isEmpty()) {
+                    return 0;
+                }
+
+                // These reference student_id without a DB-level FK (or without a
+                // cascading one) — clean them up before the hard delete so nothing
+                // is left pointing at a row that no longer exists.
+                FestParticipant::whereIn('student_id', $studentIds)->delete();
+                McqRegistration::whereIn('student_id', $studentIds)->delete();
+                StudentEditChangeRequest::whereIn('student_id', $studentIds)->delete();
+                FestSubstitutionRequest::whereIn('replacement_student_id', $studentIds)
+                    ->update(['replacement_student_id' => null]);
+
+                // fest_level_registrations and fest_individual_championship_points
+                // have real cascadeOnDelete() foreign keys on student_id — no
+                // manual cleanup needed for those.
+
+                Student::withTrashed()->whereIn('id', $studentIds)->forceDelete();
+
+                app(DataChangeLogger::class)->event(
+                    'students.erased_all',
+                    "Super admin permanently erased {$studentIds->count()} student(s) from {$tenant->name}",
+                    $tenant->id,
+                    'students',
+                    null,
+                    ['count' => $studentIds->count(), 'student_ids' => $studentIds->all()],
+                );
+
+                return $studentIds->count();
+            });
+        }, 0);
+
+        app(PlatformAuditLogger::class)->log(
+            'student.erased_all',
+            "Super admin permanently erased {$count} student(s) from school \"{$tenant->name}\"",
+            $tenant,
+            ['school_id' => $tenant->id, 'sahodaya_id' => $sahodaya->id, 'count' => $count],
+        );
+
+        return redirect()->route('admin.tenants.show', $tenant)->with(
+            $count > 0 ? 'success' : 'info',
+            $count > 0 ? "Permanently erased {$count} student record(s)." : 'No student records found to erase.'
+        );
     }
 
     public function rejectMembership(Request $request, Tenant $tenant, MembershipNotifier $notifier)
