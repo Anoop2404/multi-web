@@ -242,7 +242,7 @@
                     </FormField>
                     <FormField v-if="isSports && itemHeads.length" label="Event Head">
                         <select v-model="addForm.head_id" class="field">
-                            <option value="">Unassigned</option>
+                            <option :value="null">Unassigned</option>
                             <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
                         </select>
                     </FormField>
@@ -339,7 +339,7 @@
                     </FormField>
                     <FormField v-if="isSports && itemHeads.length" label="Event Head">
                         <select v-model="editForm.head_id" class="field">
-                            <option value="">Unassigned</option>
+                            <option :value="null">Unassigned</option>
                             <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
                         </select>
                         <p class="text-xs text-slate-500 mt-1">Changing this moves the item under the selected head.</p>
@@ -543,12 +543,12 @@ const groupedFilteredItems = computed(() => {
 
 const editForm = useForm({
     title: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
-    venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', head_id: '',
+    venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', head_id: null,
     qualify_count: null, max_per_school: null, fee_amount: null,
 });
 const addForm = useForm({
     title: '', gender: 'open', class_group: '', age_group: '', kids_band: '',
-    venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', head_id: '',
+    venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', head_id: null,
     qualify_count: null, max_per_school: null, fee_amount: null,
 });
 const headForm = useForm({
@@ -625,7 +625,7 @@ function payloadFor(item, overrides = {}) {
         sport_discipline: item.sport_discipline ?? '',
         competition_format: item.competition_format ?? '',
         participant_type: item.participant_type ?? 'individual',
-        head_id: item.head_id ?? '',
+        head_id: item.head_id ?? null,
         qualify_count: item.qualify_count ?? null,
         max_per_school: item.max_per_school ?? null,
         fee_amount: item.fee_amount ?? null,
@@ -637,7 +637,7 @@ function quickUpdate(item, overrides) {
     if (!canEdit(item)) return;
     router.put(`${base}/items/${item.id}`, payloadFor(item, overrides), {
         preserveScroll: true,
-        preserveState: true,
+        preserveState: false,
     });
 }
 
@@ -692,7 +692,7 @@ function resetAddForm(headId = '') {
     addForm.sport_discipline = '';
     addForm.competition_format = '';
     addForm.participant_type = 'individual';
-    addForm.head_id = headId ? String(headId) : (headFilter.value && headFilter.value !== 'other' ? headFilter.value : '');
+    addForm.head_id = headId ? Number(headId) : (headFilter.value && headFilter.value !== 'other' ? Number(headFilter.value) : null);
     addForm.qualify_count = null;
     addForm.max_per_school = null;
     addForm.fee_amount = null;

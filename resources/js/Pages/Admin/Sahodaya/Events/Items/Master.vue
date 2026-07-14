@@ -83,7 +83,7 @@
                             <template v-if="isSports">
                                 <FormField v-if="itemHeads.length" label="Event Head">
                                     <select v-model="itemForm.head_id" class="field">
-                                        <option value="">None</option>
+                                        <option :value="null">None</option>
                                         <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
                                     </select>
                                 </FormField>
@@ -339,7 +339,7 @@
                     <template v-if="isSports">
                         <FormField v-if="itemHeads.length" label="Event Head">
                             <select v-model="editForm.head_id" class="field">
-                                <option value="">None</option>
+                                <option :value="null">None</option>
                                 <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
                             </select>
                         </FormField>
@@ -592,7 +592,7 @@ function clearFilters() {
 }
 
 const itemForm = useForm({
-    title: '', participant_type: 'individual', result_method: '', stage_type: '', venue_type: '', head_id: selectedHeadFilter.value === 'other' ? '' : selectedHeadFilter.value,
+    title: '', participant_type: 'individual', result_method: '', stage_type: '', venue_type: '', head_id: selectedHeadFilter.value === 'other' ? null : (selectedHeadFilter.value ? Number(selectedHeadFilter.value) : null),
     competition_format: '', sport_discipline: '', class_group: '', age_group: '', kids_band: '', gender: 'open',
     category: '', area_id: '', tiebreak_mode: 'none',
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
@@ -601,7 +601,7 @@ const itemForm = useForm({
 const editingItem = ref(null);
 const editForm = useForm({
     title: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
-    venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', result_method: '', head_id: '',
+    venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', result_method: '', head_id: null,
     category: '', area_id: '', tiebreak_mode: 'none',
     qualify_count: null, max_per_school: null, fee_amount: null, quota_eligible: false,
     min_playing: null, max_subs: null, max_squad: null, min_squad: null, standbys: null,
@@ -616,7 +616,7 @@ function addItem() {
             itemForm.participant_type = 'individual';
             itemForm.stage_type = '';
             itemForm.venue_type = '';
-            itemForm.head_id = selectedHeadFilter.value === 'other' ? '' : selectedHeadFilter.value;
+            itemForm.head_id = selectedHeadFilter.value === 'other' ? null : (selectedHeadFilter.value ? Number(selectedHeadFilter.value) : null);
             itemForm.competition_format = '';
             itemForm.sport_discipline = '';
             itemForm.class_group = '';
@@ -646,9 +646,9 @@ function initialHeadFilter() {
 function setHeadFilter(value) {
     selectedHeadFilter.value = value === null || value === undefined ? '' : String(value);
     if (selectedHeadFilter.value !== 'other') {
-        itemForm.head_id = selectedHeadFilter.value;
+        itemForm.head_id = selectedHeadFilter.value ? Number(selectedHeadFilter.value) : null;
     } else {
-        itemForm.head_id = '';
+        itemForm.head_id = null;
     }
 }
 function importCatalog() {
@@ -672,7 +672,7 @@ function openEditItem(item) {
     editForm.sport_discipline = item.sport_discipline ?? '';
     editForm.competition_format = item.competition_format ?? '';
     editForm.category = item.category ?? '';
-    editForm.head_id = item.head_id ?? '';
+    editForm.head_id = item.head_id ?? null;
     editForm.area_id = item.area_id ?? '';
     editForm.participant_type = item.participant_type ?? 'individual';
     editForm.result_method = item.result_method ?? '';
@@ -706,6 +706,6 @@ function toggleItemEnabled(item, enabled) {
         qualify_count: item.qualify_count,
         max_per_school: item.max_per_school,
         fee_amount: item.fee_amount,
-    }, { preserveScroll: true, preserveState: true });
+    }, { preserveScroll: true, preserveState: false });
 }
 </script>

@@ -12,7 +12,7 @@
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <FormField :label="isSports ? 'Event Head' : 'Item head'">
                 <select v-model="row.head_id" class="field text-sm">
-                    <option value="">Unassigned</option>
+                    <option :value="null">Unassigned</option>
                     <option v-for="h in headsForAssign" :key="h.id" :value="h.id">{{ h.name }}</option>
                 </select>
             </FormField>
@@ -85,7 +85,7 @@ function toDateInput(value) {
 
 function buildRow(config) {
     return {
-        head_id: config.head_id ?? '',
+        head_id: config.head_id ?? null,
         fee_amount: config.fee_amount ?? '',
         is_enabled: config.is_enabled !== false,
         reg_start: toDateInput(config.reg_start),
