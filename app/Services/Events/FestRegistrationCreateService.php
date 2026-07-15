@@ -79,7 +79,9 @@ class FestRegistrationCreateService
 
         $isGroup = in_array($item->participant_type, ['group', 'team'], true);
         if ($isGroup) {
-            abort_if(! filled($teamName), 422, 'Team name is required for group items.');
+            if (! filled($teamName)) {
+                $teamName = $this->nextDefaultTeamName($event, $item, $school);
+            }
             $error = $item->validateSquadCount(count($performerIds));
             abort_if($error, 422, $error);
         } elseif (count($performerIds) > 1) {
@@ -226,7 +228,9 @@ class FestRegistrationCreateService
 
         $isGroup = in_array($item->participant_type, ['group', 'team'], true);
         if ($isGroup) {
-            abort_if(! filled($teamName), 422, 'Team name is required for group items.');
+            if (! filled($teamName)) {
+                $teamName = $this->nextDefaultTeamName($event, $item, $school, $registration->id);
+            }
             $error = $item->validateSquadCount(count($performerIds));
             abort_if($error, 422, $error);
         } elseif (count($performerIds) > 1) {
@@ -314,6 +318,23 @@ class FestRegistrationCreateService
 
             return $registration->fresh(['participants.student', 'item']);
         });
+    }
+
+    /**
+     * Default "Team N" name for a group/team item — the school's Nth entry under this item,
+     * so a Sahodaya/school admin never has to type a team name to register directly. Still
+     * overridable: callers only reach here when the submitted team_name was blank.
+     */
+    private function nextDefaultTeamName(FestEvent $event, FestEventItem $item, Tenant $school, ?int $excludeRegistrationId = null): string
+    {
+        $count = FestRegistration::where('event_id', $event->id)
+            ->where('item_id', $item->id)
+            ->where('school_id', $school->id)
+            ->whereIn('status', ['submitted', 'pending_approval', 'waitlisted', 'approved'])
+            ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
+            ->count();
+
+        return 'Team '.($count + 1);
     }
 
     /** @param  list<int>  $teacherIds */

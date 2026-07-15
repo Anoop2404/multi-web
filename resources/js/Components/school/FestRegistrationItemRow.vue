@@ -254,6 +254,11 @@ const showStandbyPicker = computed(() => props.eventType !== 'teacher_fest');
 
 const isGroup = computed(() => ['group', 'team'].includes(props.item.participant_type));
 
+// Default "Team N" for this school's Nth entry under this item — pre-filled so registering
+// a team is one direct action (pick athletes, confirm) instead of also requiring a typed name.
+// Still editable in the picker if the school wants a custom name.
+const nextTeamName = computed(() => `Team ${(props.registrations?.length ?? 0) + 1}`);
+
 const eligibilityLabel = computed(() => {
     const parts = [];
     const age = props.item.age_group;
@@ -403,6 +408,9 @@ function formatMoney(value) {
 }
 
 function openPicker() {
+    if (!isEditing.value && isGroup.value && !String(props.form.team_name ?? '').trim()) {
+        props.form.team_name = nextTeamName.value;
+    }
     pickerOpen.value = true;
 }
 
