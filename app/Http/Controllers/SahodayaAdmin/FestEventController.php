@@ -210,6 +210,11 @@ class FestEventController extends SahodayaAdminController
 
         $event = FestEvent::create($data);
 
+        if ($event->event_type === 'sports' && $event->parent_event_id === null) {
+            $event->update(['partition_role' => 'sports_season']);
+            app(\App\Services\Events\FestSportsEventSyncService::class)->syncSeason($event->fresh());
+        }
+
         app(PlatformAuditLogger::class)->festEvent(
             $event,
             FestPageActivity::OVERVIEW,
@@ -219,10 +224,12 @@ class FestEventController extends SahodayaAdminController
 
         return redirect(
             $event->event_type === 'sports'
-                ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup"
+                ? "/sahodaya-admin/{$this->sahodaya->id}/sports"
                 : "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}"
         )
-            ->with('success', "Event \"{$event->title}\" created.");
+            ->with('success', $event->event_type === 'sports'
+                ? "Season \"{$event->title}\" created. Sport events are listed below — open each for items and fees."
+                : "Event \"{$event->title}\" created.");
     }
 
     public function show(string $tenantId, FestEvent $event)
@@ -260,6 +267,10 @@ class FestEventController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        if ($redirect = $this->redirectSportsSeasonToHub($event, 'Items live on each sport event (Chess, Aquatics, …).')) {
+            return $redirect;
+        }
+
         $event->load('items');
         $ctx = $this->eventPageContext($event);
 
@@ -271,6 +282,10 @@ class FestEventController extends SahodayaAdminController
     public function itemsList(string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        if ($redirect = $this->redirectSportsSeasonToHub($event, 'Item listing is per sport event — open Chess, Aquatics, etc. from Sports Meet.')) {
+            return $redirect;
+        }
 
         $event->load('items');
         $ctx = $this->eventPageContext($event);
@@ -370,6 +385,11 @@ class FestEventController extends SahodayaAdminController
 
         $previousStatus = $event->status;
         $event->update($data);
+
+        // Season hub: keep child sport events in sync (open status + item placement).
+        if ($event->event_type === 'sports' && $event->isSportsSeasonEvent()) {
+            app(\App\Services\Events\FestSportsEventSyncService::class)->syncSeason($event->fresh());
+        }
 
         if (($data['status'] ?? null) === 'registration_open' && $previousStatus !== 'registration_open') {
             try {
@@ -602,6 +622,10 @@ class FestEventController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        if ($redirect = $this->redirectSportsSeasonToHub($event, 'Add items on the Chess / Aquatics (sport) event, not on the season hub.')) {
+            return $redirect;
+        }
+
         $registry = app(FestTaxonomyRegistry::class)->forTenant($this->sahodaya->id);
         $registry->ensureDefaults();
 
@@ -762,6 +786,10 @@ class FestEventController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        if ($redirect = $this->redirectSportsSeasonToHub($event, 'Import catalog items into each sport event, not the season hub.')) {
+            return $redirect;
+        }
+
         $data = $request->validate([
             'class_groups'   => 'nullable|array',
             'class_groups.*' => 'in:lp,up,hs,hss,open',
@@ -892,6 +920,23 @@ class FestEventController extends SahodayaAdminController
             'age_group'          => ['nullable', \Illuminate\Validation\Rule::in($ageKeys)],
             'kids_band'          => ['nullable', \Illuminate\Validation\Rule::in($kidsKeys)],
         ];
+    }
+
+    /**
+     * Season hub is config-only when sport events exist — send admins to /sports.
+     */
+    private function redirectSportsSeasonToHub(FestEvent $event, string $message): ?\Illuminate\Http\RedirectResponse
+    {
+        if ($event->event_type !== 'sports' || ! $event->isSportsSeasonEvent()) {
+            return null;
+        }
+
+        if (! FestEvent::where('parent_event_id', $event->id)->exists()) {
+            return null;
+        }
+
+        return redirect("/sahodaya-admin/{$this->sahodaya->id}/sports")
+            ->with('info', $message.' Open a sport from the Sports Meet list.');
     }
 
     private function eventTypes(): array

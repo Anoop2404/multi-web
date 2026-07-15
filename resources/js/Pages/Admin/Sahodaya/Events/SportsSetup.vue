@@ -11,7 +11,7 @@
         <FestEventWorkflowStepper :sahodaya-id="sahodaya.id" :event-id="event.id"
                                   event-type="sports" current-step="setup" />
 
-        <SportsSetupSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="setup" />
+        <SportsSetupSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event" active="setup" />
 
         <div v-if="sportsHubUrl"
              class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 mb-6 text-sm text-slate-700">

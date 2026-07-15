@@ -1,8 +1,9 @@
 /**
- * Sports fest — sidebar sections (Sahodaya admin, inside one sport event).
+ * Sports fest — sidebar sections (Sahodaya admin).
  *
- * After Head = Event unification, each sport (Athletics, Chess, …) is its own
- * FestEvent. There is no Event Head mini-nav — competition ops live on this event.
+ * After Head = Event unification:
+ * - Season hub: config only (age/cutoff/remittance) + link to sport events list
+ * - Each sport (Athletics, Chess, …): full competition ops on that FestEvent
  */
 
 import {
@@ -17,6 +18,30 @@ import {
     FEST_SETTINGS,
     FEST_VIEW,
 } from './sahodayaEventNavPermissions.js';
+
+/** Season hub — no Items / registrations (those live on child sport events). */
+export function sportsSeasonSidebarNav(sahodayaId, eventId) {
+    const base = `/sahodaya-admin/${sahodayaId}/events/${eventId}`;
+    const sportsHub = `/sahodaya-admin/${sahodayaId}/sports`;
+
+    return [
+        {
+            section: 'Season hub',
+            items: [
+                { label: 'Overview', href: `${base}?overview=1`, icon: 'grid', exact: true, permissions: FEST_VIEW },
+                { label: 'Setup', href: `${base}/setup`, icon: 'settings', permissions: FEST_SETTINGS },
+                { label: 'Settings', href: `${base}/settings`, icon: 'sliders', permissions: FEST_SETTINGS },
+                { label: 'Activity log', href: `${base}/activity`, icon: 'clock', permissions: FEST_VIEW },
+            ],
+        },
+        {
+            section: 'Sport events',
+            items: [
+                { label: 'All sports (Chess, …)', href: sportsHub, icon: 'layers', permissions: FEST_VIEW },
+            ],
+        },
+    ];
+}
 
 /** @returns {Array<{section: string, items: Array}>} */
 export function sportsEventSidebarNav(base, caps) {
@@ -92,6 +117,21 @@ export function sportsEventSidebarNav(base, caps) {
     groups.push({ section: 'Administration', items: adminItems });
 
     return groups;
+}
+
+/** True when this FestEvent is the season container (not Chess/Aquatics itself). */
+export function isSportsSeasonEvent(event) {
+    if (!event || event.event_type !== 'sports') {
+        return false;
+    }
+    if (event.partition_role === 'sports_season') {
+        return true;
+    }
+    if (event.partition_role === 'sports_discipline' || event.parent_event_id) {
+        return false;
+    }
+    // Legacy season: sports + no parent.
+    return !event.parent_event_id;
 }
 
 /** No Event Head mini-nav after Head = Event unification. */

@@ -68,10 +68,19 @@ class FestSportsEventSyncService
                     'partition_role' => 'sports_discipline',
                     'partition_key' => $slug,
                     'sports_age_cutoff_date' => $season->sports_age_cutoff_date,
+                    'registration_open' => $season->registration_open,
+                    'registration_close' => $season->registration_close,
+                    'event_reg_start' => $season->event_reg_start,
+                    'event_reg_end' => $season->event_reg_end,
                 ];
                 // Do not overwrite customised titles once set.
                 if (! filled($existing->title)) {
                     $payload['title'] = $title;
+                }
+                // Inherit season open status so schools see Chess/Aquatics, not only the hub.
+                if (in_array($existing->status, ['draft', 'published'], true)
+                    && in_array($season->status, ['registration_open', 'ongoing', 'published'], true)) {
+                    $payload['status'] = $season->status;
                 }
                 $existing->update($payload);
                 $this->ensureItemsOnSportEvent($season, $existing, $key);
@@ -215,12 +224,15 @@ class FestSportsEventSyncService
     {
         // Move matching items still on the season hub onto the sport event.
         FestEventItem::where('event_id', $season->id)
+            ->with('head:id,catalog_key')
             ->get()
             ->each(function (FestEventItem $item) use ($sport, $catalogKey) {
-                $key = FestItemHeadService::resolveCatalogHeadKey([
-                    'title' => $item->title,
-                    'sport_discipline' => $item->sport_discipline,
-                ]);
+                $key = $item->head?->catalog_key
+                    ?: FestItemHeadService::resolveCatalogHeadKey([
+                        'title' => $item->title,
+                        'sport_discipline' => $item->sport_discipline,
+                        'head_key' => $item->head_key ?? null,
+                    ]);
                 if ($key === $catalogKey) {
                     $item->update(['event_id' => $sport->id, 'head_id' => null]);
                 }

@@ -20,27 +20,50 @@ class FestItemHeadService
     public static function resolveCatalogHeadKey(array $row): ?string
     {
         $title = strtolower((string) ($row['title'] ?? ''));
+        $discipline = strtolower((string) ($row['sport_discipline'] ?? ''));
+        $headKey = strtolower((string) ($row['head_key'] ?? ''));
 
-        if (str_contains($title, 'chess')) {
+        if ($headKey !== '') {
+            foreach (self::catalogHeadDefinitions() as $def) {
+                if ($def['key'] === $headKey) {
+                    return $def['key'];
+                }
+            }
+        }
+
+        if (str_contains($title, 'chess') || str_contains($discipline, 'chess')) {
             return 'chess';
         }
 
-        if (str_contains($title, 'carrom')) {
+        if (str_contains($title, 'carrom') || str_contains($discipline, 'carrom')) {
             return 'carrom';
         }
 
-        $discipline = $row['sport_discipline'] ?? null;
-        if (! $discipline) {
+        if (
+            str_contains($title, 'swim')
+            || str_contains($title, 'freestyle')
+            || str_contains($title, 'backstroke')
+            || str_contains($title, 'breaststroke')
+            || str_contains($title, 'butterfly')
+            || str_contains($discipline, 'aquatic')
+            || str_contains($discipline, 'swim')
+        ) {
+            return 'aquatics';
+        }
+
+        $rawDiscipline = $row['sport_discipline'] ?? null;
+        if (! $rawDiscipline) {
             return null;
         }
 
+        // Exact match on stored enum
         foreach (self::catalogHeadDefinitions() as $def) {
-            if (($def['sport_discipline'] ?? null) !== $discipline) {
+            if (($def['sport_discipline'] ?? null) !== $rawDiscipline) {
                 continue;
             }
 
             // board_game is split by title above (chess vs carrom).
-            if ($discipline === 'board_game') {
+            if ($rawDiscipline === 'board_game') {
                 continue;
             }
 

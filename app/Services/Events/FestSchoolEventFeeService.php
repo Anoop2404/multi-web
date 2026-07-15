@@ -268,12 +268,21 @@ class FestSchoolEventFeeService
             return false;
         }
 
-        // Unified sports: fee columns live on the event — never per-head.
+        // Unified sports: sport events always bill at event level (Head = Event).
+        // Season hubs never use per-head once child sport events exist.
         if ($event->event_type === 'sports') {
-            if ($event->hasSportsFeesConfigured()) {
+            if ($event->isSportsDisciplineEvent() || $event->hasSportsFeesConfigured()) {
                 return false;
             }
-            // Transition: still use per-head only when heads exist and event fields empty.
+            // Transition: season hub only — per-head if heads still hang off the season and no discipline children.
+            if ($event->isSportsSeasonEvent()) {
+                $hasChildren = FestEvent::where('parent_event_id', $event->id)
+                    ->where('partition_role', 'sports_discipline')
+                    ->exists();
+                if ($hasChildren) {
+                    return false;
+                }
+            }
             if (! Schema::hasColumn('fest_school_event_fees', 'head_id')) {
                 return false;
             }

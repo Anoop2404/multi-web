@@ -27,8 +27,16 @@ class ProgramHubDataService
         $sahodayaId = $school->parent_id;
         $prefix = ProgramRouteMap::prefixFromSlug($programSlug);
 
+        // Sports: list sport events (Chess, Aquatics, …), not the season hub,
+        // whenever child discipline events exist — same rule as school registration.
+        $hideSportsSeasonHub = $meta['eventType'] === 'sports' && FestEvent::where('tenant_id', $sahodayaId)
+            ->ofType('sports')
+            ->whereNotNull('parent_event_id')
+            ->exists();
+
         $sahodayaEvents = FestEvent::where('tenant_id', $sahodayaId)
             ->ofType($meta['eventType'])
+            ->when($hideSportsSeasonHub, fn ($q) => $q->whereNotNull('parent_event_id'))
             ->listedForSchool($school->id, $meta['eventType'])
             ->withCount(['registrations' => fn ($q) => $q->where('school_id', $school->id)])
             ->orderByDesc('event_start')

@@ -91,8 +91,8 @@
                 </Link>
                 <Link :href="`${catalogBase}/assign${eventQuery}`"
                       class="card card--muted !py-4 hover:border-[color:var(--brand-blue)]/30 transition">
-                    <p class="text-sm font-semibold text-slate-900">Assign items to event</p>
-                    <p class="text-xs text-slate-500 mt-1">Load items into a sports event</p>
+                    <p class="text-sm font-semibold text-slate-900">Assign items to a sport</p>
+                    <p class="text-xs text-slate-500 mt-1">Pick Chess / Aquatics / … then load items</p>
                 </Link>
                 <Link :href="sahodayaProgramHref(sahodaya.id, program.slug, 'results')"
                       class="card card--muted !py-4 hover:border-[color:var(--brand-blue)]/30 transition">

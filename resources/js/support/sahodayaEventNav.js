@@ -4,8 +4,8 @@
  */
 
 import { capabilitiesForEvent } from './sahodayaEventCapabilities.js';
-import { sportsEventSidebarNav } from './sportsEventNav.js';
-export { sportsEventSidebarNav, shouldShowSportsHeadSidebar, SPORTS_HEAD_SIDEBAR_PATHS, shouldShowSchoolSportsHeadSidebar, SCHOOL_SPORTS_HEAD_SIDEBAR_PATHS } from './sportsEventNav.js';
+import { isSportsSeasonEvent, sportsEventSidebarNav, sportsSeasonSidebarNav } from './sportsEventNav.js';
+export { sportsEventSidebarNav, sportsSeasonSidebarNav, isSportsSeasonEvent, shouldShowSportsHeadSidebar, SPORTS_HEAD_SIDEBAR_PATHS, shouldShowSchoolSportsHeadSidebar, SCHOOL_SPORTS_HEAD_SIDEBAR_PATHS } from './sportsEventNav.js';
 import {
     FEST_CATERING,
     FEST_CERTIFICATES,
@@ -59,9 +59,11 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
     const isSports = event?.event_type === 'sports';
 
     if (isSports) {
-        const groups = sportsEventSidebarNav(base, caps);
+        const groups = isSportsSeasonEvent(event)
+            ? sportsSeasonSidebarNav(sahodayaId, eventId)
+            : sportsEventSidebarNav(base, caps);
 
-        if (programEvents.length) {
+        if (programEvents.length && !isSportsSeasonEvent(event)) {
             const visible = programEvents.filter((ev) => String(ev.id) !== String(eventId)).slice(0, 4);
             if (visible.length) {
                 const items = visible.map((ev) => ({

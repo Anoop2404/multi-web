@@ -11,8 +11,8 @@
         <div v-if="isSports" class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 mb-6 text-sm text-emerald-950">
             <p class="font-semibold">Your sports workflow</p>
             <p class="mt-1 text-xs text-emerald-900/90">
-                <strong>Run school day</strong> → My school events → enter marks → Submit winners →
-                <strong>Join Sahodaya meet</strong> → Register for Sahodaya → pay event fees → view Results.
+                Register separately for each sport (Chess, Aquatics, …) under Register for Sahodaya.
+                School day still uses My school events → submit winners.
             </p>
         </div>
 
@@ -50,7 +50,7 @@
         </div>
 
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
-            <HubCard :href="`${programBase}/registration`" icon="📝" label="Register for Sahodaya" hint="Pick students & pay fees" />
+            <HubCard :href="`${programBase}/registration`" icon="📝" label="Register for Sahodaya" hint="Per sport: Chess, Aquatics, …" />
             <HubCard v-if="!isTeacherFest" :href="`${programBase}/my-events`" icon="🏫" label="My school events" hint="Run your own sports day" />
             <HubCard v-if="isSports" :href="`${programBase}/submit-winners`" icon="🏅" label="Submit winners" hint="Promote to Sahodaya meet" />
             <HubCard :href="`${programBase}/results`" icon="📊" label="Results" hint="Published scores" />
