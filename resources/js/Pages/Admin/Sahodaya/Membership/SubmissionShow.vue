@@ -68,14 +68,22 @@
             </div>
 
             <div v-if="submission.counts?.length" class="card space-y-2">
-                <h3 class="section-title !mb-2">Student counts by category</h3>
+                <h3 class="section-title !mb-2">Student counts by class</h3>
                 <div v-for="c in submission.counts" :key="c.id"
                      class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
-                    <span class="font-semibold">{{ c.class_category?.label ?? 'Category' }}</span>
+                    <span class="font-semibold">{{ c.school_class?.name ?? c.class_category?.label ?? 'Class' }}</span>
                     <div class="flex gap-4">
                         <span class="text-blue-600 font-bold">M {{ c.male_count }}</span>
                         <span class="text-pink-600 font-bold">F {{ c.female_count }}</span>
                         <span class="font-bold">Total {{ c.total_count }}</span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between rounded-xl bg-[#0f3d7a]/5 px-4 py-3 text-sm border-t-2 border-[#0f3d7a]/10 mt-1">
+                    <span class="font-bold text-[#0f3d7a]">Total</span>
+                    <div class="flex gap-4">
+                        <span class="text-blue-700 font-bold">M {{ countsTotal('male_count') }}</span>
+                        <span class="text-pink-700 font-bold">F {{ countsTotal('female_count') }}</span>
+                        <span class="font-bold text-[#0f3d7a]">Total {{ countsTotal('total_count') }}</span>
                     </div>
                 </div>
             </div>
@@ -95,9 +103,13 @@ import { Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import TrackReviewCard from '@/Components/sahodaya/TrackReviewCard.vue';
 
-defineProps({
+const props = defineProps({
     sahodaya: Object, publicUrl: String,
     pendingSchoolsCount: Number, pendingSubmissionsCount: Number, pendingPaymentsCount: Number,
     submission: Object, profile: Object, schoolStudents: { type: Array, default: () => [] },
 });
+
+function countsTotal(field) {
+    return (props.submission.counts ?? []).reduce((sum, c) => sum + (Number(c[field]) || 0), 0);
+}
 </script>

@@ -30,7 +30,7 @@ class SubmissionReviewController extends SahodayaAdminController
         abort_if($submission->school->parent_id !== $this->sahodaya->id, 403);
 
         $profile = SahodayaProfile::where('tenant_id', $this->sahodaya->id)->first();
-        $submission->load(['school', 'counts.classCategory', 'teachers', 'registration']);
+        $submission->load(['school', 'counts.classCategory', 'counts.schoolClass', 'teachers', 'registration']);
 
         $schoolStudents = Student::where('tenant_id', $submission->school_id)
             ->where('status', 'active')

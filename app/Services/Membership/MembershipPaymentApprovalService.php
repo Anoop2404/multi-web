@@ -59,26 +59,33 @@ class MembershipPaymentApprovalService
             $registration = app(RegistrationStatusService::class)
                 ->ensureMembershipNumber($registration->load('school'));
             $regBefore = $registration->registration_status;
-            $registration->update(['registration_status' => 'completed']);
+            $registration->increment('amount_paid', (float) $payment->amount);
+            $registration->refresh();
+            $newStatus = $registration->outstandingBalance() > 0 ? 'payment_pending' : 'completed';
+            $registration->update(['registration_status' => $newStatus]);
             $registration->refresh();
             app(DataChangeLogger::class)->updated(
                 $registration,
-                "Registration completed for {$payment->school?->name}",
-                ['registration_status' => ['old' => $regBefore, 'new' => 'completed']],
+                $newStatus === 'completed'
+                    ? "Registration completed for {$payment->school?->name}"
+                    : "Payment verified for {$payment->school?->name}; balance of ₹{$registration->outstandingBalance()} still due",
+                ['registration_status' => ['old' => $regBefore, 'new' => $newStatus]],
                 $payment->school_id,
                 'membership',
-                ['membership_no' => $registration->reg_no],
+                ['membership_no' => $registration->reg_no, 'amount_paid' => (float) $registration->amount_paid],
             );
-            $notifier->registrationCompleted(
-                $payment->school,
-                $payment->academic_year,
-                $registration->reg_no,
-                $firstMembershipApproval,
-                $receiptHtml,
-                $receiptNo,
-            );
-            if ($freshReceipt && $receiptHtml) {
-                app(FeeReceiptEmailTracker::class)->markSent($freshReceipt->fresh());
+            if ($newStatus === 'completed') {
+                $notifier->registrationCompleted(
+                    $payment->school,
+                    $payment->academic_year,
+                    $registration->reg_no,
+                    $firstMembershipApproval,
+                    $receiptHtml,
+                    $receiptNo,
+                );
+                if ($freshReceipt && $receiptHtml) {
+                    app(FeeReceiptEmailTracker::class)->markSent($freshReceipt->fresh());
+                }
             }
         } elseif ($firstMembershipApproval) {
             $notifier->schoolApproved($school);

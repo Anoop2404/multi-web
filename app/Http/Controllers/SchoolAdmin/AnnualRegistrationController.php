@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\MembershipPayment;
-use App\Models\ClassCategory;
 use App\Models\Region;
 use App\Models\Registration;
 use App\Models\SchoolRegionAssignment;
@@ -258,10 +257,9 @@ class AnnualRegistrationController extends SchoolAdminController
     public function counts(EffectiveMasterDataResolver $resolver)
     {
         $registration = $this->currentRegistration();
-        $sahodayaId = $this->school->parent_id;
-        $categories = $resolver->classCategories($sahodayaId);
         $submission = $registration->submission;
-        $existing = $submission->counts()->get()->keyBy('class_category_id');
+        $classes = $this->schoolClasses();
+        $existing = $submission->counts()->get()->keyBy('school_class_id');
         $dbStudentCount = Student::where('tenant_id', $this->school->id)->where('status', 'active')->count();
         $submittedTotal = (int) $existing->sum('total_count');
 
@@ -269,7 +267,7 @@ class AnnualRegistrationController extends SchoolAdminController
             'registration' => $registration,
             'submission'   => $submission,
             'profile'      => $this->registrationProfilePayload(),
-            'categories'   => $categories,
+            'classes'      => $classes,
             'counts'       => $existing,
             'dbStudentCount' => $dbStudentCount,
             'countMismatch' => $dbStudentCount > 0 && $submittedTotal > 0
@@ -282,20 +280,32 @@ class AnnualRegistrationController extends SchoolAdminController
         $this->assertRegistrationEditAllowed($windowService);
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
-        abort_unless(in_array($submission->counts_status, ['pending', 'rejected']), 403);
+        // Counts can also be edited after approval, so a school can report a mid-year
+        // enrollment increase; this only updates the saved rows, it does not change
+        // counts_status — the school must still explicitly resubmit for Sahodaya review.
+        abort_unless(in_array($submission->counts_status, ['pending', 'rejected', 'approved']), 403);
 
         $data = $request->validate([
             'counts' => 'required|array',
-            'counts.*.class_category_id' => ['required', Rule::exists(ClassCategory::class, 'id')],
+            'counts.*.school_class_id' => [
+                'required',
+                Rule::exists(SchoolClass::class, 'id')->where('tenant_id', $this->school->id),
+            ],
             'counts.*.male_count'        => 'required|integer|min:0',
             'counts.*.female_count'      => 'required|integer|min:0',
             'counts.*.total_count'       => 'required|integer|min:0',
         ]);
 
+        $classCategoryIds = SchoolClass::whereIn('id', collect($data['counts'])->pluck('school_class_id'))
+            ->pluck('class_category_id', 'id');
+
         foreach ($data['counts'] as $row) {
             SchoolYearStudentCount::updateOrCreate(
-                ['school_year_submission_id' => $submission->id, 'class_category_id' => $row['class_category_id']],
-                $row
+                ['school_year_submission_id' => $submission->id, 'school_class_id' => $row['school_class_id']],
+                array_merge($row, [
+                    // kept in sync for backward-compatible category-level reporting
+                    'class_category_id' => $classCategoryIds[$row['school_class_id']] ?? null,
+                ])
             );
         }
 
@@ -483,7 +493,8 @@ class AnnualRegistrationController extends SchoolAdminController
             'paymentDueDate' => $slab?->due_date?->format('Y-m-d'),
             'paymentOverdue' => (bool) $isOverdue,
             'lateFeeAmount'  => $lateFee,
-            'totalDue'       => (float) ($registration->membership_fee_amount ?? 0) + $lateFee,
+            'amountPaid'     => (float) ($registration->amount_paid ?? 0),
+            'totalDue'       => $registration->outstandingBalance() + $lateFee,
         ]);
     }
 
@@ -495,6 +506,11 @@ class AnnualRegistrationController extends SchoolAdminController
 
         if ($registration->membership_fee_amount === null) {
             return back()->with('error', 'Membership fee is not configured yet. Please contact your Sahodaya office.');
+        }
+
+        $outstanding = $registration->outstandingBalance();
+        if ($outstanding <= 0) {
+            return back()->with('info', 'No payment is currently due.');
         }
 
         $data = $request->validate([
@@ -524,7 +540,7 @@ class AnnualRegistrationController extends SchoolAdminController
             'school_id'           => $this->school->id,
             'academic_year'       => $registration->academic_year,
             'registration_id'     => $registration->id,
-            'amount'              => $registration->membership_fee_amount,
+            'amount'              => $outstanding,
             'payment_proof_path'  => $path,
             'payment_method'      => $data['payment_method'] ?? null,
             'transaction_ref'     => $data['transaction_ref'] ?? null,
@@ -571,7 +587,7 @@ class AnnualRegistrationController extends SchoolAdminController
         $notifier->paymentSubmitted(
             $this->school,
             $registration->academic_year,
-            $registration->membership_fee_amount !== null ? (float) $registration->membership_fee_amount : null,
+            $outstanding,
             $data['transaction_ref'] ?? null,
             $data['payment_method'] ?? null,
         );

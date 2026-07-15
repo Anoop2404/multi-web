@@ -21,9 +21,18 @@ class MembershipFeeCalculator
             $amount = (float) $registration->fee_override['override_amount'];
         }
 
+        // amount_paid is 0 on a first-time registration, so outstanding == the full fee and this
+        // behaves exactly as before. On a post-approval count revision (e.g. the school's count
+        // increased into a higher fee slab after an earlier payment was already verified),
+        // amount_paid already reflects what was paid, so outstanding collapses to just the
+        // top-up difference — and if the revised total doesn't cross into a costlier slab,
+        // outstanding is zero/negative and no new payment step is opened.
+        $amountPaid = (float) ($registration->amount_paid ?? 0);
+        $outstanding = round($amount - $amountPaid, 2);
+
         $registration->update([
             'membership_fee_amount' => $amount,
-            'registration_status'   => $profile->requiresMembershipPaymentForSchool($school) && $amount > 0
+            'registration_status'   => $profile->requiresMembershipPaymentForSchool($school) && $outstanding > 0
                 ? 'payment_pending'
                 : 'completed',
         ]);

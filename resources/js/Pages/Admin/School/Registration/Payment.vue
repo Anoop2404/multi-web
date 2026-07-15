@@ -10,9 +10,17 @@
                                    current="payment" />
 
             <div class="card space-y-4">
+                <div v-if="amountPaid > 0" class="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm text-emerald-800">
+                    <p class="font-semibold">Additional payment due</p>
+                    <p class="mt-1">
+                        Your student count was revised, raising the total membership fee to
+                        ₹{{ formatAmount(registration.membership_fee_amount) }}. You've already paid
+                        ₹{{ formatAmount(amountPaid) }} — only the difference below is due now.
+                    </p>
+                </div>
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Amount due</p>
-                    <p class="text-3xl font-bold text-slate-900 mt-1">₹{{ formatAmount(registration.membership_fee_amount) }}</p>
+                    <p class="text-3xl font-bold text-slate-900 mt-1">₹{{ formatAmount(totalDue) }}</p>
                 </div>
                 <div v-if="paymentDetails" class="border-t border-slate-100 pt-4">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">How to pay</p>
@@ -65,6 +73,8 @@ const props = defineProps({
     registration: Object,
     profile: { type: Object, default: null },
     payments: { type: Array, default: () => [] },
+    amountPaid: { type: Number, default: 0 },
+    totalDue: { type: Number, default: 0 },
 });
 
 const { scrollToFirstError } = useScrollToFirstError();

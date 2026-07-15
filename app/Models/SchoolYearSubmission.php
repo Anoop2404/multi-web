@@ -25,15 +25,18 @@ class SchoolYearSubmission extends Model
     public function counts()    { return $this->hasMany(SchoolYearStudentCount::class); }
     public function teachers()  { return $this->hasMany(SubmissionTeacher::class); }
 
+    /**
+     * Whether the tracks that actually gate membership payment are approved. Teacher data still
+     * goes through its own submit/verify/approve workflow (see teacher_status) so Sahodaya can
+     * review it, but it is informational only and must never block a school from paying its
+     * membership fee — only student data (full records or counts) gates payment.
+     */
     public function allApplicableTracksApproved(SahodayaProfile $profile): bool
     {
         if ($profile->student_data_mode === 'full_records' && $this->full_records_status !== 'approved') {
             return false;
         }
         if ($profile->student_data_mode === 'counts_only' && $this->counts_status !== 'approved') {
-            return false;
-        }
-        if ($profile->teacher_registration_enabled && $this->teacher_status !== 'approved') {
             return false;
         }
 

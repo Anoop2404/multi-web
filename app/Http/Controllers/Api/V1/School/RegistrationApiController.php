@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\V1\School;
 
 use App\Http\Resources\MembershipPaymentResource;
 use App\Http\Resources\RegistrationResource;
-use App\Models\ClassCategory;
 use App\Models\MembershipPayment;
 use App\Models\Registration;
 use App\Models\SahodayaProfile;
@@ -143,13 +142,14 @@ class RegistrationApiController extends SchoolApiController
     {
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
-        $categories = $resolver->classCategories($this->school->parent_id);
-        $existing = $submission->counts()->get()->keyBy('class_category_id');
+        $classes = SchoolClass::where('tenant_id', $this->school->id)->active()
+            ->orderBy('display_order')->orderBy('name')->get();
+        $existing = $submission->counts()->get()->keyBy('school_class_id');
 
         return $this->ok([
             'registration' => RegistrationResource::make($registration),
             'submission'   => $submission,
-            'categories'   => $categories->values(),
+            'classes'      => $classes->values(),
             'counts'       => $existing,
         ]);
     }
@@ -158,20 +158,31 @@ class RegistrationApiController extends SchoolApiController
     {
         $registration = $this->currentRegistration();
         $submission = $registration->submission;
-        abort_unless(in_array($submission->counts_status, ['pending', 'rejected']), 403);
+        // Counts can also be edited after approval, so a school can report a mid-year
+        // enrollment increase; it does not itself change counts_status — the school must
+        // still explicitly resubmit for Sahodaya review via the submit-track endpoint.
+        abort_unless(in_array($submission->counts_status, ['pending', 'rejected', 'approved']), 403);
 
         $data = $request->validate([
             'counts' => 'required|array',
-            'counts.*.class_category_id' => ['required', Rule::exists(ClassCategory::class, 'id')],
+            'counts.*.school_class_id' => [
+                'required',
+                Rule::exists(SchoolClass::class, 'id')->where('tenant_id', $this->school->id),
+            ],
             'counts.*.male_count'        => 'required|integer|min:0',
             'counts.*.female_count'      => 'required|integer|min:0',
             'counts.*.total_count'       => 'required|integer|min:0',
         ]);
 
+        $classCategoryIds = SchoolClass::whereIn('id', collect($data['counts'])->pluck('school_class_id'))
+            ->pluck('class_category_id', 'id');
+
         foreach ($data['counts'] as $row) {
             SchoolYearStudentCount::updateOrCreate(
-                ['school_year_submission_id' => $submission->id, 'class_category_id' => $row['class_category_id']],
-                $row
+                ['school_year_submission_id' => $submission->id, 'school_class_id' => $row['school_class_id']],
+                array_merge($row, [
+                    'class_category_id' => $classCategoryIds[$row['school_class_id']] ?? null,
+                ])
             );
         }
 

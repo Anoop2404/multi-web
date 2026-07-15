@@ -27,7 +27,14 @@ class SchoolYearSubmissionReviewService
     {
         ['field' => $field, 'reason_field' => $reasonField] = $this->trackFields($track);
 
-        abort_unless(in_array($submission->{$field}, ['pending', 'rejected'], true), 403);
+        // Student counts specifically may be resubmitted even after approval, so a school can
+        // report a mid-year enrollment increase; Sahodaya re-reviews and, if the new total
+        // crosses into a higher fee slab, the school is asked to pay just the difference
+        // (see MembershipFeeCalculator::calculateAndApply). Records/teachers tracks keep the
+        // stricter pending/rejected-only gate.
+        $allowedFrom = $track === 'counts' ? ['pending', 'rejected', 'approved'] : ['pending', 'rejected'];
+        $isRevision = $track === 'counts' && $submission->{$field} === 'approved';
+        abort_unless(in_array($submission->{$field}, $allowedFrom, true), 403);
 
         $profile = SahodayaProfile::where('tenant_id', $school->parent_id)->firstOrFail();
 
@@ -44,6 +51,11 @@ class SchoolYearSubmissionReviewService
             if ($submission->counts()->count() < 1) {
                 throw ValidationException::withMessages([
                     'track' => 'Enter student counts before submitting.',
+                ]);
+            }
+            if ((int) $submission->counts()->sum('total_count') < 1) {
+                throw ValidationException::withMessages([
+                    'track' => 'Total student count cannot be zero.',
                 ]);
             }
         }
@@ -64,11 +76,13 @@ class SchoolYearSubmissionReviewService
 
         app(DataChangeLogger::class)->updated(
             $submission,
-            "Annual registration track submitted for review: {$track}",
+            $isRevision
+                ? "Student count revision resubmitted for review after prior approval"
+                : "Annual registration track submitted for review: {$track}",
             [$field => ['old' => $before, 'new' => 'submitted']],
             $school->id,
             'membership',
-            ['track' => $track],
+            ['track' => $track, 'is_revision' => $isRevision],
         );
 
         app(MembershipNotifier::class)->dataSubmitted($school, $submission->academic_year);
