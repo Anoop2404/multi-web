@@ -20,7 +20,7 @@ return [
         'route_prefix' => 'sports',
         'icon' => 'award',
         'description' => 'Athletics and games season hub',
-        'is_singleton' => true,
+        'is_singleton' => false,
         'sort_order' => 20,
     ],
     'kids_fest' => [

@@ -216,15 +216,12 @@ class FestEvent extends Model
 
     public function isSportsDisciplineEvent(): bool
     {
-        return $this->event_type === 'sports'
-            && ($this->partition_role === 'sports_discipline' || $this->parent_event_id !== null);
+        return $this->event_type === 'sports';
     }
 
     public function isSportsSeasonEvent(): bool
     {
-        return $this->event_type === 'sports'
-            && $this->parent_event_id === null
-            && ($this->partition_role === null || $this->partition_role === 'sports_season');
+        return false;
     }
 
     /** Fest program types that are unique (one per Sahodaya per academic year). */

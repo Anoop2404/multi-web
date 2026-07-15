@@ -25,10 +25,6 @@ class FestHeadItemNavigationService
      */
     public function headSummariesForEvent(FestEvent $event, ?string $schoolId = null): array
     {
-        if ($event->event_type === 'sports') {
-            $this->headService->syncEventHeads($event);
-        }
-
         $stats = $this->participantStatsByItem($event, $schoolId);
 
         $heads = FestItemHead::query()
@@ -113,10 +109,6 @@ class FestHeadItemNavigationService
      */
     public function navigationForEvent(FestEvent $event, ?string $schoolId = null): array
     {
-        if ($event->event_type === 'sports') {
-            $this->headService->syncEventHeads($event);
-        }
-
         $stats = $this->participantStatsByItem($event, $schoolId);
 
         $heads = FestItemHead::query()

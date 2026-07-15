@@ -121,17 +121,7 @@ export function sportsEventSidebarNav(base, caps) {
 
 /** True when this FestEvent is the season container (not Chess/Aquatics itself). */
 export function isSportsSeasonEvent(event) {
-    if (!event || event.event_type !== 'sports') {
-        return false;
-    }
-    if (event.partition_role === 'sports_season') {
-        return true;
-    }
-    if (event.partition_role === 'sports_discipline' || event.parent_event_id) {
-        return false;
-    }
-    // Legacy season: sports + no parent.
-    return !event.parent_event_id;
+    return false;
 }
 
 /** No Event Head mini-nav after Head = Event unification. */

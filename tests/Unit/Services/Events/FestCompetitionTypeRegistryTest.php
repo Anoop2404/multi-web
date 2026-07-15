@@ -67,7 +67,7 @@ class FestCompetitionTypeRegistryTest extends TestCase
         $tenant = $this->sahodaya();
         $singletons = app(FestCompetitionTypeRegistry::class)->forTenant($tenant->id)->singletonKeys();
 
-        $this->assertContains('sports', $singletons);
+        $this->assertNotContains('sports', $singletons);
         $this->assertNotContains('custom', $singletons);
     }
 

@@ -53,10 +53,8 @@ class FestRegistrationController extends SchoolAdminController
         $feeService = app(FestSchoolEventFeeService::class);
 
         // Singleton fest types (Kalotsav, …) are one-per-year: skip the event list and
-        // open the single yearly event's registration directly. Sports is intentionally
-        // excluded — schools browse sport child events (Athletics, Chess, …) as a list;
-        // the season hub is a config-only container filtered out when children exist.
-        if ($view === 'registration' && ! $request->query('event') && FestEvent::isSingletonType($eventType) && $eventType !== 'sports') {
+        // open the single yearly event's registration directly.
+        if ($view === 'registration' && ! $request->query('event') && FestEvent::isSingletonType($eventType)) {
             if ($single = $this->resolveSingletonSchoolEvent($request, $eventType, $program)) {
                 $prefix = ProgramRouteMap::prefixFromSlug($program);
 
@@ -64,16 +62,8 @@ class FestRegistrationController extends SchoolAdminController
             }
         }
 
-        // Sports: schools browse sport events (Athletics, Chess, …) as a list —
-        // the season hub is a config-only container filtered out when children exist.
-        $hideSportsSeasonHub = $eventType === 'sports' && FestEvent::where('tenant_id', $sahodayaId)
-            ->ofType('sports')
-            ->whereNotNull('parent_event_id')
-            ->exists();
-
         $events = FestEvent::where('tenant_id', $sahodayaId)
             ->ofType($eventType)
-            ->when($hideSportsSeasonHub, fn ($q) => $q->whereNotNull('parent_event_id'))
             ->listedForSchool($this->school->id, $eventType)
             ->when($request->query('event'), fn ($q) => $q->where('id', $request->query('event')))
             ->when($view === 'results', fn ($q) => $q->where('results_published', true))
