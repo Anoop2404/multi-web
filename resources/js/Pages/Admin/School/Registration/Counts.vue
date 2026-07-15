@@ -1,7 +1,7 @@
 <template>
     <SchoolAdminLayout title="Student Counts" :school="school" :show-header-title="false">
         <PageHeader title="Student counts for membership" eyebrow="Membership"
-                    description="Enter headcount by class category. Totals should match male + female counts." />
+                    description="Enter male and female headcount by class category. Total is calculated automatically." />
 
         <div class="max-w-3xl space-y-5">
             <MembershipWorkflowNav :school="school"
@@ -42,7 +42,8 @@
                                     <input v-model.number="rows[cat.id].female_count" type="number" min="0" class="field" aria-label="Female count">
                                 </td>
                                 <td class="p-3">
-                                    <input v-model.number="rows[cat.id].total_count" type="number" min="0" class="field" aria-label="Total count">
+                                    <input :value="rowTotal(cat.id)" type="number" disabled
+                                           class="field bg-slate-50 text-slate-600 font-semibold" aria-label="Total count (calculated)">
                                 </td>
                             </tr>
                         </tbody>
@@ -52,10 +53,6 @@
                     <button type="submit" class="btn-primary" :disabled="form.processing">Save counts</button>
                 </div>
             </form>
-
-            <div v-if="categories.some(c => mismatch(c.id))" class="notice-banner notice-banner--warning text-sm">
-                Some rows have totals that do not match male + female. Fix before submitting.
-            </div>
 
             <button v-if="canSubmit"
                     type="button"
@@ -108,13 +105,16 @@ const canSubmit = computed(() =>
     ['pending', 'rejected'].includes(props.submission?.counts_status),
 );
 
-function mismatch(id) {
+function rowTotal(id) {
     const r = rows[id];
-    return r.total_count !== r.male_count + r.female_count;
+    return (r.male_count || 0) + (r.female_count || 0);
 }
 
 function save() {
-    form.counts = Object.values(rows);
+    form.counts = Object.values(rows).map(r => ({
+        ...r,
+        total_count: (r.male_count || 0) + (r.female_count || 0),
+    }));
     form.post(`/school-admin/${props.school.id}/registration/counts`, {
         preserveScroll: true,
         onError: () => scrollToFirstError(form.errors),
