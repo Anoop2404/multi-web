@@ -31,7 +31,7 @@
                 </p>
             </div>
 
-            <form @submit.prevent="save" class="card card--flush overflow-hidden">
+            <form @submit.prevent="submit" class="card card--flush overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -67,24 +67,15 @@
                         </tfoot>
                     </table>
                 </div>
-                <div class="flex justify-end p-4 border-t border-slate-100">
-                    <button type="submit" class="btn-primary" :disabled="form.processing">Save counts</button>
+                <div class="flex flex-col items-end gap-2 p-4 border-t border-slate-100">
+                    <p v-if="grandTotal.total < 1" class="text-sm text-red-600">
+                        Total student count cannot be zero — enter counts before submitting.
+                    </p>
+                    <button type="submit" class="btn-primary" :disabled="form.processing || grandTotal.total < 1">
+                        {{ submission.counts_status === 'approved' ? 'Save & resubmit revised count' : 'Save & submit counts' }}
+                    </button>
                 </div>
             </form>
-
-            <p v-if="canSubmit && grandTotal.total < 1" class="text-sm text-red-600">
-                Total student count cannot be zero — enter counts before submitting for review.
-            </p>
-            <button v-if="canSubmit"
-                    type="button"
-                    class="btn-primary"
-                    :disabled="grandTotal.total < 1"
-                    @click="submit">
-                {{ submission.counts_status === 'approved' ? 'Resubmit revised count' : 'Submit counts' }}
-            </button>
-            <p v-else-if="submission.counts_status === 'submitted'" class="text-sm text-amber-700">
-                Submitting…
-            </p>
         </div>
     </SchoolAdminLayout>
 </template>
@@ -120,10 +111,6 @@ const rows = reactive(Object.fromEntries(props.classes.map(c => [c.id, {
 
 const form = useForm({ counts: [] });
 
-const canSubmit = computed(() =>
-    ['pending', 'rejected', 'approved'].includes(props.submission?.counts_status),
-);
-
 function rowTotal(id) {
     const r = rows[id];
     return (r.male_count || 0) + (r.female_count || 0);
@@ -139,7 +126,10 @@ const grandTotal = computed(() => {
     }, { male: 0, female: 0, total: 0 });
 });
 
-function save() {
+// Single action: save whatever is currently in the form, then immediately submit it for
+// (self-)verification. There is no separate "save" step to forget — the counts saved are
+// always exactly what's on screen when this button is clicked.
+function submit() {
     form.counts = Object.values(rows).map(r => ({
         ...r,
         total_count: (r.male_count || 0) + (r.female_count || 0),
@@ -147,11 +137,9 @@ function save() {
     form.post(`/school-admin/${props.school.id}/registration/counts`, {
         preserveScroll: true,
         onError: () => scrollToFirstError(form.errors),
+        onSuccess: () => {
+            router.post(`/school-admin/${props.school.id}/registration/submit-track`, { track: 'counts' });
+        },
     });
-}
-
-function submit() {
-    if (!confirm('Submit student counts? These are self-verified and approved immediately.')) return;
-    router.post(`/school-admin/${props.school.id}/registration/submit-track`, { track: 'counts' });
 }
 </script>
