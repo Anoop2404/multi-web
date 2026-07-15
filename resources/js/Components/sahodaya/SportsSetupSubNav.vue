@@ -1,3 +1,4 @@
+<script setup>
 /**
  * Horizontal strip for sports setup / competition pages.
  * Season hub: Setup + sport events list. Sport event: Setup → Items → Competition.
