@@ -153,13 +153,11 @@ class FestItemHeadService
                 ->first();
 
             if ($eventHead) {
-                $eventHead->update([
-                    'name' => $catalogHead->name,
-                    'slug' => $catalogHead->slug,
-                    'sport_discipline' => $catalogHead->sport_discipline,
-                    'is_team_heading' => $catalogHead->is_team_heading,
-                    'sort_order' => $catalogHead->sort_order,
-                ]);
+                // This runs on every competition-page load. Once an event head exists, its
+                // name/discipline/ID-card-heading/order are per-event customizations (editable
+                // via "Edit head & fees") — re-applying the catalog's values here every request
+                // was silently reverting any rename the instant the page reloaded after saving.
+                // The catalog is only used to seed brand-new heads (the else branch below).
             } else {
                 $eventHead = FestItemHead::create([
                     'tenant_id' => $tenantId,
