@@ -84,6 +84,38 @@
             <FestHeadFeeFields v-model="feeFields" :show-help="false" />
         </div>
 
+        <div v-if="notificationTriggers.length" class="border-t border-slate-100 pt-4 space-y-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Notifications</p>
+                <p class="section-desc text-xs mt-1">
+                    Untick anything this head shouldn't send. Everything is on by default.
+                </p>
+            </div>
+
+            <div class="grid gap-2 sm:grid-cols-2">
+                <label v-for="trigger in notificationTriggers" :key="trigger"
+                       class="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" class="rounded border-slate-300"
+                           v-model="notif.enabled[trigger]">
+                    {{ triggerLabel(trigger) }}
+                </label>
+            </div>
+
+            <div v-if="eligibleNotificationUsers.length">
+                <p class="text-xs font-semibold text-slate-700 mb-1">Also notify these platform users</p>
+                <select v-model="notif.extra_recipient_user_ids" multiple class="field text-sm h-28">
+                    <option v-for="user in eligibleNotificationUsers" :key="user.id" :value="user.id">
+                        {{ user.name }}{{ user.email ? ` — ${user.email}` : '' }}
+                    </option>
+                </select>
+                <p class="text-[11px] text-slate-500 mt-1">Ctrl/Cmd-click to select more than one.</p>
+            </div>
+
+            <button type="button" class="btn-secondary text-sm" :disabled="savingNotifications" @click="saveNotifications">
+                {{ savingNotifications ? 'Saving…' : 'Save notification settings' }}
+            </button>
+        </div>
+
         <div class="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
             <label class="flex items-center gap-2 text-xs text-slate-600">
                 <input v-model="row.apply_to_items" type="checkbox" class="rounded border-slate-300">
@@ -153,9 +185,12 @@ const props = defineProps({
     headRecord: { type: Object, default: null },
     disciplines: { type: Object, default: () => ({}) },
     showHeadFees: { type: Boolean, default: true },
+    notificationTriggers: { type: Array, default: () => [] },
+    eligibleNotificationUsers: { type: Array, default: () => [] },
 });
 
 const saving = ref(false);
+const savingNotifications = ref(false);
 const removing = ref(false);
 const editingHead = ref(false);
 const headForm = useForm({
@@ -206,6 +241,44 @@ watch(
 
 const canRemove = props.headRecord?.can_remove ?? false;
 const itemsForHeadUrl = `/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}/items?head_id=${props.head.head_id}`;
+
+function buildNotif(source) {
+    const disabled = new Set(source?.notification_settings?.disabled_triggers ?? []);
+    const enabled = {};
+    for (const trigger of props.notificationTriggers) {
+        enabled[trigger] = !disabled.has(trigger);
+    }
+
+    return {
+        enabled,
+        extra_recipient_user_ids: [...(source?.notification_settings?.extra_recipient_user_ids ?? [])],
+    };
+}
+
+const notif = reactive(buildNotif(props.headRecord));
+
+function triggerLabel(trigger) {
+    return trigger.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+}
+
+watch(
+    () => props.headRecord,
+    (source) => { Object.assign(notif, buildNotif(source)); },
+    { deep: true },
+);
+
+function saveNotifications() {
+    savingNotifications.value = true;
+    const disabledTriggers = props.notificationTriggers.filter((trigger) => notif.enabled[trigger] === false);
+
+    router.patch(`/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}/item-heads/${props.head.head_id}/notifications`, {
+        disabled_triggers: disabledTriggers,
+        extra_recipient_user_ids: notif.extra_recipient_user_ids,
+    }, {
+        preserveScroll: true,
+        onFinish: () => { savingNotifications.value = false; },
+    });
+}
 
 function openHeadEdit() {
     headForm.clearErrors();

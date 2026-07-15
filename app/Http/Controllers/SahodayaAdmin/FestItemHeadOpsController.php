@@ -67,7 +67,7 @@ class FestItemHeadOpsController extends SahodayaAdminController
                     'included_items_per_student', 'included_teams',
                     'verification_policy', 'approval_policy',
                     'max_participants', 'max_teams',
-                    'status', 'venue', 'event_start', 'event_end']);
+                    'status', 'venue', 'event_start', 'event_end', 'notification_settings']);
 
             if ($head) {
                 $selectedHeadRecord = [
@@ -98,6 +98,7 @@ class FestItemHeadOpsController extends SahodayaAdminController
                     'event_start' => $head->event_start?->format('Y-m-d'),
                     'event_end' => $head->event_end?->format('Y-m-d'),
                     'can_remove'        => $head->catalog_key === null,
+                    'notification_settings' => $head->notification_settings ?: (object) [],
                 ];
             }
         }
@@ -133,6 +134,15 @@ class FestItemHeadOpsController extends SahodayaAdminController
             'promoteStatus'      => $event->event_type === 'sports' && $event->parent_event_id === null
                 ? app(\App\Services\Events\PromoteSportsHeadsToDisciplineEvents::class)->status($event)
                 : null,
+            'notificationTriggers' => $event->event_type === 'sports' ? FestItemHead::NOTIFICATION_TRIGGERS : [],
+            // Extra recipients are always picked from existing platform users (Sahodaya
+            // admin/staff/event coordinators) — never free-text emails.
+            'eligibleNotificationUsers' => $event->event_type === 'sports'
+                ? \App\Models\User::role(['sahodaya_admin', 'sahodaya_staff', 'event_coordinator'])
+                    ->where('tenant_id', $this->sahodaya->id)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email'])
+                : [],
         ])));
     }
 }

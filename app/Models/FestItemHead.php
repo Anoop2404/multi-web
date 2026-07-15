@@ -13,6 +13,19 @@ class FestItemHead extends Model
 
     public const APPROVAL_POLICIES = ['auto', 'manual'];
 
+    /**
+     * Every notification trigger a head's settings can individually enable/disable.
+     * Keys match the $triggerKey each FestEventNotifier method passes to its head-aware
+     * gate — see FestEventNotifier::resolveHeadForEvent()/headNotificationsEnabled().
+     */
+    public const NOTIFICATION_TRIGGERS = [
+        'registration_approved', 'registration_rejected', 'registration_withdrawn',
+        'registration_opened', 'registration_deadline', 'payment_pending',
+        'competition_reminder', 'certificates_available', 'results_published',
+        'schedule_published', 'chest_reveal', 'promotion_completed',
+        'sports_winners_received', 'appeal_received',
+    ];
+
     protected $fillable = [
         'tenant_id', 'event_id', 'event_type', 'parent_id', 'name', 'slug',
         'sport_discipline', 'catalog_key', 'is_team_heading', 'sort_order',
@@ -24,6 +37,7 @@ class FestItemHead extends Model
         'verification_policy', 'approval_policy',
         'max_participants', 'max_teams',
         'status', 'venue', 'event_start', 'event_end', 'discipline_event_id',
+        'notification_settings',
     ];
 
     protected $casts = [
@@ -43,6 +57,7 @@ class FestItemHead extends Model
         'included_teams' => 'integer',
         'max_participants' => 'integer',
         'max_teams' => 'integer',
+        'notification_settings' => 'array',
     ];
 
     public const STATUSES = ['draft', 'published', 'registration_open', 'ongoing', 'completed'];
@@ -134,5 +149,25 @@ class FestItemHead extends Model
     public function requiresVerifiedStudentsOnly(): bool
     {
         return $this->verification_policy === 'verified_only';
+    }
+
+    /**
+     * Whether a given FestEventNotifier trigger should fire for this head. Defaults to
+     * enabled — notification_settings only ever lists what's been explicitly turned off,
+     * so a head with no settings configured behaves exactly like before Phase 3 shipped.
+     */
+    public function notificationEnabledFor(string $trigger): bool
+    {
+        $disabled = $this->notification_settings['disabled_triggers'] ?? [];
+
+        return ! in_array($trigger, $disabled, true);
+    }
+
+    /** Extra platform-user recipients (never free-text emails) to CC on this head's notifications. */
+    public function extraRecipientUserIds(): array
+    {
+        $ids = $this->notification_settings['extra_recipient_user_ids'] ?? [];
+
+        return array_values(array_unique(array_map('intval', is_array($ids) ? $ids : [])));
     }
 }

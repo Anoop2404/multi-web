@@ -978,6 +978,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/item-heads', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'store'])->name('item-heads.store');
             Route::post('/{event}/item-heads/sync', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'sync'])->name('item-heads.sync');
             Route::patch('/{event}/item-heads/{head}/windows', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'updateWindows'])->name('item-heads.windows.update');
+            Route::patch('/{event}/item-heads/{head}/notifications', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'updateNotifications'])->name('item-heads.notifications.update');
             Route::delete('/{event}/item-heads/{head}', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'destroy'])->name('item-heads.destroy');
 
             Route::get('/{event}/areas', [\App\Http\Controllers\SahodayaAdmin\FestCompetitionAreaController::class, 'index'])->name('areas.index');

@@ -45,7 +45,9 @@
                                      :head="head"
                                      :head-record="selectedHeadRecord"
                                      :disciplines="disciplines"
-                                     :show-head-fees="showHeadFees" />
+                                     :show-head-fees="showHeadFees"
+                                     :notification-triggers="notificationTriggers"
+                                     :eligible-notification-users="eligibleNotificationUsers" />
             </template>
 
             <template #default="{ item, head }">
@@ -93,6 +95,8 @@ const props = defineProps({
     showHeadFees: { type: Boolean, default: true },
     sportsHubUrl: { type: String, default: null },
     promoteStatus: { type: Object, default: null },
+    notificationTriggers: { type: Array, default: () => [] },
+    eligibleNotificationUsers: { type: Array, default: () => [] },
 });
 
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/competition`);

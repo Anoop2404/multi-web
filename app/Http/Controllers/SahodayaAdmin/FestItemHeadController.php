@@ -137,6 +137,48 @@ class FestItemHeadController extends SahodayaAdminController
             : 'Head schedule saved.');
     }
 
+    public function updateNotifications(Request $request, string $tenantId, FestEvent $event, FestItemHead $head, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if((int) $head->event_id !== (int) $event->id, 404);
+
+        $data = $request->validate([
+            'disabled_triggers' => 'nullable|array',
+            'disabled_triggers.*' => 'string|in:'.implode(',', FestItemHead::NOTIFICATION_TRIGGERS),
+            'extra_recipient_user_ids' => 'nullable|array',
+            'extra_recipient_user_ids.*' => 'integer',
+        ]);
+
+        $disabledTriggers = array_values(array_unique($data['disabled_triggers'] ?? []));
+
+        // Extra recipients must be existing platform users in this Sahodaya — never
+        // free-text emails. Silently drop anything that doesn't resolve to a real,
+        // appropriately-roled user rather than trusting the submitted id list as-is.
+        $requestedIds = array_map('intval', $data['extra_recipient_user_ids'] ?? []);
+        $validUserIds = $requestedIds === [] ? [] : \App\Models\User::role(['sahodaya_admin', 'sahodaya_staff', 'event_coordinator'])
+            ->where('tenant_id', $this->sahodaya->id)
+            ->whereIn('id', $requestedIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $head->update([
+            'notification_settings' => [
+                'disabled_triggers' => $disabledTriggers,
+                'extra_recipient_user_ids' => $validUserIds,
+            ],
+        ]);
+
+        $audit->festEvent($event, FestPageActivity::SETTINGS, 'fest.item_head.notifications_updated', "Notification settings updated for Event Head: {$head->name}", [
+            'head_id' => $head->id,
+            'disabled_triggers' => $disabledTriggers,
+            'extra_recipient_count' => count($validUserIds),
+        ]);
+
+        return back()->with('success', 'Notification settings saved.');
+    }
+
     public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit, FestItemHeadService $headService)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
