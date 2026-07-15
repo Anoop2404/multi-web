@@ -17,8 +17,9 @@
                 <p class="font-semibold">Already approved</p>
                 <p class="mt-1">
                     If your enrollment has increased since approval, update the counts below and
-                    resubmit for Sahodaya review. If the new total crosses into a higher fee slab,
-                    you'll only be asked to pay the difference.
+                    resubmit — student counts are self-verified, so it's approved immediately, no
+                    Sahodaya review needed. If the new total crosses into a higher fee slab, you'll
+                    only be asked to pay the difference.
                 </p>
             </div>
 
@@ -79,10 +80,10 @@
                     class="btn-primary"
                     :disabled="grandTotal.total < 1"
                     @click="submit">
-                {{ submission.counts_status === 'approved' ? 'Resubmit revised count for review' : 'Submit counts for Sahodaya review' }}
+                {{ submission.counts_status === 'approved' ? 'Resubmit revised count' : 'Submit counts' }}
             </button>
             <p v-else-if="submission.counts_status === 'submitted'" class="text-sm text-amber-700">
-                Awaiting Sahodaya approval…
+                Submitting…
             </p>
         </div>
     </SchoolAdminLayout>
@@ -150,7 +151,7 @@ function save() {
 }
 
 function submit() {
-    if (!confirm('Submit student counts for Sahodaya review?')) return;
+    if (!confirm('Submit student counts? These are self-verified and approved immediately.')) return;
     router.post(`/school-admin/${props.school.id}/registration/submit-track`, { track: 'counts' });
 }
 </script>
