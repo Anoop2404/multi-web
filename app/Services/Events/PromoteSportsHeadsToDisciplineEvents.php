@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestItemHead;
 use App\Models\FestMark;
+use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use Illuminate\Support\Facades\DB;
@@ -146,6 +147,14 @@ class PromoteSportsHeadsToDisciplineEvents
                 FestRegistration::whereIn('id', $registrationIds)->update(['event_id' => $discipline->id]);
                 FestMark::where('event_id', $season->id)
                     ->whereIn('item_id', $itemIds)
+                    ->update(['event_id' => $discipline->id]);
+
+                // Participants carry their own event_id too (FestNumberingService's chest-
+                // number and level-registration-number sequences query FestParticipant by
+                // event_id directly) — without this, everyone already registered before a
+                // promotion becomes invisible to those sequences under the new discipline
+                // event, and the next person to register risks a duplicate number.
+                FestParticipant::whereIn('registration_id', $registrationIds)
                     ->update(['event_id' => $discipline->id]);
 
                 FestSchoolEventFee::where('event_id', $season->id)
