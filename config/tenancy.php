@@ -54,7 +54,11 @@ return [
         in_array(env('CACHE_STORE', env('CACHE_DRIVER', 'database')), ['redis', 'memcached', 'dynamodb', 'array', 'octane'], true)
             ? Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class
             : null,
-        Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper::class,
+        // Stancl's stock bootstrapper crashes with "Undefined array key" the moment a
+        // single request/command visits more than one tenant (revert() without a paired
+        // bootstrap() on the same instance) — see App\Tenancy\Bootstrappers\SafeFilesystemTenancyBootstrapper
+        // for the exact bug and why this override exists.
+        App\Tenancy\Bootstrappers\SafeFilesystemTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper::class,
     ])),
 
