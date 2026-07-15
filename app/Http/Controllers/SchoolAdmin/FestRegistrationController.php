@@ -52,9 +52,13 @@ class FestRegistrationController extends SchoolAdminController
         $sahodayaId = $this->school->parent_id;
         $feeService = app(FestSchoolEventFeeService::class);
 
-        // Singleton fest types (Kalotsav, Sports, …) are one-per-year: skip the event
-        // list and open the single yearly event's registration directly.
-        if ($view === 'registration' && ! $request->query('event') && FestEvent::isSingletonType($eventType)) {
+        // Singleton fest types (Kalotsav, …) are one-per-year: skip the event list and
+        // open the single yearly event's registration directly. Sports is intentionally
+        // excluded here even though it's still flagged singleton at the season-hub level —
+        // head-first rebuild: schools browse the promoted discipline events (Athletics,
+        // Chess, …) as a list, same as any multi-event program. The season hub itself is
+        // a hidden technical container and is filtered out of that list below.
+        if ($view === 'registration' && ! $request->query('event') && FestEvent::isSingletonType($eventType) && $eventType !== 'sports') {
             if ($single = $this->resolveSingletonSchoolEvent($request, $eventType, $program)) {
                 $prefix = ProgramRouteMap::prefixFromSlug($program);
 
@@ -62,8 +66,19 @@ class FestRegistrationController extends SchoolAdminController
             }
         }
 
+        // Sports: schools only ever see promoted discipline events (Athletics, Chess, …),
+        // never the season hub that groups them. But during the admin's transition window
+        // (season created, heads not promoted yet), fall back to showing the season hub so
+        // schools are never left with an empty Sports page — this self-heals the moment any
+        // head is promoted (Phase 1's auto-promotion runs on every admin page load).
+        $hideSportsSeasonHub = $eventType === 'sports' && FestEvent::where('tenant_id', $sahodayaId)
+            ->ofType('sports')
+            ->whereNotNull('parent_event_id')
+            ->exists();
+
         $events = FestEvent::where('tenant_id', $sahodayaId)
             ->ofType($eventType)
+            ->when($hideSportsSeasonHub, fn ($q) => $q->whereNotNull('parent_event_id'))
             ->listedForSchool($this->school->id, $eventType)
             ->when($request->query('event'), fn ($q) => $q->where('id', $request->query('event')))
             ->when($view === 'results', fn ($q) => $q->where('results_published', true))
