@@ -152,13 +152,27 @@ class FestItemHeadService
             ->orderBy('sort_order')
             ->get();
 
+        // Once a head is promoted, promote() moves its event_id from the season to its own
+        // new discipline event — that's the whole point. But this method used to look up an
+        // existing head with `where('event_id', $event->id)` only, i.e. scoped to the SEASON's
+        // own id. After promotion that lookup always comes back empty for an already-promoted
+        // catalog_key (its event_id points elsewhere now), so every subsequent visit to the
+        // season's own Competition/Setup page was creating a brand-new duplicate head back on
+        // the season — which then got auto-promoted into a *second* discipline event on the
+        // next sweep. Fix: also match heads already living on one of this season's own
+        // already-promoted discipline events before deciding a catalog_key needs a fresh head.
+        $promotedDisciplineEventIds = FestEvent::where('parent_event_id', $event->id)->pluck('id');
+
         $map = [];
         $created = 0;
 
         foreach ($catalogHeads as $catalogHead) {
             $eventHead = FestItemHead::forTenant($tenantId)
-                ->forEvent($event->id)
                 ->where('catalog_key', $catalogHead->catalog_key)
+                ->where(function ($q) use ($event, $promotedDisciplineEventIds) {
+                    $q->where('event_id', $event->id)
+                        ->orWhereIn('event_id', $promotedDisciplineEventIds);
+                })
                 ->first();
 
             if ($eventHead) {
@@ -226,11 +240,11 @@ class FestItemHeadService
 
         $promoter = app(PromoteSportsHeadsToDisciplineEvents::class);
 
-        // status() is a cheap read-only check; only call promote() (which always writes the
-        // season's partition_role/fee_settings, even when every head is skipped) when there
-        // is actually something pending — otherwise every season page load would issue a
-        // needless UPDATE.
-        if ($promoter->status($event)['can_promote']) {
+        // hasPendingWork() is a cheap read-only check; only call promote() (which always runs
+        // a handful of queries per head, even when everything is already linked and nothing
+        // moves) when there's actually something to do — either a head still un-promoted, or
+        // an already-promoted head with stray items left behind on the season to catch up.
+        if ($promoter->hasPendingWork($event)) {
             $promoter->promote($event, false);
         }
     }
