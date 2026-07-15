@@ -83,19 +83,22 @@ class FestEventController extends SahodayaAdminController
             $season = app(\App\Services\Events\FestPrimaryEventResolver::class)
                 ->resolveOrCreate($this->sahodaya, 'sports', $programMeta['label']);
 
-            $disciplineEvents = FestEvent::forTenant($this->sahodaya->id)
+            // Ensure child sport events exist (Head = Event — no promotion step).
+            app(\App\Services\Events\FestSportsEventSyncService::class)->syncSeason($season);
+
+            $sportEvents = FestEvent::forTenant($this->sahodaya->id)
                 ->ofType('sports')
                 ->where(function ($q) use ($season) {
                     $q->where('parent_event_id', $season->id)
                         ->orWhere('partition_role', 'sports_discipline');
                 })
                 ->withCount(['items', 'registrations'])
+                ->orderBy('sort_order')
                 ->orderBy('title')
                 ->get();
 
-            // Until heads are promoted, also surface the season hub itself for setup.
-            $events = $disciplineEvents->isNotEmpty()
-                ? $disciplineEvents
+            $events = $sportEvents->isNotEmpty()
+                ? $sportEvents
                 : collect([$season->loadCount(['items', 'registrations'])]);
 
             $dashboard = app(\App\Services\Events\ProgramHubDataService::class)
@@ -107,8 +110,6 @@ class FestEventController extends SahodayaAdminController
                 'seasonEvent' => $season->only('id', 'title', 'status', 'partition_role'),
                 'seasonRemittance' => app(\App\Services\Events\FestSportsChecklist::class)
                     ->seasonRemittanceBanner($this->sahodaya->id),
-                'promoteStatus' => app(\App\Services\Events\PromoteSportsHeadsToDisciplineEvents::class)
-                    ->status($season),
                 'levelLabels' => FestEvent::levelLabels(),
                 'stats' => $dashboard['stats'],
                 'schoolParticipation' => $dashboard['schoolParticipation'],
@@ -900,29 +901,19 @@ class FestEventController extends SahodayaAdminController
             ->labels(true);
     }
 
-    public function promoteDisciplineEvents(
-        string $tenantId,
-        FestEvent $event,
-        \App\Services\Events\PromoteSportsHeadsToDisciplineEvents $promoter,
-    ) {
+    /**
+     * Legacy promote route — now syncs sport child events (Head = Event).
+     */
+    public function promoteDisciplineEvents(string $tenantId, FestEvent $event)
+    {
         abort_unless($event->tenant_id === $this->sahodaya->id, 404);
-        abort_unless($event->event_type === 'sports', 422, 'Only Sports Meet season hubs can be promoted.');
-        abort_unless($event->parent_event_id === null, 422, 'Open the season hub to promote Event Heads.');
+        abort_unless($event->event_type === 'sports', 422);
+        abort_unless($event->parent_event_id === null, 422);
 
-        $rows = $promoter->promote($event, false);
-        $created = collect($rows)->filter(fn ($r) => empty($r['skipped']) && empty($r['dry_run']))->count();
-        $skipped = collect($rows)->filter(fn ($r) => ! empty($r['skipped']))->count();
-
-        $message = $created > 0
-            ? "Promoted {$created} Event Head(s) into discipline events."
-            : 'No new discipline events were created.';
-
-        if ($skipped > 0) {
-            $message .= " {$skipped} already linked.";
-        }
+        $result = app(\App\Services\Events\FestSportsEventSyncService::class)->syncSeason($event);
 
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/sports")
-            ->with('success', $message);
+            ->with('success', "Sport events synced ({$result['created']} created, {$result['updated']} updated).");
     }
 
     public function toggleNavHidden(FestEvent $event)

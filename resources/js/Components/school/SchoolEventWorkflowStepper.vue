@@ -44,15 +44,11 @@ const eventBase = computed(() => schoolEventBase(props.schoolId, props.programPr
 const steps = computed(() => {
     const list = [
         { num: 1, key: 'overview', label: 'Overview', href: `${eventBase.value}/overview` },
-        { num: 2, key: 'registration', label: props.isSports ? 'Register students' : 'Register', href: `${eventBase.value}/registration` },
+        { num: 2, key: 'registration', label: props.isSports ? 'Register & pay' : 'Register', href: `${eventBase.value}/registration` },
     ];
 
-    if (props.isSports) {
-        list.push({ num: 3, key: 'items', label: 'By Event Head', href: `${eventBase.value}/items` });
-    }
-
     list.push({
-        num: props.isSports ? 4 : 3,
+        num: 3,
         key: 'reports',
         label: 'Reports & ID cards',
         href: `/school-admin/${props.schoolId}/${props.programPrefix}/reports/${props.eventId}`,

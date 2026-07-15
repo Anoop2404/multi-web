@@ -24,7 +24,7 @@ class MergeDuplicateSportsHeads extends Command
         .'head, migrating them onto the right discipline event, then deleting the now-empty duplicate. '
         .'Defaults to a dry run -- pass --force to write.';
 
-    public function handle(\App\Services\Events\PromoteSportsHeadsToDisciplineEvents $promoter): int
+    public function handle(\App\Services\Events\FestSportsEventSyncService $sync): int
     {
         $sahodayaId = $this->option('sahodaya');
         $force = (bool) $this->option('force');
@@ -50,7 +50,7 @@ class MergeDuplicateSportsHeads extends Command
             $this->info("Sahodaya: {$sahodaya->name} ({$sahodaya->id})");
 
             try {
-                $sahodaya->run(function () use ($sahodaya, $force, $promoter, &$totalMerged, &$totalSkipped) {
+                $sahodaya->run(function () use ($sahodaya, $force, $sync, &$totalMerged, &$totalSkipped) {
                     $seasons = FestEvent::query()
                         ->where('event_type', 'sports')
                         ->whereNull('parent_event_id')
@@ -63,8 +63,8 @@ class MergeDuplicateSportsHeads extends Command
                         $totalSkipped += $skipped;
 
                         if ($merged > 0 && $force) {
-                            $promoter->promote($season, false);
-                            $this->line("  {$season->title}: ran promote() to sweep reassigned items onto their discipline events.");
+                            $sync->syncSeason($season);
+                            $this->line("  {$season->title}: synced sport events after merge.");
                         }
                     }
                 });

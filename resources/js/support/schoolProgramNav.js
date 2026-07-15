@@ -67,11 +67,6 @@ export function schoolProgramWorkflowItems(schoolId, programSlug) {
     ];
 
     if (programSlug === 'sports-meet') {
-        items.splice(2, 0, {
-            label: 'Register by Event Head',
-            href: schoolProgramHref(schoolId, programSlug, 'item-registration'),
-            icon: 'layers',
-        });
         items.push({ label: 'Submit winners', href: schoolProgramHref(schoolId, programSlug, 'submit-winners'), icon: 'award' });
     }
 

@@ -42,7 +42,7 @@
         <section v-if="itemHeads.length" class="card space-y-4">
             <div>
                 <h3 class="section-title">Per-head windows</h3>
-                <p class="section-desc text-xs">Set registration and competition dates once per Event Head. Items inherit these dates unless overridden below.</p>
+                <p class="section-desc text-xs">Set registration and competition dates for this event. Items inherit these dates unless overridden below.</p>
             </div>
             <div class="overflow-x-auto rounded-xl border border-slate-100">
                 <table class="data-table text-sm">
@@ -80,7 +80,7 @@
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h3 class="section-title">Per-item windows</h3>
-                    <p class="section-desc text-xs">Optional per-item overrides. Leave blank to inherit from the Event Head above.</p>
+                    <p class="section-desc text-xs">Optional per-item overrides. Leave blank to inherit from the event dates above.</p>
                 </div>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/competition`" class="btn-secondary text-sm shrink-0">Competition hub →</Link>
             </div>

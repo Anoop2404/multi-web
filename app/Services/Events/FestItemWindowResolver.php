@@ -21,6 +21,11 @@ class FestItemWindowResolver
             return Carbon::parse($head->reg_start)->startOfDay();
         }
 
+        $event = $this->event($item);
+        if ($event?->event_type === 'sports' && $event->reg_start) {
+            return Carbon::parse($event->reg_start)->startOfDay();
+        }
+
         $area = $this->area($item);
         if ($area?->reg_start) {
             return Carbon::parse($area->reg_start)->startOfDay();
@@ -44,6 +49,11 @@ class FestItemWindowResolver
             return Carbon::parse($head->reg_end)->startOfDay();
         }
 
+        $event = $this->event($item);
+        if ($event?->event_type === 'sports' && $event->reg_end) {
+            return Carbon::parse($event->reg_end)->startOfDay();
+        }
+
         $area = $this->area($item);
         if ($area?->reg_end) {
             return Carbon::parse($area->reg_end)->startOfDay();
@@ -58,17 +68,25 @@ class FestItemWindowResolver
 
     public function effectiveCompetitionStart(FestEventItem $item): ?Carbon
     {
+        $event = $this->event($item);
+
         return $this->firstDate(
             $item->competition_start,
-            $this->head($item)?->competition_start ?? $this->area($item)?->competition_start
+            $this->head($item)?->competition_start
+                ?? ($event?->event_type === 'sports' ? $event->competition_start : null)
+                ?? $this->area($item)?->competition_start
         );
     }
 
     public function effectiveCompetitionEnd(FestEventItem $item): ?Carbon
     {
+        $event = $this->event($item);
+
         return $this->firstDate(
             $item->competition_end,
-            $this->head($item)?->competition_end ?? $this->area($item)?->competition_end
+            $this->head($item)?->competition_end
+                ?? ($event?->event_type === 'sports' ? $event->competition_end : null)
+                ?? $this->area($item)?->competition_end
         );
     }
 

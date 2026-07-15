@@ -50,26 +50,26 @@ const steps = computed(() => {
             },
             {
                 num: 2,
-                key: 'competition',
-                label: 'Event Heads',
-                href: `${eventBase.value}/competition`,
+                key: 'items',
+                label: 'Items',
+                href: `${eventBase.value}/items`,
             },
             {
                 num: 3,
                 key: 'registration',
-                label: 'Open registration',
+                label: 'Registrations',
                 href: `${eventBase.value}/registrations`,
             },
             {
                 num: 4,
                 key: 'operations',
-                label: 'Ongoing / marks',
+                label: 'Marks',
                 href: `${eventBase.value}/marks`,
             },
             {
                 num: 5,
                 key: 'reports',
-                label: 'Publish results',
+                label: 'Results',
                 href: `${eventBase.value}/results`,
             },
         ];

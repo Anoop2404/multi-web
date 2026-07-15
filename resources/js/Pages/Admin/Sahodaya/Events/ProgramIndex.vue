@@ -9,12 +9,11 @@
         />
 
         <div v-if="isSports" class="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 mb-6 text-sm text-sky-950">
-            <p class="font-semibold">Sports Meet — season &amp; discipline events</p>
+            <p class="font-semibold">Sports Meet — season &amp; sport events</p>
             <ol class="mt-2 list-decimal pl-4 text-xs text-sky-900/90 space-y-1">
-                <li>Configure age groups, catalog, and <strong>Event Heads</strong> on the season hub.</li>
-                <li>Set composite fees / dates on each Event Head (Competition).</li>
-                <li><strong>Promote</strong> Event Heads into separate discipline events (Athletics, Chess, …).</li>
-                <li>Open registration, marks, and publish inside each discipline event.</li>
+                <li>Configure age groups and catalog on the <strong>season</strong> hub.</li>
+                <li>Each sport (Athletics, Chess, …) is its own <strong>event</strong> with fees, items, and schedule.</li>
+                <li>Open registration, enter marks, and publish results inside each sport event.</li>
             </ol>
         </div>
 
@@ -39,47 +38,14 @@
                 <span class="status-pill text-xs" :class="statusClass(seasonEvent.status)">{{ seasonEvent.status }}</span>
                 <span v-if="seasonEvent.partition_role === 'sports_season'"
                       class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                    Season — not a sport, groups everything below
+                    Season — config only (age groups, cutoff, remittance)
                 </span>
-                <!-- Deliberately not styled as a sport to manage (no link-brand title link like the
-                     rows below) -- age groups / cutoff date / catalog are the only season-wide
-                     things left here; every sport is managed on its own row in the table below. -->
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${seasonEvent.id}/setup`" class="text-xs font-medium text-slate-500 underline ml-auto">
-                    Season settings (age groups, cutoff date) →
+                    Season settings →
                 </Link>
             </div>
-
-            <div v-if="promoteStatus?.can_promote"
-                 class="rounded-lg border border-indigo-100 bg-indigo-50/80 px-3 py-3 text-sm text-indigo-950">
-                <p class="font-semibold">
-                    Ready to promote {{ promoteStatus.pending_count }} Event Head{{ promoteStatus.pending_count === 1 ? '' : 's' }}
-                </p>
-                <p class="mt-1 text-xs text-indigo-900/80">
-                    Creates a full discipline event per head (own registration, fees, marks). Safe to run again — already linked heads are skipped.
-                </p>
-                <ul v-if="promoteStatus.heads?.length" class="mt-2 flex flex-wrap gap-1.5">
-                    <li v-for="head in promoteStatus.heads" :key="head.id"
-                        class="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-indigo-900 ring-1 ring-indigo-100">
-                        {{ head.name }}
-                    </li>
-                </ul>
-                <button type="button"
-                        class="btn-primary text-xs mt-3"
-                        :disabled="promoteForm.processing"
-                        @click="promoteHeads">
-                    {{ promoteForm.processing ? 'Promoting…' : `Promote ${promoteStatus.pending_count} Event Head(s) → discipline events` }}
-                </button>
-            </div>
-            <p v-else-if="promoteStatus && promoteStatus.head_count > 0"
-               class="text-xs text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-                All Event Heads are linked to discipline events. Manage them in the list below.
-            </p>
-            <p v-else-if="promoteStatus"
-               class="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                No Event Heads on the season yet.
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${seasonEvent.id}/competition`" class="font-semibold underline ml-1">
-                    Add Event Heads →
-                </Link>
+            <p class="text-xs text-slate-600">
+                Sport events below are created automatically from the catalog. Open each one to set fees, items, and registration.
             </p>
         </div>
 
@@ -362,33 +328,12 @@ const props = defineProps({
     eventsByLevel: { type: Object, default: null },
     seasonEvent: { type: Object, default: null },
     seasonRemittance: { type: Object, default: null },
-    promoteStatus: { type: Object, default: null },
 });
 
 const isSports = computed(() => props.program.eventType === 'sports');
 
-const promoteForm = useForm({});
-
-function promoteHeads() {
-    if (!props.seasonEvent?.id || !props.promoteStatus?.can_promote) return;
-    const n = props.promoteStatus.pending_count;
-    const names = (props.promoteStatus.heads ?? []).map((h) => h.name).join(', ');
-    if (!confirm(`Promote ${n} Event Head(s) into separate discipline events?\n\n${names}\n\nExisting linked heads are skipped.`)) {
-        return;
-    }
-    promoteForm.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.seasonEvent.id}/promote-discipline-events`);
-}
-
 function eventManageUrl(event) {
-    // Head-first permalink: a promoted discipline event always carries source_head_id
-    // (set once, at promotion) — link by head instead of the event's own id so the URL
-    // stays stable even if the event underneath ever gets re-promoted/rebuilt.
-    if (isSports.value && event.source_head_id) {
-        return `/sahodaya-admin/${props.sahodaya.id}/sports/heads/${event.source_head_id}`;
-    }
-
     const base = `/sahodaya-admin/${props.sahodaya.id}/events/${event.id}`;
-    // Discipline events open Overview; legacy season-only hub still uses setup.
     if (!isSports.value) return base;
     if (props.seasonEvent?.id && String(event.id) === String(props.seasonEvent.id)) {
         return `${base}/setup`;

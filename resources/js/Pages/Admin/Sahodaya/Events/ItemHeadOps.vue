@@ -12,20 +12,15 @@
                                  :event-id="event.id"
                                  :disciplines="disciplines"
                                  :taxonomy-masters-url="taxonomyMastersUrl"
-                                 :sports-hub-url="sportsHubUrl"
-                                 :promote-status="promoteStatus" />
+                                 :sports-hub-url="sportsHubUrl" />
 
-        <div v-if="isSports && isRoot && promoteStatus?.can_promote"
-             class="rounded-lg border border-indigo-100 bg-indigo-50/80 px-4 py-3 mb-6 text-sm text-indigo-950">
-            <p class="font-semibold">
-                {{ promoteStatus.pending_count }} Event Head{{ promoteStatus.pending_count === 1 ? '' : 's' }} ready to promote
+        <div v-if="isSports && isRoot && sportsHubUrl"
+             class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 mb-6 text-sm text-slate-700">
+            <p>
+                Sport events are managed from the
+                <Link :href="sportsHubUrl" class="font-semibold underline">Sports hub</Link>
+                — each sport (Athletics, Chess, …) is its own event.
             </p>
-            <p class="mt-1 text-xs text-indigo-900/80">
-                Turn each head into its own discipline event (own registration, fees, marks). Done from the Sports hub.
-            </p>
-            <Link :href="sportsHubUrl" class="inline-block mt-2 text-xs font-semibold underline">
-                Open Sports hub to promote →
-            </Link>
         </div>
 
         <ReportHeadItemNavigator :groups="headItemGroups"
@@ -94,7 +89,6 @@ const props = defineProps({
     catalogUrl: { type: String, default: null },
     showHeadFees: { type: Boolean, default: true },
     sportsHubUrl: { type: String, default: null },
-    promoteStatus: { type: Object, default: null },
     notificationTriggers: { type: Array, default: () => [] },
     eligibleNotificationUsers: { type: Array, default: () => [] },
 });

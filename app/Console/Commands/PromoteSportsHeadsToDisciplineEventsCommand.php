@@ -4,9 +4,12 @@ namespace App\Console\Commands;
 
 use App\Models\FestEvent;
 use App\Models\Tenant;
-use App\Services\Events\PromoteSportsHeadsToDisciplineEvents;
+use App\Services\Events\FestSportsEventSyncService;
 use Illuminate\Console\Command;
 
+/**
+ * @deprecated Use fest:migrate-sports-head-to-event. Kept as an alias that syncs sport events.
+ */
 class PromoteSportsHeadsToDisciplineEventsCommand extends Command
 {
     protected $signature = 'fest:promote-sports-heads
@@ -14,11 +17,15 @@ class PromoteSportsHeadsToDisciplineEventsCommand extends Command
         {--event= : Season fest_events id}
         {--dry-run : Preview without writing}';
 
-    protected $description = 'Promote Sports Event Heads into separate discipline FestEvents under the season hub';
+    protected $description = '[Deprecated] Sync sports catalog into child sport FestEvents (alias of FestSportsEventSyncService)';
 
-    public function handle(PromoteSportsHeadsToDisciplineEvents $promoter): int
+    public function handle(FestSportsEventSyncService $sync): int
     {
         $dryRun = (bool) $this->option('dry-run');
+        if ($dryRun) {
+            $this->warn('Dry-run: would sync sport events via FestSportsEventSyncService (no writes). Prefer fest:migrate-sports-head-to-event --dry-run for fee migration.');
+        }
+
         $sahodayaOpt = $this->option('sahodaya');
         $eventId = $this->option('event');
 
@@ -39,8 +46,8 @@ class PromoteSportsHeadsToDisciplineEventsCommand extends Command
 
         foreach ($tenants as $tenant) {
             try {
-                $tenant->run(function () use ($tenant, $promoter, $dryRun, $eventId) {
-                    $this->info(($dryRun ? '[dry-run] ' : '')."Tenant {$tenant->id} ({$tenant->subdomain})");
+                $tenant->run(function () use ($tenant, $sync, $dryRun, $eventId) {
+                    $this->info(($dryRun ? '[dry-run] ' : '')."Tenant {$tenant->id}");
 
                     $seasons = FestEvent::query()
                         ->ofType('sports')
@@ -56,30 +63,18 @@ class PromoteSportsHeadsToDisciplineEventsCommand extends Command
                     }
 
                     foreach ($seasons as $season) {
-                        $rows = $promoter->promote($season, $dryRun);
-                        $this->table(
-                            ['head_id', 'head_name', 'event_id', 'title', 'note'],
-                            collect($rows)->map(fn ($r) => [
-                                $r['head_id'],
-                                $r['head_name'],
-                                $r['event_id'] ?: '—',
-                                $r['title'],
-                                isset($r['skipped']) ? 'already linked' : (isset($r['dry_run']) ? 'would create' : 'created'),
-                            ])->all(),
-                        );
+                        if ($dryRun) {
+                            $this->line("  Would sync season #{$season->id} {$season->title}");
+
+                            continue;
+                        }
+                        $result = $sync->syncSeason($season);
+                        $this->line("  Season #{$season->id}: created {$result['created']}, updated {$result['updated']}");
                     }
                 });
             } catch (\Throwable $e) {
                 $this->warn("  ✗ {$tenant->name}: {$e->getMessage()}");
             } finally {
-                // A failed initialize() (e.g. this tenant's database doesn't exist) can throw
-                // before $tenant->run() ever reaches its own "restore the previous tenant"
-                // step, leaving tenancy() dangling on a broken tenant. Left alone, every
-                // subsequent iteration's $tenant->run() call inherits that stale reference and
-                // fails trying to restore it -- so every tenant *after* the first broken one
-                // shows this tenant's error too, even though its own promotion logic above
-                // already ran and printed correctly. Force a clean return to central context
-                // before moving on.
                 if (function_exists('tenancy') && tenancy()->initialized) {
                     tenancy()->end();
                 }

@@ -1,8 +1,8 @@
 /**
- * Sports fest — sidebar sections (Sahodaya admin, inside one event).
+ * Sports fest — sidebar sections (Sahodaya admin, inside one sport event).
  *
- * Horizontal SportsSetupSubNav mirrors the Competition section labels below.
- * Settings pages use EventSettingsSubNav only (no stacked dual bars).
+ * After Head = Event unification, each sport (Athletics, Chess, …) is its own
+ * FestEvent. There is no Event Head mini-nav — competition ops live on this event.
  */
 
 import {
@@ -26,7 +26,7 @@ export function sportsEventSidebarNav(base, caps) {
         section: 'This event',
         items: [
             { label: 'Overview', href: `${base}?overview=1`, icon: 'grid', exact: true, permissions: FEST_VIEW },
-            { label: 'Setup hub', href: `${base}/setup`, icon: 'settings', permissions: FEST_SETTINGS },
+            { label: 'Setup', href: `${base}/setup`, icon: 'settings', permissions: FEST_SETTINGS },
             { label: 'Settings', href: `${base}/settings`, icon: 'sliders', permissions: FEST_SETTINGS },
             { label: 'Activity log', href: `${base}/activity`, icon: 'clock', permissions: FEST_VIEW },
         ],
@@ -35,10 +35,9 @@ export function sportsEventSidebarNav(base, caps) {
     groups.push({
         section: 'Competition',
         items: [
-            { label: 'Event Heads', href: `${base}/competition`, icon: 'layers', permissions: FEST_VIEW },
-            { label: 'Items under heads', href: `${base}/items`, icon: 'list', permissions: FEST_SETTINGS },
+            { label: 'Items', href: `${base}/items`, icon: 'list', permissions: FEST_SETTINGS },
             { label: 'Item listing', href: `${base}/items/list`, icon: 'clipboard', permissions: FEST_VIEW },
-            { label: 'All registrations', href: `${base}/registrations`, icon: 'inbox', permissions: FEST_REGISTRATIONS },
+            { label: 'Registrations', href: `${base}/registrations`, icon: 'inbox', permissions: FEST_REGISTRATIONS },
             { label: 'Mark entry', href: `${base}/marks`, icon: 'edit', permissions: FEST_MARKS },
             { label: 'Chest numbers', href: `${base}/chest-numbers`, icon: 'hash', permissions: FEST_MANAGE },
             { label: 'Results & publish', href: `${base}/results`, icon: 'award', permissions: FEST_RESULTS },
@@ -59,12 +58,12 @@ export function sportsEventSidebarNav(base, caps) {
         section: 'Schedule',
         items: [
             { label: 'Venue schedule', href: `${base}/schedule`, icon: 'calendar', permissions: FEST_SCHEDULE },
-            { label: 'Event Head schedule', href: `${base}/schedule/items`, icon: 'map-pin', permissions: FEST_SCHEDULE },
+            { label: 'Item schedule', href: `${base}/schedule/items`, icon: 'map-pin', permissions: FEST_SCHEDULE },
         ],
     });
 
     const outputItems = [
-        { label: 'Reports', href: `${base}/reports/by-head`, icon: 'file-text', permissions: FEST_VIEW },
+        { label: 'Reports', href: `${base}/reports`, icon: 'file-text', permissions: FEST_VIEW },
         { label: 'All report types', href: `${base}/reports?all=1`, icon: 'layers', permissions: FEST_VIEW },
         { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permissions: FEST_CERTIFICATES },
         { label: 'ID cards', href: `${base}/id-cards`, icon: 'credit-card', permissions: FEST_VIEW },
@@ -80,7 +79,7 @@ export function sportsEventSidebarNav(base, caps) {
     groups.push({ section: 'Outputs', items: outputItems });
 
     const adminItems = [
-        { label: 'Event Head coordinators', href: `${base}/event-staff`, icon: 'user-check', permissions: FEST_MANAGE },
+        { label: 'Event staff', href: `${base}/event-staff`, icon: 'user-check', permissions: FEST_MANAGE },
         { label: 'Appeals', href: `${base}/appeals`, icon: 'inbox', permissions: FEST_MANAGE },
         { label: 'School invoices', href: `${base}/finance`, icon: 'file-text', permissions: FEST_FINANCE },
         { label: 'Athletic records', href: `${base}/athletic-records`, icon: 'star', permissions: FEST_MANAGE },
@@ -95,40 +94,16 @@ export function sportsEventSidebarNav(base, caps) {
     return groups;
 }
 
-/** Paths where the item-head mini-nav appears in the sidebar. */
-export const SPORTS_HEAD_SIDEBAR_PATHS = [
-    '/competition',
-    '/reports/by-head',
-    '/registrations',
-    '/marks',
-    '/chest-numbers',
-    '/results',
-];
+/** No Event Head mini-nav after Head = Event unification. */
+export const SPORTS_HEAD_SIDEBAR_PATHS = [];
 
 export function shouldShowSportsHeadSidebar(path, hasHeads) {
-    if (!hasHeads) {
-        return false;
-    }
-
-    const clean = path.split('?')[0];
-
-    return SPORTS_HEAD_SIDEBAR_PATHS.some((segment) => clean.includes(segment));
+    return false;
 }
 
-/** School admin — head drill-down on registration, items, reports, and head-wise. */
-export const SCHOOL_SPORTS_HEAD_SIDEBAR_PATHS = [
-    '/registration',
-    '/items',
-    '/reports/',
-    '/head-wise',
-];
+/** School admin — no head drill-down (sport event is one billable unit). */
+export const SCHOOL_SPORTS_HEAD_SIDEBAR_PATHS = [];
 
 export function shouldShowSchoolSportsHeadSidebar(path, hasHeads, isSports) {
-    if (!hasHeads || !isSports) {
-        return false;
-    }
-
-    const clean = path.split('?')[0];
-
-    return SCHOOL_SPORTS_HEAD_SIDEBAR_PATHS.some((segment) => clean.includes(segment));
+    return false;
 }

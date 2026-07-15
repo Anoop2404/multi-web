@@ -345,19 +345,20 @@ Also set: **fest start/end dates**, **registration open/close** on Overview. Per
 
 ### 5.6 Sports Meet — program-level extras
 
-Sports Meet is a **season hub** listing **discipline events** (Athletics, Chess, …). Each **Event Head** can be promoted to its own `FestEvent` (`partition_role=sports_discipline`) with independent status, venue, dates, and always-on **sports composite** fees (no fee-model dropdown on Sports).
+Sports Meet is a **season hub** (config only: age cutoff, remittance) listing **sport events** (Athletics, Chess, …). Each sport is its own `FestEvent` (`partition_role=sports_discipline`) with fees, items, registration, marks, and results on the event itself (Head = Event).
 
 | Feature | Path |
 |---------|------|
-| Season / discipline list | `/sports` |
+| Season / sport event list | `/sports` |
 | Age groups (U8–U19) | `/sports/age-groups` |
 | Master catalog | `/sports/catalog` |
 | Athletic records | `/sports/records` |
 | House championship | `/sports/championship` |
 | Results / rankings | `/sports/results`, `/sports/rankings` |
 
-**Promote Event Heads → discipline events:** on `/sports`, use **Promote Event Head(s) → discipline events** when heads are ready (idempotent — already linked heads are skipped). CLI still works: `php artisan fest:promote-sports-heads --sahodaya=… [--dry-run]`.  
-Backfill head fee columns: `php artisan fest:backfill-head-fees --sahodaya=… [--dry-run]`.
+Sport child events are synced automatically from the catalog (`FestSportsEventSyncService`).  
+Migrate legacy Event Heads: `php artisan fest:migrate-sports-head-to-event --sahodaya=… [--dry-run]`.  
+Deprecated alias: `php artisan fest:promote-sports-heads` (now syncs sport events).
 
 ### 5.7 Kalotsav extras
 
@@ -368,7 +369,7 @@ Backfill head fee columns: `php artisan fest:backfill-head-fees --sahodaya=… [
 
 ## 6. Fest fee models (Sports composite)
 
-**Sports:** billing is always `sports_composite` — there is no fee-model dropdown. Configure school / student / team fees on each Event Head (Competition hub). Optional event-wide fallbacks live under Settings → Fees.
+**Sports:** billing is always `sports_composite` — there is no fee-model dropdown. Configure school / student / team fees on each **sport event** (Settings → Fees). One invoice per school per sport event.
 
 **Other fest types:** choose a billing model in Settings → Fees as needed.
 
@@ -379,12 +380,12 @@ Backfill head fee columns: `php artisan fest:backfill-head-fees --sahodaya=… [
 ② Student registration    — per student in event (₹)
 ③ Included items          — how many items covered by ② per student
 ④ Item fees               — per item (when quota = 0, ALL items)
-⑤ Extra item fees         — items beyond ③ (uses head "extra" rate)
+⑤ Extra item fees         — items beyond ③ (uses event "extra" rate)
 ```
 
 ### Item fee resolution (each billed item)
 
-**Sports (per Event Head):** items inherit head rates — per-item `fee_amount` is ignored. Use head student/team rates (and optional default/extra item fees). Over-cap registrations go to a waiting list and promote when a seat frees.
+**Sports (per sport event):** items inherit the event's rates — per-item `fee_amount` is ignored. Over-cap registrations go to a waiting list.
 
 **Other fest types:**
 
@@ -622,14 +623,12 @@ During lock: school submits → school principal approves → Sahodaya approves 
 
 1. `/sports/age-groups` — configure U8–U19  
 2. `/sports/catalog` — resync master, enable items  
-3. `/sports` — open season hub (auto-created for Sports)  
-4. `/sports/catalog/assign` — import items into the season  
-5. Season → Event Heads (Competition) — sync / add heads with composite fees  
-6. `/sports` → **Promote** Event Heads into discipline events  
-7. Each discipline → Overview → dates + `registration_open`  
-8. Portal users → create fest_ops / mark coordinators → assign per Event Head  
-9. Schools register → approve → verify fees  
-10. Schedule → publish → ongoing → marks → results  
+3. `/sports` — open season hub (auto-created; sport events sync from catalog)  
+4. Each sport event → Settings → Fees (composite rates) + Items  
+5. Each sport → Overview → dates + `registration_open`  
+6. Portal users → create fest_ops / mark coordinators → assign per sport event  
+7. Schools register → approve → verify fees  
+8. Schedule → publish → ongoing → marks → results  
 
 ### B. New Kalotsav cluster event
 
@@ -676,8 +675,9 @@ During lock: school submits → school principal approves → Sahodaya approves 
 |------|---------|
 | **Master catalog** | Year-independent item list for a program |
 | **Event items** | Items imported into one fest event |
-| **Event Head** | Sports grouping (Chess, Athletics); fee/policy unit; may be promoted to a discipline event |
-| **Item head** | Same concept for non-sports fests (section grouping) |
+| **Sport event** | Sports Meet unit (Athletics, Chess, …); fees/policy/ops on one `FestEvent` |
+| **Event Head** | Legacy Sports concept (migrated onto sport events); still used as Kalotsav/other **item head** |
+| **Item head** | Section grouping for non-sports fests |
 | **Chest number** | Sports participant ID on fest day |
 | **Level round** | school / sahodaya / state |
 | **Conduct levels** | Which future rounds this event feeds |

@@ -2,29 +2,42 @@
 
 Sports uses the **Event Engine** (see [04-COMMON_ENGINES.md](04-COMMON_ENGINES.md)) with program type `sports`.
 
+## Architecture (Head = Event)
+
+| Layer | Entity | Role |
+|-------|--------|------|
+| Season hub | `FestEvent` (`partition_role=sports_season`) | Config only: age cutoff, catalog sync, state remittance |
+| Sport event | `FestEvent` (`partition_role=sports_discipline`) | Athletics, Chess, … — fees, items, registration, marks, results |
+
+There is **no separate FestItemHead runtime entity for Sports**. Catalog templates may still use `FestItemHead` with `event_id=null`. Kalotsav continues to use item heads.
+
+**Migration:** `php artisan fest:migrate-sports-head-to-event {--sahodaya=} {--dry-run}` copies legacy head fields onto sport events and consolidates per-head fees.
+
+**Sync:** `FestSportsEventSyncService` ensures one child sport event per catalog sport on the season hub.
+
 ## 1. Sports Meet Setup
 
 | Config | Description |
 |--------|-------------|
-| fest_event | Container for sports meet year |
-| levels | School / cluster / district / state |
-| registration windows | Per level via `FestItemWindowResolver` |
-| free quota | Items per student/school before fee |
+| fest_event (season) | Year container |
+| fest_event (sport) | One per sport (Athletics, Chess, …) |
+| registration windows | On the sport event / items via `FestItemWindowResolver` |
+| free quota | On the sport event (`included_items_per_student`, `included_teams`) |
 | points schema | Championship calculation |
 
-**Controllers:** `SportsProgramController`, `FestEventController`, `FestEventSettingsController`
+**Controllers:** `SportsProgramController`, `FestEventController`, `FestEventSettingsController`, `FestSportsSetupController`
 
 ---
 
-## 2. Event Heads and Items
+## 2. Sport events and Items
 
 | Entity | Description |
 |--------|-------------|
-| Event head | Track/field category grouping |
-| Catalog item | Individual sport event |
-| Item config | Gender, class category, age category, team size, max participants |
+| Sport event | One `FestEvent` per sport (fees, policy, schedule on the event) |
+| Catalog item | Individual competition item under that event |
+| Item config | Gender, age category, team size, max participants |
 
-Services: `FestCatalogService`, `FestItemCatalogService`, `FestItemHeadService`
+Services: `FestCatalogService`, `FestSportsEventSyncService`, `FestSportsCompositeFeeService`
 
 **Taxonomy:** `config/fest_item_taxonomy.php` — sports-specific codes
 

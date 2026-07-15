@@ -24,6 +24,16 @@ class FestEvent extends Model
         'require_event_registration', 'event_reg_start', 'event_reg_end', 'allow_student_self_register',
         'verification_day', 'manual_pdf_path',
         'sport_discipline', 'source_head_id',
+        // Sports unified event fields (formerly on FestItemHead)
+        'catalog_key', 'is_team_heading', 'sort_order',
+        'default_item_fee', 'extra_item_fee',
+        'school_registration_fee', 'student_registration_fee', 'team_registration_fee',
+        'included_items_per_student', 'included_teams',
+        'verification_policy', 'approval_policy',
+        'max_participants', 'max_teams',
+        'reg_start', 'reg_end', 'competition_start', 'competition_end',
+        'schedule_mode', 'competition_time',
+        'notification_settings',
     ];
 
     protected $casts = [
@@ -40,21 +50,87 @@ class FestEvent extends Model
         'require_event_registration'          => 'boolean',
         'allow_student_self_register'         => 'boolean',
         'record_tracking_enabled'             => 'boolean',
+        'is_team_heading'                     => 'boolean',
         'conduct_levels'                      => 'array',
         'aggregation_config'                  => 'array',
+        'notification_settings'               => 'array',
         'registration_open'                   => 'date',
         'registration_close'                  => 'date',
         'event_reg_start'                     => 'date',
         'event_reg_end'                       => 'date',
+        'reg_start'                           => 'date',
+        'reg_end'                             => 'date',
+        'competition_start'                   => 'date',
+        'competition_end'                     => 'date',
         'event_start'                         => 'date',
         'event_end'                           => 'date',
         'verification_day'                    => 'date',
         'sports_age_cutoff_date'              => 'date',
         'fee_amount'                          => 'decimal:2',
+        'default_item_fee'                    => 'decimal:2',
+        'extra_item_fee'                      => 'decimal:2',
+        'school_registration_fee'             => 'decimal:2',
+        'student_registration_fee'            => 'decimal:2',
+        'team_registration_fee'               => 'decimal:2',
         'fee_settings'                        => 'array',
         'numbering_settings'                  => 'array',
         'appeal_fee_amount'                   => 'decimal:2',
+        'included_items_per_student'          => 'integer',
+        'included_teams'                      => 'integer',
+        'max_participants'                    => 'integer',
+        'max_teams'                           => 'integer',
+        'sort_order'                          => 'integer',
     ];
+
+    /** Whether composite sports fee columns are configured (checklist readiness). */
+    public function hasSportsFeesConfigured(): bool
+    {
+        return $this->school_registration_fee !== null
+            || $this->student_registration_fee !== null
+            || $this->team_registration_fee !== null
+            || $this->default_item_fee !== null
+            || $this->extra_item_fee !== null;
+    }
+
+    public function requiresManualApproval(): bool
+    {
+        return $this->approval_policy === 'manual';
+    }
+
+    public function requiresVerifiedStudentsOnly(): bool
+    {
+        return $this->verification_policy === 'verified_only';
+    }
+
+    public function notificationEnabledFor(string $trigger): bool
+    {
+        $disabled = $this->notification_settings['disabled_triggers'] ?? [];
+
+        return ! in_array($trigger, $disabled, true);
+    }
+
+    /** @return list<int> */
+    public function extraRecipientUserIds(): array
+    {
+        $ids = $this->notification_settings['extra_recipient_user_ids'] ?? [];
+
+        return array_values(array_unique(array_map('intval', is_array($ids) ? $ids : [])));
+    }
+
+    public function isSameTime(): bool
+    {
+        return $this->schedule_mode === 'same_time';
+    }
+
+    public function competitionTimeShort(): ?string
+    {
+        return $this->competition_time ? substr((string) $this->competition_time, 0, 5) : null;
+    }
+
+    public function sourceHead(): BelongsTo
+    {
+        return $this->belongsTo(FestItemHead::class, 'source_head_id');
+    }
 
     protected static function booted(): void
     {

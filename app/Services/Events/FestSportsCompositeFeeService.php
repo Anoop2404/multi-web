@@ -15,24 +15,229 @@ class FestSportsCompositeFeeService
     ) {}
 
     /**
-     * Per-Event-Head composite billing (the head owns its own School/Student/Team registration
-     * fee, individual item quota, and team quota — see FestItemHead's fee columns).
+     * Per-sport-event composite billing (Head = Event unification).
      *
-     * Billing rules, confirmed against real registration scenarios:
-     *  - School Registration Fee: flat, charged once per school per head, regardless of item/
-     *    student/team counts.
-     *  - Student Registration Fee: flat, charged once per student per head who has at least one
-     *    individual (non-team) item registered under this head — added ON TOP of, not replacing,
-     *    that student's per-item charges.
-     *  - Per individual item: charge the head's student_registration_fee as the per-item rate
-     *    (items inherit head fees — FRD-04 v2; per-item fee_amount is ignored for sports_composite).
-     *    If the item is quota_eligible and the student still has a free individual-quota slot under
-     *    this head, the item is fully waived (0), and a slot is consumed.
-     *    Quota is consumed in registration order (first quota-eligible item registered wins).
-     *  - Team items (participant_type team/group) are billed ONCE per team registration via the
-     *    head's team_registration_fee (item overrides ignored), not per team member,
-     *    and are not subject to the individual Student Registration Fee. A separate team quota
-     *    (included_teams) can waive the team fee the same way, consumed in registration order.
+     * Reads fee columns from FestEvent first; when those are empty, falls back to the
+     * linked FestItemHead (source_head_id or sole head on the event) so migration can
+     * land before fest:migrate-sports-head-to-event has been run.
+     *
+     * Billing rules (same as former per-head model, scoped to the whole sport event):
+     *  - School Registration Fee: once per school per sport event
+     *  - Student Registration Fee: once per student with ≥1 individual item
+     *  - Per individual item: default_item_fee (or student_registration_fee), with free quota
+     *  - Team items: team_registration_fee once per team, with team quota
+     *
+     * @return array{
+     *   school_reg: float,
+     *   student_reg: float,
+     *   student_count: int,
+     *   item_fee: float,
+     *   team_fee: float,
+     *   included_quota: int,
+     *   included_teams: int,
+     *   lines: list<array{line_type: string, label: string, quantity: int, unit_amount: float, amount: float, meta?: array}>
+     * }
+     */
+    public function calculateForEvent(FestEvent $event, string $schoolId): array
+    {
+        $fees = $this->resolveSportsFeeSource($event);
+
+        $schoolReg = (float) ($fees['school_registration_fee'] ?? 0);
+        $studentRegRate = (float) ($fees['student_registration_fee'] ?? 0);
+        $teamRegRate = (float) ($fees['team_registration_fee'] ?? 0);
+        $individualQuota = max(0, (int) ($fees['included_items_per_student'] ?? 0));
+        $teamQuota = max(0, (int) ($fees['included_teams'] ?? 0));
+        $defaultItemFee = $fees['default_item_fee'] ?? null;
+        $extraItemFee = $fees['extra_item_fee'] ?? null;
+        $label = $event->title ?: 'Sport event';
+
+        $registrations = FestRegistration::where('event_id', $event->id)
+            ->where('school_id', $schoolId)
+            ->whereIn('status', ['submitted', 'approved'])
+            ->with(['item', 'participants'])
+            ->orderBy('id')
+            ->get();
+
+        $lines = [];
+        $studentsBilledBase = [];
+        $individualQuotaUsed = [];
+        $itemFeeTotal = 0.0;
+
+        foreach ($registrations as $registration) {
+            if ($registration->item?->isTeamItem()) {
+                continue;
+            }
+
+            foreach ($registration->participants as $participant) {
+                if ($participant->participant_role === 'standby' || ! $participant->student_id) {
+                    continue;
+                }
+
+                $studentId = $participant->student_id;
+                $studentsBilledBase[$studentId] = true;
+
+                $used = $individualQuotaUsed[$studentId] ?? 0;
+                $eligible = (bool) ($registration->item->quota_eligible ?? false);
+                $waived = $eligible && $used < $individualQuota;
+
+                if ($waived) {
+                    $individualQuotaUsed[$studentId] = $used + 1;
+                    $amount = 0.0;
+                } else {
+                    $amount = (float) ($defaultItemFee ?? $studentRegRate);
+                    if ($eligible && $individualQuota > 0 && $extraItemFee !== null) {
+                        $amount = (float) $extraItemFee;
+                    }
+                }
+
+                $lines[] = [
+                    'line_type' => $waived ? 'item_fee_waived' : 'item_fee',
+                    'label' => ($registration->item->title ?? 'Item').($waived ? ' (free quota)' : ''),
+                    'quantity' => 1,
+                    'unit_amount' => $amount,
+                    'amount' => $amount,
+                    'meta' => [
+                        'student_id' => $studentId,
+                        'item_id' => $registration->item_id,
+                        'registration_id' => $registration->id,
+                        'event_id' => $event->id,
+                    ],
+                ];
+                $itemFeeTotal += $amount;
+            }
+        }
+
+        $teamQuotaUsed = 0;
+        $teamFeeTotal = 0.0;
+
+        foreach ($registrations as $registration) {
+            if (! $registration->item?->isTeamItem()) {
+                continue;
+            }
+
+            $eligible = (bool) ($registration->item->quota_eligible ?? false);
+            $waived = $eligible && $teamQuotaUsed < $teamQuota;
+
+            if ($waived) {
+                $teamQuotaUsed++;
+                $amount = 0.0;
+            } else {
+                $amount = $teamRegRate;
+            }
+
+            $lines[] = [
+                'line_type' => $waived ? 'team_fee_waived' : 'team_fee',
+                'label' => ($registration->item->title ?? 'Team item').' — team fee'.($waived ? ' (free quota)' : ''),
+                'quantity' => 1,
+                'unit_amount' => $amount,
+                'amount' => $amount,
+                'meta' => [
+                    'registration_id' => $registration->id,
+                    'item_id' => $registration->item_id,
+                    'event_id' => $event->id,
+                ],
+            ];
+            $teamFeeTotal += $amount;
+        }
+
+        $studentCount = count($studentsBilledBase);
+        $studentRegTotal = round($studentCount * $studentRegRate, 2);
+
+        $summaryLines = [];
+        if ($schoolReg > 0) {
+            $summaryLines[] = [
+                'line_type' => 'school_reg',
+                'label' => 'School registration fee ('.$label.')',
+                'quantity' => 1,
+                'unit_amount' => $schoolReg,
+                'amount' => $schoolReg,
+                'meta' => ['event_id' => $event->id],
+            ];
+        }
+        if ($studentRegTotal > 0) {
+            $summaryLines[] = [
+                'line_type' => 'student_reg',
+                'label' => "Student registration ({$label}) — {$studentCount} × ₹".number_format($studentRegRate, 0),
+                'quantity' => $studentCount,
+                'unit_amount' => $studentRegRate,
+                'amount' => $studentRegTotal,
+                'meta' => ['event_id' => $event->id],
+            ];
+        }
+
+        return [
+            'school_reg' => $schoolReg,
+            'student_reg' => $studentRegTotal,
+            'student_count' => $studentCount,
+            'item_fee' => round($itemFeeTotal, 2),
+            'team_fee' => round($teamFeeTotal, 2),
+            'included_quota' => $individualQuota,
+            'included_teams' => $teamQuota,
+            'lines' => array_merge($summaryLines, $lines),
+        ];
+    }
+
+    /**
+     * Dual-read: FestEvent columns first, then linked FestItemHead fallback.
+     *
+     * @return array{
+     *   school_registration_fee: mixed,
+     *   student_registration_fee: mixed,
+     *   team_registration_fee: mixed,
+     *   included_items_per_student: mixed,
+     *   included_teams: mixed,
+     *   default_item_fee: mixed,
+     *   extra_item_fee: mixed
+     * }
+     */
+    public function resolveSportsFeeSource(FestEvent $event): array
+    {
+        if ($event->hasSportsFeesConfigured()) {
+            return [
+                'school_registration_fee' => $event->school_registration_fee,
+                'student_registration_fee' => $event->student_registration_fee,
+                'team_registration_fee' => $event->team_registration_fee,
+                'included_items_per_student' => $event->included_items_per_student,
+                'included_teams' => $event->included_teams,
+                'default_item_fee' => $event->default_item_fee,
+                'extra_item_fee' => $event->extra_item_fee,
+            ];
+        }
+
+        $head = null;
+        if ($event->source_head_id) {
+            $head = FestItemHead::find($event->source_head_id);
+        }
+        if (! $head) {
+            $head = FestItemHead::where('event_id', $event->id)->whereNull('parent_id')->orderBy('sort_order')->first();
+        }
+
+        if ($head) {
+            return [
+                'school_registration_fee' => $head->school_registration_fee,
+                'student_registration_fee' => $head->student_registration_fee,
+                'team_registration_fee' => $head->team_registration_fee,
+                'included_items_per_student' => $head->included_items_per_student,
+                'included_teams' => $head->included_teams,
+                'default_item_fee' => $head->default_item_fee,
+                'extra_item_fee' => $head->extra_item_fee,
+            ];
+        }
+
+        return [
+            'school_registration_fee' => null,
+            'student_registration_fee' => null,
+            'team_registration_fee' => null,
+            'included_items_per_student' => 0,
+            'included_teams' => 0,
+            'default_item_fee' => null,
+            'extra_item_fee' => null,
+        ];
+    }
+
+    /**
+     * Per-Event-Head composite billing (legacy — kept for Kalotsav / unmigrated rows).
+     * Prefer calculateForEvent() for sports after Head = Event unification.
      *
      * @return array{
      *   school_reg: float,
@@ -47,6 +252,12 @@ class FestSportsCompositeFeeService
      */
     public function calculateForHead(FestItemHead $head, string $schoolId): array
     {
+        // If the head's event already has unified fee columns, bill at event level.
+        $event = $head->event;
+        if ($event && $event->event_type === 'sports' && $event->hasSportsFeesConfigured()) {
+            return $this->calculateForEvent($event, $schoolId);
+        }
+
         $schoolReg = (float) ($head->school_registration_fee ?? 0);
         $studentRegRate = (float) ($head->student_registration_fee ?? 0);
         $teamRegRate = (float) ($head->team_registration_fee ?? 0);

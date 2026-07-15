@@ -2,9 +2,9 @@
     <SahodayaEventsLayout :title="`${event.title} — Setup`" :sahodaya="sahodaya" :event="event"
                          :show-header-title="false">
         <PageHeader :title="`${event.title} — Sports setup`" eyebrow="Setup"
-                    description="Configure this sports event end-to-end: fees, Event Heads, items, rank points, then run competition by head.">
+                    description="Configure this sports season: age groups, then open each sport event for fees, items, and registration.">
             <template #actions>
-                <Link :href="competitionUrl" class="btn-primary text-sm">Open Event Heads →</Link>
+                <Link :href="competitionUrl" class="btn-primary text-sm">Open sport events →</Link>
             </template>
         </PageHeader>
 
@@ -13,17 +13,12 @@
 
         <SportsSetupSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="setup" />
 
-        <div v-if="promoteStatus?.can_promote && sportsHubUrl"
-             class="rounded-lg border border-indigo-100 bg-indigo-50/80 px-4 py-3 mb-6 text-sm text-indigo-950">
-            <p class="font-semibold">
-                Next step: promote {{ promoteStatus.pending_count }} Event Head{{ promoteStatus.pending_count === 1 ? '' : 's' }}
+        <div v-if="sportsHubUrl"
+             class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 mb-6 text-sm text-slate-700">
+            <p>
+                Each sport (Athletics, Chess, …) is its own event.
+                <Link :href="sportsHubUrl" class="font-semibold underline ml-1">Open Sports hub →</Link>
             </p>
-            <p class="mt-1 text-xs text-indigo-900/80">
-                After fees and items are set, promote heads into separate discipline events from the Sports hub.
-            </p>
-            <Link :href="sportsHubUrl" class="inline-block mt-2 text-xs font-semibold underline">
-                Open Sports hub to promote →
-            </Link>
         </div>
 
         <div class="grid lg:grid-cols-3 gap-6">
@@ -71,9 +66,9 @@
 
                 <section v-if="headItemGroups.length" class="card space-y-4">
                     <div>
-                        <h3 class="section-title">Competition by Event Head</h3>
+                        <h3 class="section-title">Sport events</h3>
                         <p class="section-desc">
-                            After setup, use each Event Head for day-of operations — dates, item fees, registrations, marks, and results.
+                            Each sport is its own event — set fees, items, registration, marks, and results there.
                         </p>
                     </div>
                     <div class="reports-tile-grid">
@@ -82,11 +77,11 @@
                             <p class="font-semibold text-slate-900">{{ head.head_name }}</p>
                             <p class="text-xs text-slate-500 mt-1">{{ head.item_count }} item{{ head.item_count === 1 ? '' : 's' }}</p>
                             <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                                <Link :href="headUrl(head.head_id)" class="text-indigo-600 hover:underline">
-                                    Head schedule →
+                                <Link :href="sportEventUrl(head)" class="text-indigo-600 hover:underline">
+                                    Open event →
                                 </Link>
-                                <Link :href="itemsForHeadUrl(head.head_id)" class="text-emerald-700 hover:underline">
-                                    Items under this head →
+                                <Link :href="`${sportEventUrl(head)}/items`" class="text-emerald-700 hover:underline">
+                                    Items →
                                 </Link>
                             </div>
                         </div>
@@ -96,19 +91,15 @@
 
             <aside class="space-y-4">
                 <section class="card space-y-3">
-                    <h4 class="section-title">This event</h4>
+                    <h4 class="section-title">This season</h4>
                     <dl class="text-sm space-y-2">
                         <div class="flex justify-between gap-2">
-                            <dt class="text-slate-500">Event Heads</dt>
+                            <dt class="text-slate-500">Sport events</dt>
                             <dd class="font-semibold">{{ stats.heads }}</dd>
                         </div>
                         <div class="flex justify-between gap-2">
                             <dt class="text-slate-500">Enabled items</dt>
                             <dd class="font-semibold">{{ stats.items }}</dd>
-                        </div>
-                        <div class="flex justify-between gap-2">
-                            <dt class="text-slate-500">Linked to heads</dt>
-                            <dd class="font-semibold">{{ stats.linked }}</dd>
                         </div>
                     </dl>
                 </section>
@@ -170,7 +161,6 @@ const props = defineProps({
     ageRuleSummary: { type: String, default: null },
     competitionUrl: { type: String, default: null },
     sportsHubUrl: { type: String, default: null },
-    promoteStatus: { type: Object, default: null },
 });
 
 const progressPct = computed(() => {
@@ -179,22 +169,13 @@ const progressPct = computed(() => {
     return Math.round((done / total) * 100);
 });
 
-const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`);
-
 const organiserTools = computed(() => [
-    { label: 'Event Head coordinators', href: `${base.value}/event-staff`, hint: 'Assign mark-entry staff per Event Head' },
-    { label: 'ID cards', href: `${base.value}/id-cards`, hint: 'Generate participant & staff cards' },
-    { label: 'Reports', href: `${base.value}/reports/by-head`, hint: 'By head, item-wise, schedules, exports' },
-    { label: 'Sidebar visibility', href: `/sahodaya-admin/${props.sahodaya.id}/settings/nav-visibility`, hint: 'Show/hide programs & menus' },
+    { label: 'Event staff', href: `/sahodaya-admin/${props.sahodaya.id}/sports`, hint: 'Assign mark-entry staff per sport event' },
+    { label: 'Sports hub', href: `/sahodaya-admin/${props.sahodaya.id}/sports`, hint: 'All sport events this season' },
 ]);
 
-function headUrl(headId) {
-    if (headId == null) return `${base.value}/competition?head_id=other`;
-    return `${base.value}/competition?head_id=${headId}`;
-}
-
-function itemsForHeadUrl(headId) {
-    if (headId == null) return `${base.value}/items?head_id=other`;
-    return `${base.value}/items?head_id=${headId}`;
+function sportEventUrl(head) {
+    if (head.href) return head.href;
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${head.head_id}`;
 }
 </script>

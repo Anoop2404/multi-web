@@ -131,9 +131,6 @@ class FestItemHeadOpsController extends SahodayaAdminController
             'catalogUrl'         => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/items",
             'showHeadFees'       => $event->event_type === 'sports',
             'sportsHubUrl'       => "/sahodaya-admin/{$this->sahodaya->id}/sports",
-            'promoteStatus'      => $event->event_type === 'sports' && $event->parent_event_id === null
-                ? app(\App\Services\Events\PromoteSportsHeadsToDisciplineEvents::class)->status($event)
-                : null,
             'notificationTriggers' => $event->event_type === 'sports' ? FestItemHead::NOTIFICATION_TRIGGERS : [],
             // Extra recipients are always picked from existing platform users (Sahodaya
             // admin/staff/event coordinators) — never free-text emails.

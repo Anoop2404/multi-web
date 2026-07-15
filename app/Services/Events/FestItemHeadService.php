@@ -136,15 +136,17 @@ class FestItemHeadService
 
     public function syncEventHeads(FestEvent $event): int
     {
-        // Head-first rebuild: a discipline event is the permanent, 1:1 home of a single
-        // already-promoted head — there is no tenant catalog to seed onto it. Without this
-        // guard, visiting a single discipline event's own Competition page would try to seed
-        // every other catalog head (Chess, Swimming, ...) under that one event too, since
-        // none of those exist scoped to this specific event_id yet.
-        if ($event->parent_event_id !== null) {
+        // Sports season: create/update child sport FestEvents (Head = Event). No promotion.
+        if ($event->event_type === 'sports' && $event->parent_event_id === null) {
+            return app(FestSportsEventSyncService::class)->syncEventHeads($event);
+        }
+
+        // Discipline / sport child events: nothing to seed (items live on this event).
+        if ($event->event_type === 'sports' && $event->parent_event_id !== null) {
             return 0;
         }
 
+        // Non-sports (Kalotsav etc.): keep classic head seeding.
         $tenantId = $event->tenant_id;
         $catalogHeads = FestItemHead::forTenant($tenantId)
             ->whereNull('event_id')
@@ -152,36 +154,16 @@ class FestItemHeadService
             ->orderBy('sort_order')
             ->get();
 
-        // Once a head is promoted, promote() moves its event_id from the season to its own
-        // new discipline event — that's the whole point. But this method used to look up an
-        // existing head with `where('event_id', $event->id)` only, i.e. scoped to the SEASON's
-        // own id. After promotion that lookup always comes back empty for an already-promoted
-        // catalog_key (its event_id points elsewhere now), so every subsequent visit to the
-        // season's own Competition/Setup page was creating a brand-new duplicate head back on
-        // the season — which then got auto-promoted into a *second* discipline event on the
-        // next sweep. Fix: also match heads already living on one of this season's own
-        // already-promoted discipline events before deciding a catalog_key needs a fresh head.
-        $promotedDisciplineEventIds = FestEvent::where('parent_event_id', $event->id)->pluck('id');
-
         $map = [];
         $created = 0;
 
         foreach ($catalogHeads as $catalogHead) {
             $eventHead = FestItemHead::forTenant($tenantId)
                 ->where('catalog_key', $catalogHead->catalog_key)
-                ->where(function ($q) use ($event, $promotedDisciplineEventIds) {
-                    $q->where('event_id', $event->id)
-                        ->orWhereIn('event_id', $promotedDisciplineEventIds);
-                })
+                ->where('event_id', $event->id)
                 ->first();
 
-            if ($eventHead) {
-                // This runs on every competition-page load. Once an event head exists, its
-                // name/discipline/ID-card-heading/order are per-event customizations (editable
-                // via "Edit head & fees") — re-applying the catalog's values here every request
-                // was silently reverting any rename the instant the page reloaded after saving.
-                // The catalog is only used to seed brand-new heads (the else branch below).
-            } else {
+            if (! $eventHead) {
                 $eventHead = FestItemHead::create([
                     'tenant_id' => $tenantId,
                     'event_id' => $event->id,
@@ -218,34 +200,17 @@ class FestItemHeadService
                 $item->update(['head_id' => $headId]);
             });
 
-        // Head-first rebuild: every head — new or pre-existing — must own its own dedicated
-        // discipline event. This sweep is idempotent (already-promoted heads are skipped), so
-        // running it on every season page load is safe and also acts as a lazy fallback for
-        // any head that predates the Phase 0 backfill.
-        $this->promoteIfSeason($event);
-
         return $created;
     }
 
     /**
-     * Promote every un-promoted Event Head on a Sports season hub into its own dedicated
-     * discipline event. No-op for anything that isn't a sports season hub (discipline events,
-     * school-round events, and non-sports event types never have heads to promote).
+     * @deprecated Sports no longer promotes heads; FestSportsEventSyncService creates sport events.
+     * Kept as no-op so older callers do not break.
      */
     public function promoteIfSeason(FestEvent $event): void
     {
-        if ($event->event_type !== 'sports' || $event->parent_event_id !== null) {
-            return;
-        }
-
-        $promoter = app(PromoteSportsHeadsToDisciplineEvents::class);
-
-        // hasPendingWork() is a cheap read-only check; only call promote() (which always runs
-        // a handful of queries per head, even when everything is already linked and nothing
-        // moves) when there's actually something to do — either a head still un-promoted, or
-        // an already-promoted head with stray items left behind on the season to catch up.
-        if ($promoter->hasPendingWork($event)) {
-            $promoter->promote($event, false);
+        if ($event->event_type === 'sports' && $event->parent_event_id === null) {
+            app(FestSportsEventSyncService::class)->syncSeason($event);
         }
     }
 

@@ -100,6 +100,10 @@ class FestSchoolEventFeeService
 
     private function eventHasConfiguredItemFees(FestEvent $event): bool
     {
+        if ($event->event_type === 'sports' && $event->hasSportsFeesConfigured()) {
+            return true;
+        }
+
         if (FestEventItem::query()
             ->where('event_id', $event->id)
             ->where(function ($q) {
@@ -254,9 +258,9 @@ class FestSchoolEventFeeService
     }
 
     /**
-     * Whether this event bills sports_composite fees per Event Head (rather than one flat
-     * event-wide schedule). True only when the event actually has FestItemHead rows AND the
-     * fest_school_event_fees.head_id column exists (schema migrated).
+     * Whether this event bills sports_composite fees per Event Head.
+     * After Head = Event unification, sports always bills at event level (returns false).
+     * Legacy true only when heads exist, event fees are not yet on FestEvent, and head_id column exists.
      */
     public function usesPerHeadBilling(FestEvent $event): bool
     {
@@ -264,11 +268,83 @@ class FestSchoolEventFeeService
             return false;
         }
 
+        // Unified sports: fee columns live on the event — never per-head.
+        if ($event->event_type === 'sports') {
+            if ($event->hasSportsFeesConfigured()) {
+                return false;
+            }
+            // Transition: still use per-head only when heads exist and event fields empty.
+            if (! Schema::hasColumn('fest_school_event_fees', 'head_id')) {
+                return false;
+            }
+
+            return FestItemHead::where('event_id', $event->id)->exists();
+        }
+
         if (! Schema::hasColumn('fest_school_event_fees', 'head_id')) {
             return false;
         }
 
         return FestItemHead::where('event_id', $event->id)->exists();
+    }
+
+    /**
+     * Recalculate sports_composite at event level (Head = Event).
+     * Prefer this over recalculateForHead for sports sport events.
+     */
+    public function recalculateForSportsEvent(FestEvent $event, string $schoolId): FestSchoolEventFee
+    {
+        $composite = $this->sportsCompositeFeeService->calculateForEvent($event, $schoolId);
+        $total = $composite['school_reg'] + $composite['student_reg'] + $composite['item_fee'] + $composite['team_fee'];
+
+        $record = FestSchoolEventFee::firstOrNew([
+            'event_id' => $event->id,
+            'school_id' => $schoolId,
+            'head_id' => null,
+        ]);
+
+        // Prefer null-head row; if only head-scoped rows remain, reuse the first.
+        if (! $record->exists && Schema::hasColumn('fest_school_event_fees', 'head_id')) {
+            $legacy = FestSchoolEventFee::where('event_id', $event->id)
+                ->where('school_id', $schoolId)
+                ->orderByRaw('head_id is null desc')
+                ->first();
+            if ($legacy) {
+                $record = $legacy;
+                $record->head_id = null;
+            }
+        }
+
+        if ($record->exists && (float) $record->total_due > 0 && $record->isFullyPaid()) {
+            return $record;
+        }
+
+        $record->fill([
+            'head_id' => null,
+            'school_registration_fee' => $composite['school_reg'],
+            'student_registration_fee' => $composite['student_reg'],
+            'participation_item_count' => $composite['student_count'],
+            'participation_fee' => $composite['item_fee'] + $composite['team_fee'],
+            'extra_item_fee' => $composite['team_fee'],
+            'total_due' => round($total, 2),
+            'status' => $record->fee_receipt_id ? ($record->status ?? 'proof_uploaded') : 'pending',
+        ]);
+
+        if ($total <= 0) {
+            $record->status = 'approved';
+        }
+
+        $record->save();
+
+        if ($total > 0 && (float) $record->amount_paid > 0) {
+            $record->refreshPaidState();
+        }
+
+        if ($this->supportsFeeLines()) {
+            $this->syncFeeLines($record, $composite['lines']);
+        }
+
+        return $record;
     }
 
     /** Heads under this event that this school has (or previously had) billable activity for. */
@@ -421,6 +497,14 @@ class FestSchoolEventFeeService
 
     public function recalculate(FestEvent $event, string $schoolId): FestSchoolEventFee
     {
+        // Unified sports: always bill at event level when fees are on the event (or can dual-read).
+        if ($event->event_type === 'sports'
+            && ($this->resolveSchedule($event)['fee_model'] ?? 'none') === 'sports_composite'
+            && ! $this->usesPerHeadBilling($event)
+        ) {
+            return $this->recalculateForSportsEvent($event, $schoolId);
+        }
+
         if ($this->usesPerHeadBilling($event)) {
             return $this->recalculateAggregateForPerHeadEvent($event, $schoolId);
         }

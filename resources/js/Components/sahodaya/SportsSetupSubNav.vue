@@ -1,6 +1,6 @@
 <template>
     <nav class="flex flex-wrap gap-1.5 border-b border-slate-200 pb-3 mb-4 overflow-x-auto"
-         aria-label="Sports competition setup">
+         aria-label="Sports event setup">
         <Link v-for="tab in tabs" :key="tab.key"
               :href="tab.href"
               :class="active === tab.key
@@ -13,9 +13,8 @@
 
 <script setup>
 /**
- * Horizontal strip for sports Competition pages only.
- * Labels match sportsEventSidebarNav “This event” / “Competition” items —
- * Settings tabs live under sidebar → Settings (EventSettingsSubNav), not here.
+ * Horizontal strip for sports setup / competition pages.
+ * After Head = Event: Setup → Items (no Event Heads competition hub).
  */
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
@@ -31,8 +30,8 @@ const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.
 
 const tabs = computed(() => [
     { key: 'setup', label: 'Setup hub', href: `${base.value}/setup` },
-    { key: 'competition', label: 'Event Heads', href: `${base.value}/competition` },
-    { key: 'items', label: 'Items under heads', href: `${base.value}/items` },
+    { key: 'items', label: 'Items', href: `${base.value}/items` },
     { key: 'items-list', label: 'Item listing', href: `${base.value}/items/list` },
+    { key: 'competition', label: 'Competition', href: `${base.value}/competition` },
 ]);
 </script>

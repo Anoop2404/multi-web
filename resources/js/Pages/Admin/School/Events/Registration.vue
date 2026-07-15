@@ -307,7 +307,10 @@
                         <p class="text-xs font-semibold text-slate-800">Event fees & billing</p>
                         <p class="text-xs text-slate-500 mt-0.5">
                             <template v-if="event.uses_per_head_billing">
-                                Each Event Head is billed separately — paying one head does not clear another.
+                                Each section is billed separately — paying one does not clear another.
+                            </template>
+                            <template v-else-if="event.event_type === 'sports'">
+                                Fees for this sport event (school + student + item fees).
                             </template>
                             <template v-else>
                                 Includes per-student event registration (when athletes are registered above) plus item fees.

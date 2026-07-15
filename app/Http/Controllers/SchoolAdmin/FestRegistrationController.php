@@ -54,10 +54,8 @@ class FestRegistrationController extends SchoolAdminController
 
         // Singleton fest types (Kalotsav, …) are one-per-year: skip the event list and
         // open the single yearly event's registration directly. Sports is intentionally
-        // excluded here even though it's still flagged singleton at the season-hub level —
-        // head-first rebuild: schools browse the promoted discipline events (Athletics,
-        // Chess, …) as a list, same as any multi-event program. The season hub itself is
-        // a hidden technical container and is filtered out of that list below.
+        // excluded — schools browse sport child events (Athletics, Chess, …) as a list;
+        // the season hub is a config-only container filtered out when children exist.
         if ($view === 'registration' && ! $request->query('event') && FestEvent::isSingletonType($eventType) && $eventType !== 'sports') {
             if ($single = $this->resolveSingletonSchoolEvent($request, $eventType, $program)) {
                 $prefix = ProgramRouteMap::prefixFromSlug($program);
@@ -66,11 +64,8 @@ class FestRegistrationController extends SchoolAdminController
             }
         }
 
-        // Sports: schools only ever see promoted discipline events (Athletics, Chess, …),
-        // never the season hub that groups them. But during the admin's transition window
-        // (season created, heads not promoted yet), fall back to showing the season hub so
-        // schools are never left with an empty Sports page — this self-heals the moment any
-        // head is promoted (Phase 1's auto-promotion runs on every admin page load).
+        // Sports: schools browse sport events (Athletics, Chess, …) as a list —
+        // the season hub is a config-only container filtered out when children exist.
         $hideSportsSeasonHub = $eventType === 'sports' && FestEvent::where('tenant_id', $sahodayaId)
             ->ofType('sports')
             ->whereNotNull('parent_event_id')
@@ -324,169 +319,38 @@ class FestRegistrationController extends SchoolAdminController
             ->values();
     }
 
+    /**
+     * Legacy "Register by Event Head" entry — redirects to event registration
+     * (items + athletes + fees are on one page after Head = Event unification).
+     */
     public function itemRegistrationEntry(Request $request, string $tenantId, string $program = 'sports-meet')
     {
         $meta = SchoolFestProgram::meta($program);
         abort_unless($meta['eventType'] === 'sports', 404);
 
-        $events = FestEvent::query()
-            ->where('tenant_id', $this->school->parent_id)
-            ->ofType('sports')
-            ->listedForSchool($this->school->id, 'sports')
-            ->orderByDesc('event_start')
-            ->get(['id', 'title', 'status', 'event_start'])
-            ->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)
-                ->filterFestEventsForUser($request->user(), $this->school->id, $program, $rows));
+        $prefix = ProgramRouteMap::prefixFromSlug($program);
+        $eventId = $request->query('event');
 
-        if ($events->isEmpty()) {
-            return redirect()->route('school.sports.registration', ['tenantId' => $tenantId])
-                ->with('error', 'No open sports events for item registration.');
+        if ($eventId) {
+            return redirect("/school-admin/{$tenantId}/{$prefix}/events/{$eventId}/registration");
         }
 
-        $focusId = $request->query('event') ? (int) $request->query('event') : null;
-        $event = $focusId
-            ? $events->firstWhere('id', $focusId)
-            : ($events->count() === 1 ? $events->first() : null);
-
-        if (! $event) {
-            return $this->inertia('School/Sports/ItemRegistrationEvents', [
-                'program'     => $program,
-                'programMeta' => $meta,
-                'events'      => $events->values(),
-            ]);
-        }
-
-        $headNav = app(\App\Services\Events\FestHeadItemNavigationService::class)
-            ->headSummariesForEvent($event, $this->school->id);
-        $firstHeadId = $headNav['headsForFilter'][0]['id'] ?? null;
-
-        return redirect()->route('school.sports.event.items', array_filter([
-            'tenantId' => $tenantId,
-            'event'    => $event->id,
-            'head'     => $firstHeadId,
-        ]));
+        return redirect("/school-admin/{$tenantId}/{$prefix}/registration")
+            ->with('info', 'Register athletes and items on each sport event.');
     }
 
+    /**
+     * Legacy per-head items URL — redirect to the unified registration page.
+     */
     public function eventItemRegistration(Request $request, string $tenantId, FestEvent $event, string $program = 'sports-meet')
     {
         $meta = SchoolFestProgram::meta($program);
         abort_unless($meta['eventType'] === 'sports', 404);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $event = FestEvent::query()
-            ->where('id', $event->id)
-            ->ofType('sports')
-            ->listedForSchool($this->school->id, 'sports')
-            ->with('academicYear:id,label,status')
-            ->firstOrFail();
+        $prefix = ProgramRouteMap::prefixFromSlug($program);
 
-        $events = collect([$event])->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)
-            ->filterFestEventsForUser($request->user(), $this->school->id, $program, $rows));
-
-        abort_if($events->isEmpty(), 403);
-
-        $rawEvent = $events->first();
-        $navService = app(\App\Services\Events\FestHeadItemNavigationService::class);
-        $headNav = $navService->headSummariesForEvent($rawEvent, $this->school->id);
-        $headsForFilter = $headNav['headsForFilter'];
-
-        $headParam = $request->query('head') ?? $request->query('head_id');
-        $headId = null;
-        $headOther = false;
-        if ($headParam !== null && $headParam !== '') {
-            if ($headParam === 'other') {
-                $headOther = true;
-            } else {
-                $headId = (int) $headParam;
-            }
-        }
-
-        if ($headId !== null) {
-            $validHeadIds = array_column($headsForFilter, 'id');
-            if (! in_array($headId, $validHeadIds, true)) {
-                abort_if($headsForFilter === [], 404);
-
-                return redirect()->route('school.sports.event.items', [
-                    'tenantId' => $tenantId,
-                    'event'    => $rawEvent->id,
-                    'head'     => $headsForFilter[0]['id'] ?? null,
-                ]);
-            }
-        }
-
-        if ($headId === null && ! $headOther) {
-            if ($headsForFilter !== []) {
-                return redirect()->route('school.sports.event.items', [
-                    'tenantId' => $tenantId,
-                    'event'    => $rawEvent->id,
-                    'head'     => $headsForFilter[0]['id'],
-                ]);
-            }
-        }
-
-        $feeService = app(FestSchoolEventFeeService::class);
-        $filterHeadId = $headOther ? 0 : $headId;
-
-        $itemsQuery = FestEventItem::query()
-            ->where('event_id', $rawEvent->id)
-            ->where('is_enabled', true);
-        if ($headOther) {
-            $itemsQuery->whereNull('head_id');
-        } elseif ($headId !== null) {
-            $itemsQuery->where('head_id', $headId);
-        }
-        $rawEvent->setRelation('items', $itemsQuery->orderBy('display_order')->orderBy('title')->get());
-
-        $navService = app(\App\Services\Events\FestHeadItemNavigationService::class);
-        $event = $this->hydrateEventForSchoolRegistration($rawEvent, $feeService, $filterHeadId, $headNav, $navService);
-
-        $registrationsQuery = FestRegistration::where('school_id', $this->school->id)
-            ->where('event_id', $event->id);
-
-        if ($headOther) {
-            $itemIds = FestEventItem::query()
-                ->where('event_id', $event->id)
-                ->whereNull('head_id')
-                ->where('is_enabled', true)
-                ->pluck('id');
-            $registrationsQuery->whereIn('item_id', $itemIds);
-        } elseif ($headId !== null) {
-            $itemIds = FestEventItem::query()
-                ->where('event_id', $event->id)
-                ->where('head_id', $headId)
-                ->where('is_enabled', true)
-                ->pluck('id');
-            $registrationsQuery->whereIn('item_id', $itemIds);
-        }
-
-        $registrations = $registrationsQuery
-            ->with(['item:id,title,head_id', 'participants.student', 'participants.group'])
-            ->get();
-
-        $studentRows = Student::where('tenant_id', $this->school->id)
-            ->active()
-            ->with('schoolClass')
-            ->orderBy('name')
-            ->get();
-
-        $students = app(FestRegistrationEligibilityService::class)
-            ->annotateStudents($studentRows, $event, $this->school->id)
-            ->values();
-
-        return $this->inertia('School/Sports/EventItemRegistration', [
-            'program'         => $program,
-            'programMeta'     => $meta,
-            'event'           => $this->sportsItemRegistrationEventPayload($event),
-            'headItemGroups'  => $headNav['headItemGroups'],
-            'hasItemHeads'    => $headNav['hasItemHeads'],
-            'registrations'   => $registrations,
-            'students'        => $students,
-            'eventType'       => 'sports',
-            'selectedHeadId'  => $headOther ? 'other' : $headId,
-            'initialHeadId'   => $headOther ? 'other' : $headId,
-            'schoolClasses'   => $this->schoolClasses()->values(),
-            'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
-        ]);
+        return redirect("/school-admin/{$tenantId}/{$prefix}/events/{$event->id}/registration");
     }
 
     /** @return array<string, mixed> */

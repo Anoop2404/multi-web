@@ -328,6 +328,18 @@ class FestEventSettingsController extends SahodayaAdminController
             'head_fees.*.approval_policy' => 'nullable|in:auto,manual',
             'head_fees.*.max_participants' => 'nullable|integer|min:0',
             'head_fees.*.max_teams' => 'nullable|integer|min:0',
+            'sport_event_fees' => 'nullable|array',
+            'sport_event_fees.school_registration_fee' => 'nullable|numeric|min:0',
+            'sport_event_fees.student_registration_fee' => 'nullable|numeric|min:0',
+            'sport_event_fees.team_registration_fee' => 'nullable|numeric|min:0',
+            'sport_event_fees.default_item_fee' => 'nullable|numeric|min:0',
+            'sport_event_fees.extra_item_fee' => 'nullable|numeric|min:0',
+            'sport_event_fees.included_items_per_student' => 'nullable|integer|min:0|max:50',
+            'sport_event_fees.included_teams' => 'nullable|integer|min:0|max:50',
+            'sport_event_fees.verification_policy' => 'nullable|in:verified_only,all_students',
+            'sport_event_fees.approval_policy' => 'nullable|in:auto,manual',
+            'sport_event_fees.max_participants' => 'nullable|integer|min:0',
+            'sport_event_fees.max_teams' => 'nullable|integer|min:0',
             'item_fees' => 'nullable|array',
             'item_fees.*.id' => 'required|exists:fest_event_items,id',
             'item_fees.*.fee_amount' => 'nullable|numeric|min:0',
@@ -348,6 +360,36 @@ class FestEventSettingsController extends SahodayaAdminController
         );
 
         $event->update(['fee_settings' => $feeSettings]);
+
+        // Sports Head = Event: store composite fees on the FestEvent itself.
+        if ($event->event_type === 'sports') {
+            $eventFee = $data['sport_event_fees'] ?? $data;
+            $numeric = fn (string $key) => isset($eventFee[$key]) && $eventFee[$key] !== '' ? (float) $eventFee[$key] : null;
+            $int = fn (string $key, int $default = 0) => isset($eventFee[$key]) && $eventFee[$key] !== '' ? (int) $eventFee[$key] : $default;
+            $intNullable = fn (string $key) => isset($eventFee[$key]) && $eventFee[$key] !== '' ? (int) $eventFee[$key] : null;
+
+            $event->update([
+                'school_registration_fee' => $numeric('school_registration_fee') ?? $event->school_registration_fee,
+                'student_registration_fee' => $numeric('student_registration_fee') ?? $event->student_registration_fee,
+                'team_registration_fee' => $numeric('team_registration_fee') ?? $event->team_registration_fee,
+                'default_item_fee' => $numeric('default_item_fee') ?? $event->default_item_fee,
+                'extra_item_fee' => $numeric('extra_item_fee') ?? $event->extra_item_fee,
+                'included_items_per_student' => array_key_exists('included_items_per_student', $eventFee)
+                    ? $int('included_items_per_student', 0)
+                    : ($event->included_items_per_student ?? 0),
+                'included_teams' => array_key_exists('included_teams', $eventFee)
+                    ? $int('included_teams', 0)
+                    : ($event->included_teams ?? 0),
+                'verification_policy' => $eventFee['verification_policy'] ?? $event->verification_policy ?? 'all_students',
+                'approval_policy' => $eventFee['approval_policy'] ?? $event->approval_policy ?? 'auto',
+                'max_participants' => array_key_exists('max_participants', $eventFee)
+                    ? $intNullable('max_participants')
+                    : $event->max_participants,
+                'max_teams' => array_key_exists('max_teams', $eventFee)
+                    ? $intNullable('max_teams')
+                    : $event->max_teams,
+            ]);
+        }
 
         foreach ($data['item_fees'] ?? [] as $row) {
             $item = FestEventItem::where('event_id', $event->id)->find($row['id']);

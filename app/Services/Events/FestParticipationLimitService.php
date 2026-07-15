@@ -127,6 +127,11 @@ class FestParticipationLimitService
      */
     private function validateHeadCapacity(FestEventItem $item, array $policy, ?int $excludeRegistrationId = null): array
     {
+        // Sports Head = Event: enforce caps on the FestEvent when head_id is absent.
+        if ($this->event->event_type === 'sports' && ! $item->head_id) {
+            return $this->validateEventCapacity($item, $policy, $excludeRegistrationId);
+        }
+
         if (! $item->head_id) {
             return [];
         }
@@ -195,9 +200,65 @@ class FestParticipationLimitService
         return [];
     }
 
+    /**
+     * Enforce FestEvent.max_participants / max_teams for unified sports events.
+     *
+     * @return list<string>
+     */
+    private function validateEventCapacity(FestEventItem $item, array $policy, ?int $excludeRegistrationId = null): array
+    {
+        $statuses = $this->countableStatuses($policy);
+        $isTeam = $item->isTeamItem();
+
+        if ($isTeam) {
+            $maxTeams = (int) ($this->event->max_teams ?? 0);
+            if ($maxTeams <= 0) {
+                return [];
+            }
+
+            $teamCount = FestRegistration::where('event_id', $this->event->id)
+                ->whereIn('status', $statuses)
+                ->whereHas('item', fn ($q) => $q->whereIn('participant_type', ['team', 'group']))
+                ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
+                ->count();
+
+            // Sports: allow waitlist instead of hard reject.
+            if ($teamCount >= $maxTeams) {
+                return [];
+            }
+
+            return [];
+        }
+
+        $maxParticipants = (int) ($this->event->max_participants ?? 0);
+        if ($maxParticipants <= 0) {
+            return [];
+        }
+
+        $participantCount = FestRegistration::where('event_id', $this->event->id)
+            ->whereIn('status', $statuses)
+            ->whereHas('item', fn ($q) => $q
+                ->where(function ($q) {
+                    $q->whereNull('participant_type')
+                        ->orWhereNotIn('participant_type', ['team', 'group']);
+                }))
+            ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
+            ->count();
+
+        if ($participantCount >= $maxParticipants) {
+            return []; // waitlist
+        }
+
+        return [];
+    }
+
     /** Whether this item's Event Head is at capacity (active regs only — excludes waitlisted). */
     public function isHeadAtCapacity(FestEventItem $item): bool
     {
+        if ($this->event->event_type === 'sports' && ! $item->head_id) {
+            return $this->isEventAtCapacity($item);
+        }
+
         if ($this->event->event_type !== 'sports' || ! $item->head_id) {
             return false;
         }
@@ -235,6 +296,46 @@ class FestParticipationLimitService
             ->whereIn('status', $statuses)
             ->whereHas('item', fn ($q) => $q
                 ->where('head_id', $head->id)
+                ->where(function ($q) {
+                    $q->whereNull('participant_type')
+                        ->orWhereNotIn('participant_type', ['team', 'group']);
+                }))
+            ->count();
+
+        return $participantCount >= $maxParticipants;
+    }
+
+    public function isEventAtCapacity(FestEventItem $item): bool
+    {
+        if ($this->event->event_type !== 'sports') {
+            return false;
+        }
+
+        $statuses = ['submitted', 'pending_approval', 'approved'];
+        $isTeam = $item->isTeamItem();
+
+        if ($isTeam) {
+            $maxTeams = (int) ($this->event->max_teams ?? 0);
+            if ($maxTeams <= 0) {
+                return false;
+            }
+
+            $teamCount = FestRegistration::where('event_id', $this->event->id)
+                ->whereIn('status', $statuses)
+                ->whereHas('item', fn ($q) => $q->whereIn('participant_type', ['team', 'group']))
+                ->count();
+
+            return $teamCount >= $maxTeams;
+        }
+
+        $maxParticipants = (int) ($this->event->max_participants ?? 0);
+        if ($maxParticipants <= 0) {
+            return false;
+        }
+
+        $participantCount = FestRegistration::where('event_id', $this->event->id)
+            ->whereIn('status', $statuses)
+            ->whereHas('item', fn ($q) => $q
                 ->where(function ($q) {
                     $q->whereNull('participant_type')
                         ->orWhereNotIn('participant_type', ['team', 'group']);

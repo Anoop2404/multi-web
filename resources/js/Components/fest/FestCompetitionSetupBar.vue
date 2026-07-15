@@ -18,17 +18,10 @@
 
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 space-y-2">
             <p>
-                Flow: create Event Heads with fees → add items under each head → set schedule → open registration.
-            </p>
-            <p v-if="promoteStatus?.can_promote && sportsHubUrl">
-                Next:
-                <Link :href="sportsHubUrl" class="font-semibold link-brand">
-                    Promote {{ promoteStatus.pending_count }} Event Head(s) into discipline events →
-                </Link>
-            </p>
-            <p v-else-if="sportsHubUrl">
-                Manage the season list and promote heads from the
-                <Link :href="sportsHubUrl" class="font-semibold link-brand">Sports hub</Link>.
+                Sports Meet: each catalog sport is synced as its own event from the
+                <Link v-if="sportsHubUrl" :href="sportsHubUrl" class="font-semibold link-brand">Sports hub</Link>
+                <span v-else>Sports hub</span>.
+                Configure fees and items on that sport event (not as Event Heads here).
             </p>
         </div>
 
@@ -80,7 +73,6 @@ const props = defineProps({
     disciplines: { type: Object, default: () => ({}) },
     taxonomyMastersUrl: { type: String, default: null },
     sportsHubUrl: { type: String, default: null },
-    promoteStatus: { type: Object, default: null },
 });
 
 const form = useForm({

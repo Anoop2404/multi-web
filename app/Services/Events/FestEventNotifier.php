@@ -47,15 +47,20 @@ class FestEventNotifier
     }
 
     /**
-     * The Event Head that owns $event, if $event is a promoted Sports discipline event.
-     * Every discipline event is 1:1 with exactly one head post-promotion — see
-     * PromoteSportsHeadsToDisciplineEvents. Returns null for season hubs, non-sports
-     * events, and school-round events, which have no single owning head.
+     * Legacy FestItemHead linked to a sport event (dual-read during migration).
+     * Prefer FestEvent::notificationEnabledFor() once fees/notifications live on the event.
      */
     private function resolveHeadForEvent(?FestEvent $event): ?FestItemHead
     {
         if (! $event || $event->event_type !== 'sports' || $event->parent_event_id === null) {
             return null;
+        }
+
+        if ($event->source_head_id) {
+            $head = FestItemHead::find($event->source_head_id);
+            if ($head) {
+                return $head;
+            }
         }
 
         return FestItemHead::where('discipline_event_id', $event->id)->first();
