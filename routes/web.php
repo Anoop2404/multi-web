@@ -842,6 +842,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
 
         require __DIR__.'/includes/sahodaya_event_programs.php';
 
+        // Head-first permalink: always resolves to this sport's own Competition page,
+        // regardless of which discipline event id it currently lives on.
+        Route::get('/sports/heads/{head}', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'showByHead'])->name('sports.heads.show');
+
         // ── Operational modules (Phases 11–16) ────────────────────────────────
         Route::prefix('events')->name('events.')->group(function () {
             Route::get('/', [FestEventController::class, 'index'])->name('index');

@@ -22,6 +22,32 @@ class FestItemHeadController extends SahodayaAdminController
         ]);
     }
 
+    /**
+     * Head-first permalink: /sahodaya-admin/{tenantId}/sports/heads/{head} always resolves
+     * to this head's own event, regardless of which discipline event id it currently lives
+     * on (or the season, if it hasn't been promoted yet). Gives each sport a stable URL
+     * instead of admins/bookmarks having to reference a discipline event id that only
+     * exists once promotion has run.
+     *
+     * Redirects to the same Overview page the existing "Manage" link on the Sports hub's
+     * events table already opens for a discipline event (?overview=1) -- this is purely
+     * about giving that destination a stable head-based address, not about changing where
+     * "Manage" takes an admin.
+     */
+    public function showByHead(string $tenantId, FestItemHead $head)
+    {
+        abort_if($head->tenant_id !== $this->sahodaya->id, 403);
+
+        $eventId = $head->discipline_event_id ?: $head->event_id;
+        abort_if(! $eventId, 404, 'This Event Head is not linked to any event yet.');
+
+        return redirect()->route('sahodaya.events.show', [
+            'tenantId' => $tenantId,
+            'event' => $eventId,
+            'overview' => 1,
+        ]);
+    }
+
     public function updateWindows(Request $request, string $tenantId, FestEvent $event, FestItemHead $head, FestItemHeadService $headService)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

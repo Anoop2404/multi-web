@@ -35,15 +35,18 @@
         <div v-if="isSports && seasonEvent"
              class="rounded-xl border border-slate-200 bg-white px-4 py-4 mb-6 space-y-3">
             <div class="flex flex-wrap items-center gap-3 text-sm text-slate-700">
-                <span class="font-medium text-slate-500">Season hub</span>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${seasonEvent.id}/setup`" class="font-semibold link-brand">
-                    {{ seasonEvent.title }}
-                </Link>
+                <span class="font-medium text-slate-500">{{ seasonEvent.title }}</span>
                 <span class="status-pill text-xs" :class="statusClass(seasonEvent.status)">{{ seasonEvent.status }}</span>
                 <span v-if="seasonEvent.partition_role === 'sports_season'"
                       class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                    Season
+                    Season — not a sport, groups everything below
                 </span>
+                <!-- Deliberately not styled as a sport to manage (no link-brand title link like the
+                     rows below) -- age groups / cutoff date / catalog are the only season-wide
+                     things left here; every sport is managed on its own row in the table below. -->
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${seasonEvent.id}/setup`" class="text-xs font-medium text-slate-500 underline ml-auto">
+                    Season settings (age groups, cutoff date) →
+                </Link>
             </div>
 
             <div v-if="promoteStatus?.can_promote"
@@ -321,7 +324,7 @@
                             <td>{{ event.items_count }}</td>
                             <td>{{ event.registrations_count }}</td>
                             <td class="text-right">
-                                <Link :href="eventManageUrl(event.id)" class="link-brand">
+                                <Link :href="eventManageUrl(event)" class="link-brand">
                                     Manage →
                                 </Link>
                             </td>
@@ -376,11 +379,18 @@ function promoteHeads() {
     promoteForm.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.seasonEvent.id}/promote-discipline-events`);
 }
 
-function eventManageUrl(eventId) {
-    const base = `/sahodaya-admin/${props.sahodaya.id}/events/${eventId}`;
+function eventManageUrl(event) {
+    // Head-first permalink: a promoted discipline event always carries source_head_id
+    // (set once, at promotion) — link by head instead of the event's own id so the URL
+    // stays stable even if the event underneath ever gets re-promoted/rebuilt.
+    if (isSports.value && event.source_head_id) {
+        return `/sahodaya-admin/${props.sahodaya.id}/sports/heads/${event.source_head_id}`;
+    }
+
+    const base = `/sahodaya-admin/${props.sahodaya.id}/events/${event.id}`;
     // Discipline events open Overview; legacy season-only hub still uses setup.
     if (!isSports.value) return base;
-    if (props.seasonEvent?.id && String(eventId) === String(props.seasonEvent.id)) {
+    if (props.seasonEvent?.id && String(event.id) === String(props.seasonEvent.id)) {
         return `${base}/setup`;
     }
     return `${base}?overview=1`;
