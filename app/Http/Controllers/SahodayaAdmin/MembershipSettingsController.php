@@ -106,6 +106,7 @@ class MembershipSettingsController extends SahodayaAdminController
             'membership_fee_type'          => 'required|in:fixed,variable_by_student_count,none',
             'fixed_membership_fee_amount'  => 'nullable|numeric|min:0',
             'teacher_registration_enabled' => 'boolean',
+            'auto_approve_submissions'     => 'boolean',
             'student_edit_lock_enabled'    => 'boolean',
             'require_student_verification' => 'boolean',
             'payment_instructions'         => 'nullable|string|max:5000',

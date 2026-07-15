@@ -73,6 +73,14 @@ class SchoolYearSubmissionReviewService
 
         app(MembershipNotifier::class)->dataSubmitted($school, $submission->academic_year);
 
+        // If this Sahodaya doesn't require manual review, immediately approve the track the
+        // school just submitted (rather than bypass the approval check at the payment gate) so
+        // the submission's status/audit trail and the school-facing "Awaiting Sahodaya Review"
+        // badge stay consistent — it goes straight to "Approved" instead of sitting stale.
+        if ($profile->auto_approve_submissions) {
+            $this->approveTrack($submission->fresh(), $track, null);
+        }
+
         return $submission->fresh();
     }
 

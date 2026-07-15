@@ -169,6 +169,19 @@
                                 <span class="text-sm font-medium text-gray-700">Teacher registration enabled</span>
                             </label>
                         </FormField>
+                        <FormField label="" class-extra="sm:col-span-2">
+                            <label class="flex items-center gap-3 cursor-pointer mt-2">
+                                <input v-model="profileForm.auto_approve_submissions" type="checkbox"
+                                       class="w-4 h-4 text-purple-600 rounded">
+                                <span class="text-sm font-medium text-gray-700">Auto-approve submitted counts &amp; teacher records</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Schools still submit their student counts / teacher list for the year, but payment
+                                unlocks as soon as they submit — without waiting for a Sahodaya admin to manually
+                                approve each track from Submissions. Turn on if you don't need to review data before
+                                collecting membership fees.
+                            </p>
+                        </FormField>
                     </FormGrid>
                 </FormSection>
 
