@@ -333,6 +333,13 @@ input[type='radio'] {
     @apply flex min-w-0 items-center gap-2.5 rounded-xl px-1 py-1 transition sm:flex-1;
 }
 
+.workflow-stepper__text {
+    /* Flex children default to min-width:auto, so without this the label's `truncate` never
+       actually engages — the untruncated text forces the row open and overlaps the connector
+       line next to it. min-w-0 lets it shrink so truncate can do its job. */
+    @apply min-w-0 flex-1;
+}
+
 .workflow-stepper__link:not(.workflow-stepper__link--static):hover {
     @apply bg-slate-50;
 }
