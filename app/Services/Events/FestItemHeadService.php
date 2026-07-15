@@ -136,6 +136,15 @@ class FestItemHeadService
 
     public function syncEventHeads(FestEvent $event): int
     {
+        // Head-first rebuild: a discipline event is the permanent, 1:1 home of a single
+        // already-promoted head — there is no tenant catalog to seed onto it. Without this
+        // guard, visiting a single discipline event's own Competition page would try to seed
+        // every other catalog head (Chess, Swimming, ...) under that one event too, since
+        // none of those exist scoped to this specific event_id yet.
+        if ($event->parent_event_id !== null) {
+            return 0;
+        }
+
         $tenantId = $event->tenant_id;
         $catalogHeads = FestItemHead::forTenant($tenantId)
             ->whereNull('event_id')
@@ -195,7 +204,35 @@ class FestItemHeadService
                 $item->update(['head_id' => $headId]);
             });
 
+        // Head-first rebuild: every head — new or pre-existing — must own its own dedicated
+        // discipline event. This sweep is idempotent (already-promoted heads are skipped), so
+        // running it on every season page load is safe and also acts as a lazy fallback for
+        // any head that predates the Phase 0 backfill.
+        $this->promoteIfSeason($event);
+
         return $created;
+    }
+
+    /**
+     * Promote every un-promoted Event Head on a Sports season hub into its own dedicated
+     * discipline event. No-op for anything that isn't a sports season hub (discipline events,
+     * school-round events, and non-sports event types never have heads to promote).
+     */
+    public function promoteIfSeason(FestEvent $event): void
+    {
+        if ($event->event_type !== 'sports' || $event->parent_event_id !== null) {
+            return;
+        }
+
+        $promoter = app(PromoteSportsHeadsToDisciplineEvents::class);
+
+        // status() is a cheap read-only check; only call promote() (which always writes the
+        // season's partition_role/fee_settings, even when every head is skipped) when there
+        // is actually something pending — otherwise every season page load would issue a
+        // needless UPDATE.
+        if ($promoter->status($event)['can_promote']) {
+            $promoter->promote($event, false);
+        }
     }
 
     /** Re-seed master catalogs and relink sports item heads for an existing tenant DB. */

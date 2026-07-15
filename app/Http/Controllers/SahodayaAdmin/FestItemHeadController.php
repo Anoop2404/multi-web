@@ -137,7 +137,7 @@ class FestItemHeadController extends SahodayaAdminController
             : 'Head schedule saved.');
     }
 
-    public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit, FestItemHeadService $headService)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
@@ -186,6 +186,11 @@ class FestItemHeadController extends SahodayaAdminController
             'max_participants' => $intNullable('max_participants'),
             'max_teams' => $intNullable('max_teams'),
         ]);
+
+        // Head-first rebuild: a head is only ever "done" once it owns its own dedicated
+        // discipline event — promote it immediately instead of leaving it pending on the
+        // season hub. Idempotent/no-op for non-sports events and already-promoted heads.
+        $headService->promoteIfSeason($event);
 
         $audit->festEvent($event, FestPageActivity::SETTINGS, 'fest.item_head.created', "Event Head created: {$head->name}", [
             'head_id' => $head->id,
