@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Student ID Card — Premium Classic (Sample)</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #e9e9e9;
+    font-family: 'Trebuchet MS', Arial, sans-serif;
+  }
+  .page {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 28px;
+    padding: 32px;
+  }
+  .note {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto 24px;
+    font-size: 12px;
+    color: #555;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px 16px;
+  }
+  .ph {
+    background: #fff3cd;
+    border: 1px dashed #caa03c;
+    padding: 0 3px;
+    border-radius: 3px;
+  }
+
+  .card {
+    position: relative;
+    width: 86mm;
+    height: 54mm;
+    border-radius: 3.5mm;
+    overflow: hidden;
+    background: #fdfcf8;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  }
+
+  /* ---------------- FRONT ---------------- */
+  .front .top-band {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 15mm;
+    background: linear-gradient(90deg, #16213a 0%, #223159 100%);
+    display: flex;
+    align-items: center;
+    padding: 0 3mm;
+    gap: 2.5mm;
+  }
+  .front .top-band .logo {
+    width: 9mm; height: 9mm;
+    border-radius: 50%;
+    background: #fff;
+    flex-shrink: 0;
+  }
+  .front .top-band .org-text { color: #fff; line-height: 1.15; }
+  .front .top-band .org-text .l1 { font-size: 8.5px; font-weight: 700; letter-spacing: 0.4px; }
+  .front .top-band .org-text .l2 { font-size: 6.5px; color: #d4af37; font-weight: 700; letter-spacing: 1px; }
+  .front .top-band .card-title {
+    margin-left: auto;
+    color: #d4af37;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-align: right;
+  }
+
+  .front .gold-rule {
+    position: absolute;
+    top: 15mm; left: 0; right: 0;
+    height: 1mm;
+    background: linear-gradient(90deg, #f6dd8c, #b8860b 60%, #8a6a1e);
+  }
+
+  .front .body {
+    position: absolute;
+    top: 16.5mm; left: 0; right: 0; bottom: 0;
+    display: flex;
+    padding: 2.5mm 3mm 2mm;
+    gap: 2.5mm;
+  }
+  .front .photo {
+    width: 18mm; height: 22mm;
+    border: 1px solid #c9a24b;
+    background: #f1eee4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 6px;
+    color: #999;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .front .info { flex: 1; min-width: 0; }
+  .front .name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #16213a;
+    line-height: 1.1;
+    margin-bottom: 1.2mm;
+  }
+  .front .row {
+    font-size: 6.7px;
+    color: #333;
+    margin-bottom: 0.9mm;
+    display: flex;
+  }
+  .front .row .k { width: 15mm; color: #888; flex-shrink: 0; }
+  .front .row .v { font-weight: 700; }
+
+  .front .qr {
+    position: absolute;
+    right: 3mm; bottom: 2.5mm;
+    width: 11mm; height: 11mm;
+    background: #fff;
+    border: 1px solid #ddd;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+    padding: 0.7mm;
+  }
+  .front .qr div { background: #16213a; }
+  .front .qr div.o { background: transparent; }
+
+  .front .uid {
+    position: absolute;
+    left: 3mm; bottom: 2mm;
+    font-size: 5.6px;
+    color: #999;
+    letter-spacing: 0.3px;
+  }
+
+  /* ---------------- BACK ---------------- */
+  .back { padding: 3mm; }
+  .back .h {
+    font-size: 7.5px;
+    font-weight: 700;
+    color: #16213a;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #d4af37;
+    padding-bottom: 1mm;
+    margin-bottom: 1.5mm;
+  }
+  .back .row {
+    font-size: 6.5px;
+    color: #333;
+    margin-bottom: 1mm;
+    display: flex;
+  }
+  .back .row .k { width: 20mm; color: #888; flex-shrink: 0; }
+  .back .terms {
+    font-size: 5.6px;
+    color: #666;
+    line-height: 1.5;
+    margin-top: 1.5mm;
+  }
+  .back .barcode {
+    position: absolute;
+    left: 3mm; right: 3mm; bottom: 6mm;
+    height: 6mm;
+    background: repeating-linear-gradient(90deg, #16213a 0 0.5mm, transparent 0.5mm 1.1mm, #16213a 1.1mm 1.4mm, transparent 1.4mm 2.3mm, #16213a 2.3mm 2.6mm, transparent 2.6mm 3.4mm);
+  }
+  .back .barcode-label {
+    position: absolute;
+    left: 3mm; right: 3mm; bottom: 2.5mm;
+    text-align: center;
+    font-size: 5.5px;
+    letter-spacing: 2px;
+    color: #555;
+  }
+  .back .footer-org {
+    position: absolute;
+    left: 3mm; right: 3mm; top: auto; bottom: 13mm;
+  }
+
+  @media print {
+    body { background: #fff; }
+    .note { display: none; }
+    .card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="note">
+  Premium "Classic" student ID card sample — navy &amp; gold, matches the Sahodaya certificate letterhead style.
+  Front (left) and back (right) shown at true CR80 card size (86mm × 54mm). All <span class="ph">yellow boxes</span>
+  and the photo/QR areas are placeholders — swap in real student data, a photo, and a generated QR code when producing
+  final cards.
+</div>
+
+<div class="page">
+
+  <!-- FRONT -->
+  <div class="card front">
+    <div class="top-band">
+      <div class="logo"></div>
+      <div class="org-text">
+        <div class="l1 ph">[ SAHODAYA / SCHOOL NAME ]</div>
+        <div class="l2">STUDENT ID CARD</div>
+      </div>
+      <div class="card-title">2026&#8209;27</div>
+    </div>
+    <div class="gold-rule"></div>
+    <div class="body">
+      <div class="photo">PHOTO</div>
+      <div class="info">
+        <div class="name ph">[ STUDENT NAME ]</div>
+        <div class="row"><span class="k">Class</span><span class="v ph">[X-A]</span></div>
+        <div class="row"><span class="k">Adm. No</span><span class="v ph">[ADM0000]</span></div>
+        <div class="row"><span class="k">DOB</span><span class="v ph">[DD-MM-YYYY]</span></div>
+        <div class="row"><span class="k">Blood Grp</span><span class="v ph">[O+]</span></div>
+      </div>
+      <div class="qr">
+        <div></div><div class="o"></div><div></div><div></div><div class="o"></div>
+        <div class="o"></div><div></div><div class="o"></div><div></div><div></div>
+        <div></div><div class="o"></div><div></div><div class="o"></div><div></div>
+        <div class="o"></div><div></div><div class="o"></div><div></div><div class="o"></div>
+        <div></div><div></div><div class="o"></div><div></div><div></div>
+      </div>
+      <div class="uid">ID: <span class="ph">SCH-2026-000123</span></div>
+    </div>
+  </div>
+
+  <!-- BACK -->
+  <div class="card back">
+    <div class="h">IF FOUND, PLEASE RETURN TO SCHOOL</div>
+    <div class="row"><span class="k">Address</span><span class="ph">[ STUDENT ADDRESS ]</span></div>
+    <div class="row"><span class="k">Parent / Guardian</span><span class="ph">[ NAME ]</span></div>
+    <div class="row"><span class="k">Emergency Contact</span><span class="ph">[ PHONE NUMBER ]</span></div>
+    <div class="row"><span class="k">Valid Upto</span><span class="ph">31-03-2027</span></div>
+    <div class="terms">
+      This card is the property of <span class="ph">[SCHOOL NAME]</span> and is non-transferable.
+      Loss must be reported to the school office immediately for a duplicate to be issued.
+    </div>
+    <div class="barcode"></div>
+    <div class="barcode-label ph">SCH-2026-000123</div>
+  </div>
+
+</div>
+
+</body>
+</html>

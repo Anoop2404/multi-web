@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Student List Verification Certificate (Sample)</title>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #e9e9e9;
+    font-family: 'Georgia', 'Times New Roman', serif;
+  }
+  .page-wrap { display: flex; justify-content: center; padding: 24px 0; }
+  .certificate {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+    background: #fffdf8;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+  }
+
+  .frame-outer { position: absolute; inset: 16px; border: 2px solid #b8860b; }
+  .frame-inner { position: absolute; inset: 24px; border: 1px solid #c9a24b; }
+
+  .corner { position: absolute; width: 220px; height: 220px; z-index: 2; }
+  .corner.tr { top: 0; right: 0; }
+  .corner.bl { bottom: 0; left: 0; }
+  .corner .tri { position: absolute; inset: 0; }
+  .corner.tr .tri.gold {
+    background: linear-gradient(135deg, #f7e2a0 0%, #d4af37 40%, #9c7a24 75%, #6e5314 100%);
+    clip-path: polygon(100% 0, 100% 100%, 0 0);
+  }
+  .corner.tr .tri.navy {
+    background: linear-gradient(135deg, #1c2b4a 0%, #0e1626 100%);
+    clip-path: polygon(100% 18%, 100% 100%, 18% 0, 100% 0);
+  }
+  .corner.bl .tri.gold {
+    background: linear-gradient(315deg, #f7e2a0 0%, #d4af37 40%, #9c7a24 75%, #6e5314 100%);
+    clip-path: polygon(0 100%, 100% 100%, 0 0);
+  }
+  .corner.bl .tri.navy {
+    background: linear-gradient(315deg, #1c2b4a 0%, #0e1626 100%);
+    clip-path: polygon(0 82%, 0 0, 82% 100%, 0 100%);
+  }
+
+  .content {
+    position: relative;
+    z-index: 3;
+    padding: 42px 54px 36px;
+    text-align: center;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .logo-wrap svg { width: 84px; height: 84px; }
+  .logo-caption { margin-top: 4px; font-family: 'Trebuchet MS', Arial, sans-serif; }
+  .logo-caption .brand { font-size: 14px; font-weight: 700; letter-spacing: 1px; color: #16213a; }
+  .logo-caption .brand2 { font-size: 12px; font-weight: 700; letter-spacing: 3px; color: #b8860b; }
+
+  .org-name {
+    margin-top: 18px;
+    font-size: 27px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #16213a;
+    font-family: 'Arial Black', Arial, 'Helvetica Neue', sans-serif;
+  }
+  .org-meta {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #444;
+    font-family: 'Trebuchet MS', Arial, sans-serif;
+  }
+
+  .title-block { margin-top: 26px; }
+  .title-main {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    line-height: 1.05;
+    background: linear-gradient(180deg, #e9c766 0%, #b8860b 55%, #7a5a12 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .title-sub {
+    margin-top: 6px;
+    font-size: 15px;
+    letter-spacing: 4px;
+    color: #16213a;
+    font-weight: 600;
+    font-family: 'Trebuchet MS', Arial, sans-serif;
+  }
+
+  .certify-line { margin-top: 24px; font-size: 14.5px; color: #333; font-style: italic; }
+  .school-name { margin-top: 8px; font-size: 23px; font-weight: 700; color: #16213a; }
+  .under-note { margin-top: 4px; font-size: 12.5px; color: #555; font-family: 'Trebuchet MS', Arial, sans-serif; }
+
+  .stats-row {
+    margin: 22px auto 0;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    max-width: 480px;
+  }
+  .stat-card {
+    flex: 1;
+    border: 1.5px solid #c9a24b;
+    border-radius: 8px;
+    padding: 12px 8px;
+    background: #fffaf0;
+  }
+  .stat-card .num { font-size: 26px; font-weight: 800; color: #16213a; font-family: 'Trebuchet MS', Arial, sans-serif; }
+  .stat-card.verified .num { color: #0f6e56; }
+  .stat-card .lbl { margin-top: 3px; font-size: 9.5px; letter-spacing: 0.5px; color: #777; text-transform: uppercase; font-family: 'Trebuchet MS', Arial, sans-serif; }
+
+  .as-on { margin-top: 12px; font-size: 11.5px; color: #666; font-family: 'Trebuchet MS', Arial, sans-serif; }
+
+  .download-box {
+    margin: 26px auto 0;
+    max-width: 440px;
+    border: 1.5px solid #8b3fd1;
+    border-radius: 10px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    text-align: left;
+    background: #faf7ff;
+  }
+  .download-box .qr {
+    width: 24mm; height: 24mm;
+    background: #fff;
+    border: 1px solid #ddd;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-template-rows: repeat(7, 1fr);
+    padding: 1mm;
+    flex-shrink: 0;
+  }
+  .download-box .qr div { background: #16213a; }
+  .download-box .qr div.o { background: transparent; }
+  .download-box .txt { font-family: 'Trebuchet MS', Arial, sans-serif; }
+  .download-box .txt .lead { font-size: 12.5px; font-weight: 700; color: #5a3d99; margin-bottom: 4px; }
+  .download-box .txt .desc { font-size: 11px; color: #444; line-height: 1.5; }
+  .download-box .txt .url {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 10.5px;
+    color: #5a3d99;
+    word-break: break-all;
+  }
+  .download-box .txt .expiry { margin-top: 5px; font-size: 9.5px; color: #888; }
+
+  .spacer { flex: 1; }
+
+  .signatures { display: flex; justify-content: space-between; padding: 0 30px; margin-bottom: 8px; }
+  .sig { width: 40%; text-align: center; }
+  .sig .mark { min-height: 36px; border-bottom: 1px solid #999; }
+  .sig .name { margin-top: 6px; font-size: 12.5px; font-weight: 700; color: #16213a; font-family: 'Trebuchet MS', Arial, sans-serif; }
+  .sig .role { font-size: 10.5px; color: #555; font-family: 'Trebuchet MS', Arial, sans-serif; }
+
+  .footer-row {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 0 24px 20px; font-size: 11px; color: #444;
+    font-family: 'Trebuchet MS', Arial, sans-serif; text-align: left;
+  }
+  .footer-row div div { margin-top: 2px; }
+  .seal { width: 60px; height: 60px; }
+
+  .ph { background: #fff3cd; border: 1px dashed #caa03c; padding: 0 4px; border-radius: 3px; }
+
+  .note {
+    max-width: 210mm; margin: 0 auto 24px; font-family: Arial, sans-serif; font-size: 12px;
+    color: #555; background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 10px 16px;
+  }
+
+  @media print {
+    body { background: #fff; }
+    .note { display: none; }
+    .page-wrap { padding: 0; }
+    .certificate { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-wrap" style="flex-direction: column; align-items: center;">
+  <div class="note">
+    Generic student-list verification certificate. Fill in the <span class="ph">yellow boxes</span> — school name,
+    verified/total counts, date, and the real PDF download URL/QR — before sending to a school. The counts and link
+    are meant to be generated by the platform (e.g. after a Sahodaya admin bulk-verifies a school's students) and
+    inserted here automatically.
+  </div>
+
+  <div class="certificate">
+    <div class="frame-outer"></div>
+    <div class="frame-inner"></div>
+    <div class="corner tr"><div class="tri gold"></div><div class="tri navy"></div></div>
+    <div class="corner bl"><div class="tri gold"></div><div class="tri navy"></div></div>
+
+    <div class="content">
+
+      <div class="logo-wrap">
+        <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="60" cy="60" r="56" fill="#ffffff" stroke="#16213a" stroke-width="2"/>
+          <g>
+            <polygon points="60,60 60,10 70,14" fill="#e53935"/>
+            <polygon points="60,60 70,14 82,24" fill="#fb8c00"/>
+            <polygon points="60,60 82,24 96,42" fill="#fdd835"/>
+            <polygon points="60,60 96,42 104,60" fill="#43a047"/>
+            <polygon points="60,60 104,60 96,78" fill="#00897b"/>
+            <polygon points="60,60 96,78 82,96" fill="#1e88e5"/>
+            <polygon points="60,60 82,96 70,106" fill="#3949ab"/>
+            <polygon points="60,60 70,106 50,106" fill="#8e24aa"/>
+            <polygon points="60,60 50,106 38,96" fill="#d81b60"/>
+            <polygon points="60,60 38,96 24,78" fill="#e53935"/>
+            <polygon points="60,60 24,78 16,60" fill="#fb8c00"/>
+            <polygon points="60,60 16,60 24,42" fill="#fdd835"/>
+            <polygon points="60,60 24,42 38,24" fill="#43a047"/>
+            <polygon points="60,60 38,24 50,14" fill="#1e88e5"/>
+            <polygon points="60,60 50,14 60,10" fill="#3949ab"/>
+          </g>
+          <circle cx="60" cy="60" r="16" fill="#ffffff" stroke="#16213a" stroke-width="1.5"/>
+          <path d="M40 88 Q50 78 60 88 Q70 98 80 88" stroke="#1e88e5" stroke-width="3" fill="none" stroke-linecap="round"/>
+        </svg>
+        <div class="logo-caption">
+          <div class="brand ph">[ SAHODAYA / REGION NAME ]</div>
+          <div class="brand2">SAHODAYA</div>
+        </div>
+      </div>
+
+      <div class="org-name ph">[ FULL SAHODAYA NAME ]</div>
+      <div class="org-meta">
+        REG. UNDER SOCIETIES REGISTRATION ACT <span class="ph">[YEAR]</span> NO. <span class="ph">[REG. NUMBER]</span>
+      </div>
+
+      <div class="title-block">
+        <div class="title-main">VERIFICATION</div>
+        <div class="title-sub">CERTIFICATE OF STUDENT DATA VERIFICATION</div>
+      </div>
+
+      <div class="certify-line">This is to certify that the student records submitted by</div>
+      <div class="school-name ph">[ SCHOOL NAME ]</div>
+      <div class="under-note">have been reviewed and verified for academic year <span class="ph">[YYYY-YY]</span> with the following summary:</div>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="num ph">[142]</div>
+          <div class="lbl">Total submitted</div>
+        </div>
+        <div class="stat-card verified">
+          <div class="num ph">[138]</div>
+          <div class="lbl">Verified students</div>
+        </div>
+        <div class="stat-card">
+          <div class="num ph">[97%]</div>
+          <div class="lbl">Verification rate</div>
+        </div>
+      </div>
+
+      <div class="as-on">Verified as on <span class="ph">[DD-MM-YYYY]</span></div>
+
+      <div class="download-box">
+        <div class="qr">
+          <div></div><div class="o"></div><div></div><div></div><div class="o"></div><div></div><div></div>
+          <div class="o"></div><div></div><div class="o"></div><div></div><div class="o"></div><div></div><div class="o"></div>
+          <div></div><div></div><div class="o"></div><div></div><div class="o"></div><div></div><div></div>
+          <div class="o"></div><div></div><div></div><div class="o"></div><div></div><div></div><div class="o"></div>
+          <div></div><div class="o"></div><div class="o"></div><div></div><div class="o"></div><div></div><div></div>
+          <div class="o"></div><div></div><div class="o"></div><div></div><div class="o"></div><div class="o"></div><div></div>
+          <div></div><div class="o"></div><div></div><div></div><div class="o"></div><div></div><div class="o"></div>
+        </div>
+        <div class="txt">
+          <div class="lead">Download the full verified students list</div>
+          <div class="desc">Scan the QR code or open the secure link below to download the complete
+            PDF list of verified students for this school.</div>
+          <div class="url ph">https://[sahodaya-domain]/verify/students/[school-id]/[secure-token]</div>
+          <div class="expiry">Link valid until <span class="ph">[DD-MM-YYYY]</span> — regenerate from the Sahodaya dashboard if expired.</div>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="signatures">
+        <div class="sig">
+          <div class="mark">&nbsp;</div>
+          <div class="name ph">[ VERIFICATION OFFICER NAME ]</div>
+          <div class="role">Verification Officer</div>
+        </div>
+        <div class="sig">
+          <div class="mark">&nbsp;</div>
+          <div class="name ph">[ SAHODAYA ADMIN NAME ]</div>
+          <div class="role">Sahodaya Administrator</div>
+        </div>
+      </div>
+
+      <div class="footer-row">
+        <div>
+          <div>Date : <span class="ph">[DD-MM-YYYY]</span></div>
+          <div>Place : <span class="ph">[PLACE]</span></div>
+        </div>
+        <svg class="seal" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="sealGrad2" cx="38%" cy="32%" r="75%">
+              <stop offset="0%" stop-color="#f6dd8c"/>
+              <stop offset="55%" stop-color="#d4af37"/>
+              <stop offset="100%" stop-color="#8a6a1e"/>
+            </radialGradient>
+          </defs>
+          <polygon points="35,55 30,90 50,78 70,90 65,55" fill="#b8860b"/>
+          <circle cx="50" cy="45" r="30" fill="url(#sealGrad2)" stroke="#8a6a1e" stroke-width="1.5"/>
+          <circle cx="50" cy="45" r="22" fill="none" stroke="#fff3cd" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.8"/>
+        </svg>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
