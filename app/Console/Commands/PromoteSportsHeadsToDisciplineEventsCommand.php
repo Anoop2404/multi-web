@@ -71,6 +71,18 @@ class PromoteSportsHeadsToDisciplineEventsCommand extends Command
                 });
             } catch (\Throwable $e) {
                 $this->warn("  ✗ {$tenant->name}: {$e->getMessage()}");
+            } finally {
+                // A failed initialize() (e.g. this tenant's database doesn't exist) can throw
+                // before $tenant->run() ever reaches its own "restore the previous tenant"
+                // step, leaving tenancy() dangling on a broken tenant. Left alone, every
+                // subsequent iteration's $tenant->run() call inherits that stale reference and
+                // fails trying to restore it -- so every tenant *after* the first broken one
+                // shows this tenant's error too, even though its own promotion logic above
+                // already ran and printed correctly. Force a clean return to central context
+                // before moving on.
+                if (function_exists('tenancy') && tenancy()->initialized) {
+                    tenancy()->end();
+                }
             }
         }
 
