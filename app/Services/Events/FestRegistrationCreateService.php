@@ -109,7 +109,7 @@ class FestRegistrationCreateService
             return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $initialStatus) {
                 $eventRegService = app(FestEventRegistrationService::class);
                 foreach (array_merge($performerIds, $standbyIds) as $studentId) {
-                    if ($eventRegService->requireEventRegistration($event) && $event->event_type !== 'sports') {
+                    if ($eventRegService->requireEventRegistration($event)) {
                         $eventRegService->assertStudentEligible($event, $studentId);
                     } else {
                         $student = Student::find($studentId);

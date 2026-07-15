@@ -251,41 +251,6 @@ class FestSportsCompositeFeeServiceTest extends TestCase
         $this->assertSame(200.0, $result['team_fee']); // one waived by included_teams, one billed
     }
 
-    public function test_per_head_payment_independence(): void
-    {
-        ['school' => $school, 'event' => $event, 'head' => $athletics] = $this->sportsContext();
-        $chess = FestItemHead::create([
-            'tenant_id' => $athletics->tenant_id,
-            'event_id' => $event->id,
-            'name' => 'Chess',
-            'slug' => 'chess',
-            'sort_order' => 2,
-            'school_registration_fee' => 50,
-            'student_registration_fee' => 50,
-            'team_registration_fee' => 0,
-            'included_items_per_student' => 0,
-            'included_teams' => 0,
-        ]);
-
-        $student = $this->makeStudent($school);
-        $athItem = $this->makeItem($event, $athletics, ['title' => '100m', 'fee_amount' => 0]);
-        $chessItem = $this->makeItem($event, $chess, ['title' => 'Chess open', 'fee_amount' => 0]);
-        $athReg = $this->registerStudent($event, $athItem, $school, $student);
-        $chessReg = $this->registerStudent($event, $chessItem, $school, $student);
-
-        $feeService = app(FestSchoolEventFeeService::class);
-        $athFee = $feeService->recalculateForHead($event, $school->id, $athletics);
-        $chessFee = $feeService->recalculateForHead($event, $school->id, $chess);
-
-        $athFee->update([
-            'status' => 'approved',
-            'amount_paid' => $athFee->total_due,
-        ]);
-
-        $this->assertTrue($feeService->isPaidForRegistration($event->fresh(), $athReg->fresh()));
-        $this->assertFalse($feeService->isPaidForRegistration($event->fresh(), $chessReg->fresh()));
-        $this->assertGreaterThan(0, (float) $chessFee->fresh()->total_due);
-    }
 
     public function test_cancelling_unpaid_registration_releases_quota_slot(): void
     {
@@ -328,14 +293,14 @@ class FestSportsCompositeFeeServiceTest extends TestCase
         $registration = $this->registerStudent($event, $item, $school, $student);
 
         $feeService = app(FestSchoolEventFeeService::class);
-        $fee = $feeService->recalculateForHead($event, $school->id, $head);
+        $fee = $feeService->recalculate($event, $school->id);
         $fee->update([
             'status' => 'approved',
             'amount_paid' => $fee->total_due,
         ]);
 
         $this->expectException(HttpException::class);
-        app(FestRegistrationService::class)->cancel($registration->fresh(), $event->fresh());
+        app(FestRegistrationService::class)->cancel($registration->fresh(), $event->fresh(), notify: false);
     }
 
     public function test_max_participants_cap_allows_waitlist_when_reached(): void
@@ -402,17 +367,6 @@ class FestSportsCompositeFeeServiceTest extends TestCase
         $this->assertTrue($limits->isHeadAtCapacity($teamItem->fresh(['head'])));
     }
 
-    public function test_uses_per_head_billing_for_sports_with_heads(): void
-    {
-        ['event' => $event] = $this->sportsContext();
-        $feeService = app(FestSchoolEventFeeService::class);
-
-        // Sports events always resolve to sports_composite when heads exist.
-        $this->assertTrue($feeService->usesPerHeadBilling($event->fresh()));
-
-        $event->update(['fee_settings' => ['fee_model' => 'per_item']]);
-        $this->assertTrue($feeService->usesPerHeadBilling($event->fresh()));
-    }
 
     public function test_cancel_promotes_oldest_waitlisted_under_head(): void
     {

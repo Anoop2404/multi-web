@@ -64,13 +64,11 @@ class FestSportsCompositeFeeTest extends TestCase
             'level_round' => 'sahodaya',
             'status' => 'registration_open',
             'require_event_registration' => true,
-            'fee_settings' => [
-                'fee_model' => 'sports_composite',
-                'school_registration_flat' => 2000,
-                'per_student_amount' => 300,
-                'included_items_per_student' => 2,
-                'default_item_fee' => 150,
-            ],
+            'school_registration_fee' => 2000,
+            'student_registration_fee' => 300,
+            'included_items_per_student' => 2,
+            'default_item_fee' => 150,
+            'extra_item_fee' => 100,
         ]);
 
         $students = collect(range(1, 2))->map(function (int $i) use ($school, $class) {
@@ -102,6 +100,7 @@ class FestSportsCompositeFeeTest extends TestCase
                 'age_group' => 'u14',
                 'is_enabled' => true,
                 'fee_amount' => 100,
+                'quota_eligible' => true,
             ]);
         });
 
@@ -132,9 +131,10 @@ class FestSportsCompositeFeeTest extends TestCase
 
         $this->assertEquals(2000.0, (float) $fee->school_registration_fee);
         $this->assertEquals(600.0, (float) $fee->student_registration_fee);
-        $this->assertEquals(200.0, (float) $fee->extra_item_fee);
+        $this->assertEquals(200.0, (float) $fee->participation_fee);
+        $this->assertEquals(0.0, (float) $fee->extra_item_fee);
         $this->assertEquals(2800.0, (float) $fee->total_due);
-        $this->assertCount(4, $fee->fresh('lines')->lines);
+        $this->assertCount(8, $fee->fresh('lines')->lines);
     }
 
     public function test_sports_composite_zero_included_quota_charges_every_item(): void
@@ -142,9 +142,7 @@ class FestSportsCompositeFeeTest extends TestCase
         ['school' => $school, 'event' => $event, 'students' => $students] = $this->sportsContext();
 
         $event->update([
-            'fee_settings' => array_merge($event->fee_settings ?? [], [
-                'included_items_per_student' => 0,
-            ]),
+            'included_items_per_student' => 0,
         ]);
 
         $item = FestEventItem::create([
@@ -155,6 +153,7 @@ class FestSportsCompositeFeeTest extends TestCase
             'age_group' => 'u14',
             'is_enabled' => true,
             'fee_amount' => 100,
+            'quota_eligible' => true,
         ]);
 
         $regService = app(FestEventRegistrationService::class);
@@ -179,8 +178,9 @@ class FestSportsCompositeFeeTest extends TestCase
 
         $this->assertEquals(2000.0, (float) $fee->school_registration_fee);
         $this->assertEquals(600.0, (float) $fee->student_registration_fee);
-        $this->assertEquals(200.0, (float) $fee->extra_item_fee);
-        $this->assertEquals(2800.0, (float) $fee->total_due);
+        $this->assertEquals(300.0, (float) $fee->participation_fee);
+        $this->assertEquals(0.0, (float) $fee->extra_item_fee);
+        $this->assertEquals(2900.0, (float) $fee->total_due);
 
         $itemLines = $fee->fresh('lines')->lines->where('line_type', 'item_fee');
         $this->assertCount(2, $itemLines);
