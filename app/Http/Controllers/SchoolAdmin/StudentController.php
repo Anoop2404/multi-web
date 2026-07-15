@@ -950,6 +950,14 @@ class StudentController extends SchoolAdminController
     private function studentPayload(Student $student): array
     {
         $data = $student->toArray();
+        // Eloquent's default array/JSON serialization of a `date`-cast attribute round-trips
+        // it through Carbon::toJSON(), which converts to UTC before formatting. For a positive
+        // UTC-offset app timezone (Asia/Kolkata, +5:30) that rolls local midnight back to the
+        // previous day (e.g. 2011-09-09 becomes 2011-09-08T18:30:00Z), so the list page showed
+        // a DOB one day earlier than the Edit page (which calls ->format('Y-m-d') directly and
+        // never converts timezone). Override with an explicit, timezone-safe format to match.
+        $data['dob'] = $student->dob?->format('Y-m-d');
+        $data['admission_date'] = $student->admission_date?->format('Y-m-d');
         $data['photo_url'] = $student->photoUrl();
         $data['has_photo'] = filled($student->photo);
         $data['is_verified'] = $student->isVerified();

@@ -599,6 +599,10 @@ class AnnualRegistrationController extends SchoolAdminController
     private function submissionStudentPayload(SubmissionStudent $student): array
     {
         $data = $student->toArray();
+        // Same off-by-one as Student::dob (see StudentController::studentPayload): a `date`-cast
+        // attribute serialized via toArray()/toJSON() round-trips through Carbon's UTC conversion,
+        // rolling local midnight back a day in the +5:30 app timezone. Override explicitly.
+        $data['dob'] = $student->dob?->format('Y-m-d');
         $data['image_url'] = $student->imageUrl($this->school->id);
 
         return $data;
