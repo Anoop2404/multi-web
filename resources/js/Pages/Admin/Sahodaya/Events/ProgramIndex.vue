@@ -289,10 +289,16 @@
                             </td>
                             <td>{{ event.items_count }}</td>
                             <td>{{ event.registrations_count }}</td>
-                            <td class="text-right">
+                            <td class="text-right whitespace-nowrap">
                                 <Link :href="eventManageUrl(event)" class="link-brand">
                                     Manage →
                                 </Link>
+                                <button v-if="!event.registrations_count && !event.state_program_id"
+                                        type="button"
+                                        class="ml-3 text-xs font-medium text-rose-600 hover:text-rose-800"
+                                        @click="deleteEvent(event)">
+                                    Delete
+                                </button>
                             </td>
                         </tr>
                     </tbody>
@@ -383,6 +389,13 @@ function createEvent() {
 
 function toggleNavHidden(event) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}/toggle-nav-hidden`, {}, { preserveScroll: true });
+}
+
+function deleteEvent(event) {
+    if (!window.confirm(`Delete "${event.title}"? This cannot be undone. Events with registrations cannot be deleted — hide them instead.`)) {
+        return;
+    }
+    router.delete(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}`, { preserveScroll: true });
 }
 
 function fmt(v) {

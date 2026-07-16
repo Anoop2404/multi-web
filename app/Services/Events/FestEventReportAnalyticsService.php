@@ -182,6 +182,11 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function headWiseSummary(?string $schoolId = null): array
     {
+        // Sports (Head = Event): summarise per sport event instead of per head row.
+        if ($this->event->event_type === 'sports') {
+            return $this->sportsWiseSummary($schoolId);
+        }
+
         $heads = FestItemHead::forTenant($this->event->tenant_id)
             ->forEvent($this->event->id)
             ->orderBy('sort_order')
@@ -255,6 +260,84 @@ class FestEventReportAnalyticsService
                 'pending_fee_total'   => round((float) $headFees->whereNotIn('status', ['approved', 'waived'])->sum('total_due'), 2),
                 'default_item_fee'    => $head->default_item_fee !== null ? (float) $head->default_item_fee : null,
                 'extra_item_fee'      => $head->extra_item_fee !== null ? (float) $head->extra_item_fee : null,
+            ];
+        })->all();
+    }
+
+    /**
+     * Sports summary: one row per sport event (children when run on the season hub,
+     * itself when run on a single sport event). head_id carries the sport event id.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function sportsWiseSummary(?string $schoolId = null): array
+    {
+        $sports = $this->event->isSportsSeasonEvent()
+            ? FestEvent::where('parent_event_id', $this->event->id)
+                ->ofType('sports')
+                ->orderBy('sort_order')
+                ->orderBy('title')
+                ->get()
+            : collect([$this->event]);
+
+        return $sports->map(function (FestEvent $sport) use ($schoolId) {
+            $itemIds = FestEventItem::where('event_id', $sport->id)->pluck('id');
+
+            $regBase = FestRegistration::query()
+                ->where('event_id', $sport->id)
+                ->whereIn('item_id', $itemIds)
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+
+            $approved = (clone $regBase)->where('status', 'approved')->count();
+            $pending = (clone $regBase)->whereIn('status', ['submitted', 'pending_approval'])->count();
+            $waitlisted = (clone $regBase)->where('status', 'waitlisted')->count();
+
+            $participantBase = FestParticipant::query()
+                ->whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $sport->id)
+                    ->whereIn('item_id', $itemIds)
+                    ->active()
+                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)));
+
+            $participantCount = (clone $participantBase)->count();
+            $verifiedParticipants = (clone $participantBase)
+                ->whereHas('student', fn ($q) => $q->whereNotNull('verified_at'))
+                ->count();
+
+            $maxItemReg = FestRegistration::query()
+                ->where('event_id', $sport->id)
+                ->whereIn('item_id', $itemIds)
+                ->active()
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+                ->selectRaw('item_id, count(*) as cnt')
+                ->groupBy('item_id')
+                ->pluck('cnt', 'item_id')
+                ->max() ?? 0;
+
+            $fees = FestSchoolEventFee::where('event_id', $sport->id)
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+                ->get();
+
+            return [
+                'head_id'             => $sport->id,
+                'head_name'           => $sport->title,
+                'item_count'          => $itemIds->count(),
+                'registration_count'  => $approved + $pending,
+                'approved_count'      => $approved,
+                'pending_count'       => $pending,
+                'waitlisted_count'    => $waitlisted,
+                'participant_count'   => $participantCount,
+                'verified_count'      => $verifiedParticipants,
+                'unverified_count'    => max(0, $participantCount - $verifiedParticipants),
+                'max_item_reg_count'  => (int) $maxItemReg,
+                'included_quota'      => max(0, (int) ($sport->included_items_per_student ?? 0)),
+                'verification_policy' => $sport->verification_policy ?? 'all_students',
+                'approval_policy'     => $sport->approval_policy ?? 'auto',
+                'due_total'           => round((float) $fees->sum('total_due'), 2),
+                'collected_total'     => round((float) $fees->where('status', 'approved')->sum('total_due'), 2),
+                'pending_fee_total'   => round((float) $fees->whereNotIn('status', ['approved', 'waived'])->sum('total_due'), 2),
+                'default_item_fee'    => $sport->default_item_fee !== null ? (float) $sport->default_item_fee : null,
+                'extra_item_fee'      => $sport->extra_item_fee !== null ? (float) $sport->extra_item_fee : null,
             ];
         })->all();
     }

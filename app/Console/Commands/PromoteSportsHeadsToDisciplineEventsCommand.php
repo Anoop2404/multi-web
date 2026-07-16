@@ -68,7 +68,7 @@ class PromoteSportsHeadsToDisciplineEventsCommand extends Command
 
                             continue;
                         }
-                        $result = $sync->syncSeason($season);
+                        $result = $sync->syncSeason($season, createMissing: true);
                         $this->line("  Season #{$season->id}: created {$result['created']}, updated {$result['updated']}");
                     }
                 });

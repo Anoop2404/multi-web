@@ -48,9 +48,23 @@ class FestItemHeadController extends SahodayaAdminController
         ]);
     }
 
+    /**
+     * Sports uses sport events (Head = Event) — every head write endpoint is closed
+     * for sports so no page can recreate head rows or edit head data on the side.
+     */
+    private function abortIfSports(FestEvent $event): void
+    {
+        abort_if(
+            $event->event_type === 'sports',
+            422,
+            'Sports no longer uses Event Heads — manage each sport from Setup → Sport events.',
+        );
+    }
+
     public function updateWindows(Request $request, string $tenantId, FestEvent $event, FestItemHead $head, FestItemHeadService $headService)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $this->abortIfSports($event);
         abort_if((int) $head->event_id !== (int) $event->id, 404);
 
         $data = $request->validate([
@@ -166,6 +180,7 @@ class FestItemHeadController extends SahodayaAdminController
     public function updateNotifications(Request $request, string $tenantId, FestEvent $event, FestItemHead $head, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $this->abortIfSports($event);
         abort_if((int) $head->event_id !== (int) $event->id, 404);
 
         $data = $request->validate([
@@ -208,6 +223,23 @@ class FestItemHeadController extends SahodayaAdminController
     public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit, FestItemHeadService $headService)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        // Sports: heads are gone (Head = Event). Any leftover form posting here
+        // creates a sport event directly instead of a dead head row.
+        if ($event->event_type === 'sports') {
+            abort_unless($event->parent_event_id === null, 422, 'Add sports on the season setup page.');
+
+            $sportData = $request->validate([
+                'name' => 'required|string|max:120',
+                'sport_discipline' => 'nullable|string|max:60',
+                'is_team_heading' => 'nullable|boolean',
+            ]);
+
+            $sport = app(\App\Services\Events\FestSportsEventSyncService::class)->addSport($event, $sportData);
+
+            return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$sport->id}")
+                ->with('success', "Sport event \"{$sport->title}\" created.");
+        }
 
         $data = $request->validate([
             'name' => 'required|string|max:120',
@@ -280,6 +312,11 @@ class FestItemHeadController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        if ($event->event_type === 'sports') {
+            return redirect()->route('sahodaya.events.setup.index', [$tenantId, $event->id])
+                ->with('info', 'Sports no longer uses Event Heads — add sports from the Setup hub.');
+        }
+
         $service->ensureCatalogHeads($this->sahodaya->id, $event->event_type);
         $count = $service->syncEventHeads($event);
 
@@ -289,6 +326,7 @@ class FestItemHeadController extends SahodayaAdminController
     public function destroy(string $tenantId, FestEvent $event, FestItemHead $head, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $this->abortIfSports($event);
         abort_if((int) $head->event_id !== (int) $event->id, 404);
         abort_if($head->catalog_key, 422, 'Catalog heads cannot be removed — disable items instead.');
 

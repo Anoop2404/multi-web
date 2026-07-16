@@ -19,6 +19,10 @@ class FestItemHeadOpsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        if ($event->event_type === 'sports') {
+            return redirect()->route('sahodaya.events.setup.index', [$tenantId, $event->id]);
+        }
+
         $navService = app(FestHeadItemNavigationService::class);
         $nav = $navService->navigationForEvent($event);
 

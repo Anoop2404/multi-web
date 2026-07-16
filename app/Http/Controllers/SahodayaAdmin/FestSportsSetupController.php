@@ -118,6 +118,31 @@ class FestSportsSetupController extends SahodayaAdminController
             'ageRuleSummary' => FestSportsAgeGroup::ageRuleSummary($event),
             'competitionUrl' => $isSeason ? "{$tenantBase}/sports" : "{$base}/items",
             'sportsHubUrl'   => "{$tenantBase}/sports",
+            'canAddSport'    => $isSeason,
+            'addSportUrl'    => $isSeason ? "{$base}/setup/sports" : null,
         ]));
+    }
+
+    /**
+     * Explicit "Add sport" — the only way new sport events are created (catalog
+     * sports are no longer auto-seeded on page loads, and deleted sports stay
+     * deleted). Names matching the catalog reuse its metadata and items.
+     */
+    public function storeSport(\Illuminate\Http\Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless($event->event_type === 'sports', 404);
+        abort_unless($event->parent_event_id === null, 422, 'Sports are added on the season, not under another sport.');
+
+        $data = $request->validate([
+            'name' => 'required|string|max:120',
+            'sport_discipline' => 'nullable|string|max:60',
+            'is_team_heading' => 'nullable|boolean',
+        ]);
+
+        $sport = app(FestSportsEventSyncService::class)->addSport($event, $data);
+
+        return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$sport->id}")
+            ->with('success', "Sport event \"{$sport->title}\" ready — configure items, fees, and open registration.");
     }
 }

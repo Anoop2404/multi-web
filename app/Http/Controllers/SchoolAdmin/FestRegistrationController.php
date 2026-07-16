@@ -53,8 +53,12 @@ class FestRegistrationController extends SchoolAdminController
         $feeService = app(FestSchoolEventFeeService::class);
 
         // Singleton fest types (Kalotsav, …) are one-per-year: skip the event list and
-        // open the single yearly event's registration directly.
-        if ($view === 'registration' && ! $request->query('event') && FestEvent::isSingletonType($eventType)) {
+        // open the single yearly event's registration directly. Sports is explicitly
+        // excluded regardless of the tenant's is_singleton flag (may be stale pre-
+        // unification data): schools browse per-sport events as a list, never the
+        // season hub — which no longer carries items and would render empty.
+        if ($view === 'registration' && ! $request->query('event')
+            && $eventType !== 'sports' && FestEvent::isSingletonType($eventType)) {
             if ($single = $this->resolveSingletonSchoolEvent($request, $eventType, $program)) {
                 $prefix = ProgramRouteMap::prefixFromSlug($program);
 
@@ -65,6 +69,14 @@ class FestRegistrationController extends SchoolAdminController
         $events = FestEvent::where('tenant_id', $sahodayaId)
             ->ofType($eventType)
             ->listedForSchool($this->school->id, $eventType)
+            // Sports: hide the season hub once per-sport children exist (hub carries no
+            // items). Standalone sport events and a childless hub (mid-setup fallback)
+            // remain visible so schools never get an empty Sports page.
+            ->when($eventType === 'sports', fn ($q) => $q->whereNotExists(
+                fn ($sub) => $sub->selectRaw('1')
+                    ->from('fest_events as sports_children')
+                    ->whereColumn('sports_children.parent_event_id', 'fest_events.id'),
+            ))
             ->when($request->query('event'), fn ($q) => $q->where('id', $request->query('event')))
             ->when($view === 'results', fn ($q) => $q->where('results_published', true))
             ->with('items')
@@ -493,11 +505,13 @@ class FestRegistrationController extends SchoolAdminController
         $event->setAttribute('event_registrations', app(\App\Services\Events\FestEventRegistrationService::class)
             ->studentEventRegistrations($event, $this->school->id));
         if ($event->event_type === 'sports') {
-            $nav = $headNav ?? $navService->headSummariesForEvent($event, $this->school->id);
+            // Head = Event: no head tabs/filters on sports events — leftover
+            // FestItemHead rows relinked to the sport event would otherwise render
+            // a redundant single-head tab. Items group by age group instead.
             $event->setAttribute('head_navigation', [
-                'headItemGroups'  => $nav['headItemGroups'] ?? [],
-                'headsForFilter'  => $nav['headsForFilter'] ?? [],
-                'hasItemHeads'    => (bool) ($nav['hasItemHeads'] ?? false),
+                'headItemGroups'  => [],
+                'headsForFilter'  => [],
+                'hasItemHeads'    => false,
             ]);
             $schedule = $feeService->resolveSchedule($event);
             $event->setAttribute('student_event_reg_fee', (float) ($schedule['per_student_amount'] ?? 0));

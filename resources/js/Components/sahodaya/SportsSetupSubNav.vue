@@ -29,7 +29,6 @@ const tabs = computed(() => {
         { key: 'setup', label: 'Setup hub', href: `${base.value}/setup` },
         { key: 'items', label: 'Items', href: `${base.value}/items` },
         { key: 'items-list', label: 'Item listing', href: `${base.value}/items/list` },
-        { key: 'competition', label: 'Competition', href: `${base.value}/competition` },
     ];
 });
 </script>

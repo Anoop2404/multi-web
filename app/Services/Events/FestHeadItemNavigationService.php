@@ -25,6 +25,18 @@ class FestHeadItemNavigationService
      */
     public function headSummariesForEvent(FestEvent $event, ?string $schoolId = null): array
     {
+        // Sports (Head = Event): tabs are sport events, never FestItemHead rows —
+        // leftover head rows relinked to sport events must not render as tabs.
+        if ($event->event_type === 'sports') {
+            $nav = $this->sportsNavigation($event, $schoolId, withItems: false);
+
+            return [
+                'headItemGroups' => $nav['headItemGroups'],
+                'headsForFilter' => $nav['headsForFilter'],
+                'hasItemHeads'   => $nav['hasItemHeads'],
+            ];
+        }
+
         $stats = $this->participantStatsByItem($event, $schoolId);
 
         $heads = FestItemHead::query()
@@ -109,6 +121,11 @@ class FestHeadItemNavigationService
      */
     public function navigationForEvent(FestEvent $event, ?string $schoolId = null): array
     {
+        // Sports (Head = Event): groups are sport events, not FestItemHead rows.
+        if ($event->event_type === 'sports') {
+            return $this->sportsNavigation($event, $schoolId, withItems: true);
+        }
+
         $stats = $this->participantStatsByItem($event, $schoolId);
 
         $heads = FestItemHead::query()
@@ -326,6 +343,86 @@ class FestHeadItemNavigationService
     }
 
     /** @param array<int, array{participant_count: int, chest_assigned: int, item_reg_assigned: int}> $stats */
+    /**
+     * Sports navigation: one group per sport event. On the season hub the groups
+     * are the child sport events; on a single sport event, one group of its own
+     * items. head_id carries the sport event id.
+     *
+     * @return array{
+     *     headItemGroups: list<array<string, mixed>>,
+     *     headsForFilter: list<array{id: int, name: string}>,
+     *     hasItemHeads: bool,
+     *     unassignedItems: list<array<string, mixed>>
+     * }
+     */
+    private function sportsNavigation(FestEvent $event, ?string $schoolId, bool $withItems): array
+    {
+        $isSeason = $event->isSportsSeasonEvent();
+
+        $sports = $isSeason
+            ? FestEvent::where('parent_event_id', $event->id)
+                ->ofType('sports')
+                ->orderBy('sort_order')
+                ->orderBy('title')
+                ->get()
+            : collect([$event]);
+
+        $groups = [];
+        $headsForFilter = [];
+
+        foreach ($sports as $sport) {
+            $stats = $this->participantStatsByItem($sport, $schoolId);
+
+            $items = FestEventItem::query()
+                ->where('event_id', $sport->id)
+                ->where('is_enabled', true)
+                ->orderBy('display_order')
+                ->orderBy('title')
+                ->get(['id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at']);
+
+            if ($items->isEmpty() && $schoolId) {
+                continue;
+            }
+
+            $numbering = app(FestNumberingService::class)->settings($sport);
+            $defaultChestStart = (int) ($numbering['chest_no_start'] ?? 1);
+
+            $itemPayloads = $items->map(
+                fn (FestEventItem $item) => $this->itemNavPayload($item, $stats, $defaultChestStart, $sport->title),
+            )->values()->all();
+
+            $groups[] = [
+                'head_id'            => $sport->id,
+                'head_name'          => $sport->title,
+                'item_count'         => count($itemPayloads),
+                'participant_count'  => array_sum(array_column($itemPayloads, 'participant_count')),
+                'status'             => $sport->status,
+                'venue'              => $sport->venue,
+                'reg_start'          => $sport->reg_start?->format('Y-m-d'),
+                'reg_end'            => $sport->reg_end?->format('Y-m-d'),
+                'competition_start'  => $sport->competition_start?->format('Y-m-d'),
+                'competition_end'    => $sport->competition_end?->format('Y-m-d'),
+                'schedule_mode'      => $sport->schedule_mode ?? 'different_days',
+                'competition_time'   => $sport->competition_time
+                    ? substr((string) $sport->competition_time, 0, 5)
+                    : null,
+                'registration_open'  => $sport->isRegistrationOpen(),
+                'items'              => $withItems ? $itemPayloads : [],
+            ];
+
+            $headsForFilter[] = ['id' => $sport->id, 'name' => $sport->title];
+        }
+
+        return [
+            'headItemGroups'  => $groups,
+            'headsForFilter'  => $headsForFilter,
+            // Tabs only make sense on the season hub (multiple sports). A single
+            // sport event renders its items flat — no head/tab chrome.
+            'hasItemHeads'    => $isSeason && $groups !== [],
+            'unassignedItems' => [],
+        ];
+    }
+
     private function itemNavPayload(
         FestEventItem $item,
         array $stats,

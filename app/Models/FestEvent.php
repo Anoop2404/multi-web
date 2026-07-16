@@ -214,14 +214,39 @@ class FestEvent extends Model
             });
     }
 
+    /**
+     * A registrable sport event (Athletics, Chess, …): either a promoted child of a
+     * season hub or a standalone sports event created directly in the new flow.
+     * Excludes only the season hub container.
+     */
     public function isSportsDisciplineEvent(): bool
     {
-        return $this->event_type === 'sports';
+        return $this->event_type === 'sports' && ! $this->isSportsSeasonEvent();
     }
 
+    /**
+     * The legacy season hub container. Kept as a hidden rollup (medal tally, season
+     * remittance) — never registrable and never shown to schools once children exist.
+     */
     public function isSportsSeasonEvent(): bool
     {
-        return false;
+        if ($this->event_type !== 'sports' || $this->parent_event_id !== null) {
+            return false;
+        }
+
+        if ($this->partition_role === 'sports_season') {
+            return true;
+        }
+
+        if ($this->partition_role !== null) {
+            return false;
+        }
+
+        // Untagged top-level sports event: legacy hub if it has children,
+        // otherwise a standalone sport event from the new flow.
+        return $this->relationLoaded('childEvents')
+            ? $this->childEvents->isNotEmpty()
+            : self::where('parent_event_id', $this->id)->exists();
     }
 
     /** Fest program types that are unique (one per Sahodaya per academic year). */

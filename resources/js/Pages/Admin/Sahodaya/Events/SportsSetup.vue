@@ -64,13 +64,49 @@
                     </ol>
                 </section>
 
-                <section v-if="headItemGroups.length" class="card space-y-4">
-                    <div>
-                        <h3 class="section-title">Sport events</h3>
-                        <p class="section-desc">
-                            Each sport is its own event — set fees, items, registration, marks, and results there.
-                        </p>
+                <section v-if="headItemGroups.length || canAddSport" class="card space-y-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h3 class="section-title">Sport events</h3>
+                            <p class="section-desc">
+                                Each sport is its own event — set fees, items, registration, marks, and results there.
+                            </p>
+                        </div>
+                        <button v-if="canAddSport" type="button" class="btn-primary text-sm"
+                                @click="showAddSport = !showAddSport">
+                            + Add sport
+                        </button>
                     </div>
+
+                    <form v-if="showAddSport && canAddSport" class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3"
+                          @submit.prevent="submitAddSport">
+                        <div class="grid sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="form-label" for="add-sport-name">Sport name</label>
+                                <input id="add-sport-name" v-model="addSportForm.name" type="text" required
+                                       class="form-input" placeholder="e.g. Athletics, Chess, Kabaddi" />
+                                <p v-if="addSportForm.errors.name" class="text-xs text-rose-600 mt-1">{{ addSportForm.errors.name }}</p>
+                            </div>
+                            <div>
+                                <label class="form-label" for="add-sport-discipline">Discipline (optional)</label>
+                                <input id="add-sport-discipline" v-model="addSportForm.sport_discipline" type="text"
+                                       class="form-input" placeholder="e.g. athletics, racket" />
+                            </div>
+                        </div>
+                        <label class="flex items-center gap-2 text-sm text-slate-700">
+                            <input v-model="addSportForm.is_team_heading" type="checkbox" class="rounded border-slate-300" />
+                            Has team items
+                        </label>
+                        <p class="text-xs text-slate-500">
+                            Catalog names (Athletics, Chess, …) load their default items automatically; other names start empty.
+                        </p>
+                        <div class="flex gap-2">
+                            <button type="submit" class="btn-primary text-sm" :disabled="addSportForm.processing">
+                                Create sport event
+                            </button>
+                            <button type="button" class="btn-secondary text-sm" @click="showAddSport = false">Cancel</button>
+                        </div>
+                    </form>
                     <div class="reports-tile-grid">
                         <div v-for="head in headItemGroups" :key="head.head_id ?? 'other'"
                              class="reports-head-card group block">
@@ -144,8 +180,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Link, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
@@ -161,7 +197,27 @@ const props = defineProps({
     ageRuleSummary: { type: String, default: null },
     competitionUrl: { type: String, default: null },
     sportsHubUrl: { type: String, default: null },
+    canAddSport: { type: Boolean, default: false },
+    addSportUrl: { type: String, default: null },
 });
+
+const showAddSport = ref(false);
+const addSportForm = useForm({
+    name: '',
+    sport_discipline: '',
+    is_team_heading: true,
+});
+
+function submitAddSport() {
+    if (!props.addSportUrl) return;
+    addSportForm.post(props.addSportUrl, {
+        preserveScroll: true,
+        onSuccess: () => {
+            addSportForm.reset();
+            showAddSport.value = false;
+        },
+    });
+}
 
 const progressPct = computed(() => {
     const { done, total } = props.checklistProgress;

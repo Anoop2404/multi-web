@@ -519,32 +519,54 @@ class MigrateSportsHeadToEvent extends Command
     /** @param  list<int>  $headIds */
     private function migrateStrayRowsToSportEvent(FestEvent $season, FestEvent $sport, array $headIds): void
     {
-        if ((int) $season->id === (int) $sport->id || $headIds === []) {
+        if ((int) $season->id === (int) $sport->id) {
             return;
         }
 
-        $itemIds = FestEventItem::where('event_id', $season->id)
-            ->whereIn('head_id', $headIds)
-            ->pluck('id');
+        // Items still on the season and linked to these heads.
+        $itemIds = $headIds === []
+            ? collect()
+            : FestEventItem::where('event_id', $season->id)
+                ->whereIn('head_id', $headIds)
+                ->pluck('id');
 
-        FestEventItem::whereIn('id', $itemIds)->update(['event_id' => $sport->id]);
+        if ($itemIds->isNotEmpty()) {
+            FestEventItem::whereIn('id', $itemIds)->update(['event_id' => $sport->id]);
+        }
+
+        // Registrations stranded on the season: covers both the items moved above AND
+        // items the page-load sync already moved (which also nulled head_id — the old
+        // head_id-only matching missed those, leaving their registrations invisible).
+        $sportItemIds = FestEventItem::where('event_id', $sport->id)->pluck('id');
 
         $registrationIds = FestRegistration::where('event_id', $season->id)
-            ->whereIn('item_id', $itemIds)
+            ->whereIn('item_id', $sportItemIds)
             ->pluck('id');
 
-        FestRegistration::whereIn('id', $registrationIds)->update(['event_id' => $sport->id]);
+        if ($registrationIds->isNotEmpty()) {
+            FestRegistration::whereIn('id', $registrationIds)->update(['event_id' => $sport->id]);
 
-        FestParticipant::whereIn('registration_id', $registrationIds)
+            FestParticipant::whereIn('registration_id', $registrationIds)
+                ->update(['event_id' => $sport->id]);
+        }
+
+        \App\Models\FestMark::where('event_id', $season->id)
+            ->whereIn('item_id', $sportItemIds)
             ->update(['event_id' => $sport->id]);
 
-        FestSchoolEventFee::where('event_id', $season->id)
-            ->whereIn('head_id', $headIds)
+        \App\Models\FestSchedule::where('event_id', $season->id)
+            ->whereIn('item_id', $sportItemIds)
             ->update(['event_id' => $sport->id]);
 
-        FestEventStaff::where('event_id', $season->id)
-            ->whereIn('head_id', $headIds)
-            ->update(['event_id' => $sport->id, 'head_id' => null]);
+        if ($headIds !== []) {
+            FestSchoolEventFee::where('event_id', $season->id)
+                ->whereIn('head_id', $headIds)
+                ->update(['event_id' => $sport->id]);
+
+            FestEventStaff::where('event_id', $season->id)
+                ->whereIn('head_id', $headIds)
+                ->update(['event_id' => $sport->id, 'head_id' => null]);
+        }
     }
 
     /**

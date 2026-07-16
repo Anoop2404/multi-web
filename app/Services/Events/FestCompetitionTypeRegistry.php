@@ -26,7 +26,7 @@ class FestCompetitionTypeRegistry
         }
 
         foreach (config('fest_competition_types', []) as $typeKey => $meta) {
-            FestCompetitionType::firstOrCreate(
+            $row = FestCompetitionType::firstOrCreate(
                 [
                     'tenant_id' => $this->tenantId,
                     'type_key' => $typeKey,
@@ -43,6 +43,14 @@ class FestCompetitionTypeRegistry
                     'is_active' => true,
                 ]
             );
+
+            // Config is authoritative for structural flags on system rows: a stale
+            // is_singleton (e.g. sports pre-unification) breaks routing tenant-wide,
+            // and tenants may miss the fixing migration. Labels/icons stay tenant-editable.
+            $configSingleton = (bool) ($meta['is_singleton'] ?? true);
+            if ($row->is_system && (bool) $row->is_singleton !== $configSingleton) {
+                $row->update(['is_singleton' => $configSingleton]);
+            }
         }
     }
 

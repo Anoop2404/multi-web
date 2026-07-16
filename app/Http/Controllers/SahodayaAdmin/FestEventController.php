@@ -22,7 +22,6 @@ use App\Services\Events\FestCatalogService;
 use App\Services\Events\FestItemCatalogService;
 use App\Services\Events\FestQualificationService;
 use App\Services\Events\FestTaxonomyRegistry;
-use App\Models\FestItemHead;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
 
@@ -346,6 +345,23 @@ class FestEventController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($event->isStateProgram(), 422, 'State programs cannot be deleted from Sahodaya admin.');
+
+        // Guard rails: deleting an event with children or registrations would orphan
+        // school data. Hide it from navigation instead (toggle-nav-hidden).
+        $childCount = FestEvent::where('parent_event_id', $event->id)->count();
+        abort_if(
+            $childCount > 0,
+            422,
+            "This event has {$childCount} child event(s) — delete or move them first, or hide this event instead.",
+        );
+
+        $registrationCount = \App\Models\FestRegistration::where('event_id', $event->id)->count();
+        abort_if(
+            $registrationCount > 0,
+            422,
+            "This event has {$registrationCount} registration(s). Hide it from schools instead of deleting, or clear registrations first.",
+        );
+
         $title = $event->title;
         $event->delete();
 
@@ -759,15 +775,12 @@ class FestEventController extends SahodayaAdminController
         $taxonomy = $taxonomyRegistry->allLabels();
         $taxonomy['class_group'] = FestClassGroupScheme::taxonomyClassGroups($classGroupScheme, $event);
 
+        // Sports (Head = Event): pages group by sport events, not FestItemHead rows.
+        // Keep the passive sync (heals partition_role / hub visibility, never creates)
+        // but stop shipping head rows to the UI.
         $itemHeads = [];
         if ($event->event_type === 'sports') {
             app(\App\Services\Events\FestItemHeadService::class)->syncEventHeads($event);
-            $itemHeads = FestItemHead::forTenant($this->sahodaya->id)
-                ->forEvent($event->id)
-                ->whereNull('parent_id')
-                ->orderBy('sort_order')
-                ->get(['id', 'name', 'sport_discipline', 'is_team_heading'])
-                ->all();
         }
 
         $competitionAreas = [];
@@ -887,7 +900,8 @@ class FestEventController extends SahodayaAdminController
         abort_unless($event->event_type === 'sports', 422);
         abort_unless($event->parent_event_id === null, 422);
 
-        $result = app(\App\Services\Events\FestSportsEventSyncService::class)->syncSeason($event);
+        // Explicit admin action: allowed to create missing sport events.
+        $result = app(\App\Services\Events\FestSportsEventSyncService::class)->syncSeason($event, createMissing: true);
 
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/sports")
             ->with('success', "Sport events synced ({$result['created']} created, {$result['updated']} updated).");

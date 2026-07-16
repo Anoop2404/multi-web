@@ -55,6 +55,16 @@ trait BuildsItemHeadReportContext
             return null;
         }
 
+        // Sports (Head = Event): the "head" filter value is a sport event id —
+        // its items are simply the items on that event.
+        if ($event->event_type === 'sports' && $headId > 0) {
+            return \App\Models\FestEventItem::query()
+                ->where('event_id', $headId)
+                ->where('is_enabled', true)
+                ->pluck('id')
+                ->all();
+        }
+
         $query = \App\Models\FestEventItem::query()
             ->where('event_id', $event->id)
             ->where('is_enabled', true);

@@ -227,13 +227,13 @@ class FestItemHeadService
     }
 
     /**
-     * @deprecated Sports no longer promotes heads; FestSportsEventSyncService creates sport events.
-     * Kept as no-op so older callers do not break.
+     * Explicit promotion entry (head creation, migration commands): allowed to
+     * create the sport event for the head — including custom, non-catalog heads.
      */
     public function promoteIfSeason(FestEvent $event): void
     {
         if ($event->event_type === 'sports' && $event->parent_event_id === null) {
-            app(FestSportsEventSyncService::class)->syncSeason($event);
+            app(FestSportsEventSyncService::class)->syncSeason($event, createMissing: true);
         }
     }
 

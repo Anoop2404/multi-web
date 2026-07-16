@@ -119,7 +119,11 @@ class FestReportController extends SahodayaAdminController
             'exports'      => $exports,
             'schools'      => $service->schools(),
             'items'        => $service->items()->map->only(['id', 'title', 'class_group']),
-            'heads'        => \App\Models\FestItemHead::forTenant($this->sahodaya->id)->forEvent($event->id)->orderBy('sort_order')->get(['id', 'name']),
+            'heads'        => $event->event_type === 'sports'
+                ? ($event->isSportsSeasonEvent()
+                    ? FestEvent::where('parent_event_id', $event->id)->ofType('sports')->orderBy('sort_order')->orderBy('title')->get(['id', 'title'])->map(fn ($e) => ['id' => $e->id, 'name' => $e->title])->values()
+                    : collect([['id' => $event->id, 'name' => $event->title]]))
+                : \App\Models\FestItemHead::forTenant($this->sahodaya->id)->forEvent($event->id)->orderBy('sort_order')->get(['id', 'name']),
             'stages'       => $service->scheduleStages()->map(fn ($s) => ['id' => $s->id, 'name' => $s->name]),
             'classGroups'  => FestReportService::classGroups($event),
             'currentPhase' => $currentPhase,
