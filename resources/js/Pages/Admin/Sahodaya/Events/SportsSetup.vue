@@ -98,7 +98,7 @@
                             Has team items
                         </label>
                         <p class="text-xs text-slate-500">
-                            Catalog names (Athletics, Chess, …) load their default items automatically; other names start empty.
+                            Sport events start empty — load items afterwards via "Assign items to event".
                         </p>
                         <div class="flex gap-2">
                             <button type="submit" class="btn-primary text-sm" :disabled="addSportForm.processing">

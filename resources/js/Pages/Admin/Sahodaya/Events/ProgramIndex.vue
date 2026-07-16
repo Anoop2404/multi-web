@@ -392,7 +392,7 @@ function toggleNavHidden(event) {
 }
 
 function deleteEvent(event) {
-    if (!window.confirm(`Delete "${event.title}"? This cannot be undone. Events with registrations cannot be deleted — hide them instead.`)) {
+    if (!window.confirm(`Delete "${event.title}"? This cannot be undone. A sports season deletes its child sport events too. Anything with registrations is blocked — hide it instead.`)) {
         return;
     }
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/events/${event.id}`, { preserveScroll: true });

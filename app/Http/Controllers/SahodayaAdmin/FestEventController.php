@@ -346,23 +346,27 @@ class FestEventController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($event->isStateProgram(), 422, 'State programs cannot be deleted from Sahodaya admin.');
 
-        // Guard rails: deleting an event with children or registrations would orphan
-        // school data. Hide it from navigation instead (toggle-nav-hidden).
-        $childCount = FestEvent::where('parent_event_id', $event->id)->count();
-        abort_if(
-            $childCount > 0,
-            422,
-            "This event has {$childCount} child event(s) — delete or move them first, or hide this event instead.",
-        );
+        // Guard rails: deleting an event with registrations would orphan school data.
+        // A sports season hub whose whole tree is registration-free deletes as a unit
+        // (children first — items/fees/level-registrations cascade per event).
+        $childIds = FestEvent::where('parent_event_id', $event->id)->pluck('id');
 
-        $registrationCount = \App\Models\FestRegistration::where('event_id', $event->id)->count();
+        $registrationCount = \App\Models\FestRegistration::whereIn(
+            'event_id',
+            $childIds->concat([$event->id]),
+        )->count();
         abort_if(
             $registrationCount > 0,
             422,
-            "This event has {$registrationCount} registration(s). Hide it from schools instead of deleting, or clear registrations first.",
+            "This event (or its child events) has {$registrationCount} registration(s). Hide it from schools instead of deleting, or clear registrations first.",
         );
 
+        if ($childIds->isNotEmpty() && $event->event_type !== 'sports') {
+            abort(422, 'This event has child events — delete or move them first, or hide this event instead.');
+        }
+
         $title = $event->title;
+        FestEvent::where('parent_event_id', $event->id)->get()->each->delete();
         $event->delete();
 
         $audit->log('fest.event.deleted', "Event deleted: {$title}", properties: [

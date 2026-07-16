@@ -2,7 +2,6 @@
 
 namespace App\Services\Events;
 
-use App\Models\FestCatalogItem;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestItemHead;
@@ -448,37 +447,12 @@ class FestSportsEventSyncService
             });
         }
 
-        if (FestEventItem::where('event_id', $sport->id)->exists()) {
-            // Clear leftover head_ids on sport event items (Head = Event).
-            FestEventItem::where('event_id', $sport->id)
-                ->whereNotNull('head_id')
-                ->update(['head_id' => null]);
-
-            return;
-        }
-
-        if ($catalogKey === null) {
-            return;
-        }
-
-        // Seed from tenant master catalog.
-        $catalogItems = FestCatalogItem::forProgram($season->tenant_id, 'sports')
-            ->where('head_key', $catalogKey)
-            ->where('is_enabled', true)
-            ->orderBy('display_order')
-            ->get();
-
-        $order = 0;
-        foreach ($catalogItems as $catalog) {
-            $order++;
-            FestEventItem::create(array_merge($catalog->toEventAttributes(), [
-                'event_id' => $sport->id,
-                'head_id' => null,
-                'display_order' => $order,
-                'is_enabled' => true,
-                'sport_discipline' => $catalog->sport_discipline ?? $sport->sport_discipline,
-            ]));
-        }
+        // Clear leftover head_ids on sport event items (Head = Event).
+        // NOTE: no catalog auto-seeding — sport events start empty and admins load
+        // items explicitly via "Assign items to event" (items master → assign).
+        FestEventItem::where('event_id', $sport->id)
+            ->whereNotNull('head_id')
+            ->update(['head_id' => null]);
     }
 
     private function sportTitle(FestEvent $season, string $name): string
