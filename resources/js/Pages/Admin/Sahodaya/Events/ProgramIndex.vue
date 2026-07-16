@@ -295,14 +295,22 @@
                                 </div>
                             </div>
 
-                            <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center gap-2">
+                            <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap justify-between items-center gap-2">
                                 <span class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border"
                                       :class="event.has_sports_fees_configured ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-amber-50 border-amber-100 text-amber-800'">
                                     {{ event.has_sports_fees_configured ? 'Composite billing active' : 'Fee config pending' }}
                                 </span>
-                                <Link :href="eventManageUrl(event)" class="btn-secondary text-xs !min-h-0 !px-2.5 !py-1">
-                                    Manage →
-                                </Link>
+                                <div class="flex items-center gap-2">
+                                    <button v-if="!event.registrations_count && !event.state_program_id"
+                                            type="button"
+                                            class="text-xs font-medium text-rose-600 hover:text-rose-800"
+                                            @click="deleteEvent(event)">
+                                        Delete
+                                    </button>
+                                    <Link :href="eventManageUrl(event)" class="btn-secondary text-xs !min-h-0 !px-2.5 !py-1">
+                                        Manage →
+                                    </Link>
+                                </div>
                             </div>
                         </div>
                     </div>
