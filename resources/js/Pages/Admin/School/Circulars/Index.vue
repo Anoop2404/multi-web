@@ -11,7 +11,7 @@
                     <p class="font-semibold text-gray-900">{{ c.title }}</p>
                     <p class="text-xs text-gray-500 mt-1">
                         {{ c.category || 'General' }}
-                        <span v-if="c.issued_date"> · {{ c.issued_date }}</span>
+                        <span v-if="c.issued_date"> · {{ formatCalendarDate(c.issued_date) }}</span>
                     </p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
@@ -35,6 +35,7 @@
 <script setup>
 import { router } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({ school: Object, circulars: Array });
 

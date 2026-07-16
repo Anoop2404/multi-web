@@ -47,10 +47,10 @@
                                   class="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
                                 Unverified
                             </span>
-                            <div v-if="row.verified_at" class="text-[10px] text-gray-400 mt-0.5">{{ row.verified_at }}</div>
+                            <div v-if="row.verified_at" class="text-[10px] text-gray-400 mt-0.5">{{ formatDateTime(row.verified_at) }}</div>
                         </td>
                         <td class="capitalize text-sm">{{ row.status }}</td>
-                        <td class="text-xs text-gray-500">{{ row.created_at || '—' }}</td>
+                        <td class="text-xs text-gray-500">{{ formatDateTime(row.created_at) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -61,6 +61,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 defineProps({
     sahodaya: Object,

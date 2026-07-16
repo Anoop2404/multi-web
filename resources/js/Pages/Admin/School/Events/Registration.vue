@@ -195,7 +195,7 @@
                         </span>
                         <span v-if="event.sports_age_cutoff_display || event.sports_age_cutoff_date"
                               class="inline-flex items-center gap-1 rounded-lg bg-slate-100 text-slate-600 px-2.5 py-1">
-                            Age cutoff {{ event.sports_age_cutoff_display ?? String(event.sports_age_cutoff_date).slice(0, 10) }}
+                            Age cutoff {{ event.sports_age_cutoff_display ?? formatDate(event.sports_age_cutoff_date) }}
                         </span>
                     </div>
                     <p v-if="event.age_rule_summary" class="text-xs text-indigo-800 mt-3 leading-relaxed">

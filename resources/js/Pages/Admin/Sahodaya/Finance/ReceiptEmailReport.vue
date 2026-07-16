@@ -59,13 +59,13 @@
                     <tr v-for="r in receipts" :key="r.id">
                         <td class="font-mono text-sm">{{ r.receipt_number || '—' }}</td>
                         <td>₹{{ fmt(r.amount) }}</td>
-                        <td class="text-xs">{{ r.reviewed_at || '—' }}</td>
+                        <td class="text-xs">{{ formatDateTime(r.reviewed_at) }}</td>
                         <td>
                             <span class="text-xs font-semibold px-2 py-0.5 rounded" :class="statusClass(r.receipt_email_status)">
                                 {{ r.receipt_email_status }}
                             </span>
                         </td>
-                        <td class="text-xs">{{ r.receipt_emailed_at || '—' }}</td>
+                        <td class="text-xs">{{ formatDateTime(r.receipt_emailed_at) }}</td>
                         <td>{{ r.resend_count }}</td>
                         <td class="text-xs text-red-600 max-w-xs truncate">{{ r.receipt_email_error || '—' }}</td>
                         <td>
@@ -87,6 +87,7 @@ import { computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object,

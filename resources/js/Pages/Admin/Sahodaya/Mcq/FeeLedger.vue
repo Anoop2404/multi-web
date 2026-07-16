@@ -74,7 +74,7 @@
                         </thead>
                         <tbody>
                             <tr v-for="t in transactions" :key="t.id">
-                                <td class="text-xs">{{ t.transaction_date }}</td>
+                                <td class="text-xs">{{ formatCalendarDate(t.transaction_date) }}</td>
                                 <td class="text-xs capitalize">{{ t.entry_type }}</td>
                                 <td class="text-right font-mono">₹{{ fmt(t.amount) }}</td>
                             </tr>
@@ -93,6 +93,7 @@
 import { Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 defineProps({
     sahodaya: Object,

@@ -44,8 +44,8 @@
                         <td class="text-xs">
                             <span class="font-semibold" :class="sessionTone(r.session_status?.tone)">{{ r.session_status?.label || r.status }}</span>
                         </td>
-                        <td class="text-xs">{{ r.started_at || '—' }}</td>
-                        <td class="text-xs">{{ r.submitted_at || '—' }}</td>
+                        <td class="text-xs">{{ formatDateTime(r.started_at) }}</td>
+                        <td class="text-xs">{{ formatDateTime(r.submitted_at) }}</td>
                         <td>{{ r.score ?? '—' }}</td>
                     </tr>
                 </tbody>
@@ -59,6 +59,7 @@ import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 const props = defineProps({ sahodaya: Object, exam: Object, registrations: { type: Array, default: () => [] } });
 const counts = computed(() => ({

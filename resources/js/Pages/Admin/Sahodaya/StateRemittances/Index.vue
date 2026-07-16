@@ -32,7 +32,7 @@
                     </div>
                     <p v-if="r.description" class="text-sm text-gray-600">{{ r.description }}</p>
                     <p class="text-xs text-gray-500 mt-1">
-                        <span v-if="r.due_date">Due: {{ r.due_date }}</span>
+                        <span v-if="r.due_date">Due: {{ formatCalendarDate(r.due_date) }}</span>
                         <span v-if="r.transaction_ref" class="ml-3">Ref: {{ r.transaction_ref }}</span>
                     </p>
                     <p v-if="r.rejection_reason" class="text-xs text-red-600 mt-1">Rejected: {{ r.rejection_reason }}</p>
@@ -79,6 +79,7 @@
 import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, remittances: Array, summary: Object });
 

@@ -31,7 +31,7 @@
                             <td class="text-xs capitalize">{{ sf.status?.replace('_', ' ') }}</td>
                             <td class="text-xs">
                                 <template v-if="sf.fee_receipt">
-                                    {{ sf.fee_receipt.payment_date || '—' }}
+                                    {{ formatCalendarDate(sf.fee_receipt.payment_date) }}
                                     <span v-if="sf.fee_receipt.transaction_ref" class="text-slate-500"> · {{ sf.fee_receipt.transaction_ref }}</span>
                                 </template>
                                 <span v-else class="text-slate-400">Not uploaded</span>
@@ -55,6 +55,7 @@
 import { router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object,

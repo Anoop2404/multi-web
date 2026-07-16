@@ -380,7 +380,7 @@
                     <div>
                         <p class="text-sm font-medium">{{ session.title }}</p>
                         <p class="text-xs text-gray-500">
-                            {{ session.scheduled_at || 'No date' }}
+                            {{ session.scheduled_at ? formatDateTime(session.scheduled_at) : 'No date' }}
                             {{ session.venue ? `· ${session.venue}` : '' }}
                             <span v-if="session.resource_person?.name || sessionResourceName(session)" class="text-indigo-700">
                                 · {{ session.resource_person?.name || sessionResourceName(session) }}
@@ -475,6 +475,7 @@
 import { useForm, router, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object,

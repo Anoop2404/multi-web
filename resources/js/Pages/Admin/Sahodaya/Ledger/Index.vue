@@ -150,7 +150,7 @@
                         </thead>
                         <tbody>
                             <tr v-for="t in transactionRows" :key="t.id">
-                                <td class="text-xs">{{ t.transaction_date }}</td>
+                                <td class="text-xs whitespace-nowrap">{{ formatCalendarDate(t.transaction_date) }}</td>
                                 <td class="text-xs">
                                     <span :class="t.entry_type === 'credit' ? 'text-emerald-700' : 'text-red-600'" class="font-semibold">
                                         {{ t.entry_type === 'credit' ? '+' : '−' }}
@@ -187,6 +187,7 @@
 import { Link, useForm, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,

@@ -88,7 +88,7 @@
                             <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
                             <td class="font-medium">{{ row.title }}</td>
                             <td class="text-xs uppercase">{{ row.age_group || '—' }}</td>
-                            <td>{{ row.scheduled_date || '—' }}</td>
+                            <td>{{ formatCalendarDate(row.scheduled_date) }}</td>
                             <td>{{ row.scheduled_time || '—' }}</td>
                             <td>{{ row.venue || '—' }}</td>
                             <td>{{ row.stage || '—' }}</td>
@@ -111,6 +111,7 @@ import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 import ReportHeadFilter from '@/Components/reports/ReportHeadFilter.vue';
 import { useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
 

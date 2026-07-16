@@ -18,7 +18,7 @@
         </form>
         <ul class="bg-white border rounded-xl divide-y text-sm">
             <li v-for="o in orders" :key="o.id" class="p-3 flex justify-between">
-                <span>{{ o.meal_date?.slice?.(0,10) ?? o.meal_date }} · {{ o.meal_type }} · {{ o.head_count }} pax</span>
+                <span>{{ formatCalendarDate(o.meal_date) }} · {{ o.meal_type }} · {{ o.head_count }} pax</span>
                 <span class="text-gray-500">{{ o.status }}</span>
             </li>
             <li v-if="!orders.length" class="p-4 text-gray-400">No meal requests yet</li>
@@ -29,6 +29,7 @@
 <script setup>
 import { useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({ school: Object, event: Object, orders: Array });
 const form = useForm({ meal_date: '', meal_type: 'lunch', head_count: 10, notes: '' });

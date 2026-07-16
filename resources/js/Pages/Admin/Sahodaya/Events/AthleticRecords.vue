@@ -75,7 +75,7 @@
                                 View marks
                             </Link>
                         </p>
-                        <p class="text-[10px] text-gray-400 mt-1">{{ b.broken_at }}</p>
+                        <p class="text-[10px] text-gray-400 mt-1">{{ formatDateTime(b.broken_at) }}</p>
                     </li>
                     <li v-if="!breaks.length" class="p-6 text-center text-gray-400">No record breaks yet.</li>
                 </ul>
@@ -91,6 +91,7 @@ import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,

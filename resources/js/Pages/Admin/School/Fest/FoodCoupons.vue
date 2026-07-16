@@ -34,7 +34,7 @@
                         <td class="p-3 font-mono font-semibold">{{ c.coupon_code }}</td>
                         <td class="p-3">{{ c.event?.title }}</td>
                         <td class="p-3 capitalize">{{ c.meal_type }}</td>
-                        <td class="p-3">{{ c.valid_date }}</td>
+                        <td class="p-3">{{ formatCalendarDate(c.valid_date) }}</td>
                         <td class="p-3">{{ c.head_count }}</td>
                         <td class="p-3">
                             <span class="text-xs px-2 py-0.5 rounded-full capitalize"
@@ -58,6 +58,7 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({
     events: Array,

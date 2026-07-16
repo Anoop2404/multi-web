@@ -49,7 +49,7 @@
                         <td class="text-xs">{{ bank.class_group_label || '—' }}</td>
                         <td>{{ bank.questions_count }}</td>
                         <td>{{ bank.exams_count }}</td>
-                        <td class="text-xs whitespace-nowrap">{{ bank.updated_at }}</td>
+                        <td class="text-xs whitespace-nowrap">{{ formatDateTime(bank.updated_at) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -66,6 +66,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 defineProps({
     sahodaya: Object,

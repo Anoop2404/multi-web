@@ -17,7 +17,7 @@
                 </thead>
                 <tbody>
                     <tr v-for="row in submissions" :key="row.id">
-                        <td class="text-xs whitespace-nowrap">{{ row.created_at }}</td>
+                        <td class="text-xs whitespace-nowrap">{{ formatDateTime(row.created_at) }}</td>
                         <td class="text-xs font-mono">{{ JSON.stringify(row.payload_json) }}</td>
                         <td>{{ row.is_spam ? 'Yes' : 'No' }}</td>
                     </tr>
@@ -33,6 +33,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 defineProps({
     sahodaya: Object,

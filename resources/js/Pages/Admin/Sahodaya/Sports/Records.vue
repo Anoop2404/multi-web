@@ -55,7 +55,7 @@
                         <td>{{ br.item?.title }}</td>
                         <td>{{ br.participant?.student?.name || '—' }}</td>
                         <td class="font-mono">{{ br.new_value }}</td>
-                        <td class="text-xs text-slate-500">{{ br.broken_at }}</td>
+                        <td class="text-xs text-slate-500">{{ formatDateTime(br.broken_at) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -67,6 +67,7 @@
 <script setup>
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 defineProps({
     sahodaya: Object,

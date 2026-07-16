@@ -61,7 +61,7 @@
                         <span v-if="p.level_label" class="text-xs text-indigo-600">({{ p.level_label }})</span>
                     </div>
                     <div class="text-xs text-gray-500 space-x-3">
-                        <span v-if="p.payment_date">{{ p.payment_date }}</span>
+                        <span v-if="p.payment_date">{{ formatCalendarDate(p.payment_date) }}</span>
                         <span v-if="p.transaction_ref">Ref: {{ p.transaction_ref }}</span>
                         <span v-if="p.receipt_number" class="font-mono text-indigo-700">#{{ p.receipt_number }}</span>
                     </div>
@@ -115,6 +115,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({
     school: Object,

@@ -82,6 +82,20 @@ export function formatAgeLabel(value) {
     return `${age} years old`;
 }
 
+/** Full timestamp (date + time) for `_at`-style columns where time-of-day matters. */
+export function formatDateTime(value, locale = 'en-IN') {
+    if (! value) return '—';
+
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '—';
+
+    return new Intl.DateTimeFormat(locale, {
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+        timeZone: 'Asia/Kolkata',
+    }).format(d);
+}
+
 /** @returns {string} */
 export function formatDobDetail(value) {
     const label = formatCalendarDate(value);

@@ -38,7 +38,7 @@
                         <td>{{ row.program }}</td>
                         <td>₹{{ Number(row.amount).toLocaleString('en-IN') }}</td>
                         <td><span class="status-pill text-xs status-pill--open capitalize">{{ row.status }}</span></td>
-                        <td class="text-xs text-slate-500">{{ row.updated_at }}</td>
+                        <td class="text-xs text-slate-500">{{ formatDateTime(row.updated_at) }}</td>
                     </tr>
                     <tr v-if="!rows.length">
                         <td colspan="6" class="p-8 text-center text-slate-400">No outstanding receivables.</td>
@@ -52,6 +52,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 defineProps({
     sahodaya: Object,

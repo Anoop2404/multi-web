@@ -46,7 +46,7 @@
                     </span>
                 </div>
                 <p class="text-slate-600 mt-1">{{ log.ip_address }} · {{ log.description }}</p>
-                <p class="text-xs text-slate-400 mt-1">{{ log.created_at }}</p>
+                <p class="text-xs text-slate-400 mt-1">{{ formatDateTime(log.created_at) }}</p>
             </div>
         </div>
 
@@ -65,6 +65,7 @@ import { reactive } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import FormField from '@/Components/ui/FormField.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object,

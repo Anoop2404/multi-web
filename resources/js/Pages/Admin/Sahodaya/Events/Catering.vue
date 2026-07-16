@@ -16,7 +16,7 @@
                 <tbody>
                     <tr v-for="o in orders" :key="o.id" class="border-t">
                         <td class="p-3">{{ schools[o.school_id] ?? o.school_id }}</td>
-                        <td class="p-3">{{ o.meal_date?.slice?.(0,10) ?? o.meal_date }}</td>
+                        <td class="p-3">{{ formatCalendarDate(o.meal_date) }}</td>
                         <td class="p-3">{{ o.meal_type }}</td>
                         <td class="p-3">{{ o.head_count }}</td>
                         <td class="p-3">{{ o.status }}</td>
@@ -36,6 +36,7 @@
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,

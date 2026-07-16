@@ -49,7 +49,7 @@
                             <td class="text-xs">{{ fee.program_label }}</td>
                             <td>{{ fee.school_name }}</td>
                             <td class="font-semibold">₹{{ fee.total_due }}</td>
-                            <td class="text-xs whitespace-nowrap">{{ fee.updated_at }}</td>
+                            <td class="text-xs whitespace-nowrap">{{ formatDateTime(fee.updated_at) }}</td>
                             <td class="text-xs whitespace-nowrap text-right space-x-2">
                                 <a v-if="fee.fee_receipt?.proof_url" :href="fee.fee_receipt.proof_url" target="_blank" rel="noopener" class="link-brand">Proof</a>
                                 <button v-if="fee.fee_receipt?.status === 'uploaded'" type="button" @click="approve(fee.id)" class="text-green-700 font-semibold">Approve</button>
@@ -72,6 +72,7 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object,

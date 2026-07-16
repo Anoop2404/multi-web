@@ -94,7 +94,7 @@
                                     <p class="font-medium text-sm">{{ p.vendor_name }}</p>
                                     <p v-if="p.description" class="text-xs text-slate-500">{{ p.description }}</p>
                                 </td>
-                                <td class="text-xs">{{ p.due_date || '—' }}</td>
+                                <td class="text-xs">{{ formatCalendarDate(p.due_date) }}</td>
                                 <td class="text-right font-mono text-sm">₹{{ fmt(p.amount) }}</td>
                                 <td class="text-right font-mono text-sm">₹{{ fmt(p.amount - p.amount_paid) }}</td>
                                 <td><span class="text-xs capitalize font-semibold">{{ p.status }}</span></td>
@@ -122,6 +122,7 @@
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object,

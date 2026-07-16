@@ -41,7 +41,7 @@
                         <td class="p-3 font-mono text-xs">{{ c.coupon_code }}</td>
                         <td class="p-3">{{ c.school_name }}</td>
                         <td class="p-3 capitalize">{{ c.meal_type }}</td>
-                        <td class="p-3">{{ c.valid_date }}</td>
+                        <td class="p-3">{{ formatCalendarDate(c.valid_date) }}</td>
                         <td class="p-3">{{ c.head_count }}</td>
                         <td class="p-3"><span class="text-xs px-2 py-0.5 rounded bg-gray-100">{{ c.status }}</span></td>
                         <td class="p-3 text-right">
@@ -62,6 +62,7 @@
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,

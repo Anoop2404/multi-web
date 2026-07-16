@@ -31,11 +31,11 @@
                             <td class="text-xs">{{ r.school_name || '—' }}</td>
                             <td class="text-xs whitespace-nowrap capitalize">{{ r.previous_status || 'pending' }} → <span class="font-semibold">{{ r.requested_status }}</span></td>
                             <td class="text-xs max-w-xs">{{ r.requested_note || '—' }}</td>
-                            <td class="text-xs">{{ r.requested_by || '—' }}<br><span class="text-slate-400">{{ r.created_at }}</span></td>
+                            <td class="text-xs">{{ r.requested_by || '—' }}<br><span class="text-slate-400">{{ formatDateTime(r.created_at) }}</span></td>
                             <td class="text-xs">
                                 <span :class="statusClass(r.status)">{{ r.status_label }}</span>
                                 <div v-if="r.status !== 'pending'" class="text-slate-400 mt-0.5">
-                                    {{ r.reviewed_by }} · {{ r.reviewed_at }}
+                                    {{ r.reviewed_by }} · {{ formatDateTime(r.reviewed_at) }}
                                     <div v-if="r.review_note">{{ r.review_note }}</div>
                                 </div>
                             </td>
@@ -61,6 +61,7 @@ import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import { formatDateTime } from '@/support/calendarDates.js';
 
 const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, exam: Object, requests: { type: Array, default: () => [] } });
 

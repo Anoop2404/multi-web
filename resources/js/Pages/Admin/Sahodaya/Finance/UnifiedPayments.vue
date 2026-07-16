@@ -72,7 +72,7 @@
                     </div>
                     <p class="text-xs text-slate-600">{{ p.school_name }}</p>
                     <div class="text-xs text-gray-500 space-x-3 mt-1">
-                        <span v-if="p.payment_date">{{ p.payment_date }}</span>
+                        <span v-if="p.payment_date">{{ formatCalendarDate(p.payment_date) }}</span>
                         <span v-if="p.receipt_number" class="font-mono text-indigo-700">#{{ p.receipt_number }}</span>
                         <span v-if="p.receipt_email_status" :class="emailStatusClass(p.receipt_email_status)">
                             Email: {{ p.receipt_email_status }}
@@ -105,6 +105,7 @@ import { computed, reactive, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({
     sahodaya: Object,
