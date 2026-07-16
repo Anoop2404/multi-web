@@ -45,7 +45,7 @@
                 </Link>
             </div>
             <p class="text-xs text-slate-600">
-                Sport events below are created automatically from the catalog. Open each one to set fees, items, and registration.
+                Add sports from the season's Setup hub ("+ Add sport"). Open each sport event to load items, set fees, and open registration.
             </p>
         </div>
 
@@ -209,10 +209,14 @@
         </section>
 
         <div class="space-y-6">
-            <form v-if="!isSports" @submit.prevent="createEvent" class="card space-y-4">
+            <form @submit.prevent="createEvent" class="card space-y-4">
                 <div>
-                    <h3 class="section-title">Create {{ program.label }} event</h3>
-                    <p class="section-desc mt-1">Add a new round or season for this program.</p>
+                    <h3 class="section-title">{{ isSports ? 'Create Sports Meet season' : `Create ${program.label} event` }}</h3>
+                    <p class="section-desc mt-1">
+                        {{ isSports
+                            ? 'Creates the season (age groups, cutoff, remittance). Add each sport — Athletics, Chess, … — from its Setup hub afterwards; sports start empty and you load items per sport.'
+                            : 'Add a new round or season for this program.' }}
+                    </p>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <FormField label="Event title" :error="form.errors.title" class-extra="sm:col-span-2" required>

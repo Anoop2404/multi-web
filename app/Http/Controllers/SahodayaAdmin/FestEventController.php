@@ -169,6 +169,20 @@ class FestEventController extends SahodayaAdminController
 
         $event = FestEvent::create($data);
 
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::OVERVIEW,
+            'fest.event.created',
+            "Event created: {$event->title}",
+        );
+
+        // Sports: a new top-level event is the season container — land the admin on
+        // its Setup hub where "+ Add sport" lives (sports are added explicitly now).
+        if ($event->event_type === 'sports' && $event->parent_event_id === null) {
+            return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/setup")
+                ->with('success', "Season \"{$event->title}\" created — set age groups & cutoff, then add each sport with \"+ Add sport\".");
+        }
+
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}")
             ->with('success', "Event \"{$event->title}\" created.");
     }
