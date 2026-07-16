@@ -1678,18 +1678,32 @@ const incompleteSquads = computed(() => {
     return list;
 });
 
+// Event dates arrive as full ISO timestamps (e.g. Eloquent `date` casts
+// serialize as UTC midnight of the next IST day). Appending "T12:00:00" to a
+// value that already has a time component produces an invalid Date — this
+// helper handles both a bare "YYYY-MM-DD" string and a full ISO timestamp.
+function toEventDate(value) {
+    if (!value) return null;
+    const str = String(value);
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(str) ? `${str}T12:00:00` : str;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function formatDate(iso) {
-    if (!iso) return '—';
-    const d = new Date(`${iso}T12:00:00`);
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const d = toEventDate(iso);
+    if (!d) return '—';
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
 }
 
 function formatDateRange(start, end) {
-    if (!start && !end) return 'Not scheduled';
-    if (start && end) {
+    const startD = toEventDate(start);
+    const endD = toEventDate(end);
+    if (!startD && !endD) return 'Not scheduled';
+    if (startD && endD) {
         if (start === end) return formatDate(start);
         return `${formatDate(start)} – ${formatDate(end)}`;
     }
-    return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
+    return startD ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
 }
 </script>

@@ -189,31 +189,48 @@ function headLink(headId, action) {
     return `${reportsHref.value}${q}`;
 }
 
+// Event dates arrive from the backend as full ISO timestamps (e.g.
+// "2026-07-23T18:30:00.000000Z" — an Eloquent `date` cast serialized as UTC
+// midnight of the *next* day in IST). Naively appending "T12:00:00" to a
+// string that already has a time component produces an invalid Date, which
+// silently made every date on this page show "Not scheduled". `toEventDate`
+// handles both a bare "YYYY-MM-DD" string and a full ISO timestamp safely.
+function toEventDate(value) {
+    if (!value) return null;
+    const str = String(value);
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(str) ? `${str}T12:00:00` : str;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
 const isRegClosed = computed(() => {
-    if (!props.event.registration_close) return false;
-    return new Date() > new Date(`${props.event.registration_close}T23:59:59`);
+    const d = toEventDate(props.event.registration_close);
+    if (!d) return false;
+    const endOfDay = new Date(d);
+    endOfDay.setHours(23, 59, 59, 999);
+    return new Date() > endOfDay;
 });
 
 const isRegOpenYet = computed(() => {
-    if (!props.event.registration_open) return true;
-    return new Date() >= new Date(`${props.event.registration_open}T00:00:00`);
+    const d = toEventDate(props.event.registration_open);
+    if (!d) return true;
+    return new Date() >= d;
 });
 
 function formatDate(iso) {
-    if (!iso) return '—';
-    const d = new Date(`${iso}T12:00:00`);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const d = toEventDate(iso);
+    if (!d) return '—';
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
 }
 
 function formatDateRange(start, end) {
-    const startOk = start && !Number.isNaN(new Date(`${start}T12:00:00`).getTime());
-    const endOk = end && !Number.isNaN(new Date(`${end}T12:00:00`).getTime());
-    if (!startOk && !endOk) return 'Not scheduled';
-    if (startOk && endOk) {
+    const startD = toEventDate(start);
+    const endD = toEventDate(end);
+    if (!startD && !endD) return 'Not scheduled';
+    if (startD && endD) {
         if (start === end) return formatDate(start);
         return `${formatDate(start)} – ${formatDate(end)}`;
     }
-    return startOk ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
+    return startD ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
 }
 </script>
