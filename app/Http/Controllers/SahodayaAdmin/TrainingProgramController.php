@@ -375,7 +375,11 @@ class TrainingProgramController extends SahodayaAdminController
         $query = (clone $base)
             ->with([
                 'teacher.teachingType',
-                'school:id,name',
+                // Must include "type" — TrainingRegistration::displaySchoolName()
+                // checks `$this->school->type === 'school'` before trusting the
+                // name; with type not selected it's always null, so a perfectly
+                // valid, correctly-linked school silently rendered as "—" here.
+                'school:id,name,type',
                 'feeReceipt',
                 'certificate',
                 'pendingSchool',
