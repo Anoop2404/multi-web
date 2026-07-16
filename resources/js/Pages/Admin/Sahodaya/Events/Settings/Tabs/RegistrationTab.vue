@@ -122,30 +122,21 @@
             </div>
 
             <div v-if="itemRows.length" class="overflow-x-auto rounded-xl border border-slate-100">
-                <table class="data-table text-sm table-fixed w-full">
-                    <colgroup>
-                        <col class="w-48">
-                        <col class="w-24">
-                        <col class="w-32">
-                        <col class="w-32">
-                        <col class="w-32">
-                        <col class="w-32">
-                        <col class="w-16">
-                    </colgroup>
+                <table class="data-table text-sm w-full" style="min-width: 1100px;">
                     <thead class="bg-slate-50">
                         <tr>
-                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600">Item</th>
-                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600">Head</th>
-                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600">Reg opens</th>
-                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600">Reg closes</th>
-                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600">Competition start</th>
-                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600">Competition end</th>
-                            <th class="px-3 py-2 sticky right-0 bg-slate-50"></th>
+                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600 min-w-[11rem]">Item</th>
+                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600 min-w-[7rem]">Head</th>
+                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600 min-w-[9.5rem] whitespace-nowrap">Reg opens</th>
+                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600 min-w-[9.5rem] whitespace-nowrap">Reg closes</th>
+                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600 min-w-[9.5rem] whitespace-nowrap">Competition start</th>
+                            <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600 min-w-[9.5rem] whitespace-nowrap">Competition end</th>
+                            <th class="px-3 py-2 sticky right-0 bg-slate-50 min-w-[4.5rem]"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
                         <tr v-for="row in itemRows" :key="row.id">
-                            <td class="px-3 py-2 font-medium text-slate-900 truncate" :title="row.title">{{ row.title }}</td>
+                            <td class="px-3 py-2 font-medium text-slate-900 max-w-[11rem] truncate" :title="row.title">{{ row.title }}</td>
                             <td class="px-3 py-2">
                                 <select v-if="itemHeads.length" v-model="row.head_id" class="field text-xs w-full">
                                     <option :value="null">—</option>
@@ -153,10 +144,10 @@
                                 </select>
                                 <span v-else class="text-slate-400 text-xs">{{ row.head_name || '—' }}</span>
                             </td>
-                            <td class="px-3 py-2"><input v-model="row.reg_start" type="date" class="field text-xs w-full"></td>
-                            <td class="px-3 py-2"><input v-model="row.reg_end" type="date" class="field text-xs w-full"></td>
-                            <td class="px-3 py-2"><input v-model="row.competition_start" type="date" class="field text-xs w-full"></td>
-                            <td class="px-3 py-2"><input v-model="row.competition_end" type="date" class="field text-xs w-full"></td>
+                            <td class="px-3 py-2"><input v-model="row.reg_start" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
+                            <td class="px-3 py-2"><input v-model="row.reg_end" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
+                            <td class="px-3 py-2"><input v-model="row.competition_start" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
+                            <td class="px-3 py-2"><input v-model="row.competition_end" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
                             <td class="px-3 py-2 text-right sticky right-0 bg-white">
                                 <button type="button" class="btn-secondary text-xs py-1 px-2"
                                         :disabled="savingId === row.id"
