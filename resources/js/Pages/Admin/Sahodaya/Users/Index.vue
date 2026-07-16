@@ -6,6 +6,11 @@
             description="Create judges, exam staff, mark-entry coordinators, event ops, and view-only Sahodaya staff. Assign permissions and event duties below."
         />
 
+        <div v-if="newCredentials" class="notice-banner notice-banner--success mb-4 text-sm">
+            Account created. Username: <strong class="font-mono">{{ newCredentials.username }}</strong>
+            · Temp password: <strong class="font-mono">{{ newCredentials.password }}</strong> (shown once — share this with the user, it won't be shown again)
+        </div>
+
         <form @submit.prevent="createUser" class="card mb-6 form-stack">
             <div>
                 <h3 class="section-title">New user</h3>
@@ -17,9 +22,9 @@
                         <input :id="id" v-model="form.name" class="field" placeholder="Full name" required>
                     </template>
                 </FormField>
-                <FormField label="Email" :error="form.errors.email" required>
+                <FormField label="Email (optional — leave blank to log in by username only)" :error="form.errors.email">
                     <template #default="{ id }">
-                        <input :id="id" v-model="form.email" type="email" class="field" placeholder="Email" required>
+                        <input :id="id" v-model="form.email" type="email" class="field" placeholder="Email (optional)">
                     </template>
                 </FormField>
                 <FormField label="Password" :error="form.errors.password" class-extra="sm:col-span-2" required>
@@ -56,6 +61,17 @@
                             {{ d.label }}
                         </label>
                     </div>
+                </div>
+            </div>
+            <div v-if="form.roles.includes('event_admin')" class="card card--accent space-y-3">
+                <p class="text-xs font-semibold text-violet-900">Event admin — assigned events</p>
+                <p class="text-xs text-slate-500">This user gets full sahodaya-admin control (items, fees, registrations, results, settings) but only for the events checked below.</p>
+                <div class="flex flex-wrap gap-2">
+                    <label v-for="e in festEvents" :key="e.id" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
+                        <input type="checkbox" :value="e.id" v-model="form.event_admin_event_ids">
+                        {{ e.title }} ({{ e.status }})
+                    </label>
+                    <p v-if="!festEvents.length" class="text-xs text-slate-400 italic">No active events yet.</p>
                 </div>
             </div>
             <div v-if="hasExamRole(form.roles)" class="card card--muted space-y-3">
@@ -141,9 +157,9 @@
                         <input :id="id" v-model="editForm.name" class="field" required>
                     </template>
                 </FormField>
-                <FormField label="Email" :error="editForm.errors.email" required>
+                <FormField label="Email (optional)" :error="editForm.errors.email">
                     <template #default="{ id }">
-                        <input :id="id" v-model="editForm.email" type="email" class="field" required>
+                        <input :id="id" v-model="editForm.email" type="email" class="field">
                     </template>
                 </FormField>
                 <FormField label="New password" hint="Leave blank to keep current password">
@@ -174,6 +190,16 @@
                             <input type="checkbox" :value="d.value" v-model="editForm.fest_ops_duties" :aria-label="d.label">
                             {{ d.label }}
                         </label>
+                    </div>
+                </div>
+                <div v-if="editForm.roles.includes('event_admin')" class="card card--accent space-y-3">
+                    <p class="text-xs font-semibold text-violet-900">Event admin — assigned events</p>
+                    <div class="flex flex-wrap gap-2">
+                        <label v-for="e in festEvents" :key="e.id" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
+                            <input type="checkbox" :value="e.id" v-model="editForm.event_admin_event_ids">
+                            {{ e.title }} ({{ e.status }})
+                        </label>
+                        <p v-if="!festEvents.length" class="text-xs text-slate-400 italic">No active events yet.</p>
                     </div>
                 </div>
                 <div v-if="hasExamRole(editForm.roles)" class="card card--muted space-y-3">
@@ -231,17 +257,20 @@ const props = defineProps({
     festEvents: Array,
     mcqExams: Array,
     dutyOptions: Array,
+    newCredentials: Object,
 });
 
 const form = useForm({
     name: '', email: '', password: '', roles: [], permissions: [],
     fest_ops_event_id: '', fest_ops_duties: [],
+    event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
 });
 const editing = ref(null);
 const editForm = useForm({
     name: '', email: '', password: '', roles: [], permissions: [],
     fest_ops_event_id: '', fest_ops_duties: [],
+    event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
 });
 
@@ -302,6 +331,10 @@ function openEdit(user) {
     editForm.fest_ops_duties = fest
         ? user.fest_assignments.filter(a => a.event_id === fest.event_id).map(a => a.duty)
         : [];
+
+    editForm.event_admin_event_ids = (user.fest_assignments || [])
+        .filter(a => a.duty === 'event_admin')
+        .map(a => a.event_id);
 
     const exam = user.exam_assignments?.[0];
     editForm.exam_staff_exam_id = exam?.exam_id ?? '';

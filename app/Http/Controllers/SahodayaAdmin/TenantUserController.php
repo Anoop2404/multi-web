@@ -82,7 +82,7 @@ class TenantUserController extends SahodayaAdminController
 
         $data = $request->validate([
             'name'          => 'required|string|max:255',
-            'email'         => 'required|email|max:255|unique:users,email',
+            'email'         => 'nullable|email|max:255|unique:users,email',
             'password'      => 'nullable|string|min:8',
             'roles'         => 'required|array|min:1',
             'roles.*'       => ['string', Rule::in($roles)],
@@ -93,6 +93,8 @@ class TenantUserController extends SahodayaAdminController
             'fest_ops_duties.*' => ['string', Rule::in(TenantUserCatalog::festEventDuties())],
             'exam_staff_exam_id' => 'nullable|exists:mcq_exams,id',
             'exam_staff_role'    => 'nullable|in:controller,staff',
+            'event_admin_event_ids'   => 'array',
+            'event_admin_event_ids.*' => 'exists:fest_events,id',
         ]);
 
         $perms = $data['permissions'] ?? $provisioner->defaultPermissionsForRoles($data['roles'], 'sahodaya');
@@ -102,7 +104,7 @@ class TenantUserController extends SahodayaAdminController
             $data['roles'],
             $perms,
             $data['name'],
-            $data['email'],
+            $data['email'] ?? null,
             $data['password'] ?? null,
             null,
             null,
@@ -112,6 +114,7 @@ class TenantUserController extends SahodayaAdminController
 
         $user = $result['user'];
         $this->syncEventStaffAssignment($user, $data);
+        $this->syncEventAdminAssignment($user, $data);
         $this->syncExamStaffAssignment($user, $data);
 
         $audit->userCreated($user);
@@ -133,7 +136,7 @@ class TenantUserController extends SahodayaAdminController
 
         $data = $request->validate([
             'name'          => 'required|string|max:255',
-            'email'         => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'email'         => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password'      => 'nullable|string|min:8',
             'roles'         => 'required|array|min:1',
             'roles.*'       => ['string', Rule::in($roles)],
@@ -144,6 +147,8 @@ class TenantUserController extends SahodayaAdminController
             'fest_ops_duties.*' => ['string', Rule::in(TenantUserCatalog::festEventDuties())],
             'exam_staff_exam_id' => 'nullable|exists:mcq_exams,id',
             'exam_staff_role'    => 'nullable|in:controller,staff',
+            'event_admin_event_ids'   => 'array',
+            'event_admin_event_ids.*' => 'exists:fest_events,id',
         ]);
 
         $password = $data['password'] ?? null;
@@ -154,13 +159,14 @@ class TenantUserController extends SahodayaAdminController
             $data['roles'],
             $perms,
             $data['name'],
-            $data['email'],
+            $data['email'] ?? null,
             $password,
             $user->id,
         );
 
         $updated = $result['user'];
         $this->syncEventStaffAssignment($updated, $data);
+        $this->syncEventAdminAssignment($updated, $data);
         $this->syncExamStaffAssignment($updated, $data);
 
         $audit->userUpdated($updated);
@@ -202,6 +208,31 @@ class TenantUserController extends SahodayaAdminController
                 'event_id' => $eventId,
                 'user_id'  => $user->id,
                 'duty'     => $duty,
+            ]);
+        }
+    }
+
+    /** @param  array<string, mixed>  $data */
+    private function syncEventAdminAssignment(User $user, array $data): void
+    {
+        if (! in_array('event_admin', $data['roles'] ?? [], true)) {
+            FestEventStaff::where('user_id', $user->id)->where('duty', 'event_admin')->delete();
+
+            return;
+        }
+
+        $eventIds = array_values(array_unique(array_map('intval', $data['event_admin_event_ids'] ?? [])));
+
+        FestEventStaff::where('user_id', $user->id)
+            ->where('duty', 'event_admin')
+            ->whereNotIn('event_id', $eventIds ?: [0])
+            ->delete();
+
+        foreach ($eventIds as $eventId) {
+            FestEventStaff::firstOrCreate([
+                'event_id' => $eventId,
+                'user_id'  => $user->id,
+                'duty'     => 'event_admin',
             ]);
         }
     }

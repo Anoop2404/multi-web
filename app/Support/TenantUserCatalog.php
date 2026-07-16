@@ -23,6 +23,7 @@ class TenantUserCatalog
             'exam_staff',
             'fest_ops',
             'school_principal',
+            'event_admin',
         ];
     }
 
@@ -136,6 +137,7 @@ class TenantUserCatalog
             'fest_ops'                 => 'Event operations (assigned per event)',
             'group_admin'              => 'Class / group admin',
             'house_admin'              => 'House admin (intra-school)',
+            'event_admin'              => 'Event admin (full control, assigned events only)',
         ];
     }
 
@@ -168,6 +170,7 @@ class TenantUserCatalog
             'marks'        => 'Mark entry coordinator',
             'discipline'   => 'Discipline / item head admin',
             'admit_cards'  => 'Admit cards desk',
+            'event_admin'  => 'Event admin (full control)',
         ];
     }
 
@@ -244,6 +247,7 @@ class TenantUserCatalog
             'data_entry',
             'event_coordinator',
             'mark_entry_admin',
+            'event_admin',
         ];
     }
 
@@ -288,6 +292,11 @@ class TenantUserCatalog
             'data_entry'               => ['fest.view', 'fest.manage', 'fest.marks'],
             'event_coordinator'        => ['fest.view', 'fest.manage', 'fest.schedule', 'fest.settings'],
             'mark_entry_admin'         => ['fest.view', 'fest.marks'],
+            'event_admin'              => [
+                'fest.view', 'fest.manage', 'fest.marks', 'fest.registrations',
+                'fest.results', 'fest.finance', 'fest.settings', 'fest.catering',
+                'fest.schedule', 'fest.certificates',
+            ],
             default                    => [],
         };
     }

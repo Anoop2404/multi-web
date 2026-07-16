@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\FestEventStaff;
 use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -41,6 +42,25 @@ class EnsureSahodayaAdminApi
             if ($permission === null || ! $user->can($permission)) {
                 return response()->json(['message' => 'View-only access. Contact your Sahodaya administrator.'], 403);
             }
+        }
+
+        if ($user->hasRole('event_admin') && ! $user->hasRole('sahodaya_admin')) {
+            $allowedEventIds = FestEventStaff::query()
+                ->where('user_id', $user->id)
+                ->where('duty', 'event_admin')
+                ->pluck('event_id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            $raw = $request->route('event');
+            $requestedEventId = is_object($raw) ? ($raw->id ?? null) : (is_numeric($raw) ? (int) $raw : null);
+
+            if ($requestedEventId !== null && ! in_array((int) $requestedEventId, $allowedEventIds, true)) {
+                return response()->json(['message' => 'You are not assigned to this event.'], 403);
+            }
+
+            $request->attributes->set('eventAdminEventIds', $allowedEventIds);
         }
 
         return $next($request);

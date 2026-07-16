@@ -934,11 +934,23 @@ class StudentController extends SchoolAdminController
         ]);
     }
 
-    /** @return list<mixed> */
+    /**
+     * Admission numbers only need to be unique within this school for one
+     * academic year (matches the students_tenant_year_admission_unique
+     * partial DB index) — the same number can be reused in a later year.
+     *
+     * @return list<mixed>
+     */
     private function admissionNumberRules(?Student $ignore = null): array
     {
+        $academicYearId = $ignore
+            ? $ignore->academic_year_id
+            : \App\Support\StudentRecordHelper::activeAcademicYearIdForSchool($this->school);
+
         $unique = Rule::unique('students', 'admission_number')
-            ->where(fn ($q) => $q->where('tenant_id', $this->school->id)->whereNull('deleted_at'));
+            ->where(fn ($q) => $q->where('tenant_id', $this->school->id)
+                ->where('academic_year_id', $academicYearId)
+                ->whereNull('deleted_at'));
 
         if ($ignore) {
             $unique->ignore($ignore->id);

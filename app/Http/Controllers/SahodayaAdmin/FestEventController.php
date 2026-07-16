@@ -42,6 +42,10 @@ class FestEventController extends SahodayaAdminController
             ->withCount(['items', 'registrations'])
             ->orderByDesc('event_start');
 
+        if ($request->attributes->has('eventAdminEventIds')) {
+            $q->whereIn('id', $request->attributes->get('eventAdminEventIds'));
+        }
+
         $events = $q->get();
         $activeStatuses = ['published', 'registration_open', 'ongoing'];
 
@@ -58,7 +62,7 @@ class FestEventController extends SahodayaAdminController
         ]);
     }
 
-    public function programIndex(string $tenantId, string $program)
+    public function programIndex(Request $request, string $tenantId, string $program)
     {
         $registry = app(\App\Services\Events\FestCompetitionTypeRegistry::class)
             ->forTenant($this->sahodaya->id);
@@ -90,11 +94,16 @@ class FestEventController extends SahodayaAdminController
             }
         }
 
-        $events = FestEvent::forTenant($this->sahodaya->id)
+        $eventsQuery = FestEvent::forTenant($this->sahodaya->id)
             ->ofType($eventType)
             ->withCount(['items', 'registrations'])
-            ->orderByDesc('event_start')
-            ->get();
+            ->orderByDesc('event_start');
+
+        if ($request->attributes->has('eventAdminEventIds')) {
+            $eventsQuery->whereIn('id', $request->attributes->get('eventAdminEventIds'));
+        }
+
+        $events = $eventsQuery->get();
 
         $events->each(function (FestEvent $ev) {
             $ev->has_sports_fees_configured = $ev->hasSportsFeesConfigured();

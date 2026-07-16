@@ -24,7 +24,7 @@ class TenantUserProvisioner
         array $roles,
         array $permissions,
         string $name,
-        string $email,
+        ?string $email,
         ?string $password = null,
         ?int $userId = null,
         ?array $groupClasses = null,
@@ -32,7 +32,7 @@ class TenantUserProvisioner
         ?int $createdByUserId = null,
         ?string $username = null,
     ): array {
-        $email = strtolower(trim($email));
+        $email = $email !== null && trim($email) !== '' ? strtolower(trim($email)) : null;
         $plainPassword = null;
 
         $user = $userId
@@ -42,7 +42,7 @@ class TenantUserProvisioner
         $user->fill([
             'name'              => $name,
             'email'             => $email,
-            'email_verified_at' => $user->email_verified_at ?? now(),
+            'email_verified_at' => $email ? ($user->email_verified_at ?? now()) : null,
         ]);
 
         if ($password !== null) {

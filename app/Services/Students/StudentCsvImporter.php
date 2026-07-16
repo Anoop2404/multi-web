@@ -7,6 +7,7 @@ use App\Models\Student;
 use App\Models\Tenant;
 use App\Services\Spreadsheet\SpreadsheetReader;
 use App\Services\Spreadsheet\SpreadsheetWriter;
+use App\Support\StudentRecordHelper;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
@@ -357,10 +358,16 @@ class StudentCsvImporter
             }
         }
 
+        // Admission numbers only need to be unique within one school for one
+        // academic year (matches the students_tenant_year_admission_unique DB
+        // index) — the same number can be reused in a later academic year.
         $admissionNos = array_values(array_filter(array_column($rows, 'admission_number')));
         if ($admissionNos !== []) {
+            $academicYearId = StudentRecordHelper::activeAcademicYearIdForSchool($this->school);
+
             $existingAdm = Student::query()
                 ->where('tenant_id', $this->school->id)
+                ->where('academic_year_id', $academicYearId)
                 ->whereIn('admission_number', $admissionNos)
                 ->pluck('admission_number')
                 ->map(fn ($v) => strtolower((string) $v))
@@ -373,7 +380,7 @@ class StudentCsvImporter
                 if ($adm && isset($existingAdmSet[strtolower($adm)])) {
                     $errors[] = [
                         'row' => $row['row'],
-                        'message' => "Admission number \"{$adm}\" already exists in this school.",
+                        'message' => "Admission number \"{$adm}\" already exists in this school for this academic year.",
                     ];
                 }
             }

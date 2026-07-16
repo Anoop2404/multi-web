@@ -6,7 +6,7 @@
             <h2 v-if="title" class="page-header-title">{{ title }}</h2>
             <p v-if="description" class="page-header-desc">{{ description }}</p>
         </div>
-        <div v-if="$slots.actions" class="page-header-actions shrink-0">
+        <div v-if="$slots.actions" class="page-header-actions w-full sm:w-auto">
             <slot name="actions" />
         </div>
     </div>

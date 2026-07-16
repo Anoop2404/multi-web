@@ -6,47 +6,44 @@
             :description="`${students.total ?? 0} ${(students.total ?? 0) === 1 ? 'student' : 'students'}${hasActiveFilters ? ' · filtered' : ''}`"
         >
             <template #actions>
-                <a :href="exportUrl('xlsx')" class="btn-secondary">↓ Export (.xlsx)</a>
-                <a :href="exportUrl('csv')" class="btn-secondary">↓ Export (.csv)</a>
-                <a :href="exportPdfUrl()" class="btn-secondary">↓ Print / PDF</a>
-                <button v-if="canBulkRemove && selectedIds.length" type="button"
-                        class="btn-secondary text-sm !border-red-200 !text-red-700 hover:!bg-red-50"
-                        :disabled="bulkDeleteForm.processing"
-                        @click="bulkRemoveSelected">
-                    Remove selected ({{ selectedIds.length }})
-                </button>
-                <button v-if="canBulkRemove" type="button" class="btn-secondary text-sm"
-                        @click="showClassDelete = true">
-                    Remove by class…
-                </button>
-                <button v-if="canBulkRemove" type="button"
-                        class="btn-secondary text-sm !border-red-200 !text-red-700 hover:!bg-red-50"
-                        @click="showRemoveAll = true">
-                    Remove all students…
-                </button>
-                <Link v-if="pendingChangeRequests > 0"
-                      :href="`/school-admin/${school.id}/students/pending-change-requests`"
-                      class="btn-secondary text-sm">
-                    Change requests ({{ pendingChangeRequests }})
-                </Link>
-                <Link :href="`/school-admin/${school.id}/users/profile-change-requests`"
-                      class="btn-secondary text-sm">
-                    Profile requests
-                </Link>
-                <button v-if="needsChangeRequest" type="button" @click="openCreateRequestModal" class="btn-primary">
+                <ActionsMenu label="Export / print">
+                    <a :href="exportUrl('xlsx')" class="menu-item">↓ Export (.xlsx)</a>
+                    <a :href="exportUrl('csv')" class="menu-item">↓ Export (.csv)</a>
+                    <a :href="exportPdfUrl()" class="menu-item">↓ Print / PDF</a>
+                </ActionsMenu>
+
+                <ActionsMenu label="Requests">
+                    <Link v-if="pendingChangeRequests > 0"
+                          :href="`/school-admin/${school.id}/students/pending-change-requests`"
+                          class="menu-item">
+                        Change requests ({{ pendingChangeRequests }})
+                    </Link>
+                    <Link :href="`/school-admin/${school.id}/users/profile-change-requests`" class="menu-item">
+                        Profile requests
+                    </Link>
+                </ActionsMenu>
+
+                <ActionsMenu v-if="canBulkUpload" label="Bulk tools">
+                    <button type="button" @click="openBulkUpload" class="menu-item">Bulk upload students</button>
+                    <button type="button" @click="openBulkUpload('zip')" class="menu-item">Update photos (ZIP)</button>
+                    <Link :href="`/school-admin/${school.id}/imports`" class="menu-item">Import history</Link>
+                    <div v-if="canBulkRemove" class="my-1 border-t border-slate-100"></div>
+                    <p v-if="canBulkRemove" class="menu-section-label">Danger zone</p>
+                    <button v-if="canBulkRemove" type="button" class="menu-item menu-item--danger"
+                            @click="showClassDelete = true">
+                        Remove by class…
+                    </button>
+                    <button v-if="canBulkRemove" type="button" class="menu-item menu-item--danger"
+                            @click="showRemoveAll = true">
+                        Remove all students…
+                    </button>
+                </ActionsMenu>
+
+                <button v-if="needsChangeRequest" type="button" @click="openCreateRequestModal" class="btn-primary text-sm">
                     Request new student
                 </button>
-                <button v-if="canBulkUpload" type="button" @click="openBulkUpload('zip')" class="btn-secondary">
-                    Update photos (ZIP)
-                </button>
-                <button v-if="canBulkUpload" type="button" @click="openBulkUpload" class="btn-secondary">
-                    Bulk upload
-                </button>
-                <Link v-if="canBulkUpload" :href="`/school-admin/${school.id}/imports`" class="btn-secondary text-sm">
-                    Import history
-                </Link>
                 <Link v-if="canBulkUpload" :href="`/school-admin/${school.id}/students/create`"
-                      :class="['btn-primary', !schoolClasses.length ? 'pointer-events-none opacity-50' : '']"
+                      :class="['btn-primary text-sm', !schoolClasses.length ? 'pointer-events-none opacity-50' : '']"
                       :title="!schoolClasses.length ? 'Classes are configured by your Sahodaya' : ''">
                     + Add student
                 </Link>
@@ -105,7 +102,7 @@
             >
                 <template #toolbar>
                     <div class="space-y-3">
-                        <FormGrid class-extra="sm:grid-cols-2 lg:grid-cols-4 items-end">
+                        <FormGrid class-extra="sm:grid-cols-2 lg:grid-cols-5 items-end">
                             <FormField label="Category">
                                 <select v-model="filterForm.class_category_id" @change="onCategoryChange" class="field">
                                     <option :value="null">All categories</option>
@@ -134,15 +131,13 @@
                                     <option value="unverified">Pending Sahodaya verification</option>
                                 </select>
                             </FormField>
-                            <div class="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-1">
-                                <button v-if="hasActiveFilters" type="button" @click="clearFilters" class="btn-ghost">Clear</button>
-                            </div>
-                        </FormGrid>
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
-                            <FormField label="Search" class-extra="flex-1 max-w-md">
+                            <FormField label="Search">
                                 <input v-model="filterForm.search" type="search" placeholder="Name, reg no, email, roll no…"
                                        class="field">
                             </FormField>
+                        </FormGrid>
+                        <div v-if="hasActiveFilters" class="flex justify-end">
+                            <button type="button" @click="clearFilters" class="btn-ghost text-xs">Clear filters</button>
                         </div>
                         <div v-if="canBulkRemove && students.data?.length"
                              class="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2 text-sm">
@@ -493,6 +488,7 @@
 
 <script setup>
 import SahodayaDataTable from '@/Components/SahodayaDataTable.vue';
+import ActionsMenu from '@/Components/ui/ActionsMenu.vue';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ProfilePhotoCropper from '@/Components/school/ProfilePhotoCropper.vue';
 import StudentPhotoEditModal from '@/Components/school/StudentPhotoEditModal.vue';

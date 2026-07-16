@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Middleware\Concerns\RedirectsUnauthenticated;
+use App\Models\FestEventStaff;
 use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -40,6 +41,42 @@ class EnsureSahodayaAdmin
             && $user->hasAnyRole(TenantUserCatalog::sahodayaPermissionRoles()),
         );
 
+        // Event admins get a full sahodaya-admin experience, but locked to the
+        // specific events they've been assigned (via FestEventStaff duty=event_admin).
+        // Users with a broader role (sahodaya_admin, etc.) bypass this scoping even
+        // if they also happen to hold the event_admin role.
+        if ($user->hasRole('event_admin') && ! $user->hasRole('sahodaya_admin')) {
+            $allowedEventIds = FestEventStaff::query()
+                ->where('user_id', $user->id)
+                ->where('duty', 'event_admin')
+                ->pluck('event_id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            $requestedEventId = $this->resolveRouteEventId($request);
+            if ($requestedEventId !== null && ! in_array($requestedEventId, $allowedEventIds, true)) {
+                abort(403, 'You are not assigned to this event.');
+            }
+
+            $request->attributes->set('eventAdminEventIds', $allowedEventIds);
+        }
+
         return $next($request);
+    }
+
+    private function resolveRouteEventId(Request $request): ?int
+    {
+        $raw = $request->route('event');
+
+        if ($raw === null) {
+            return null;
+        }
+
+        if (is_object($raw)) {
+            return isset($raw->id) ? (int) $raw->id : null;
+        }
+
+        return is_numeric($raw) ? (int) $raw : null;
     }
 }

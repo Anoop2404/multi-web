@@ -8,12 +8,15 @@ use App\Services\Audit\DataChangeLogger;
 use App\Support\StudentRecordHelper;
 use App\Support\TenantStorage;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 
 class StudentRecordCreator
 {
     /** @param  array<string, mixed>  $fields */
     public function create(Tenant $school, array $fields, ?UploadedFile $photo = null): Student
     {
+        $academicYearId = StudentRecordHelper::activeAcademicYearIdForSchool($school);
+
         $payload = [
             'tenant_id'        => $school->id,
             'school_class_id'  => $fields['school_class_id'],
@@ -21,13 +24,14 @@ class StudentRecordCreator
             'gender'           => $fields['gender'],
             'dob'              => $fields['dob'] ?? null,
             'status'           => 'active',
-            'academic_year_id' => StudentRecordHelper::activeAcademicYearIdForSchool($school),
+            'academic_year_id' => $academicYearId,
         ];
 
         $payload['reg_no'] = app(StudentRegistrationNumberGenerator::class)->generate($school);
 
         if (! empty($fields['admission_number'])) {
             $payload['admission_number'] = trim((string) $fields['admission_number']);
+            $this->assertAdmissionNumberAvailable($school, $academicYearId, $payload['admission_number']);
         }
 
         if (! empty($fields['parent_email'])) {
@@ -62,5 +66,26 @@ class StudentRecordCreator
         }
 
         return $student;
+    }
+
+    /**
+     * School admission numbers only need to be unique within one school for
+     * one academic year (matches the students_tenant_year_admission_unique
+     * partial DB index) — the same number can be reused in a later year.
+     */
+    public function assertAdmissionNumberAvailable(Tenant $school, ?int $academicYearId, string $admissionNumber, ?int $ignoreStudentId = null): void
+    {
+        $exists = Student::query()
+            ->where('tenant_id', $school->id)
+            ->where('academic_year_id', $academicYearId)
+            ->whereRaw('lower(admission_number) = ?', [strtolower($admissionNumber)])
+            ->when($ignoreStudentId, fn ($q) => $q->where('id', '!=', $ignoreStudentId))
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'admission_number' => "Admission number \"{$admissionNumber}\" already exists in this school for this academic year.",
+            ]);
+        }
     }
 }
