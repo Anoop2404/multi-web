@@ -568,20 +568,33 @@ class FestRegistrationController extends SchoolAdminController
             ? array_values(array_unique($data['teacher_ids'] ?? []))
             : array_values(array_diff($data['student_ids'], $standbyIds));
 
-        $registration = app(\App\Services\Events\FestRegistrationCreateService::class)->createForSchool(
-            $event,
-            $item,
-            $this->school,
-            $performerIds,
-            $standbyIds,
-            $data['team_name'] ?? null,
-            teamContacts: [
-                'coach_name' => $data['coach_name'] ?? null,
-                'coach_phone' => $data['coach_phone'] ?? null,
-                'manager_name' => $data['manager_name'] ?? null,
-                'manager_phone' => $data['manager_phone'] ?? null,
-            ],
-        );
+        try {
+            $registration = app(\App\Services\Events\FestRegistrationCreateService::class)->createForSchool(
+                $event,
+                $item,
+                $this->school,
+                $performerIds,
+                $standbyIds,
+                $data['team_name'] ?? null,
+                teamContacts: [
+                    'coach_name' => $data['coach_name'] ?? null,
+                    'coach_phone' => $data['coach_phone'] ?? null,
+                    'manager_name' => $data['manager_name'] ?? null,
+                    'manager_phone' => $data['manager_phone'] ?? null,
+                ],
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $messages = $e->errors();
+            $mapped = [];
+            foreach ($messages as $key => $errors) {
+                if (in_array($key, ['student_ids', 'teacher_ids', 'standby_ids', 'registration'])) {
+                    $mapped["items.{$item->id}"] = $errors;
+                } else {
+                    $mapped[$key] = $errors;
+                }
+            }
+            throw \Illuminate\Validation\ValidationException::withMessages($mapped);
+        }
 
         app(PlatformAuditLogger::class)->festRegistrationSubmitted($registration->fresh(['event', 'item']));
 
@@ -624,21 +637,34 @@ class FestRegistrationController extends SchoolAdminController
             ? array_values(array_unique($data['teacher_ids'] ?? []))
             : array_values(array_diff($data['student_ids'], $standbyIds));
 
-        $registration = app(\App\Services\Events\FestRegistrationCreateService::class)->updateForSchool(
-            $registration,
-            $event,
-            $item,
-            $this->school,
-            $performerIds,
-            $standbyIds,
-            $data['team_name'] ?? null,
-            teamContacts: [
-                'coach_name' => $data['coach_name'] ?? null,
-                'coach_phone' => $data['coach_phone'] ?? null,
-                'manager_name' => $data['manager_name'] ?? null,
-                'manager_phone' => $data['manager_phone'] ?? null,
-            ],
-        );
+        try {
+            $registration = app(\App\Services\Events\FestRegistrationCreateService::class)->updateForSchool(
+                $registration,
+                $event,
+                $item,
+                $this->school,
+                $performerIds,
+                $standbyIds,
+                $data['team_name'] ?? null,
+                teamContacts: [
+                    'coach_name' => $data['coach_name'] ?? null,
+                    'coach_phone' => $data['coach_phone'] ?? null,
+                    'manager_name' => $data['manager_name'] ?? null,
+                    'manager_phone' => $data['manager_phone'] ?? null,
+                ],
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $messages = $e->errors();
+            $mapped = [];
+            foreach ($messages as $key => $errors) {
+                if (in_array($key, ['student_ids', 'teacher_ids', 'standby_ids', 'registration'])) {
+                    $mapped["items.{$item->id}"] = $errors;
+                } else {
+                    $mapped[$key] = $errors;
+                }
+            }
+            throw \Illuminate\Validation\ValidationException::withMessages($mapped);
+        }
 
         app(PlatformAuditLogger::class)->festRegistrationSubmitted($registration->fresh(['event', 'item']));
 

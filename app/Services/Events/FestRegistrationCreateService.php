@@ -14,6 +14,7 @@ use App\Services\Events\Concerns\HandlesFestRegistrationDuplicates;
 use App\Services\Events\EventLifecycleGate;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class FestRegistrationCreateService
 {
@@ -52,20 +53,24 @@ class FestRegistrationCreateService
         }
 
         app(FestEventRegistrationService::class)->assertSchoolMembershipApproved($school);
-        abort_if($item->is_enabled === false, 422, 'This item is not open for registration.');
+        if ($item->is_enabled === false) {
+            throw ValidationException::withMessages(['registration' => 'This item is not open for registration.']);
+        }
 
         app(FestItemRegistrationGate::class)->assertOpen($item);
         app(FestRegistrationFeeGate::class)->assertCanRegister($event, $school);
 
         if (! $skipSchoolClosedCheck && $school->fest_registration_closed) {
-            abort(422, 'Fest registration is closed for this school.');
+            throw ValidationException::withMessages(['registration' => 'Fest registration is closed for this school.']);
         }
 
         if ($event->registration_locked) {
-            abort(422, 'Registration is locked for this event.');
+            throw ValidationException::withMessages(['registration' => 'Registration is locked for this event.']);
         }
 
-        abort_if(! $event->isRegistrationOpen(), 422, 'Registration is closed for this event.');
+        if (! $event->isRegistrationOpen()) {
+            throw ValidationException::withMessages(['registration' => 'Registration is closed for this event.']);
+        }
         EventLifecycleGate::allowRegistration($event);
 
         if ($event->event_type === 'teacher_fest') {
@@ -75,7 +80,9 @@ class FestRegistrationCreateService
         $standbyIds = array_values(array_unique($standbyIds));
         $performerIds = array_values(array_diff(array_unique($performerIds), $standbyIds));
 
-        abort_if($performerIds === [], 422, 'Select at least one participant.');
+        if ($performerIds === []) {
+            throw ValidationException::withMessages(['student_ids' => 'Select at least one participant.']);
+        }
 
         $isGroup = in_array($item->participant_type, ['group', 'team'], true);
         if ($isGroup) {
@@ -83,18 +90,24 @@ class FestRegistrationCreateService
                 $teamName = $this->nextDefaultTeamName($event, $item, $school);
             }
             $error = $item->validateSquadCount(count($performerIds));
-            abort_if($error, 422, $error);
+            if ($error) {
+                throw ValidationException::withMessages(['student_ids' => $error]);
+            }
         } elseif (count($performerIds) > 1) {
-            abort(422, 'This item allows only one participant.');
+            throw ValidationException::withMessages(['student_ids' => 'This item allows only one participant.']);
         }
 
         $limitErrors = (new FestParticipationLimitService($event))
             ->validateRegistration($item, $school->id, $performerIds, $standbyIds);
-        abort_if($limitErrors, 422, implode(' ', $limitErrors));
+        if ($limitErrors) {
+            throw ValidationException::withMessages(['student_ids' => implode(' ', $limitErrors)]);
+        }
 
         $eligibilityErrors = app(FestRegistrationEligibilityService::class)
             ->validateStudents($event, $item, array_merge($performerIds, $standbyIds));
-        abort_if($eligibilityErrors, 422, implode(' ', $eligibilityErrors));
+        if ($eligibilityErrors) {
+            throw ValidationException::withMessages(['student_ids' => implode(' ', $eligibilityErrors)]);
+        }
 
         $item->loadMissing('head');
         $limitService = new FestParticipationLimitService($event);
@@ -207,15 +220,21 @@ class FestRegistrationCreateService
         abort_if($registration->school_id !== $school->id, 403);
         abort_if($school->parent_id !== $event->tenant_id, 403);
 
-        abort_unless(
-            app(FestRegistrationService::class)->canSchoolCancel($registration, $event),
-            422,
-            'This registration can no longer be edited — it may already be approved with payment, past results-publish, or the event has closed.'
-        );
+        if (! app(FestRegistrationService::class)->canSchoolCancel($registration, $event)) {
+            throw ValidationException::withMessages([
+                'registration' => 'This registration can no longer be edited — it may already be approved with payment, past results-publish, or the event has closed.',
+            ]);
+        }
 
-        abort_if($item->is_enabled === false, 422, 'This item is not open for registration.');
+        if ($item->is_enabled === false) {
+            throw ValidationException::withMessages(['registration' => 'This item is not open for registration.']);
+        }
         app(FestItemRegistrationGate::class)->assertOpen($item);
-        abort_if($event->schedule_published, 422, 'The squad cannot be changed once the fest-day schedule has been published.');
+        if ($event->schedule_published) {
+            throw ValidationException::withMessages([
+                'registration' => 'The squad cannot be changed once the fest-day schedule has been published.',
+            ]);
+        }
 
         if ($event->event_type === 'teacher_fest') {
             return $this->updateTeacherRegistration($registration, $event, $item, $school, $performerIds);
@@ -224,7 +243,9 @@ class FestRegistrationCreateService
         $standbyIds = array_values(array_unique($standbyIds));
         $performerIds = array_values(array_diff(array_unique($performerIds), $standbyIds));
 
-        abort_if($performerIds === [], 422, 'Select at least one participant.');
+        if ($performerIds === []) {
+            throw ValidationException::withMessages(['student_ids' => 'Select at least one participant.']);
+        }
 
         $isGroup = in_array($item->participant_type, ['group', 'team'], true);
         if ($isGroup) {
@@ -232,18 +253,24 @@ class FestRegistrationCreateService
                 $teamName = $this->nextDefaultTeamName($event, $item, $school, $registration->id);
             }
             $error = $item->validateSquadCount(count($performerIds));
-            abort_if($error, 422, $error);
+            if ($error) {
+                throw ValidationException::withMessages(['student_ids' => $error]);
+            }
         } elseif (count($performerIds) > 1) {
-            abort(422, 'This item allows only one participant.');
+            throw ValidationException::withMessages(['student_ids' => 'This item allows only one participant.']);
         }
 
         $limitErrors = (new FestParticipationLimitService($event))
             ->validateRegistration($item, $school->id, $performerIds, $standbyIds, $registration->id);
-        abort_if($limitErrors, 422, implode(' ', $limitErrors));
+        if ($limitErrors) {
+            throw ValidationException::withMessages(['student_ids' => implode(' ', $limitErrors)]);
+        }
 
         $eligibilityErrors = app(FestRegistrationEligibilityService::class)
             ->validateStudents($event, $item, array_merge($performerIds, $standbyIds));
-        abort_if($eligibilityErrors, 422, implode(' ', $eligibilityErrors));
+        if ($eligibilityErrors) {
+            throw ValidationException::withMessages(['student_ids' => implode(' ', $eligibilityErrors)]);
+        }
 
         return DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts) {
             $eventRegService = app(FestEventRegistrationService::class);
@@ -346,10 +373,12 @@ class FestRegistrationCreateService
         array $teacherIds,
     ): FestRegistration {
         $teacherIds = array_values(array_unique($teacherIds));
-        abort_if($teacherIds === [], 422, 'Select at least one teacher.');
+        if ($teacherIds === []) {
+            throw ValidationException::withMessages(['teacher_ids' => 'Select at least one teacher.']);
+        }
 
         if (count($teacherIds) > 1 && ! in_array($item->participant_type, ['group', 'team'], true)) {
-            abort(422, 'This item allows only one teacher.');
+            throw ValidationException::withMessages(['teacher_ids' => 'This item allows only one teacher.']);
         }
 
         return DB::transaction(function () use ($registration, $event, $school, $teacherIds) {
@@ -384,10 +413,12 @@ class FestRegistrationCreateService
         array $teacherIds,
     ): FestRegistration {
         $teacherIds = array_values(array_unique($teacherIds));
-        abort_if($teacherIds === [], 422, 'Select at least one teacher.');
+        if ($teacherIds === []) {
+            throw ValidationException::withMessages(['teacher_ids' => 'Select at least one teacher.']);
+        }
 
         if (count($teacherIds) > 1 && ! in_array($item->participant_type, ['group', 'team'], true)) {
-            abort(422, 'This item allows only one teacher.');
+            throw ValidationException::withMessages(['teacher_ids' => 'This item allows only one teacher.']);
         }
 
         try {

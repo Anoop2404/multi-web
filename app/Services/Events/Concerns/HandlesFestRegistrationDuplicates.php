@@ -18,7 +18,10 @@ trait HandlesFestRegistrationDuplicates
     protected function abortOnFestRegistrationDuplicate(QueryException $e): void
     {
         if ($this->isFestRegistrationDuplicate($e)) {
-            abort(422, 'Your school already has an entry for this item.');
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'registration' => 'Your school already has an entry for this item.',
+            ]);
         }
     }
 }
+
