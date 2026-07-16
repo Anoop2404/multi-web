@@ -251,6 +251,61 @@ class FestSportsCompositeFeeServiceTest extends TestCase
         $this->assertSame(200.0, $result['team_fee']); // one waived by included_teams, one billed
     }
 
+    public function test_team_item_billed_per_participant_if_team_fee_is_zero(): void
+    {
+        ['school' => $school, 'event' => $event, 'head' => $head] = $this->sportsContext([
+            'team_registration_fee' => 0,
+            'default_item_fee' => 200,
+            'included_teams' => 0,
+        ]);
+
+        $teamItem = $this->makeItem($event, $head, [
+            'title' => 'U19 Chess Team',
+            'participant_type' => 'team',
+            'min_group_size' => 4,
+            'max_group_size' => 5,
+            'quota_eligible' => false,
+        ]);
+
+        $registration = FestRegistration::create([
+            'event_id' => $event->id,
+            'item_id' => $teamItem->id,
+            'school_id' => $school->id,
+            'status' => 'approved',
+        ]);
+
+        // Add 4 participants
+        foreach (range(1, 4) as $i) {
+            $student = $this->makeStudent($school, "Athlete {$i}");
+            FestParticipant::create([
+                'registration_id' => $registration->id,
+                'student_id' => $student->id,
+                'participant_role' => 'performer',
+            ]);
+        }
+
+        // Add 1 standby (which should be excluded)
+        $standby = $this->makeStudent($school, 'Standby');
+        FestParticipant::create([
+            'registration_id' => $registration->id,
+            'student_id' => $standby->id,
+            'participant_role' => 'standby',
+        ]);
+
+        $result = app(FestSportsCompositeFeeService::class)->calculateForHead($head->fresh(), $school->id);
+
+        // 4 performers * 200 default_item_fee = 800.0
+        $this->assertSame(800.0, $result['team_fee']);
+        
+        // Let's verify the line label and quantity
+        $line = collect($result['lines'])->firstWhere('line_type', 'team_fee');
+        $this->assertNotNull($line);
+        $this->assertSame('U19 Chess Team (4 × ₹200)', $line['label']);
+        $this->assertSame(4, $line['quantity']);
+        $this->assertSame(200.0, $line['unit_amount']);
+    }
+
+
 
     public function test_cancelling_unpaid_registration_releases_quota_slot(): void
     {

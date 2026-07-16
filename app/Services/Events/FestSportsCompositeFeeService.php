@@ -121,15 +121,32 @@ class FestSportsCompositeFeeService
             if ($waived) {
                 $teamQuotaUsed++;
                 $amount = 0.0;
+                $label = ($registration->item->title ?? 'Team item').' — team fee (free quota)';
+                $quantity = 1;
+                $unitAmount = 0.0;
             } else {
-                $amount = $teamRegRate;
+                if ($teamRegRate == 0) {
+                    $performersCount = $registration->participants
+                        ->filter(fn ($p) => $p->participant_role !== 'standby' && $p->student_id)
+                        ->count();
+                    $itemFee = (float) ($defaultItemFee ?? $studentRegRate);
+                    $amount = $itemFee * $performersCount;
+                    $label = ($registration->item->title ?? 'Team item')." ({$performersCount} × ₹".number_format($itemFee, 0).")";
+                    $quantity = $performersCount;
+                    $unitAmount = $itemFee;
+                } else {
+                    $amount = $teamRegRate;
+                    $label = ($registration->item->title ?? 'Team item').' — team fee';
+                    $quantity = 1;
+                    $unitAmount = $teamRegRate;
+                }
             }
 
             $lines[] = [
                 'line_type' => $waived ? 'team_fee_waived' : 'team_fee',
-                'label' => ($registration->item->title ?? 'Team item').' — team fee'.($waived ? ' (free quota)' : ''),
-                'quantity' => 1,
-                'unit_amount' => $amount,
+                'label' => $label,
+                'quantity' => $quantity,
+                'unit_amount' => $unitAmount,
                 'amount' => $amount,
                 'meta' => [
                     'registration_id' => $registration->id,
@@ -338,16 +355,32 @@ class FestSportsCompositeFeeService
             if ($waived) {
                 $teamQuotaUsed++;
                 $amount = 0.0;
+                $label = ($registration->item->title ?? 'Team item').' — team fee (free quota)';
+                $quantity = 1;
+                $unitAmount = 0.0;
             } else {
-                // FRD-04 v2: team items inherit the Event Head team registration fee.
-                $amount = $teamRegRate;
+                if ($teamRegRate == 0) {
+                    $performersCount = $registration->participants
+                        ->filter(fn ($p) => $p->participant_role !== 'standby' && $p->student_id)
+                        ->count();
+                    $itemFee = (float) ($head->default_item_fee ?? $studentRegRate);
+                    $amount = $itemFee * $performersCount;
+                    $label = ($registration->item->title ?? 'Team item')." ({$performersCount} × ₹".number_format($itemFee, 0).")";
+                    $quantity = $performersCount;
+                    $unitAmount = $itemFee;
+                } else {
+                    $amount = $teamRegRate;
+                    $label = ($registration->item->title ?? 'Team item').' — team fee';
+                    $quantity = 1;
+                    $unitAmount = $teamRegRate;
+                }
             }
 
             $lines[] = [
                 'line_type' => $waived ? 'team_fee_waived' : 'team_fee',
-                'label' => ($registration->item->title ?? 'Team item').' — team fee'.($waived ? ' (free quota)' : ''),
-                'quantity' => 1,
-                'unit_amount' => $amount,
+                'label' => $label,
+                'quantity' => $quantity,
+                'unit_amount' => $unitAmount,
                 'amount' => $amount,
                 'meta' => [
                     'registration_id' => $registration->id,
