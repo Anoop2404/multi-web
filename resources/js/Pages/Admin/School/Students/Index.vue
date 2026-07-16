@@ -199,9 +199,19 @@
                         </Link>
                     </td>
                     <td class="px-4 py-3 min-w-[13rem] font-medium text-gray-900">
-                        <Link :href="profileUrl(student)" class="hover:text-[#0f3d7a] hover:underline">
-                            {{ student.name }}
-                        </Link>
+                        <div class="flex items-center gap-2">
+                            <Link :href="profileUrl(student)" class="hover:text-[#0f3d7a] hover:underline">
+                                {{ student.name }}
+                            </Link>
+                            <span v-if="student.is_verified"
+                                  class="inline-flex items-center gap-1 shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                ✓ Verified
+                            </span>
+                            <span v-else
+                                  class="inline-flex items-center gap-1 shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                Pending
+                            </span>
+                        </div>
                     </td>
                     <td class="px-4 py-3 font-mono text-xs text-gray-500">
                         {{ student.reg_no || '—' }}
@@ -213,16 +223,6 @@
                     <td class="px-4 py-3">
                         <span class="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
                               :class="statusClass(student.status)">{{ student.status }}</span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <span v-if="student.is_verified"
-                              class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                            ✓ Verified
-                        </span>
-                        <span v-else
-                              class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                            Pending
-                        </span>
                     </td>
                     <td class="px-4 py-3 text-right whitespace-nowrap">
                         <Link :href="profileUrl(student)" class="link-brand text-xs mr-3">Profile</Link>
@@ -570,7 +570,6 @@ const columns = computed(() => {
         { key: 'parent_email', label: 'Email',  sortable: true },
         { key: 'class',        label: 'Class',  sortable: true },
         { key: 'status',       label: 'Status', sortable: true },
-        { key: 'verified',     label: 'Verification', sortable: false },
         { key: 'actions',      label: '', sortable: false, align: 'right' },
     ];
     return base;
