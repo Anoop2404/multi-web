@@ -69,7 +69,11 @@ class ProgramFeeReceiptService
     public function issueTraining(TrainingRegistration $registration, FeeReceipt $receipt): FeeReceipt
     {
         $registration->loadMissing(['program', 'teacher', 'school']);
-        $sahodaya = Tenant::find($registration->school?->parent_id);
+        // Fall back to the training program's own Sahodaya when the registration
+        // has no linked school (e.g. a teacher registered with no school / a
+        // pending-school request) — the program's tenant_id is always the
+        // Sahodaya, so the receipt can still be issued correctly.
+        $sahodaya = Tenant::find($registration->school?->parent_id ?? $registration->program?->tenant_id);
         abort_unless($sahodaya, 422, 'School Sahodaya not found.');
 
         return $this->issueOnApprove($receipt, $sahodaya, 'TRN', function (string $receiptNo) use ($registration, $receipt, $sahodaya) {

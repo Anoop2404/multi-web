@@ -343,6 +343,7 @@ class TrainingProgramController extends SahodayaAdminController
             'status'       => 'nullable|string|max:40',
             'source'       => 'nullable|in:all,qr,portal,school',
             'verification' => 'nullable|in:all,verified,unverified',
+            'school'       => 'nullable|in:all,assigned,pending,none',
             'sort'         => 'nullable|in:id,teacher,status,source',
             'dir'          => 'nullable|in:asc,desc',
             'per_page'     => 'nullable|integer|min:10|max:100',
@@ -356,6 +357,10 @@ class TrainingProgramController extends SahodayaAdminController
             'confirmed'  => (clone $base)->whereIn('training_registrations.status', ['confirmed', 'completed'])->count(),
             'waitlisted' => (clone $base)->where('training_registrations.status', 'waitlisted')->count(),
             'qr'         => (clone $base)->where('training_registrations.registration_source', 'qr')->count(),
+            'no_school'  => (clone $base)
+                ->whereNull('training_registrations.school_id')
+                ->whereNull('training_registrations.pending_school_id')
+                ->count(),
         ];
 
         $sort = $filters['sort'] ?? 'id';
@@ -364,6 +369,7 @@ class TrainingProgramController extends SahodayaAdminController
         $status = $filters['status'] ?? 'all';
         $source = $filters['source'] ?? 'all';
         $verification = $filters['verification'] ?? 'all';
+        $schoolFilter = $filters['school'] ?? 'all';
         $search = trim((string) ($filters['search'] ?? ''));
 
         $query = (clone $base)
@@ -388,6 +394,11 @@ class TrainingProgramController extends SahodayaAdminController
                 'teacher',
                 fn ($t) => $t->whereNull('verified_at')
             ))
+            ->when($schoolFilter === 'none', fn ($q) => $q
+                ->whereNull('training_registrations.school_id')
+                ->whereNull('training_registrations.pending_school_id'))
+            ->when($schoolFilter === 'pending', fn ($q) => $q->whereNotNull('training_registrations.pending_school_id'))
+            ->when($schoolFilter === 'assigned', fn ($q) => $q->whereNotNull('training_registrations.school_id'))
             ->when($search !== '', function ($q) use ($search) {
                 $term = '%'.$search.'%';
                 $matchedSchoolIds = Tenant::where('parent_id', $this->sahodaya->id)
@@ -438,6 +449,7 @@ class TrainingProgramController extends SahodayaAdminController
                 'status'       => $status === '' ? 'all' : $status,
                 'source'       => $source,
                 'verification' => $verification,
+                'school'       => $schoolFilter,
                 'sort'         => $sort,
                 'dir'          => $dir,
                 'per_page'     => $perPage,
@@ -681,6 +693,13 @@ class TrainingProgramController extends SahodayaAdminController
         if ($fullyPaid && $registration->fresh()->status === 'registered') {
             $registration->update(['status' => 'confirmed']);
         }
+
+        // This receipt is created directly with status "approved" (offline/manual
+        // payment), so FeeReceiptObserver::updated() never fires — it only reacts
+        // to a status *change* via ->update(), not ->create(). Post to the ledger
+        // explicitly here, otherwise a manually recorded training fee never shows
+        // up in accounts/ledger.
+        app(\App\Services\Ledger\TrainingFeeLedgerService::class)->postApprovedReceipt($receipt->fresh());
 
         $issued = app(ProgramFeeReceiptService::class)->issueTraining(
             $registration->fresh(['program', 'teacher', 'school']),

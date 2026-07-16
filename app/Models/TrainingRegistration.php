@@ -31,6 +31,24 @@ class TrainingRegistration extends Model
         'display_school_name',
     ];
 
+    protected static function booted(): void
+    {
+        // Safety net: every registration must resolve to either a real school or a
+        // pending-school request awaiting Sahodaya approval. All current creation
+        // paths (QR public form, portal self-registration, school CSV import)
+        // already enforce this at the controller/service layer — this guard just
+        // stops a future code path from silently creating an orphaned row with
+        // neither, which is otherwise invisible until someone notices "—" in the
+        // registrations list with no "Pending school" tag.
+        static::creating(function (self $registration) {
+            if (! $registration->school_id && ! $registration->pending_school_id) {
+                throw new \RuntimeException(
+                    'TrainingRegistration must have either school_id or pending_school_id set.'
+                );
+            }
+        });
+    }
+
     public function getDisplaySchoolNameAttribute(): string
     {
         return $this->displaySchoolName();

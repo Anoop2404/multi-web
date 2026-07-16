@@ -141,6 +141,49 @@ class TenantUserCatalog
         ];
     }
 
+    /**
+     * Short clarifying text shown under each role chip in the Portal users form —
+     * mainly to disambiguate the three event-related roles (event_coordinator,
+     * fest_ops, event_admin), which read as near-synonyms from their labels alone.
+     *
+     * @return array<string, string>
+     */
+    public static function roleDescriptions(): array
+    {
+        return [
+            'sahodaya_staff'           => 'Read-only by default; tick individual permissions below to widen access.',
+            'registration_coordinator' => 'Manages registrations across all events (not scoped to one event).',
+            'sahodaya_finance'         => 'Fee approvals, ledger, and finance reports across the Sahodaya.',
+            'certificate_collector'    => 'Issues and prints certificates once results are published.',
+            'data_entry'               => 'Enters marks/results but cannot change event settings.',
+            'event_coordinator'        => 'Sahodaya-wide: manage settings, schedule, marks, and results for every event — not limited to one event.',
+            'judge'                    => 'Portal login for entering marks for events they officiate — no admin panel access.',
+            'mark_entry_admin'         => 'Enters and corrects marks across events.',
+            'mark_entry_coordinator'   => 'Portal login for entering marks for assigned events only.',
+            'exam_controller'          => 'Talent Search exam: attendance + marks for the assigned exam.',
+            'exam_staff'               => 'Talent Search exam: attendance only for the assigned exam.',
+            'fest_ops'                 => 'One operational duty (registration desk, stage, food, etc.) for a single event you assign — narrow, task-based access.',
+            'school_principal'         => 'Full school-admin access, can create/manage other school users.',
+            'event_admin'              => 'Full sahodaya-admin control (items, fees, registrations, results, settings) but locked to only the events you tick below.',
+        ];
+    }
+
+    /**
+     * Groups roles for the Portal users create form so related roles (especially
+     * the three event-scoped ones) are visually clustered instead of one flat list.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function roleGroups(): array
+    {
+        return [
+            'General'            => ['sahodaya_staff', 'school_principal'],
+            'Registration & finance' => ['registration_coordinator', 'sahodaya_finance', 'certificate_collector', 'data_entry'],
+            'Event roles'        => ['event_coordinator', 'fest_ops', 'event_admin', 'judge'],
+            'Exams & marks'      => ['mark_entry_admin', 'mark_entry_coordinator', 'exam_controller', 'exam_staff'],
+        ];
+    }
+
     /** @return list<string> */
     public static function sportsFestEventDuties(): array
     {

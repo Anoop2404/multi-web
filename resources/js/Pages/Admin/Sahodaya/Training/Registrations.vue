@@ -55,6 +55,13 @@
             </button>
         </div>
 
+        <button v-if="counts.no_school" type="button"
+                class="mb-6 w-full text-left rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 hover:bg-rose-100 transition"
+                @click="setSchoolFilter('none')">
+            <span class="font-semibold">{{ counts.no_school }} teacher(s) have no school on this registration</span>
+            <span class="block text-xs text-rose-700 mt-0.5">Not linked to a member school and no pending-school request was submitted. Click to view &amp; assign a school.</span>
+        </button>
+
         <SahodayaDataTable
             :columns="columns"
             :links="registrations.links"
@@ -99,6 +106,15 @@
                             <option value="all">All teachers</option>
                             <option value="verified">Verified</option>
                             <option value="unverified">Unverified</option>
+                        </select>
+                    </div>
+                    <div class="min-w-[10rem]">
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">School</label>
+                        <select v-model="filterForm.school" class="field text-sm">
+                            <option value="all">All</option>
+                            <option value="assigned">Has a school</option>
+                            <option value="pending">Pending school</option>
+                            <option value="none">No school at all</option>
                         </select>
                     </div>
                     <div class="min-w-[7rem]">
@@ -216,7 +232,7 @@ const props = defineProps({
     registrations: { type: Object, required: true },
     counts: {
         type: Object,
-        default: () => ({ total: 0, registered: 0, confirmed: 0, waitlisted: 0, qr: 0 }),
+        default: () => ({ total: 0, registered: 0, confirmed: 0, waitlisted: 0, qr: 0, no_school: 0 }),
     },
     filters: {
         type: Object,
@@ -225,6 +241,7 @@ const props = defineProps({
             status: 'all',
             source: 'all',
             verification: 'all',
+            school: 'all',
             sort: 'id',
             dir: 'desc',
             per_page: 50,
@@ -247,6 +264,7 @@ const filterForm = reactive({
     status: props.filters.status ?? 'all',
     source: props.filters.source ?? 'all',
     verification: props.filters.verification ?? 'all',
+    school: props.filters.school ?? 'all',
     per_page: Number(props.filters.per_page ?? 50),
 });
 
@@ -256,6 +274,7 @@ watch(() => props.filters, (f) => {
     filterForm.status = f.status ?? 'all';
     filterForm.source = f.source ?? 'all';
     filterForm.verification = f.verification ?? 'all';
+    filterForm.school = f.school ?? 'all';
     filterForm.per_page = Number(f.per_page ?? 50);
 }, { deep: true });
 
@@ -266,6 +285,7 @@ const hasActiveFilters = computed(() =>
     || filterForm.status !== 'all'
     || filterForm.source !== 'all'
     || filterForm.verification !== 'all'
+    || filterForm.school !== 'all'
     || Number(filterForm.per_page) !== 50,
 );
 
@@ -279,6 +299,7 @@ function listParams(extra = {}) {
         status: filterForm.status,
         source: filterForm.source,
         verification: filterForm.verification,
+        school: filterForm.school,
         sort: props.filters.sort ?? 'id',
         dir: props.filters.dir ?? 'desc',
         per_page: Number(filterForm.per_page) || 50,
@@ -295,6 +316,7 @@ useDebouncedInertiaFilters(filterForm, applyFilters, () => ({
     status: props.filters.status ?? 'all',
     source: props.filters.source ?? 'all',
     verification: props.filters.verification ?? 'all',
+    school: props.filters.school ?? 'all',
     per_page: Number(props.filters.per_page ?? 50),
 }));
 
@@ -303,6 +325,7 @@ function clearFilters() {
     filterForm.status = 'all';
     filterForm.source = 'all';
     filterForm.verification = 'all';
+    filterForm.school = 'all';
     filterForm.per_page = 50;
     router.get(listUrl.value, {
         sort: props.filters.sort ?? 'id',
@@ -320,6 +343,13 @@ function setStatus(status) {
 function setSource(source) {
     filterForm.source = source;
     filterForm.status = 'all';
+    applyFilters();
+}
+
+function setSchoolFilter(school) {
+    filterForm.school = school;
+    filterForm.status = 'all';
+    filterForm.source = 'all';
     applyFilters();
 }
 

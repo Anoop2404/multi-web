@@ -262,10 +262,21 @@ class TenantUserController extends SahodayaAdminController
     private function roleOptions(array $roles): array
     {
         $labels = TenantUserCatalog::roleLabels();
+        $descriptions = TenantUserCatalog::roleDescriptions();
+        $groups = TenantUserCatalog::roleGroups();
+
+        $groupOf = [];
+        foreach ($groups as $groupName => $groupRoles) {
+            foreach ($groupRoles as $r) {
+                $groupOf[$r] = $groupName;
+            }
+        }
 
         return collect($roles)->map(fn ($r) => [
-            'value' => $r,
-            'label' => $labels[$r] ?? $r,
+            'value'       => $r,
+            'label'       => $labels[$r] ?? $r,
+            'description' => $descriptions[$r] ?? null,
+            'group'       => $groupOf[$r] ?? 'Other',
         ])->values()->all();
     }
 

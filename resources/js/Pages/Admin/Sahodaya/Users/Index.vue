@@ -35,12 +35,25 @@
             </div>
             <div>
                 <ChoiceGroup label="Roles" :error="form.errors.roles">
-                    <label v-for="r in assignableRoles" :key="r.value"
-                           class="choice-chip"
-                           :class="{ 'choice-chip--checked': form.roles.includes(r.value) }">
-                        <input type="checkbox" class="choice-chip-input" :value="r.value" v-model="form.roles">
-                        <span class="choice-chip-label">{{ r.label }}</span>
-                    </label>
+                    <div class="w-full space-y-4">
+                        <div v-for="group in groupedRoles" :key="group.name">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">{{ group.name }}</p>
+                            <div class="flex flex-wrap gap-2">
+                                <label v-for="r in group.roles" :key="r.value"
+                                       class="choice-chip"
+                                       :class="{ 'choice-chip--checked': form.roles.includes(r.value) }"
+                                       :title="r.description || ''">
+                                    <input type="checkbox" class="choice-chip-input" :value="r.value" v-model="form.roles">
+                                    <span class="choice-chip-label">{{ r.label }}</span>
+                                </label>
+                            </div>
+                            <p v-if="group.name === 'Event roles'" class="mt-1.5 text-xs text-slate-500 space-y-0.5">
+                                <span class="block"><strong class="text-slate-600">Event coordinator</strong> — full control across every event.</span>
+                                <span class="block"><strong class="text-slate-600">Event operations</strong> — one duty (registration desk, stage, food…) on one event.</span>
+                                <span class="block"><strong class="text-slate-600">Event admin</strong> — full control, but only for the events you tick.</span>
+                            </p>
+                        </div>
+                    </div>
                 </ChoiceGroup>
             </div>
             <div v-if="form.roles.includes('fest_ops')" class="card card--accent space-y-3">
@@ -131,14 +144,30 @@
                         <td class="font-medium text-slate-900">{{ u.name }}</td>
                         <td class="text-slate-600">{{ u.email }}</td>
                         <td class="text-xs">
-                            <p>{{ u.roles.join(', ') }}</p>
-                            <p v-if="u.permissions.length" class="mt-1 text-slate-400">{{ u.permissions.join(', ') }}</p>
-                            <p v-if="u.fest_assignments?.length" class="mt-1 text-violet-600">
-                                Ops: {{ u.fest_assignments.map(a => `${a.event_title} (${a.duty})`).join(', ') }}
-                            </p>
-                            <p v-if="u.exam_assignments?.length" class="mt-1 text-sky-600">
-                                Exams: {{ u.exam_assignments.map(a => `${a.exam_title} (${a.role})`).join(', ') }}
-                            </p>
+                            <div class="flex flex-wrap gap-1">
+                                <span v-for="r in u.roles" :key="r"
+                                      class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                                    {{ roleLabel(r) }}
+                                </span>
+                            </div>
+                            <div v-if="u.permissions.length" class="flex flex-wrap gap-1 mt-1.5">
+                                <span v-for="p in u.permissions" :key="p"
+                                      class="inline-flex items-center rounded-full bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-[9px] text-slate-500">
+                                    {{ permissionLabels[p] || p }}
+                                </span>
+                            </div>
+                            <div v-if="u.fest_assignments?.length" class="flex flex-wrap gap-1 mt-1.5">
+                                <span v-for="(a, i) in u.fest_assignments" :key="i"
+                                      class="inline-flex items-center rounded-full bg-violet-50 border border-violet-200 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+                                    {{ a.event_title }} · {{ dutyLabel(a.duty) }}
+                                </span>
+                            </div>
+                            <div v-if="u.exam_assignments?.length" class="flex flex-wrap gap-1 mt-1.5">
+                                <span v-for="(a, i) in u.exam_assignments" :key="i"
+                                      class="inline-flex items-center rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+                                    {{ a.exam_title }} · {{ a.role === 'controller' ? 'Controller' : 'Hall staff' }}
+                                </span>
+                            </div>
                         </td>
                         <td class="text-right whitespace-nowrap">
                             <button type="button" @click="openEdit(u)" class="btn-ghost text-indigo-600">Edit</button>
@@ -167,13 +196,18 @@
                         <input :id="id" v-model="editForm.password" type="password" class="field">
                     </template>
                 </FormField>
-                <div>
-                    <p class="form-label mb-2">Roles</p>
-                    <div class="flex flex-wrap gap-2">
-                        <label v-for="r in assignableRoles" :key="r.value" class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1 text-xs">
-                            <input type="checkbox" :value="r.value" v-model="editForm.roles">
-                            {{ r.label }}
-                        </label>
+                <div class="space-y-3">
+                    <p class="form-label mb-1">Roles</p>
+                    <div v-for="group in groupedRoles" :key="group.name">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">{{ group.name }}</p>
+                        <div class="flex flex-wrap gap-2">
+                            <label v-for="r in group.roles" :key="r.value"
+                                   class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1 text-xs"
+                                   :title="r.description || ''">
+                                <input type="checkbox" :value="r.value" v-model="editForm.roles">
+                                {{ r.label }}
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div v-if="editForm.roles.includes('fest_ops')" class="card card--accent space-y-3">
@@ -240,7 +274,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 
@@ -273,6 +307,29 @@ const editForm = useForm({
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
 });
+
+const groupedRoles = computed(() => {
+    const order = [];
+    const byGroup = new Map();
+    for (const r of props.assignableRoles) {
+        const g = r.group || 'Other';
+        if (!byGroup.has(g)) {
+            byGroup.set(g, []);
+            order.push(g);
+        }
+        byGroup.get(g).push(r);
+    }
+    return order.map((name) => ({ name, roles: byGroup.get(name) }));
+});
+
+function roleLabel(value) {
+    return props.assignableRoles.find((r) => r.value === value)?.label ?? value;
+}
+
+function dutyLabel(value) {
+    if (value === 'event_admin') return 'Event admin (full control)';
+    return props.dutyOptions.find((d) => d.value === value)?.label ?? value;
+}
 
 function hasExamRole(roles) {
     return roles.includes('exam_controller') || roles.includes('exam_staff');
