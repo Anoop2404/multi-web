@@ -29,7 +29,7 @@
                 <p class="text-slate-600 mt-1">{{ log.to }} · {{ log.template_key || 'direct' }}</p>
                 <p v-if="log.error" class="text-red-600 text-xs mt-1">{{ log.error }}</p>
                 <div class="flex items-center justify-between mt-2">
-                    <p class="text-xs text-slate-400">{{ log.created_at }}</p>
+                    <p class="text-xs text-slate-400">{{ formatDate(log.created_at) }}</p>
                     <button v-if="log.status === 'failed' || log.status === 'skipped'" type="button"
                             class="text-xs font-semibold text-[#0f3d7a] hover:underline"
                             @click="retryLog(log.id)">
@@ -68,5 +68,16 @@ function statusClass(status) {
 
 function retryLog(id) {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/finance/email-delivery/${id}/retry`, {}, { preserveScroll: true });
+}
+
+function formatDate(value) {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleString('en-IN', {
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+        timeZone: 'Asia/Kolkata',
+    });
 }
 </script>
