@@ -174,9 +174,9 @@
                               class="inline-flex items-center gap-1 rounded-lg bg-emerald-50 text-emerald-800 px-2.5 py-1 border border-emerald-100">
                             <strong>{{ event.quotas.used.total }}</strong> school {{ event.quotas.used.total === 1 ? 'entry' : 'entries' }}
                         </span>
-                        <span v-if="event.sports_age_cutoff_date"
+                        <span v-if="event.sports_age_cutoff_display || event.sports_age_cutoff_date"
                               class="inline-flex items-center gap-1 rounded-lg bg-slate-100 text-slate-600 px-2.5 py-1">
-                            Age cutoff {{ event.sports_age_cutoff_date }}
+                            Age cutoff {{ event.sports_age_cutoff_display ?? String(event.sports_age_cutoff_date).slice(0, 10) }}
                         </span>
                     </div>
                     <p v-if="event.age_rule_summary" class="text-xs text-indigo-800 mt-3 leading-relaxed">

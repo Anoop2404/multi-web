@@ -160,7 +160,10 @@ class ProgramHubDataService
                 'items'             => (int) $events->sum('items_count'),
                 'results_published' => $events->where('results_published', true)->count(),
                 'fees_collected'    => (float) FestSchoolEventFee::whereIn('event_id', $eventIds)->forAmountAggregation()->where('status', 'approved')->sum('total_due'),
-                'fees_pending'      => FestSchoolEventFee::whereIn('event_id', $eventIds)->forAmountAggregation()->whereIn('status', ['pending', 'proof_uploaded'])->count(),
+                // Only rows with an actual amount owed: ₹0 placeholder rows are
+                // auto-created when a school merely opens a registration page and
+                // must not show up as "pending fees".
+                'fees_pending'      => FestSchoolEventFee::whereIn('event_id', $eventIds)->forAmountAggregation()->whereIn('status', ['pending', 'proof_uploaded'])->where('total_due', '>', 0)->count(),
                 'schools_registered'=> $registeredSchoolIds->count(),
                 'schools_total'     => $schoolIds->count(),
             ],

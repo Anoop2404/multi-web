@@ -489,7 +489,11 @@ class FestRegistrationController extends SchoolAdminController
         $event->setAttribute('age_rule_summary', $event->event_type === 'sports'
             ? FestSportsAgeGroup::ageRuleSummary($event)
             : null);
-        $event->setAttribute('sports_age_cutoff_date', $event->sports_age_cutoff_date?->format('Y-m-d'));
+        // Display copy: the casted attribute serializes as a UTC ISO timestamp
+        // ("2026-12-30T18:30:00Z" for an IST 2026-12-31 cutoff — wrong day, ugly),
+        // so ship a plain Y-m-d string alongside it. The cast stays intact because
+        // eligibility/age-group code still reads the Carbon value after this.
+        $event->setAttribute('sports_age_cutoff_display', $event->sports_age_cutoff_date?->format('Y-m-d'));
         $event->setAttribute('require_event_registration', (bool) $event->require_event_registration);
         $feeGate = app(\App\Services\Events\FestRegistrationFeeGate::class);
         $eventFeeCleared = $feeGate->isSchoolFeeCleared($event, $this->school->id);
