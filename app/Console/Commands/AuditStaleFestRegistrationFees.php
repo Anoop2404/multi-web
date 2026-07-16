@@ -87,8 +87,11 @@ class AuditStaleFestRegistrationFees extends Command
         $stats = ['deleted_item' => 0, 'disabled_item' => 0, 'old_event_id' => 0];
 
         // 1. Active registrations whose item row no longer exists at all.
+        // (Joined queries below qualify the status column explicitly — the active()
+        // scope emits an unqualified `status` which is ambiguous once fest_events
+        // is joined in, since it has its own status column too.)
         $deletedItemRows = FestRegistration::query()
-            ->active()
+            ->whereIn('fest_registrations.status', FestRegistration::ACTIVE_STATUSES)
             ->leftJoin('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
             ->whereNotNull('fest_registrations.item_id')
             ->whereNull('fest_event_items.id')
@@ -103,7 +106,7 @@ class AuditStaleFestRegistrationFees extends Command
 
         // 2. Active registrations whose item still exists but is disabled.
         $disabledItemRows = FestRegistration::query()
-            ->active()
+            ->whereIn('fest_registrations.status', FestRegistration::ACTIVE_STATUSES)
             ->join('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
             ->where('fest_event_items.is_enabled', false)
             ->when($eventOpt, fn ($q) => $q->where('fest_registrations.event_id', $eventOpt))
@@ -124,7 +127,7 @@ class AuditStaleFestRegistrationFees extends Command
         // event_id — the "stranded on an old event id" case from the sports
         // Head = Event migration (fix path: fest:backfill-sports-registrations).
         $oldEventIdRows = FestRegistration::query()
-            ->active()
+            ->whereIn('fest_registrations.status', FestRegistration::ACTIVE_STATUSES)
             ->join('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
             ->join('fest_events as item_event', 'item_event.id', '=', 'fest_event_items.event_id')
             ->whereColumn('fest_registrations.event_id', '!=', 'fest_event_items.event_id')
