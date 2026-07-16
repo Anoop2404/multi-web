@@ -13,7 +13,7 @@
             <div class="flex flex-wrap gap-2 shrink-0">
                 <a v-if="reportsHref" :href="reportsHref" class="btn-secondary text-xs !min-h-0">Event reports →</a>
                 <a v-if="itemsUrl && registeredCount" :href="itemsUrl" class="btn-secondary text-xs !min-h-0">
-                    Step 2 · Register by Event Head →
+                    Step 2 · Register items →
                 </a>
                 <button type="button" class="btn-primary text-xs !min-h-0"
                         :disabled="!selectedIds.length || form.processing"

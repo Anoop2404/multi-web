@@ -127,63 +127,7 @@ class BackfillSportsRegistrations extends Command
                 }
             }
 
-            // 2. Remap registrations stranded on the season whose item moved to a child.
-            $strays = FestRegistration::query()
-                ->where('fest_registrations.event_id', $season->id)
-                ->join('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
-                ->where('fest_event_items.event_id', '!=', $season->id)
-                ->select('fest_registrations.id as reg_id', 'fest_event_items.event_id as sport_event_id')
-                ->get()
-                ->groupBy('sport_event_id');
-
-            foreach ($strays as $sportEventId => $group) {
-                $regIds = $group->pluck('reg_id')->map(fn ($id) => (int) $id)->all();
-                $sport = FestEvent::find($sportEventId);
-                $label = $sport?->title ?? "event #{$sportEventId}";
-                $this->line('    '.count($regIds)." registration(s) → {$label}");
-
-                if ($dryRun) {
-                    $stats['registrations'] += count($regIds);
-                    $stats['participants'] += FestParticipant::whereIn('registration_id', $regIds)->count();
-
-                    continue;
-                }
-
-                DB::transaction(function () use ($season, $sportEventId, $regIds, &$stats) {
-                    $stats['registrations'] += FestRegistration::whereIn('id', $regIds)
-                        ->update(['event_id' => $sportEventId]);
-
-                    $stats['participants'] += FestParticipant::whereIn('registration_id', $regIds)
-                        ->where(fn ($q) => $q->where('event_id', $season->id)->orWhereNull('event_id'))
-                        ->update(['event_id' => $sportEventId]);
-                });
-            }
-
-            // 3. Marks / schedule rows still keyed to the season for moved items.
-            foreach ([FestMark::class => 'marks', FestSchedule::class => 'schedules'] as $model => $key) {
-                $table = (new $model)->getTable();
-
-                $rows = $model::query()
-                    ->where("{$table}.event_id", $season->id)
-                    ->join('fest_event_items', 'fest_event_items.id', '=', "{$table}.item_id")
-                    ->where('fest_event_items.event_id', '!=', $season->id)
-                    ->select("{$table}.id as row_id", 'fest_event_items.event_id as sport_event_id')
-                    ->get()
-                    ->groupBy('sport_event_id');
-
-                foreach ($rows as $sportEventId => $group) {
-                    if ($dryRun) {
-                        $stats[$key] += $group->count();
-
-                        continue;
-                    }
-
-                    $stats[$key] += $model::whereIn('id', $group->pluck('row_id'))
-                        ->update(['event_id' => $sportEventId]);
-                }
-            }
-
-            // 4. Hide the hub from schools once children exist.
+            // 2. Hide the hub from schools once children exist.
             if (! $season->nav_hidden && FestEvent::where('parent_event_id', $season->id)->exists()) {
                 if ($dryRun) {
                     $this->line('    Would hide season hub from school nav.');
@@ -196,6 +140,114 @@ class BackfillSportsRegistrations extends Command
 
         if ($seasons->isEmpty()) {
             $this->line('  No sports season hubs.');
+        }
+
+        // Tenant-wide: any sports registration whose event_id disagrees with its
+        // item's current event — regardless of where it got stranded (season hub,
+        // deleted/merged discipline event, re-moved item). Item's event is truth.
+        $strays = FestRegistration::query()
+            ->join('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
+            ->join('fest_events as item_event', 'item_event.id', '=', 'fest_event_items.event_id')
+            ->where('item_event.event_type', 'sports')
+            ->whereColumn('fest_registrations.event_id', '!=', 'fest_event_items.event_id')
+            ->select('fest_registrations.id as reg_id', 'fest_event_items.event_id as sport_event_id')
+            ->get()
+            ->groupBy('sport_event_id');
+
+        foreach ($strays as $sportEventId => $group) {
+            $regIds = $group->pluck('reg_id')->map(fn ($id) => (int) $id)->all();
+            $sport = FestEvent::find($sportEventId);
+            $label = $sport?->title ?? "event #{$sportEventId}";
+            $this->line('  '.count($regIds)." registration(s) → {$label}");
+
+            if ($dryRun) {
+                $stats['registrations'] += count($regIds);
+                $stats['participants'] += FestParticipant::whereIn('registration_id', $regIds)->count();
+
+                continue;
+            }
+
+            DB::transaction(function () use ($sportEventId, $regIds, &$stats) {
+                $stats['registrations'] += FestRegistration::whereIn('id', $regIds)
+                    ->update(['event_id' => $sportEventId]);
+
+                $stats['participants'] += FestParticipant::whereIn('registration_id', $regIds)
+                    ->where(fn ($q) => $q->where('event_id', '!=', $sportEventId)->orWhereNull('event_id'))
+                    ->update(['event_id' => $sportEventId]);
+            });
+        }
+
+        // Participants out of sync with their (already-correct) registration.
+        $participantFix = FestParticipant::query()
+            ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
+            ->join('fest_events', 'fest_events.id', '=', 'fest_registrations.event_id')
+            ->where('fest_events.event_type', 'sports')
+            ->where(fn ($q) => $q
+                ->whereColumn('fest_participants.event_id', '!=', 'fest_registrations.event_id')
+                ->orWhereNull('fest_participants.event_id'));
+
+        $participantFixCount = (clone $participantFix)->count();
+        if ($participantFixCount > 0) {
+            if ($dryRun) {
+                $this->line("  {$participantFixCount} participant(s) out of sync with their registration.");
+                $stats['participants'] += $participantFixCount;
+            } else {
+                $ids = (clone $participantFix)->pluck('fest_participants.id');
+                $rows = FestParticipant::whereIn('fest_participants.id', $ids)
+                    ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
+                    ->select('fest_participants.id as pid', 'fest_registrations.event_id as reg_event_id')
+                    ->get()
+                    ->groupBy('reg_event_id');
+                foreach ($rows as $eventId => $group) {
+                    $stats['participants'] += FestParticipant::whereIn('id', $group->pluck('pid'))
+                        ->update(['event_id' => $eventId]);
+                }
+            }
+        }
+
+        // Marks / schedule rows keyed to a different event than their item.
+        foreach ([FestMark::class => 'marks', FestSchedule::class => 'schedules'] as $model => $key) {
+            $table = (new $model)->getTable();
+
+            $rows = $model::query()
+                ->join('fest_event_items', 'fest_event_items.id', '=', "{$table}.item_id")
+                ->join('fest_events as item_event', 'item_event.id', '=', 'fest_event_items.event_id')
+                ->where('item_event.event_type', 'sports')
+                ->whereColumn("{$table}.event_id", '!=', 'fest_event_items.event_id')
+                ->select("{$table}.id as row_id", 'fest_event_items.event_id as sport_event_id')
+                ->get()
+                ->groupBy('sport_event_id');
+
+            foreach ($rows as $sportEventId => $group) {
+                if ($dryRun) {
+                    $stats[$key] += $group->count();
+
+                    continue;
+                }
+
+                $stats[$key] += $model::whereIn('id', $group->pluck('row_id'))
+                    ->update(['event_id' => $sportEventId]);
+            }
+        }
+
+        // Diagnostics only — never auto-fixed, needs a human decision.
+        $orphanedByEvent = FestRegistration::query()
+            ->leftJoin('fest_events', 'fest_events.id', '=', 'fest_registrations.event_id')
+            ->whereNull('fest_events.id')
+            ->count();
+        if ($orphanedByEvent > 0) {
+            $this->warn("  ⚠ {$orphanedByEvent} registration(s) point at a DELETED event (fest_events row gone). Not auto-fixed — inspect: SELECT event_id, COUNT(*) FROM fest_registrations r LEFT JOIN fest_events e ON e.id = r.event_id WHERE e.id IS NULL GROUP BY event_id;");
+        }
+
+        $orphanedByItem = FestRegistration::query()
+            ->join('fest_events', 'fest_events.id', '=', 'fest_registrations.event_id')
+            ->where('fest_events.event_type', 'sports')
+            ->whereNotNull('fest_registrations.item_id')
+            ->leftJoin('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
+            ->whereNull('fest_event_items.id')
+            ->count();
+        if ($orphanedByItem > 0) {
+            $this->warn("  ⚠ {$orphanedByItem} sports registration(s) reference a DELETED item. Not auto-fixed.");
         }
 
         return $stats;

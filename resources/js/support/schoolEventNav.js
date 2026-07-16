@@ -101,7 +101,7 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
     if (isSports) {
         workflowItems.push(
             { label: 'Step 1 · Register students', href: `${eventBase}/registration`, icon: 'clipboard' },
-            { label: 'Step 2 · Register by Event Head', href: `${eventBase}/items`, icon: 'layers' },
+            { label: 'Step 2 · Register items', href: `${eventBase}/registration#item-registration-${eventId}`, icon: 'layers' },
             { label: 'All reports', href: reportsBase, icon: 'file-text' },
         );
     } else {

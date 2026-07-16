@@ -74,7 +74,7 @@ export function schoolHeadActionLinks(schoolId, programPrefix, eventId, headId, 
     ];
 
     if (isSports) {
-        links.push({ key: 'items', label: 'Register by Event Head', href: `${eventBase}/items${q}`, icon: 'layers' });
+        links.push({ key: 'items', label: 'Register items', href: `${eventBase}/registration#item-registration-${eventId}`, icon: 'layers' });
     }
 
     links.push(

@@ -221,24 +221,98 @@
                         :students="studentsForEvent(event.id)"
                         :event-registrations="event.event_registrations ?? []"
                         :register-url="`${programBase}/events/${event.id}/register-students`"
-                        :items-url="`${programBase}/events/${event.id}/items`"
+                        :items-url="`#item-registration-${event.id}`"
                         :reports-href="`${programBase}/reports/${event.id}/registration-register`"
                         :student-event-reg-fee="Number(event.student_event_reg_fee ?? 0)"
                         :school-classes="schoolClasses"
                     />
 
-                    <div class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <h4 class="text-sm font-bold text-emerald-950">Step 2 · Register by Event Head</h4>
+                    <!-- ── Step 2: item registration (inline — Head = Event) ── -->
+                    <div :id="`item-registration-${event.id}`" class="rounded-xl border border-emerald-200 overflow-hidden">
+                        <div class="px-4 py-3 bg-emerald-50/40 border-b border-emerald-100">
+                            <h4 class="text-sm font-bold text-emerald-950">Step 2 · Register for items</h4>
                             <p class="text-xs text-emerald-900/80 mt-0.5">
                                 <strong>{{ eventRegisteredCount(event) }}</strong> event athlete{{ eventRegisteredCount(event) === 1 ? '' : 's' }}
-                                · pick an Event Head (Athletics, Field events, Relay, etc.) and add them to its items.
+                                · pick items below and add participants.
+                                <span v-if="sportsRegistrationSummary(event)"> {{ sportsRegistrationSummary(event) }}</span>
                             </p>
                         </div>
-                        <Link :href="`${programBase}/item-registration?event=${event.id}`"
-                              class="btn-primary text-sm !min-h-0 shrink-0">
-                            Register by Event Head →
-                        </Link>
+
+                        <div v-if="event.require_event_registration && !eventRegisteredCount(event)"
+                             class="px-4 py-3 text-sm text-amber-800 bg-amber-50 border-b border-amber-100">
+                            Register students for the event above first — item registration needs event athletes.
+                        </div>
+
+                        <div class="px-4 py-2 bg-white border-b border-gray-100 flex flex-wrap gap-2 items-center">
+                            <input v-model="sportsSearch[event.id]" type="search"
+                                   class="field flex-1 min-w-[10rem] !py-1.5 text-sm"
+                                   placeholder="Search items…" autocomplete="off">
+                            <select v-model="sportsAgeFilter[event.id]" class="field text-xs !py-1.5 min-w-[9rem] max-w-[14rem]">
+                                <option value="">All age categories</option>
+                                <option v-for="(label, key) in (event.item_group_labels ?? {})" :key="key" :value="key">
+                                    {{ label }}
+                                </option>
+                            </select>
+                            <button v-if="sportsSearch[event.id] || sportsAgeFilter[event.id]"
+                                    type="button" class="btn-ghost text-xs !py-1.5"
+                                    @click="clearSportsFilters(event.id)">
+                                Clear
+                            </button>
+                        </div>
+
+                        <div class="overflow-x-auto bg-white">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 border-b border-gray-100">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[160px]">Event item</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[140px]">Eligibility</th>
+                                        <th v-if="event.fee_required" class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">Item fee</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[120px]">Registered</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-48">Participants</th>
+                                        <th class="px-3 py-2 w-24"></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-50">
+                                    <FestRegistrationItemRow
+                                        v-for="item in sportsFlatItems(event)"
+                                        :key="item.id"
+                                        :row-id="itemRowId(event.id, item.id)"
+                                        :item="item"
+                                        :form="itemForms[itemFormKey(event.id, item.id)]"
+                                        :registrations="registrationsForItem(event.id, item.id)"
+                                        :eligible-students="eligibleStudentsForItem(event.id, item)"
+                                        :all-students="studentsForEvent(event.id)"
+                                        :student-ineligibility-reason="(student) => studentIneligibilityReason(student, event, item)"
+                                        :show-fee="event.fee_required"
+                                        :blocked="isItemBlocked(event, item)"
+                                        :block-reason="itemBlockReason(event, item)"
+                                        :error-message="itemErrors[itemFormKey(event.id, item.id)]"
+                                        :status-label="itemStatusMeta(event, item).label"
+                                        :status-class="itemStatusMeta(event, item).badgeClass"
+                                        :status-hint="itemStatusMeta(event, item).hint"
+                                        performer-label="participants"
+                                        :is-teacher-fest="false"
+                                        :event-type="eventType"
+                                        :teachers="teachers"
+                                        :student-label="studentOptionLabel"
+                                        :registered-names="registeredNames"
+                                        :can-withdraw="canWithdraw"
+                                        :can-edit="canEdit"
+                                        :editing-registration-id="editingRegistrationId[itemFormKey(event.id, item.id)]"
+                                        :column-count="event.fee_required ? 6 : 5"
+                                        @register="submitItem(event, item)"
+                                        @update="updateItem(event, item)"
+                                        @withdraw="withdraw"
+                                        @edit="startEdit($event, event, item)"
+                                        @cancel-edit="cancelEdit(event, item)"
+                                        @add-student="showAddStudent = true"
+                                    />
+                                </tbody>
+                            </table>
+                            <p v-if="!sportsFlatItems(event).length" class="px-4 py-6 text-sm text-slate-500 text-center">
+                                No items match the current filters.
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -733,6 +807,24 @@ function sportsRegistrationSummary(event) {
 
 function groupVisibleItemCount(group) {
     return group.genderGroups.reduce((n, gg) => n + gg.items.length, 0);
+}
+
+// Flat, filtered item list for the inline sports item-registration table
+// (Head = Event: no head grouping — age filter + search only), ordered by age group.
+function sportsFlatItems(event) {
+    let items = sportsItemsForFilters(event);
+
+    const ageKey = sportsAgeFilter[event.id] ?? '';
+    if (ageKey) {
+        items = items.filter((i) => (i.age_group || 'open') === ageKey);
+    }
+
+    return [...items].sort((a, b) => {
+        const ai = SPORTS_AGE_ORDER.indexOf(String(a.age_group || 'open').toLowerCase());
+        const bi = SPORTS_AGE_ORDER.indexOf(String(b.age_group || 'open').toLowerCase());
+        if (ai !== bi) return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+        return String(a.title ?? '').localeCompare(String(b.title ?? ''));
+    });
 }
 
 function clearSportsFilters(eventId) {
