@@ -92,8 +92,46 @@
                 </div>
             </div>
 
+            <div v-if="itemRows.length" class="rounded-xl border border-amber-100 bg-amber-50/60 p-3 space-y-2">
+                <p class="text-xs font-semibold text-amber-800">Bulk fill — set a date once and apply it to every item row below</p>
+                <div class="flex flex-wrap items-end gap-2">
+                    <label class="text-xs text-slate-600">
+                        Reg opens
+                        <input v-model="bulkDates.reg_start" type="date" class="field text-xs block mt-1">
+                    </label>
+                    <label class="text-xs text-slate-600">
+                        Reg closes
+                        <input v-model="bulkDates.reg_end" type="date" class="field text-xs block mt-1">
+                    </label>
+                    <label class="text-xs text-slate-600">
+                        Competition start
+                        <input v-model="bulkDates.competition_start" type="date" class="field text-xs block mt-1">
+                    </label>
+                    <label class="text-xs text-slate-600">
+                        Competition end
+                        <input v-model="bulkDates.competition_end" type="date" class="field text-xs block mt-1">
+                    </label>
+                    <button type="button" class="btn-secondary text-xs py-1.5 px-2.5" @click="applyBulkDates('empty')">
+                        Fill empty rows
+                    </button>
+                    <button type="button" class="btn-secondary text-xs py-1.5 px-2.5" @click="applyBulkDates('all')">
+                        Overwrite all rows
+                    </button>
+                </div>
+                <p class="text-[11px] text-amber-700">Only fields you fill in above get applied — leave a field blank to skip it. Remember to click "Save all" after applying.</p>
+            </div>
+
             <div v-if="itemRows.length" class="overflow-x-auto rounded-xl border border-slate-100">
-                <table class="data-table text-sm">
+                <table class="data-table text-sm table-fixed w-full">
+                    <colgroup>
+                        <col class="w-48">
+                        <col class="w-24">
+                        <col class="w-32">
+                        <col class="w-32">
+                        <col class="w-32">
+                        <col class="w-32">
+                        <col class="w-16">
+                    </colgroup>
                     <thead class="bg-slate-50">
                         <tr>
                             <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600">Item</th>
@@ -102,24 +140,24 @@
                             <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600">Reg closes</th>
                             <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600">Competition start</th>
                             <th class="text-left px-3 py-2 text-xs font-semibold text-slate-600">Competition end</th>
-                            <th class="px-3 py-2 w-20"></th>
+                            <th class="px-3 py-2 sticky right-0 bg-slate-50"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
                         <tr v-for="row in itemRows" :key="row.id">
-                            <td class="px-3 py-2 font-medium text-slate-900">{{ row.title }}</td>
+                            <td class="px-3 py-2 font-medium text-slate-900 truncate" :title="row.title">{{ row.title }}</td>
                             <td class="px-3 py-2">
-                                <select v-if="itemHeads.length" v-model="row.head_id" class="field text-xs min-w-[7rem]">
+                                <select v-if="itemHeads.length" v-model="row.head_id" class="field text-xs w-full">
                                     <option :value="null">—</option>
                                     <option v-for="h in itemHeads" :key="h.id" :value="h.id">{{ h.name }}</option>
                                 </select>
                                 <span v-else class="text-slate-400 text-xs">{{ row.head_name || '—' }}</span>
                             </td>
-                            <td class="px-3 py-2"><input v-model="row.reg_start" type="date" class="field text-xs"></td>
-                            <td class="px-3 py-2"><input v-model="row.reg_end" type="date" class="field text-xs"></td>
-                            <td class="px-3 py-2"><input v-model="row.competition_start" type="date" class="field text-xs"></td>
-                            <td class="px-3 py-2"><input v-model="row.competition_end" type="date" class="field text-xs"></td>
-                            <td class="px-3 py-2 text-right">
+                            <td class="px-3 py-2"><input v-model="row.reg_start" type="date" class="field text-xs w-full"></td>
+                            <td class="px-3 py-2"><input v-model="row.reg_end" type="date" class="field text-xs w-full"></td>
+                            <td class="px-3 py-2"><input v-model="row.competition_start" type="date" class="field text-xs w-full"></td>
+                            <td class="px-3 py-2"><input v-model="row.competition_end" type="date" class="field text-xs w-full"></td>
+                            <td class="px-3 py-2 text-right sticky right-0 bg-white">
                                 <button type="button" class="btn-secondary text-xs py-1 px-2"
                                         :disabled="savingId === row.id"
                                         @click="saveRow(row)">
@@ -196,6 +234,28 @@ function saveRow(row) {
 
 function saveAllRows() {
     saveAllItemWindows(itemRows.value);
+}
+
+const bulkDates = ref({
+    reg_start: '',
+    reg_end: '',
+    competition_start: '',
+    competition_end: '',
+});
+
+const bulkDateFields = ['reg_start', 'reg_end', 'competition_start', 'competition_end'];
+
+function applyBulkDates(mode) {
+    const fieldsToApply = bulkDateFields.filter((field) => bulkDates.value[field]);
+    if (!fieldsToApply.length) return;
+
+    itemRows.value.forEach((row) => {
+        fieldsToApply.forEach((field) => {
+            if (mode === 'all' || !row[field]) {
+                row[field] = bulkDates.value[field];
+            }
+        });
+    });
 }
 
 function saveHeadWindowRow(row) {
