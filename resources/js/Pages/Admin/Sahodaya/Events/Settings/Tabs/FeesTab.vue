@@ -430,7 +430,7 @@
                 </div>
             </section>
 
-            <section v-if="feeSettingsForm.fee_model === 'item_catalog' && feeSettingsForm.item_fees.length" class="card space-y-4">
+            <section v-if="(feeSettingsForm.fee_model === 'item_catalog' || feeSettingsForm.fee_model === 'sports_composite') && feeSettingsForm.item_fees.length" class="card space-y-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h3 class="section-title">Per-item overrides</h3>
@@ -594,6 +594,12 @@ function formatAmount(value, asPlaceholder = false) {
 
 function categoryRateForRow(row) {
     if (event.event_type === 'sports') {
+        // Composite billing has no per-age-group rate — the flat default/extra item
+        // fee from "Sport event billing" is what every non-overridden item bills at.
+        const flat = feeSettingsForm.sport_event_fees.default_item_fee;
+        if (flat !== '' && flat != null) {
+            return flat;
+        }
         const ageFee = row.age_group ? feeSettingsForm.age_group_fees[row.age_group] : null;
         if (ageFee !== '' && ageFee != null) {
             return ageFee;

@@ -83,9 +83,16 @@ class FestSportsCompositeFeeService
                 $eligible = (bool) ($registration->item->quota_eligible ?? false);
                 $waived = $eligible && $used < $individualQuota;
 
+                // A per-item fee override (set on the event's Items/Fees page) always
+                // wins over the flat event-wide rate — that's the whole point of an
+                // override. Quota waivers still apply on top of it.
+                $itemOverride = $registration->item->fee_amount !== null ? (float) $registration->item->fee_amount : null;
+
                 if ($waived) {
                     $individualQuotaUsed[$studentId] = $used + 1;
                     $amount = 0.0;
+                } elseif ($itemOverride !== null) {
+                    $amount = $itemOverride;
                 } else {
                     $amount = (float) ($defaultItemFee ?? $studentRegRate);
                     if ($eligible && $individualQuota > 0 && $extraItemFee !== null) {
@@ -120,6 +127,7 @@ class FestSportsCompositeFeeService
 
             $eligible = (bool) ($registration->item->quota_eligible ?? false);
             $waived = $eligible && $teamQuotaUsed < $teamQuota;
+            $itemOverride = $registration->item->fee_amount !== null ? (float) $registration->item->fee_amount : null;
 
             if ($waived) {
                 $teamQuotaUsed++;
@@ -127,6 +135,11 @@ class FestSportsCompositeFeeService
                 $label = ($registration->item->title ?? 'Team item').' — team fee (free quota)';
                 $quantity = 1;
                 $unitAmount = 0.0;
+            } elseif ($itemOverride !== null) {
+                $amount = $itemOverride;
+                $label = ($registration->item->title ?? 'Team item').' — team fee (override)';
+                $quantity = 1;
+                $unitAmount = $itemOverride;
             } else {
                 if ($teamRegRate == 0) {
                     $performersCount = $registration->participants
@@ -314,11 +327,16 @@ class FestSportsCompositeFeeService
                 $eligible = (bool) ($registration->item->quota_eligible ?? false);
                 $waived = $eligible && $used < $individualQuota;
 
+                // Per-item override (event Items/Fees page) takes priority over the
+                // head's flat rate.
+                $itemOverride = $registration->item->fee_amount !== null ? (float) $registration->item->fee_amount : null;
+
                 if ($waived) {
                     $individualQuotaUsed[$studentId] = $used + 1;
                     $amount = 0.0;
+                } elseif ($itemOverride !== null) {
+                    $amount = $itemOverride;
                 } else {
-                    // FRD-04 v2: ignore item.fee_amount — inherit Event Head rates.
                     $amount = (float) ($head->default_item_fee ?? $studentRegRate);
                     if ($eligible && $individualQuota > 0 && $head->extra_item_fee !== null) {
                         // Beyond free quota: prefer explicit extra rate when configured.
@@ -354,6 +372,7 @@ class FestSportsCompositeFeeService
 
             $eligible = (bool) ($registration->item->quota_eligible ?? false);
             $waived = $eligible && $teamQuotaUsed < $teamQuota;
+            $itemOverride = $registration->item->fee_amount !== null ? (float) $registration->item->fee_amount : null;
 
             if ($waived) {
                 $teamQuotaUsed++;
@@ -361,6 +380,11 @@ class FestSportsCompositeFeeService
                 $label = ($registration->item->title ?? 'Team item').' — team fee (free quota)';
                 $quantity = 1;
                 $unitAmount = 0.0;
+            } elseif ($itemOverride !== null) {
+                $amount = $itemOverride;
+                $label = ($registration->item->title ?? 'Team item').' — team fee (override)';
+                $quantity = 1;
+                $unitAmount = $itemOverride;
             } else {
                 if ($teamRegRate == 0) {
                     $performersCount = $registration->participants
