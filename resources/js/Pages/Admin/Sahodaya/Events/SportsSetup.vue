@@ -2,9 +2,13 @@
     <SahodayaEventsLayout :title="`${event.title} — Setup`" :sahodaya="sahodaya" :event="event"
                          :show-header-title="false">
         <PageHeader :title="`${event.title} — Sports setup`" eyebrow="Setup"
-                    description="Configure this sports season: age groups, then open each sport event for fees, items, and registration.">
+                    :description="isSeason
+                        ? 'Configure this sports season: age groups, then open each sport event for fees, items, and registration.'
+                        : 'Configure this sport event: items, fees, registration windows — then open registration.'">
             <template #actions>
-                <Link :href="competitionUrl" class="btn-primary text-sm">Open sport events →</Link>
+                <Link :href="competitionUrl" class="btn-primary text-sm">
+                    {{ isSeason ? 'Open sport events →' : 'Items →' }}
+                </Link>
             </template>
         </PageHeader>
 
@@ -15,9 +19,13 @@
 
         <div v-if="sportsHubUrl"
              class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 mb-6 text-sm text-slate-700">
-            <p>
+            <p v-if="isSeason">
                 Each sport (Athletics, Chess, …) is its own event.
                 <Link :href="sportsHubUrl" class="font-semibold underline ml-1">Open Sports hub →</Link>
+            </p>
+            <p v-else>
+                This is a standalone sport event — schools register directly on it.
+                <Link :href="sportsHubUrl" class="font-semibold underline ml-1">All sports →</Link>
             </p>
         </div>
 
@@ -69,7 +77,9 @@
                         <div>
                             <h3 class="section-title">Sport events</h3>
                             <p class="section-desc">
-                                Each sport is its own event — set fees, items, registration, marks, and results there.
+                                {{ isSeason
+                                    ? 'Each sport is its own event — set fees, items, registration, marks, and results there.'
+                                    : 'Adding a sport turns this event into a season container — schools then register on the sports underneath, not on this event.' }}
                             </p>
                         </div>
                         <button v-if="canAddSport" type="button" class="btn-primary text-sm"
@@ -127,9 +137,9 @@
 
             <aside class="space-y-4">
                 <section class="card space-y-3">
-                    <h4 class="section-title">This season</h4>
+                    <h4 class="section-title">{{ isSeason ? 'This season' : 'This sport event' }}</h4>
                     <dl class="text-sm space-y-2">
-                        <div class="flex justify-between gap-2">
+                        <div v-if="isSeason" class="flex justify-between gap-2">
                             <dt class="text-slate-500">Sport events</dt>
                             <dd class="font-semibold">{{ stats.heads }}</dd>
                         </div>
@@ -197,6 +207,7 @@ const props = defineProps({
     ageRuleSummary: { type: String, default: null },
     competitionUrl: { type: String, default: null },
     sportsHubUrl: { type: String, default: null },
+    isSeason: { type: Boolean, default: false },
     canAddSport: { type: Boolean, default: false },
     addSportUrl: { type: String, default: null },
 });

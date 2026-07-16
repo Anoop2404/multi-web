@@ -69,6 +69,22 @@ class FestSchoolEventFeeService
             $sportsDefaults = config('fest_fees.level_defaults.sports', []);
             $schedule = array_merge($sportsDefaults, $schedule);
             $schedule['fee_model'] = 'sports_composite';
+
+            // Head = Event: once fees are configured on the sport event (Settings →
+            // Fee settings), its unified columns are the single source of truth.
+            // Blank columns then mean ₹0 — NOT "fall back to config defaults",
+            // otherwise schools see phantom ₹300/₹150 charges the admin never set.
+            if ($event->hasSportsFeesConfigured()) {
+                $schedule['school_registration_flat'] = (float) ($event->school_registration_fee ?? 0);
+                $schedule['per_student_amount'] = (float) ($event->student_registration_fee ?? 0);
+                $schedule['team_registration_fee'] = (float) ($event->team_registration_fee ?? 0);
+                $schedule['default_item_fee'] = (float) ($event->default_item_fee ?? 0);
+                $schedule['extra_item_fee'] = $event->extra_item_fee !== null
+                    ? (float) $event->extra_item_fee
+                    : ($schedule['extra_item_fee'] ?? null);
+                $schedule['included_items_per_student'] = (int) ($event->included_items_per_student ?? 0);
+                $schedule['included_teams'] = (int) ($event->included_teams ?? 0);
+            }
         }
 
         if (($schedule['fee_model'] ?? '') === 'item_catalog') {

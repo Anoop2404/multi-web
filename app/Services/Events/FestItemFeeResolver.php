@@ -13,8 +13,13 @@ class FestItemFeeResolver
 {
     public function amountForItem(?FestEventItem $item, array $schedule, ?FestEvent $event = null, bool $extraQuotaItem = false): float
     {
-        // Sports composite: items inherit Event Head rates (FRD-04 v2) — ignore item.fee_amount.
+        // Sports composite: items inherit the sport event's rates (Head = Event) —
+        // except an explicit per-item fee override, which always wins.
         if (($schedule['fee_model'] ?? null) === 'sports_composite' || $event?->event_type === 'sports') {
+            if ($item?->fee_amount !== null) {
+                return (float) $item->fee_amount;
+            }
+
             if ($item?->head_id) {
                 $head = $item->relationLoaded('head')
                     ? $item->head

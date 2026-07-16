@@ -20,8 +20,9 @@ class FestSportsSetupController extends SahodayaAdminController
         $base = "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}";
         $tenantBase = "/sahodaya-admin/{$this->sahodaya->id}";
 
-        // Season hub: sync child sport events. Sport child: operate on self.
-        $isSeason = $event->parent_event_id === null;
+        // Season hub (tagged, or top-level with children): sync + season UI.
+        // Standalone sport events and sport children: operate on self.
+        $isSeason = $event->isSportsSeasonEvent();
         if ($isSeason) {
             app(FestSportsEventSyncService::class)->syncSeason($event);
         }
@@ -118,8 +119,11 @@ class FestSportsSetupController extends SahodayaAdminController
             'ageRuleSummary' => FestSportsAgeGroup::ageRuleSummary($event),
             'competitionUrl' => $isSeason ? "{$tenantBase}/sports" : "{$base}/items",
             'sportsHubUrl'   => "{$tenantBase}/sports",
-            'canAddSport'    => $isSeason,
-            'addSportUrl'    => $isSeason ? "{$base}/setup/sports" : null,
+            'isSeason'       => $isSeason,
+            // Any top-level sports event may host child sports (adding the first
+            // one turns it into a season container).
+            'canAddSport'    => $event->parent_event_id === null,
+            'addSportUrl'    => $event->parent_event_id === null ? "{$base}/setup/sports" : null,
         ]));
     }
 

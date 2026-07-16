@@ -27,10 +27,13 @@ class FestEventItem extends Model
         'fee_amount' => 'decimal:2',
         'is_enabled' => 'boolean',
         'is_mandatory' => 'boolean',
-        'reg_start' => 'date',
-        'reg_end' => 'date',
-        'competition_start' => 'date',
-        'competition_end' => 'date',
+        // date:Y-m-d — plain-date serialization. Bare 'date' casts serialize to a UTC
+        // ISO timestamp (2026-07-25 IST → "2026-07-24T18:30:00Z"), so date inputs
+        // display the previous day and each save silently shifts the date back one.
+        'reg_start' => 'date:Y-m-d',
+        'reg_end' => 'date:Y-m-d',
+        'competition_start' => 'date:Y-m-d',
+        'competition_end' => 'date:Y-m-d',
         'results_published_at' => 'datetime',
         'quota_eligible' => 'boolean',
     ];
