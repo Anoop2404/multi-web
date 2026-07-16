@@ -90,6 +90,9 @@
                                     <th class="whitespace-nowrap">Age group</th>
                                     <th class="whitespace-nowrap">Gender</th>
                                     <th class="whitespace-nowrap">Participant</th>
+                                    <th class="whitespace-nowrap text-center">Regs</th>
+                                    <th class="whitespace-nowrap">Reg window</th>
+                                    <th class="whitespace-nowrap">Competition</th>
                                     <th class="whitespace-nowrap text-center">Qualifiers</th>
                                     <th class="whitespace-nowrap text-center">Max/school</th>
                                     <th class="whitespace-nowrap text-right">Fee</th>
@@ -122,6 +125,14 @@
                                     <td class="text-slate-600">{{ categoryLabel(item) }}</td>
                                     <td class="text-slate-600">{{ genderLabel(item.gender) }}</td>
                                     <td class="text-slate-600">{{ participantLabel(item.participant_type) }}</td>
+                                    <td class="text-center font-semibold text-slate-800">{{ item.registrations_count ?? 0 }}</td>
+                                    <td class="text-xs text-slate-600 whitespace-nowrap">
+                                        {{ formatDateRange(item.reg_start, item.reg_end) }}
+                                    </td>
+                                    <td class="text-xs text-slate-600 whitespace-nowrap">
+                                        {{ formatDateRange(item.competition_start, item.competition_end) }}
+                                        <span v-if="item.competition_time" class="block text-[10px] text-slate-400 font-mono">@ {{ item.competition_time.slice(0, 5) }}</span>
+                                    </td>
                                     <td class="text-center text-slate-600">{{ item.qualify_count ?? '—' }}</td>
                                     <td class="text-center text-slate-600">{{ item.max_per_school ?? '—' }}</td>
                                     <td class="text-right text-slate-600">
@@ -735,5 +746,20 @@ function saveEdit() {
         preserveScroll: true,
         onSuccess: closeEdit,
     });
+}
+
+function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatDateRange(start, end) {
+    if (!start && !end) return 'Not scheduled';
+    if (start && end) {
+        if (start === end) return formatDate(start);
+        return `${formatDate(start)} – ${formatDate(end)}`;
+    }
+    return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
 }
 </script>

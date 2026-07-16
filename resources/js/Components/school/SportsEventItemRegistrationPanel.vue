@@ -23,7 +23,7 @@
         </section>
         <p v-else
            class="text-sm text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3">
-            Pick students directly under each Event Head. Event registration number will be created automatically when you register an item.
+            Pick students directly under each Sport Event. Event registration number will be created automatically when you register an item.
         </p>
 
         <div class="rounded-xl border border-emerald-200 bg-emerald-50/30 overflow-hidden">
@@ -143,8 +143,8 @@
 
         <div v-if="event.fee_required && event.uses_per_head_billing && event.school_head_fees?.length"
              class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-2">
-            <p class="text-xs font-semibold text-slate-800">Fees by Event Head</p>
-            <p class="text-xs text-slate-500">Each head is billed separately. Pay from the main Registration page.</p>
+            <p class="text-xs font-semibold text-slate-800">Fees by Sport Event</p>
+            <p class="text-xs text-slate-500">Each sport event is billed separately. Pay from the main Registration page.</p>
             <ul class="text-xs text-indigo-900 space-y-1">
                 <li v-for="hf in event.school_head_fees" :key="hf.head_id" class="flex justify-between gap-3">
                     <span>{{ hf.head_name }}</span>
@@ -461,7 +461,7 @@ function isItemFull(item) {
 
 function itemBlockReason(item) {
     if (!props.headRegistrationOpen) {
-        return 'Registration is closed for this Event Head.';
+        return 'Registration is closed for this Sport Event.';
     }
     if (item.registration_open === false) {
         if (item.reg_start && new Date(`${item.reg_start}T12:00:00`) > new Date()) {

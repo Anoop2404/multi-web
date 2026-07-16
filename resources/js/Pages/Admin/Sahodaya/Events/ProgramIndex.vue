@@ -52,15 +52,15 @@
         <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ stats.events }}</p>
-                <p class="text-xs text-slate-500 mt-1">Events</p>
+                <p class="text-xs text-slate-500 mt-1">{{ isSports ? 'Sport events' : 'Events' }}</p>
             </div>
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold text-emerald-700">{{ stats.active_events }}</p>
-                <p class="text-xs text-slate-500 mt-1">Active / open</p>
+                <p class="text-xs text-slate-500 mt-1">{{ isSports ? 'Active sports' : 'Active / open' }}</p>
             </div>
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ stats.registrations }}</p>
-                <p class="text-xs text-slate-500 mt-1">Registrations</p>
+                <p class="text-xs text-slate-500 mt-1">{{ isSports ? 'Athletes' : 'Registrations' }}</p>
             </div>
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold text-green-700">₹{{ fmt(stats.fees_collected) }}</p>
@@ -256,57 +256,105 @@
                     <h3 class="section-title">Events in this program</h3>
                 </div>
                 <EmptyState
+                    v-slot:empty
                     v-if="!events.length"
                     :title="`No ${program.label} events yet`"
                     :description="`Create your first ${program.label} event using the form above.`"
                     icon="🏆"
                 />
-                <table v-else class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Title</th>
-                            <th>Level</th>
-                            <th>Status</th>
-                            <th>Sidebar</th>
-                            <th>Items</th>
-                            <th>Registrations</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="event in events" :key="event.id">
-                            <td class="font-medium text-slate-900">
-                                {{ event.title }}
-                                <span v-if="event.state_program_id" class="ml-1 text-xs text-amber-700">(state)</span>
-                            </td>
-                            <td class="text-xs">{{ levelLabels[event.level_round] ?? event.level_round }}</td>
-                            <td>
-                                <span class="status-pill" :class="statusClass(event.status)">{{ event.status }}</span>
-                            </td>
-                            <td>
-                                <button type="button"
-                                        class="text-xs font-medium"
-                                        :class="event.nav_hidden ? 'text-slate-400' : 'text-emerald-700'"
-                                        @click="toggleNavHidden(event)">
-                                    {{ event.nav_hidden ? 'Hidden' : 'Visible' }}
-                                </button>
-                            </td>
-                            <td>{{ event.items_count }}</td>
-                            <td>{{ event.registrations_count }}</td>
-                            <td class="text-right whitespace-nowrap">
-                                <Link :href="eventManageUrl(event)" class="link-brand">
+                <template v-else>
+                    <!-- Sports Grid layout -->
+                    <div v-if="isSports" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 p-5 bg-slate-50/50">
+                        <div v-for="event in events" :key="event.id" class="card hover:shadow-md transition duration-200 border border-slate-100 flex flex-col justify-between !py-4">
+                            <div>
+                                <div class="flex items-start justify-between gap-2">
+                                    <h4 class="font-bold text-slate-900 leading-snug text-sm">{{ event.title }}</h4>
+                                    <span class="status-pill text-[10px]" :class="statusClass(event.status)">{{ event.status }}</span>
+                                </div>
+                                
+                                <!-- Dates and Venue summary -->
+                                <div class="mt-3 space-y-1 text-[11px] text-slate-500">
+                                    <p v-if="event.registration_open || event.registration_close" class="flex items-center gap-1.5">
+                                        <span>📝 <strong>Reg:</strong></span>
+                                        <span>{{ formatDateRange(event.registration_open, event.registration_close) }}</span>
+                                    </p>
+                                    <p v-if="event.event_start || event.event_end" class="flex items-center gap-1.5">
+                                        <span>🏆 <strong>Comp:</strong></span>
+                                        <span>{{ formatDateRange(event.event_start, event.event_end) }}</span>
+                                    </p>
+                                    <p v-if="event.venue" class="flex items-center gap-1.5">
+                                        <span>📍 <strong>Venue:</strong></span>
+                                        <span>{{ event.venue }}</span>
+                                    </p>
+                                </div>
+
+                                <!-- Stats summary -->
+                                <div class="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold text-slate-600">
+                                    <span class="bg-slate-100 px-1.5 py-0.5 rounded">{{ event.items_count }} items</span>
+                                    <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">{{ event.registrations_count }} registrations</span>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center gap-2">
+                                <span class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border"
+                                      :class="event.has_sports_fees_configured ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-amber-50 border-amber-100 text-amber-800'">
+                                    {{ event.has_sports_fees_configured ? 'Composite billing active' : 'Fee config pending' }}
+                                </span>
+                                <Link :href="eventManageUrl(event)" class="btn-secondary text-xs !min-h-0 !px-2.5 !py-1">
                                     Manage →
                                 </Link>
-                                <button v-if="!event.registrations_count && !event.state_program_id"
-                                        type="button"
-                                        class="ml-3 text-xs font-medium text-rose-600 hover:text-rose-800"
-                                        @click="deleteEvent(event)">
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Flat table for Kalotsav/etc -->
+                    <table v-else class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Level</th>
+                                <th>Status</th>
+                                <th>Sidebar</th>
+                                <th>Items</th>
+                                <th>Registrations</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="event in events" :key="event.id">
+                                <td class="font-medium text-slate-900">
+                                    {{ event.title }}
+                                    <span v-if="event.state_program_id" class="ml-1 text-xs text-amber-700">(state)</span>
+                                </td>
+                                <td class="text-xs">{{ levelLabels[event.level_round] ?? event.level_round }}</td>
+                                <td>
+                                    <span class="status-pill" :class="statusClass(event.status)">{{ event.status }}</span>
+                                </td>
+                                <td>
+                                    <button type="button"
+                                            class="text-xs font-medium"
+                                            :class="event.nav_hidden ? 'text-slate-400' : 'text-emerald-700'"
+                                            @click="toggleNavHidden(event)">
+                                        {{ event.nav_hidden ? 'Hidden' : 'Visible' }}
+                                    </button>
+                                </td>
+                                <td>{{ event.items_count }}</td>
+                                <td>{{ event.registrations_count }}</td>
+                                <td class="text-right whitespace-nowrap">
+                                    <Link :href="eventManageUrl(event)" class="link-brand">
+                                        Manage →
+                                    </Link>
+                                    <button v-if="!event.registrations_count && !event.state_program_id"
+                                            type="button"
+                                            class="ml-3 text-xs font-medium text-rose-600 hover:text-rose-800"
+                                            @click="deleteEvent(event)">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </template>
             </div>
         </div>
 
@@ -411,5 +459,20 @@ function participationClass(s) {
     if (s.registered) return 'bg-green-50 border-green-200 text-green-800';
     if (s.fee_paid) return 'bg-blue-50 border-blue-200 text-blue-800';
     return 'bg-slate-50 border-slate-200 text-slate-500';
+}
+
+function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatDateRange(start, end) {
+    if (!start && !end) return 'Not scheduled';
+    if (start && end) {
+        if (start === end) return formatDate(start);
+        return `${formatDate(start)} – ${formatDate(end)}`;
+    }
+    return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
 }
 </script>

@@ -12,6 +12,9 @@
             </div>
             <p v-if="item.squad_summary" class="text-[11px] text-indigo-600 mt-0.5">{{ item.squad_summary }}</p>
             <p v-if="item.competition_line" class="text-[11px] text-slate-500 mt-0.5">Event: {{ item.competition_line }}</p>
+            <p v-if="item.competition_start" class="text-[11px] text-slate-500 mt-0.5">
+                Competition: {{ formatDate(item.competition_start) }}<span v-if="item.competition_time"> @ {{ item.competition_time.slice(0, 5) }}</span>
+            </p>
             <p v-if="statusHint && !blockReason" class="text-[11px] text-indigo-600 mt-0.5">{{ statusHint }}</p>
             <p v-if="blockReason" class="text-[11px] text-amber-700 mt-0.5">{{ blockReason }}</p>
             <p v-if="errorMessage" class="text-[11px] text-red-600 mt-0.5 font-medium">{{ errorMessage }}</p>
@@ -24,6 +27,11 @@
                 <span v-for="reg in registrations" :key="reg.id"
                       class="inline-flex items-center gap-1 max-w-full rounded-md bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[11px] text-emerald-900">
                     <span class="truncate font-medium">{{ registeredNames(reg) }}</span>
+                    <span v-if="isGroup"
+                          class="px-1 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider whitespace-nowrap"
+                          :class="squadCompletionClass(reg)">
+                        {{ squadCompletionLabel(reg) }}
+                    </span>
                     <span class="text-emerald-600/70 shrink-0">{{ reg.status }}</span>
                     <button v-if="canEdit(reg)" type="button"
                             class="shrink-0 text-indigo-600 font-semibold hover:underline"
@@ -65,8 +73,12 @@
                     {{ isEditing ? 'Save changes' : 'Register' }}
                 </button>
             </div>
-            <p v-if="selectedCount > 0" class="text-[10px] text-indigo-700 font-medium mt-1 text-right">
+            <p v-if="selectedCount > 0" class="text-[10px] font-medium mt-1 text-right"
+               :class="selectedCount >= (item.min_group_size || 1) ? 'text-emerald-700' : 'text-amber-700'">
                 {{ selectedCount }} {{ performerLabel }}{{ selectedCount !== 1 ? 's' : '' }} ready
+                <span v-if="isGroup && selectedCount < (item.min_group_size || 1)">
+                    (requires min {{ item.min_group_size || 1 }})
+                </span>
             </p>
             <p v-if="selectedAgeNotes.length" class="text-[10px] text-amber-700 mt-1 text-right max-w-xs ml-auto leading-snug">
                 {{ selectedAgeNotes.join(' · ') }}
@@ -426,5 +438,31 @@ function submit() {
     } else {
         emit('register');
     }
+}
+
+function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function squadPerformersCount(reg) {
+    return (reg.participants ?? [])
+        .filter((p) => p.participant_role !== 'standby' && p.student_id)
+        .length;
+}
+
+function squadCompletionLabel(reg) {
+    const count = squadPerformersCount(reg);
+    const min = props.item.min_group_size || 1;
+    if (count >= min) return 'Complete';
+    return `${count}/${min} min`;
+}
+
+function squadCompletionClass(reg) {
+    const count = squadPerformersCount(reg);
+    const min = props.item.min_group_size || 1;
+    if (count >= min) return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+    return 'bg-amber-100 text-amber-800 border border-amber-200';
 }
 </script>

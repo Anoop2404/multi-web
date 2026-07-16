@@ -505,6 +505,17 @@ class FestReportController extends SahodayaAdminController
             ? collect($rows)->firstWhere('student_id', $studentId)
             : null;
 
+        $childEvents = [];
+        if ($event->event_type === 'sports') {
+            $seasonId = $event->parent_event_id ?? $event->id;
+            $childEvents = FestEvent::where('parent_event_id', $seasonId)
+                ->orWhere('id', $seasonId)
+                ->ofType('sports')
+                ->orderBy('title')
+                ->get(['id', 'title', 'parent_event_id'])
+                ->all();
+        }
+
         return $this->inertia('Sahodaya/Events/Reports/StudentWise', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'            => $rows,
             'selectedStudent' => $selectedStudent,
@@ -515,6 +526,7 @@ class FestReportController extends SahodayaAdminController
             ],
             'schools' => collect($service->schools())->map(fn ($name, $id) => ['id' => $id, 'name' => $name])->values(),
             'xlsUrl'  => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/student-wise-report?'.http_build_query(array_filter(['school_id' => $schoolId])),
+            'childEvents' => $childEvents,
         ])));
     }
 

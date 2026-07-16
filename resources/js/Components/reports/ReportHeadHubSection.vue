@@ -2,7 +2,7 @@
     <section class="mb-8">
         <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
             <div>
-                <h3 class="section-title mb-1">{{ isSports ? 'By Event Head' : 'By item head' }}</h3>
+                <h3 class="section-title mb-1">{{ isSports ? 'By Sport Event' : 'By item head' }}</h3>
                 <p class="text-sm text-slate-600">Primary navigation — open a head section, then pick an item.</p>
             </div>
             <div class="flex flex-wrap gap-2 text-sm">

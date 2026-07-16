@@ -4,6 +4,20 @@
         <PageHeader :title="pageTitle" eyebrow="Scoring"
                     :description="pageDescription" />
 
+        <!-- Sport Event Switcher -->
+        <div v-if="isSports && childEvents.length" class="card mb-4">
+            <div class="flex flex-wrap gap-3 items-center">
+                <div>
+                    <label class="text-xs font-semibold text-slate-600">Select Sport Event</label>
+                    <select :value="event.id" @change="switchSportEvent" class="field text-sm mt-1 w-64">
+                        <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
+                            {{ ev.title }} {{ ev.parent_event_id === null ? '(Season Hub)' : '' }}
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
                 <p class="text-2xl font-bold">{{ publishTotals.items }}</p>
@@ -117,6 +131,9 @@
                     <p class="section-desc mt-0.5">Head-wise list — sort by published or pending. Click an item to review marks.</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    <button v-if="selectedPublishIds.length" type="button" class="btn-primary text-xs mr-2" @click="bulkPublishItems">
+                        Publish selected ({{ selectedPublishIds.length }})
+                    </button>
                     <button v-for="opt in statusFilters" :key="opt.id" type="button"
                             class="text-xs px-3 py-1.5 rounded-full border transition-colors"
                             :class="statusFilter === opt.id
@@ -130,6 +147,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
+                        <th class="w-8 pl-5"></th>
                         <th>Head</th>
                         <th>Item</th>
                         <th>Details</th>
@@ -142,7 +160,7 @@
                 <tbody>
                     <template v-for="(row, idx) in filteredSummaries" :key="row.item_id">
                         <tr v-if="shouldShowHeadDivider(row, filteredSummaries[idx - 1])" class="bg-slate-50/80">
-                            <td colspan="7" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            <td colspan="8" class="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 {{ row.head_name ?? 'Other items' }}
                                 <span v-if="headPublishCounts[row.head_id ?? 'other']" class="font-normal normal-case ml-2 text-slate-500">
                                     {{ headPublishCounts[row.head_id ?? 'other'].published }}/{{ headPublishCounts[row.head_id ?? 'other'].total }} published
@@ -150,11 +168,19 @@
                             </td>
                         </tr>
                         <tr>
-                            <td class="pl-5 text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
+                            <td class="pl-5 text-center">
+                                <input v-if="!row.results_published && row.marks_ready" type="checkbox" :value="row.item_id" v-model="selectedPublishIds" />
+                            </td>
+                            <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
                             <td>
                                 <Link :href="itemResultsUrl(row)" class="font-medium text-indigo-700 hover:underline">
                                     {{ row.title }}
                                 </Link>
+                                <p v-if="row.competition_start && isSports" class="mt-1">
+                                    <span class="inline-flex items-center gap-1 rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-800 border border-sky-100 uppercase tracking-wide">
+                                        🏆 Comp: {{ formatShortDate(row.competition_start) }}<span v-if="row.competition_time"> @ {{ row.competition_time.slice(0, 5) }}</span>
+                                    </span>
+                                </p>
                                 <p v-if="row.item_code" class="text-xs font-mono text-slate-400 mt-0.5">{{ row.item_code }}</p>
                             </td>
                             <td class="text-xs text-slate-600">
@@ -321,6 +347,7 @@ const props = defineProps({
     itemResultRows: { type: Array, default: () => [] },
     resultsBaseUrl: String,
     marksBaseUrl: String,
+    childEvents: { type: Array, default: () => [] },
 });
 
 const promoteForm = useForm({ next_event_id: props.suggestedNextId ?? '' });
@@ -479,5 +506,20 @@ function promoteAuto() {
 function revoke(id) {
     if (!confirm('Revoke this promotion and cancel the next-level registration?')) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/qualifications/${id}/revoke`, {}, { preserveScroll: true });
+}
+
+const selectedPublishIds = ref([]);
+
+function switchSportEvent(evt) {
+    const nextEventId = evt.target.value;
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${nextEventId}/results`);
+}
+
+function bulkPublishItems() {
+    if (!selectedPublishIds.value.length) return;
+    if (!confirm(`Publish results for ${selectedPublishIds.value.length} selected item(s)?`)) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/results/items/bulk-publish`, {
+        item_ids: selectedPublishIds.value,
+    }, { preserveScroll: true, onSuccess: () => { selectedPublishIds.value = []; } });
 }
 </script>

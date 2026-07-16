@@ -95,6 +95,10 @@ class FestEventController extends SahodayaAdminController
             ->orderByDesc('event_start')
             ->get();
 
+        $events->each(function (FestEvent $ev) {
+            $ev->has_sports_fees_configured = $ev->hasSportsFeesConfigured();
+        });
+
         $dashboard = app(\App\Services\Events\ProgramHubDataService::class)
             ->sahodayaProgramDashboard($this->sahodaya, $program, $eventType);
 
@@ -196,13 +200,24 @@ class FestEventController extends SahodayaAdminController
         $event->load(['academicYear', 'childEvents', 'parentEvent']);
         $ctx = $this->eventPageContext($event);
 
+        $stats = [
+            'items'          => $event->items()->count(),
+            'registrations'  => $event->registrations()->count(),
+            'school_rounds'  => $ctx['schoolRoundCount'],
+        ];
+
+        if ($event->event_type === 'sports') {
+            $regs = $event->registrations()
+                ->whereIn('status', FestRegistration::ACTIVE_STATUSES)
+                ->with('participants')
+                ->get();
+            $stats['schools_count'] = $regs->pluck('school_id')->unique()->count();
+            $stats['athletes_count'] = $regs->flatMap(fn($r) => $r->participants ?? [])->filter(fn($p) => $p->participant_role !== 'standby')->count();
+        }
+
         return $this->inertia('Sahodaya/Events/Overview', $ctx + [
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::OVERVIEW),
-            'stats'        => [
-                'items'          => $event->items()->count(),
-                'registrations'  => $event->registrations()->count(),
-                'school_rounds'  => $ctx['schoolRoundCount'],
-            ],
+            'stats'        => $stats,
             'lifecycle'       => \App\Services\Events\FestLifecycleService::for($event)->checklist(),
             'suggestedStatus' => \App\Services\Events\FestLifecycleService::for($event)->suggestedStatus(),
         ]);
@@ -232,7 +247,9 @@ class FestEventController extends SahodayaAdminController
             return $redirect;
         }
 
-        $event->load('items');
+        $event->load(['items' => function ($q) {
+            $q->withCount(['registrations' => fn ($r) => $r->whereIn('status', \App\Models\FestRegistration::ACTIVE_STATUSES)]);
+        }]);
         $ctx = $this->eventPageContext($event);
 
         return $this->inertia('Sahodaya/Events/Items/List', $ctx + [

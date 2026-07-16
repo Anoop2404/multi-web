@@ -148,4 +148,14 @@ class FestSchoolEventFeeController extends SahodayaAdminController
 
         return TenantStorage::downloadResponse($this->sahodaya, $path);
     }
+
+    public function recalculate(Request $request, string $tenantId, FestEvent $event, FestSchoolEventFee $schoolEventFee)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($schoolEventFee->event_id !== $event->id, 403);
+
+        app(\App\Services\Events\FestSchoolEventFeeService::class)->recalculate($event, $schoolEventFee->school_id);
+
+        return back()->with('success', 'Fees successfully recalculated for this school.');
+    }
 }

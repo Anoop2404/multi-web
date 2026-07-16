@@ -1,11 +1,7 @@
 <template>
     <div class="mb-6 space-y-4">
         <nav class="reports-tabs" aria-label="Reports navigation">
-            <Link v-if="isSports" :href="`${base}/reports/by-head`"
-                  class="reports-tab"
-                  :class="{ 'reports-tab--active': active === 'by-head' }">
-                <span aria-hidden="true">📂</span> By Event Head
-            </Link>
+
             <Link :href="`${base}/reports${isSports ? '?all=1' : ''}`"
                   class="reports-tab"
                   :class="{ 'reports-tab--active': active === 'hub' }">
@@ -24,12 +20,12 @@
             </Link>
         </nav>
 
-        <FestEventMetaBar v-if="eventMeta && active !== 'hub' && active !== 'by-head'" :meta="eventMeta" compact />
+        <FestEventMetaBar v-if="eventMeta && active !== 'hub'" :meta="eventMeta" compact />
 
-        <Link v-if="active !== 'hub' && active !== 'by-head'"
-              :href="isSports ? `${base}/reports/by-head` : `${base}/reports`"
+        <Link v-if="active !== 'hub'"
+              :href="`${base}/reports`"
               class="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-indigo-600">
-            ← {{ isSports ? 'Reports by Event Head' : 'All report types' }}
+            ← All report types
         </Link>
     </div>
 </template>

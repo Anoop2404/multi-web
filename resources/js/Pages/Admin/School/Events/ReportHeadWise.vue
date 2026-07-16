@@ -75,7 +75,7 @@
                         </tr>
                         <tr v-if="!summary.length">
                             <td colspan="7" class="p-6 text-center text-slate-400">
-                                No Event Heads configured for this event yet.
+                                No sport events configured for this event yet.
                             </td>
                         </tr>
                     </tbody>

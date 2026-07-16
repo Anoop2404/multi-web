@@ -3,7 +3,7 @@
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Mark entry status`" eyebrow="Reports"
                     :description="event.event_type === 'sports'
-                        ? 'Track mark entry progress by Event Head and item.'
+                        ? 'Track mark entry progress by Sport Event and item.'
                         : 'Track mark entry progress by item head and item.'" />
 
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="mark-entry-status" />
@@ -46,6 +46,8 @@
                         <th>Head</th>
                         <th>Item</th>
                         <th>Class</th>
+                        <th>Competition</th>
+                        <th>Progress</th>
                         <th>Judges</th>
                         <th>Participants</th>
                         <th>Marked</th>
@@ -56,7 +58,7 @@
                 <tbody>
                     <template v-for="(row, idx) in displayRows" :key="row.item_id">
                         <tr v-if="idx === 0 || row.head_name !== displayRows[idx - 1]?.head_name" class="bg-slate-50/80">
-                            <td colspan="8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            <td colspan="12" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 {{ row.head_name ?? 'Other items' }}
                             </td>
                         </tr>
@@ -64,6 +66,18 @@
                             <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
                             <td class="font-medium">{{ row.title }}</td>
                             <td>{{ row.class_group || '—' }}</td>
+                            <td class="text-xs whitespace-nowrap">
+                                {{ formatDateRange(row.competition_start, row.competition_end) }}
+                                <span v-if="row.competition_time" class="block text-[10px] text-slate-400 font-mono">@ {{ row.competition_time.slice(0, 5) }}</span>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden border">
+                                        <div class="bg-indigo-600 h-1.5 rounded-full" :style="{ width: `${progressPercentage(row)}%` }"></div>
+                                    </div>
+                                    <span class="text-xs text-slate-500 font-medium">{{ progressPercentage(row)}}%</span>
+                                </div>
+                            </td>
                             <td>{{ row.judges }}</td>
                             <td>{{ row.participants }}</td>
                             <td>{{ row.marked }}</td>
@@ -76,7 +90,7 @@
                         </tr>
                     </template>
                     <tr v-if="!displayRows.length">
-                        <td colspan="8" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
+                        <td colspan="12" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
                     </tr>
                 </tbody>
             </table>
@@ -138,5 +152,25 @@ function applyFilter() {
         head_id: headFilter.value || undefined,
         item_id: itemFilter.value || undefined,
     }, { preserveScroll: true, preserveState: true });
+}
+
+function progressPercentage(row) {
+    if (!row.participants) return 0;
+    return Math.round((row.marked / row.participants) * 100);
+}
+
+function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function formatDateRange(start, end) {
+    if (!start && !end) return '—';
+    if (start && end) {
+        if (start === end) return formatDate(start);
+        return `${formatDate(start)} – ${formatDate(end)}`;
+    }
+    return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
 }
 </script>

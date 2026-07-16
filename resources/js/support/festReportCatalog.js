@@ -1,7 +1,7 @@
 /** Client-side mirror of export → interactive preview routes (Sahodaya event reports). */
 
 export const REPORT_CATEGORIES = {
-    heads: { label: 'By item head', sportsLabel: 'By Event Head', icon: '📂' },
+    heads: { label: 'By item head', sportsLabel: 'By Sport Event', icon: '📂' },
     registration: { label: 'Registration & fees', icon: '📋' },
     schedule: { label: 'Schedule & clashes', icon: '📅' },
     competition: { label: 'Marks & results', icon: '🏆' },
@@ -201,7 +201,7 @@ export function groupSchoolReports(reports) {
 
 /** Short descriptions for interactive Sahodaya report pages */
 export const INTERACTIVE_REPORT_META = {
-    'head-wise-participants': { icon: '📂', hint: 'Participants grouped by item head', sportsHint: 'Participants grouped by Event Head' },
+    'head-wise-participants': { icon: '📂', hint: 'Participants grouped by item head', sportsHint: 'Participants grouped by Sport Event' },
     'area-wise-participants': { icon: '🗂️', hint: 'Participants grouped by competition area' },
     'school-detailed': { icon: '🏫', hint: 'Detailed marks by school and item' },
     'overall-ranking': { icon: '🥇', hint: 'School ranking and total points' },

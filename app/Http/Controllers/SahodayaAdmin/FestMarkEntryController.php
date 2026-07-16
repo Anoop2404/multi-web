@@ -51,6 +51,17 @@ class FestMarkEntryController extends SahodayaAdminController
             default => null,
         };
 
+        $childEvents = [];
+        if ($event->event_type === 'sports') {
+            $seasonId = $event->parent_event_id ?? $event->id;
+            $childEvents = FestEvent::where('parent_event_id', $seasonId)
+                ->orWhere('id', $seasonId)
+                ->ofType('sports')
+                ->orderBy('title')
+                ->get(['id', 'title', 'parent_event_id'])
+                ->all();
+        }
+
         return $this->inertia('Sahodaya/Events/MarkEntry', $this->withEventActivity($event, FestPageActivity::MARKS, [
             'event'          => $event,
             'registrations'  => $registrations,
@@ -62,6 +73,7 @@ class FestMarkEntryController extends SahodayaAdminController
             'rankPoints'     => $event->event_type === 'sports'
                 ? app(FestRankPointService::class)->listForEvent($event)
                 : [],
+            'childEvents'    => $childEvents,
         ]));
     }
 

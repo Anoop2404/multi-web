@@ -40,6 +40,20 @@
             </template>
         </p>
 
+        <!-- Filters Panel -->
+        <div v-if="isSports && childEvents.length" class="card mb-4">
+            <div class="flex flex-wrap gap-3 items-center">
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Select Sport Event</label>
+                    <select :value="event.id" @change="switchSportEvent" class="field text-sm mt-1 w-64">
+                        <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
+                            {{ ev.title }} {{ ev.parent_event_id === null ? '(Season Hub)' : '' }}
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <EmptyState
             v-if="!sections.length"
             title="No registrations to mark"
@@ -63,6 +77,17 @@
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 bg-slate-50/80">
                     <div>
                         <h3 class="section-title">{{ section.item?.title }}</h3>
+                        <div v-if="isSports" class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 mt-1">
+                            <span v-if="section.item?.competition_start">
+                                📅 {{ formatDate(section.item.competition_start) }}<span v-if="section.item.competition_time"> @ {{ section.item.competition_time.slice(0, 5) }}</span>
+                            </span>
+                            <span v-if="section.item?.squad_summary">
+                                👥 {{ section.item.squad_summary }}
+                            </span>
+                            <span v-else-if="section.item?.min_group_size" class="text-indigo-600">
+                                👥 Squad: {{ section.item.min_group_size }}–{{ section.item.max_group_size || section.item.min_group_size }} athletes
+                            </span>
+                        </div>
                         <p v-if="section.schoolName" class="section-desc mt-0.5">{{ section.schoolName }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -225,6 +250,7 @@ const props = defineProps({
     selectedItemId: { type: [Number, String], default: null },
     competitionUrl: { type: String, default: null },
     rankPoints: { type: Array, default: () => [] },
+    childEvents: { type: Array, default: () => [] },
 });
 
 const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/import`);
@@ -354,5 +380,16 @@ function autoRank(item) {
     }
 
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${item.id}/auto-rank`, {}, { preserveScroll: true });
+}
+
+function switchSportEvent(evt) {
+    const nextEventId = evt.target.value;
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${nextEventId}/marks`);
+}
+
+function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 </script>

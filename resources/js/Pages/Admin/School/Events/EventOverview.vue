@@ -7,11 +7,41 @@
             </template>
         </PageHeader>
 
+        <!-- Dates & venue strip -->
+        <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600 bg-slate-50 border border-slate-200/60 rounded-xl px-4 py-2.5 mb-5">
+            <div class="flex items-center gap-1.5">
+                <span class="text-base" aria-hidden="true">📅</span>
+                <span><strong>Event dates:</strong> {{ formatDateRange(event.event_start, event.event_end) }}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="text-base" aria-hidden="true">📝</span>
+                <span><strong>Registration:</strong> {{ formatDateRange(event.registration_open, event.registration_close) }}</span>
+            </div>
+            <div v-if="event.venue" class="flex items-center gap-1.5">
+                <span class="text-base" aria-hidden="true">📍</span>
+                <span><strong>Venue:</strong> {{ event.venue }}</span>
+            </div>
+        </div>
+
         <SchoolEventWorkflowStepper :school-id="school.id"
                                     :program-prefix="programPrefix"
                                     :event-id="event.id"
                                     :is-sports="isSports"
                                     current-step="overview" />
+
+        <!-- Registration window banner -->
+        <div v-if="isRegClosed" class="notice-banner notice-banner--warning text-sm mb-5">
+            <p class="font-semibold">Registration is Closed</p>
+            <p class="mt-0.5">The registration deadline for this event was {{ formatDate(event.registration_close) }}. You can still view details but cannot modify entries.</p>
+        </div>
+        <div v-else-if="!isRegOpenYet" class="notice-banner notice-banner--info text-sm mb-5">
+            <p class="font-semibold">Registration Not Open Yet</p>
+            <p class="mt-0.5">Registration will open on {{ formatDate(event.registration_open) }}.</p>
+        </div>
+        <div v-else class="notice-banner notice-banner--success text-sm mb-5">
+            <p class="font-semibold">Registration is Open</p>
+            <p class="mt-0.5">You can register students and submit entries until {{ formatDate(event.registration_close) }}.</p>
+        </div>
 
         <div v-if="schoolRegion?.applies" class="mb-5">
             <div v-if="schoolRegion.region" class="notice-banner notice-banner--info text-sm">
@@ -47,12 +77,23 @@
             </div>
         </div>
 
+        <!-- Billing / Fee Payment Callout -->
+        <div v-if="stats.fees_due > 0 && stats.fee_status !== 'approved'" 
+             class="notice-banner mb-6 text-sm flex flex-wrap items-center justify-between gap-4"
+             :class="stats.fee_status === 'proof_uploaded' ? 'notice-banner--info' : 'notice-banner--warning'">
+            <div>
+                <p class="font-semibold">{{ stats.fee_status === 'proof_uploaded' ? 'Payment receipt pending approval' : 'Action required: Fee payment due' }}</p>
+                <p class="mt-0.5">₹{{ formatAmount(stats.fees_due) }} is outstanding for this event.</p>
+            </div>
+            <Link :href="eventRegistrationHref" class="btn-primary text-xs !min-h-0">Go to Billing & Pay →</Link>
+        </div>
+
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
             <HubCard :href="eventRegistrationHref" icon="📝"
                      :label="isSports ? 'Step 1 · Register students' : 'Register students'"
                      :hint="isSports ? 'Add athletes to this event & pay fees' : 'Add participants & pay fees'" />
-            <HubCard v-if="isSports" :href="itemRegistrationHref" icon="🏃" label="Step 2 · Register by Event Head"
-                     hint="Pick an Event Head (Athletics, Field, Relay…) and add athletes to its items" />
+            <HubCard v-if="isSports" :href="itemRegistrationHref" icon="🏃" label="Step 2 · Register by Sport Event"
+                     hint="Pick a sport event (Athletics, Chess…) and add athletes to its items" />
             <HubCard :href="reportsHref" icon="📋" label="Reports & ID cards" hint="Admit cards, ID cards, exports" />
             <HubCard :href="clashHref" icon="⚠️" label="Clash requests" hint="Report schedule conflicts" />
             <HubCard :href="substitutionHref" icon="🔄" label="Substitutions" hint="Request participant swaps" />
@@ -61,10 +102,10 @@
 
         <section v-if="eventHeadNav?.headItemGroups?.length" class="card space-y-4">
             <div>
-                <h3 class="section-title text-base">{{ isSports ? 'Event Heads' : 'Item heads' }}</h3>
+                <h3 class="section-title text-base">{{ isSports ? 'Sport Events' : 'Item heads' }}</h3>
                 <p class="text-sm text-slate-500 mt-1">
                     {{ isSports
-                        ? 'Jump straight into registering students for a specific head, or view its reports.'
+                        ? 'Jump straight into registering students for a specific sport event, or view its reports.'
                         : 'Jump to registration or reports for a section.' }}
                 </p>
             </div>
@@ -75,7 +116,23 @@
                     <p class="text-xs text-slate-500 mt-1">
                         {{ head.item_count }} items · {{ head.participant_count }} registered
                     </p>
-                    <div class="flex flex-wrap gap-2 mt-3">
+                    <div v-if="head.items?.length" class="mt-3 space-y-2.5 border-t border-slate-200/80 pt-3">
+                        <div v-for="item in head.items" :key="item.id" class="text-xs flex flex-col gap-0.5">
+                            <span class="font-semibold text-slate-900">{{ item.title }}</span>
+                            <div class="text-[10px] text-slate-500 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                <span class="text-indigo-700 font-semibold">{{ item.participant_count }} registered</span>
+                                <span>·</span>
+                                <span class="capitalize">{{ item.participant_type }}</span>
+                                <span>·</span>
+                                <span class="uppercase font-mono">{{ item.age_group || 'open' }}</span>
+                                <span v-if="item.gender && item.gender !== 'open'">·</span>
+                                <span v-if="item.gender && item.gender !== 'open'" class="capitalize">{{ item.gender }}</span>
+                                <span v-if="item.squad_summary">·</span>
+                                <span v-if="item.squad_summary" class="text-slate-400">{{ item.squad_summary }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-4 border-t border-slate-100 pt-3">
                         <Link v-if="isSports" :href="headLink(head.head_id, 'items')" class="btn-primary text-xs !min-h-0">Register students →</Link>
                         <Link v-else :href="headLink(head.head_id, 'registration')" class="btn-secondary text-xs">Register</Link>
                         <Link :href="headLink(head.head_id, 'reports')" class="btn-secondary text-xs">Reports</Link>
@@ -130,5 +187,30 @@ function headLink(headId, action) {
     }
 
     return `${reportsHref.value}${q}`;
+}
+
+const isRegClosed = computed(() => {
+    if (!props.event.registration_close) return false;
+    return new Date() > new Date(`${props.event.registration_close}T23:59:59`);
+});
+
+const isRegOpenYet = computed(() => {
+    if (!props.event.registration_open) return true;
+    return new Date() >= new Date(`${props.event.registration_open}T00:00:00`);
+});
+
+function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatDateRange(start, end) {
+    if (!start && !end) return 'Not scheduled';
+    if (start && end) {
+        if (start === end) return formatDate(start);
+        return `${formatDate(start)} – ${formatDate(end)}`;
+    }
+    return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
 }
 </script>

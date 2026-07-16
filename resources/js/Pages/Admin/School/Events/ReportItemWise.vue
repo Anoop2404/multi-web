@@ -4,7 +4,7 @@
             :title="`Item-wise — ${event.title}`"
             :eyebrow="programLabel"
             :description="event.event_type === 'sports'
-                ? 'Pick an Event Head, then an item, to view participants and marks.'
+                ? 'Pick a Sport Event, then an item, to view participants and marks.'
                 : 'Pick an item head, then an item, to view participants and marks.'"
         >
             <template #actions>

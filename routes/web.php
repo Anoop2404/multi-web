@@ -920,6 +920,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/results', [FestResultsController::class, 'show'])->name('results.show');
             Route::post('/{event}/results/publish', [FestResultsController::class, 'publish'])->name('results.publish');
             Route::post('/{event}/results/unpublish', [FestResultsController::class, 'unpublish'])->name('results.unpublish');
+            Route::post('/{event}/results/items/bulk-publish', [FestResultsController::class, 'bulkPublishItems'])->name('results.items.bulk-publish');
             Route::post('/{event}/results/items/{item}/publish', [FestResultsController::class, 'publishItem'])->name('results.items.publish');
             Route::post('/{event}/results/items/{item}/unpublish', [FestResultsController::class, 'unpublishItem'])->name('results.items.unpublish');
             Route::post('/{event}/results/promote', [FestResultsController::class, 'promote'])->name('results.promote');
@@ -947,6 +948,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/school-fees/{schoolEventFee}/approve', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'approve'])->name('school-fees.approve');
             Route::post('/{event}/school-fees/{schoolEventFee}/reject', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'reject'])->name('school-fees.reject');
             Route::get('/{event}/school-fees/{schoolEventFee}/proof', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'proof'])->name('school-fees.proof');
+            Route::post('/{event}/school-fees/{schoolEventFee}/recalculate', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'recalculate'])->name('school-fees.recalculate');
             Route::get('/{event}/export/registrations', [FestExportController::class, 'registrations'])->name('export.registrations');
             Route::get('/{event}/export/results', [FestExportController::class, 'results'])->name('export.results');
             Route::get('/{event}/export/attendance', [FestExportController::class, 'attendance'])->name('export.attendance');

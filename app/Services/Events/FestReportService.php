@@ -137,6 +137,9 @@ class FestReportService
                 'marked'       => $scored,
                 'pending'      => max(0, $partCount - $scored),
                 'complete'     => $partCount > 0 && $scored >= $partCount,
+                'competition_start' => $item->competition_start,
+                'competition_end'   => $item->competition_end,
+                'competition_time'  => $item->competition_time,
             ];
         }
 

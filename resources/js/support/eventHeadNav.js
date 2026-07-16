@@ -42,7 +42,7 @@ export function sahodayaHeadActionLinks(sahodayaId, eventId, headId, options = {
         {
             key: 'reports',
             label: 'Reports',
-            href: isSports ? `${base}/reports/by-head${headQueryParam(headId)}` : `${base}/reports${headQueryParam(headId)}`,
+            href: `${base}/reports${headQueryParam(headId)}`,
             icon: 'file-text',
         },
     );

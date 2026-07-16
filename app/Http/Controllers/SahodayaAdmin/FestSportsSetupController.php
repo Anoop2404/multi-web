@@ -55,13 +55,31 @@ class FestSportsSetupController extends SahodayaAdminController
 
         $headsFullyConfigured = $headCount > 0 && $headsWithCompositeFees === $headCount;
 
-        $headItemGroups = $sportEvents->map(fn (FestEvent $sport) => [
-            'head_id' => $sport->id,
-            'head_name' => $sport->title,
-            'href' => "/sahodaya-admin/{$this->sahodaya->id}/events/{$sport->id}",
-            'item_count' => FestEventItem::where('event_id', $sport->id)->where('is_enabled', true)->count(),
-            'fees_configured' => $sport->hasSportsFeesConfigured(),
-        ])->values()->all();
+        $registrationsQuery = \App\Models\FestRegistration::whereIn('event_id', $sportEvents->pluck('id'))
+            ->whereIn('status', \App\Models\FestRegistration::ACTIVE_STATUSES)
+            ->with('participants')
+            ->get()
+            ->groupBy('event_id');
+
+        $headItemGroups = $sportEvents->map(function (FestEvent $sport) use ($registrationsQuery) {
+            $regs = $registrationsQuery->get($sport->id) ?? collect();
+            $schoolsCount = $regs->pluck('school_id')->unique()->count();
+            $athletesCount = $regs->flatMap(fn($r) => $r->participants ?? [])->filter(fn($p) => $p->participant_role !== 'standby')->count();
+
+            return [
+                'head_id' => $sport->id,
+                'head_name' => $sport->title,
+                'href' => "/sahodaya-admin/{$this->sahodaya->id}/events/{$sport->id}",
+                'item_count' => FestEventItem::where('event_id', $sport->id)->where('is_enabled', true)->count(),
+                'fees_configured' => $sport->hasSportsFeesConfigured(),
+                'registration_open' => $sport->registration_open,
+                'registration_close' => $sport->registration_close,
+                'event_start' => $sport->event_start,
+                'event_end' => $sport->event_end,
+                'schools_count' => $schoolsCount,
+                'athletes_count' => $athletesCount,
+            ];
+        })->values()->all();
 
         $checklist = app(\App\Services\Events\FestSportsChecklist::class)->forSetupHub($event, [
             'base' => $base,

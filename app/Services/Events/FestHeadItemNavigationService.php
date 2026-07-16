@@ -23,12 +23,12 @@ class FestHeadItemNavigationService
      *     hasItemHeads: bool
      * }
      */
-    public function headSummariesForEvent(FestEvent $event, ?string $schoolId = null): array
+    public function headSummariesForEvent(FestEvent $event, ?string $schoolId = null, bool $withItems = false): array
     {
         // Sports (Head = Event): tabs are sport events, never FestItemHead rows —
         // leftover head rows relinked to sport events must not render as tabs.
         if ($event->event_type === 'sports') {
-            $nav = $this->sportsNavigation($event, $schoolId, withItems: false);
+            $nav = $this->sportsNavigation($event, $schoolId, withItems: $withItems);
 
             return [
                 'headItemGroups' => $nav['headItemGroups'],
@@ -251,9 +251,9 @@ class FestHeadItemNavigationService
     }
 
     /** Head tab metadata only — no nested item lists (keeps Inertia payloads small). */
-    public function tabSummaries(array $headItemGroups): array
+    public function tabSummaries(array $headItemGroups, bool $includeItems = false): array
     {
-        return array_map(fn (array $group) => [
+        return array_map(fn (array $group) => array_filter([
             'head_id'            => $group['head_id'] ?? null,
             'head_name'          => $group['head_name'] ?? '',
             'item_count'         => (int) ($group['item_count'] ?? 0),
@@ -265,19 +265,23 @@ class FestHeadItemNavigationService
             'schedule_mode'      => $group['schedule_mode'] ?? 'different_days',
             'competition_time'   => $group['competition_time'] ?? null,
             'registration_open'  => $group['registration_open'] ?? true,
-        ], $headItemGroups);
+            'items'              => $includeItems ? ($group['items'] ?? []) : null,
+        ], fn ($v) => $v !== null), $headItemGroups);
     }
 
     /** @param array<string, mixed> $nav */
-    public function slimNavigation(array $nav): array
+    public function slimNavigation(array $nav, bool $includeItems = false): array
     {
         return [
-            'headItemGroups'  => $this->tabSummaries($nav['headItemGroups'] ?? []),
+            'headItemGroups'  => $this->tabSummaries($nav['headItemGroups'] ?? [], $includeItems),
             'headsForFilter'  => $nav['headsForFilter'] ?? [],
             'hasItemHeads'    => (bool) ($nav['hasItemHeads'] ?? false),
             'unassignedItems' => [],
         ];
     }
+
+
+
 
     /** @return array<string, mixed> */
     public function selectedHeadFromGroups(array $groups, ?int $headId): ?array
@@ -378,7 +382,12 @@ class FestHeadItemNavigationService
                 ->where('is_enabled', true)
                 ->orderBy('display_order')
                 ->orderBy('title')
-                ->get(['id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at']);
+                ->get([
+                    'id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start',
+                    'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end',
+                    'competition_time', 'results_published_at',
+                    'participant_type', 'gender', 'age_group', 'min_group_size', 'max_group_size', 'criteria_json'
+                ]);
 
             if ($items->isEmpty() && $schoolId) {
                 continue;
@@ -452,6 +461,10 @@ class FestHeadItemNavigationService
             'item_reg_missing'  => max(0, $total - $stat['item_reg_assigned']),
             'results_published' => $item->results_published_at !== null,
             'results_published_at' => $item->results_published_at?->toIso8601String(),
+            'participant_type'  => $item->participant_type,
+            'gender'            => $item->gender,
+            'age_group'         => $item->age_group,
+            'squad_summary'     => $item->squadSummary(),
         ];
     }
 

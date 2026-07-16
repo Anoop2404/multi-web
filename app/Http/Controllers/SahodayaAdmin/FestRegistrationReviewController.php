@@ -284,6 +284,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'registration_ids'   => 'nullable|array',
             'registration_ids.*' => 'integer|exists:fest_registrations,id',
             'school_id'          => 'nullable|exists:tenants,id',
+            'item_id'            => 'nullable|integer|exists:fest_event_items,id',
             'override_lifecycle' => 'nullable|boolean',
         ]);
 
@@ -292,6 +293,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             $data['registration_ids'] ?? [],
             $data['school_id'] ?? null,
             (bool) ($data['override_lifecycle'] ?? false),
+            $data['item_id'] ?? null,
         );
 
         $audit->festEvent($event, FestPageActivity::REGISTRATIONS, 'fest.registrations.bulk_approved', "Approved {$result['approved']} registration(s)", [
@@ -317,6 +319,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'registration_ids'   => 'nullable|array',
             'registration_ids.*' => 'integer|exists:fest_registrations,id',
             'school_id'          => 'nullable|exists:tenants,id',
+            'item_id'            => 'nullable|integer|exists:fest_event_items,id',
             'override_lifecycle' => 'nullable|boolean',
         ]);
 
@@ -325,6 +328,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             $data['registration_ids'] ?? [],
             $data['school_id'] ?? null,
             (bool) ($data['override_lifecycle'] ?? false),
+            $data['item_id'] ?? null,
         );
 
         $audit->festEvent($event, FestPageActivity::REGISTRATIONS, 'fest.registrations.bulk_rejected', "Rejected {$result['rejected']} registration(s)", [

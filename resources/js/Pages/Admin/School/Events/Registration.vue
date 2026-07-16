@@ -98,7 +98,7 @@
             <div class="px-4 pb-4 pt-0 border-t border-slate-100">
                 <ol class="list-decimal pl-4 space-y-1 text-slate-600 mt-3 mb-3">
                     <li><strong>Step 1 · Register for event</strong> — add athletes to the sports fest (event ID assigned).</li>
-                    <li><strong>Step 2 · Register by Event Head</strong> — pick a head (Athletics, Field, Relay…), then add athletes to each item inside it.</li>
+                    <li><strong>Step 2 · Register by Sport Event</strong> — pick a sport event (Athletics, Chess…), then add athletes to each item inside it.</li>
                     <li>Pay event + item fees in the billing section; Sahodaya approves → chest numbers on fest day.</li>
                 </ol>
                 <p class="text-xs text-slate-500">
@@ -125,6 +125,17 @@
         />
 
         <div v-else class="space-y-5">
+            <!-- Squad warnings alert -->
+            <div v-if="incompleteSquads.length" class="notice-banner notice-banner--warning text-sm mb-4 max-w-3xl">
+                <p class="font-semibold text-amber-950">⚠️ Attention: Incomplete Squads</p>
+                <p class="mt-1 text-slate-700">You have registered teams for the following items but haven't added the minimum required participants. These may be rejected by Sahodaya:</p>
+                <ul class="list-disc pl-5 mt-2 space-y-1 text-slate-700 font-medium">
+                    <li v-for="(squad, idx) in incompleteSquads" :key="idx">
+                        <strong>{{ squad.item_title }}</strong>: Currently has {{ squad.count }} participant{{ squad.count === 1 ? '' : 's' }} (requires at least {{ squad.min }}).
+                    </li>
+                </ul>
+            </div>
+
             <div v-if="focusEventId && displayEvents.length === 1" class="notice-banner notice-banner--info text-sm mb-2">
                 Showing Sahodaya event registration. <Link :href="`${programBase}/registration`" class="link-brand font-semibold">View all events</Link>
             </div>
@@ -169,6 +180,14 @@
                         <span v-if="event.academic_year_label"
                               class="inline-flex items-center gap-1 rounded-lg bg-violet-50 text-violet-800 px-2.5 py-1 border border-violet-100">
                             Academic year <strong class="font-mono">{{ event.academic_year_label }}</strong>
+                        </span>
+                        <span v-if="event.registration_open || event.registration_close"
+                              class="inline-flex items-center gap-1 rounded-lg bg-indigo-50 text-indigo-800 px-2.5 py-1 border border-indigo-100">
+                            <strong>Registration:</strong> {{ formatDateRange(event.registration_open, event.registration_close) }}
+                        </span>
+                        <span v-if="event.event_start || event.event_end"
+                              class="inline-flex items-center gap-1 rounded-lg bg-sky-50 text-sky-800 px-2.5 py-1 border border-sky-100">
+                            <strong>Competition:</strong> {{ formatDateRange(event.event_start, event.event_end) }}
                         </span>
                         <span v-if="event.quotas && eventType === 'sports'"
                               class="inline-flex items-center gap-1 rounded-lg bg-emerald-50 text-emerald-800 px-2.5 py-1 border border-emerald-100">
@@ -1617,7 +1636,7 @@ function uploadHeadPayment(event, headFee) {
     const key = headPaymentKey(event.id, headFee.head_id);
     const file = headPaymentFiles[key];
     if (!file) {
-        alert('Choose a payment proof file for this Event Head first.');
+        alert('Choose a payment proof file for this Sport Event first.');
         return;
     }
     router.post(`${programBase.value}/events/${event.id}/payment`, {
@@ -1625,5 +1644,41 @@ function uploadHeadPayment(event, headFee) {
         transaction_ref: headPaymentRefs[key] || null,
         head_id: headFee.head_id,
     }, { forceFormData: true, preserveScroll: true });
+}
+
+const incompleteSquads = computed(() => {
+    if (!props.registrations || !props.events) return [];
+    const list = [];
+    for (const reg of props.registrations) {
+        const item = props.events.flatMap(ev => ev.items ?? []).find(it => Number(it.id) === Number(reg.item_id));
+        if (!item) continue;
+        const isGroup = ['group', 'team'].includes(item.participant_type);
+        if (!isGroup) continue;
+        const count = (reg.participants ?? []).filter(p => p.participant_role !== 'standby' && p.student_id).length;
+        const min = item.min_group_size || 1;
+        if (count < min) {
+            list.push({
+                item_title: item.title,
+                count,
+                min,
+            });
+        }
+    }
+    return list;
+});
+
+function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatDateRange(start, end) {
+    if (!start && !end) return 'Not scheduled';
+    if (start && end) {
+        if (start === end) return formatDate(start);
+        return `${formatDate(start)} – ${formatDate(end)}`;
+    }
+    return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
 }
 </script>

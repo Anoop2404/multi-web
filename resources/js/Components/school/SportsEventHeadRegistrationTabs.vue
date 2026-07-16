@@ -2,13 +2,13 @@
     <section class="mb-6">
         <div class="flex flex-wrap items-end justify-between gap-2 mb-3">
             <div>
-                <h3 class="text-sm font-semibold text-slate-800">Event Heads</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Pick a section — items and registration below update for that head.</p>
+                <h3 class="text-sm font-semibold text-slate-800">Sport Events</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Pick a sport event — its items and registration panel will appear below.</p>
             </div>
         </div>
 
         <div v-if="!headItemGroups.length" class="text-sm text-slate-400 py-4 text-center border border-dashed border-slate-200 rounded-xl">
-            No Event Heads configured for this event yet.
+            No sport events configured for this event yet.
         </div>
 
         <div v-else class="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory">

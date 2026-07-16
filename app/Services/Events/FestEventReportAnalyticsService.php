@@ -412,6 +412,11 @@ class FestEventReportAnalyticsService
                 'max_per_school'     => $item->max_per_school,
                 'fee_per_item'       => $feePerItem,
                 'line_fee'           => $lineFee,
+                'reg_start'          => $item->reg_start,
+                'reg_end'            => $item->reg_end,
+                'competition_start'  => $item->competition_start,
+                'competition_end'    => $item->competition_end,
+                'competition_time'   => $item->competition_time,
             ];
         }
 
@@ -713,7 +718,7 @@ class FestEventReportAnalyticsService
                     'student.schoolClass:id,name',
                     'teacher:id,name,reg_no',
                     'registration.school:id,name',
-                    'registration.item:id,title,head_id',
+                    'registration.item:id,title,head_id,competition_start,competition_end,competition_time',
                 ])
                 ->get();
 
@@ -733,6 +738,11 @@ class FestEventReportAnalyticsService
                     'chest_no'   => $p->chest_no,
                     'fest_id'    => $p->level_registration_number,
                     'status'     => $p->registration?->status,
+                    'role'       => $p->participant_role,
+                    'team_name'  => $p->registration?->team_name,
+                    'competition_start' => $p->registration?->item?->competition_start,
+                    'competition_end'   => $p->registration?->item?->competition_end,
+                    'competition_time'  => $p->registration?->item?->competition_time,
                 ];
             }
         }
@@ -1228,22 +1238,28 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function studentWiseBrowserRows(?string $schoolId = null, ?string $search = null): array
     {
+        $eventIds = [$this->event->id];
+        if ($this->event->isSportsSeasonEvent()) {
+            $eventIds = array_merge($eventIds, FestEvent::where('parent_event_id', $this->event->id)->pluck('id')->all());
+        }
+
         $participants = FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $this->event->id)
+                ->whereIn('event_id', $eventIds)
                 ->active()
                 ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
             ->whereNotNull('student_id')
             ->with([
                 'student:id,name,reg_no,gender',
                 'registration.school:id,name',
-                'registration.item:id,title,head_id',
+                'registration.item:id,title,head_id,event_id',
                 'registration.item.head:id,name',
+                'registration.item.event:id,title',
             ])
             ->get();
 
         $marksByParticipant = FestMark::query()
-            ->where('event_id', $this->event->id)
+            ->whereIn('event_id', $eventIds)
             ->whereIn('participant_id', $participants->pluck('id'))
             ->get()
             ->keyBy('participant_id');
@@ -1270,16 +1286,20 @@ class FestEventReportAnalyticsService
                 $mark = $marksByParticipant->get($p->id);
 
                 return [
-                    'item_id'    => $p->registration?->item_id,
-                    'item_title' => $p->registration?->item?->title,
-                    'head_name'  => $p->registration?->item?->head?->name,
-                    'status'     => $p->registration?->status,
-                    'fest_id'    => $p->level_registration_number,
-                    'item_reg'   => $p->item_registration_number,
-                    'chest_no'   => $p->chest_no,
-                    'grade'      => $mark?->grade,
-                    'position'   => $mark?->position,
-                    'score'      => $mark?->score,
+                    'item_id'           => $p->registration?->item_id,
+                    'item_title'        => $p->registration?->item?->title,
+                    'head_name'         => $p->registration?->item?->head?->name,
+                    'status'            => $p->registration?->status,
+                    'fest_id'           => $p->level_registration_number,
+                    'item_reg'          => $p->item_registration_number,
+                    'chest_no'          => $p->chest_no,
+                    'grade'             => $mark?->grade,
+                    'position'          => $mark?->position,
+                    'score'             => $mark?->score,
+                    'mark_value'        => $mark?->measurement_value,
+                    'mark_unit'         => $mark?->measurement_unit,
+                    'sport_event_id'    => $p->registration?->event_id,
+                    'sport_event_title' => $p->registration?->item?->event?->title,
                 ];
             })->values()->all();
 

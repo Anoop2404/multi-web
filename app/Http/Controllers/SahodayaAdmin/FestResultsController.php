@@ -67,6 +67,17 @@ class FestResultsController extends SahodayaAdminController
                 'suggested'   => $suggestedNext?->id === $e->id,
             ]);
 
+        $childEvents = [];
+        if ($event->event_type === 'sports') {
+            $seasonId = $event->parent_event_id ?? $event->id;
+            $childEvents = FestEvent::where('parent_event_id', $seasonId)
+                ->orWhere('id', $seasonId)
+                ->ofType('sports')
+                ->orderBy('title')
+                ->get(['id', 'title', 'parent_event_id'])
+                ->all();
+        }
+
         return $this->inertia('Sahodaya/Events/Results', $this->withEventActivity($event, FestPageActivity::RESULTS, array_merge($ctx, [
             'event'             => $event,
             'scoreboard'        => EventContext::for($event)->scoreboardBySchool(),
@@ -84,6 +95,7 @@ class FestResultsController extends SahodayaAdminController
             'itemResultRows'    => $itemResultRows,
             'resultsBaseUrl'    => "/sahodaya-admin/{$tenantId}/events/{$event->id}/results",
             'marksBaseUrl'      => "/sahodaya-admin/{$tenantId}/events/{$event->id}/marks",
+            'childEvents'       => $childEvents,
         ])));
     }
 
@@ -123,6 +135,33 @@ class FestResultsController extends SahodayaAdminController
 
             return $group;
         }, $groups);
+    }
+
+    public function bulkPublishItems(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'item_ids' => 'required|array',
+            'item_ids.*' => 'integer|exists:fest_event_items,id',
+        ]);
+
+        $items = FestEventItem::where('event_id', $event->id)
+            ->whereIn('id', $data['item_ids'])
+            ->get();
+
+        $publishedCount = 0;
+        foreach ($items as $item) {
+            app(FestItemResultsService::class)->publishItem($item);
+            $publishedCount++;
+        }
+
+        if ($publishedCount > 0) {
+            EventContext::for($event)->recalculateSchoolPoints();
+            $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.bulk_items_published', "Bulk published results for {$publishedCount} item(s)");
+        }
+
+        return back()->with('success', "Successfully published results for {$publishedCount} item(s).");
     }
 
     public function publishItem(string $tenantId, FestEvent $event, FestEventItem $item, PlatformAuditLogger $audit)

@@ -34,8 +34,26 @@ class FestEventFeesController extends SahodayaAdminController
                 $regs = FestRegistration::where('event_id', $fee->event_id)
                     ->where('school_id', $fee->school_id)
                     ->whereIn('status', ['submitted', 'approved'])
-                    ->with('item')
+                    ->with(['item', 'participants'])
                     ->get();
+
+                $teamRegs = $regs->filter(fn ($r) => $r->item?->isTeamItem());
+                $indivRegs = $regs->filter(fn ($r) => $r->item && ! $r->item->isTeamItem());
+
+                $teamCount = $teamRegs->count();
+                $indivCount = $indivRegs->count();
+                $teamStudentsCount = 0;
+                foreach ($teamRegs as $r) {
+                    $teamStudentsCount += $r->participants
+                        ->filter(fn ($p) => $p->participant_role !== 'standby' && $p->student_id)
+                        ->count();
+                }
+
+                $sportsParticipation = $event->event_type === 'sports' ? [
+                    'team_count' => $teamCount,
+                    'team_students_count' => $teamStudentsCount,
+                    'indiv_count' => $indivCount,
+                ] : null;
 
                 return [
                     'id' => $fee->id,
@@ -51,6 +69,7 @@ class FestEventFeesController extends SahodayaAdminController
                     'breakdown' => $feeService->breakdown($event, $fee, $schedule),
                     'fee_receipt' => $fee->feeReceipt,
                     'items' => $regs->map(fn ($r) => $r->item?->title)->filter()->values(),
+                    'sports_participation' => $sportsParticipation,
                 ];
             });
 

@@ -35,7 +35,7 @@
                             Step 1 · Event registration
                         </Link>
                         <Link v-if="isSports" :href="`${programBase}/events/${ev.id}/items`" class="btn-secondary text-xs !min-h-0">
-                            Step 2 · Register by Event Head
+                            Step 2 · Register by Sport Event
                         </Link>
                     </div>
                 </article>

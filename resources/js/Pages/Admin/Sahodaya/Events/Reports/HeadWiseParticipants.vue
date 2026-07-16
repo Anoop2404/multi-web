@@ -1,15 +1,15 @@
 <template>
-    <SahodayaEventsLayout :title="`${event.title} — Head-wise participants`" :sahodaya="sahodaya" :event="event"
+    <SahodayaEventsLayout :title="event.event_type === 'sports' ? `${event.title} — Sport-wise participants` : `${event.title} — Head-wise participants`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Head-wise participants`" eyebrow="Reports"
+        <PageHeader :title="event.event_type === 'sports' ? `${event.title} — Sport-wise participants` : `${event.title} — Head-wise participants`" eyebrow="Reports"
                     :description="event.event_type === 'sports'
-                        ? 'Participants grouped by Event Head (Athletics, Chess, etc.).'
+                        ? 'Participants grouped by Sport Event (Athletics, Chess, etc.).'
                         : 'Participants grouped by item head.'">
             <template #actions>
                 <Link v-if="event.event_type === 'sports'"
-                      :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/reports/by-head`"
+                      :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/reports`"
                       class="btn-secondary text-sm">
-                    ← By Event Head
+                    ← All report types
                 </Link>
                 <Link v-else :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/reports`"
                       class="btn-secondary text-sm">
@@ -51,7 +51,7 @@
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ totals.heads }}</p>
-                <p class="text-xs text-slate-500 mt-1">{{ event.event_type === 'sports' ? 'Event Heads' : 'Item heads' }}</p>
+                <p class="text-xs text-slate-500 mt-1">{{ event.event_type === 'sports' ? 'Sport Events' : 'Item heads' }}</p>
             </div>
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ totals.items }}</p>
@@ -72,12 +72,12 @@
         </div>
 
         <section class="mb-8">
-            <h3 class="section-title mb-3">Summary by head</h3>
+            <h3 class="section-title mb-3">{{ event.event_type === 'sports' ? 'Summary by Sport Event' : 'Summary by head' }}</h3>
             <div class="card overflow-hidden p-0">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Head</th>
+                            <th>{{ event.event_type === 'sports' ? 'Sport Event' : 'Head' }}</th>
                             <th>Items</th>
                             <th>Regs</th>
                             <th>Approved</th>
@@ -152,9 +152,27 @@
                             <tr>
                                 <td>{{ row.head_name }}</td>
                                 <td>{{ row.school }}</td>
-                                <td class="font-medium">{{ row.student }}</td>
+                                <td class="font-medium">
+                                    {{ row.student }}
+                                    <div class="flex flex-wrap gap-1 mt-0.5 text-[10px]">
+                                        <span v-if="row.role" class="px-1.5 py-0.5 rounded font-bold uppercase tracking-wide"
+                                              :class="row.role === 'standby' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'">
+                                            {{ row.role }}
+                                        </span>
+                                        <span v-if="row.team_name" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
+                                            👥 {{ row.team_name }}
+                                        </span>
+                                    </div>
+                                </td>
                                 <td>{{ row.reg_no }}</td>
-                                <td>{{ row.item }}</td>
+                                <td>
+                                    {{ row.item }}
+                                    <div v-if="row.competition_start && event.event_type === 'sports'" class="mt-0.5">
+                                        <span class="inline-flex items-center gap-1 rounded bg-sky-50 px-1 py-0.5 text-[9px] font-bold text-sky-800 border border-sky-100 uppercase tracking-wide">
+                                            📅 {{ formatDate(row.competition_start) }}<span v-if="row.competition_time"> @ {{ row.competition_time.slice(0, 5) }}</span>
+                                        </span>
+                                    </div>
+                                </td>
                                 <td>{{ row.fest_id ?? '—' }}</td>
                                 <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
                                 <td>{{ row.chest_no ?? '—' }}</td>
@@ -223,5 +241,11 @@ const totals = computed(() => ({
 
 function applyFilter() {
     applyHeadFilter({ school_id: schoolFilter.value || undefined });
+}
+
+function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 </script>

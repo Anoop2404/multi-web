@@ -36,8 +36,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'update:itemId', 'apply']);
 
-const resolvedLabel = computed(() => props.label ?? (props.isSports ? 'Event Head' : 'Item head'));
-const resolvedAllLabel = computed(() => props.allLabel ?? (props.isSports ? 'All Event Heads' : 'All heads'));
+const resolvedLabel = computed(() => props.label ?? (props.isSports ? 'Sport Event' : 'Item head'));
+const resolvedAllLabel = computed(() => props.allLabel ?? (props.isSports ? 'All sport events' : 'All heads'));
 
 const items = computed(() => {
     if (!props.modelValue) {

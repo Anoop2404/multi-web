@@ -3,7 +3,7 @@
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Registration & Fees Register`" eyebrow="Reports"
                     :description="event.event_type === 'sports'
-                        ? 'Grouped by Event Head — Fest ID, item reg, and chest numbers per item row.'
+                        ? 'Grouped by Sport Event — Fest ID, item reg, and chest numbers per item row.'
                         : 'Grouped by item head — Fest ID, item reg, and chest numbers per item row.'">
             <template #actions>
                 <a :href="exportUrl" class="btn-primary text-sm">Export CSV ↓</a>
@@ -75,7 +75,7 @@
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="p-3">Head</th>
+                        <th class="p-3">{{ event.event_type === 'sports' ? 'Sport Event' : 'Head' }}</th>
                         <th class="p-3">School</th>
                         <th class="p-3">Participant</th>
                         <th class="p-3">Fest ID</th>
@@ -95,13 +95,29 @@
                         <tr class="border-t align-top">
                             <td class="p-3 text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
                             <td class="p-3 text-xs">{{ row.school_name }}</td>
-                            <td class="p-3">
-                                <span class="font-medium">{{ row.participant_name }}</span>
-                                <p class="text-xs font-mono text-[#0f3d7a]">{{ row.participant_reg_no }}</p>
-                            </td>
-                            <td class="p-3 font-mono text-xs font-semibold text-[#0f3d7a]">{{ row.level_reg }}</td>
-                            <td class="p-3 font-mono text-xs">{{ row.item_reg }}</td>
-                            <td class="p-3 text-xs">{{ row.item_title }}</td>
+                             <td class="p-3">
+                                 <span class="font-medium text-slate-800">{{ row.participant_name }}</span>
+                                 <p class="text-xs font-mono text-[#0f3d7a]">{{ row.participant_reg_no }}</p>
+                                 <div class="flex flex-wrap gap-1 mt-1 text-[9px]">
+                                     <span v-if="row.role" class="px-1 py-0.5 rounded font-bold uppercase tracking-wide"
+                                           :class="row.role === 'standby' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'">
+                                         {{ row.role }}
+                                     </span>
+                                     <span v-if="row.team_name" class="px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
+                                         👥 {{ row.team_name }}
+                                     </span>
+                                 </div>
+                             </td>
+                             <td class="p-3 font-mono text-xs font-semibold text-[#0f3d7a]">{{ row.level_reg }}</td>
+                             <td class="p-3 font-mono text-xs">{{ row.item_reg }}</td>
+                             <td class="p-3 text-xs">
+                                 <span class="font-medium text-slate-900">{{ row.item_title }}</span>
+                                 <div v-if="row.competition_start && event.event_type === 'sports'" class="mt-0.5">
+                                     <span class="inline-flex items-center gap-1 rounded bg-sky-50 px-1 py-0.5 text-[9px] font-bold text-sky-800 border border-sky-100 uppercase tracking-wide">
+                                         📅 {{ formatDate(row.competition_start) }}<span v-if="row.competition_time"> @ {{ row.competition_time.slice(0, 5) }}</span>
+                                     </span>
+                                 </div>
+                             </td>
                             <td class="p-3 font-mono text-xs">{{ row.chest_no }}</td>
                             <td class="p-3 text-xs">{{ row.item_fee != null ? `₹${row.item_fee}` : '—' }}</td>
                         </tr>
@@ -178,5 +194,11 @@ function feeStatusClass(status) {
         rejected: 'bg-red-100 text-red-700',
         pending: 'bg-slate-100 text-slate-600',
     }[status] ?? 'bg-slate-100 text-slate-600';
+}
+
+function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 </script>

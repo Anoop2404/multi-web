@@ -2,7 +2,7 @@
     <SchoolAdminLayout :title="pageTitle" :school="school" :show-header-title="false">
         <PageHeader
             :title="pageTitle"
-            eyebrow="Sports Meet · Step 2 · Register by Event Head"
+            eyebrow="Sports Meet · Step 2 · Register by Sport Event"
             :description="pageDescription"
         >
             <template #actions>
@@ -102,12 +102,12 @@ const pageTitle = computed(() => {
     if (activeHead.value) {
         return `${activeHead.value.head_name} — ${props.event.title}`;
     }
-    return `Register by Event Head — ${props.event.title}`;
+    return `Register by Sport Event — ${props.event.title}`;
 });
 
 const pageDescription = computed(() => {
     if (!activeHead.value) {
-        return 'Register athletes for sports events by Event Head.';
+        return 'Register athletes for sports events by Sport Event.';
     }
     const parts = [
         `${activeHead.value.item_count ?? 0} items`,

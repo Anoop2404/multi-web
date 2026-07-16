@@ -120,9 +120,36 @@
                     <div class="reports-tile-grid">
                         <div v-for="head in headItemGroups" :key="head.head_id ?? 'other'"
                              class="reports-head-card group block">
-                            <p class="font-semibold text-slate-900">{{ head.head_name }}</p>
-                            <p class="text-xs text-slate-500 mt-1">{{ head.item_count }} item{{ head.item_count === 1 ? '' : 's' }}</p>
-                            <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                            <p class="font-semibold text-slate-950 text-sm leading-snug">{{ head.head_name }}</p>
+
+                            <!-- Dates summary -->
+                            <div class="mt-2 space-y-0.5 text-[10px] text-slate-500">
+                                <p v-if="head.registration_open || head.registration_close" class="flex items-center gap-1">
+                                    <span>📝 Reg:</span>
+                                    <span>{{ formatDateRange(head.registration_open, head.registration_close) }}</span>
+                                </p>
+                                <p v-if="head.event_start || head.event_end" class="flex items-center gap-1">
+                                    <span>🏆 Comp:</span>
+                                    <span>{{ formatDateRange(head.event_start, head.event_end) }}</span>
+                                </p>
+                            </div>
+
+                            <!-- Participation Stats -->
+                            <div class="mt-2.5 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-medium text-slate-600">
+                                <span class="bg-slate-100 px-1.5 py-0.5 rounded">{{ head.item_count }} item{{ head.item_count === 1 ? '' : 's' }}</span>
+                                <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">{{ head.schools_count ?? 0 }} school{{ head.schools_count === 1 ? '' : 's' }}</span>
+                                <span class="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">{{ head.athletes_count ?? 0 }} athlete{{ head.athletes_count === 1 ? '' : 's' }}</span>
+                            </div>
+
+                            <!-- Fee Config status badge -->
+                            <div class="mt-2.5">
+                                <span class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border"
+                                      :class="head.fees_configured ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-amber-50 border-amber-100 text-amber-800'">
+                                    {{ head.fees_configured ? 'Composite billing active' : 'Fee config pending' }}
+                                </span>
+                            </div>
+
+                            <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold pt-2 border-t border-slate-100">
                                 <Link :href="sportEventUrl(head)" class="text-indigo-600 hover:underline">
                                     Open event →
                                 </Link>
@@ -244,5 +271,20 @@ const organiserTools = computed(() => [
 function sportEventUrl(head) {
     if (head.href) return head.href;
     return `/sahodaya-admin/${props.sahodaya.id}/events/${head.head_id}`;
+}
+
+function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatDateRange(start, end) {
+    if (!start && !end) return 'Not scheduled';
+    if (start && end) {
+        if (start === end) return formatDate(start);
+        return `${formatDate(start)} – ${formatDate(end)}`;
+    }
+    return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
 }
 </script>

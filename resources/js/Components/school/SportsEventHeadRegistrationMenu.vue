@@ -1,10 +1,10 @@
 <template>
     <div class="space-y-6">
         <div class="notice-banner notice-banner--info text-sm max-w-3xl">
-            <p class="font-semibold text-[#0f3d7a] mb-1">Choose an Event Head</p>
+            <p class="font-semibold text-[#0f3d7a] mb-1">Choose a Sport Event</p>
             <p class="text-slate-700">
-                Each section (Athletics, Field events, etc.) has its own registration window.
-                Open a head to register athletes for its events.
+                Each sport event (Athletics, Chess, etc.) has its own registration window.
+                Open a sport event to register athletes for its items.
             </p>
         </div>
 
@@ -27,8 +27,8 @@
             </div>
         </div>
 
-        <EmptyState v-if="!headItemGroups.length" title="No Event Heads yet" icon="📂"
-                    description="Sahodaya has not synced Event Heads for this event yet." />
+        <EmptyState v-if="!headItemGroups.length" title="No sport events yet" icon="🏆"
+                    description="Sahodaya has not configured sport events for this event yet." />
 
         <div v-else class="space-y-4">
             <div v-for="head in headItemGroups" :key="head.head_id ?? 'other'"

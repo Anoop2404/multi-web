@@ -200,6 +200,11 @@ class FestRegistrationRegisterService
             'school_total_due'      => $feeRequired ? (float) ($schoolFee?->total_due ?? 0) : null,
             'school_fee_status'     => $feeRequired ? ($schoolFee?->status ?? 'pending') : 'n/a',
             'is_teacher'            => $isTeacher,
+            'role'                  => $participant->participant_role ?? 'performer',
+            'team_name'             => $registration->team_name,
+            'competition_start'     => $registration->item?->competition_start,
+            'competition_end'       => $registration->item?->competition_end,
+            'competition_time'      => $registration->item?->competition_time,
         ];
     }
 }

@@ -2,11 +2,10 @@
     <SahodayaEventsLayout :title="`${event.title} — Reports`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <div class="reports-shell">
             <PageHeader :title="`${event.title} — Reports`" eyebrow="Analytics"
-                        description="Browse reports by Event Head, download phase packs, or explore all report types.">
+                        :description="event.event_type === 'sports'
+                            ? 'Browse reports by Sport Event, download phase packs, or explore all report types.'
+                            : 'Browse reports by Event Head, download phase packs, or explore all report types.'">
                 <template #actions>
-                    <Link v-if="event.event_type === 'sports'" :href="`${reportsBase}/by-head`" class="btn-primary text-sm">
-                        By Event Head →
-                    </Link>
                     <span v-if="currentPhase" class="status-pill status-pill--published capitalize">{{ currentPhase }} phase</span>
                 </template>
             </PageHeader>
@@ -47,19 +46,30 @@
                         icon="🔍"
                         class="mb-8" />
 
-            <ReportHeadHubSection v-if="hasItemHeads"
+            <ReportHeadHubSection v-if="hasItemHeads && event.event_type !== 'sports'"
                                   compact
-                                  :is-sports="event.event_type === 'sports'"
+                                  :is-sports="false"
                                   :heads="headSummary"
                                   :head-item-groups="headItemGroups"
                                   :head-report-base="headWiseReportBase"
                                   :export-base-url="headWiseExportUrl"
                                   :manage-url="itemHeadsManageUrl" />
 
-            <EmptyState v-else-if="event.event_type === 'sports'" title="No Event Heads yet" icon="📂" class="mb-2"
-                        description="Sync Event Heads from the competition hub, then reports will group by Athletics, Chess, etc.">
-                <Link :href="itemHeadsManageUrl" class="btn-primary text-sm mt-4 inline-flex">Open competition hub</Link>
-            </EmptyState>
+            <section v-else-if="event.event_type === 'sports' && headItemGroups.length" class="mb-8">
+                <h3 class="section-title mb-3">By Sport Event</h3>
+                <p class="text-sm text-slate-600 mb-4">Jump to reports filtered for a specific sport event and its items.</p>
+                <div class="reports-tile-grid">
+                    <Link v-for="head in headItemGroups" :key="head.head_id"
+                          :href="`${reportsBase}/by-head?head=${head.head_id}`"
+                          class="reports-head-card group block hover:no-underline">
+                        <span v-if="head.participant_count" class="reports-head-card__count">
+                            {{ head.participant_count }}
+                        </span>
+                        <p class="font-semibold text-slate-900 pr-16 group-hover:text-[color:var(--brand-navy)]">{{ head.head_name }}</p>
+                        <p class="text-xs text-slate-500 mt-1">{{ head.item_count }} item{{ head.item_count === 1 ? '' : 's' }}</p>
+                    </Link>
+                </div>
+            </section>
 
             <EventPageActivityLog :logs="activityLogs" />
         </div>

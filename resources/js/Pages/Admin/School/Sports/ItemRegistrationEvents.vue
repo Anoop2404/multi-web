@@ -1,9 +1,9 @@
 <template>
-    <SchoolAdminLayout title="Register by Event Head" :school="school" :show-header-title="false">
+    <SchoolAdminLayout title="Register by Sport Event" :school="school" :show-header-title="false">
         <PageHeader
-            title="Register by Event Head"
+            title="Register by Sport Event"
             eyebrow="Sports Meet · Step 2"
-            description="Choose which sports fest, then pick an Event Head to register athletes for its events."
+            description="Choose which sports fest, then pick a sport event to register athletes for its items."
         >
             <template #actions>
                 <Link :href="`${programBase}/registration`" class="btn-secondary text-sm">← Step 1: Event registration</Link>

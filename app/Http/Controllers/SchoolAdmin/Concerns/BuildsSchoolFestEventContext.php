@@ -18,7 +18,8 @@ trait BuildsSchoolFestEventContext
         $meta = SchoolFestProgram::meta($programSlug);
         $navService = app(FestHeadItemNavigationService::class);
         $headNav = $navService->slimNavigation(
-            $navService->headSummariesForEvent($event, $this->school->id),
+            $navService->headSummariesForEvent($event, $this->school->id, withItems: true),
+            includeItems: true
         );
 
         $prefix = ProgramRouteMap::prefixFromSlug($meta['slug']);

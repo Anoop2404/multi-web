@@ -2,7 +2,7 @@
     <SchoolAdminLayout :title="`Mark entry status — ${event.title}`" :school="school" :show-header-title="false">
         <PageHeader :title="`Mark entry status — ${event.title}`" :eyebrow="programLabel"
                     :description="event.event_type === 'sports'
-                        ? 'Mark entry progress for your school\'s participants by Event Head and item.'
+                        ? 'Mark entry progress for your school\'s participants by Sport Event and item.'
                         : 'Mark entry progress for your school\'s participants by item head and item.'">
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>

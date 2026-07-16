@@ -23,14 +23,26 @@
                 <p class="text-xl font-bold">{{ stats.items }}</p>
                 <p class="text-xs text-slate-500 mt-1">Items</p>
             </div>
-            <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold">{{ stats.registrations }}</p>
-                <p class="text-xs text-slate-500 mt-1">Registrations</p>
-            </div>
-            <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold">{{ stats.school_rounds }}</p>
-                <p class="text-xs text-slate-500 mt-1">School rounds</p>
-            </div>
+            <template v-if="event.event_type === 'sports'">
+                <div class="card card--muted !py-4 text-center">
+                    <p class="text-xl font-bold text-indigo-700">{{ stats.schools_count ?? 0 }}</p>
+                    <p class="text-xs text-slate-500 mt-1">Schools registered</p>
+                </div>
+                <div class="card card--muted !py-4 text-center">
+                    <p class="text-xl font-bold text-emerald-700">{{ stats.athletes_count ?? 0 }}</p>
+                    <p class="text-xs text-slate-500 mt-1">Athletes registered</p>
+                </div>
+            </template>
+            <template v-else>
+                <div class="card card--muted !py-4 text-center">
+                    <p class="text-xl font-bold">{{ stats.registrations }}</p>
+                    <p class="text-xs text-slate-500 mt-1">Registrations</p>
+                </div>
+                <div class="card card--muted !py-4 text-center">
+                    <p class="text-xl font-bold">{{ stats.school_rounds }}</p>
+                    <p class="text-xs text-slate-500 mt-1">School rounds</p>
+                </div>
+            </template>
         </div>
 
         <div class="grid lg:grid-cols-3 gap-6">
@@ -94,7 +106,7 @@
                                 <a :href="sportsAgeGroupsUrl" class="link-brand">Age categories master →</a>
                             </div>
                         </div>
-                        <div v-if="!event.state_program_id" class="space-y-2">
+                        <div v-if="!event.state_program_id && event.event_type !== 'sports'" class="space-y-2">
                             <p class="form-label">Conduct levels</p>
                             <div class="flex flex-wrap gap-3">
                                 <label v-for="(label, key) in selectableLevelLabels" :key="key" class="choice-chip">

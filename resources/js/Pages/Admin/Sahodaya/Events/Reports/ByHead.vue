@@ -17,8 +17,8 @@
                                  :has-item-heads="hasItemHeads"
                                  :show-item-stats="true"
                                  :is-sports="true"
-                                 :hint="'Pick an Event Head (Athletics, Chess…), then an item to open filtered reports.'"
-                                 empty-heads-text="Sync Event Heads from the competition hub, then return here.">
+                                 :hint="'Pick a sport event (Athletics, Chess…), then an item to open filtered reports.'"
+                                 empty-heads-text="No sport events configured yet. Add sport events from the Sports Setup hub.">
 
             <template v-if="selectedHeadId && !selectedItemId" #head-detail="{ head }">
                 <FestHeadReportPanel :sahodaya-id="sahodaya.id"
@@ -76,7 +76,7 @@ const pageTitle = computed(() => {
     if (selectedHeadMeta.value?.head_name) {
         return `${props.event.title} — ${selectedHeadMeta.value.head_name}`;
     }
-    return `${props.event.title} — Reports by Event Head`;
+    return `${props.event.title} — Reports by Sport Event`;
 });
 
 const headerDescription = computed(() => {
@@ -86,6 +86,6 @@ const headerDescription = computed(() => {
     if (props.selectedHeadId) {
         return 'Section reports for the whole head, or pick an item for item-specific reports.';
     }
-    return 'Navigate by Event Head, then pick an item — same flow as competition hub.';
+    return 'Navigate by Sport Event, then pick an item — same flow as competition hub.';
 });
 </script>

@@ -3,7 +3,7 @@
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Item registration counts`" eyebrow="Reports"
                     :description="event.event_type === 'sports'
-                        ? 'Registrations, participants, schools and fees per item — grouped by Event Head.'
+                        ? 'Registrations, participants, schools and fees per item — grouped by Sport Event.'
                         : 'Registrations, participants, schools and fees per item — grouped by item head.'">
             <template #actions>
                 <a :href="pdfUrl" target="_blank" class="btn-secondary text-sm">Export PDF ↓</a>
@@ -47,12 +47,12 @@
         </div>
 
         <section v-if="headSummary?.length" class="mb-8">
-            <h3 class="section-title mb-3">{{ event.event_type === 'sports' ? 'Summary by Event Head' : 'Summary by item head' }}</h3>
+            <h3 class="section-title mb-3">{{ event.event_type === 'sports' ? 'Summary by Sport Event' : 'Summary by item head' }}</h3>
             <div class="card overflow-hidden p-0">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Head</th>
+                            <th>{{ event.event_type === 'sports' ? 'Sport Event' : 'Head' }}</th>
                             <th>Items</th>
                             <th>Regs</th>
                             <th>Approved</th>
@@ -88,11 +88,14 @@
             <h3 class="section-title mb-3">By competition item</h3>
             <div class="card overflow-hidden p-0">
                 <table class="data-table">
-                    <thead>
+                    <thead class="bg-gray-50 border-b">
                         <tr>
                             <th>Head</th>
                             <th>Item</th>
                             <th>Age / class</th>
+                            <th>Type</th>
+                            <th>Reg window</th>
+                            <th>Competition</th>
                             <th>Schools</th>
                             <th>Approved</th>
                             <th>Pending</th>
@@ -106,14 +109,28 @@
                     <tbody>
                         <template v-for="(row, idx) in displayRows" :key="row.item_id">
                             <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                                <td colspan="11" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                <td colspan="15" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                     {{ row.head_name ?? 'Other items' }}
                                 </td>
                             </tr>
                             <tr>
                                 <td class="text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
-                                <td class="font-medium">{{ row.title }}</td>
+                                <td class="font-medium">
+                                    {{ row.title }}
+                                    <span v-if="row.item_code" class="block text-xs font-mono text-slate-400">{{ row.item_code }}</span>
+                                </td>
                                 <td>{{ row.age_group || row.class_group || '—' }}</td>
+                                <td>
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide"
+                                          :class="row.participant_type === 'individual' ? 'bg-slate-100 text-slate-700' : 'bg-indigo-100 text-indigo-800'">
+                                        {{ row.participant_type === 'individual' ? 'Indiv' : 'Team' }}
+                                    </span>
+                                </td>
+                                <td class="text-xs whitespace-nowrap">{{ formatDateRange(row.reg_start, row.reg_end) }}</td>
+                                <td class="text-xs whitespace-nowrap">
+                                    {{ formatDateRange(row.competition_start, row.competition_end) }}
+                                    <span v-if="row.competition_time" class="block text-[10px] text-slate-400 font-mono">@ {{ row.competition_time.slice(0, 5) }}</span>
+                                </td>
                                 <td>{{ row.school_count ?? '—' }}</td>
                                 <td>{{ row.approved }}</td>
                                 <td>{{ row.pending }}</td>
@@ -131,7 +148,7 @@
                             </tr>
                         </template>
                         <tr v-if="!displayRows.length">
-                            <td colspan="11" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
+                            <td colspan="15" class="p-6 text-center text-slate-400">No items match the selected filters.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -188,4 +205,19 @@ const filteredHeadSummary = computed(() => {
     if (!headId) return props.headSummary ?? [];
     return (props.headSummary ?? []).filter((h) => String(h.head_id) === headId);
 });
+
+function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function formatDateRange(start, end) {
+    if (!start && !end) return '—';
+    if (start && end) {
+        if (start === end) return formatDate(start);
+        return `${formatDate(start)} – ${formatDate(end)}`;
+    }
+    return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
+}
 </script>

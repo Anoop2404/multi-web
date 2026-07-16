@@ -10,7 +10,7 @@ use App\Services\Events\EventLifecycleGate;
 class FestRegistrationBulkService
 {
     /** @return array{approved: int, rejected: int, skipped: int, errors: list<string>} */
-    public function approveMany(FestEvent $event, array $registrationIds, ?int $schoolId = null, bool $overrideLifecycle = false): array
+    public function approveMany(FestEvent $event, array $registrationIds, ?int $schoolId = null, bool $overrideLifecycle = false, ?int $itemId = null): array
     {
         EventLifecycleGate::allowRegistrationReview($event, $overrideLifecycle);
 
@@ -27,7 +27,8 @@ class FestRegistrationBulkService
         $query = FestRegistration::where('event_id', $event->id)
             ->where('status', 'submitted')
             ->when($registrationIds !== [], fn ($q) => $q->whereIn('id', $registrationIds))
-            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->when($itemId, fn ($q) => $q->where('item_id', $itemId));
 
         foreach ($query->with(['participants', 'item', 'event'])->get() as $registration) {
             if (($policy['require_fee_before_approval'] ?? true) && $feeService->feeRequired($event)) {
@@ -49,7 +50,7 @@ class FestRegistrationBulkService
     }
 
     /** @return array{approved: int, rejected: int, skipped: int, errors: list<string>} */
-    public function rejectMany(FestEvent $event, array $registrationIds, ?int $schoolId = null, bool $overrideLifecycle = false): array
+    public function rejectMany(FestEvent $event, array $registrationIds, ?int $schoolId = null, bool $overrideLifecycle = false, ?int $itemId = null): array
     {
         EventLifecycleGate::allowRegistrationReview($event, $overrideLifecycle);
 
@@ -64,7 +65,8 @@ class FestRegistrationBulkService
         $query = FestRegistration::where('event_id', $event->id)
             ->where('status', 'submitted')
             ->when($registrationIds !== [], fn ($q) => $q->whereIn('id', $registrationIds))
-            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->when($itemId, fn ($q) => $q->where('item_id', $itemId));
 
         foreach ($query->get() as $registration) {
             $registration->update(['status' => 'rejected']);

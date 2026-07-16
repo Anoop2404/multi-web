@@ -37,10 +37,6 @@ const tabs = computed(() => {
         { key: 'assign', label: 'Assign to event', href: `${base.value}/assign${eventQuery.value}` },
     ];
 
-    if (props.eventType === 'sports' || props.programSlug === 'sports-meet') {
-        items.splice(2, 0, { key: 'heads', label: 'Event Heads', href: `${base.value}/heads${eventQuery.value}` });
-    }
-
     return items;
 });
 </script>

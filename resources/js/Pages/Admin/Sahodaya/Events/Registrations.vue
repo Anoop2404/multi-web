@@ -28,6 +28,25 @@
                         <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
                     </select>
                 </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Filter by item</label>
+                    <select v-model="filterItemId" class="field text-sm mt-1 w-56">
+                        <option value="">All items</option>
+                        <option v-for="item in eventItems" :key="item.id" :value="item.id">
+                            {{ item.title }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-600">Filter by status</label>
+                    <select v-model="filterStatus" class="field text-sm mt-1 w-32">
+                        <option value="">All statuses</option>
+                        <option value="submitted">Submitted</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="withdrawn">Withdrawn</option>
+                    </select>
+                </div>
                 <div class="flex-1 min-w-[180px]">
                     <label class="text-xs font-semibold text-gray-600">Search participant</label>
                     <input v-model="searchQuery" type="search" placeholder="Name or reg no…"
@@ -38,7 +57,8 @@
                 <button type="button" class="btn-primary text-xs" :disabled="!selectedIds.length" @click="bulkApprove">Approve selected ({{ selectedIds.length }})</button>
                 <button type="button" class="btn-secondary text-xs text-red-600" :disabled="!selectedIds.length" @click="bulkReject">Reject selected</button>
                 <button v-if="filterSchoolId" type="button" class="btn-primary text-xs" @click="approveSchool">Approve all for school</button>
-                <label class="flex items-center gap-1 text-xs text-gray-600 ml-auto">
+                <button v-if="filterItemId" type="button" class="btn-primary text-xs" @click="approveItem">Approve all for item</button>
+                <label class="flex items-center gap-1 text-xs text-gray-600 ml-auto font-medium">
                     <input type="checkbox" v-model="overrideLifecycle"> Override locked registration
                 </label>
             </div>
@@ -90,11 +110,15 @@
                                         {{ reg.status }}
                                     </span>
                                 </td>
-                                <td class="p-3 text-xs">
-                                    <span v-for="p in performers(reg)" :key="p.id" class="block">
-                                        {{ p.student?.name ?? p.teacher?.name ?? '—' }}
-                                        <span v-if="p.student?.reg_no" class="text-gray-400"> · {{ p.student.reg_no }}</span>
-                                    </span>
+                                <td class="p-3 text-xs space-y-1">
+                                    <div v-for="p in reg.participants" :key="p.id" class="flex flex-wrap items-center gap-1.5">
+                                        <span class="font-medium text-slate-800">{{ p.student?.name ?? p.teacher?.name ?? '—' }}</span>
+                                        <span v-if="p.student?.reg_no" class="text-gray-400">· {{ p.student.reg_no }}</span>
+                                        <span class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
+                                              :class="p.participant_role === 'standby' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-indigo-50 text-indigo-800 border border-indigo-200'">
+                                            {{ p.participant_role || 'performer' }}
+                                        </span>
+                                    </div>
                                     <div v-if="reg.status === 'approved' && standbyCount(reg)" class="mt-1">
                                         <button type="button" class="text-indigo-600 font-semibold" @click="openSubstitute(reg)">Substitute</button>
                                     </div>
@@ -138,13 +162,19 @@
                                 {{ reg.status }}
                             </span>
                         </td>
-                        <td class="p-3 text-xs">
-                            {{ performerCount(reg) }} performer(s)
-                            <span v-if="standbyCount(reg)" class="text-gray-500"> + {{ standbyCount(reg) }} standby</span>
-                            <div v-if="reg.status === 'approved' && standbyCount(reg)" class="mt-1">
-                                <button type="button" class="text-indigo-600 font-semibold" @click="openSubstitute(reg)">Substitute</button>
-                            </div>
-                        </td>
+                        <td class="p-3 text-xs space-y-1">
+                                    <div v-for="p in reg.participants" :key="p.id" class="flex flex-wrap items-center gap-1.5">
+                                        <span class="font-medium text-slate-800">{{ p.student?.name ?? p.teacher?.name ?? '—' }}</span>
+                                        <span v-if="p.student?.reg_no" class="text-gray-400">· {{ p.student.reg_no }}</span>
+                                        <span class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
+                                              :class="p.participant_role === 'standby' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-indigo-50 text-indigo-800 border border-indigo-200'">
+                                            {{ p.participant_role || 'performer' }}
+                                        </span>
+                                    </div>
+                                    <div v-if="reg.status === 'approved' && standbyCount(reg)" class="mt-1">
+                                        <button type="button" class="text-indigo-600 font-semibold" @click="openSubstitute(reg)">Substitute</button>
+                                    </div>
+                                </td>
                         <td class="p-3 text-right space-x-2">
                             <template v-if="reg.status === 'submitted'">
                                 <button @click="approve(reg.id)" class="text-green-600 text-xs font-semibold">Approve</button>
@@ -347,6 +377,8 @@ const filterDescription = computed(() => {
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const filterSchoolId = ref('');
+const filterItemId = ref('');
+const filterStatus = ref('');
 const searchQuery = ref(props.filters?.search ?? '');
 const selectedIds = ref([]);
 const overrideLifecycle = ref(false);
@@ -524,8 +556,17 @@ function applySearch() {
 }
 
 const filteredRegistrations = computed(() => {
-    if (!filterSchoolId.value) return props.registrations;
-    return props.registrations.filter(r => String(r.school_id) === String(filterSchoolId.value));
+    let list = props.registrations;
+    if (filterSchoolId.value) {
+        list = list.filter(r => String(r.school_id) === String(filterSchoolId.value));
+    }
+    if (filterItemId.value) {
+        list = list.filter(r => String(r.item_id) === String(filterItemId.value));
+    }
+    if (filterStatus.value) {
+        list = list.filter(r => r.status === filterStatus.value);
+    }
+    return list;
 });
 
 function statusClass(status) {
@@ -616,6 +657,14 @@ function approveSchool() {
     if (!filterSchoolId.value || !confirm('Approve all submitted registrations for this school?')) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-approve`, {
         school_id: filterSchoolId.value,
+        override_lifecycle: overrideLifecycle.value,
+    }, { preserveScroll: true });
+}
+
+function approveItem() {
+    if (!filterItemId.value || !confirm('Approve all submitted registrations for this item?')) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-approve`, {
+        item_id: filterItemId.value,
         override_lifecycle: overrideLifecycle.value,
     }, { preserveScroll: true });
 }
