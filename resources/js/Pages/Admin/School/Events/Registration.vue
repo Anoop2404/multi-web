@@ -412,6 +412,14 @@
                             <a :href="`/school-admin/${school.id}/registration`" class="link-brand font-semibold">Annual Registration</a>.
                             <a :href="`${programBase}/reports/${event.id}/fee-summary`" class="link-brand font-semibold ml-1">Fee report →</a>
                         </p>
+                        <p v-if="event.registration_close" class="text-xs font-semibold text-amber-700 mt-1">
+                            Due by: {{ formatDate(event.registration_close) }} (last registration date)
+                        </p>
+                    </div>
+
+                    <div v-if="paymentDetails" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">How to pay</p>
+                        <pre class="text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{{ paymentDetails }}</pre>
                     </div>
 
                     <!-- Per-head invoices (sports_composite) -->
@@ -571,7 +579,10 @@ const props = defineProps({
     isTeacherFest: { type: Boolean, default: false },
     studentEditLock: { type: Object, default: () => ({ locked: false }) },
     schoolRegion: { type: Object, default: null },
+    profile: { type: Object, default: null },
 });
+
+const paymentDetails = computed(() => props.profile?.payment_details_text || '');
 
 const { programSlug, programLabel, programBase } = useSchoolProgramContext(props);
 const page = usePage();

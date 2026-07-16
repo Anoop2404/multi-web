@@ -202,15 +202,18 @@ const isRegOpenYet = computed(() => {
 function formatDate(iso) {
     if (!iso) return '—';
     const d = new Date(`${iso}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function formatDateRange(start, end) {
-    if (!start && !end) return 'Not scheduled';
-    if (start && end) {
+    const startOk = start && !Number.isNaN(new Date(`${start}T12:00:00`).getTime());
+    const endOk = end && !Number.isNaN(new Date(`${end}T12:00:00`).getTime());
+    if (!startOk && !endOk) return 'Not scheduled';
+    if (startOk && endOk) {
         if (start === end) return formatDate(start);
         return `${formatDate(start)} – ${formatDate(end)}`;
     }
-    return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
+    return startOk ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
 }
 </script>

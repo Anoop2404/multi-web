@@ -14,6 +14,7 @@ use App\Models\Teacher;
 use App\Models\FestEventInvoice;
 use App\Models\FestSchedule;
 use App\Models\FestSchoolVerification;
+use App\Models\SahodayaProfile;
 use App\Services\Events\FestInvoiceService;
 use App\Services\Events\FestItemFeeResolver;
 use App\Services\Events\FestLevelRegistrationService;
@@ -153,7 +154,24 @@ class FestRegistrationController extends SchoolAdminController
             'presets'       => config('fest_participation_presets'),
             'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
             'focusEventId'    => $focusEventId,
+            'profile'         => $this->eventPaymentProfileProp(),
         ]);
+    }
+
+    /**
+     * Same Sahodaya bank/UPI payment details shown on the annual membership payment
+     * page — reused here so schools have one place to look up where to send event
+     * and item fee payments.
+     *
+     * @return array{payment_details_text: string}|null
+     */
+    private function eventPaymentProfileProp(): ?array
+    {
+        $profile = SahodayaProfile::where('tenant_id', $this->school->parent_id)->first();
+
+        return $profile ? array_merge($profile->toArray(), [
+            'payment_details_text' => $profile->paymentDetailsText(),
+        ]) : null;
     }
 
     /**
@@ -262,6 +280,7 @@ class FestRegistrationController extends SchoolAdminController
                 'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
                 'focusEventId'    => $event->id,
                 'singleEventMode' => true,
+                'profile'         => $this->eventPaymentProfileProp(),
             ],
         ));
     }
