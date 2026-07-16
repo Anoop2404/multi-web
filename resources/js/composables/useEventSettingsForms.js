@@ -278,6 +278,25 @@ export function useEventSettingsForms(props) {
         }, { preserveScroll: true });
     }
 
+    const bulkSavingItemWindows = ref(false);
+
+    function saveAllItemWindows(rows) {
+        bulkSavingItemWindows.value = true;
+        router.patch(`${base}/items/windows/bulk`, {
+            rows: (rows ?? []).map((row) => ({
+                id: row.id,
+                reg_start: row.reg_start || null,
+                reg_end: row.reg_end || null,
+                competition_start: row.competition_start || null,
+                competition_end: row.competition_end || null,
+                head_id: row.head_id || null,
+            })),
+        }, {
+            preserveScroll: true,
+            onFinish: () => { bulkSavingItemWindows.value = false; },
+        });
+    }
+
     function saveHeadWindow(headId, row) {
         router.patch(`${base}/item-heads/${headId}/windows`, {
             reg_start: row.reg_start || null,
@@ -424,6 +443,8 @@ export function useEventSettingsForms(props) {
         saveLifecycle,
         saveRegistrationSettings,
         saveItemWindow,
+        saveAllItemWindows,
+        bulkSavingItemWindows,
         saveHeadWindow,
         saveNumberingSettings,
         saveItemNumbering,

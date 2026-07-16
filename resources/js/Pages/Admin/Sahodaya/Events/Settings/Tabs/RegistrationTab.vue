@@ -82,7 +82,14 @@
                     <h3 class="section-title">Per-item windows</h3>
                     <p class="section-desc text-xs">Optional per-item overrides. Leave blank to inherit from the event dates above.</p>
                 </div>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/competition`" class="btn-secondary text-sm shrink-0">Competition hub →</Link>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button v-if="itemRows.length" type="button" class="btn-primary text-sm"
+                            :disabled="bulkSavingItemWindows"
+                            @click="saveAllRows">
+                        {{ bulkSavingItemWindows ? 'Saving…' : 'Save all' }}
+                    </button>
+                    <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/competition`" class="btn-secondary text-sm">Competition hub →</Link>
+                </div>
             </div>
 
             <div v-if="itemRows.length" class="overflow-x-auto rounded-xl border border-slate-100">
@@ -132,7 +139,7 @@
 import { inject, ref, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 
-const { registrationSettingsForm, saveRegistrationSettings, saveItemWindow, saveHeadWindow, sahodaya, event, itemHeads, clusterRequireStudentVerification } = inject('eventSettings');
+const { registrationSettingsForm, saveRegistrationSettings, saveItemWindow, saveAllItemWindows, bulkSavingItemWindows, saveHeadWindow, sahodaya, event, itemHeads, clusterRequireStudentVerification } = inject('eventSettings');
 
 const savingId = ref(null);
 const savingHeadId = ref(null);
@@ -185,6 +192,10 @@ function saveRow(row) {
     savingId.value = row.id;
     saveItemWindow(row.id, row);
     setTimeout(() => { savingId.value = null; }, 600);
+}
+
+function saveAllRows() {
+    saveAllItemWindows(itemRows.value);
 }
 
 function saveHeadWindowRow(row) {

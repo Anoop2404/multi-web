@@ -939,6 +939,44 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', 'Item registration window saved.');
     }
 
+    /** Save every row of the "Per-item windows" table in one request instead of one PATCH per row. */
+    public function bulkUpdateItemWindows(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'rows' => 'required|array',
+            'rows.*.id' => 'required|integer|exists:fest_event_items,id',
+            'rows.*.reg_start' => 'nullable|date',
+            'rows.*.reg_end' => 'nullable|date',
+            'rows.*.competition_start' => 'nullable|date',
+            'rows.*.competition_end' => 'nullable|date|after_or_equal:rows.*.competition_start',
+            'rows.*.head_id' => 'nullable|exists:fest_item_heads,id',
+        ]);
+
+        $updated = 0;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($data, $event, &$updated) {
+            foreach ($data['rows'] as $row) {
+                $item = FestEventItem::where('event_id', $event->id)->find($row['id']);
+                if (! $item) {
+                    continue;
+                }
+
+                $item->update([
+                    'reg_start' => $row['reg_start'] ?? null,
+                    'reg_end' => $row['reg_end'] ?? null,
+                    'competition_start' => $row['competition_start'] ?? null,
+                    'competition_end' => $row['competition_end'] ?? null,
+                    'head_id' => $row['head_id'] ?? null,
+                ]);
+                $updated++;
+            }
+        });
+
+        return back()->with('success', "Saved {$updated} item registration window(s).");
+    }
+
     public function publishItemResults(string $tenantId, FestEvent $event, FestEventItem $item)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

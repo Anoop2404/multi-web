@@ -977,6 +977,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::put('/{event}/numbering-settings', [FestEventSettingsController::class, 'updateNumberingSettings'])->name('numbering-settings.update');
             Route::put('/{event}/item-numbering', [FestEventSettingsController::class, 'updateItemNumbering'])->name('item-numbering.update');
             Route::patch('/{event}/items/{item}/windows', [FestEventSettingsController::class, 'updateItemWindows'])->name('items.windows.update');
+            Route::patch('/{event}/items/windows/bulk', [FestEventSettingsController::class, 'bulkUpdateItemWindows'])->name('items.windows.bulk-update');
             Route::post('/{event}/items/{item}/publish-results', [FestEventSettingsController::class, 'publishItemResults'])->name('items.publish-results');
             Route::get('/{event}/setup', [\App\Http\Controllers\SahodayaAdmin\FestSportsSetupController::class, 'index'])->name('setup.index');
             Route::post('/{event}/setup/sports', [\App\Http\Controllers\SahodayaAdmin\FestSportsSetupController::class, 'storeSport'])->name('setup.sports.store');
