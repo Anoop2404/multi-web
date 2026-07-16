@@ -229,6 +229,7 @@ class FestSchoolEventFeeService
         $count = FestRegistration::where('event_id', $event->id)
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved'])
+            ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
             ->count();
 
         if (! ($schedule['charge_standbys'] ?? false)) {

@@ -54,6 +54,9 @@ class FestSportsCompositeFeeService
         $registrations = FestRegistration::where('event_id', $event->id)
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved'])
+            // A withdrawn/disabled/deleted item should never keep billing a school —
+            // whoever turned the item off is telling us it's no longer offered.
+            ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
             ->with(['item', 'participants'])
             ->orderBy('id')
             ->get();
@@ -284,7 +287,7 @@ class FestSportsCompositeFeeService
         $registrations = FestRegistration::where('event_id', $head->event_id)
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved'])
-            ->whereHas('item', fn ($q) => $q->where('head_id', $head->id))
+            ->whereHas('item', fn ($q) => $q->where('head_id', $head->id)->where('is_enabled', true))
             ->with(['item', 'participants'])
             ->orderBy('id')
             ->get();
@@ -479,6 +482,7 @@ class FestSportsCompositeFeeService
         $registrations = FestRegistration::where('event_id', $event->id)
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved'])
+            ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
             ->with(['item', 'participants'])
             ->get();
 
