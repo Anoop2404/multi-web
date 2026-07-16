@@ -7,6 +7,7 @@ use App\Models\FestEvent;
 use App\Models\FestCompetitionArea;
 use App\Models\FestSchoolEventFee;
 use App\Models\FestEventItem;
+use App\Models\FestRegistration;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Support\Fest\FestEventItemPayload;
 use App\Support\Fest\FestEventPayload;

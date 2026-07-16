@@ -79,7 +79,7 @@
                     </div>
 
                     <div class="overflow-x-auto">
-                        <table class="data-table text-sm">
+                        <table class="data-table data-table--items text-sm">
                             <thead>
                                 <tr>
                                     <th class="w-12 text-center">On</th>
@@ -91,64 +91,67 @@
                                     <th class="whitespace-nowrap">Gender</th>
                                     <th class="whitespace-nowrap">Participant</th>
                                     <th class="whitespace-nowrap text-center">Regs</th>
-                                    <th class="whitespace-nowrap">Reg window</th>
-                                    <th class="whitespace-nowrap">Competition</th>
-                                    <th class="whitespace-nowrap text-center">Qualifiers</th>
-                                    <th class="whitespace-nowrap text-center">Max/school</th>
-                                    <th class="whitespace-nowrap text-right">Fee</th>
                                     <th class="whitespace-nowrap text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="item in group.rows" :key="item.id" :class="item.is_enabled === false ? 'opacity-60 bg-slate-50/70' : ''">
-                                    <td class="text-center">
-                                        <button v-if="canEdit(item)" type="button"
-                                                class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                                                :class="item.is_enabled !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'"
-                                                @click="quickUpdate(item, { is_enabled: item.is_enabled === false })">
-                                            {{ item.is_enabled !== false ? 'On' : 'Off' }}
-                                        </button>
-                                        <span v-else :class="item.is_enabled !== false ? 'text-emerald-700 text-xs font-semibold' : 'text-slate-400 text-xs'">
-                                            {{ item.is_enabled !== false ? 'Yes' : 'No' }}
-                                        </span>
-                                    </td>
-                                    <td class="text-center">
-                                        <FestItemMetaIcons :gender="item.gender" :participant-type="item.participant_type" />
-                                    </td>
-                                    <td>
-                                        <p class="font-medium text-slate-900">{{ item.title }}</p>
-                                        <p v-if="item.item_code" class="text-xs text-slate-400 font-mono mt-0.5">{{ item.item_code }}</p>
-                                        <p v-if="squadSummary(item)" class="text-xs text-slate-500 mt-0.5">{{ squadSummary(item) }}</p>
-                                    </td>
-                                    <td class="text-slate-600">{{ venueLabel(item.venue_type) }}</td>
-                                    <td class="text-slate-600">{{ disciplineLabel(item.sport_discipline) }}</td>
-                                    <td class="text-slate-600">{{ categoryLabel(item) }}</td>
-                                    <td class="text-slate-600">{{ genderLabel(item.gender) }}</td>
-                                    <td class="text-slate-600">{{ participantLabel(item.participant_type) }}</td>
-                                    <td class="text-center font-semibold text-slate-800">{{ item.registrations_count ?? 0 }}</td>
-                                    <td class="text-xs text-slate-600 whitespace-nowrap">
-                                        {{ formatDateRange(item.reg_start, item.reg_end) }}
-                                    </td>
-                                    <td class="text-xs text-slate-600 whitespace-nowrap">
-                                        {{ formatDateRange(item.competition_start, item.competition_end) }}
-                                        <span v-if="item.competition_time" class="block text-[10px] text-slate-400 font-mono">@ {{ item.competition_time.slice(0, 5) }}</span>
-                                    </td>
-                                    <td class="text-center text-slate-600">{{ item.qualify_count ?? '—' }}</td>
-                                    <td class="text-center text-slate-600">{{ item.max_per_school ?? '—' }}</td>
-                                    <td class="text-right text-slate-600">
-                                        <span v-if="item.fee_amount != null">₹{{ item.fee_amount }}</span>
-                                        <span v-else class="text-slate-400">Default</span>
-                                    </td>
-                                    <td class="text-right whitespace-nowrap">
-                                        <button v-if="canEdit(item)" type="button" class="text-xs font-semibold text-[#0f3d7a] mr-2" @click="openEdit(item)">
-                                            Edit
-                                        </button>
-                                        <button v-if="canEdit(item)" type="button" class="text-xs font-semibold text-indigo-600" @click="openEdit(item, true)">
-                                            Move Event Head
-                                        </button>
-                                        <span v-else class="text-xs text-amber-600">State item</span>
-                                    </td>
-                                </tr>
+                                <template v-for="item in group.rows" :key="item.id">
+                                    <tr :class="item.is_enabled === false ? 'opacity-60 bg-slate-50/70' : ''">
+                                        <td class="text-center !border-b-0">
+                                            <button v-if="canEdit(item)" type="button"
+                                                    class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                                    :class="item.is_enabled !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'"
+                                                    @click="quickUpdate(item, { is_enabled: item.is_enabled === false })">
+                                                {{ item.is_enabled !== false ? 'On' : 'Off' }}
+                                            </button>
+                                            <span v-else :class="item.is_enabled !== false ? 'text-emerald-700 text-xs font-semibold' : 'text-slate-400 text-xs'">
+                                                {{ item.is_enabled !== false ? 'Yes' : 'No' }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center !border-b-0">
+                                            <FestItemMetaIcons :gender="item.gender" :participant-type="item.participant_type" />
+                                        </td>
+                                        <td class="!border-b-0">
+                                            <p class="font-medium text-slate-900">{{ item.title }}</p>
+                                            <p v-if="item.item_code" class="text-xs text-slate-400 font-mono mt-0.5">{{ item.item_code }}</p>
+                                            <p v-if="squadSummary(item)" class="text-xs text-slate-500 mt-0.5">{{ squadSummary(item) }}</p>
+                                        </td>
+                                        <td class="text-slate-600 !border-b-0">{{ venueLabel(item.venue_type) }}</td>
+                                        <td class="text-slate-600 !border-b-0">{{ disciplineLabel(item.sport_discipline) }}</td>
+                                        <td class="text-slate-600 !border-b-0">{{ categoryLabel(item) }}</td>
+                                        <td class="text-slate-600 !border-b-0">{{ genderLabel(item.gender) }}</td>
+                                        <td class="text-slate-600 !border-b-0">{{ participantLabel(item.participant_type) }}</td>
+                                        <td class="text-center font-semibold text-slate-800 !border-b-0">{{ item.registrations_count ?? 0 }}</td>
+                                        <td class="text-right whitespace-nowrap !border-b-0">
+                                            <button v-if="canEdit(item)" type="button" class="text-xs font-semibold text-[#0f3d7a] mr-2" @click="openEdit(item)">
+                                                Edit
+                                            </button>
+                                            <button v-if="canEdit(item)" type="button" class="text-xs font-semibold text-indigo-600" @click="openEdit(item, true)">
+                                                Move Event Head
+                                            </button>
+                                            <span v-else class="text-xs text-amber-600">State item</span>
+                                        </td>
+                                    </tr>
+                                    <tr :class="item.is_enabled === false ? 'opacity-60 bg-slate-50/70' : ''">
+                                        <td colspan="10" class="!pt-0">
+                                            <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500 border-t border-dashed border-slate-200 pt-2">
+                                                <span><span class="font-semibold text-slate-600">Reg window:</span> {{ formatDateRange(item.reg_start, item.reg_end) }}</span>
+                                                <span>
+                                                    <span class="font-semibold text-slate-600">Competition:</span>
+                                                    {{ formatDateRange(item.competition_start, item.competition_end) }}
+                                                    <span v-if="item.competition_time" class="font-mono">@ {{ item.competition_time.slice(0, 5) }}</span>
+                                                </span>
+                                                <span><span class="font-semibold text-slate-600">Qualifiers:</span> {{ item.qualify_count ?? '—' }}</span>
+                                                <span><span class="font-semibold text-slate-600">Max/school:</span> {{ item.max_per_school ?? '—' }}</span>
+                                                <span>
+                                                    <span class="font-semibold text-slate-600">Fee:</span>
+                                                    <span v-if="item.fee_amount != null">₹{{ item.fee_amount }}</span>
+                                                    <span v-else class="text-slate-400">Default</span>
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
                             </tbody>
                         </table>
                     </div>
@@ -763,3 +766,14 @@ function formatDateRange(start, end) {
     return start ? `From ${formatDate(start)}` : `Until ${formatDate(end)}`;
 }
 </script>
+
+<style scoped>
+/* Taller rows, narrower cell padding — scoped to this page's Event Head item table only. */
+.data-table--items th,
+.data-table--items td {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+}
+</style>
