@@ -198,7 +198,7 @@
                             <span v-else class="text-xs text-gray-400 font-semibold">{{ initials(student.name) }}</span>
                         </Link>
                     </td>
-                    <td class="px-4 py-3 font-medium text-gray-900">
+                    <td class="px-4 py-3 min-w-[13rem] font-medium text-gray-900">
                         <Link :href="profileUrl(student)" class="hover:text-[#0f3d7a] hover:underline">
                             {{ student.name }}
                         </Link>
@@ -216,10 +216,11 @@
                     </td>
                     <td class="px-4 py-3">
                         <span v-if="student.is_verified"
-                              class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                              class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                             ✓ Verified
                         </span>
-                        <span v-else class="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+                        <span v-else
+                              class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                             Pending
                         </span>
                     </td>
@@ -562,7 +563,7 @@ const columns = computed(() => {
     const base = [
         ...(canBulkRemove.value ? [{ key: 'select', label: '', sortable: false, class: 'w-10' }] : []),
         { key: 'photo',        label: 'Photo',  sortable: false, class: 'w-14' },
-        { key: 'name',         label: 'Name',   sortable: true },
+        { key: 'name',         label: 'Name',   sortable: true, class: 'min-w-[13rem]' },
         { key: 'reg_no',       label: 'Student ID', sortable: false },
         { key: 'gender',       label: 'Gender', sortable: false },
         { key: 'dob',          label: 'DOB',    sortable: false },
