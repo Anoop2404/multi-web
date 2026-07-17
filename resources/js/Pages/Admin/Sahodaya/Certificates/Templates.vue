@@ -234,6 +234,16 @@
                                @change="e => form.template_file = e.target.files[0]">
                     </template>
                 </FormField>
+
+                <div class="sm:col-span-2">
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input v-model="form.is_active" type="checkbox" class="rounded" :true-value="true" :false-value="false">
+                        Active — use this template for this event type + certificate type combination
+                    </label>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Only one template can be active per event type + certificate type. Activating this one automatically deactivates any other.
+                    </p>
+                </div>
             </FormGrid>
             <FormActions>
                 <button type="submit" class="btn-primary" :disabled="form.processing">
@@ -374,6 +384,7 @@ const form = useForm({
     certificate_type: 'participation',
     title: 'Certificate of Participation',
     body: props.defaultBody,
+    is_active: true,
     template_file: null,
     logo: null,
     seal: null,
@@ -408,6 +419,7 @@ function editTemplate(template) {
     form.certificate_type = template.certificate_type || 'participation';
     form.title = template.title || 'Certificate of Participation';
     form.body = template.body || props.defaultBody;
+    form.is_active = template.is_active ?? true;
     form.template_file = null;
     form.logo = null;
     form.seal = null;
@@ -430,6 +442,7 @@ function cancelEdit() {
     form.certificate_type = 'participation';
     form.title = 'Certificate of Participation';
     form.body = props.defaultBody;
+    form.is_active = true;
     form.template_file = null;
     form.logo = null;
     form.seal = null;
