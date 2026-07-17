@@ -218,7 +218,7 @@
             @endforeach
         </div>
 
-        <p class="uuid">Verification: {{ $certificate->verification_uuid }}</p>
+        <p class="uuid">Verification: {{ $certificate->verification_uuid ?? 'Not yet issued' }}</p>
     </div>
 @endif
 
