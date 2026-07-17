@@ -25,7 +25,7 @@
                     <button v-for="v in t.available_variables" :key="v" type="button"
                             class="font-mono text-[11px] px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-indigo-700 hover:bg-indigo-100"
                             @click="insertVariable(t, v)">
-                        {{ '{{' + v + '}}' }}
+                        {{ placeholderText(v) }}
                     </button>
                 </div>
 
@@ -96,6 +96,14 @@ watch(() => props.templates, (rows) => {
 
 function setBodyRef(id, el) {
     if (el) bodyRefs[id] = el;
+}
+
+// Kept out of the template as a literal string build — a raw "{{" inside a
+// Vue mustache interpolation confuses the template compiler's tokenizer
+// (it starts looking for the interpolation's own closing "}}" from there),
+// causing an "Unterminated string constant" build error.
+function placeholderText(variable) {
+    return '{{' + variable + '}}';
 }
 
 function insertVariable(t, variable) {
