@@ -227,11 +227,11 @@ class CertificateBackgroundConverter
             return $this->viaImagick($absolutePdfPath);
         }
 
-        if ($this->binaryExists('pdftoppm')) {
+        if ($this->functionAvailable('exec') && $this->binaryExists('pdftoppm')) {
             return $this->viaPdftoppm($absolutePdfPath);
         }
 
-        if (PHP_OS_FAMILY === 'Darwin' && $this->binaryExists('qlmanage')) {
+        if (PHP_OS_FAMILY === 'Darwin' && $this->functionAvailable('proc_open') && $this->binaryExists('qlmanage')) {
             return $this->viaQlmanage($absolutePdfPath);
         }
 
@@ -352,8 +352,28 @@ class CertificateBackgroundConverter
 
     private function binaryExists(string $name): bool
     {
+        // Many shared-hosting PHP configs (e.g. aaPanel defaults) disable shell_exec/exec/
+        // proc_open entirely for security. Calling a disabled function isn't a warning in
+        // PHP 8 — it's a fatal "Call to undefined function" error, so this must be checked
+        // before ever calling shell_exec(), not just before running a command through it.
+        if (! $this->functionAvailable('shell_exec')) {
+            return false;
+        }
+
         $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
 
         return $path !== '';
+    }
+
+    /** True only if the named function exists AND hasn't been disabled via php.ini disable_functions. */
+    private function functionAvailable(string $name): bool
+    {
+        if (! function_exists($name)) {
+            return false;
+        }
+
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+
+        return ! in_array($name, $disabled, true);
     }
 }
