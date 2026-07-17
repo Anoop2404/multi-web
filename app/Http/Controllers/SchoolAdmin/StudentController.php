@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Http\Controllers\Concerns\ManagesStudentPortalCredentials;
+use App\Models\FestParticipant;
+use App\Models\FestRegistration;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\UploadedFileBackup;
@@ -545,71 +547,27 @@ class StudentController extends SchoolAdminController
         abort_if($student->tenant_id !== $this->school->id, 403);
         $this->assertCanEditStudents();
 
+        abort_if(
+            $this->hasActiveFestRegistration($student),
+            422,
+            "{$student->name} is registered for one or more event items. Withdraw those registrations first before removing the student.",
+        );
+
         $this->withdrawStudent($student);
 
         return back()->with('success', 'Student record withdrawn.');
     }
 
     /**
-     * Withdraw selected students, or all active students in a class (wrong upload cleanup).
+     * True if this student is currently entered in a fest/event item that hasn't been
+     * withdrawn or rejected — removing the student out from under a live registration would
+     * leave a dangling entry (chest number, ID card, marks, etc. pointing at a deleted student).
      */
-    public function bulkDestroy(Request $request)
+    private function hasActiveFestRegistration(Student $student): bool
     {
-        $this->assertCanEditStudents();
-
-        $data = $request->validate([
-            'scope'             => 'required|in:selected,class,all',
-            'student_ids'       => 'nullable|array|max:500',
-            'student_ids.*'     => 'integer',
-            'school_class_id'   => [
-                'nullable',
-                'integer',
-                Rule::exists('school_classes', 'id')->where('tenant_id', $this->school->id),
-            ],
-            'confirm_school_name' => 'required_if:scope,all|string',
-        ]);
-
-        $query = Student::query()->where('tenant_id', $this->school->id);
-
-        if ($data['scope'] === 'class') {
-            abort_unless(! empty($data['school_class_id']), 422, 'Choose a class to remove students from.');
-
-            $query->where('school_class_id', $data['school_class_id'])
-                ->where('status', 'active');
-        } elseif ($data['scope'] === 'all') {
-            // Extra server-side guard on top of the frontend confirmation: the typed
-            // name must match this school's name exactly (case-insensitive) before
-            // every active student in the school gets withdrawn in one go.
-            abort_unless(
-                mb_strtolower(trim($data['confirm_school_name'])) === mb_strtolower(trim($this->school->name)),
-                422,
-                'Type the school name exactly to confirm removing all students.'
-            );
-
-            $query->where('status', 'active');
-        } else {
-            $ids = array_values(array_unique(array_map('intval', $data['student_ids'] ?? [])));
-            abort_if($ids === [], 422, 'Select at least one student to remove.');
-
-            $query->whereIn('id', $ids);
-        }
-
-        $students = $query->orderBy('id')->get();
-        $count = 0;
-
-        foreach ($students as $student) {
-            $this->withdrawStudent($student);
-            $count++;
-        }
-
-        if ($count === 0) {
-            return back()->with('info', 'No matching students to remove.');
-        }
-
-        return back()->with(
-            'success',
-            $count === 1 ? '1 student withdrawn.' : "{$count} students withdrawn."
-        );
+        return FestParticipant::where('student_id', $student->id)
+            ->whereHas('registration', fn ($q) => $q->whereNotIn('status', ['rejected', 'withdrawn']))
+            ->exists();
     }
 
     private function withdrawStudent(Student $student): void
@@ -974,6 +932,12 @@ class StudentController extends SchoolAdminController
         $data['has_photo'] = filled($student->photo);
         $data['is_verified'] = $student->isVerified();
         $data['verified_at'] = $student->verified_at?->toIso8601String();
+
+        $ageGroupKey = \App\Support\FestSportsAgeGroup::assignedAgeGroupForStudentByTenant($student, $this->school->parent_id);
+        $data['sports_age_group'] = $ageGroupKey;
+        $data['sports_age_group_label'] = $ageGroupKey
+            ? (\App\Support\FestSportsAgeGroup::labels($this->school->parent_id)[$ageGroupKey] ?? strtoupper($ageGroupKey))
+            : null;
 
         return $data;
     }

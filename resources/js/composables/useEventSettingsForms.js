@@ -156,6 +156,7 @@ export function useEventSettingsForms(props) {
         first_item: existingFeeSettings.first_item ?? schedule.first_item ?? '',
         additional_item: existingFeeSettings.additional_item ?? schedule.additional_item ?? '',
         charge_standbys: existingFeeSettings.charge_standbys ?? schedule.charge_standbys ?? false,
+        team_standby_fee_amount: existingFeeSettings.team_standby_fee_amount ?? schedule.team_standby_fee_amount ?? '',
         school_registration: {
             secondary: existingFeeSettings.school_registration?.secondary ?? schedule.school_registration?.secondary ?? '',
             senior_secondary: existingFeeSettings.school_registration?.senior_secondary ?? schedule.school_registration?.senior_secondary ?? '',

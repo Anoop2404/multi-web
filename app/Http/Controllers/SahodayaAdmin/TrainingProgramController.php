@@ -1231,6 +1231,37 @@ class TrainingProgramController extends SahodayaAdminController
         ]));
     }
 
+    /**
+     * Preview what this teacher's certificate will look like, without requiring
+     * one to already be issued (unlike printCertificate, which needs an
+     * existing Certificate row). Renders live from the current template + the
+     * registration's own attendance/school data, same as the sample-template
+     * preview but using this teacher's real values instead of placeholders.
+     */
+    public function previewRegistrationCertificate(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->program_id !== $program->id, 403);
+
+        $registration->load(['program', 'teacher', 'school']);
+
+        $certificateService = app(TrainingCertificateService::class);
+        $fieldValues = $certificateService->resolveFieldValues($registration, $this->sahodaya);
+        $render = $certificateService->renderContext($registration, $this->sahodaya);
+
+        $certificate = \App\Models\Certificate::where('entity_type', TrainingRegistration::class)
+            ->where('entity_id', $registration->id)
+            ->first();
+
+        return view('training.certificate', array_merge($render, [
+            'registration' => $registration,
+            'certificate'  => $certificate,
+            'sahodaya'     => $this->sahodaya,
+            'fieldValues'  => $fieldValues,
+            'previewOnly'  => ! $certificate,
+        ]));
+    }
+
     public function registrationInvoice(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);

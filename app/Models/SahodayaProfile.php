@@ -21,6 +21,7 @@ class SahodayaProfile extends Model
         'setup_wizard_complete', 'setup_wizard_dismissed_at',
         'payment_bank_name', 'payment_account_no', 'payment_ifsc', 'payment_upi',
         'application_form_config', 'active_academic_year', 'fest_class_group_scheme', 'nav_visibility',
+        'sports_age_cutoff_date',
         'receipt_template_json', 'receipt_next_number',
         'mail_host', 'mail_port', 'mail_encryption', 'mail_username', 'mail_password',
         'mail_from_address', 'mail_from_name', 'mail_transport', 'zeptomail_region',
@@ -45,6 +46,7 @@ class SahodayaProfile extends Model
         'application_form_config'      => 'array',
         'nav_visibility'               => 'array',
         'receipt_template_json'        => 'array',
+        'sports_age_cutoff_date'       => 'date:Y-m-d',
         'mail_password'                => 'encrypted',
         'mail_port'                    => 'integer',
     ];

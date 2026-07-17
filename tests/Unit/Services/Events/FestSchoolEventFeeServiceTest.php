@@ -222,6 +222,72 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(450.0, (float) $fee->participation_fee);
     }
 
+    public function test_team_item_standby_is_not_charged_the_full_team_fee_without_a_rate_set(): void
+    {
+        ['school' => $school, 'event' => $event] = $this->festContext();
+
+        $teamItem = FestEventItem::create([
+            'event_id'         => $event->id,
+            'title'            => 'Group Dance',
+            'participant_type' => 'team',
+            'class_group'      => 'hs',
+            'is_enabled'       => true,
+            'fee_amount'       => 500,
+        ]);
+
+        $event->update([
+            'fee_settings' => [
+                'fee_model'        => 'item_catalog',
+                'charge_standbys'  => true,
+                // team_standby_fee_amount intentionally left unset.
+            ],
+        ]);
+
+        $registration = $this->approvedRegistration($event->fresh(), $teamItem, $school);
+        FestParticipant::create([
+            'registration_id'  => $registration->id,
+            'participant_role' => 'standby',
+        ]);
+
+        $fee = app(FestSchoolEventFeeService::class)->recalculate($event->fresh(), $school->id);
+
+        // Team entry itself: ₹500. Standby should add ₹0, not another ₹500.
+        $this->assertSame(500.0, (float) $fee->participation_fee);
+    }
+
+    public function test_team_item_standby_uses_dedicated_rate_when_configured(): void
+    {
+        ['school' => $school, 'event' => $event] = $this->festContext();
+
+        $teamItem = FestEventItem::create([
+            'event_id'         => $event->id,
+            'title'            => 'Group Dance',
+            'participant_type' => 'team',
+            'class_group'      => 'hs',
+            'is_enabled'       => true,
+            'fee_amount'       => 500,
+        ]);
+
+        $event->update([
+            'fee_settings' => [
+                'fee_model'                => 'item_catalog',
+                'charge_standbys'          => true,
+                'team_standby_fee_amount'  => 75,
+            ],
+        ]);
+
+        $registration = $this->approvedRegistration($event->fresh(), $teamItem, $school);
+        FestParticipant::create([
+            'registration_id'  => $registration->id,
+            'participant_role' => 'standby',
+        ]);
+
+        $fee = app(FestSchoolEventFeeService::class)->recalculate($event->fresh(), $school->id);
+
+        // Team entry ₹500 + one standby at the dedicated ₹75 rate.
+        $this->assertSame(575.0, (float) $fee->participation_fee);
+    }
+
     public function test_per_student_uses_unique_student_count(): void
     {
         ['school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();

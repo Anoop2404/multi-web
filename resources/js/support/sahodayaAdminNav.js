@@ -470,9 +470,9 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
         if (canNav('users')) {
             settingsItems.push({ label: 'Sidebar visibility', href: `${base}/settings/nav-visibility`, icon: 'layers' });
             settingsItems.push({ label: 'Portal users', href: `${base}/users`, icon: 'users' });
-            if (websiteEnabled && publicWebsiteEnabled) {
-                settingsItems.push({ label: 'Notification templates', href: `${base}/notification-templates`, icon: 'file-text' });
-            }
+            // Not gated on websiteEnabled/publicWebsiteEnabled — this is a
+            // communications setting, not part of the public website/CMS module.
+            settingsItems.push({ label: 'Notification templates', href: `${base}/notification-templates`, icon: 'file-text' });
         }
         if (websiteEnabled && !publicWebsiteEnabled && canNav('website')) {
             settingsItems.push({ label: 'Portal landing', href: `${base}/public-content`, icon: 'globe' });

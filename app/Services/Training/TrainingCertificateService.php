@@ -83,7 +83,7 @@ class TrainingCertificateService
             'generated_at'      => now(),
         ]);
 
-        $this->notifyCertificateAvailable($registration);
+        $this->notifyCertificateAvailable($registration, $certificate);
 
         return $certificate;
     }
@@ -388,31 +388,106 @@ class TrainingCertificateService
         return $this->presentSessions($registration)->count();
     }
 
-    private function notifyCertificateAvailable(TrainingRegistration $registration): void
+    private function notifyCertificateAvailable(TrainingRegistration $registration, Certificate $certificate): void
     {
         $registration->loadMissing(['teacher', 'program', 'school']);
-        $teacherUser = $registration->teacher?->user_id
-            ? User::find($registration->teacher->user_id)
-            : null;
-
-        if (! $teacherUser) {
+        $teacher = $registration->teacher;
+        if (! $teacher) {
             return;
         }
 
-        $schoolId = $registration->school_id;
-        $actionUrl = $schoolId
-            ? "/portal/teacher/{$schoolId}/training/{$registration->id}/certificate"
-            : null;
+        $programTitle = $registration->program?->title ?? 'Training';
+        $printUrl = route('certificates.print', $certificate->verification_uuid, absolute: true);
 
-        app(NotificationService::class)->notifyFromTemplate(
-            $teacherUser,
-            'training.certificate.available',
-            [
-                'program_title' => $registration->program?->title ?? 'Training',
-                'teacher_name' => $registration->teacher?->name ?? '',
-            ],
-            $actionUrl,
-        );
+        // Portal in-app card, only meaningful for teachers who have a linked
+        // portal login — keeps the existing bell-notification behavior.
+        $teacherUser = $teacher->user_id ? User::find($teacher->user_id) : null;
+        if ($teacherUser) {
+            $schoolId = $registration->school_id;
+            $actionUrl = $schoolId
+                ? "/portal/teacher/{$schoolId}/training/{$registration->id}/certificate"
+                : $printUrl;
+
+            app(NotificationService::class)->notifyFromTemplate(
+                $teacherUser,
+                'training.certificate.available',
+                [
+                    'program_title' => $programTitle,
+                    'teacher_name'  => $teacher->name ?? '',
+                ],
+                $actionUrl,
+            );
+        }
+
+        // Always also email the teacher directly at their registered email —
+        // this is the path that actually reaches most training participants,
+        // since QR self-registered teachers rarely have a portal account. Uses
+        // the public, no-login certificate print link so it works regardless.
+        if ($teacher->email) {
+            $this->emailCertificatePdf($registration, $certificate, $programTitle, $printUrl);
+        }
+    }
+
+    /**
+     * Email the teacher a ready-to-open PDF of their certificate (not just a
+     * link) — generated from the same view used for print/preview, so it's
+     * always pixel-identical to what they'd see on the print page.
+     */
+    private function emailCertificatePdf(TrainingRegistration $registration, Certificate $certificate, string $programTitle, string $printUrl): void
+    {
+        $teacher = $registration->teacher;
+        $sahodayaId = $registration->program?->tenant_id;
+        if (! $teacher?->email || ! $sahodayaId) {
+            return;
+        }
+
+        try {
+            $sahodaya = Tenant::find($sahodayaId);
+            if (! $sahodaya) {
+                return;
+            }
+
+            $render = $this->renderContext($registration, $sahodaya);
+            $fieldValues = $this->resolveFieldValues($registration, $sahodaya);
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
+                'registration' => $registration,
+                'certificate'  => $certificate,
+                'sahodaya'     => $sahodaya,
+                'fieldValues'  => $fieldValues,
+            ]))->setPaper('a4', 'landscape');
+
+            $subject = "Your certificate for {$programTitle} is ready";
+            $body = "Dear {$teacher->name},\n\nYour certificate for \"{$programTitle}\" is attached as a PDF.\n\nYou can also view or reprint it anytime here: {$printUrl}";
+            $attachment = [
+                'content' => $pdf->output(),
+                'name'    => 'certificate.pdf',
+                'mime'    => 'application/pdf',
+            ];
+
+            $mailer = \App\Services\Mail\SahodayaMailer::for($sahodayaId);
+            if ($mailer->isConfigured()) {
+                $mailer->sendViewWithAttachments(
+                    $teacher->email,
+                    $subject,
+                    'emails.notification-plain',
+                    ['title' => $subject, 'body' => $body],
+                    [$attachment],
+                );
+
+                return;
+            }
+
+            \Illuminate\Support\Facades\Mail::raw($body, function ($message) use ($teacher, $subject, $attachment) {
+                $message->to($teacher->email)->subject($subject)
+                    ->attachData($attachment['content'], $attachment['name'], ['mime' => $attachment['mime']]);
+            });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Certificate PDF email failed', [
+                'registration_id' => $registration->id,
+                'error'           => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

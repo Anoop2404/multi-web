@@ -365,6 +365,14 @@
                     Charge standby participants (uses default / category rate per standby)
                 </label>
 
+                <FormField v-if="feeSettingsForm.charge_standbys" label="Team standby fee (₹)"
+                           hint="Charged per standby in a team/group item, instead of the full team fee. Leave blank to not charge team standbys at all.">
+                    <template #default="{ id }">
+                        <input :id="id" v-model.number="feeSettingsForm.team_standby_fee_amount" type="number" min="0"
+                               class="field max-w-xs" placeholder="₹0 (not charged)">
+                    </template>
+                </FormField>
+
                 <FormField label="Optional fee cap (₹)" hint="Maximum total due per school">
                     <template #default="{ id }">
                         <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field max-w-xs">

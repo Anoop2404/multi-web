@@ -91,6 +91,13 @@
                     <p class="pcard__tag">{{ $itemLine }}</p>
                 @endif
             </div>
+
+            @if(!empty($card['chest_number']))
+                <div class="pcard__badge">
+                    <span class="pcard__badge-label">Chest No.</span>
+                    <span class="pcard__badge-value">{{ $card['chest_number'] }}</span>
+                </div>
+            @endif
         </div>
     @endif
 

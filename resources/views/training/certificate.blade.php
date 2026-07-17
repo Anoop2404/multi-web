@@ -117,6 +117,10 @@
     <p class="no-print" style="text-align:center;font-family:system-ui,sans-serif;font-size:13px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;padding:10px 16px;margin:16px auto;max-width:842px;border-radius:8px;">
         <strong>Sample certificate</strong> — for client demo only. Configure layout under Certificate Templates.
     </p>
+@elseif(!empty($previewOnly))
+    <p class="no-print" style="text-align:center;font-family:system-ui,sans-serif;font-size:13px;color:#0f3d7a;background:#eff6ff;border:1px solid #bfdbfe;padding:10px 16px;margin:16px auto;max-width:842px;border-radius:8px;">
+        <strong>Preview only</strong> — this certificate has not been issued yet. Use "Issue cert" to generate the final version with a verification number.
+    </p>
 @endif
 
 @if($hasBackground)
@@ -160,7 +164,7 @@
         @php $u = $layout['uuid'] ?? []; @endphp
         <div class="overlay-field uuid"
              style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($u, ['top' => 92, 'left' => 5, 'width' => 90, 'font_size' => 8, 'font_family' => 'Arial']) }}">
-            Verification: {{ $certificate->verification_uuid }}
+            Verification: {{ $certificate->verification_uuid ?? 'Not yet issued' }}
         </div>
     </div>
 @else

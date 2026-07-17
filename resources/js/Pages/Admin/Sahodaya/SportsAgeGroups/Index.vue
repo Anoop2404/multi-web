@@ -19,7 +19,7 @@
                 <ul class="list-disc pl-4 space-y-1 text-slate-700">
                     <li><strong>Under age</strong> is the maximum age on the reference date (U17 → under 17).</li>
                     <li>Students can register for any item whose band they qualify for (under-N rule).</li>
-                    <li>Per-event cutoff date is set under each Sports Meet → Settings → Eligibility.</li>
+                    <li>A specific Sports Meet event can still override the reference date under its own Settings → Eligibility — otherwise the Sahodaya-wide date below applies everywhere, including the student roster's age-category column.</li>
                     <li v-if="activeAcademicYear">
                         Active academic year: <strong class="font-mono">{{ activeAcademicYear.label }}</strong>
                         — fest events use their assigned year to match student records.
@@ -27,6 +27,26 @@
                     </li>
                 </ul>
             </div>
+
+            <form @submit.prevent="saveGlobalCutoff" class="card space-y-3">
+                <div>
+                    <p class="font-semibold text-sm">Sahodaya-wide age reference date</p>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Single default used everywhere age category is computed (student lists, item eligibility) unless a specific event sets its own override. Leave blank to fall back to 31 Dec of the competition year.
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-end gap-3">
+                    <div>
+                        <label class="label-xs">Reference date</label>
+                        <input v-model="cutoffForm.sports_age_cutoff_date" type="date" class="field">
+                    </div>
+                    <button type="submit" class="btn-primary text-sm" :disabled="cutoffForm.processing">Save</button>
+                    <button v-if="cutoffForm.sports_age_cutoff_date" type="button" class="btn-ghost text-sm"
+                            @click="cutoffForm.sports_age_cutoff_date = ''; saveGlobalCutoff()">
+                        Clear
+                    </button>
+                </div>
+            </form>
 
             <form v-if="showAdd" @submit.prevent="createGroup"
                   class="card space-y-3">
@@ -118,7 +138,7 @@
 
 <script setup>
 import { reactive, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 
 const props = defineProps({
@@ -129,9 +149,18 @@ const props = defineProps({
     programEvents: { type: Array, default: () => [] },
     groups: Array,
     activeAcademicYear: Object,
+    globalAgeCutoffDate: { type: String, default: null },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/sports/age-groups`;
+
+const cutoffForm = useForm({
+    sports_age_cutoff_date: props.globalAgeCutoffDate ?? '',
+});
+
+function saveGlobalCutoff() {
+    cutoffForm.put(`${base}/global-cutoff`, { preserveScroll: true });
+}
 const showAdd = ref(false);
 const editId = ref(null);
 const addRouter = reactive({ processing: false });

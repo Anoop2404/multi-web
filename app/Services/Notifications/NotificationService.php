@@ -72,6 +72,50 @@ class NotificationService
         return InAppNotification::where('user_id', $user->id)->whereNull('read_at')->count();
     }
 
+    /**
+     * Send a plain email straight to an address with no User account required —
+     * for recipients (e.g. QR-registered training teachers) who may never have
+     * a portal login. Uses the Sahodaya's configured mailer when available,
+     * same delivery path as sendEmail(), just not tied to a User model.
+     */
+    public function notifyEmailToAddress(string $email, ?string $sahodayaId, string $title, string $body, ?string $templateKey = null): void
+    {
+        if (! $email) {
+            $this->logWriter->skipped(null, $title, 'No recipient email', $templateKey, $body);
+
+            return;
+        }
+
+        $log = $this->logWriter->queued(null, $title, $templateKey, $email, $body);
+
+        try {
+            if ($sahodayaId) {
+                $mailer = SahodayaMailer::for($sahodayaId);
+                if ($mailer->isConfigured()) {
+                    $mailer->sendView($email, $title, 'emails.notification-plain', [
+                        'title' => $title,
+                        'body'  => $body,
+                    ]);
+                    $this->logWriter->sent($log);
+
+                    return;
+                }
+            }
+
+            Mail::raw($body, function ($message) use ($email, $title) {
+                $message->to($email)->subject($title);
+            });
+
+            $this->logWriter->sent($log);
+        } catch (\Throwable $e) {
+            $this->logWriter->failed($log, $e->getMessage());
+            Log::warning('Direct email notification failed', [
+                'to'    => $email,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     private function sendEmail(User $user, string $title, string $body, ?string $templateKey = null): void
     {
         if (! $user->email) {

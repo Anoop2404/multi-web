@@ -296,6 +296,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'first_item' => 'nullable|numeric|min:0',
             'additional_item' => 'nullable|numeric|min:0',
             'charge_standbys' => 'nullable|boolean',
+            'team_standby_fee_amount' => 'nullable|numeric|min:0',
             'school_registration' => 'nullable|array',
             'school_registration.secondary' => 'nullable|numeric|min:0',
             'school_registration.senior_secondary' => 'nullable|numeric|min:0',

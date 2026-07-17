@@ -317,7 +317,6 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/students/bulk',                               [StudentController::class, 'createBulk'])->name('students.create.bulk');
     Route::post('/students',                                   [StudentController::class, 'store'])->name('students.store');
     Route::post('/students/bulk',                              [StudentController::class, 'storeBulk'])->name('students.store.bulk');
-    Route::post('/students/bulk-delete',                       [StudentController::class, 'bulkDestroy'])->name('students.bulk-destroy');
     Route::post('/students/backfill-reg-numbers',             [StudentController::class, 'backfillRegNumbers'])->name('students.backfill-reg-numbers');
     Route::post('/students/change-request', [StudentController::class, 'submitCreateChangeRequest'])->name('students.change-request.create');
     Route::post('/students/{student}/change-request', [StudentController::class, 'submitChangeRequest'])->name('students.change-request');
@@ -612,6 +611,15 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{taxonomyMaster}', [\App\Http\Controllers\SahodayaAdmin\FestTaxonomyMasterController::class, 'destroy'])->name('destroy');
         });
 
+        // Notification templates — communications config, not part of the public
+        // website/CMS module, so it must stay reachable even when the website
+        // feature is disabled (WEBSITE_ENABLED=false). Previously nested under
+        // the website.enabled middleware below, which made this page 404 for any
+        // Sahodaya with the website feature off.
+        Route::get('/notification-templates', [\App\Http\Controllers\SahodayaAdmin\NotificationTemplateController::class, 'index'])->name('notification-templates.index');
+        Route::put('/notification-templates/{template}', [\App\Http\Controllers\SahodayaAdmin\NotificationTemplateController::class, 'update'])->name('notification-templates.update');
+        Route::post('/notification-templates/{template}/test', [\App\Http\Controllers\SahodayaAdmin\NotificationTemplateController::class, 'sendTest'])->name('notification-templates.test');
+
         // Website & CMS (disabled until WEBSITE_ENABLED=true)
         Route::middleware('website.enabled')->group(function () {
         Route::middleware('public.website.admin.cms')->group(function () {
@@ -663,9 +671,6 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/circulars',              [\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'index'])->name('circulars.index');
         Route::post('/circulars',             [\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'store'])->name('circulars.store');
         Route::delete('/circulars/{circular}',[\App\Http\Controllers\SahodayaAdmin\CircularController::class, 'destroy'])->name('circulars.destroy');
-
-        Route::get('/notification-templates', [\App\Http\Controllers\SahodayaAdmin\NotificationTemplateController::class, 'index'])->name('notification-templates.index');
-        Route::put('/notification-templates/{template}', [\App\Http\Controllers\SahodayaAdmin\NotificationTemplateController::class, 'update'])->name('notification-templates.update');
         }); // public.website.admin.cms
         }); // website.enabled
 
@@ -1210,6 +1215,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{program}/registrations/{registration}/invoice', [TrainingProgramController::class, 'registrationInvoice'])->name('registrations.invoice');
             Route::get('/{program}/registrations/{registration}/id-card', [TrainingProgramController::class, 'registrationIdCard'])->name('registrations.id-card');
             Route::get('/{program}/certificate/preview', [TrainingProgramController::class, 'previewCertificate'])->name('certificate.preview');
+            Route::get('/{program}/registrations/{registration}/certificate/preview', [TrainingProgramController::class, 'previewRegistrationCertificate'])->name('registrations.certificate.preview');
             Route::post('/{program}/registrations/{registration}/certificate', [TrainingProgramController::class, 'issueCertificate'])->name('registrations.certificate');
             Route::get('/{program}/registrations/{registration}/certificate/print', [TrainingProgramController::class, 'printCertificate'])->name('registrations.certificate.print');
             Route::get('/{program}/certificates/export', [TrainingProgramController::class, 'exportCertificatesZip'])->name('certificates.export');

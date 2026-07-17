@@ -162,7 +162,7 @@ class MembershipSettingsController extends SahodayaAdminController
         return back()->with('success', 'Membership settings saved.');
     }
 
-    public function updateMembershipFees(Request $request)
+    public function updateMembershipFees(Request $request, \App\Services\Membership\MembershipFeeCalculator $feeCalculator)
     {
         $profile = SahodayaProfile::firstOrCreate(['tenant_id' => $this->sahodaya->id]);
 
@@ -232,7 +232,47 @@ class MembershipSettingsController extends SahodayaAdminController
             ['sahodaya_id' => $this->sahodaya->id],
         );
 
-        return back()->with('success', 'Membership fees saved.');
+        $reopened = $this->refreshPendingMembershipFees($profile->fresh(), $feeCalculator);
+
+        return back()->with('success', $reopened > 0
+            ? "Membership fees saved. Reopened payment for {$reopened} school(s) whose fee changed (including already-paid schools now owing a top-up)."
+            : 'Membership fees saved.');
+    }
+
+    /**
+     * A school's fee is calculated once (from the Sahodaya's fee settings at the time) and
+     * stored on its Registration row. Re-running the calculation is safe even for schools
+     * that already paid and were verified ('completed'/legacy 'approved'): calculateAndApply()
+     * works off outstandingBalance() = new_amount - amount_paid, so if the Sahodaya raises the
+     * fee after a school already paid the old (lower) amount, this reopens payment for just the
+     * difference (a top-up) — mirroring the existing post-approval count-revision top-up logic
+     * in MembershipFeeCalculator. If the new fee is lower than or equal to what they already
+     * paid, outstanding is <= 0 and the registration is left/kept 'completed' — no refunds are
+     * ever implied. Schools still mid-review (data_pending/data_rejected, not yet cleared for
+     * payment) are intentionally excluded — calculateAndApply requires all applicable tracks
+     * approved (or no data submission required), which mid-review registrations don't satisfy.
+     */
+    private function refreshPendingMembershipFees(SahodayaProfile $profile, \App\Services\Membership\MembershipFeeCalculator $feeCalculator): int
+    {
+        $registrations = \App\Models\Registration::whereIn('registration_status', [
+                'payment_pending', 'payment_rejected', 'completed', 'approved',
+            ])
+            ->with('submission')
+            ->get()
+            ->filter(fn (\App\Models\Registration $registration) => $registration->submission !== null);
+
+        $reopened = 0;
+        foreach ($registrations as $registration) {
+            $wasSettled = in_array($registration->registration_status, ['completed', 'approved'], true);
+
+            $feeCalculator->calculateAndApply($registration, $profile, $registration->submission);
+
+            if ($wasSettled && $registration->fresh()->registration_status === 'payment_pending') {
+                $reopened++;
+            }
+        }
+
+        return $reopened;
     }
 
     public function updatePaymentDetails(Request $request)

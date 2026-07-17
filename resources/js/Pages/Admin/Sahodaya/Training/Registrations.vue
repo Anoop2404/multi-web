@@ -186,9 +186,9 @@
                             Fee approvals →
                         </Link>
                         <a v-if="!['cancelled','rejected'].includes(r.status)"
-                           :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations/${r.id}/id-card`"
+                           :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations/${r.id}/certificate/preview`"
                            target="_blank" rel="noopener"
-                           class="text-xs text-slate-600 font-semibold">ID card ↓</a>
+                           class="text-xs text-slate-600 font-semibold">Preview certificate ↗</a>
                         <a v-if="hasFee && program.fee_type === 'flat'"
                            :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/registrations/${r.id}/invoice`"
                            target="_blank" rel="noopener"

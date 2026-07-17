@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Support\PersistDefaults;
 use App\Models\FestEventItem;
 use App\Models\FestSportsAgeGroupConfig;
+use App\Models\SahodayaProfile;
 use App\Services\Events\FestSportsAgeGroupRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -23,7 +24,24 @@ class SportsAgeGroupController extends SahodayaAdminController
         return $this->inertia('Sahodaya/SportsAgeGroups/Index', $this->programNavProps('sports-meet') + [
             'groups'           => $groups,
             'activeAcademicYear' => \App\Support\AcademicYear::activeRecord(),
+            'globalAgeCutoffDate' => SahodayaProfile::where('tenant_id', $this->sahodaya->id)
+                ->value('sports_age_cutoff_date'),
         ]);
+    }
+
+    public function updateGlobalCutoff(Request $request)
+    {
+        $data = $request->validate([
+            'sports_age_cutoff_date' => 'nullable|date',
+        ]);
+
+        SahodayaProfile::where('tenant_id', $this->sahodaya->id)->update([
+            'sports_age_cutoff_date' => $data['sports_age_cutoff_date'] ?? null,
+        ]);
+
+        return back()->with('success', $data['sports_age_cutoff_date'] ?? null
+            ? 'Sahodaya-wide age reference date saved.'
+            : 'Sahodaya-wide age reference date cleared — falls back to the computed default.');
     }
 
     public function store(Request $request)

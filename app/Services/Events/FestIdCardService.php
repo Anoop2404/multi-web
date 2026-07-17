@@ -11,6 +11,7 @@ use App\Models\FestSchedule;
 use App\Models\FestVolunteer;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\FestSportsAgeGroup;
 use App\Support\TenantStorage;
 
 class FestIdCardService
@@ -601,6 +602,30 @@ class FestIdCardService
             ?? ($itemModel ? $this->itemWindows->competitionLine($itemModel) : null);
         $qrPayload = $this->qrPayload($event, 'participant', (string) $p->id, $festId);
 
+        // Sports meets: chest number is the field an athlete is actually
+        // identified by on the field, and age category is what determines
+        // which items they're eligible for — both worth surfacing on the
+        // printed card face, not just buried in reports.
+        $isSports = $event->event_type === 'sports';
+        $chestNumber = null;
+        $ageGroupLabel = null;
+        if ($isSports) {
+            $chestLabel = $this->chestService->participantLabel($p);
+            $chestNumber = ($chestLabel && $chestLabel !== '—') ? $chestLabel : null;
+
+            if ($itemModel) {
+                $ageKey = FestSportsAgeGroup::resolveForItem($itemModel->age_group, $itemModel->class_group, 'sports');
+                if ($ageKey && $ageKey !== 'open') {
+                    $ageGroupLabel = FestSportsAgeGroup::labels($event->tenant_id)[$ageKey] ?? strtoupper($ageKey);
+                }
+            }
+        }
+
+        $itemLabel = $item !== '—' ? $item : null;
+        if ($ageGroupLabel) {
+            $itemLabel = $itemLabel ? "{$itemLabel} · {$ageGroupLabel}" : $ageGroupLabel;
+        }
+
         return [
             'card_type'       => 'individual',
             'audience'        => 'student',
@@ -613,7 +638,9 @@ class FestIdCardService
             'subtitle'        => $school,
             'detail'          => $item !== '—' ? $item : null,
             'head_label'      => $headName,
-            'item_label'      => $item !== '—' ? $item : ($headName ?: null),
+            'item_label'      => $itemLabel ?: ($headName ?: null),
+            'age_group_label' => $ageGroupLabel,
+            'chest_number'    => $chestNumber,
             'schedule'        => $scheduleLine,
             'id_label'        => 'Fest ID',
             'id_number'       => $festId,

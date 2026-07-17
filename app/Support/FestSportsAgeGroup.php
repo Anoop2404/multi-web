@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\SahodayaProfile;
 use App\Models\Student;
 use App\Services\Events\FestSportsAgeGroupRegistry;
 use Carbon\Carbon;
@@ -91,10 +92,38 @@ class FestSportsAgeGroup
         };
     }
 
+    /**
+     * Sahodaya-wide default age reference date (Configuration → Age groups),
+     * used whenever an event doesn't set its own override. Cached per-request
+     * per tenant to avoid repeat queries when scoring many students/items.
+     *
+     * @var array<string, ?Carbon>
+     */
+    private static array $globalCutoffCache = [];
+
+    public static function globalCutoffDate(?string $tenantId): ?Carbon
+    {
+        if (! $tenantId) {
+            return null;
+        }
+
+        if (array_key_exists($tenantId, self::$globalCutoffCache)) {
+            return self::$globalCutoffCache[$tenantId];
+        }
+
+        $raw = SahodayaProfile::where('tenant_id', $tenantId)->value('sports_age_cutoff_date');
+
+        return self::$globalCutoffCache[$tenantId] = $raw ? Carbon::parse($raw)->startOfDay() : null;
+    }
+
     public static function competitionYear(FestEvent $event): int
     {
         if ($event->sports_age_cutoff_date) {
             return (int) $event->sports_age_cutoff_date->format('Y');
+        }
+
+        if ($global = self::globalCutoffDate($event->tenant_id)) {
+            return (int) $global->format('Y');
         }
 
         $date = $event->event_end ?? $event->event_start ?? $event->registration_close ?? now();
@@ -102,11 +131,19 @@ class FestSportsAgeGroup
         return (int) Carbon::parse($date)->format('Y');
     }
 
-    /** Date on which student age is counted for Under-N eligibility. */
+    /**
+     * Date on which student age is counted for Under-N eligibility.
+     * Priority: this event's own override → Sahodaya-wide default (Age groups
+     * config) → computed fallback (competition year + configured month/day).
+     */
     public static function cutoffDate(FestEvent $event): Carbon
     {
         if ($event->sports_age_cutoff_date) {
             return Carbon::parse($event->sports_age_cutoff_date)->startOfDay();
+        }
+
+        if ($global = self::globalCutoffDate($event->tenant_id)) {
+            return $global;
         }
 
         $year = self::competitionYear($event);
@@ -122,15 +159,14 @@ class FestSportsAgeGroup
         return 'Age counted as of '.$cutoff->format('j M Y').'. Under-N items accept any student whose age on that date is less than N (e.g. U14 = under 14 years).';
     }
 
-    /** Student age in whole years on the event age cutoff date. */
-    public static function ageOnCutoff(Student $student, FestEvent $event): ?int
+    /** Student age in whole years on a given reference date. */
+    public static function ageOnDate(Student $student, Carbon $cutoff): ?int
     {
         if (! $student->dob) {
             return null;
         }
 
         $dob = Carbon::parse($student->dob)->startOfDay();
-        $cutoff = self::cutoffDate($event);
         $age = $cutoff->year - $dob->year;
 
         if ($cutoff->format('md') < $dob->format('md')) {
@@ -138,6 +174,61 @@ class FestSportsAgeGroup
         }
 
         return $age;
+    }
+
+    /** Student age in whole years on the event age cutoff date. */
+    public static function ageOnCutoff(Student $student, FestEvent $event): ?int
+    {
+        if (! $student->dob) {
+            return null;
+        }
+
+        return self::ageOnDate($student, self::cutoffDate($event));
+    }
+
+    /**
+     * The Sahodaya-wide default reference date for a tenant, with no event in
+     * play (e.g. the general student roster): the global config if set,
+     * otherwise 31 Dec of the current year.
+     */
+    public static function defaultCutoffDateForTenant(string $tenantId): Carbon
+    {
+        if ($global = self::globalCutoffDate($tenantId)) {
+            return $global;
+        }
+
+        [$month, $day] = explode('-', config('fest_co_curricular.sports.cutoff_month_day', '12-31'));
+
+        return Carbon::create((int) now()->format('Y'), (int) $month, (int) $day)->startOfDay();
+    }
+
+    /**
+     * The single age category a student falls into using the Sahodaya-wide
+     * default reference date — for contexts with no specific FestEvent (e.g.
+     * the general student roster). Mirrors assignedAgeGroupForStudent() but
+     * without requiring an event.
+     */
+    public static function assignedAgeGroupForStudentByTenant(Student $student, string $tenantId): ?string
+    {
+        if (! $student->dob) {
+            return null;
+        }
+
+        $cutoff = self::defaultCutoffDateForTenant($tenantId);
+
+        foreach (self::orderedAgeGroups($tenantId) as $group) {
+            $underAge = self::underAge($group, $tenantId);
+            if (! $underAge) {
+                continue;
+            }
+
+            $age = self::ageOnDate($student, $cutoff);
+            if ($age !== null && $age < $underAge) {
+                return $group;
+            }
+        }
+
+        return null;
     }
 
     /** Minimum birth date (inclusive) to qualify for Under-N on the event age reference date. */
@@ -152,20 +243,7 @@ class FestSportsAgeGroup
             return null;
         }
 
-        if ($event->sports_age_cutoff_date) {
-            $cutoff = self::cutoffDate($event);
-            $latestBirth = $cutoff->copy()->subYears($underAge)->addDay();
-
-            return $latestBirth->startOfDay();
-        }
-
-        $year = self::competitionYear($event);
-        [$month, $day] = explode('-', config('fest_co_curricular.sports.cutoff_month_day', '12-31'));
-
-        return Carbon::create($year, (int) $month, (int) $day)
-            ->subYears($underAge)
-            ->addDay()
-            ->startOfDay();
+        return self::cutoffDate($event)->copy()->subYears($underAge)->addDay()->startOfDay();
     }
 
     /** @return list<string> */

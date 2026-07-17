@@ -318,6 +318,8 @@ class FestEventFeeResolver
                 'default_item_fee' => isset($input['default_item_fee']) && $input['default_item_fee'] !== ''
                     ? (float) $input['default_item_fee'] : null,
                 'charge_standbys' => (bool) ($input['charge_standbys'] ?? false),
+                'team_standby_fee_amount' => isset($input['team_standby_fee_amount']) && $input['team_standby_fee_amount'] !== ''
+                    ? (float) $input['team_standby_fee_amount'] : null,
             ], $input);
         }
 

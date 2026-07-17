@@ -154,9 +154,23 @@ class FestItemFeeResolver
                 ->get();
 
             foreach ($standbys as $participant) {
-                $amount = isset($schedule['default_item_fee']) && $schedule['default_item_fee'] !== ''
-                    ? (float) $schedule['default_item_fee']
-                    : $this->amountForItem($participant->registration?->item, $schedule, $event);
+                $item = $participant->registration?->item;
+
+                if ($item?->isTeamItem()) {
+                    // A standby on a team/group entry doesn't field a whole extra team, so it
+                    // shouldn't be charged the item's full team registration fee. Use the
+                    // dedicated team-standby rate if the Sahodaya has set one; otherwise this
+                    // standby isn't billed at all (avoids silently overcharging by the full
+                    // team fee, which was the previous fallback behavior).
+                    $amount = isset($schedule['team_standby_fee_amount']) && $schedule['team_standby_fee_amount'] !== ''
+                        ? (float) $schedule['team_standby_fee_amount']
+                        : 0.0;
+                } else {
+                    $amount = isset($schedule['default_item_fee']) && $schedule['default_item_fee'] !== ''
+                        ? (float) $schedule['default_item_fee']
+                        : $this->amountForItem($item, $schedule, $event);
+                }
+
                 $name = $participant->student?->name ?? 'Standby participant';
                 $itemTitle = $participant->registration?->item?->title ?? 'Item';
                 $lines[] = [

@@ -54,6 +54,7 @@ foreach ($sahodayaFestPrograms as $cfg) {
             Route::prefix('age-groups')->name('age-groups.')->group(function () {
                 Route::get('/', [SportsAgeGroupController::class, 'index'])->name('index');
                 Route::post('/', [SportsAgeGroupController::class, 'store'])->name('store');
+                Route::put('/global-cutoff', [SportsAgeGroupController::class, 'updateGlobalCutoff'])->name('global-cutoff.update');
                 Route::post('/reset-defaults', [SportsAgeGroupController::class, 'resetDefaults'])->name('reset-defaults');
                 Route::put('/{sportsAgeGroup}', [SportsAgeGroupController::class, 'update'])->name('update');
                 Route::delete('/{sportsAgeGroup}', [SportsAgeGroupController::class, 'destroy'])->name('destroy');
