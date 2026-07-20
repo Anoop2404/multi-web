@@ -58,7 +58,7 @@
                     <option value="">Select event</option>
                     <option v-for="ev in events" :key="ev.id" :value="ev.id">{{ ev.title }}</option>
                 </select>
-                <input type="file" accept=".csv,text/csv" class="text-xs" @change="onImportFile">
+                <input type="file" accept=".csv,text/csv" class="text-xs" @change="onImportFile" />
                 <button type="button" class="btn-primary text-xs" :disabled="!importEventId || !importFile || importForm.processing"
                         @click="submitImport">
                     Import CSV
@@ -203,6 +203,29 @@
                     </p>
                 </div>
 
+                <!-- In-card navigation tabs (Option 2) -->
+                <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-2.5 flex flex-wrap gap-2 text-xs font-semibold">
+                    <button v-if="isSports" type="button" @click="setTab(event.id, 'athletes')"
+                            class="px-3.5 py-1.5 rounded-lg transition"
+                            :class="getTab(event.id) === 'athletes' ? 'bg-[#0f3d7a] text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'">
+                        Step 1: Event Athletes ({{ (event.event_registrations || []).length }})
+                    </button>
+                    <button type="button" @click="setTab(event.id, 'items')"
+                            class="px-3.5 py-1.5 rounded-lg transition"
+                            :class="getTab(event.id) === 'items' ? 'bg-[#0f3d7a] text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'">
+                        {{ isSports ? 'Step 2: Item Registration' : 'Item Registration' }}
+                    </button>
+                    <button v-if="event.fee_required" type="button" @click="setTab(event.id, 'payment')"
+                            class="px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5"
+                            :class="getTab(event.id) === 'payment' ? 'bg-[#0f3d7a] text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'">
+                        <span>{{ isSports ? 'Step 3: Billing & Payment' : 'Billing & Payment' }}</span>
+                        <span v-if="event.school_fee?.status" class="text-[10px] px-1.5 py-0.5 rounded-full uppercase font-mono"
+                              :class="event.school_fee.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'">
+                            {{ event.school_fee.status }}
+                        </span>
+                    </button>
+                </div>
+
                 <div class="p-5">
                 <!-- Kalotsav-style participation quotas -->
                 <div v-if="event.quotas && eventType === 'kalolsavam'" class="grid sm:grid-cols-3 gap-2 mb-4">
@@ -236,6 +259,7 @@
                     </div>
 
                     <SportsEventAthletesPanel
+                        v-show="getTab(event.id) === 'athletes'"
                         :event="event"
                         :students="studentsForEvent(event.id)"
                         :event-registrations="event.event_registrations ?? []"
@@ -247,7 +271,7 @@
                     />
 
                     <!-- ── Step 2: item registration (inline — Head = Event) ── -->
-                    <div :id="`item-registration-${event.id}`" class="rounded-xl border border-emerald-200 overflow-hidden">
+                    <div v-show="getTab(event.id) === 'items'" :id="`item-registration-${event.id}`" class="rounded-xl border border-emerald-200 overflow-hidden">
                         <div class="px-4 py-3 bg-emerald-50/40 border-b border-emerald-100">
                             <h4 class="text-sm font-bold text-emerald-950">Step 2 · Register for items</h4>
                             <p class="text-xs text-emerald-900/80 mt-0.5">
@@ -336,7 +360,7 @@
                 </div>
 
                 <!-- ── KALOTSAV / KIDS FEST / TEACHER FEST: generic flat table ── -->
-                <form v-else class="mt-4 space-y-4" @submit.prevent>
+                <form v-else v-show="getTab(event.id) === 'items'" class="mt-4 space-y-4" @submit.prevent>
                     <div class="rounded-xl border border-gray-100 overflow-hidden">
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
@@ -393,154 +417,25 @@
                     </div>
                 </form>
 
-                <!-- Item fees — separate from annual Sahodaya membership -->
-                <div v-if="event.fee_required && (event.uses_per_head_billing ? event.school_head_fees?.length : event.school_fee)"
-                     class="mt-4 border-t border-gray-100 pt-4 space-y-3">
-                    <div>
-                        <p class="text-xs font-semibold text-slate-800">Event fees & billing</p>
-                        <p class="text-xs text-slate-500 mt-0.5">
-                            <template v-if="event.uses_per_head_billing">
-                                Each section is billed separately — paying one does not clear another.
-                            </template>
-                            <template v-else-if="event.event_type === 'sports'">
-                                Fees for this sport event (school + student + item fees).
-                            </template>
-                            <template v-else>
-                                Includes per-student event registration (when athletes are registered above) plus item fees.
-                            </template>
-                            Annual Sahodaya membership is paid under
-                            <a :href="`/school-admin/${school.id}/registration`" class="link-brand font-semibold">Annual Registration</a>.
-                            <a :href="`${programBase}/reports/${event.id}/fee-summary`" class="link-brand font-semibold ml-1">Fee report →</a>
-                        </p>
-                        <p v-if="event.registration_close" class="text-xs font-semibold text-amber-700 mt-1">
-                            Due by: {{ formatDate(event.registration_close) }} (last registration date)
-                        </p>
-                    </div>
-
-                    <div v-if="paymentDetails" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">How to pay</p>
-                        <pre class="text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{{ paymentDetails }}</pre>
-                    </div>
-
-                    <!-- Per-head invoices (sports_composite) -->
-                    <div v-if="event.uses_per_head_billing" class="space-y-3">
-                        <div v-for="headFee in event.school_head_fees" :key="headFee.head_id"
-                             class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm space-y-2">
-                            <div class="flex flex-wrap items-center justify-between gap-2">
-                                <p class="font-semibold text-indigo-950">{{ headFee.head_name }}</p>
-                                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full border"
-                                      :class="headFeeStatusClass(headFee.status)">
-                                    {{ headFeeStatusLabel(headFee.status) }}
-                                </span>
-                            </div>
-                            <p v-if="headFee.status === 'rejected' && headFee.rejection_reason"
-                               class="text-xs text-red-600">
-                                Reason: {{ headFee.rejection_reason }}
-                            </p>
-                            <ul v-if="(headFee.breakdown?.items ?? []).length" class="text-xs text-indigo-900 space-y-1">
-                                <li v-for="(line, i) in headFee.breakdown.items" :key="i" class="flex justify-between gap-4">
-                                    <span>{{ line.label }}</span>
-                                    <span class="font-semibold shrink-0">₹{{ formatMoney(line.amount) }}</span>
-                                </li>
-                            </ul>
-                            <div class="flex flex-wrap justify-between gap-2 text-xs pt-2 border-t border-indigo-100">
-                                <span class="text-indigo-800">
-                                    Due ₹{{ formatMoney(headFee.total_due) }}
-                                    <span v-if="headFee.amount_paid > 0"> · Paid ₹{{ formatMoney(headFee.amount_paid) }}</span>
-                                </span>
-                                <span class="font-semibold text-indigo-950">
-                                    Outstanding ₹{{ formatMoney(headFee.outstanding) }}
-                                </span>
-                            </div>
-                            <div class="flex flex-wrap gap-2 items-center">
-                                <form v-if="canUploadHeadFee(headFee)"
-                                      @submit.prevent="uploadHeadPayment(event, headFee)"
-                                      class="flex flex-wrap gap-2 items-center">
-                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-                                           @change="e => setHeadPaymentFile(event.id, headFee.head_id, e.target.files[0])"
-                                           class="text-xs">
-                                    <input v-model="headPaymentRefs[headPaymentKey(event.id, headFee.head_id)]"
-                                           class="field text-xs w-36" placeholder="Txn ref (opt)">
-                                    <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">
-                                        Upload proof
-                                    </button>
-                                </form>
-                                <a v-if="headFee.status === 'approved'"
-                                   :href="`${programBase}/events/${event.id}/receipt?head_id=${headFee.head_id}`"
-                                   target="_blank" rel="noopener"
-                                   class="px-2 py-1 bg-green-50 border border-green-300 text-green-700 text-xs font-semibold rounded">
-                                    View Receipt ↗
-                                </a>
-                            </div>
-                        </div>
-                        <div v-if="event.school_fee && Number(event.school_fee.total_due) > 0"
-                             class="flex flex-wrap gap-2 items-center text-xs">
-                            <span class="text-slate-600 font-semibold">
-                                Combined total: ₹{{ formatMoney(event.school_fee.total_due) }}
-                            </span>
-                            <a :href="`${programBase}/events/${event.id}/invoice?preview=1`"
-                               target="_blank" rel="noopener"
-                               class="px-2 py-1 bg-white border border-indigo-300 text-indigo-700 font-semibold rounded">
-                                Preview combined invoice ↗
-                            </a>
-                            <a :href="`${programBase}/events/${event.id}/invoice`"
-                               target="_blank" rel="noopener"
-                               class="px-2 py-1 bg-indigo-50 border border-indigo-300 text-indigo-700 font-semibold rounded">
-                                Download combined invoice ↓
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- Single-invoice path (non sports_composite) -->
-                    <div v-else class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm">
-                        <ul v-if="itemFeeLines(event).length" class="text-xs text-indigo-900 space-y-1">
-                            <li v-for="(line, i) in itemFeeLines(event)" :key="i" class="flex justify-between gap-4">
-                                <span>{{ line.label }}</span>
-                                <span class="font-semibold shrink-0">₹{{ formatMoney(line.amount) }}</span>
-                            </li>
-                        </ul>
-                        <p v-else class="text-xs text-indigo-800">Register items above to see item fees here.</p>
-                        <p class="font-semibold text-indigo-900 mt-2 pt-2 border-t border-indigo-100">
-                            Item fees due: ₹{{ formatMoney(itemFeesDue(event)) }}
-                            <span v-if="event.school_fee.participation_item_count" class="font-normal text-indigo-700">
-                                ({{ event.school_fee.participation_item_count }} item{{ event.school_fee.participation_item_count === 1 ? '' : 's' }})
-                            </span>
-                        </p>
-                        <div class="mt-2 flex flex-wrap gap-2 items-center">
-                            <span v-if="event.school_fee.status === 'approved'" class="text-xs text-green-700 font-semibold">Payment approved</span>
-                            <span v-else-if="event.school_fee.status === 'proof_uploaded'" class="text-xs text-amber-700 font-semibold">Payment pending approval</span>
-                            <span v-else-if="event.school_fee.status === 'rejected'" class="text-xs text-red-600 font-semibold">
-                                Payment rejected — re-upload
-                                <span v-if="event.school_fee.rejection_reason" class="font-normal block">Reason: {{ event.school_fee.rejection_reason }}</span>
-                            </span>
-                            <form v-if="itemFeesDue(event) > 0 && ['pending', 'rejected'].includes(event.school_fee.status)"
-                                  @submit.prevent="uploadEventPayment(event)" class="flex flex-wrap gap-2 items-center">
-                                <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-                                       @change="e => eventPaymentFiles[event.id] = e.target.files[0]" class="text-xs">
-                                <input v-model="eventPaymentRefs[event.id]" class="field text-xs w-36" placeholder="Txn ref (opt)">
-                                <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">Upload item fee proof</button>
-                            </form>
-                            <a v-if="event.school_fee.status === 'approved'"
-                               :href="`${programBase}/events/${event.id}/receipt`"
-                               target="_blank" rel="noopener"
-                               class="px-2 py-1 bg-green-50 border border-green-300 text-green-700 text-xs font-semibold rounded">
-                                View Receipt ↗
-                            </a>
-                            <a v-if="itemFeesDue(event) > 0"
-                               :href="`${programBase}/events/${event.id}/invoice?preview=1`"
-                               target="_blank" rel="noopener"
-                               class="px-2 py-1 bg-white border border-indigo-300 text-indigo-700 text-xs font-semibold rounded">
-                                Preview Invoice ↗
-                            </a>
-                            <a v-if="itemFeesDue(event) > 0"
-                               :href="`${programBase}/events/${event.id}/invoice`"
-                               target="_blank" rel="noopener"
-                               class="px-2 py-1 bg-indigo-50 border border-indigo-300 text-indigo-700 text-xs font-semibold rounded">
-                                Download Invoice ↓
-                            </a>
-                        </div>
-                    </div>
-                </div>
+                <EventBillingPanel
+                    v-if="event.fee_required && (event.uses_per_head_billing ? event.school_head_fees?.length : event.school_fee)"
+                    v-show="getTab(event.id) === 'payment'"
+                    :event="event"
+                    :school-id="school.id"
+                    :program-base="programBase"
+                    :payment-details="paymentDetails"
+                    :item-fee-lines="itemFeeLines(event)"
+                    :item-fees-due="itemFeesDue(event)"
+                    :is-min-fee-applied="isMinFeeApplied(event)"
+                    :event-payment-ref="eventPaymentRefs[event.id] ?? ''"
+                    :head-payment-ref-map="headPaymentRefs"
+                    @upload-event-payment="uploadEventPayment(event)"
+                    @set-event-file="file => eventPaymentFiles[event.id] = file"
+                    @update-event-ref="refVal => eventPaymentRefs[event.id] = refVal"
+                    @upload-head-payment="headFee => uploadHeadPayment(event, headFee)"
+                    @set-head-file="(headId, file) => setHeadPaymentFile(event.id, headId, file)"
+                    @update-head-ref="(headId, refVal) => headPaymentRefs[headPaymentKey(event.id, headId)] = refVal"
+                />
                 <p v-else-if="canRegister(event) && !event.fee_required" class="text-xs text-gray-400 mt-4 border-t border-gray-100 pt-4">No fee for this round</p>
                 </div>
             </div>
@@ -563,6 +458,7 @@ import QuickAddStudentModal from '@/Components/school/QuickAddStudentModal.vue';
 import FestRegistrationItemRow from '@/Components/school/FestRegistrationItemRow.vue';
 import SportsEventAthletesPanel from '@/Components/school/SportsEventAthletesPanel.vue';
 import SchoolEventWorkflowStepper from '@/Components/school/SchoolEventWorkflowStepper.vue';
+import EventBillingPanel from '@/Components/school/EventBillingPanel.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { genderLabel } from '@/support/festItemEligibility.js';
 
@@ -598,6 +494,44 @@ const programPrefix = computed(() =>
     || page.props.programPrefix
     || programBase.value.split('/').pop(),
 );
+
+const activeTabMap = reactive({});
+
+function getTab(eventId) {
+    if (!activeTabMap[eventId]) {
+        const ev = (props.events || []).find(e => e.id === eventId);
+        if (ev?.school_fee?.status && ['proof_uploaded', 'approved'].includes(ev.school_fee.status)) {
+            activeTabMap[eventId] = 'payment';
+        } else if (props.eventType === 'sports') {
+            activeTabMap[eventId] = 'athletes';
+        } else {
+            activeTabMap[eventId] = 'items';
+        }
+    }
+    return activeTabMap[eventId];
+}
+
+function setTab(eventId, tab) {
+    activeTabMap[eventId] = tab;
+}
+
+function registeredItemCount(event) {
+    let count = 0;
+    const items = event.items || [];
+    for (const item of items) {
+        if (registrationsForItem(event.id, item.id)?.length > 0) {
+            count++;
+        }
+    }
+    return count;
+}
+
+function isMinFeeApplied(event) {
+    const minFee = Number(event.fee_settings?.school_fee_min ?? (props.eventType === 'sports' ? 1500 : 0));
+    if (!minFee || !event.school_fee) return false;
+    const totalDue = Number(event.school_fee.total_due ?? 0);
+    return totalDue > 0 && totalDue === minFee;
+}
 const isSports = computed(() => props.eventType === 'sports' || programSlug.value === 'sports-meet');
 const isLocked = computed(() => !!props.studentEditLock?.locked);
 
@@ -607,19 +541,8 @@ const displayEvents = computed(() => {
 });
 
 onMounted(() => {
-    const urlHeadId = new URLSearchParams(usePage().url.split('?')[1] ?? '').get('head_id')
-        ?? new URLSearchParams(usePage().url.split('?')[1] ?? '').get('head');
-
-    for (const event of props.events ?? []) {
-        if (props.eventType !== 'sports') continue;
-        const heads = event.head_navigation?.headsForFilter ?? [];
-        if (!heads.length) continue;
-
-        if (!sportsHeadFilter[event.id]) {
-            const matched = urlHeadId && heads.some((h) => String(h.id) === String(urlHeadId));
-            sportsHeadFilter[event.id] = matched ? urlHeadId : heads[0].id;
-        }
-    }
+    // Head = Event for sports now — head_navigation is always empty, so there's
+    // no per-head filter to preselect from a ?head_id= URL param anymore.
 
     if (!props.focusEventId) return;
     requestAnimationFrame(() => {
@@ -667,7 +590,6 @@ const bulkAssignItemIds = ref([]);
 const bulkAssignForm = useForm({ student_ids: [], item_ids: [] });
 const sportsSearch = reactive({});
 const sportsAgeFilter = reactive({});
-const sportsHeadFilter = reactive({});
 const sportsItemFilter = reactive({});
 const fetchedStudentsByEvent = reactive({});
 
@@ -694,14 +616,11 @@ function eventRegisteredCount(event) {
     ).length;
 }
 
+// Head = Event for sports now — no head filter, just item id + free-text search.
 function sportsItemsForFilters(event) {
-    const headId = sportsHeadFilter[event.id] ?? '';
     const itemId = sportsItemFilter[event.id] ?? '';
     let items = event?.items ?? [];
 
-    if (headId) {
-        items = items.filter((i) => Number(i.head_id || 0) === Number(headId));
-    }
     if (itemId) {
         items = items.filter((i) => Number(i.id) === Number(itemId));
     }
@@ -714,34 +633,12 @@ function sportsItemsForFilters(event) {
     return items;
 }
 
-function sportsHeadOptions(event) {
-    return event.head_navigation?.headsForFilter ?? [];
-}
-
-function sportsItemOptions(event) {
-    const headId = sportsHeadFilter[event.id];
-    const groups = event.head_navigation?.headItemGroups ?? [];
-    if (headId) {
-        const head = groups.find((h) => Number(h.head_id) === Number(headId));
-        return head?.items ?? [];
-    }
-    return groups.flatMap((h) => h.items ?? []);
-}
-
-function selectSportsHead(eventId, headId) {
-    sportsHeadFilter[eventId] = headId;
-    sportsItemFilter[eventId] = '';
-}
-
 function sportsGroups(event) {
     const items = sportsItemsForFilters(event);
     const labels = event?.item_group_labels ?? {};
     const students = studentsForEvent(event.id);
     const allRegs = props.registrations ?? [];
     const registeredStudentIds = eventRegisteredStudentIds(event);
-    const headNameById = Object.fromEntries(
-        (event.head_navigation?.headsForFilter ?? []).map((h) => [Number(h.id), h.name]),
-    );
 
     const byAge = {};
     for (const item of items) {
@@ -759,8 +656,6 @@ function sportsGroups(event) {
         })
         .map((key) => {
             const groupItems = byAge[key] ?? [];
-            const headId = sportsHeadFilter[event.id] ? Number(sportsHeadFilter[event.id]) : null;
-            const headName = headId ? (headNameById[headId] ?? null) : null;
             const label = labels[key] ?? String(key).toUpperCase();
             const itemIds = new Set(groupItems.map((i) => Number(i.id)));
 
@@ -802,14 +697,11 @@ function sportsGroups(event) {
             }
             if (!genderGroups.length) genderGroups.push({ gender: 'all', label: '', items: groupItems });
 
-            return { key, label, headName, items: groupItems, eligibleCount, registeredCount, openCount, noEligibleCount, genderGroups };
+            return { key, label, items: groupItems, eligibleCount, registeredCount, openCount, noEligibleCount, genderGroups };
         });
 }
 
 function filteredSportsGroups(event) {
-    if (sportsHeadOptions(event).length && !sportsHeadFilter[event.id]) {
-        return [];
-    }
     const ageKey = sportsAgeFilter[event.id] ?? '';
     return sportsGroups(event).filter((group) => !ageKey || group.key === ageKey);
 }
@@ -868,9 +760,6 @@ function clearSportsFilters(eventId) {
     sportsSearch[eventId] = '';
     sportsAgeFilter[eventId] = '';
     sportsItemFilter[eventId] = '';
-    const event = props.events.find((e) => e.id === eventId);
-    const heads = event?.head_navigation?.headsForFilter ?? [];
-    sportsHeadFilter[eventId] = heads[0]?.id ?? '';
 }
 
 function onImportFile(e) {
@@ -935,7 +824,6 @@ for (const e of props.events) {
     eventPaymentRefs[e.id] = '';
     sportsSearch[e.id] = '';
     sportsAgeFilter[e.id] = '';
-    sportsHeadFilter[e.id] = '';
     sportsItemFilter[e.id] = '';
     for (const item of allItemsStatic(e)) {
         itemForms[itemFormKey(e.id, item.id)] = {

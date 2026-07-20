@@ -1,14 +1,11 @@
 @extends('emails.layouts.sahodaya')
 
 @section('content')
-    <h2 style="margin:0 0 12px;font-size:18px;color:#041525;font-weight:700;">Your school portal is ready</h2>
+    <h2 style="margin:0 0 12px;font-size:18px;color:#041525;font-weight:700;">{{ $title ?? 'Your school portal is ready' }}</h2>
 
     <p>Hello,</p>
 
-    <p>
-        <strong>{{ $school->name }}</strong> has been registered with
-        <strong>{{ $sahodayaName }}</strong>. Use the credentials below to sign in and complete Gmail verification.
-    </p>
+    <p>{{ $body ?? $school->name.' has been registered with '.$sahodayaName.'. Use the credentials below to sign in and complete Gmail verification.' }}</p>
 
     @include('emails.partials.detail-table', ['rows' => [
         'School' => $school->name,

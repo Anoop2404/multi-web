@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\AdmissionEnquiry;
+use App\Models\NotificationTemplate;
 use App\Models\Tenant;
 use App\Support\Mail\EmailBranding;
 use Illuminate\Bus\Queueable;
@@ -33,6 +34,13 @@ class AdmissionEnquiryReceived extends Mailable
             ? Tenant::query()->find($this->school->parent_id)
             : null;
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.admission_enquiry',
+            ['school_name' => $this->school->name],
+            'New Admission Enquiry',
+            '',
+        );
+
         return new Content(
             view: 'emails.admission-enquiry',
             with: array_merge(
@@ -41,6 +49,8 @@ class AdmissionEnquiryReceived extends Mailable
                     'headerTitle'    => 'New Admission Enquiry',
                     'headerSubtitle' => $this->school->name,
                     'headerEyebrow'  => 'Admissions',
+                    'title'          => $copy['title'],
+                    'body'           => $copy['body'],
                     'footerNote'     => 'Submitted via '.$this->school->name.' Admission Portal',
                 ],
             ),

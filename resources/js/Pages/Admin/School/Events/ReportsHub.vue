@@ -1,6 +1,6 @@
 <template>
-    <SchoolAdminLayout title="Fest Reports" :school="school" :show-header-title="false">
-        <PageHeader title="Fest Reports" description="Reports and exports by program type." />
+    <SchoolAdminLayout title="All Fest Reports Hub" :school="school" :show-header-title="false">
+        <PageHeader title="All Fest Reports Hub" eyebrow="Cross-program overview" description="Select a fest program below to view event-level reports, participant exports, and qualifiers." />
         <div class="hub-grid">
             <HubCard
                 v-for="p in programs"

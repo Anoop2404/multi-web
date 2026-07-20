@@ -205,6 +205,7 @@ function festToolItems(schoolId) {
         { label: 'Fest Hub', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'star' },
         { label: 'All fest reports', href: schoolAdminHref(schoolId, 'fest', 'reports'), icon: 'file-text', exact: true },
         { label: 'School Events', href: schoolAdminHref(schoolId, 'fest-programs'), icon: 'calendar' },
+        { label: 'Meal requests', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'coffee' },
         { label: 'Food Coupons', href: schoolAdminHref(schoolId, 'food-coupons'), icon: 'clipboard' },
         { label: 'Circulars', href: schoolAdminHref(schoolId, 'circulars'), icon: 'file-text' },
         { label: 'Notifications', href: schoolAdminHref(schoolId, 'notifications'), icon: 'bell' },
@@ -286,13 +287,15 @@ export function schoolAdminNav(schoolId, options = {}) {
         }
         schoolItems.push(
             { label: 'Students', href: schoolAdminHref(schoolId, 'students'), icon: 'users', badge: pendingChangeRequests },
+            { label: 'Import history', href: schoolAdminHref(schoolId, 'imports'), icon: 'clock' },
             { label: 'Teachers', href: schoolAdminHref(schoolId, 'teachers'), icon: 'user-check' },
             { label: 'School houses', href: schoolAdminHref(schoolId, 'houses'), icon: 'layers' },
             { label: 'Payment history', href: schoolAdminHref(schoolId, 'payments'), icon: 'credit-card' },
             { label: 'Settings', href: schoolAdminHref(schoolId, 'settings'), icon: 'settings' },
         );
-        // Hidden — accessible from Settings page
+        // User management links
         if (canNav('users')) {
+            schoolItems.push({ label: 'Profile requests', href: `${schoolAdminHref(schoolId, 'users')}/profile-change-requests`, icon: 'user-check', badge: pendingChangeRequests });
             schoolItems.push({ label: 'Portal users', href: schoolAdminHref(schoolId, 'users'), icon: 'shield', hidden: true });
             schoolItems.push({ label: 'Event coordinators', href: `${schoolAdminHref(schoolId, 'users')}?coordinators=1`, icon: 'users' });
         }

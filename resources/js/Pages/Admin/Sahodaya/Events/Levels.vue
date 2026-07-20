@@ -1,10 +1,11 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Levels`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Rounds & promotion`" eyebrow="Multi-level"
+        <PageHeader :title="`${event.title} — Rounds & promotion`" eyebrow="Rounds & levels"
                     :description="isPartitionedHub ? 'Regional partitions, school rounds, and overall championship aggregation.' : (event.event_type === 'kids_fest' ? 'Kids Fest clusters, school rounds, and promotions.' : 'School rounds, promotions, and child events.')" />
 
-        <EventSubNav v-if="event.event_type !== 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="levels" />
+        <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="levels" :event="event" />
+        <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="levels" />
 
         <div class="grid lg:grid-cols-2 gap-6 max-w-5xl">
             <div class="card space-y-4">
@@ -113,6 +114,7 @@ import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, reactive } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
 const props = defineProps({

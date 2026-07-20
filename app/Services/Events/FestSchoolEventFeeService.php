@@ -573,6 +573,7 @@ class FestSchoolEventFeeService
 
         $subtotal = $schoolRegFee + $participationFee;
         $total = $this->applySchoolFeeCap($subtotal, $schedule);
+        $total = $this->applySchoolFeeMin($total, $schedule);
 
         if ($total < $subtotal && $participationFee > 0) {
             $participationFee = max(0, round($total - $schoolRegFee, 2));
@@ -883,6 +884,17 @@ class FestSchoolEventFeeService
 
         if ($cap !== null && $cap > 0 && $total > $cap) {
             return $cap;
+        }
+
+        return $total;
+    }
+
+    private function applySchoolFeeMin(float $total, array $schedule): float
+    {
+        $min = isset($schedule['school_fee_min']) ? (float) $schedule['school_fee_min'] : null;
+
+        if ($min !== null && $min > 0 && $total > 0 && $total < $min) {
+            return $min;
         }
 
         return $total;

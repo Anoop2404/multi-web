@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\SahodayaAdmin\Concerns;
 
 use App\Models\FestEvent;
+use App\Models\IdCardTemplate;
 use App\Models\Tenant;
 use App\Support\FestIdCardTemplates;
 use App\Support\TenantBranding;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 trait BuildsFestIdCardResponses
@@ -28,8 +30,22 @@ trait BuildsFestIdCardResponses
         ], fn ($v) => $v !== null && $v !== '');
     }
 
-    protected function idCardSheetView(Request $request): string
+    /**
+     * Resolve a Sahodaya-uploaded custom ID card template for this event/item/audience,
+     * if one is configured and active. Returns null to fall back to the built-in
+     * standard/premium layouts.
+     */
+    protected function resolveCustomIdCardTemplate(FestEvent $event, ?int $itemId, string $audience): ?IdCardTemplate
     {
+        return IdCardTemplate::resolveFor($event, $itemId, $audience);
+    }
+
+    protected function idCardSheetView(Request $request, ?IdCardTemplate $customTemplate = null): string
+    {
+        if ($customTemplate) {
+            return 'fest.id-cards.custom-sheet';
+        }
+
         return FestIdCardTemplates::sheetView($request->input('template'));
     }
 
@@ -42,8 +58,9 @@ trait BuildsFestIdCardResponses
         string $audience,
         bool $showTitle,
         ?array $sections = null,
+        ?IdCardTemplate $customTemplate = null,
     ): array {
-        return [
+        $base = [
             'cards'          => $cards,
             'sections'       => $sections,
             'clusterName'    => $sahodaya->name,
@@ -52,5 +69,19 @@ trait BuildsFestIdCardResponses
             'audience'       => $audience,
             'showTitle'      => $showTitle,
         ];
+
+        if (! $customTemplate) {
+            return $base;
+        }
+
+        return array_merge($base, [
+            'backgroundUrl' => $customTemplate->background_path
+                ? TenantStorage::logoUrl($sahodaya, $customTemplate->background_path)
+                : null,
+            'fields'        => $customTemplate->fields(),
+            'cardWidthMm'   => $customTemplate->card_width_mm,
+            'cardHeightMm'  => $customTemplate->card_height_mm,
+            'cardsPerPage'  => $customTemplate->cards_per_page,
+        ]);
     }
 }

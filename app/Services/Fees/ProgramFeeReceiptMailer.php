@@ -3,6 +3,7 @@
 namespace App\Services\Fees;
 
 use App\Models\FeeReceipt;
+use App\Models\NotificationTemplate;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Mail\SahodayaMailer;
@@ -51,12 +52,19 @@ class ProgramFeeReceiptMailer
         $receiptNo = $receipt->receipt_number ?? '—';
         $subject = "Fee receipt {$receiptNo} — {$contextTitle}";
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.fees.receipt_approved',
+            ['context_title' => $contextTitle, 'sahodaya_name' => $sahodaya->name, 'receipt_no' => $receiptNo],
+            'Your fee payment has been approved',
+            'Payment for {{context_title}} has been verified by {{sahodaya_name}}. Your official receipt (No. {{receipt_no}}) is attached to this email.',
+        );
+
         $viewData = [
             'headerTitle'    => 'Payment approved',
             'headerSubtitle' => $school->name,
             'headerEyebrow'  => $feeTypeLabel,
-            'title'          => 'Your fee payment has been approved',
-            'body'           => "Payment for {$contextTitle} has been verified by {$sahodaya->name}. Your official receipt (No. {$receiptNo}) is attached to this email.",
+            'title'          => $copy['title'],
+            'body'           => $copy['body'],
             'feeTypeLabel'   => $feeTypeLabel,
             'contextTitle'   => $contextTitle,
             'receiptNo'      => $receiptNo,

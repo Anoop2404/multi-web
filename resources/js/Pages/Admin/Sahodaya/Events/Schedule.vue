@@ -1,8 +1,10 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Schedule`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Schedule`" eyebrow="Registration"
+        <PageHeader :title="`${event.title} — Schedule`" eyebrow="Schedule"
                     description="Build performance order, resolve clashes, and publish to the public portal." />
+
+        <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="schedule" :event="event" />
         <div class="flex flex-wrap gap-2 mb-4 items-center">
             <button type="button" @click="autoGenerate"
                     class="btn-primary px-4 py-2 rounded-lg text-sm">Auto-order by chest no.</button>
@@ -38,25 +40,29 @@
             </ul>
         </div>
 
-        <form @submit.prevent="save" class="bg-white border rounded-xl p-4 mb-4 grid md:grid-cols-5 gap-2">
-            <select v-model="form.item_id" class="field" required>
-                <option value="">Item</option>
-                <option v-for="item in event.items" :key="item.id" :value="item.id">{{ item.title }}</option>
-            </select>
-            <select v-model="form.participant_id" class="field">
-                <option value="">All item (block)</option>
-                <option v-for="p in participantsForItem" :key="p.id" :value="p.id">
-                    #{{ p.chest_no }} {{ p.student?.name ?? p.teacher?.name }}
-                </option>
-            </select>
-            <input v-model="form.scheduled_at" type="datetime-local" class="field">
-            <select v-if="stages.length" v-model="form.stage_id" class="field">
-                <option value="">Stage</option>
-                <option v-for="s in stages" :key="s.id" :value="s.id">{{ stageOptionLabel(s) }}</option>
-            </select>
-            <input v-else v-model="form.stage" class="field" placeholder="Stage">
-            <button class="btn-primary">Save slot</button>
-        </form>
+        <section class="card mb-4">
+            <h3 class="section-title">Add schedule slot</h3>
+            <p class="section-desc mb-3">Assign a date/time and stage for a specific item or individual participant.</p>
+            <form @submit.prevent="save" class="grid md:grid-cols-5 gap-2">
+                <select v-model="form.item_id" class="field" required>
+                    <option value="">Item</option>
+                    <option v-for="item in event.items" :key="item.id" :value="item.id">{{ item.title }}</option>
+                </select>
+                <select v-model="form.participant_id" class="field">
+                    <option value="">All item (block)</option>
+                    <option v-for="p in participantsForItem" :key="p.id" :value="p.id">
+                        #{{ p.chest_no }} {{ p.student?.name ?? p.teacher?.name }}
+                    </option>
+                </select>
+                <input v-model="form.scheduled_at" type="datetime-local" class="field">
+                <select v-if="stages.length" v-model="form.stage_id" class="field">
+                    <option value="">Stage</option>
+                    <option v-for="s in stages" :key="s.id" :value="s.id">{{ stageOptionLabel(s) }}</option>
+                </select>
+                <input v-else v-model="form.stage" class="field" placeholder="Stage">
+                <button class="btn-primary">Save slot</button>
+            </form>
+        </section>
 
         <div class="card card--flush overflow-x-auto">
             <table class="w-full min-w-[800px] text-sm">
@@ -99,6 +105,7 @@
 import { computed, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
 const props = defineProps({

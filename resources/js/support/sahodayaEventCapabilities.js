@@ -48,48 +48,12 @@ export function capabilitiesForEvent(event) {
 
 export function settingsTabsForEvent(event) {
     const caps = capabilitiesForEvent(event);
-    const tabs = [
-        { id: 'lifecycle', label: 'Lifecycle' },
-        { id: 'locks', label: 'Locks' },
+    return [
+        { id: 'fees', label: caps.isSports ? '💳 Fees & Windows' : '💳 Fees & Registration', icon: '💳' },
+        { id: 'points', label: caps.isSports ? '🏆 Scoring & Rules' : '🏆 Points & Rules', icon: '🏆' },
+        { id: 'venues', label: caps.isSports ? '📍 Venues & Numbering' : '📍 Venues & Logistics', icon: '📍' },
+        { id: 'lifecycle', label: '⚙️ General & Operations', icon: '⚙️' },
     ];
-
-    if (caps.venues) {
-        tabs.push({ id: 'venues', label: caps.isSports ? 'Venues' : 'Venues & stages' });
-    }
-
-    if (caps.comboRules) {
-        tabs.push({ id: 'combo', label: 'Combo rules' });
-    }
-
-    if (caps.gradeBands) {
-        tabs.push({ id: 'grades', label: 'Grades' });
-    }
-
-    tabs.push({ id: 'points', label: caps.isSports ? 'Rank points' : 'Points' });
-    if (caps.isSports) {
-        tabs.push({ id: 'eligibility', label: 'Age cutoff' });
-    }
-
-    tabs.push({ id: 'participation', label: 'Participation' });
-
-    if (caps.hasEventFees) {
-        tabs.push({ id: 'fees', label: caps.isSports ? 'Fee settings' : 'Event fees' });
-    }
-
-    if (caps.isSports) {
-        tabs.push({ id: 'registration', label: 'Registration windows' });
-        tabs.push({ id: 'numbering', label: 'Chest numbering' });
-    }
-
-    tabs.push({ id: 'volunteers', label: 'Volunteers' });
-
-    if (caps.recordSettings) {
-        tabs.push({ id: 'records', label: 'Records' });
-    }
-
-    tabs.push({ id: 'clone', label: 'Clone' });
-
-    return tabs;
 }
 
 export function settingsDescriptionForEvent(event) {

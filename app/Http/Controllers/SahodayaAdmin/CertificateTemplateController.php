@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\CertificateTemplate;
+use App\Models\FestEvent;
 use App\Services\Certificates\CertificateBackgroundConverter;
 use App\Services\Training\TrainingCertificateService;
 use App\Support\TenantStorage;
@@ -36,10 +37,22 @@ class CertificateTemplateController extends SahodayaAdminController
                 return $row;
             });
 
+        $festEvents = FestEvent::where('tenant_id', $this->sahodaya->id)
+            ->orderByDesc('event_start')
+            ->with(['items' => fn ($q) => $q->orderBy('display_order')])
+            ->get(['id', 'title', 'event_type', 'event_start'])
+            ->map(fn (FestEvent $e) => [
+                'id'    => $e->id,
+                'title' => $e->title,
+                'items' => $e->items->map(fn ($i) => ['id' => $i->id, 'title' => $i->title])->values(),
+            ]);
+
         return $this->inertia('Sahodaya/Certificates/Templates', [
             'templates'          => $templates,
+            'festEvents'         => $festEvents,
             'defaultBody'        => CertificateTemplate::defaultTrainingBody(),
             'defaultTopperBody'  => CertificateTemplate::defaultTopperBody(),
+            'defaultFestBody'    => CertificateTemplate::defaultFestBody(),
             'defaultSignatories' => CertificateTemplate::defaultTrainingSignatories(),
             'defaultLayout'      => CertificateTemplate::defaultBackgroundLayout(),
             'fontFamilyOptions'  => CertificateTemplate::fontFamilyOptions(),
@@ -65,6 +78,8 @@ class CertificateTemplateController extends SahodayaAdminController
     {
         $data = $request->validate([
             'event_type'          => 'required|string|max:50',
+            'event_id'            => 'nullable|integer|exists:fest_events,id',
+            'item_id'             => 'nullable|integer|exists:fest_event_items,id',
             'certificate_type'    => 'required|string|max:50',
             'title'               => 'nullable|string|max:255',
             'body'                => 'nullable|string',
@@ -103,6 +118,16 @@ class CertificateTemplateController extends SahodayaAdminController
             'is_active'           => 'nullable|boolean',
         ]);
 
+        if (! empty($data['event_id'])) {
+            $event = FestEvent::where('id', $data['event_id'])->where('tenant_id', $this->sahodaya->id)->first();
+            abort_unless($event, 422, 'Event does not belong to this Sahodaya.');
+            if (! empty($data['item_id'])) {
+                abort_unless($event->items()->where('id', $data['item_id'])->exists(), 422, 'Item does not belong to the selected event.');
+            }
+        } elseif (! empty($data['item_id'])) {
+            abort(422, 'Select an event before choosing an item.');
+        }
+
         $baseDir = 'sahodaya/'.$this->sahodaya->id.'/certificate-templates';
         $disk = TenantStorage::uploadDisk();
 
@@ -125,15 +150,19 @@ class CertificateTemplateController extends SahodayaAdminController
 
         $signatories = $this->normalizeSignatories($request, $data['signatories'] ?? null, $baseDir.'/signatures', $disk);
 
-        $dynamicFields = $data['dynamic_fields_json'] ?? $this->defaultTrainingFields();
+        $dynamicFields = $data['dynamic_fields_json'] ?? match ($data['event_type']) {
+            'fest' => $this->defaultFestFields(),
+            default => $this->defaultTrainingFields(),
+        };
         $body = $data['body'] ?? match ($data['event_type']) {
             'training' => CertificateTemplate::defaultTrainingBody(),
             'topper' => CertificateTemplate::defaultTopperBody(),
+            'fest' => CertificateTemplate::defaultFestBody(),
             default => null,
         };
 
         $layout = null;
-        if ($backgroundPath || ($data['event_type'] === 'training' && isset($data['layout_json']))) {
+        if ($backgroundPath || (in_array($data['event_type'], ['training', 'fest'], true) && isset($data['layout_json']))) {
             $layout = $this->mergeLayout($data['layout_json'] ?? null);
         }
 
@@ -141,12 +170,16 @@ class CertificateTemplateController extends SahodayaAdminController
             CertificateTemplate::where('tenant_id', $this->sahodaya->id)
                 ->where('event_type', $data['event_type'])
                 ->where('certificate_type', $data['certificate_type'])
+                ->when(! empty($data['event_id']), fn ($q) => $q->where('event_id', $data['event_id']), fn ($q) => $q->whereNull('event_id'))
+                ->when(! empty($data['item_id']), fn ($q) => $q->where('item_id', $data['item_id']), fn ($q) => $q->whereNull('item_id'))
                 ->update(['is_active' => false]);
         }
 
         CertificateTemplate::create([
             'tenant_id'           => $this->sahodaya->id,
             'event_type'          => $data['event_type'],
+            'event_id'            => $data['event_id'] ?? null,
+            'item_id'             => $data['item_id'] ?? null,
             'certificate_type'    => $data['certificate_type'],
             'title'               => $data['title'] ?? 'Certificate of Participation',
             'body'                => $body,
@@ -247,6 +280,8 @@ class CertificateTemplateController extends SahodayaAdminController
             CertificateTemplate::where('tenant_id', $this->sahodaya->id)
                 ->where('event_type', $template->event_type)
                 ->where('certificate_type', $template->certificate_type)
+                ->when($template->event_id, fn ($q) => $q->where('event_id', $template->event_id), fn ($q) => $q->whereNull('event_id'))
+                ->when($template->item_id, fn ($q) => $q->where('item_id', $template->item_id), fn ($q) => $q->whereNull('item_id'))
                 ->where('id', '!=', $template->id)
                 ->update(['is_active' => false]);
             $updates['is_active'] = true;
@@ -347,6 +382,21 @@ class CertificateTemplateController extends SahodayaAdminController
             ['key' => 'days_attended', 'source' => 'days_attended', 'label' => 'Days attended'],
             ['key' => 'training_hours', 'source' => 'training_hours', 'label' => 'Training hours'],
             ['key' => 'total_days', 'source' => 'total_days', 'label' => 'Total days'],
+            ['key' => 'certificate_date', 'source' => 'certificate_date', 'label' => 'Certificate date'],
+        ];
+    }
+
+    /** @return list<array{key: string, source: string, label: string}> */
+    private function defaultFestFields(): array
+    {
+        return [
+            ['key' => 'recipient_name', 'source' => 'recipient_name', 'label' => 'Recipient name'],
+            ['key' => 'school_name', 'source' => 'school_name', 'label' => 'School name'],
+            ['key' => 'event_title', 'source' => 'event_title', 'label' => 'Event title'],
+            ['key' => 'item_title', 'source' => 'item_title', 'label' => 'Item title'],
+            ['key' => 'event_dates', 'source' => 'event_dates', 'label' => 'Event dates'],
+            ['key' => 'achievement_line', 'source' => 'achievement_line', 'label' => 'Achievement line'],
+            ['key' => 'sahodaya_name', 'source' => 'sahodaya_name', 'label' => 'Sahodaya name'],
             ['key' => 'certificate_date', 'source' => 'certificate_date', 'label' => 'Certificate date'],
         ];
     }

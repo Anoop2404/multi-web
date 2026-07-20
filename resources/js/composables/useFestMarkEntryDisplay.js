@@ -1,13 +1,41 @@
 import { computed, reactive } from 'vue';
 
+const GROUP_PARTICIPANT_TYPES = ['team', 'group', 'pair', 'trio'];
+
 export function useFestMarkEntryDisplay(props, isSports) {
     const bulkRank = reactive({});
 
+    // Team/group items: the mark applies to the whole squad, so show one
+    // row per team (not one per member) — saving it fans out to every
+    // member on the backend (see FestMarkEntryController::expandToTeam()).
     function markableParticipants(reg) {
         const list = reg.participants ?? [];
         const performers = list.filter((p) => p.participant_role !== 'standby');
+        const source = performers.length ? performers : list;
 
-        return performers.length ? performers : list;
+        const isGroupItem = GROUP_PARTICIPANT_TYPES.includes(reg.item?.participant_type);
+        if (!isGroupItem) {
+            return source;
+        }
+
+        const byKey = new Map();
+        for (const p of source) {
+            const key = p.group_id ?? `solo-${p.id}`;
+            const existing = byKey.get(key);
+            if (existing) {
+                existing._member_count += 1;
+                continue;
+            }
+            byKey.set(key, {
+                ...p,
+                chest_no: p.group?.chest_no ?? p.chest_no,
+                _is_team: Boolean(p.group_id),
+                _member_count: 1,
+                _team_name: p.group?.team_name || 'Team',
+            });
+        }
+
+        return [...byKey.values()];
     }
 
     const sections = computed(() => {

@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\NotificationTemplate;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Mail\SahodayaMailer;
@@ -45,10 +46,21 @@ class PortalVerifyEmail extends VerifyEmail
 
         $branding = EmailBranding::forTenant($sahodaya);
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.auth.verify_email',
+            ['school_name' => $school?->name ?? '', 'sahodaya_name' => $branding['sahodayaName'] ?? ''],
+            'Verify your Gmail address',
+            $school
+                ? 'Your school {{school_name}} is registered with {{sahodaya_name}}. Please confirm your Gmail address to activate your school portal account.'
+                : 'Welcome to {{sahodaya_name}}. Please confirm your Gmail address to activate your school portal account.',
+        );
+
         return array_merge($branding, [
             'headerTitle'      => 'Gmail Verification',
             'headerSubtitle'   => $school?->name,
             'headerEyebrow'    => 'School Portal',
+            'title'            => $copy['title'],
+            'body'             => $copy['body'],
             'userName'         => $notifiable->name,
             'schoolName'       => $school?->name,
             'verificationUrl'  => $this->verificationUrl($notifiable),

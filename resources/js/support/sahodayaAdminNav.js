@@ -395,6 +395,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
             menuOn('fest_payments') ? { label: 'Fest payments', href: `${base}/fest/payments`, icon: 'credit-card' } : null,
             menuOn('display_screens') ? { label: 'Display screens', href: `${base}/display-screens`, icon: 'monitor' } : null,
             menuOn('certificate_templates') ? { label: 'Certificate templates', href: `${base}/certificate-templates`, icon: 'award' } : null,
+            menuOn('id_card_templates') ? { label: 'ID card templates', href: `${base}/id-card-templates`, icon: 'credit-card' } : null,
             { label: 'Find certificate', href: `${base}/events/certificates/search`, icon: 'file-text' },
             programOn('custom') ? { label: 'Custom events', href: `${base}/programs/custom`, icon: 'layers', hidden: true } : null,
         ].filter(Boolean);

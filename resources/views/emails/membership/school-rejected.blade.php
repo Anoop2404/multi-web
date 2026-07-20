@@ -1,14 +1,11 @@
 @extends('emails.layouts.sahodaya')
 
 @section('content')
-    <h2 style="margin:0 0 12px;font-size:18px;color:#041525;font-weight:700;">Application not approved</h2>
+    <h2 style="margin:0 0 12px;font-size:18px;color:#041525;font-weight:700;">{{ $title ?? 'Application not approved' }}</h2>
 
     <p>Hello,</p>
 
-    <p>
-        We regret to inform you that the membership application for
-        <strong>{{ $school->name }}</strong> was not approved by <strong>{{ $sahodayaName }}</strong>.
-    </p>
+    <p>{{ $body ?? 'We regret to inform you that the membership application for '.$school->name.' was not approved by '.$sahodayaName.'.' }}</p>
 
     @include('emails.partials.alert-box', [
         'variant' => 'danger',

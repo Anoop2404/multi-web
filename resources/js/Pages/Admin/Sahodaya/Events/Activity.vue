@@ -1,10 +1,11 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Activity`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Activity log`" eyebrow="Audit trail"
+        <PageHeader :title="`${event.title} — Activity log`" eyebrow="Activity log"
                     description="All actions across this event, grouped newest first." />
 
-        <EventSubNav v-if="event.event_type !== 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="activity" />
+        <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="activity" :event="event" />
+        <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="activity" />
 
         <div class="form-section overflow-hidden !p-0">
             <EmptyState v-if="!activityLogs.length" title="No activity yet" description="Actions on this event will appear here." icon="📋" class="p-8" />
@@ -35,6 +36,7 @@
 <script setup>
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 
 defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,

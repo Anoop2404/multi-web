@@ -22,11 +22,23 @@ class FestChestNumberService
         }
 
         $event = $participant->registration?->event;
-        if ($event?->chest_reveal_mode === 'stage_entry' && ! $participant->chest_revealed_at) {
+        if ($event?->chest_reveal_mode === 'stage_entry' && ! $this->isRevealed($participant)) {
             return '—';
         }
 
-        return (string) ($participant->chest_no ?? '—');
+        $chest = app(FestNumberingService::class)->effectiveChestNumber($participant);
+
+        return (string) ($chest ?? '—');
+    }
+
+    private function isRevealed(FestParticipant $participant): bool
+    {
+        $participant->loadMissing('group');
+        if ($participant->group_id && $participant->group) {
+            return (bool) $participant->group->chest_revealed_at;
+        }
+
+        return (bool) $participant->chest_revealed_at;
     }
 
     public function revealAtStageEntry(FestParticipant $participant): void
@@ -38,13 +50,28 @@ class FestChestNumberService
             throw new HttpException(422, 'This event does not use stage-entry chest reveal.');
         }
 
+        $participant->loadMissing('group', 'registration.item');
+        $item = $participant->registration?->item;
+        $numbering = app(FestNumberingService::class);
+
+        if ($item && $participant->group_id && $participant->group && $numbering->isGroupItem($item)) {
+            $group = $participant->group;
+            if ($group->chest_revealed_at) {
+                return;
+            }
+            if ($group->chest_no === null) {
+                $numbering->resolveGroupChestNumber($event, $item, $group);
+            }
+            $group->update(['chest_revealed_at' => now()]);
+
+            return;
+        }
+
         if ($participant->chest_revealed_at) {
             return;
         }
 
-        $numbering = app(FestNumberingService::class);
-        if (! $numbering->persistedChestNumber($participant) && $participant->registration?->item) {
-            $item = $participant->registration->item;
+        if (! $numbering->persistedChestNumber($participant) && $item) {
             ['chest' => $chest, 'persist' => $persist, 'chest_head_id' => $chestHeadId] = $numbering->resolveChestAssignment(
                 $event,
                 $item,
@@ -83,10 +110,23 @@ class FestChestNumberService
 
     public function clearChest(FestParticipant $participant): void
     {
-        $participant->loadMissing('registration.event', 'registration.item');
-        $eventId = $participant->event_id ?? $participant->registration?->event_id;
+        $participant->loadMissing('registration.event', 'registration.item', 'group');
         $event = $participant->registration?->event;
         $item = $participant->registration?->item;
+
+        if ($item && $participant->group_id && $participant->group
+            && $event && app(FestNumberingService::class)->isGroupItem($item)) {
+            // Team/group items: clearing one member's chest clears the
+            // whole squad's shared number.
+            $participant->group->update([
+                'chest_no'          => null,
+                'chest_revealed_at' => null,
+            ]);
+
+            return;
+        }
+
+        $eventId = $participant->event_id ?? $participant->registration?->event_id;
         $headScope = ($event && $item)
             ? app(FestNumberingService::class)->chestHeadScope($event, $item)
             : (int) ($participant->chest_head_id ?? FestNumberingService::CHEST_SCOPE_EVENT);

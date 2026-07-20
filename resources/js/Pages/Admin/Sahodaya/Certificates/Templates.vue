@@ -14,10 +14,7 @@
                 <FormField label="Event type" required>
                     <template #default="{ id }">
                         <select :id="id" v-model="form.event_type" class="field" required>
-                            <option value="kalolsavam">Kalotsav</option>
-                            <option value="sports">Sports Meet</option>
-                            <option value="kids_fest">Kids Fest</option>
-                            <option value="teacher_fest">Teacher Fest</option>
+                            <option value="fest">Fest / Event certificate</option>
                             <option value="training">Training</option>
                             <option value="topper">Topper (Congratulations)</option>
                         </select>
@@ -31,11 +28,33 @@
                         <select v-else-if="form.event_type === 'topper'" :id="id" v-model="form.certificate_type" class="field" required>
                             <option value="congratulations">congratulations</option>
                         </select>
+                        <select v-else-if="form.event_type === 'fest'" :id="id" v-model="form.certificate_type" class="field" required>
+                            <option v-for="t in festCertificateTypes" :key="t" :value="t">{{ t.replaceAll('_', ' ') }}</option>
+                        </select>
                         <input v-else :id="id" v-model="form.certificate_type" class="field" placeholder="participation" required>
                     </template>
                 </FormField>
 
-                <template v-if="form.event_type === 'training' || form.event_type === 'topper'">
+                <template v-if="form.event_type === 'fest'">
+                    <FormField label="Event" hint="Leave blank to make this the Sahodaya-wide default for this certificate type.">
+                        <template #default="{ id }">
+                            <select :id="id" v-model="form.event_id" class="field" @change="form.item_id = null">
+                                <option :value="null">All events (default)</option>
+                                <option v-for="e in festEvents" :key="e.id" :value="e.id">{{ e.title }}</option>
+                            </select>
+                        </template>
+                    </FormField>
+                    <FormField label="Item" hint="Leave blank to cover every item in the selected event.">
+                        <template #default="{ id }">
+                            <select :id="id" v-model="form.item_id" class="field" :disabled="!form.event_id">
+                                <option :value="null">All items in event</option>
+                                <option v-for="i in selectedEventItems" :key="i.id" :value="i.id">{{ i.title }}</option>
+                            </select>
+                        </template>
+                    </FormField>
+                </template>
+
+                <template v-if="form.event_type === 'training' || form.event_type === 'topper' || form.event_type === 'fest'">
                     <FormField label="Certificate title" class-extra="sm:col-span-2">
                         <template #default="{ id }">
                             <input :id="id" v-model="form.title" class="field"
@@ -43,7 +62,7 @@
                         </template>
                     </FormField>
                     <FormField
-                        v-if="form.event_type === 'training'"
+                        v-if="form.event_type === 'training' || form.event_type === 'fest'"
                         label="Background (PDF or image)"
                         class-extra="sm:col-span-2"
                         :hint="editingId
@@ -61,7 +80,7 @@
                                    @change="e => form.template_file = e.target.files[0]">
                         </template>
                     </FormField>
-                    <template v-if="form.event_type === 'training'">
+                    <template v-if="form.event_type === 'training' || form.event_type === 'fest'">
                         <div class="sm:col-span-2 rounded-xl border border-slate-100 bg-slate-50/80 p-4 space-y-3">
                             <p class="text-sm font-semibold text-slate-700">Background layout options</p>
                             <label class="flex items-center gap-2 text-sm text-slate-700">
@@ -209,7 +228,9 @@
                     <FormField label="Body text" class-extra="sm:col-span-2"
                                :hint="form.event_type === 'topper'
                                    ? 'Placeholders: {recipient_name}, {school_name}, {sahodaya_name}, {academic_year}, {class}, {examination_type}, {percentage}, {rank}'
-                                   : 'Placeholders: {salutation} (Mr./Mrs. from gender), {recipient_name}, {designation}, {school_name}, {program_title}, {sahodaya_name}, {venue}, {conducted_on}, {days_attended}, {training_hours}. With a background PDF, title/logo/signatories in the design are used instead of HTML chrome.'">
+                                   : form.event_type === 'fest'
+                                       ? 'Placeholders: {recipient_name}, {school_name}, {event_title}, {item_title}, {event_dates}, {achievement_line}, {sahodaya_name}, {certificate_date}. With a background PDF, title/logo/signatories in the design are used instead of HTML chrome.'
+                                       : 'Placeholders: {salutation} (Mr./Mrs. from gender), {recipient_name}, {designation}, {school_name}, {program_title}, {sahodaya_name}, {venue}, {conducted_on}, {days_attended}, {training_hours}. With a background PDF, title/logo/signatories in the design are used instead of HTML chrome.'">
                         <template #default="{ id }">
                             <textarea :id="id" v-model="form.body" class="field font-mono text-xs" rows="8"></textarea>
                         </template>
@@ -288,6 +309,7 @@
                     <thead>
                         <tr>
                             <th>Event type</th>
+                            <th>Scope</th>
                             <th>Certificate type</th>
                             <th>Title</th>
                             <th>Background</th>
@@ -298,6 +320,12 @@
                     <tbody>
                         <tr v-for="t in templates" :key="t.id">
                             <td class="capitalize">{{ t.event_type.replace('_', ' ') }}</td>
+                            <td class="text-xs text-slate-600">
+                                <template v-if="t.event_type === 'fest'">
+                                    {{ scopeLabel(t) }}
+                                </template>
+                                <template v-else>—</template>
+                            </td>
                             <td>{{ t.certificate_type }}</td>
                             <td>{{ t.title || '—' }}</td>
                             <td>
@@ -307,7 +335,7 @@
                             </td>
                             <td>{{ t.is_active ? 'Yes' : 'No' }}</td>
                             <td class="text-right space-x-3">
-                                <button v-if="t.event_type === 'training'" type="button"
+                                <button v-if="t.event_type === 'training' || t.event_type === 'fest'" type="button"
                                         class="text-slate-700 text-xs font-semibold hover:text-slate-900"
                                         @click="editTemplate(t)">
                                     Edit
@@ -324,7 +352,7 @@
                             </td>
                         </tr>
                         <tr v-if="!templates.length">
-                            <td colspan="6" class="p-6 text-center text-slate-400">No templates yet.</td>
+                            <td colspan="7" class="p-6 text-center text-slate-400">No templates yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -335,7 +363,7 @@
 
 <script setup>
 import { useForm, router } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 
 const props = defineProps({
@@ -343,8 +371,10 @@ const props = defineProps({
     publicUrl: String,
     pendingPaymentsCount: Number,
     templates: { type: Array, default: () => [] },
+    festEvents: { type: Array, default: () => [] },
     defaultBody: { type: String, default: '' },
     defaultTopperBody: { type: String, default: '' },
+    defaultFestBody: { type: String, default: '' },
     defaultSignatories: { type: Array, default: () => [] },
     defaultLayout: { type: Object, default: () => ({}) },
     fontFamilyOptions: { type: Array, default: () => [
@@ -361,6 +391,26 @@ const trainingCertificateTypes = [
     'resource_person',
     'organizer',
 ];
+
+const festCertificateTypes = [
+    'winner',
+    'participation',
+    'record_break',
+    'volunteer',
+    'organizer',
+];
+
+const selectedEventItems = computed(() => {
+    const event = props.festEvents.find(e => e.id === form.event_id);
+    return event?.items || [];
+});
+
+function scopeLabel(t) {
+    const event = props.festEvents.find(e => e.id === t.event_id);
+    if (!event) return 'All events (default)';
+    const item = event.items.find(i => i.id === t.item_id);
+    return item ? `${event.title} — ${item.title}` : `${event.title} (all items)`;
+}
 
 const editingId = ref(null);
 const editingTemplate = ref(null);
@@ -408,10 +458,12 @@ function layoutDefaults(from = null) {
 }
 
 const form = useForm({
-    event_type: 'training',
+    event_type: 'fest',
     certificate_type: 'participation',
+    event_id: null,
+    item_id: null,
     title: 'Certificate of Participation',
-    body: props.defaultBody,
+    body: props.defaultFestBody,
     is_active: true,
     template_file: null,
     logo: null,
@@ -438,6 +490,13 @@ watch(() => form.event_type, (type) => {
         form.certificate_type = 'congratulations';
         form.title = 'Certificate of Congratulations';
         form.body = props.defaultTopperBody || '';
+    } else if (type === 'fest') {
+        if (!festCertificateTypes.includes(form.certificate_type)) {
+            form.certificate_type = 'participation';
+        }
+        form.title = 'Certificate of Participation';
+        form.body = props.defaultFestBody || '';
+        form.layout_json = layoutDefaults();
     }
 });
 
@@ -446,6 +505,8 @@ function editTemplate(template) {
     editingTemplate.value = template;
     form.event_type = template.event_type || 'training';
     form.certificate_type = template.certificate_type || 'participation';
+    form.event_id = template.event_id ?? null;
+    form.item_id = template.item_id ?? null;
     form.title = template.title || 'Certificate of Participation';
     form.body = template.body || props.defaultBody;
     form.is_active = template.is_active ?? true;
@@ -468,10 +529,12 @@ function editTemplate(template) {
 function cancelEdit() {
     editingId.value = null;
     editingTemplate.value = null;
-    form.event_type = 'training';
+    form.event_type = 'fest';
     form.certificate_type = 'participation';
+    form.event_id = null;
+    form.item_id = null;
     form.title = 'Certificate of Participation';
-    form.body = props.defaultBody;
+    form.body = props.defaultFestBody;
     form.is_active = true;
     form.template_file = null;
     form.logo = null;

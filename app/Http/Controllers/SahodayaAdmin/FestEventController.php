@@ -423,6 +423,14 @@ class FestEventController extends SahodayaAdminController
             }
         }
 
+        if (($data['status'] ?? null) === 'completed' && $previousStatus !== 'completed') {
+            try {
+                app(FestEventNotifier::class)->eventCompleted($event->fresh());
+            } catch (\Throwable) {
+                // Notifications must never block event updates.
+            }
+        }
+
         app(PlatformAuditLogger::class)->festEvent(
             $event,
             FestPageActivity::OVERVIEW,
@@ -1002,6 +1010,68 @@ class FestEventController extends SahodayaAdminController
 
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/sports")
             ->with('success', "Sport events synced ({$result['created']} created, {$result['updated']} updated).");
+    }
+
+    /**
+     * Lightweight status-only transition, for one-click "Mark as completed" /
+     * "Apply suggested status" actions (e.g. from EventLifecyclePanel) that
+     * shouldn't need to submit the full event-settings form.
+     */
+    public function quickStatus(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'status' => 'required|in:draft,published,registration_open,ongoing,completed,cancelled',
+        ]);
+
+        $newStatus = $data['status'];
+
+        if (in_array($newStatus, ['published', 'registration_open'], true)
+            && ! in_array($event->status, ['published', 'registration_open', 'ongoing', 'completed'], true)) {
+            try {
+                \App\Services\Events\EventLifecycleGate::assertCanPublishEvent(
+                    $event,
+                    $event->venue,
+                    $event->event_start,
+                );
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                return back()->withErrors(['status' => $e->getMessage()]);
+            }
+        }
+
+        $previousStatus = $event->status;
+        $event->update(['status' => $newStatus]);
+
+        if ($event->event_type === 'sports' && $event->isSportsSeasonEvent()) {
+            app(\App\Services\Events\FestSportsEventSyncService::class)->syncSeason($event->fresh());
+        }
+
+        if ($newStatus === 'registration_open' && $previousStatus !== 'registration_open') {
+            try {
+                app(FestEventNotifier::class)->registrationOpened($event->fresh());
+            } catch (\Throwable) {
+                // Notifications must never block event updates.
+            }
+        }
+
+        if ($newStatus === 'completed' && $previousStatus !== 'completed') {
+            try {
+                app(FestEventNotifier::class)->eventCompleted($event->fresh());
+            } catch (\Throwable) {
+                // Notifications must never block event updates.
+            }
+        }
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::OVERVIEW,
+            'fest.event.updated',
+            "Event status changed: {$event->title} → {$newStatus}",
+            ['status' => $newStatus],
+        );
+
+        return back()->with('success', "Status updated to \"{$newStatus}\".");
     }
 
     public function toggleNavHidden(FestEvent $event)

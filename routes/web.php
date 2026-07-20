@@ -861,6 +861,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/levels', [FestEventController::class, 'levels'])->name('levels');
             Route::get('/{event}/activity', [\App\Http\Controllers\SahodayaAdmin\FestEventActivityController::class, 'index'])->name('activity');
             Route::post('/{event}/toggle-nav-hidden', [FestEventController::class, 'toggleNavHidden'])->name('toggle-nav-hidden');
+            Route::post('/{event}/quick-status', [FestEventController::class, 'quickStatus'])->name('quick-status');
             Route::post('/{event}/fix-mistaken-season', [FestEventController::class, 'fixMistakenSeason'])->name('fix-mistaken-season');
             Route::get('/{event}', [FestEventController::class, 'show'])->name('show');
             Route::put('/{event}', [FestEventController::class, 'update'])->name('update');
@@ -956,6 +957,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/school-fees/{schoolEventFee}/reject', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'reject'])->name('school-fees.reject');
             Route::get('/{event}/school-fees/{schoolEventFee}/proof', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'proof'])->name('school-fees.proof');
             Route::post('/{event}/school-fees/{schoolEventFee}/recalculate', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'recalculate'])->name('school-fees.recalculate');
+            Route::post('/{event}/school-fees/{schoolEventFee}/force-approve', [\App\Http\Controllers\SahodayaAdmin\FestSchoolEventFeeController::class, 'forceApprove'])->name('school-fees.force-approve');
             Route::get('/{event}/export/registrations', [FestExportController::class, 'registrations'])->name('export.registrations');
             Route::get('/{event}/export/results', [FestExportController::class, 'results'])->name('export.results');
             Route::get('/{event}/export/attendance', [FestExportController::class, 'attendance'])->name('export.attendance');
@@ -1255,6 +1257,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{template}/preview', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'preview'])->name('preview');
             Route::put('/{template}', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'update'])->name('update');
             Route::delete('/{template}', [\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::prefix('id-card-templates')->name('id-card-templates.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\SahodayaAdmin\IdCardTemplateController::class, 'index'])->name('index');
+            Route::post('/', [\App\Http\Controllers\SahodayaAdmin\IdCardTemplateController::class, 'store'])->name('store');
+            Route::put('/{template}', [\App\Http\Controllers\SahodayaAdmin\IdCardTemplateController::class, 'update'])->name('update');
+            Route::delete('/{template}', [\App\Http\Controllers\SahodayaAdmin\IdCardTemplateController::class, 'destroy'])->name('destroy');
         });
 
         Route::prefix('state-remittances')->name('state-remittances.')->group(function () {

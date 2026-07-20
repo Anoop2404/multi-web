@@ -1,7 +1,7 @@
 <template>
-    <SchoolAdminLayout :title="`${event.title} — Meals`" :school="school" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Meals`" eyebrow="Fest"
-            description="Order meals and catering for fest participants." />
+    <SchoolAdminLayout :title="`${event.title} — Meal Requests (Catering)`" :school="school" :show-header-title="false">
+        <PageHeader :title="`${event.title} — Meal Requests (Catering)`" eyebrow="Fest Catering"
+            description="Order bulk meals and catering for your school's fest team and participants (different from individual student Food Coupons)." />
 
 
         <form @submit.prevent="submit" class="card mb-4 grid sm:grid-cols-2 gap-2">

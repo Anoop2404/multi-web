@@ -97,7 +97,7 @@ class PublicCertificateController extends Controller
             ]);
         }
 
-        $payload = app(FestCertificateService::class)->payloadFor($certificate);
+        $payload = app(FestCertificateService::class)->renderContext($certificate);
         $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
 
         return view('fest.certificate-print', $payload);

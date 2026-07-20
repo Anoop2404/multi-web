@@ -7,10 +7,12 @@ use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
+use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestMarkSaveService;
+use App\Services\Events\FestNumberingService;
 use App\Services\Events\FestRankPointService;
 use App\Services\Events\FestSportsAutoRankService;
 use App\Support\FestPageActivity;
@@ -33,7 +35,7 @@ class FestMarkEntryController extends SahodayaAdminController
         $registrations = FestRegistration::where('event_id', $event->id)
             ->where('status', 'approved')
             ->when($itemIds !== null, fn ($q) => $q->whereIn('item_id', $itemIds))
-            ->with(['item', 'school', 'participants.student', 'participants.teacher'])
+            ->with(['item', 'school', 'participants.student', 'participants.teacher', 'participants.group'])
             ->get();
 
         $marks = FestMark::where('event_id', $event->id)->get()->keyBy('participant_id');
@@ -93,14 +95,44 @@ class FestMarkEntryController extends SahodayaAdminController
             'measurement_unit'  => 'nullable|string|max:20',
         ]);
 
-        $result = $markSave->save($event, $data, $request->user()->id);
+        $teamParticipantIds = $this->expandToTeam($event, (int) $data['item_id'], (int) $data['participant_id']);
+
+        $result = null;
+        foreach ($teamParticipantIds as $participantId) {
+            $result = $markSave->save($event, [...$data, 'participant_id' => $participantId], $request->user()->id);
+        }
 
         $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.saved', "Mark saved for participant #{$data['participant_id']}", [
             'participant_id' => $data['participant_id'],
             'item_id'        => $data['item_id'],
+            'team_size'      => count($teamParticipantIds),
         ]);
 
-        return back()->with('success', $result['message']);
+        return back()->with('success', $result['message'] ?? 'Mark saved.');
+    }
+
+    /**
+     * For a team/group item, the mark applies to the whole squad — saving
+     * it writes the same grade/position/score to every member's row so
+     * per-participant certificate/results/points logic keeps working
+     * unchanged, while the entry screen shows and edits it once per team.
+     *
+     * @return list<int>
+     */
+    private function expandToTeam(FestEvent $event, int $itemId, int $participantId): array
+    {
+        $participant = FestParticipant::with('registration.item')->find($participantId);
+        $item = $participant?->registration?->item;
+
+        if (! $participant || ! $item || ! $participant->group_id
+            || ! app(FestNumberingService::class)->isGroupItem($item)) {
+            return [$participantId];
+        }
+
+        return FestParticipant::where('group_id', $participant->group_id)
+            ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('item_id', $itemId))
+            ->pluck('id')
+            ->all();
     }
 
     public function autoRankItem(string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)

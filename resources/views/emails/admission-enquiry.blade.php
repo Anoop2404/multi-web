@@ -1,7 +1,10 @@
 @extends('emails.layouts.sahodaya')
 
 @section('content')
-    <h2 style="margin:0 0 16px;font-size:18px;color:#041525;font-weight:700;">New Admission Enquiry</h2>
+    <h2 style="margin:0 0 16px;font-size:18px;color:#041525;font-weight:700;">{{ $title ?? 'New Admission Enquiry' }}</h2>
+    @if(!empty($body))
+        <p>{{ $body }}</p>
+    @endif
 
     @include('emails.partials.detail-table', ['rows' => array_filter([
         'Student name' => $enquiry->student_name,

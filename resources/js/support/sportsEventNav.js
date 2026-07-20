@@ -62,10 +62,11 @@ export function sportsEventSidebarNav(base, caps) {
         items: [
             { label: 'Items', href: `${base}/items`, icon: 'list', permissions: FEST_SETTINGS },
             { label: 'Item listing', href: `${base}/items/list`, icon: 'clipboard', permissions: FEST_VIEW },
+            { label: 'Rounds & levels', href: `${base}/levels`, icon: 'repeat', permissions: FEST_MANAGE },
             { label: 'Registrations', href: `${base}/registrations`, icon: 'inbox', permissions: FEST_REGISTRATIONS },
-            { label: 'Mark entry', href: `${base}/marks`, icon: 'edit', permissions: FEST_MARKS },
             { label: 'Chest numbers', href: `${base}/chest-numbers`, icon: 'hash', permissions: FEST_MANAGE },
-            { label: 'Results & publish', href: `${base}/results`, icon: 'award', permissions: FEST_RESULTS },
+            { label: 'Marks', href: `${base}/marks`, icon: 'edit', permissions: FEST_MARKS },
+            { label: 'Results', href: `${base}/results`, icon: 'award', permissions: FEST_RESULTS },
             { label: 'Leaderboard', href: `${base}/leaderboard`, icon: 'bar-chart', permissions: FEST_RESULTS },
         ],
     });
@@ -111,7 +112,6 @@ export function sportsEventSidebarNav(base, caps) {
         { label: 'Houses', href: `${base}/houses`, icon: 'building', permissions: FEST_MANAGE },
         { label: 'Catering', href: `${base}/catering`, icon: 'clipboard', permissions: FEST_CATERING },
         { label: 'Food coupons', href: `${base}/food-coupons`, icon: 'hash', permissions: FEST_CATERING },
-        { label: 'Rounds & levels', href: `${base}/levels`, icon: 'repeat', permissions: FEST_MANAGE },
     ];
 
     groups.push({ section: 'Administration', items: adminItems });
@@ -119,7 +119,7 @@ export function sportsEventSidebarNav(base, caps) {
     return groups;
 }
 
-/** True when this FestEvent is the season container (not Chess/Aquatics itself). */
+/** Legacy season hub helper — intentionally inert after Head = Event unification. */
 export function isSportsSeasonEvent(event) {
     return false;
 }

@@ -1,14 +1,11 @@
 @extends('emails.layouts.sahodaya')
 
 @section('content')
-    <h2 style="margin:0 0 12px;font-size:18px;color:#041525;font-weight:700;">Membership approved</h2>
+    <h2 style="margin:0 0 12px;font-size:18px;color:#041525;font-weight:700;">{{ $title ?? 'Membership approved' }}</h2>
 
     <p>Hello,</p>
 
-    <p>
-        Great news! Your school <strong>{{ $school->name }}</strong> has been approved as a member of
-        <strong>{{ $sahodayaName }}</strong>.
-    </p>
+    <p>{{ $body ?? 'Great news! Your school '.$school->name.' has been approved as a member of '.$sahodayaName.'.' }}</p>
 
     @include('emails.partials.alert-box', [
         'variant' => 'success',

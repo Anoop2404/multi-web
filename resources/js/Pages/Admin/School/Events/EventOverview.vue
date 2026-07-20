@@ -85,7 +85,7 @@
                 <p class="font-semibold">{{ stats.fee_status === 'proof_uploaded' ? 'Payment receipt pending approval' : 'Action required: Fee payment due' }}</p>
                 <p class="mt-0.5">₹{{ formatAmount(stats.fees_due) }} is outstanding for this event.</p>
             </div>
-            <Link :href="eventRegistrationHref" class="btn-primary text-xs !min-h-0">Go to Billing & Pay →</Link>
+            <Link :href="eventPaymentHref" class="btn-primary text-xs !min-h-0">Go to Billing & Pay →</Link>
         </div>
 
         <!--
@@ -162,6 +162,7 @@ const props = defineProps({
 const isSports = computed(() => props.event?.event_type === 'sports' || props.program === 'sports-meet');
 const eventBase = computed(() => schoolEventBase(props.school.id, props.programPrefix, props.event.id));
 const eventRegistrationHref = computed(() => `${eventBase.value}/registration`);
+const eventPaymentHref = computed(() => `${eventBase.value}/registration?tab=payment`);
 const reportsHref = computed(() => `/school-admin/${props.school.id}/${props.programPrefix}/reports/${props.event.id}`);
 
 function formatAmount(value) {

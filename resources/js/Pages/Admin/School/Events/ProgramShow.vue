@@ -5,14 +5,14 @@
 
 
         <div class="max-w-3xl space-y-4">
-            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm">
+            <div class="notice-banner notice-banner--info text-sm">
                 <p class="font-semibold text-indigo-900">School-level event</p>
                 <p class="text-indigo-700 mt-1">
                     Items include inherited state + Sahodaya catalog plus your school custom items.
                 </p>
             </div>
 
-            <div class="bg-white border rounded-xl p-4 space-y-2 text-sm">
+            <div class="card card--muted text-sm space-y-2">
                 <p><span class="text-gray-500">Type:</span> {{ eventTypes[event.event_type] ?? event.event_type }}</p>
                 <p><span class="text-gray-500">Status:</span> {{ event.status }}</p>
                 <p><span class="text-gray-500">Total items:</span> {{ event.items?.length ?? 0 }}</p>
@@ -34,7 +34,7 @@
             </form>
 
             <div class="card">
-                <h3 class="font-semibold mb-3">Participation policy (school round)</h3>
+                <h3 class="section-title">Participation policy (school round)</h3>
                 <form @submit.prevent="savePolicy" class="grid sm:grid-cols-3 gap-2 mb-4">
                     <select v-model="policyForm.preset_key" class="field sm:col-span-3">
                         <option value="">Custom limits</option>
@@ -48,7 +48,7 @@
             </div>
 
             <div class="card">
-                <h3 class="font-semibold mb-3">Add school custom item</h3>
+                <h3 class="section-title">Add school custom item</h3>
                 <form @submit.prevent="addItem" class="grid sm:grid-cols-2 gap-2">
                     <input v-model="itemForm.title" class="field sm:col-span-2" placeholder="Item name" required>
                     <select v-model="itemForm.class_group" class="field">
@@ -60,7 +60,7 @@
                         <option value="group">Group</option>
                         <option value="team">Team</option>
                     </select>
-                    <button class="px-3 py-2 text-white rounded-lg text-sm sm:col-span-2">Add school item</button>
+                    <button class="btn-primary text-sm sm:col-span-2">Add school item</button>
                 </form>
             </div>
 

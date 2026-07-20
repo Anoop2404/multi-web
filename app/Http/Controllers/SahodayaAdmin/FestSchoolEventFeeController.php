@@ -158,4 +158,58 @@ class FestSchoolEventFeeController extends SahodayaAdminController
 
         return back()->with('success', 'Fees successfully recalculated for this school.');
     }
+
+    /**
+     * Manual override for a "partial" record whose approved-receipt total
+     * genuinely covers what the school was billed at approval time, but
+     * `total_due` moved afterward (a registration changed between approval
+     * and the next page-load recalculation). There is no direct "force
+     * approved" status flip — instead this waives the residual mismatch by
+     * bringing `total_due` down to `amount_paid`, then re-derives status the
+     * normal way, so the record freezes exactly like any other fully-paid
+     * record (future recalculate() calls leave it alone).
+     */
+    public function forceApprove(Request $request, string $tenantId, FestEvent $event, FestSchoolEventFee $schoolEventFee, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($schoolEventFee->event_id !== $event->id, 403);
+
+        $data = $request->validate(['reason' => 'required|string|max:500']);
+
+        $schoolEventFee->refresh();
+        $paid = (float) $schoolEventFee->amount_paid;
+        $shortfall = round(max(0, (float) $schoolEventFee->total_due - $paid), 2);
+
+        abort_if($shortfall <= 0, 422, 'This fee is already fully paid — nothing to override.');
+
+        $fullyPaid = DB::transaction(function () use ($schoolEventFee, $paid, $event) {
+            $schoolEventFee->update(['total_due' => $paid]);
+            $schoolEventFee->refresh();
+            $schoolEventFee->refreshPaidState();
+            $fullyPaid = $schoolEventFee->fresh()->isFullyPaid();
+
+            if ($fullyPaid) {
+                app(\App\Services\Events\FestRegistrationApprovalService::class)
+                    ->approveSchoolEvent($event, $schoolEventFee->school_id, $schoolEventFee->head_id);
+
+                if ($schoolEventFee->head_id === null) {
+                    FestEventInvoice::where('event_id', $schoolEventFee->event_id)
+                        ->where('school_id', $schoolEventFee->school_id)
+                        ->update(['status' => 'paid']);
+                }
+            }
+
+            return $fullyPaid;
+        });
+
+        $audit->festEvent($event, FestPageActivity::FEES, 'fest.fee.force_approved', 'School event fee manually approved (due/paid mismatch override)', [
+            'school_id'      => $schoolEventFee->school_id,
+            'waived_amount'  => $shortfall,
+            'reason'         => $data['reason'],
+        ]);
+
+        return back()->with('success', $fullyPaid
+            ? '₹'.number_format($shortfall, 2).' waived to reconcile total due against amount paid — registrations approved.'
+            : 'Could not reconcile — balance still outstanding.');
+    }
 }

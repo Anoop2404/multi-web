@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\NotificationTemplate;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Mail\SahodayaMailer;
@@ -34,10 +35,21 @@ class PortalResetPassword extends ResetPassword
         [$school, $sahodaya] = $this->tenantsFor($notifiable);
         $branding = EmailBranding::forTenant($sahodaya);
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.auth.reset_password',
+            ['school_name' => $school?->name ?? '', 'sahodaya_name' => $branding['sahodayaName'] ?? ''],
+            'Reset your password',
+            $school
+                ? 'We received a request to reset the password for your {{school_name}} portal account with {{sahodaya_name}}.'
+                : 'We received a request to reset the password for your {{sahodaya_name}} portal account.',
+        );
+
         return array_merge($branding, [
             'headerTitle' => 'Password Reset',
             'headerSubtitle' => $school?->name,
             'headerEyebrow' => 'School Portal',
+            'title' => $copy['title'],
+            'body' => $copy['body'],
             'userName' => $notifiable->name,
             'schoolName' => $school?->name,
             'resetUrl' => $this->resetUrl($notifiable),

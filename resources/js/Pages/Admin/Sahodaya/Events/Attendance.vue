@@ -1,8 +1,12 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Attendance`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Attendance`" eyebrow="Registration"
+        <PageHeader :title="`${event.title} — Attendance`" eyebrow="Attendance"
                     description="Mark participant attendance by item." />
+
+        <SportsSetupSubNav v-if="event.event_type === 'sports'"
+                           :sahodaya-id="sahodaya.id" :event-id="event.id"
+                           :event="event" active="attendance" class="mb-4" />
         <div class="flex flex-wrap gap-2 mb-4 border-b border-gray-200 pb-3">
             <button type="button" @click="itemFilter = ''"
                     :class="itemFilter === '' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-50'"
@@ -50,21 +54,26 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="p in filteredParticipants" :key="p.id" class="border-t">
-                        <td class="p-3 font-mono text-xs">{{ p.chest_no ?? '—' }}</td>
-                        <td class="p-3 font-medium">{{ p.student?.name ?? p.teacher?.name }}</td>
-                        <td class="p-3 text-gray-500">{{ p.registration?.school?.name ?? '—' }}</td>
-                        <td class="p-3 text-gray-500">{{ p.registration?.item?.title }}</td>
+                    <tr v-for="row in displayRows" :key="row.key" class="border-t">
+                        <td class="p-3 font-mono text-xs">{{ row.chest_no ?? '—' }}</td>
+                        <td class="p-3 font-medium">
+                            {{ row.name }}
+                            <span v-if="row.is_team" class="ml-1 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 align-middle">
+                                Team · {{ row.member_count }}
+                            </span>
+                        </td>
+                        <td class="p-3 text-gray-500">{{ row.school }}</td>
+                        <td class="p-3 text-gray-500">{{ row.item_title }}</td>
                         <td class="p-3">
                             <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
-                                <button @click="mark(p, 'present')"
-                                        :class="statusFor(p) === 'present' ? 'bg-green-600 text-white' : 'bg-white text-green-700 hover:bg-green-50'"
+                                <button @click="mark(row.representative, 'present')"
+                                        :class="row.status === 'present' ? 'bg-green-600 text-white' : 'bg-white text-green-700 hover:bg-green-50'"
                                         class="px-3 py-1.5">Present</button>
-                                <button @click="mark(p, 'absent')"
-                                        :class="statusFor(p) === 'absent' ? 'bg-red-600 text-white' : 'bg-white text-red-600 hover:bg-red-50'"
+                                <button @click="mark(row.representative, 'absent')"
+                                        :class="row.status === 'absent' ? 'bg-red-600 text-white' : 'bg-white text-red-600 hover:bg-red-50'"
                                         class="px-3 py-1.5 border-l border-gray-200">Absent</button>
                             </div>
-                            <span v-if="!statusFor(p)" class="ml-2 text-gray-400 text-xs">Not marked</span>
+                            <span v-if="!row.status" class="ml-2 text-gray-400 text-xs">Not marked</span>
                         </td>
                     </tr>
                 </tbody>
@@ -79,6 +88,7 @@ import { computed, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -90,9 +100,59 @@ const itemFilter = ref('');
 const importFile = ref(null);
 const importForm = useForm({ file: null });
 
+const GROUP_PARTICIPANT_TYPES = ['team', 'group', 'pair', 'trio'];
+
 const filteredParticipants = computed(() => {
     if (!itemFilter.value) return props.participants;
     return props.participants.filter(p => p.registration?.item_id == itemFilter.value);
+});
+
+// Team/group items: one row per squad (attendance applies to the whole
+// team), not one row per member.
+const displayRows = computed(() => {
+    const rows = [];
+    const seenGroups = new Set();
+
+    for (const p of filteredParticipants.value) {
+        const item = p.registration?.item;
+        const isGroupItem = item && GROUP_PARTICIPANT_TYPES.includes(item.participant_type);
+
+        if (isGroupItem && p.group_id) {
+            const key = `${p.registration.item_id}-${p.group_id}`;
+            if (seenGroups.has(key)) continue;
+            seenGroups.add(key);
+
+            const members = filteredParticipants.value.filter(
+                (m) => m.group_id === p.group_id && m.registration?.item_id === p.registration.item_id
+            );
+
+            rows.push({
+                key,
+                is_team: true,
+                member_count: members.length,
+                name: p.group?.team_name || 'Team',
+                chest_no: p.group?.chest_no,
+                school: p.registration?.school?.name ?? '—',
+                item_title: item.title,
+                status: statusFor(p),
+                representative: p,
+            });
+            continue;
+        }
+
+        rows.push({
+            key: `p-${p.id}`,
+            is_team: false,
+            name: p.student?.name ?? p.teacher?.name,
+            chest_no: p.chest_no,
+            school: p.registration?.school?.name ?? '—',
+            item_title: item?.title,
+            status: statusFor(p),
+            representative: p,
+        });
+    }
+
+    return rows;
 });
 
 // Blank, printable sheet (chest no / name / school, no status filled in) for marking

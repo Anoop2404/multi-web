@@ -56,6 +56,11 @@ class NotificationTemplatesSeeder extends Seeder
     {
         return [
             [
+                'slug'          => 'fest.event.completed',
+                'title'         => 'Event completed',
+                'body_template' => '{{event_title}} ({{competition_label}}) is now marked complete. Results, certificates, and ID cards remain available for download.',
+            ],
+            [
                 'slug'          => 'fest.registration.approved',
                 'title'         => 'Event registration approved',
                 'body_template' => 'Your registration for {{event_title}} ({{item_title}}) has been approved.',
@@ -364,6 +369,101 @@ class NotificationTemplatesSeeder extends Seeder
                 'slug'          => 'board_results.result_published',
                 'title'         => 'Board result published',
                 'body_template' => 'Your Class {{class}} ({{examination_type}}) result for {{academic_year}} is now published. Pass %: {{pass_percent}}.',
+            ],
+
+            // --- Full HTML transactional emails (membership, fee receipts, auth) ---
+            // These render inside branded Blade layouts (logo, buttons, tables) rather
+            // than the plain-text notification wrapper; only the title/paragraph wording
+            // is templated here, structural elements (tables, buttons) stay in the view.
+            [
+                'slug'          => 'email.membership.application_submitted',
+                'title'         => 'New school application',
+                'body_template' => 'A new school has submitted a membership application and is awaiting your review on the Sahodaya admin panel.',
+            ],
+            [
+                'slug'          => 'email.membership.credentials_issued',
+                'title'         => 'Your school portal is ready',
+                'body_template' => '{{school_name}} has been registered with {{sahodaya_name}}. Use the credentials below to sign in and complete Gmail verification.',
+            ],
+            [
+                'slug'          => 'email.membership.school_approved',
+                'title'         => 'Membership approved',
+                'body_template' => 'Great news! Your school {{school_name}} has been approved as a member of {{sahodaya_name}}.',
+            ],
+            [
+                'slug'          => 'email.membership.school_rejected',
+                'title'         => 'Application not approved',
+                'body_template' => 'We regret to inform you that the membership application for {{school_name}} was not approved by {{sahodaya_name}}.',
+            ],
+            [
+                'slug'          => 'email.membership.data_submitted',
+                'title'         => 'Review annual submission',
+                'body_template' => '{{school_name}} submitted student and/or teacher data for {{academic_year}}. Please review the submission in the Sahodaya admin panel.',
+            ],
+            [
+                'slug'          => 'email.membership.data_approved',
+                'title'         => 'Submission approved',
+                'body_template' => 'Your annual data submission for {{academic_year}} has been approved by {{sahodaya_name}}. You can continue with membership payment.',
+            ],
+            [
+                'slug'          => 'email.membership.data_rejected',
+                'title'         => 'Submission needs correction',
+                'body_template' => 'Your annual data submission for {{academic_year}} was rejected. Please review the reason below, make corrections, and resubmit.',
+            ],
+            [
+                'slug'          => 'email.membership.payment_submitted',
+                'title'         => 'Payment proof submitted',
+                'body_template' => '{{school_name}} uploaded membership payment proof for {{academic_year}}. Please review and verify the payment.',
+            ],
+            [
+                'slug'          => 'email.membership.payment_verified',
+                'title'         => 'Membership payment approved',
+                'body_template' => 'Your membership payment for {{academic_year}} has been verified by {{sahodaya_name}}. Your membership number is shown below.',
+            ],
+            [
+                'slug'          => 'email.membership.payment_rejected',
+                'title'         => 'Payment proof not accepted',
+                'body_template' => 'Your payment proof for {{academic_year}} was rejected by {{sahodaya_name}}. Please upload a valid proof again.',
+            ],
+            [
+                'slug'          => 'email.membership.registration_completed_first',
+                'title'         => 'Welcome to the Sahodaya network',
+                'body_template' => "Welcome! Your school's membership with {{sahodaya_name}} has been approved and your {{academic_year}} annual registration is complete.",
+            ],
+            [
+                'slug'          => 'email.membership.registration_completed_renewal',
+                'title'         => 'Annual membership active',
+                'body_template' => 'Your {{academic_year}} annual Sahodaya membership registration is complete. Payment has been verified and your membership is now active.',
+            ],
+            [
+                'slug'          => 'email.membership.reminder_window_closing',
+                'title'         => 'Registration closing soon',
+                'body_template' => 'Annual membership registration for {{academic_year}} closes in {{days_left}} day(s). Please begin registration in the school portal.',
+            ],
+            [
+                'slug'          => 'email.membership.reminder_payment_due',
+                'title'         => 'Payment due',
+                'body_template' => 'Membership fee of ₹{{amount}} for {{academic_year}} is pending. Please upload payment proof in the school portal.',
+            ],
+            [
+                'slug'          => 'email.fees.receipt_approved',
+                'title'         => 'Your fee payment has been approved',
+                'body_template' => 'Payment for {{context_title}} has been verified by {{sahodaya_name}}. Your official receipt (No. {{receipt_no}}) is attached to this email.',
+            ],
+            [
+                'slug'          => 'email.admission_enquiry',
+                'title'         => 'New Admission Enquiry',
+                'body_template' => '',
+            ],
+            [
+                'slug'          => 'email.auth.verify_email',
+                'title'         => 'Verify your Gmail address',
+                'body_template' => 'Your school {{school_name}} is registered with {{sahodaya_name}}. Please confirm your Gmail address to activate your school portal account.',
+            ],
+            [
+                'slug'          => 'email.auth.reset_password',
+                'title'         => 'Reset your password',
+                'body_template' => 'We received a request to reset the password for your {{school_name}} portal account with {{sahodaya_name}}.',
             ],
         ];
     }

@@ -540,19 +540,26 @@ class FestIdCardService
 
             $lead = $performers->first();
             $festId = $lead?->level_registration_number ?? sprintf('REG-%04d', $registration->id);
-            $teamName = $registration->groups->first()?->team_name;
+            $group = $registration->groups->first();
+            $teamName = $group?->team_name;
             $itemTitle = $registration->item?->title ?? '—';
             $school = $registration->school?->name ?? '—';
             $scheduleLine = $lead ? $this->scheduleLine($schedules->get($lead->id)) : null;
 
+            // Team/group items carry ONE chest number for the whole squad
+            // (on FestGroup, not per member) — show it on the team card
+            // itself, not repeated per member.
+            $chestNumber = ($group && $group->chest_no !== null) ? (string) $group->chest_no : null;
+            if ($chestNumber && $event->chest_reveal_mode === 'stage_entry' && ! $group->chest_revealed_at) {
+                $chestNumber = null;
+            }
+
             $members = $performers->map(function (FestParticipant $p) {
                 $name = $p->student?->name ?? $p->teacher?->name ?? 'Member';
-                $chest = $this->chestService->participantLabel($p);
 
                 return [
                     'name'      => $name,
                     'fest_id'   => $p->level_registration_number ?? '—',
-                    'chest'     => $chest !== '—' ? $chest : null,
                     'initials'  => $this->initials($name),
                     'photo_url' => $this->portraitUrl($p),
                     'photo_src' => $this->portraitDataUri($p),
@@ -574,6 +581,7 @@ class FestIdCardService
                 'subtitle'        => $school,
                 'detail'          => $itemTitle,
                 'item_label'      => $itemTitle !== '—' ? $itemTitle : null,
+                'chest_number'    => $chestNumber,
                 'schedule'        => $scheduleLine,
                 'members'         => $members,
                 'member_count'    => count($members),

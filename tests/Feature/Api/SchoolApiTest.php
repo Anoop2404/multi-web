@@ -117,7 +117,7 @@ class SchoolApiTest extends TestCase
             ->deleteJson("/api/v1/school/{$school->id}/students/{$studentId}")
             ->assertOk();
 
-        $this->assertDatabaseMissing('students', ['id' => $studentId]);
+        $this->assertSoftDeleted('students', ['id' => $studentId]);
     }
 
     public function test_school_admin_can_upload_and_serve_student_photo(): void

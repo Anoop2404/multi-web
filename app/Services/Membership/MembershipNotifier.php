@@ -2,6 +2,7 @@
 
 namespace App\Services\Membership;
 
+use App\Models\NotificationTemplate;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Mail\SahodayaMailer;
@@ -14,6 +15,13 @@ class MembershipNotifier
         $sahodaya = $this->sahodayaFor($school);
         $payload = $school->application_payload ?? [];
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.application_submitted',
+            ['school_name' => $school->name],
+            'New school application',
+            'A new school has submitted a membership application and is awaiting your review on the Sahodaya admin panel.',
+        );
+
         $this->notifySahodayaRecipients(
             $school->parent_id,
             'New school application — '.$school->name,
@@ -22,6 +30,8 @@ class MembershipNotifier
                 'headerTitle'    => 'New School Application',
                 'headerSubtitle' => $school->name,
                 'headerEyebrow'  => 'Membership',
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
                 'school'         => $school,
                 'reviewUrl'      => EmailBranding::sahodayaAdminUrl($sahodaya, 'schools?status=pending'),
                 'applicationDetails' => array_filter([
@@ -40,6 +50,14 @@ class MembershipNotifier
     {
         $sahodaya = $this->sahodayaFor($school);
         $loginUrl = EmailBranding::schoolLoginUrl($sahodaya);
+        $sahodayaName = $sahodaya?->name ?? '';
+
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.credentials_issued',
+            ['school_name' => $school->name, 'sahodaya_name' => $sahodayaName],
+            'Your school portal is ready',
+            '{{school_name}} has been registered with {{sahodaya_name}}. Use the credentials below to sign in and complete Gmail verification.',
+        );
 
         $this->mailerFor($school->parent_id)->sendView(
             $user->email,
@@ -49,6 +67,9 @@ class MembershipNotifier
                 'headerTitle'    => 'School Portal Access',
                 'headerSubtitle' => $school->name,
                 'headerEyebrow'  => 'Welcome',
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
+                'sahodayaName'   => $sahodayaName,
                 'school'         => $school,
                 'user'           => $user,
                 'plainPassword'  => $plainPassword,
@@ -66,6 +87,14 @@ class MembershipNotifier
 
         $sahodaya = $this->sahodayaFor($school);
         $loginUrl = EmailBranding::schoolLoginUrl($sahodaya);
+        $sahodayaName = $sahodaya?->name ?? '';
+
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.school_approved',
+            ['school_name' => $school->name, 'sahodaya_name' => $sahodayaName],
+            'Membership approved',
+            'Great news! Your school {{school_name}} has been approved as a member of {{sahodaya_name}}.',
+        );
 
         $this->mailerFor($school->parent_id)->sendView(
             $email,
@@ -75,6 +104,9 @@ class MembershipNotifier
                 'headerTitle'    => 'Membership Approved',
                 'headerSubtitle' => $school->name,
                 'headerEyebrow'  => 'Welcome',
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
+                'sahodayaName'   => $sahodayaName,
                 'school'         => $school,
                 'loginUrl'       => $loginUrl,
             ],
@@ -88,6 +120,16 @@ class MembershipNotifier
             return;
         }
 
+        $sahodaya = $this->sahodayaFor($school);
+        $sahodayaName = $sahodaya?->name ?? '';
+
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.school_rejected',
+            ['school_name' => $school->name, 'sahodaya_name' => $sahodayaName],
+            'Application not approved',
+            'We regret to inform you that the membership application for {{school_name}} was not approved by {{sahodaya_name}}.',
+        );
+
         $this->mailerFor($school->parent_id)->sendView(
             $email,
             'School Application Rejected — '.$school->name,
@@ -96,6 +138,9 @@ class MembershipNotifier
                 'headerTitle'    => 'Application Not Approved',
                 'headerSubtitle' => $school->name,
                 'headerEyebrow'  => 'Membership',
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
+                'sahodayaName'   => $sahodayaName,
                 'school'         => $school,
                 'reason'         => $reason,
             ],
@@ -106,6 +151,13 @@ class MembershipNotifier
     {
         $sahodaya = $this->sahodayaFor($school);
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.data_submitted',
+            ['school_name' => $school->name, 'academic_year' => $academicYear],
+            'Review annual submission',
+            '{{school_name}} submitted student and/or teacher data for {{academic_year}}. Please review the submission in the Sahodaya admin panel.',
+        );
+
         $this->notifySahodayaRecipients(
             $school->parent_id,
             "Annual data submitted — {$school->name}",
@@ -114,8 +166,8 @@ class MembershipNotifier
                 'headerTitle'    => 'Annual Data Submitted',
                 'headerSubtitle' => $school->name,
                 'headerEyebrow'  => $academicYear,
-                'title'          => 'Review annual submission',
-                'body'           => "{$school->name} submitted student and/or teacher data for {$academicYear}. Please review the submission in the Sahodaya admin panel.",
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
                 'details'        => [
                     'School'        => $school->name,
                     'Academic year' => $academicYear,
@@ -130,6 +182,13 @@ class MembershipNotifier
     {
         $sahodaya = $this->sahodayaFor($school);
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.data_approved',
+            ['academic_year' => $academicYear, 'sahodaya_name' => $sahodaya?->name ?? ''],
+            'Submission approved',
+            'Your annual data submission for {{academic_year}} has been approved by {{sahodaya_name}}. You can continue with membership payment.',
+        );
+
         $this->notifySchoolAdmins(
             $school,
             "Annual data approved — {$academicYear}",
@@ -138,8 +197,8 @@ class MembershipNotifier
                 'headerTitle'    => 'Annual Data Approved',
                 'headerSubtitle' => $school->name,
                 'headerEyebrow'  => $academicYear,
-                'title'          => 'Submission approved',
-                'body'           => "Your annual data submission for {$academicYear} has been approved by {$sahodaya?->name}. You can continue with membership payment.",
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
                 'actionUrl'      => EmailBranding::schoolAdminUrl($sahodaya, $school, 'registration'),
                 'actionLabel'    => 'Continue registration',
                 'actionVariant'  => 'success',
@@ -151,6 +210,13 @@ class MembershipNotifier
     {
         $sahodaya = $this->sahodayaFor($school);
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.data_rejected',
+            ['academic_year' => $academicYear],
+            'Submission needs correction',
+            'Your annual data submission for {{academic_year}} was rejected. Please review the reason below, make corrections, and resubmit.',
+        );
+
         $this->notifySchoolAdmins(
             $school,
             "Annual data rejected — {$academicYear}",
@@ -159,8 +225,8 @@ class MembershipNotifier
                 'headerTitle'    => 'Annual Data Rejected',
                 'headerSubtitle' => $school->name,
                 'headerEyebrow'  => $academicYear,
-                'title'          => 'Submission needs correction',
-                'body'           => "Your annual data submission for {$academicYear} was rejected. Please review the reason below, make corrections, and resubmit.",
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
                 'reason'         => $reason,
                 'reasonTitle'    => 'Rejection reason',
                 'alertVariant'   => 'danger',
@@ -180,6 +246,13 @@ class MembershipNotifier
     ): void {
         $sahodaya = $this->sahodayaFor($school);
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.payment_submitted',
+            ['school_name' => $school->name, 'academic_year' => $academicYear],
+            'Payment proof submitted',
+            '{{school_name}} uploaded membership payment proof for {{academic_year}}. Please review and verify the payment.',
+        );
+
         $this->notifySahodayaRecipients(
             $school->parent_id,
             "Payment proof submitted — {$school->name}",
@@ -188,6 +261,8 @@ class MembershipNotifier
                 'headerTitle'    => 'Payment Proof Received',
                 'headerSubtitle' => $school->name,
                 'headerEyebrow'  => $academicYear,
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
                 'school'         => $school,
                 'academicYear'   => $academicYear,
                 'amount'         => $amount,
@@ -202,6 +277,13 @@ class MembershipNotifier
     {
         $sahodaya = $this->sahodayaFor($school);
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.payment_verified',
+            ['academic_year' => $academicYear, 'sahodaya_name' => $sahodaya?->name ?? ''],
+            'Membership payment approved',
+            'Your membership payment for {{academic_year}} has been verified by {{sahodaya_name}}. Your membership number is shown below.',
+        );
+
         $this->notifySchoolAdmins(
             $school,
             "Payment verified — Membership {$membershipNo}",
@@ -210,8 +292,8 @@ class MembershipNotifier
                 'headerTitle'    => 'Payment Verified',
                 'headerSubtitle' => $school->name,
                 'headerEyebrow'  => $academicYear,
-                'title'          => 'Membership payment approved',
-                'body'           => "Your membership payment for {$academicYear} has been verified by {$sahodaya?->name}. Your membership number is shown below.",
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
                 'details'        => [
                     'Academic year'  => $academicYear,
                     'Membership No.' => $membershipNo,
@@ -228,6 +310,13 @@ class MembershipNotifier
     {
         $sahodaya = $this->sahodayaFor($school);
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.payment_rejected',
+            ['academic_year' => $academicYear, 'sahodaya_name' => $sahodaya?->name ?? ''],
+            'Payment proof not accepted',
+            'Your payment proof for {{academic_year}} was rejected by {{sahodaya_name}}. Please upload a valid proof again.',
+        );
+
         $this->notifySchoolAdmins(
             $school,
             "Payment rejected — {$academicYear}",
@@ -236,8 +325,8 @@ class MembershipNotifier
                 'headerTitle'    => 'Payment Rejected',
                 'headerSubtitle' => $school->name,
                 'headerEyebrow'  => $academicYear,
-                'title'          => 'Payment proof not accepted',
-                'body'           => "Your payment proof for {$academicYear} was rejected by {$sahodaya?->name}. Please upload a valid proof again.",
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
                 'reason'         => $reason,
                 'reasonTitle'    => 'Rejection reason',
                 'alertVariant'   => 'danger',
@@ -258,10 +347,16 @@ class MembershipNotifier
     ): void {
         $sahodaya = $this->sahodayaFor($school);
 
-        $body = $firstMembershipApproval
-            ? "Welcome! Your school's membership with {$sahodaya?->name} has been approved and your {$academicYear} annual registration is complete."
-            : "Your {$academicYear} annual Sahodaya membership registration is complete. Payment has been verified and your membership is now active.";
+        $copy = NotificationTemplate::renderOrDefault(
+            $firstMembershipApproval ? 'email.membership.registration_completed_first' : 'email.membership.registration_completed_renewal',
+            ['academic_year' => $academicYear, 'sahodaya_name' => $sahodaya?->name ?? ''],
+            $firstMembershipApproval ? 'Welcome to the Sahodaya network' : 'Annual membership active',
+            $firstMembershipApproval
+                ? "Welcome! Your school's membership with {{sahodaya_name}} has been approved and your {{academic_year}} annual registration is complete."
+                : 'Your {{academic_year}} annual Sahodaya membership registration is complete. Payment has been verified and your membership is now active.',
+        );
 
+        $body = $copy['body'];
         if ($receiptHtml) {
             $body .= ' Your official membership fee receipt is attached to this email.';
         }
@@ -270,7 +365,7 @@ class MembershipNotifier
             'headerTitle'    => 'Membership Complete',
             'headerSubtitle' => $school->name,
             'headerEyebrow'  => $academicYear,
-            'title'          => $firstMembershipApproval ? 'Welcome to the Sahodaya network' : 'Annual membership active',
+            'title'          => $copy['title'],
             'body'           => $body,
             'academicYear'   => $academicYear,
             'membershipNo'   => $membershipNo,
@@ -375,13 +470,20 @@ class MembershipNotifier
             return;
         }
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.reminder_window_closing',
+            ['academic_year' => $academicYear, 'days_left' => (string) $daysLeft],
+            'Registration closing soon',
+            'Annual membership registration for {{academic_year}} closes in {{days_left}} day(s). Please begin registration in the school portal.',
+        );
+
         $this->mailerFor($school->parent_id)->sendView(
             $email,
             'Membership registration closing soon — '.$school->name,
             'emails.membership.generic-school',
             [
-                'title'          => 'Registration closing soon',
-                'body'           => "Annual membership registration for {$academicYear} closes in {$daysLeft} day(s). Please begin registration in the school portal.",
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
             ],
         );
     }
@@ -393,13 +495,20 @@ class MembershipNotifier
             return;
         }
 
+        $copy = NotificationTemplate::renderOrDefault(
+            'email.membership.reminder_payment_due',
+            ['academic_year' => $academicYear, 'amount' => number_format($amount, 2)],
+            'Payment due',
+            'Membership fee of ₹{{amount}} for {{academic_year}} is pending. Please upload payment proof in the school portal.',
+        );
+
         $this->mailerFor($school->parent_id)->sendView(
             $email,
             'Membership payment due — '.$school->name,
             'emails.membership.generic-school',
             [
-                'title'          => 'Payment due',
-                'body'           => "Membership fee of ₹".number_format($amount, 2)." for {$academicYear} is pending. Please upload payment proof in the school portal.",
+                'title'          => $copy['title'],
+                'body'           => $copy['body'],
             ],
         );
     }

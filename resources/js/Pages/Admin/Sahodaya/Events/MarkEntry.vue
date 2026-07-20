@@ -1,7 +1,7 @@
 <template>
     <SahodayaEventsLayout title="Mark entry" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Mark entry`" eyebrow="Scoring"
+        <PageHeader :title="`${event.title} — Mark entry`" eyebrow="Mark entry"
                     :description="filterDescription">
             <template #actions>
                 <Link v-if="competitionUrl" :href="competitionUrl" class="btn-secondary shrink-0 text-sm">← {{ isSports ? 'By Event Head' : 'By item head' }}</Link>
@@ -14,7 +14,9 @@
             <Link :href="competitionUrl" class="font-semibold underline ml-1">Back to item listing</Link>
         </p>
 
-        <FestEventWorkflowStepper :sahodaya-id="sahodaya.id" :event-id="event.id"
+        <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
+                           :event="event" active="marks" class="mb-4" />
+        <FestEventWorkflowStepper v-else :sahodaya-id="sahodaya.id" :event-id="event.id"
                                   :event-type="event.event_type" :current-step="'operations'" />
 
         <p v-if="isSports && event.record_tracking_enabled"
@@ -158,6 +160,9 @@
                                     </span>
                                     <span v-if="!isSports">{{ participantName(participant) }}</span>
                                     <span v-else class="text-slate-700">{{ participantName(participant) }}</span>
+                                    <span v-if="participant._is_team" class="ml-1 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 align-middle">
+                                        Team · {{ participant._member_count }}
+                                    </span>
                                 </td>
                                 <td v-if="isSports" class="align-middle">
                                     <select :value="attendanceStatus(participant, item)"
@@ -234,6 +239,7 @@ import { reactive, computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import { useFestMarkEntryDisplay } from '@/composables/useFestMarkEntryDisplay.js';
 
@@ -308,6 +314,9 @@ for (const reg of props.registrations ?? []) {
 }
 
 function participantName(participant) {
+    if (participant._is_team) {
+        return participant._team_name;
+    }
     return participant.student?.name ?? participant.teacher?.name ?? 'Unnamed participant';
 }
 

@@ -391,6 +391,10 @@ class FestEventFeeResolver
             $normalized['school_fee_cap'] = (float) $input['school_fee_cap'];
         }
 
+        if (isset($input['school_fee_min']) && $input['school_fee_min'] !== '') {
+            $normalized['school_fee_min'] = (float) $input['school_fee_min'];
+        }
+
         return $normalized;
     }
 }

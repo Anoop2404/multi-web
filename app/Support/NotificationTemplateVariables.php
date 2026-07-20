@@ -23,6 +23,7 @@ class NotificationTemplateVariables
     public static function map(): array
     {
         return [
+            'fest.event.completed'         => ['event_title', 'competition_label'],
             'fest.registration.approved'   => ['event_title', 'item_title'],
             'fest.registration.rejected'   => ['event_title'],
             'fest.registration.withdrawn'  => ['event_title', 'item_title'],
@@ -91,6 +92,25 @@ class NotificationTemplateVariables
             'board_results.result_approved'           => ['class', 'examination_type', 'academic_year'],
             'board_results.result_rejected'            => ['class', 'examination_type', 'academic_year', 'reason'],
             'board_results.result_published'           => ['class', 'examination_type', 'academic_year', 'pass_percent'],
+
+            'email.membership.application_submitted'          => ['school_name'],
+            'email.membership.credentials_issued'              => ['school_name', 'sahodaya_name'],
+            'email.membership.school_approved'                 => ['school_name', 'sahodaya_name'],
+            'email.membership.school_rejected'                 => ['school_name', 'sahodaya_name'],
+            'email.membership.data_submitted'                  => ['school_name', 'academic_year'],
+            'email.membership.data_approved'                   => ['academic_year', 'sahodaya_name'],
+            'email.membership.data_rejected'                   => ['academic_year'],
+            'email.membership.payment_submitted'               => ['school_name', 'academic_year'],
+            'email.membership.payment_verified'                => ['academic_year', 'sahodaya_name'],
+            'email.membership.payment_rejected'                => ['academic_year', 'sahodaya_name'],
+            'email.membership.registration_completed_first'    => ['academic_year', 'sahodaya_name'],
+            'email.membership.registration_completed_renewal'  => ['academic_year'],
+            'email.membership.reminder_window_closing'         => ['academic_year', 'days_left'],
+            'email.membership.reminder_payment_due'            => ['academic_year', 'amount'],
+            'email.fees.receipt_approved'                      => ['context_title', 'sahodaya_name', 'receipt_no'],
+            'email.admission_enquiry'                          => ['school_name'],
+            'email.auth.verify_email'                          => ['school_name', 'sahodaya_name'],
+            'email.auth.reset_password'                        => ['school_name', 'sahodaya_name'],
         ];
     }
 
@@ -137,6 +157,9 @@ class NotificationTemplateVariables
             'class'           => '10',
             'examination_type'=> 'SSLC',
             'pass_percent'    => '95',
+            'sahodaya_name'   => 'Sample Sahodaya',
+            'context_title'   => 'Sample Fee Payment',
+            'receipt_no'      => 'RCPT-0001',
             default           => 'Sample value',
         };
     }

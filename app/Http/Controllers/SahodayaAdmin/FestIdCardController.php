@@ -68,13 +68,16 @@ class FestIdCardController extends SahodayaAdminController
         $filters = $this->idCardFilters($request);
         $service->requireStudentItem($data['audience'], $filters);
         $cards = $service->cards($event, $data['audience'], $filters);
+        $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, $data['audience']);
 
-        return view($this->idCardSheetView($request), $this->idCardViewData(
+        return view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $this->sahodaya,
             $cards,
             $data['audience'],
             true,
+            null,
+            $customTemplate,
         ));
     }
 
@@ -86,11 +89,12 @@ class FestIdCardController extends SahodayaAdminController
         $filters = $this->idCardFilters($request);
         $service->requireStudentItem($data['audience'], $filters);
         $cards = $service->cards($event, $data['audience'], $filters);
+        $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, $data['audience']);
 
         $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'ID cards PDF generated', [
             'audience' => $data['audience'],
             'count'    => count($cards),
-            'template' => $request->input('template', 'standard'),
+            'template' => $customTemplate ? 'custom:'.$customTemplate->id : $request->input('template', 'standard'),
             'scope'    => $filters['scope'] ?? 'item',
         ]);
 
@@ -101,12 +105,14 @@ class FestIdCardController extends SahodayaAdminController
             default => $data['audience'],
         };
 
-        return Pdf::loadView($this->idCardSheetView($request), $this->idCardViewData(
+        return Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $this->sahodaya,
             $cards,
             $data['audience'],
             false,
+            null,
+            $customTemplate,
         ))->download("{$slug}-{$scopeSuffix}-id-cards.pdf");
     }
 
@@ -123,23 +129,25 @@ class FestIdCardController extends SahodayaAdminController
         abort_if($sections === [], 422, 'No approved participants found for any item.');
 
         $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
+        $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
         $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'All-item ID cards PDF generated', [
             'audience' => 'student',
             'count'    => $totalCards,
             'items'    => count($sections),
-            'template' => $request->input('template', 'standard'),
+            'template' => $customTemplate ? 'custom:'.$customTemplate->id : $request->input('template', 'standard'),
         ]);
 
         $slug = str($event->title)->slug('-');
 
-        return Pdf::loadView($this->idCardSheetView($request), $this->idCardViewData(
+        return Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $this->sahodaya,
             [],
             'student',
             false,
             $sections,
+            $customTemplate,
         ))->download("{$slug}-all-items-id-cards.pdf");
     }
 
@@ -163,23 +171,25 @@ class FestIdCardController extends SahodayaAdminController
         abort_if($sections === [], 422, 'No approved participants found for any item head.');
 
         $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
+        $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
         $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'All-head ID cards PDF generated', [
             'audience' => 'student',
             'count'    => $totalCards,
             'heads'    => count($sections),
-            'template' => $request->input('template', 'standard'),
+            'template' => $customTemplate ? 'custom:'.$customTemplate->id : $request->input('template', 'standard'),
         ]);
 
         $slug = str($event->title)->slug('-');
 
-        return Pdf::loadView($this->idCardSheetView($request), $this->idCardViewData(
+        return Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $this->sahodaya,
             [],
             'student',
             false,
             $sections,
+            $customTemplate,
         ))->download("{$slug}-all-heads-id-cards.pdf");
     }
 

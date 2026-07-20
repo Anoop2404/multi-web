@@ -1,58 +1,106 @@
 <template>
-    <div class="card space-y-3">
-        <div class="flex items-start justify-between gap-3">
-            <div>
-                <h4 class="section-title">Event progress</h4>
-                <p class="section-desc text-xs mt-0.5">
-                    {{ isSports
-                        ? 'Sports phases: Setup → Open registration (schools see event) → Ongoing → Publish results → Complete.'
-                        : 'Lifecycle checklist — complete each step before fest day.' }}
-                </p>
+    <div class="card space-y-4 shadow-sm border border-slate-200/80">
+        <!-- Progress Header & Bar -->
+        <div>
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+                <h4 class="section-title !mb-0 text-sm">Event Progress</h4>
+                <span class="text-xs font-bold text-slate-700 font-mono">
+                    {{ completedCount }}/{{ totalCount }} <span class="text-slate-400 font-normal">({{ progressPercent }}%)</span>
+                </span>
             </div>
-            <Link :href="`${base}/settings/lifecycle`" class="text-xs link-brand shrink-0">Full checklist →</Link>
+            <!-- Progress Bar -->
+            <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-300"
+                     :style="{ width: `${progressPercent}%` }"></div>
+            </div>
         </div>
-        <p v-if="suggestedStatus" class="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-            Suggested status: <strong>{{ suggestedStatus }}</strong>
-        </p>
-        <ul class="space-y-2">
-                <li v-for="step in lifecycle" :key="step.key"
-                class="flex items-start gap-2.5 text-sm border rounded-lg px-3 py-2.5"
-                :class="step.done
-                    ? 'bg-emerald-50/80 border-emerald-200'
-                    : step.optional
-                        ? 'bg-slate-50/60 border-slate-100'
-                        : 'bg-slate-50 border-slate-200'">
-                <span class="text-base leading-none">{{ step.done ? '✓' : '○' }}</span>
-                <div class="flex-1 min-w-0">
-                    <p class="font-medium text-slate-800">
+
+        <!-- Suggested Status Banner (if applicable) -->
+        <div v-if="suggestedStatus && suggestedStatus !== currentStatus"
+             class="text-xs text-indigo-900 bg-indigo-50 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
+            <span>Next phase: <strong>{{ suggestedStatus }}</strong></span>
+            <button type="button" class="btn-primary text-xs !py-1 !px-2.5 shrink-0" :disabled="applying" @click="applySuggestedStatus">
+                {{ applying ? 'Applying...' : 'Apply status' }}
+            </button>
+        </div>
+
+        <!-- Step List Filter Control -->
+        <div class="flex items-center justify-between text-xs pt-1">
+            <span class="text-slate-400 uppercase tracking-wider font-bold text-[10px]">Checklist Steps</span>
+            <button type="button"
+                    class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+                    @click="showAllSteps = !showAllSteps">
+                {{ showAllSteps ? 'Show pending only' : `Show all (${totalCount})` }}
+            </button>
+        </div>
+
+        <!-- Compact Checklist Items -->
+        <ul class="divide-y divide-slate-100 text-xs">
+            <li v-for="step in visibleSteps" :key="step.key"
+                class="py-2.5 flex items-center justify-between gap-2 group transition">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                          :class="step.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'">
+                        {{ step.done ? '✓' : '○' }}
+                    </span>
+                    <span class="truncate font-medium" :class="step.done ? 'text-slate-500 line-through' : 'text-slate-800 font-semibold'">
                         {{ step.label }}
-                        <span v-if="step.optional" class="ml-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">Optional</span>
-                    </p>
-                    <p v-if="step.hint" class="text-xs text-slate-500 mt-0.5">{{ step.hint }}</p>
-                    <p v-if="step.detail" class="text-xs text-slate-400 mt-0.5">{{ step.detail }}</p>
-                    <Link v-if="step.href || stepLink(step.key)" :href="step.href || stepLink(step.key)"
-                          class="inline-block mt-1.5 text-xs font-semibold link-brand">
-                        Open →
-                    </Link>
+                        <span v-if="step.optional" class="ml-1 text-[9px] font-normal uppercase tracking-wide text-slate-400 no-underline">(Opt)</span>
+                    </span>
                 </div>
+                <Link v-if="step.href || stepLink(step.key)"
+                      :href="step.href || stepLink(step.key)"
+                      class="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline shrink-0">
+                    Open →
+                </Link>
             </li>
         </ul>
     </div>
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     sahodayaId: { type: [String, Number], required: true },
     eventId: { type: [String, Number], required: true },
     lifecycle: { type: Array, default: () => [] },
     suggestedStatus: { type: String, default: null },
+    currentStatus: { type: String, default: null },
     eventType: { type: String, default: '' },
 });
 
+const showAllSteps = ref(false);
 const isSports = computed(() => props.eventType === 'sports');
+const applying = ref(false);
+
+const completedCount = computed(() => props.lifecycle.filter((s) => s.done).length);
+const totalCount = computed(() => props.lifecycle.length);
+const progressPercent = computed(() => (totalCount.value ? Math.round((completedCount.value / totalCount.value) * 100) : 0));
+
+const visibleSteps = computed(() => {
+    if (showAllSteps.value) return props.lifecycle;
+    const pending = props.lifecycle.filter((s) => !s.done);
+    return pending.length > 0 ? pending : props.lifecycle;
+});
+
+function applySuggestedStatus() {
+    const incomplete = props.lifecycle.filter((s) => !s.done && !s.optional);
+    let message = `Change event status to "${props.suggestedStatus}"?`;
+    if (incomplete.length) {
+        const items = incomplete.map((s) => `• ${s.label}`).join('\n');
+        message = `These checklist items aren't done yet:\n\n${items}\n\nChange status to "${props.suggestedStatus}" anyway?`;
+    }
+    if (!confirm(message)) return;
+
+    applying.value = true;
+    router.post(`${base.value}/quick-status`, { status: props.suggestedStatus }, {
+        preserveScroll: true,
+        onFinish: () => { applying.value = false; },
+    });
+}
+
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}`);
 const eventQuery = computed(() => `?event_id=${props.eventId}`);
 

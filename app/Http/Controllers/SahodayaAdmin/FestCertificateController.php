@@ -76,7 +76,7 @@ class FestCertificateController extends SahodayaAdminController
         $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
 
         foreach ($certificates as $certificate) {
-            $payload = $service->payloadFor($certificate);
+            $payload = $service->renderContext($certificate);
             $name = str($payload['student']?->name ?? 'participant')->slug().'-'.$certificate->verification_uuid.'.html';
             $html = view('fest.certificate-print', $payload)->render();
             $zip->addFromString($name, $html);

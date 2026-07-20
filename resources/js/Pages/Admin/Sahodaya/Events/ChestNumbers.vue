@@ -1,14 +1,16 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Chest Numbers`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="pageTitle" eyebrow="Operations"
+        <PageHeader :title="pageTitle" eyebrow="Chest numbers"
                     :description="selectedItem
-                        ? `${selectedItem.head_name ? selectedItem.head_name + ' · ' : ''}Chest starts at ${selectedItem.chest_no_start}`
-                        : 'Pick Event Head, then item — participants load only at the item level.'">
+                        ? `Chest starts at ${selectedItem.chest_no_start} · one chest number per student, shared across every item in this event`
+                        : 'Pick an item — participants load only at the item level, but each student keeps a single chest number across the whole event.'">
             <template #actions>
                 <Link :href="numberingUrl" class="btn-secondary text-sm">Numbering settings</Link>
             </template>
         </PageHeader>
+
+        <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="chest-numbers" :event="event" />
 
         <ReportHeadItemNavigator :groups="headItemGroups"
                                  :base-url="base"
@@ -16,9 +18,7 @@
                                  :selected-item-id="selectedItemId"
                                  :has-item-heads="hasItemHeads"
                                  :is-sports="true"
-                                 :hint="hasItemHeads
-                                     ? 'Sports events are organized by Event Head (Athletics, Chess, …) — choose a head, then an item.'
-                                     : 'Select a competition item to assign chest numbers.'"
+                                 :hint="'Select a competition item to view or assign chest numbers — each student holds one chest number for the whole event, reused automatically across every item they compete in.'"
                                  empty-heads-text="No enabled items on this event yet. Import items from the catalog first.">
 
             <template #default="{ item, head }">
@@ -70,7 +70,8 @@
                             <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                                 <tr>
                                     <th class="p-3">Chest</th><th class="p-3">Fest ID</th><th class="p-3">Item reg</th>
-                                    <th class="p-3">Participant</th><th class="p-3">School</th><th class="p-3">Status</th><th class="p-3">Team</th><th class="p-3"></th>
+                                    <th class="p-3">Participant / Team</th><th class="p-3">School</th><th class="p-3">Status</th>
+                                    <th class="p-3">{{ hasTeamRows ? 'Members' : 'Team' }}</th><th class="p-3"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -78,7 +79,12 @@
                                     <td class="p-3 font-mono font-bold">{{ p.chest_no ?? '—' }}</td>
                                     <td class="p-3 font-mono text-xs text-[#0f3d7a]">{{ p.fest_id ?? '—' }}</td>
                                     <td class="p-3 font-mono text-xs">{{ p.item_reg ?? '—' }}</td>
-                                    <td class="p-3">{{ p.name }}</td>
+                                    <td class="p-3">
+                                        {{ p.name }}
+                                        <span v-if="p.is_team" class="ml-1 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 align-middle">
+                                            Team · {{ p.member_count }}
+                                        </span>
+                                    </td>
                                     <td class="p-3 text-xs">{{ p.school }}</td>
                                     <td class="p-3 text-xs" :class="p.reg_status === 'approved' ? 'text-emerald-700' : 'text-amber-700'">{{ p.reg_status }}</td>
                                     <td class="p-3 text-xs">{{ p.group ?? '—' }}</td>
@@ -93,6 +99,9 @@
                                 </tr>
                             </tbody>
                         </table>
+                        <p v-if="hasTeamRows" class="px-3 py-2 text-xs text-slate-500 border-t">
+                            This is a team item — one chest number is shared by the whole squad. Clearing or revealing applies to every member.
+                        </p>
                     </div>
                 </div>
             </template>
@@ -106,6 +115,7 @@
 import { computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
 
@@ -125,6 +135,7 @@ const props = defineProps({
 });
 
 const showGreen = ref(props.view === 'green-room');
+const hasTeamRows = computed(() => props.participants.some((p) => p.is_team));
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/chest-numbers`);
 const numberingUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/settings/numbering`);
 const pageTitle = computed(() => {

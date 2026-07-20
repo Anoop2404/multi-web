@@ -304,6 +304,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'per_item_amount' => 'nullable|numeric|min:0',
             'per_student_amount' => 'nullable|numeric|min:0',
             'school_fee_cap' => 'nullable|numeric|min:0',
+            'school_fee_min' => 'nullable|numeric|min:0',
             'include_school_registration' => 'nullable|boolean',
             'class_group_scheme' => 'nullable|in:cbse,sahodaya,cluster',
             'class_group_fees' => 'nullable|array',

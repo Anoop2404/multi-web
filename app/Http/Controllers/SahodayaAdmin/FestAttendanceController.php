@@ -8,6 +8,7 @@ use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestNumberingService;
 use Illuminate\Http\Request;
 use App\Services\Events\FestAttendanceImportService;
 
@@ -27,7 +28,7 @@ class FestAttendanceController extends SahodayaAdminController
             // attendees and were showing up as blank rows with no name.
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
-            ->with(['registration.item', 'registration.school', 'student', 'teacher'])
+            ->with(['registration.item', 'registration.school', 'student', 'teacher', 'group'])
             ->get();
 
         $attendance = FestAttendance::where('event_id', $event->id)
@@ -55,23 +56,51 @@ class FestAttendanceController extends SahodayaAdminController
             'status'         => 'required|in:present,absent',
         ]);
 
-        FestAttendance::updateOrCreate(
-            ['item_id' => $data['item_id'], 'participant_id' => $data['participant_id']],
-            [
-                'event_id'  => $event->id,
-                'status'    => $data['status'],
-                'marked_by' => $request->user()->id,
-                'marked_at' => now(),
-            ]
-        );
+        $participantIds = $this->expandToTeam($event, $data['item_id'], $data['participant_id']);
+
+        foreach ($participantIds as $participantId) {
+            FestAttendance::updateOrCreate(
+                ['item_id' => $data['item_id'], 'participant_id' => $participantId],
+                [
+                    'event_id'  => $event->id,
+                    'status'    => $data['status'],
+                    'marked_by' => $request->user()->id,
+                    'marked_at' => now(),
+                ]
+            );
+        }
 
         $audit->festEvent($event, FestPageActivity::ATTENDANCE, 'fest.attendance.saved', 'Attendance saved', [
             'participant_id' => $data['participant_id'],
             'item_id'        => $data['item_id'],
             'status'         => $data['status'],
+            'team_size'      => count($participantIds),
         ]);
 
         return back()->with('success', 'Attendance saved.');
+    }
+
+    /**
+     * For a team/group item, marking one member also marks every squad
+     * member the same way — attendance applies to the whole team, not just
+     * whoever happened to be clicked.
+     *
+     * @return list<int>
+     */
+    private function expandToTeam(FestEvent $event, int $itemId, int $participantId): array
+    {
+        $participant = FestParticipant::with('registration.item')->find($participantId);
+        $item = $participant?->registration?->item;
+
+        if (! $participant || ! $item || ! $participant->group_id
+            || ! app(FestNumberingService::class)->isGroupItem($item)) {
+            return [$participantId];
+        }
+
+        return FestParticipant::where('group_id', $participant->group_id)
+            ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('item_id', $itemId))
+            ->pluck('id')
+            ->all();
     }
 
     private function bulkStore(Request $request, FestEvent $event, PlatformAuditLogger $audit)
@@ -82,6 +111,13 @@ class FestAttendanceController extends SahodayaAdminController
             'participant_ids.*' => 'exists:fest_participants,id',
             'status'          => 'required|in:present,absent',
         ]);
+
+        $expandedIds = collect($data['participant_ids'])
+            ->flatMap(fn ($id) => $this->expandToTeam($event, (int) $data['item_id'], (int) $id))
+            ->unique()
+            ->values()
+            ->all();
+        $data['participant_ids'] = $expandedIds;
 
         foreach ($data['participant_ids'] as $participantId) {
             FestAttendance::updateOrCreate(

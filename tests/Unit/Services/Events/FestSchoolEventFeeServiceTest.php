@@ -371,6 +371,25 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(600.0, (float) $fee->total_due);
     }
 
+    public function test_school_fee_min_enforces_floor_amount(): void
+    {
+        ['school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();
+
+        $event->update([
+            'fee_settings' => [
+                'fee_model' => 'per_item',
+                'per_item_amount' => 200,
+                'school_fee_min' => 1500,
+            ],
+        ]);
+
+        $this->approvedRegistration($event, $item, $school);
+
+        $fee = app(FestSchoolEventFeeService::class)->recalculate($event->fresh(), $school->id);
+
+        $this->assertSame(1500.0, (float) $fee->total_due);
+    }
+
     public function test_normalize_event_fee_settings_persists_cap_for_cksc(): void
     {
         $normalized = app(FestEventFeeResolver::class)->normalizeEventFeeSettings([

@@ -2,13 +2,20 @@
     <SchoolAdminLayout :title="`${event.title} — Fest Hub`" :school="school" :show-header-title="false">
         <PageHeader
             :title="event.title"
-            eyebrow="Fest Hub"
+            eyebrow="Fest"
             :description="`Registration status: ${registrations.length} entries · ${programLabel}`"
         >
             <template #actions>
                 <Link :href="registrationUrl" class="btn-primary">Open registration</Link>
             </template>
         </PageHeader>
+
+        <SchoolEventWorkflowStepper
+            :school-id="school.id"
+            :program-prefix="programPrefix"
+            :event-id="event.id"
+            :is-sports="false"
+            current-step="overview" />
 
         <div class="hub-grid mb-6">
             <HubCard
@@ -73,6 +80,8 @@
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SchoolEventWorkflowStepper from '@/Components/school/SchoolEventWorkflowStepper.vue';
+import { SLUG_TO_PREFIX } from '@/support/schoolProgramNav.js';
 import { schoolProgramHref } from '@/support/schoolProgramNav.js';
 
 const props = defineProps({
@@ -95,5 +104,20 @@ const programLabels = {
 };
 
 const programLabel = computed(() => programLabels[props.programSlug] ?? 'Fest');
+const programPrefix = computed(() => SLUG_TO_PREFIX[props.programSlug] ?? props.programSlug);
 const resultsUrl = computed(() => schoolProgramHref(props.school.id, props.programSlug, 'results'));
+
+function participantName(appeal) {
+    const p = appeal.participant;
+    return p?.student?.name ?? p?.teacher?.name ?? '—';
+}
+
+function statusClass(status) {
+    const map = {
+        pending:  'bg-amber-100 text-amber-700',
+        approved: 'bg-emerald-100 text-emerald-700',
+        rejected: 'bg-red-100 text-red-700',
+    };
+    return map[status] ?? 'bg-slate-100 text-slate-600';
+}
 </script>

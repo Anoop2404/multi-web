@@ -34,11 +34,11 @@
                 <p class="text-xs text-slate-500 mt-1">Results published</p>
             </div>
             <div class="card card--muted text-center !py-4">
-                <p class="text-2xl font-bold text-amber-700">₹{{ fmt(stats.fees_due) }}</p>
+                <p class="text-2xl font-bold text-amber-600">₹{{ fmt(stats.fees_due) }}</p>
                 <p class="text-xs text-slate-500 mt-1">Fees due</p>
             </div>
             <div class="card card--muted text-center !py-4">
-                <p class="text-2xl font-bold text-yellow-700">{{ stats.fees_awaiting }}</p>
+                <p class="text-2xl font-bold text-amber-500">{{ stats.fees_awaiting }}</p>
                 <p class="text-xs text-slate-500 mt-1">Awaiting approval</p>
             </div>
         </div>

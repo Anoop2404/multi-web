@@ -181,6 +181,26 @@ class FestEventNotifier
         }
     }
 
+    /** Notify approved schools once an event's status moves to "completed". */
+    public function eventCompleted(FestEvent $event): void
+    {
+        $schoolIds = Tenant::query()
+            ->where('parent_id', $event->tenant_id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->pluck('id');
+
+        $slug = $this->resolveTemplateSlug($event, 'fest.event.completed');
+        $replacements = [
+            'event_title' => $event->title,
+            'competition_label' => $this->competitionLabel($event),
+        ];
+
+        foreach ($schoolIds as $schoolId) {
+            $this->notifySchool($schoolId, $slug, $replacements);
+        }
+    }
+
     public function paymentPending(FestEvent $event, string $schoolId, float $amount): void
     {
         $head = $this->resolveHeadForEvent($event);

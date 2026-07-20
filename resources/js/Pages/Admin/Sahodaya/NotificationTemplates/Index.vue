@@ -149,6 +149,7 @@ const SAMPLES = {
     status: 'confirmed', from_title: 'School round', new_value: '11.2', record_unit: 'seconds',
     prize_label: 'Gold', title: 'Sample Remittance', context_label: 'Sample context',
     class: '10', examination_type: 'SSLC', pass_percent: '95',
+    sahodaya_name: 'Sample Sahodaya', context_title: 'Sample Fee Payment', receipt_no: 'RCPT-0001',
 };
 
 function sampleFor(variable) {

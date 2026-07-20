@@ -51,6 +51,11 @@
                             <input :id="id" v-model.number="feeSettingsForm.school_fee_cap" type="number" min="0" class="field" placeholder="—">
                         </template>
                     </FormField>
+                    <FormField label="Minimum school fee floor (₹)" hint="Minimum total fee charged per school once registered (e.g. ₹1,500 for sports)">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="feeSettingsForm.school_fee_min" type="number" min="0" class="field" placeholder="1500">
+                        </template>
+                    </FormField>
                     <p class="sm:col-span-2 text-sm text-slate-600">
                         <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/competition`" class="link-brand font-semibold">
                             Edit head fees on Competition →

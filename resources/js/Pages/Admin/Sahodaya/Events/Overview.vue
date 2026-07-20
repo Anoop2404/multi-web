@@ -1,19 +1,26 @@
 <template>
     <SahodayaEventsLayout :title="event.title" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="event.title" eyebrow="Event overview"
+                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        
+        <!-- Header & Primary Actions -->
+        <PageHeader :title="event.title" eyebrow="Event Overview"
                     :description="`${eventTypesLabel} · ${levelLabels[event.level_round] ?? event.level_round}`">
             <template #actions>
-                <a :href="publicFestUrl" target="_blank" rel="noopener" class="btn-secondary text-xs">Public portal ↗</a>
+                <div class="flex flex-wrap items-center gap-2">
+                    <a :href="publicFestUrl" target="_blank" rel="noopener" class="btn-secondary text-xs">
+                        Public portal ↗
+                    </a>
+                    <button type="button" class="btn-primary text-xs flex items-center gap-1.5 shadow-sm" :disabled="form.processing" @click="saveEvent">
+                        <span>{{ form.processing ? 'Saving...' : 'Save event' }}</span>
+                    </button>
+                </div>
             </template>
         </PageHeader>
-
-        <FestEventWorkflowStepper :sahodaya-id="sahodaya.id" :event-id="event.id"
-                                  :event-type="event.event_type" :current-step="'setup'" />
 
         <EventSubNav v-if="event.event_type !== 'sports'"
                      :sahodaya-id="sahodaya.id" :event-id="event.id" active="overview" />
 
+        <!-- Warnings & System Alerts -->
         <div v-if="event.state_program_id" class="notice-banner notice-banner--warning mb-4">
             <strong>State program</strong> — propagated from central admin.
         </div>
@@ -35,47 +42,110 @@
             </button>
         </div>
 
-        <div class="grid sm:grid-cols-3 gap-4 mb-6">
-            <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold">{{ stats.items }}</p>
-                <p class="text-xs text-slate-500 mt-1">Items</p>
+        <!-- Event Phase Stepper Banner -->
+        <div class="card mb-6 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white !p-5 shadow-lg">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xl font-bold text-white backdrop-blur">
+                        {{ isSports ? '⚽' : '🎭' }}
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-base font-bold text-white leading-snug">{{ event.title }}</h2>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider border border-white/20 bg-white/10 text-white">
+                                {{ form.status }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-0.5">
+                            {{ isSports ? 'Sports Meet Event Workspace' : 'Sahodaya Event Workspace' }}
+                            <span v-if="event.venue" class="ml-2 opacity-80">· 📍 {{ event.venue }}</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div v-if="isSports" class="flex items-center gap-2">
+                    <Link :href="`${base}/setup`" class="btn-secondary text-xs !bg-white/10 hover:!bg-white/20 !text-white !border-white/20">
+                        ⚙️ Setup Hub
+                    </Link>
+                    <Link :href="`${base}/items`" class="btn-primary text-xs !bg-indigo-600 hover:!bg-indigo-500 !text-white !border-transparent">
+                        Items &amp; Catalog →
+                    </Link>
+                </div>
+            </div>
+
+            <!-- Workflow Status Steps -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-white/10">
+                <div v-for="step in workflowSteps" :key="step.status"
+                     class="rounded-lg p-2.5 text-xs transition border"
+                     :class="form.status === step.status
+                         ? 'bg-indigo-600/90 border-indigo-400 text-white shadow-inner font-bold'
+                         : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] uppercase font-mono tracking-wider opacity-80">Step {{ step.num }}</span>
+                        <span v-if="form.status === step.status" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    </div>
+                    <p class="font-medium text-xs leading-tight text-white">{{ step.label }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric KPI Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div class="card card--muted !py-3.5 text-center transition hover:border-slate-300">
+                <p class="text-2xl font-black text-slate-900">{{ stats.items }}</p>
+                <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Items Enabled</p>
             </div>
             <template v-if="event.event_type === 'sports'">
-                <div class="card card--muted !py-4 text-center">
-                    <p class="text-xl font-bold text-indigo-700">{{ stats.schools_count ?? 0 }}</p>
-                    <p class="text-xs text-slate-500 mt-1">Schools registered</p>
+                <div class="card card--muted !py-3.5 text-center transition hover:border-indigo-300">
+                    <p class="text-2xl font-black text-indigo-600">{{ stats.schools_count ?? 0 }}</p>
+                    <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Schools Registered</p>
                 </div>
-                <div class="card card--muted !py-4 text-center">
-                    <p class="text-xl font-bold text-emerald-700">{{ stats.athletes_count ?? 0 }}</p>
-                    <p class="text-xs text-slate-500 mt-1">Athletes registered</p>
+                <div class="card card--muted !py-3.5 text-center transition hover:border-emerald-300">
+                    <p class="text-2xl font-black text-emerald-600">{{ stats.athletes_count ?? 0 }}</p>
+                    <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Athletes Registered</p>
                 </div>
             </template>
             <template v-else>
-                <div class="card card--muted !py-4 text-center">
-                    <p class="text-xl font-bold">{{ stats.registrations }}</p>
-                    <p class="text-xs text-slate-500 mt-1">Registrations</p>
+                <div class="card card--muted !py-3.5 text-center transition hover:border-indigo-300">
+                    <p class="text-2xl font-black text-indigo-600">{{ stats.registrations }}</p>
+                    <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Registrations</p>
                 </div>
-                <div class="card card--muted !py-4 text-center">
-                    <p class="text-xl font-bold">{{ stats.school_rounds }}</p>
-                    <p class="text-xs text-slate-500 mt-1">School rounds</p>
+                <div class="card card--muted !py-3.5 text-center transition hover:border-violet-300">
+                    <p class="text-2xl font-black text-violet-600">{{ stats.school_rounds }}</p>
+                    <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">School Rounds</p>
                 </div>
             </template>
+            <div class="card card--muted !py-3.5 text-center transition hover:border-amber-300">
+                <p class="text-2xl font-black" :class="form.results_published ? 'text-emerald-600' : 'text-amber-600'">
+                    {{ form.results_published ? 'Published' : 'Hidden' }}
+                </p>
+                <p class="text-xs font-semibold text-slate-500 mt-0.5 uppercase tracking-wider text-[10px]">Public Portal Results</p>
+            </div>
         </div>
 
         <div class="grid lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2">
-                <form @submit.prevent="saveEvent" class="form-section">
-                    <div class="form-section-head">
-                        <h3 class="form-section-title">Event details</h3>
-                        <p class="form-section-hint">Title, status, and conduct levels.</p>
+            <!-- Left 2-cols: Event Configuration Form & Details -->
+            <div class="lg:col-span-2 space-y-6">
+                <form @submit.prevent="saveEvent" class="card space-y-6">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <h3 class="section-title !mb-0">Event Settings &amp; Configuration</h3>
+                            <span class="status-pill text-xs font-mono font-bold uppercase tracking-wider" :class="statusClass(form.status)">
+                                {{ form.status }}
+                            </span>
+                        </div>
+                        <p class="section-desc mt-1">Configure event phase, schedule dates, location, and rules.</p>
                     </div>
-                    <div class="form-section-body space-y-4">
+
+                    <!-- Core Info Block -->
+                    <div class="space-y-4 pt-2 border-t border-slate-100">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">1. Basic Info &amp; Lifecycle Phase</h4>
                         <FormGrid>
-                            <FormField label="Title" class-extra="sm:col-span-2">
+                            <FormField label="Event Title" class-extra="sm:col-span-2" required>
                                 <input v-model="form.title" class="field" :disabled="!!event.state_program_id" required>
                             </FormField>
-                            <FormField label="Status" :hint="statusHint">
-                                <select v-model="form.status" class="field">
+                            <FormField label="Lifecycle Phase Status" class-extra="sm:col-span-2">
+                                <select v-model="form.status" class="field font-medium">
                                     <option value="draft">Draft (setup — Sahodaya only)</option>
                                     <option v-if="!isSports" value="published">Published</option>
                                     <option v-if="isSports" value="published">Published (Sahodaya announce only)</option>
@@ -84,47 +154,68 @@
                                     <option value="completed">Completed</option>
                                 </select>
                             </FormField>
-                            <p v-if="isSports" class="sm:col-span-2 text-xs text-slate-500 -mt-2">
-                                Sports schools only see this event from <strong>Registration open</strong> onward.
-                                Use <strong>Results published</strong> below to release medals/rankings — that is separate from status.
+                        </FormGrid>
+
+                        <div v-if="isSports" class="rounded-xl border border-sky-100 bg-sky-50/70 p-3.5 text-xs text-sky-950 space-y-1">
+                            <p class="font-bold text-sky-900 flex items-center gap-1.5">
+                                <span>💡</span> Sports Visibility Rule
                             </p>
-                            <FormField label="Academic year" hint="Only students enrolled in this year can register. Defaults to active year on create.">
-                                <select v-model="form.academic_year_id" class="field">
-                                    <option :value="null">— Not scoped —</option>
-                                    <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.id">
-                                        {{ ay.label }} ({{ ay.status }})
-                                    </option>
-                                </select>
-                            </FormField>
-                            <FormField label="Fest start date">
+                            <p class="text-sky-800 leading-relaxed">
+                                Schools can only view &amp; register athletes for this sport when status is set to <strong>Registration open</strong>.
+                                Releasing medals/rankings is controlled separately by the <strong>Results published</strong> setting below.
+                            </p>
+                        </div>
+
+                        <FormField label="Academic Year Scope" hint="Only students enrolled in this academic year can register.">
+                            <select v-model="form.academic_year_id" class="field">
+                                <option :value="null">— Not scoped (All years) —</option>
+                                <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.id">
+                                    {{ ay.label }} ({{ ay.status }})
+                                </option>
+                            </select>
+                        </FormField>
+                    </div>
+
+                    <!-- Schedule & Dates Section -->
+                    <div class="border-t border-slate-100 pt-5 space-y-4">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">2. Event Schedule &amp; Deadlines</h4>
+                        <FormGrid>
+                            <FormField label="Fest Start Date">
                                 <input v-model="form.event_start" type="date" class="field">
                             </FormField>
-                            <FormField label="Fest end date">
+                            <FormField label="Fest End Date">
                                 <input v-model="form.event_end" type="date" class="field">
                             </FormField>
-                            <FormField label="Registration opens">
+                            <FormField label="Registration Opens Date">
                                 <input v-model="form.registration_open" type="date" class="field">
                             </FormField>
-                            <FormField label="Registration closes">
+                            <FormField label="Registration Closes Date">
                                 <input v-model="form.registration_close" type="date" class="field">
                             </FormField>
-                            <FormField label="Venue" class-extra="sm:col-span-2">
-                                <input v-model="form.venue" class="field" placeholder="e.g. District stadium">
-                            </FormField>
-                            <FormField label="Results" class-extra="sm:col-span-2">
-                                <CheckboxField v-model="form.results_published" label="Results published on public portal" />
+                            <FormField label="Venue Location" class-extra="sm:col-span-2">
+                                <input v-model="form.venue" class="field" placeholder="e.g. District Stadium, Malappuram">
                             </FormField>
                         </FormGrid>
-                        <div v-if="isSports" class="rounded-xl border border-slate-200/80 bg-slate-50/80 p-4 space-y-2">
-                            <p class="form-label">Sports age cutoff</p>
-                            <p class="text-xs text-slate-600">{{ ageRuleSummary }}</p>
-                            <div class="flex flex-wrap gap-3 text-xs">
-                                <Link :href="`${base}/settings/eligibility`" class="link-brand">Age reference date →</Link>
-                                <a :href="sportsAgeGroupsUrl" class="link-brand">Age categories master →</a>
+                    </div>
+
+                    <!-- Public Portal & Rules Section -->
+                    <div class="border-t border-slate-100 pt-5 space-y-4">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">3. Public Portal &amp; Eligibility Rules</h4>
+                        <FormField label="Public Results Visibility" class-extra="sm:col-span-2">
+                            <CheckboxField v-model="form.results_published" label="Publish results, scores &amp; rankings on public portal" />
+                        </FormField>
+
+                        <div v-if="isSports" class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                            <p class="form-label font-bold text-slate-800">Sports Age Cutoff Rule</p>
+                            <p class="text-xs text-slate-600 leading-relaxed">{{ ageRuleSummary }}</p>
+                            <div class="flex flex-wrap gap-3 text-xs pt-1">
+                                <Link :href="`${base}/settings/eligibility`" class="link-brand font-semibold">Age reference date →</Link>
+                                <a :href="sportsAgeGroupsUrl" class="link-brand font-semibold">Age categories master →</a>
                             </div>
                         </div>
+
                         <div v-if="!event.state_program_id && event.event_type !== 'sports'" class="space-y-2">
-                            <p class="form-label">Conduct levels</p>
+                            <p class="form-label font-bold text-slate-800">Conduct Levels</p>
                             <div class="flex flex-wrap gap-3">
                                 <label v-for="(label, key) in selectableLevelLabels" :key="key" class="choice-chip">
                                     <input type="checkbox" class="choice-chip-input" :value="key" v-model="form.conduct_levels">
@@ -132,72 +223,24 @@
                                 </label>
                             </div>
                         </div>
-                        <p v-if="form.hasErrors" class="text-sm text-red-600">
-                            {{ Object.values(form.errors).flat().join(' ') }}
-                        </p>
-                        <FormActions>
-                            <button type="submit" class="btn-primary" :disabled="form.processing">Save event</button>
-                        </FormActions>
+                    </div>
+
+                    <p v-if="form.hasErrors" class="text-sm text-red-600 font-medium">
+                        {{ Object.values(form.errors).flat().join(' ') }}
+                    </p>
+                    <div class="flex justify-end pt-3 border-t border-slate-100">
+                        <button type="submit" class="btn-primary flex items-center gap-1.5" :disabled="form.processing">
+                            <span>{{ form.processing ? 'Saving...' : 'Save event settings' }}</span>
+                        </button>
                     </div>
                 </form>
             </div>
 
-            <aside class="space-y-4">
+            <!-- Right Column: Single Clean Progress Tracker Card -->
+            <aside>
                 <EventLifecyclePanel :sahodaya-id="sahodaya.id" :event-id="event.id"
-                                     :event-type="event.event_type"
+                                     :event-type="event.event_type" :current-status="event.status"
                                      :lifecycle="lifecycle" :suggested-status="suggestedStatus" />
-
-                <div v-if="eventHeadNav?.headItemGroups?.length" class="card space-y-3">
-                    <h4 class="section-title">{{ isSports ? 'Event Heads' : 'Item heads' }}</h4>
-                    <p class="text-xs text-slate-500">
-                        {{ isSports
-                            ? 'Each Event Head has its own schedule, fees, and status — open to configure or promote to a full discipline event.'
-                            : 'Quick access to registrations, marks, and reports by section.' }}
-                    </p>
-                    <div v-for="head in eventHeadNav.headItemGroups" :key="head.head_id ?? 'other'"
-                         class="rounded-lg border border-slate-100 bg-slate-50/80 p-3">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <Link :href="`${base}/competition${headQuery(head.head_id)}`" class="text-sm font-semibold text-slate-900 hover:text-indigo-700">
-                                {{ head.head_name }}
-                            </Link>
-                            <span v-if="head.status" class="text-[10px] px-1.5 py-0.5 rounded-full bg-white border border-slate-200 capitalize">
-                                {{ String(head.status).replace('_', ' ') }}
-                            </span>
-                        </div>
-                        <p class="text-[11px] text-slate-500 mt-0.5">
-                            {{ head.item_count }} items · {{ head.participant_count }} participants
-                            <template v-if="head.venue"> · {{ head.venue }}</template>
-                        </p>
-                        <div class="flex flex-wrap gap-2 mt-2">
-                            <Link :href="`${base}/competition${headQuery(head.head_id)}`" class="link-brand text-xs font-semibold">Open →</Link>
-                            <Link :href="`${base}/registrations${headQuery(head.head_id)}`" class="link-brand text-xs">Registrations</Link>
-                            <Link :href="`${base}/marks${headQuery(head.head_id)}`" class="link-brand text-xs">Marks</Link>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card space-y-3">
-                    <h4 class="section-title">Fest fees</h4>
-                    <p class="section-desc text-xs">Per-event registration fees — not annual membership.</p>
-                    <Link :href="`${base}/settings/fees`" class="link-brand text-sm">Configure in Settings → Fees</Link>
-                </div>
-                <div class="card space-y-2">
-                    <h4 class="section-title">Quick links</h4>
-                    <Link v-if="isSports" :href="`${base}/setup`" class="block text-sm link-brand font-semibold">Sports setup hub →</Link>
-                    <Link :href="`${base}/items`" class="block text-sm link-brand">Event items setup</Link>
-                    <Link :href="`${base}/settings/participation`" class="block text-sm link-brand">Participation policy</Link>
-                    <Link :href="`${base}/registrations`" class="block text-sm link-brand">Registrations</Link>
-                    <Link :href="`${base}/leaderboard`" class="block text-sm link-brand">Leaderboard</Link>
-                    <Link :href="`${base}/activity`" class="block text-sm link-brand">Full activity log</Link>
-                    <Link :href="`${base}/reports`" class="block text-sm link-brand">Reports</Link>
-                </div>
-                <div class="card space-y-2">
-                    <h4 class="section-title">Organiser tools</h4>
-                    <Link :href="`${base}/event-staff`" class="block text-sm link-brand">Event staff & coordinators</Link>
-                    <Link :href="`${base}/id-cards`" class="block text-sm link-brand">ID cards</Link>
-                    <Link v-if="event.event_type === 'kalolsavam'" :href="`${base}/levels`" class="block text-sm link-brand">Regions & rounds</Link>
-                    <Link :href="`/sahodaya-admin/${sahodaya.id}/settings/nav-visibility`" class="block text-sm link-brand">Sidebar visibility</Link>
-                </div>
             </aside>
         </div>
 
@@ -209,10 +252,12 @@
 import { Link, useForm, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
-import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventLifecyclePanel from '@/Components/sahodaya/EventLifecyclePanel.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+import FormGrid from '@/Components/ui/FormGrid.vue';
+import FormField from '@/Components/ui/FormField.vue';
+import CheckboxField from '@/Components/ui/CheckboxField.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -244,13 +289,6 @@ const statusHint = computed(() => (isSports.value
     ? 'Setup → Registration open (schools see event) → Ongoing → Complete. Publish results separately.'
     : 'Draft → Published → Registration open → Ongoing → Completed.'));
 
-function headQuery(headId) {
-    if (headId == null) {
-        return '?head_id=other';
-    }
-
-    return `?head_id=${headId}`;
-}
 const eventTypesLabel = computed(() => props.event.event_type?.replace(/_/g, ' ') ?? 'Event');
 const publicFestUrl = computed(() => {
     const root = (props.publicUrl ?? '').replace(/\/$/, '');
@@ -261,6 +299,23 @@ const selectableLevelLabels = computed(() => {
     const keys = isSports.value ? ['school', 'sahodaya'] : Object.keys(props.levelLabels ?? {});
     return Object.fromEntries(keys.map((k) => [k, props.levelLabels[k]]));
 });
+
+const workflowSteps = computed(() => [
+    { num: 1, status: 'draft', label: 'Setup & Config' },
+    { num: 2, status: 'published', label: 'Published' },
+    { num: 3, status: 'registration_open', label: 'Registration Open' },
+    { num: 4, status: 'ongoing', label: 'Ongoing Event' },
+]);
+
+function statusClass(status) {
+    return {
+        draft: 'bg-slate-100 text-slate-700 border-slate-200',
+        published: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+        registration_open: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+        ongoing: 'bg-amber-100 text-amber-900 border-amber-200',
+        completed: 'bg-violet-100 text-violet-800 border-violet-200',
+    }[status] ?? 'bg-slate-100 text-slate-700 border-slate-200';
+}
 
 const form = useForm({
     title: props.event.title,

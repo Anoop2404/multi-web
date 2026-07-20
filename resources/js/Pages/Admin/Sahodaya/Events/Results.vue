@@ -1,8 +1,13 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Results`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="pageTitle" eyebrow="Scoring"
+        <PageHeader :title="pageTitle" eyebrow="Results"
                     :description="pageDescription" />
+
+        <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
+                           :event="event" active="results" class="mb-4" />
+        <FestEventWorkflowStepper v-else :sahodaya-id="sahodaya.id" :event-id="event.id"
+                                  :event-type="event.event_type" :current-step="'reports'" />
 
         <!-- Sport Event Switcher -->
         <div v-if="isSports && childEvents.length" class="card mb-4">
@@ -326,6 +331,8 @@
 import { computed, ref, watch } from 'vue';
 import { router, useForm, Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
 import FestHeadItemInfoPanel from '@/Components/fest/FestHeadItemInfoPanel.vue';

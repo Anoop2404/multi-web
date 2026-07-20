@@ -4,7 +4,7 @@
         <ol class="flex flex-wrap gap-1 min-w-max">
             <li v-for="step in steps" :key="step.key" class="flex items-center">
                 <component
-                    :is="step.href ? 'a' : 'span'"
+                    :is="step.href ? Link : 'span'"
                     :href="step.href || undefined"
                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition"
                     :class="step.key === currentStep
@@ -26,6 +26,7 @@
 </template>
 
 <script setup>
+import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({

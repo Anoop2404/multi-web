@@ -26,9 +26,19 @@ class FestEligibilityRuleEngine
     /** @var array<string, \Illuminate\Support\Collection<int, FestEligibilityRule>> */
     private static array $rulesCache = [];
 
+    public static function flushCache(): void
+    {
+        self::$hasTableCache = null;
+        self::$rulesCache = [];
+    }
+
     /** @return list<string> */
     public function validateStudent(Student $student, FestEvent $event, FestEventItem $item): array
     {
+        if (app()->environment('testing')) {
+            self::flushCache();
+        }
+
         if (! (self::$hasTableCache ??= Schema::hasTable('fest_eligibility_rules'))) {
             return [];
         }

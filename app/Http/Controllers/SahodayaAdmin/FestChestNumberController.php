@@ -228,75 +228,165 @@ class FestChestNumberController extends SahodayaAdminController
     /** @return list<array<string, mixed>> */
     private function participantRows(FestEvent $event, int $itemId, bool $includePending = false): array
     {
-        return FestParticipant::whereHas('registration', fn ($q) => $q
+        $item = FestEventItem::find($itemId);
+        $isGroupItem = $item && app(FestNumberingService::class)->isGroupItem($item);
+
+        $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->where('item_id', $itemId)
             ->when($includePending, fn ($q2) => $q2->active(), fn ($q2) => $q2->where('status', 'approved')))
             ->with(['registration.school', 'registration', 'student', 'teacher', 'group'])
-            ->get()
-            ->sortBy(fn ($p) => [$p->chest_no ?? 99999, $p->id])
-            ->values()
-            ->map(function (FestParticipant $p) {
+            ->get();
+
+        if (! $isGroupItem) {
+            return $participants
+                ->sortBy(fn ($p) => [$p->chest_no ?? 99999, $p->id])
+                ->values()
+                ->map(fn (FestParticipant $p) => $this->individualRow($p))
+                ->all();
+        }
+
+        return $participants
+            ->groupBy('group_id')
+            ->map(function ($members, $groupId) {
+                $first = $members->first();
+                $group = $first->group;
+                $school = $first->registration->school?->name ?? Tenant::find($first->registration->school_id)?->name;
+                $memberNames = $members
+                    ->map(fn (FestParticipant $m) => $m->student?->name ?? $m->teacher?->name)
+                    ->filter()
+                    ->values()
+                    ->all();
+
                 return [
-                    'id'                => $p->id,
-                    'chest_no'          => $p->chest_no,
-                    'chest_revealed_at' => $p->chest_revealed_at,
-                    'fest_id'           => $p->level_registration_number,
-                    'item_reg'          => $p->item_registration_number,
-                    'name'              => $p->student?->name ?? $p->teacher?->name,
-                    'school'            => $p->registration->school?->name ?? Tenant::find($p->registration->school_id)?->name,
-                    'group'             => $p->group?->team_name,
-                    'reg_status'        => $p->registration->status,
+                    'id'                => $first->id,
+                    'is_team'           => true,
+                    'member_count'      => $members->count(),
+                    'chest_no'          => $group?->chest_no,
+                    'chest_revealed_at' => $group?->chest_revealed_at,
+                    'fest_id'           => null,
+                    'item_reg'          => $first->item_registration_number,
+                    'name'              => $group?->team_name ?: 'Team',
+                    'school'            => $school,
+                    'group'             => implode(', ', $memberNames),
+                    'reg_status'        => $first->registration->status,
                 ];
             })
+            ->sortBy(fn ($row) => [$row['chest_no'] ?? 99999, $row['id']])
+            ->values()
             ->all();
+    }
+
+    /** @return array<string, mixed> */
+    private function individualRow(FestParticipant $p): array
+    {
+        return [
+            'id'                => $p->id,
+            'is_team'           => false,
+            'chest_no'          => $p->chest_no,
+            'chest_revealed_at' => $p->chest_revealed_at,
+            'fest_id'           => $p->level_registration_number,
+            'item_reg'          => $p->item_registration_number,
+            'name'              => $p->student?->name ?? $p->teacher?->name,
+            'school'            => $p->registration->school?->name ?? Tenant::find($p->registration->school_id)?->name,
+            'group'             => $p->group?->team_name,
+            'reg_status'        => $p->registration->status,
+        ];
     }
 
     /** @return list<array<string, mixed>> */
     private function greenRoomRows(FestEvent $event, int $itemId): array
     {
-        return FestParticipant::whereHas('registration', fn ($q) => $q
+        $item = FestEventItem::find($itemId);
+        $isGroupItem = $item && app(FestNumberingService::class)->isGroupItem($item);
+
+        $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->where('item_id', $itemId)
             ->where('status', 'approved')
             ->whereHas('item', fn ($i) => $i->where('stage_type', 'on_stage')))
-            ->whereNull('chest_revealed_at')
-            ->with(['registration.school', 'student', 'teacher'])
-            ->orderBy('chest_no')
-            ->get()
-            ->map(function (FestParticipant $p) {
-                return [
+            ->with(['registration.school', 'student', 'teacher', 'group'])
+            ->get();
+
+        if (! $isGroupItem) {
+            return $participants
+                ->whereNull('chest_revealed_at')
+                ->sortBy('chest_no')
+                ->values()
+                ->map(fn (FestParticipant $p) => [
                     'id'       => $p->id,
                     'chest_no' => $p->chest_no,
                     'fest_id'  => $p->level_registration_number,
                     'name'     => $p->student?->name ?? $p->teacher?->name,
                     'school'   => $p->registration->school?->name ?? Tenant::find($p->registration->school_id)?->name,
+                ])
+                ->all();
+        }
+
+        return $participants
+            ->groupBy('group_id')
+            ->filter(fn ($members) => ! $members->first()->group?->chest_revealed_at)
+            ->map(function ($members) {
+                $first = $members->first();
+                $group = $first->group;
+
+                return [
+                    'id'       => $first->id,
+                    'chest_no' => $group?->chest_no,
+                    'fest_id'  => null,
+                    'name'     => ($group?->team_name ?: 'Team').' ('.$members->count().')',
+                    'school'   => $first->registration->school?->name ?? Tenant::find($first->registration->school_id)?->name,
                 ];
             })
+            ->sortBy('chest_no')
+            ->values()
             ->all();
     }
 
     /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
     private function chestNumberRows(FestEvent $event, ?int $itemId = null)
     {
-        return FestParticipant::whereHas('registration', fn ($q) => $q
+        $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->where('status', 'approved')
             ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId)))
+            ->with(['registration.item', 'registration.school', 'student', 'teacher', 'group'])
+            ->get();
+
+        $numbering = app(FestNumberingService::class);
+
+        $individualRows = $participants
+            ->filter(fn ($p) => ! $p->registration->item || ! $numbering->isGroupItem($p->registration->item))
             ->whereNotNull('chest_no')
-            ->with(['registration.item', 'registration.school', 'student', 'teacher'])
-            ->get()
-            ->sortBy(fn ($p) => [$p->registration->item_id ?? 0, $p->chest_no ?? 9999])
-            ->values()
-            ->map(function (FestParticipant $p) {
+            ->map(fn (FestParticipant $p) => [
+                'chest_no' => $p->chest_no,
+                'fest_id'  => $p->level_registration_number,
+                'item_reg' => $p->item_registration_number,
+                'name'     => $p->student?->name ?? $p->teacher?->name,
+                'item'     => $p->registration->item?->title,
+                'school'   => $p->registration?->school?->name ?? Tenant::find($p->registration->school_id)?->name,
+            ]);
+
+        $groupRows = $participants
+            ->filter(fn ($p) => $p->registration->item && $numbering->isGroupItem($p->registration->item) && $p->group?->chest_no !== null)
+            ->groupBy('group_id')
+            ->map(function ($members) {
+                $first = $members->first();
+                $group = $first->group;
+
                 return [
-                    'chest_no' => $p->chest_no,
-                    'fest_id'  => $p->level_registration_number,
-                    'item_reg' => $p->item_registration_number,
-                    'name'     => $p->student?->name ?? $p->teacher?->name,
-                    'item'     => $p->registration->item?->title,
-                    'school'   => $p->registration?->school?->name ?? Tenant::find($p->registration->school_id)?->name,
+                    'chest_no' => $group->chest_no,
+                    'fest_id'  => null,
+                    'item_reg' => $first->item_registration_number,
+                    'name'     => ($group->team_name ?: 'Team').' ('.$members->count().' members)',
+                    'item'     => $first->registration->item?->title,
+                    'school'   => $first->registration?->school?->name ?? Tenant::find($first->registration->school_id)?->name,
                 ];
-            });
+            })
+            ->values();
+
+        return $individualRows->merge($groupRows)
+            ->sortBy(fn ($row) => [$row['item'] ?? '', $row['chest_no'] ?? 9999])
+            ->values();
     }
 }

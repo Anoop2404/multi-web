@@ -4,9 +4,11 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestGroup;
 use App\Models\FestLevelRegistration;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Support\Facades\DB;
 
 class FestNumberingService
@@ -57,15 +59,17 @@ class FestNumberingService
     }
 
     /**
-     * Chest scope: per item head in sports events; event-wide otherwise.
-     * Stored as chest_head_id (0 = event-wide).
+     * Chest scope: always event-wide now. Sports used to scope this per item
+     * head when one FestEvent (the "season") held many disciplines, each its
+     * own head — different heads needed independent chest ranges. Since the
+     * Head = Event rebuild, every discipline is its own standalone FestEvent,
+     * so "per head" and "per event" are the same thing; a student should hold
+     * exactly one chest number across every item they compete in within a
+     * sports event, same as any other fest type. Stored as chest_head_id
+     * (always 0 now — kept as a column for schema/backward compatibility).
      */
     public function chestHeadScope(FestEvent $event, FestEventItem $item): int
     {
-        if ($event->event_type === 'sports' && $item->head_id) {
-            return (int) $item->head_id;
-        }
-
         return self::CHEST_SCOPE_EVENT;
     }
 
@@ -83,8 +87,39 @@ class FestNumberingService
                 ->whereNotNull('chest_no')
                 ->max('chest_no');
 
-            return max($start, ($max ?? 0) + 1);
+            // Team/group squads share the same numeric pool as individuals
+            // (one sequence per event), so a squad number never collides
+            // with an individual's number or vice versa.
+            $groupMax = FestGroup::where('event_id', $event->id)
+                ->whereNotNull('chest_no')
+                ->max('chest_no');
+
+            $max = max((int) $max, (int) $groupMax);
+
+            return max($start, $max + 1);
         });
+    }
+
+    /** Team/group/pair/trio items get ONE chest number for the whole squad. */
+    public function isGroupItem(FestEventItem $item): bool
+    {
+        return FestTeamSquadRules::isMultiPerson($item->participant_type);
+    }
+
+    /**
+     * Resolve/assign the shared chest number for a team/group registration.
+     * Returns the newly-assigned number, or null if the group already had one.
+     */
+    public function resolveGroupChestNumber(FestEvent $event, FestEventItem $item, FestGroup $group): ?int
+    {
+        if ($group->chest_no !== null) {
+            return null;
+        }
+
+        $chest = $this->nextChestNumber($event, $item);
+        $group->update(['event_id' => $event->id, 'chest_no' => $chest]);
+
+        return $chest;
     }
 
     public function persistedChestNumber(FestParticipant $participant): ?int
@@ -126,6 +161,11 @@ class FestNumberingService
     /** Resolved chest for display — includes sibling registrations under the same item head. */
     public function effectiveChestNumber(FestParticipant $participant): ?int
     {
+        $participant->loadMissing('group');
+        if ($participant->group_id && $participant->group?->chest_no !== null) {
+            return (int) $participant->group->chest_no;
+        }
+
         $persisted = $this->persistedChestNumber($participant);
         if ($persisted !== null) {
             return $persisted;
@@ -194,7 +234,7 @@ class FestNumberingService
 
     public function assignParticipantNumbers(FestParticipant $participant): void
     {
-        $participant->loadMissing('registration.event', 'registration.item', 'student');
+        $participant->loadMissing('registration.event', 'registration.item', 'student', 'group');
         $registration = $participant->registration;
         $event = $registration?->event;
         $item = $registration?->item;
@@ -223,7 +263,11 @@ class FestNumberingService
             $updates['item_registration_number'] = $this->nextItemRegistrationNumber($event, $item);
         }
 
-        if (! $this->persistedChestNumber($participant) && $this->shouldAutoAssignChestOnCreate($event, $item)) {
+        if ($this->isGroupItem($item) && $participant->group_id && $participant->group) {
+            // Team/group items: the number lives on the squad (FestGroup),
+            // never on the individual participant row.
+            $this->resolveGroupChestNumber($event, $item, $participant->group);
+        } elseif (! $this->persistedChestNumber($participant) && $this->shouldAutoAssignChestOnCreate($event, $item)) {
             ['chest' => $chest, 'persist' => $persist, 'chest_head_id' => $chestHeadId] = $this->resolveChestAssignment($event, $item, $participant);
             if ($persist) {
                 $updates['chest_no'] = $chest;
@@ -241,12 +285,33 @@ class FestNumberingService
     {
         $count = 0;
 
+        // Team/group items: one chest number per squad (FestGroup), not per member.
+        FestGroup::whereHas('registration', fn ($q) => $q
+            ->where('event_id', $event->id)
+            ->whereIn('status', ['submitted', 'approved'])
+            ->when($item, fn ($q2) => $q2->where('item_id', $item->id))
+            ->whereHas('item', fn ($qi) => $qi->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)))
+            ->with('registration.item')
+            ->whereNull('chest_no')
+            ->each(function (FestGroup $group) use ($event, &$count) {
+                $groupItem = $group->registration?->item;
+                if (! $groupItem || ! $this->isGroupItem($groupItem)) {
+                    return;
+                }
+
+                if ($this->resolveGroupChestNumber($event, $groupItem, $group) !== null) {
+                    $count++;
+                }
+            });
+
         FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->whereIn('status', ['submitted', 'approved'])
-            ->when($item, fn ($q2) => $q2->where('item_id', $item->id)))
+            ->when($item, fn ($q2) => $q2->where('item_id', $item->id))
+            ->whereDoesntHave('item', fn ($qi) => $qi->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)))
             ->with('registration.item')
             ->whereNull('chest_no')
+            ->whereNull('group_id')
             ->each(function (FestParticipant $p) use ($event, &$count) {
                 if (! $p->registration?->item) {
                     return;

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class CertificateTemplate extends Model
 {
     protected $fillable = [
-        'tenant_id', 'event_type', 'certificate_type', 'title', 'body',
+        'tenant_id', 'event_type', 'event_id', 'item_id', 'certificate_type', 'title', 'body',
         'template_file_path', 'background_path', 'logo_path', 'seal_path', 'signatories',
         'dynamic_fields_json', 'layout_json', 'is_active',
     ];
@@ -18,6 +18,16 @@ class CertificateTemplate extends Model
         'signatories'         => 'array',
         'is_active'           => 'boolean',
     ];
+
+    public function event()
+    {
+        return $this->belongsTo(FestEvent::class, 'event_id');
+    }
+
+    public function item()
+    {
+        return $this->belongsTo(FestEventItem::class, 'item_id');
+    }
 
     /**
      * Default overlay positions (% of page) when a background image is used.
@@ -202,6 +212,16 @@ BODY;
 Congratulations! This is to certify that {recipient_name} of {school_name} has excelled in the CBSE {examination_type} (Class {class}) examination for the academic year {academic_year}, securing {percentage} (Rank {rank}).
 
 We commend this outstanding academic achievement and wish continued success.
+BODY;
+    }
+
+    /** Default body text with placeholders for fest event certificates. */
+    public static function defaultFestBody(): string
+    {
+        return <<<'BODY'
+This is to certify that {recipient_name} of {school_name} has {achievement_line} in {item_title}, {event_title} organized by {sahodaya_name} held on {event_dates}.
+
+We appreciate the participant's talent and dedication and wish continued success in future endeavours.
 BODY;
     }
 

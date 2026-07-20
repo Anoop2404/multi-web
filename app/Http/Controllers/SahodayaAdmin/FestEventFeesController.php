@@ -63,6 +63,7 @@ class FestEventFeesController extends SahodayaAdminController
                     'head_id' => $fee->head_id,
                     'status' => $fee->status,
                     'total_due' => $fee->total_due,
+                    'amount_paid' => $fee->amount_paid,
                     'participation_item_count' => $fee->participation_item_count,
                     'school_registration_fee' => $fee->school_registration_fee,
                     'participation_fee' => $fee->participation_fee,
@@ -77,7 +78,7 @@ class FestEventFeesController extends SahodayaAdminController
 
         $summary = [
             'total_due'  => $schoolFees->sum('total_due'),
-            'total_paid' => $schoolFees->where('status', 'approved')->sum('total_due'),
+            'total_paid' => $schoolFees->sum('amount_paid'),
             'pending'    => $schoolFees->where('status', 'pending')->count(),
             'awaiting'   => $schoolFees->where('status', 'proof_uploaded')->count(),
         ];

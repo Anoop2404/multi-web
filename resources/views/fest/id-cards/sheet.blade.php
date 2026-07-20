@@ -79,7 +79,7 @@
 @endif
 
 @php
-    $chunks = array_chunk($cards, 6);
+    $chunks = array_chunk($cards, 4);
 @endphp
 
 @foreach($chunks as $pageIndex => $pageCards)
@@ -100,7 +100,12 @@
                     @if(($card['card_type'] ?? 'individual') === 'team')
                     <div class="card__body">
                         <div class="card__info" style="display:block;padding-left:2.5mm;">
-                            <div class="card__name">{{ $card['name'] }}</div>
+                            <div class="card__name">
+                                {{ $card['name'] }}
+                                @if(!empty($card['chest_number']))
+                                <span style="font-weight:700;">· Chest #{{ $card['chest_number'] }}</span>
+                                @endif
+                            </div>
                             <div class="card__sub">{{ $card['subtitle'] }}</div>
                             <div class="card__detail">{{ $card['detail'] }}</div>
                             @if(!empty($card['schedule']))
@@ -111,7 +116,6 @@
                                 <div class="card__member">
                                     {{ $member['name'] }}
                                     · {{ $member['fest_id'] }}
-                                    @if(!empty($member['chest'])) · {{ $member['chest'] }} @endif
                                 </div>
                                 @endforeach
                                 @if(($card['member_count'] ?? 0) > 7)

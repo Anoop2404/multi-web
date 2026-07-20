@@ -617,13 +617,16 @@ class FestSchoolReportController extends SchoolAdminController
             'head'  => 'head-pass',
             default => 'student',
         };
+        $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, 'student');
 
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView($this->idCardSheetView($request), $this->idCardViewData(
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $cluster,
             $cards,
             'student',
             false,
+            null,
+            $customTemplate,
         ))->download("{$slug}-{$scopeSuffix}-id-cards.pdf");
     }
 
@@ -649,14 +652,16 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($sections === [], 422, 'No participants found for any item head.');
 
         $slug = str($event->title)->slug('-');
+        $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView($this->idCardSheetView($request), $this->idCardViewData(
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $cluster,
             [],
             'student',
             false,
             $sections,
+            $customTemplate,
         ))->download("{$slug}-all-heads-id-cards.pdf");
     }
 

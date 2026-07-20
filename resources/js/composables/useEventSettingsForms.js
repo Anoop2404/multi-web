@@ -167,6 +167,7 @@ export function useEventSettingsForms(props) {
         school_registration_flat: existingFeeSettings.school_registration_flat ?? schedule.school_registration_flat ?? '',
         included_items_per_student: existingFeeSettings.included_items_per_student ?? schedule.included_items_per_student ?? '',
         school_fee_cap: existingFeeSettings.school_fee_cap ?? schedule.school_fee_cap ?? '',
+        school_fee_min: existingFeeSettings.school_fee_min ?? schedule.school_fee_min ?? (props.event?.event_type === 'sports' ? 1500 : ''),
         class_group_scheme: existingFeeSettings.class_group_scheme ?? schedule.class_group_scheme ?? '',
         include_school_registration: existingFeeSettings.include_school_registration ?? schedule.include_school_registration ?? false,
         class_group_fees: {
