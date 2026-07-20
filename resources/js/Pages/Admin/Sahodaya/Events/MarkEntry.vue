@@ -84,10 +84,48 @@
                     </button>
                 </div>
 
-                <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4"
-                        :disabled="bulkSaving" @click="saveAll">
-                    {{ bulkSaving ? 'Saving all…' : 'Save All Marks ✓' }}
-                </button>
+                <div class="flex items-center gap-2">
+                    <button v-if="props.selectedItemId" type="button" class="btn-secondary text-xs !py-1.5 !px-3"
+                            @click="showColumnConfig = !showColumnConfig">
+                        {{ showColumnConfig ? 'Close Columns ✕' : '⚙️ Configure Columns' }}
+                    </button>
+                    <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4"
+                            :disabled="bulkSaving" @click="saveAll">
+                        {{ bulkSaving ? 'Saving all…' : 'Save All Marks ✓' }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Column (criteria) configuration panel -->
+            <div v-if="showColumnConfig" class="border-t border-slate-100 pt-3 space-y-3">
+                <p class="text-xs text-slate-500">
+                    Define the mark-entry columns for this item (e.g. "Judge 1", "Content", "Presentation"). The entry
+                    table and printed mark sheet will show exactly these columns plus a Total.
+                </p>
+
+                <div class="space-y-2">
+                    <div v-for="(row, idx) in columnDraft" :key="row._key" class="flex items-center gap-2">
+                        <span class="text-[10px] font-bold text-slate-400 w-5">{{ idx + 1 }}.</span>
+                        <input v-model="row.label" type="text" placeholder="Column name (e.g. Judge 1)"
+                               class="field text-xs flex-1">
+                        <input v-model.number="row.max_score" type="number" min="0.5" step="0.5" placeholder="Max"
+                               class="field text-xs w-20">
+                        <button type="button" class="text-rose-500 hover:underline text-xs font-semibold"
+                                @click="removeColumnRow(idx)">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-2 pt-1">
+                    <button type="button" class="btn-secondary text-xs !py-1 !px-3" @click="addColumnRow">
+                        + Add Column
+                    </button>
+                    <button type="button" class="btn-primary text-xs !py-1.5 !px-4"
+                            :disabled="savingColumns" @click="saveColumnConfig">
+                        {{ savingColumns ? 'Saving…' : 'Save Columns' }}
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -420,6 +458,46 @@ function participantTotal(participantId) {
 
 function criteriaScoresPayload(participantId) {
     return { ...(criteriaForms[participantId] ?? {}) };
+}
+
+// Column (criteria) configuration
+let draftKeySeq = 0;
+const showColumnConfig = ref(false);
+const savingColumns = ref(false);
+const columnDraft = reactive(
+    (props.criteria ?? []).map((c) => ({
+        _key: draftKeySeq++,
+        id: c.id,
+        label: c.label,
+        max_score: c.max_score ?? 10,
+    }))
+);
+
+function addColumnRow() {
+    columnDraft.push({ _key: draftKeySeq++, id: null, label: '', max_score: 10 });
+}
+
+function removeColumnRow(idx) {
+    columnDraft.splice(idx, 1);
+}
+
+function saveColumnConfig() {
+    if (!props.selectedItemId) return;
+    savingColumns.value = true;
+    const rows = columnDraft
+        .filter((r) => (r.label ?? '').trim() !== '')
+        .map((r) => ({ id: r.id, label: r.label.trim(), max_score: r.max_score || 10 }));
+
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria`,
+        { criteria: rows },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                savingColumns.value = false;
+            },
+        }
+    );
 }
 
 // Signed mark sheet upload
