@@ -278,6 +278,85 @@ class FestMarkEntryController extends SahodayaAdminController
         ])->download("mark-criteria-sheet-{$item->id}.pdf");
     }
 
+    /**
+     * Generate printable / downloadable Mark Entry Evaluation Sheet PDF.
+     */
+    public function markEntrySheet(Request $request, string $tenantId, FestEvent $event, FestNumberingService $numbering)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $itemId = $request->integer('item_id');
+
+        $query = FestEventItem::where('event_id', $event->id)->where('is_enabled', true);
+        if ($itemId) {
+            $query->where('id', $itemId);
+        }
+        $items = $query->orderBy('code')->orderBy('title')->get();
+
+        abort_if($items->isEmpty(), 404, 'No competition items found.');
+
+        $sheets = [];
+
+        foreach ($items as $item) {
+            $isGroup = $numbering->isGroupItem($item);
+
+            $participants = FestParticipant::whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $event->id)
+                    ->where('item_id', $item->id)
+                    ->where('status', 'approved'))
+                ->where('participant_role', '!=', 'standby')
+                ->with(['student', 'teacher', 'registration.school', 'group'])
+                ->get();
+
+            $rows = [];
+            $seenGroups = [];
+
+            foreach ($participants as $p) {
+                if ($isGroup && $p->group_id) {
+                    if (isset($seenGroups[$p->group_id])) {
+                        continue;
+                    }
+                    $seenGroups[$p->group_id] = true;
+                    $chest = $p->group?->chest_no;
+                    $regNo = $p->student?->reg_no ?? $p->teacher?->reg_no ?? "GRP-{$p->group_id}";
+                } else {
+                    $chest = $numbering->effectiveChestNumber($p);
+                    $regNo = $p->student?->reg_no ?? $p->teacher?->reg_no ?? "REG-{$p->id}";
+                }
+
+                $rows[] = [
+                    'chest_no' => $chest,
+                    'reg_no'   => $regNo,
+                    'school'   => strtoupper($p->registration?->school?->name ?? '—'),
+                ];
+            }
+
+            usort($rows, function ($a, $b) {
+                if ($a['chest_no'] && $b['chest_no']) {
+                    return (int) $a['chest_no'] <=> (int) $b['chest_no'];
+                }
+                return strcmp($a['reg_no'] ?? '', $b['reg_no'] ?? '');
+            });
+
+            $sheets[] = [
+                'item' => $item,
+                'rows' => $rows,
+            ];
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-entry-sheet', [
+            'sahodaya' => $this->sahodaya,
+            'event'    => $event,
+            'sheets'   => $sheets,
+        ]);
+
+        $fileName = $itemId
+            ? "mark-entry-sheet-item-{$itemId}.pdf"
+            : "mark-entry-sheets-{$event->id}.pdf";
+
+        return $pdf->download($fileName);
+    }
+
     public function autoRankItem(string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

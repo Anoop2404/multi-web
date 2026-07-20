@@ -10,6 +10,9 @@
                     <Link v-if="competitionUrl" :href="competitionUrl" class="btn-secondary text-xs">
                         ← {{ isSports ? 'By Event Head' : 'By Item Head' }}
                     </Link>
+                    <a :href="markEntrySheetUrl" target="_blank" class="btn-secondary text-xs !bg-indigo-50 !text-indigo-800 hover:!bg-indigo-100 font-bold border-indigo-200">
+                        🖨️ Mark Entry Sheet PDF
+                    </a>
                     <a v-if="cumulativeSheetUrl" :href="cumulativeSheetUrl" target="_blank" class="btn-secondary text-xs">
                         Cumulative Sheet ↓
                     </a>
@@ -25,28 +28,8 @@
                            :event="event" active="marks" class="mb-4" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="marks" class="mb-4" />
 
-        <!-- Guidance Banner -->
-        <div class="mb-4 rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-4 text-xs text-indigo-950 shadow-sm space-y-1">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <p class="font-bold text-indigo-900 flex items-center gap-1.5 text-sm">
-                    <span>✍️</span> Mark Entry &amp; Results Evaluation
-                </p>
-                <Link v-if="selectedItemId" :href="competitionUrl" class="text-xs font-bold text-indigo-700 hover:underline">
-                    ← Back to Item Directory
-                </Link>
-            </div>
-            <p class="text-indigo-900/80 leading-relaxed">
-                <template v-if="isSports">
-                    Mark attendance, enter time/distance, then pick position/rank. Team points apply automatically when rank is selected.
-                </template>
-                <template v-else>
-                    Enter place/position (1, 2, 3…). Multiple participants can share the same rank (ties allowed). Points and grades are saved per participant.
-                </template>
-            </p>
-        </div>
-
-        <!-- Filter & Item Selector Toolbar Card -->
-        <div class="card !p-4 space-y-3.5 mb-5">
+        <!-- Filter & Item Selector Card -->
+        <div class="card !p-4 space-y-3 mb-5">
             <!-- Child Event Selector for Sports -->
             <div v-if="isSports && childEvents.length" class="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Sport Event:</label>
@@ -58,9 +41,9 @@
             </div>
 
             <!-- Item Pill Chips -->
-            <div v-if="itemOptions.length > 1" class="space-y-2 border-b border-slate-100 pb-3">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Select Competition Item</p>
-                <div class="flex flex-wrap gap-1.5 text-xs">
+            <div v-if="itemOptions.length > 1" class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Item:</span>
                     <button v-for="it in itemOptions" :key="it.id" type="button" @click="selectItem(it.id)"
                             :class="selectedItemId == it.id
                                 ? 'bg-slate-900 text-white font-bold shadow-sm'
@@ -69,40 +52,11 @@
                         {{ it.title }}
                     </button>
                 </div>
-            </div>
 
-            <!-- Judge Criteria Toggle & Save All Bar -->
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <button v-if="selectedItemId && !isSports" type="button" class="btn-secondary text-xs flex items-center gap-1.5" @click="showCriteriaPanel = !showCriteriaPanel">
-                    <span>⚖️ Marking Criteria / Judge Columns</span>
-                    <span class="text-[11px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">
-                        {{ hasCriteria ? `${criteria.length} configured` : 'Single grade/score' }}
-                    </span>
-                </button>
-
-                <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4 ml-auto"
+                <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4"
                         :disabled="bulkSaving" @click="saveAll">
                     {{ bulkSaving ? 'Saving all…' : 'Save All Marks ✓' }}
                 </button>
-            </div>
-
-            <!-- Expandable Criteria Panel -->
-            <div v-if="showCriteriaPanel && !isSports" class="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3 text-xs pt-3">
-                <h4 class="font-bold text-slate-900">Configure Judge Criteria / Sub-Scores</h4>
-                <p class="text-slate-500 leading-relaxed">
-                    Add rows per judge or criterion (e.g. "Judge 1", "Content", "Presentation"). The sum becomes the participant's mark. Leave empty to use plain grade/score entry.
-                </p>
-                <div v-for="(row, idx) in criteriaDraft" :key="idx" class="flex items-center gap-2">
-                    <input v-model="row.label" type="text" class="field text-xs flex-1" placeholder="e.g. Judge 1 / Content">
-                    <input v-model.number="row.max_score" type="number" min="0.5" step="0.5" class="field text-xs w-24" placeholder="Max">
-                    <button type="button" class="btn-secondary text-xs !text-rose-700 hover:!bg-rose-50 !py-1 !px-2" @click="criteriaDraft.splice(idx, 1)">Remove</button>
-                </div>
-                <div class="flex items-center gap-2 pt-1">
-                    <button type="button" class="btn-secondary text-xs" @click="criteriaDraft.push({ id: null, label: '', max_score: 10 })">+ Add Criterion Row</button>
-                    <button type="button" class="btn-primary text-xs !py-1 !px-3" :disabled="savingCriteria" @click="saveCriteriaConfig">
-                        {{ savingCriteria ? 'Saving…' : 'Save Criteria Config' }}
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -119,30 +73,27 @@
             </template>
         </EmptyState>
 
-        <!-- Sections Table -->
+        <!-- Single Unified Datatable List -->
         <div v-else class="space-y-6">
             <section v-for="section in sections" :key="section.key" class="card !p-0 overflow-hidden border border-slate-200">
-                <!-- Section Header -->
+                <!-- Section Bar -->
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 bg-slate-50">
-                    <div>
+                    <div class="flex items-center gap-2">
                         <h3 class="section-title !mb-0 text-sm font-bold text-slate-900">{{ section.item?.title }}</h3>
-                        <p v-if="section.schoolName" class="text-xs text-slate-500 mt-0.5">{{ section.schoolName }}</p>
+                        <span class="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold text-[11px]">
+                            {{ section.rows.length }} participant(s)
+                        </span>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2 text-xs">
                         <div v-if="section.rows.length > 1" class="flex items-center gap-1.5">
                             <span class="text-slate-500 font-medium text-[11px]">Same rank for all:</span>
-                            <template v-if="isSports">
-                                <select v-model="bulkRank[section.bulkKey]" class="field text-xs !py-1 min-w-[9rem]">
-                                    <option :value="null">—</option>
-                                    <option v-for="opt in rankOptionsForItem(section.item)" :key="opt.rank" :value="opt.rank">
-                                        {{ opt.label }} ({{ opt.points }} pts)
-                                    </option>
-                                </select>
-                            </template>
-                            <template v-else>
-                                <input v-model.number="bulkRank[section.bulkKey]" type="number" min="1" class="field text-xs !py-1 w-16" placeholder="#" />
-                            </template>
+                            <select v-model="bulkRank[section.bulkKey]" class="field text-xs !py-1 min-w-[9rem]">
+                                <option :value="null">—</option>
+                                <option v-for="opt in rankOptions" :key="opt.rank" :value="opt.rank">
+                                    {{ opt.label }}
+                                </option>
+                            </select>
                             <button type="button" class="btn-secondary text-xs !py-1 !px-2.5"
                                     :disabled="!bulkRank[section.bulkKey]"
                                     @click="applyBulkRank(section, markForms)">
@@ -153,105 +104,99 @@
                         <button v-if="isSports && section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5" @click="autoRank(section.item)">
                             Auto-rank
                         </button>
-                        <span class="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold text-[11px]">
-                            {{ section.rows.length }} participant(s)
-                        </span>
                     </div>
                 </div>
 
-                <!-- Table -->
+                <!-- Datatable -->
                 <div class="overflow-x-auto bg-white">
                     <table class="w-full text-xs text-left">
-                        <thead class="bg-slate-50/70 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold">
+                        <thead class="bg-slate-50/80 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold">
                             <tr>
-                                <th class="p-3.5 w-12 text-center">#</th>
-                                <th class="p-3.5">Chest No. / Reg ID</th>
-                                <th v-if="isSports" class="p-3.5 w-32">Attendance</th>
+                                <th class="p-3.5 w-10 text-center">#</th>
+                                <th class="p-3.5 w-32">Chest No.</th>
+                                <th class="p-3.5 w-36">Reg No.</th>
+                                <th class="p-3.5 w-32">Attendance</th>
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
-                                <th v-if="showMeasurement(section.item)" class="p-3.5 w-20">Unit</th>
-                                <th class="p-3.5 w-44">Position / Rank</th>
-                                <th v-if="!isSports && !hasCriteria" class="p-3.5 w-24">Grade</th>
-                                <th v-if="!isSports && !hasCriteria" class="p-3.5 w-24">Points</th>
-                                <template v-if="!isSports && hasCriteria">
-                                    <th v-for="c in criteria" :key="c.id" class="p-3.5 w-24">
-                                        {{ c.label }} <span class="font-normal text-slate-400">(/ {{ c.max_score }})</span>
-                                    </th>
-                                    <th class="p-3.5 w-24">Total</th>
-                                </template>
+                                <th class="p-3.5 w-44">Rank</th>
+                                <th class="p-3.5 w-28">Marks / Score</th>
+                                <th v-if="!isSports" class="p-3.5 w-24">Grade</th>
                                 <th class="p-3.5 text-right w-24">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             <tr v-for="({ participant, item }, pIdx) in section.rows" :key="participant.id"
-                                :class="isAbsent(participant, item) ? 'bg-slate-50/80 opacity-60' : 'hover:bg-slate-50/70 transition'">
+                                :class="isAbsent(participant, item) ? 'bg-rose-50/30' : 'hover:bg-slate-50/70 transition'">
                                 
+                                <!-- Serial No -->
                                 <td class="p-3.5 text-slate-400 text-center font-mono font-medium">{{ pIdx + 1 }}</td>
 
-                                <!-- Chest No. / Reg ID Only -->
-                                <td class="p-3.5 font-mono font-bold text-slate-900 text-sm">
-                                    <div class="flex items-center gap-2">
-                                        <span v-if="participant.chest_no" class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg border border-indigo-100">
-                                            Chest #{{ participant.chest_no }}
-                                        </span>
-                                        <span v-else-if="participantRegNo(participant)" class="inline-flex items-center gap-1 bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200">
-                                            Reg #{{ participantRegNo(participant) }}
-                                        </span>
-                                        <span v-else class="inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200">
-                                            ID: {{ participant.id }}
-                                        </span>
-
-                                        <span v-if="participant._is_team" class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-100">
-                                            Team · {{ participant._member_count }}
-                                        </span>
-                                    </div>
+                                <!-- Chest No. -->
+                                <td class="p-3.5 font-mono font-bold text-slate-900">
+                                    <span v-if="participant.chest_no" class="inline-flex items-center bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100 text-xs">
+                                        #{{ participant.chest_no }}
+                                    </span>
+                                    <span v-else class="text-slate-400 font-normal">—</span>
                                 </td>
 
-                                <!-- Attendance (Sports) -->
-                                <td v-if="isSports" class="p-3.5">
+                                <!-- Reg No. -->
+                                <td class="p-3.5 font-mono text-slate-700 text-xs">
+                                    <span v-if="participantRegNo(participant)" class="bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
+                                        {{ participantRegNo(participant) }}
+                                    </span>
+                                    <span v-else class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
+                                        ID: {{ participant.id }}
+                                    </span>
+                                </td>
+
+                                <!-- Attendance -->
+                                <td class="p-3.5">
                                     <select :value="attendanceStatus(participant, item)"
-                                            class="field text-xs !py-1"
+                                            class="field text-xs !py-1 font-semibold"
+                                            :class="isAbsent(participant, item) ? '!border-rose-300 !bg-rose-50 !text-rose-700' : ''"
                                             @change="markAttendance(participant, item, $event.target.value)">
-                                        <option value="">—</option>
+                                        <option value="">Present ✓</option>
                                         <option value="present">Present ✓</option>
                                         <option value="absent">Absent ✕</option>
                                     </select>
                                 </td>
 
-                                <!-- Time / Distance -->
+                                <!-- Time / Distance (if applicable) -->
                                 <td v-if="showMeasurement(section.item)" class="p-3.5">
-                                    <input v-model="markForms[participant.id].measurement_value"
-                                           class="field text-xs"
-                                           placeholder="e.g. 7.45 / 5.20"
-                                           :disabled="isAbsent(participant, item)">
-                                </td>
-                                <td v-if="showMeasurement(section.item)" class="p-3.5">
-                                    <input v-model="markForms[participant.id].measurement_unit"
-                                           class="field text-xs"
-                                           placeholder="s / m"
-                                           :disabled="isAbsent(participant, item)">
+                                    <div class="flex items-center gap-1">
+                                        <input v-model="markForms[participant.id].measurement_value"
+                                               class="field text-xs"
+                                               placeholder="7.45"
+                                               :disabled="isAbsent(participant, item)">
+                                        <input v-model="markForms[participant.id].measurement_unit"
+                                               class="field text-xs w-16"
+                                               placeholder="s/m"
+                                               :disabled="isAbsent(participant, item)">
+                                    </div>
                                 </td>
 
-                                <!-- Rank -->
+                                <!-- Rank Dropdown -->
                                 <td class="p-3.5">
-                                    <select v-if="isSports"
-                                            :value="markForms[participant.id].position ?? ''"
-                                            class="field text-xs !py-1 font-semibold"
+                                    <select :value="markForms[participant.id].position ?? ''"
+                                            class="field text-xs !py-1 font-bold text-slate-900"
                                             :disabled="isAbsent(participant, item)"
                                             @change="setRank(participant.id, item, markForms, $event.target.value)">
-                                        <option value="">—</option>
-                                        <option v-for="opt in rankOptionsForItem(item)" :key="opt.rank" :value="opt.rank">
-                                            {{ opt.label }} ({{ opt.points }} pts)
+                                        <option value="">— Select Rank —</option>
+                                        <option v-for="opt in rankOptions" :key="opt.rank" :value="opt.rank">
+                                            {{ opt.label }}
                                         </option>
                                     </select>
-                                    <input v-else
-                                           v-model.number="markForms[participant.id].position" type="number" min="1"
-                                           class="field text-xs font-semibold" placeholder="Rank (1, 2, 3)" title="Ties allowed"
-                                           @input="applyRankPoints(participant.id, item, markForms)">
                                 </td>
 
-                                <!-- Grade & Points (Non-Sports, No Criteria) -->
-                                <td v-if="!isSports && !hasCriteria" class="p-3.5">
-                                    <select v-model="markForms[participant.id].grade" class="field text-xs">
+                                <!-- Marks / Score (Optional) -->
+                                <td class="p-3.5">
+                                    <input v-model.number="markForms[participant.id].score" type="number" min="0" step="0.5"
+                                           class="field text-xs font-bold tabular-nums" placeholder="Pts (Optional)"
+                                           :disabled="isAbsent(participant, item)">
+                                </td>
+
+                                <!-- Grade (Non-Sports) -->
+                                <td v-if="!isSports" class="p-3.5">
+                                    <select v-model="markForms[participant.id].grade" class="field text-xs" :disabled="isAbsent(participant, item)">
                                         <option value="">—</option>
                                         <option>A</option>
                                         <option>A+</option>
@@ -259,21 +204,8 @@
                                         <option>C</option>
                                     </select>
                                 </td>
-                                <td v-if="!isSports && !hasCriteria" class="p-3.5">
-                                    <input v-model.number="markForms[participant.id].score" type="number" min="0"
-                                           class="field text-xs font-bold tabular-nums" placeholder="Pts">
-                                </td>
 
-                                <!-- Judge Criteria Inputs -->
-                                <template v-if="!isSports && hasCriteria">
-                                    <td v-for="c in criteria" :key="c.id" class="p-3.5">
-                                        <input v-model.number="criteriaForms[participant.id][c.id]" type="number" min="0" :max="c.max_score" step="0.5"
-                                               class="field text-xs tabular-nums" placeholder="0">
-                                    </td>
-                                    <td class="p-3.5 font-black text-slate-900 text-sm tabular-nums">{{ criteriaTotal(participant.id) }}</td>
-                                </template>
-
-                                <!-- Save Button -->
+                                <!-- Action Button -->
                                 <td class="p-3.5 text-right">
                                     <div class="flex items-center justify-end gap-2">
                                         <span v-if="savedIds.has(participant.id)" class="text-xs font-bold text-emerald-600">Saved ✓</span>
@@ -327,13 +259,20 @@ const props = defineProps({
 
 const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/import`);
 const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
-const settingsPointsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/settings/points`);
 const isSports = computed(() => props.event?.event_type === 'sports');
+
+const markEntrySheetUrl = computed(() => {
+    let url = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/mark-entry-sheet`;
+    if (props.selectedItemId) {
+        url += `?item_id=${props.selectedItemId}`;
+    }
+    return url;
+});
 
 const filterDescription = computed(() => (
     isSports.value
         ? 'Sports event marks, attendance, times/distances, and ranks.'
-        : 'Entering marks for competition items — rank, grade, score, or judge criteria.'
+        : 'Entering marks for competition items — chest no, reg no, rank, score, and grade.'
 ));
 
 const itemOptions = computed(() => {
@@ -363,21 +302,24 @@ const displayCtx = useFestMarkEntryDisplay(props, isSports);
 const {
     bulkRank,
     sections,
-    markableParticipants,
-    attendanceKey,
     attendanceStatus,
     isAbsent,
     showMeasurement,
-    rankLabel,
-    rankOptionsForItem,
     setRank,
-    pointsForRank,
-    displayTeamPts,
     applyRankPoints,
     applyBulkRank,
     buildMarkPayload,
     iterSaveRows,
 } = displayCtx;
+
+const rankOptions = computed(() => [
+    { rank: 1, label: '1st Place' },
+    { rank: 2, label: '2nd Place' },
+    { rank: 3, label: '3rd Place' },
+    { rank: 4, label: '4th Place' },
+    { rank: 5, label: '5th Place' },
+    { rank: 6, label: '6th Place' },
+]);
 
 // Form state per participant
 const markForms = reactive({});
@@ -394,53 +336,6 @@ for (const reg of props.registrations ?? []) {
     }
 }
 
-// Criteria / judge sub-score state
-const hasCriteria = computed(() => (props.criteria ?? []).length > 0);
-const criteria = computed(() => props.criteria ?? []);
-
-const criteriaForms = reactive({});
-for (const reg of props.registrations ?? []) {
-    for (const p of reg.participants ?? []) {
-        const existing = props.criterionScores?.[p.id] ?? {};
-        const form = {};
-        for (const c of props.criteria ?? []) {
-            form[c.id] = existing[c.id] ?? null;
-        }
-        criteriaForms[p.id] = form;
-    }
-}
-
-function criteriaTotal(participantId) {
-    const form = criteriaForms[participantId] ?? {};
-    return Object.values(form).reduce((sum, v) => sum + (Number(v) || 0), 0);
-}
-
-const showCriteriaPanel = ref(false);
-const criteriaDraft = reactive(
-    (props.criteria ?? []).map((c) => ({ id: c.id, label: c.label, max_score: Number(c.max_score) })),
-);
-const savingCriteria = ref(false);
-
-function saveCriteriaConfig() {
-    if (!props.selectedItemId || savingCriteria.value) {
-        return;
-    }
-    savingCriteria.value = true;
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria`, {
-        criteria: criteriaDraft.filter((row) => (row.label ?? '').trim() !== ''),
-    }, {
-        preserveScroll: true,
-        onFinish: () => { savingCriteria.value = false; },
-    });
-}
-
-function participantName(participant) {
-    if (participant._is_team) {
-        return participant._team_name;
-    }
-    return participant.student?.name ?? participant.teacher?.name ?? 'Participant';
-}
-
 function participantRegNo(participant) {
     return participant.student?.fest_registration_id ?? participant.event_reg_id ?? null;
 }
@@ -453,21 +348,15 @@ function markAttendance(participant, item, status) {
     }, { preserveScroll: true });
 }
 
-function markPayloadWithCriteria(participant, item) {
-    const payload = buildMarkPayload(participant, item, markForms);
-    if (hasCriteria.value) {
-        payload.criteria_scores = { ...criteriaForms[participant.id] };
-    }
-    return payload;
-}
-
 const savedIds = ref(new Set());
 const savingIds = ref(new Set());
 const bulkSaving = ref(false);
 
 function saveMark(participant, item) {
+    if (isAbsent(participant, item)) return;
+
     savingIds.value = new Set([...savingIds.value, participant.id]);
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, markPayloadWithCriteria(participant, item), {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, buildMarkPayload(participant, item, markForms), {
         preserveScroll: true,
         onSuccess: () => {
             savedIds.value = new Set([...savedIds.value, participant.id]);
@@ -483,9 +372,11 @@ function saveMark(participant, item) {
 async function saveAll() {
     bulkSaving.value = true;
     for (const { participant, item } of iterSaveRows()) {
+        if (isAbsent(participant, item)) continue;
+
         await new Promise((resolve) => {
             savingIds.value = new Set([...savingIds.value, participant.id]);
-            router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, markPayloadWithCriteria(participant, item), {
+            router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, buildMarkPayload(participant, item, markForms), {
                 preserveScroll: true,
                 onSuccess: () => {
                     savedIds.value = new Set([...savedIds.value, participant.id]);
