@@ -40,19 +40,6 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
     }
 
     const sections = computed(() => {
-        if (!isSports.value) {
-            return (props.registrations ?? []).map((reg) => ({
-                key: `reg-${reg.id}`,
-                item: reg.item,
-                schoolName: reg.school?.name ?? null,
-                rows: markableParticipants(reg).map((participant) => ({
-                    participant,
-                    item: reg.item,
-                })),
-                bulkKey: reg.id,
-            }));
-        }
-
         const byItem = new Map();
 
         for (const reg of props.registrations ?? []) {
@@ -65,7 +52,6 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
                 byItem.set(itemId, {
                     key: `item-${itemId}`,
                     item: reg.item,
-                    schoolName: null,
                     rows: [],
                     bulkKey: itemId,
                 });
@@ -75,6 +61,7 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
                 byItem.get(itemId).rows.push({
                     participant,
                     item: reg.item,
+                    schoolName: reg.school?.name ?? '—',
                 });
             }
         }

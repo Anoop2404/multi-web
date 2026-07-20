@@ -164,7 +164,8 @@
                     <table class="w-full text-xs text-left">
                         <thead class="bg-slate-50/70 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold">
                             <tr>
-                                <th class="p-3.5">Participant / Squad</th>
+                                <th class="p-3.5 w-12 text-center">#</th>
+                                <th class="p-3.5">Chest No. / Reg ID</th>
                                 <th v-if="isSports" class="p-3.5 w-32">Attendance</th>
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-20">Unit</th>
@@ -181,16 +182,24 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            <tr v-for="{ participant, item } in section.rows" :key="participant.id"
+                            <tr v-for="({ participant, item }, pIdx) in section.rows" :key="participant.id"
                                 :class="isAbsent(participant, item) ? 'bg-slate-50/80 opacity-60' : 'hover:bg-slate-50/70 transition'">
                                 
-                                <!-- Participant -->
-                                <td class="p-3.5 font-bold text-slate-900">
+                                <td class="p-3.5 text-slate-400 text-center font-mono font-medium">{{ pIdx + 1 }}</td>
+
+                                <!-- Chest No. / Reg ID Only -->
+                                <td class="p-3.5 font-mono font-bold text-slate-900 text-sm">
                                     <div class="flex items-center gap-2">
-                                        <span v-if="participant.chest_no" class="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
-                                            #{{ participant.chest_no }}
+                                        <span v-if="participant.chest_no" class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg border border-indigo-100">
+                                            Chest #{{ participant.chest_no }}
                                         </span>
-                                        <span>{{ participantName(participant) }}</span>
+                                        <span v-else-if="participantRegNo(participant)" class="inline-flex items-center gap-1 bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg border border-slate-200">
+                                            Reg #{{ participantRegNo(participant) }}
+                                        </span>
+                                        <span v-else class="inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200">
+                                            ID: {{ participant.id }}
+                                        </span>
+
                                         <span v-if="participant._is_team" class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-100">
                                             Team · {{ participant._member_count }}
                                         </span>
