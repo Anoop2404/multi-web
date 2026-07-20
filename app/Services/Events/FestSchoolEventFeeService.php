@@ -353,18 +353,15 @@ class FestSchoolEventFeeService
             'participation_fee' => $composite['item_fee'] + $composite['team_fee'],
             'extra_item_fee' => $composite['team_fee'],
             'total_due' => round($total, 2),
-            'status' => $record->fee_receipt_id ? ($record->status ?? 'proof_uploaded') : 'pending',
         ]);
-
-        if ($total <= 0) {
-            $record->status = 'approved';
-        }
-
         $record->save();
 
-        if ($total > 0 && (float) $record->amount_paid > 0) {
-            $record->refreshPaidState();
-        }
+        // Derive status from the actual receipt state (approved/uploaded/none) rather
+        // than trusting whatever status happens to already be stored — previously a
+        // status of 'approved' set while total_due was (incorrectly) 0 would stick
+        // around forever afterward, even once the real amount was recalculated and
+        // even if the school's uploaded proof was never actually approved by an admin.
+        $record->refreshPaidState();
 
         if ($this->supportsFeeLines()) {
             $this->syncFeeLines($record, $composite['lines']);
@@ -422,18 +419,11 @@ class FestSchoolEventFeeService
             'participation_fee' => $composite['item_fee'] + $composite['team_fee'],
             'extra_item_fee' => $composite['team_fee'],
             'total_due' => round($total, 2),
-            'status' => $record->fee_receipt_id ? ($record->status ?? 'proof_uploaded') : 'pending',
         ]);
-
-        if ($total <= 0) {
-            $record->status = 'approved';
-        }
-
         $record->save();
 
-        if ($total > 0 && (float) $record->amount_paid > 0) {
-            $record->refreshPaidState();
-        }
+        // See recalculateForSportsEvent() for why status is derived, not preserved.
+        $record->refreshPaidState();
 
         if ($this->supportsFeeLines()) {
             $this->syncFeeLines($record, $composite['lines']);
@@ -606,19 +596,12 @@ class FestSchoolEventFeeService
             'participation_fee' => $participationFee,
             'extra_item_fee' => $this->supportsSportsCompositeSchema() ? $extraItemFee : null,
             'total_due' => $total,
-            'status' => $record->fee_receipt_id ? ($record->status ?? 'proof_uploaded') : 'pending',
         ], fn ($value) => $value !== null));
-
-        if ($total <= 0) {
-            $record->status = 'approved';
-        }
-
         $record->save();
 
-        // Keep partial-payment status in sync if anything has already been paid.
-        if ($total > 0 && (float) $record->amount_paid > 0) {
-            $record->refreshPaidState();
-        }
+        // Derive status from the actual receipt state rather than preserving whatever
+        // was stored — see recalculateForSportsEvent() for the incident this fixes.
+        $record->refreshPaidState();
 
         if ($useComposite && $this->supportsFeeLines()) {
             $this->syncFeeLines($record, $compositeLines);

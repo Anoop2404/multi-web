@@ -9,6 +9,7 @@ use App\Models\FestRegistration;
 use App\Models\McqExam;
 use App\Models\McqRegistration;
 use App\Models\MembershipPayment;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Support\AuditLogCatalog;
 use Illuminate\Database\Eloquent\Model;
@@ -196,9 +197,11 @@ class PlatformAuditLogger
 
     public function festFeeProofUploaded(FestEvent $event, string $schoolId): AuditLog
     {
+        $schoolName = Tenant::find($schoolId)?->name ?? "School #{$schoolId}";
+
         return $this->log(
             'fest.fee.proof_uploaded',
-            "School #{$schoolId} uploaded fee proof for {$event->title}",
+            "{$schoolName} uploaded fee proof for {$event->title}",
             $event,
             ['event_id' => $event->id, 'school_id' => $schoolId],
         );

@@ -433,6 +433,10 @@
                                     {{ headFeeStatusLabel(headFee.status) }}
                                 </span>
                             </div>
+                            <p v-if="headFee.status === 'rejected' && headFee.rejection_reason"
+                               class="text-xs text-red-600">
+                                Reason: {{ headFee.rejection_reason }}
+                            </p>
                             <ul v-if="(headFee.breakdown?.items ?? []).length" class="text-xs text-indigo-900 space-y-1">
                                 <li v-for="(line, i) in headFee.breakdown.items" :key="i" class="flex justify-between gap-4">
                                     <span>{{ line.label }}</span>
@@ -505,7 +509,10 @@
                         <div class="mt-2 flex flex-wrap gap-2 items-center">
                             <span v-if="event.school_fee.status === 'approved'" class="text-xs text-green-700 font-semibold">Payment approved</span>
                             <span v-else-if="event.school_fee.status === 'proof_uploaded'" class="text-xs text-amber-700 font-semibold">Payment pending approval</span>
-                            <span v-else-if="event.school_fee.status === 'rejected'" class="text-xs text-red-600 font-semibold">Payment rejected — re-upload</span>
+                            <span v-else-if="event.school_fee.status === 'rejected'" class="text-xs text-red-600 font-semibold">
+                                Payment rejected — re-upload
+                                <span v-if="event.school_fee.rejection_reason" class="font-normal block">Reason: {{ event.school_fee.rejection_reason }}</span>
+                            </span>
                             <form v-if="itemFeesDue(event) > 0 && ['pending', 'rejected'].includes(event.school_fee.status)"
                                   @submit.prevent="uploadEventPayment(event)" class="flex flex-wrap gap-2 items-center">
                                 <input type="file" accept=".pdf,.jpg,.jpeg,.png"

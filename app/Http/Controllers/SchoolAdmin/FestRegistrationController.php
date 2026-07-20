@@ -468,7 +468,14 @@ class FestRegistrationController extends SchoolAdminController
         $event->setAttribute('quotas', $usage);
         $event->setAttribute('school_fee', $schoolFee ? array_merge(
             $schoolFee->toArray(),
-            ['breakdown' => $feeService->breakdown($event, $schoolFee, $schedule)]
+            [
+                'breakdown' => $feeService->breakdown($event, $schoolFee, $schedule),
+                // Rejection reason lives on the receipt, not the fee row — surfaced here so
+                // the school can see *why* before re-uploading, instead of a bare "rejected".
+                'rejection_reason' => $schoolFee->status === 'rejected'
+                    ? $schoolFee->receipts()->where('status', 'rejected')->latest('id')->value('rejection_reason')
+                    : null,
+            ]
         ) : null);
 
         $usesPerHead = $feeService->usesPerHeadBilling($event);
@@ -493,6 +500,9 @@ class FestRegistrationController extends SchoolAdminController
                     'outstanding' => (float) $fee->outstandingBalance(),
                     'status' => $fee->status,
                     'breakdown' => $feeService->breakdown($event, $fee, $schedule),
+                    'rejection_reason' => $fee->status === 'rejected'
+                        ? $fee->receipts()->where('status', 'rejected')->latest('id')->value('rejection_reason')
+                        : null,
                 ];
             })->values()->all());
         }

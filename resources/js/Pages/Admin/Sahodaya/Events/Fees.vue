@@ -91,9 +91,14 @@
                         </td>
                         <td class="p-3 font-semibold">₹{{ row.total_due }}</td>
                         <td class="p-3">
-                            <span :class="statusClass(row.status)" class="text-xs font-semibold px-2 py-0.5 rounded">
+                            <span :class="statusClass(row.status)" class="text-xs font-semibold px-2 py-0.5 rounded"
+                                  :title="row.status === 'rejected' ? row.fee_receipt?.rejection_reason : null">
                                 {{ row.status }}
                             </span>
+                            <p v-if="row.status === 'rejected' && row.fee_receipt?.rejection_reason"
+                               class="text-[11px] text-red-600 mt-1 max-w-[14rem]">
+                                {{ row.fee_receipt.rejection_reason }}
+                            </p>
                         </td>
                         <td class="p-3 text-right text-xs space-y-1">
                             <button @click="recalculateFee(row.id)" class="text-slate-500 hover:text-slate-900 font-semibold block mb-1">Recalculate</button>
