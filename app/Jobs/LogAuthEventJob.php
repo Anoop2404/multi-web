@@ -35,7 +35,7 @@ class LogAuthEventJob implements ShouldQueue
         ]);
     }
 
-    public static function fromLogin(string $action, int $userId, string $email, array $context = []): self
+    public static function fromLogin(string $action, int $userId, ?string $email, array $context = []): self
     {
         return new self(
             action: $action,
@@ -46,14 +46,20 @@ class LogAuthEventJob implements ShouldQueue
         );
     }
 
-    private static function descriptionFor(string $action, string $email): string
+    // Portal accounts (judge/house-admin/group-admin/coordinator roles, etc.) can
+    // legitimately have no email — "Email (optional — leave blank to log in by
+    // username only)" is an explicit option on the Users form — so $email must
+    // stay nullable through this whole chain, not just at the constructor.
+    private static function descriptionFor(string $action, ?string $email): string
     {
+        $label = $email ?? 'username-only account';
+
         return match ($action) {
-            'login' => "User logged in: {$email}",
+            'login' => "User logged in: {$label}",
             'login.failed' => 'Failed login attempt',
-            'login.portal_rejected' => "Login rejected (wrong portal): {$email}",
-            'login.no_portal' => "Login rejected (no portal): {$email}",
-            'logout' => "User logged out: {$email}",
+            'login.portal_rejected' => "Login rejected (wrong portal): {$label}",
+            'login.no_portal' => "Login rejected (no portal): {$label}",
+            'logout' => "User logged out: {$label}",
             default => AuditLogCatalog::categoryForAction($action).' event',
         };
     }

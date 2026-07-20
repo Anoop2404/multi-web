@@ -88,17 +88,14 @@
             <Link :href="eventRegistrationHref" class="btn-primary text-xs !min-h-0">Go to Billing & Pay →</Link>
         </div>
 
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
-            <HubCard :href="eventRegistrationHref" icon="📝"
-                     :label="isSports ? 'Step 1 · Register students' : 'Register students'"
-                     :hint="isSports ? 'Add athletes to this event & pay fees' : 'Add participants & pay fees'" />
-            <HubCard v-if="isSports" :href="itemRegistrationHref" icon="🏃" label="Step 2 · Register by Sport Event"
-                     hint="Pick a sport event (Athletics, Chess…) and add athletes to its items" />
-            <HubCard :href="reportsHref" icon="📋" label="Reports & ID cards" hint="Admit cards, ID cards, exports" />
-            <HubCard :href="clashHref" icon="⚠️" label="Clash requests" hint="Report schedule conflicts" />
-            <HubCard :href="substitutionHref" icon="🔄" label="Substitutions" hint="Request participant swaps" />
-            <HubCard :href="festDayHref" icon="📅" label="Fest day view" hint="Day-of-event snapshot" />
-        </div>
+        <!--
+            Deliberately no quick-action card grid here: every one of those links
+            (Register students, Register by sport, Reports, Clash requests,
+            Substitutions, Fest day view) already lives in the left sidebar
+            (schoolEventScopedNav, see resources/js/support/schoolEventNav.js) and
+            in the "Event workflow" stepper above. Repeating them a third time as
+            cards was pure duplication — see the July 2026 UI/UX audit.
+        -->
 
         <section v-if="eventHeadNav?.headItemGroups?.length" class="card space-y-4">
             <div>
@@ -148,7 +145,6 @@ import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
-import HubCard from '@/Components/ui/HubCard.vue';
 import SchoolEventWorkflowStepper from '@/Components/school/SchoolEventWorkflowStepper.vue';
 import { headQueryParam, schoolEventBase } from '@/support/eventHeadNav.js';
 
@@ -166,11 +162,7 @@ const props = defineProps({
 const isSports = computed(() => props.event?.event_type === 'sports' || props.program === 'sports-meet');
 const eventBase = computed(() => schoolEventBase(props.school.id, props.programPrefix, props.event.id));
 const eventRegistrationHref = computed(() => `${eventBase.value}/registration`);
-const itemRegistrationHref = computed(() => `${eventBase.value}/items`);
 const reportsHref = computed(() => `/school-admin/${props.school.id}/${props.programPrefix}/reports/${props.event.id}`);
-const clashHref = computed(() => `${eventBase.value}/clash-requests`);
-const substitutionHref = computed(() => `${eventBase.value}/substitution-requests`);
-const festDayHref = computed(() => `/school-admin/${props.school.id}/${props.programPrefix}/fest-day/${props.event.id}`);
 
 function formatAmount(value) {
     const n = Number(value);

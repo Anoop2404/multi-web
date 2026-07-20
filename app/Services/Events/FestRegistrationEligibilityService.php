@@ -280,6 +280,15 @@ class FestRegistrationEligibilityService
         return null;
     }
 
+    /**
+     * Cached per event per request: this policy row is identical for every
+     * student validated against the same event, but validateSchoolQualification()
+     * is called once per student from the per-student loop in validateStudent().
+     *
+     * @var array<int, ?FestParticipationPolicy>
+     */
+    private static array $qualificationPolicyCache = [];
+
     private function validateSchoolQualification(Student $student, FestEvent $event): ?string
     {
         if (! $event->id) {
@@ -290,9 +299,12 @@ class FestRegistrationEligibilityService
             return null;
         }
 
-        $policy = FestParticipationPolicy::where('event_id', $event->id)
-            ->whereNull('class_group')
-            ->first();
+        if (! array_key_exists($event->id, self::$qualificationPolicyCache)) {
+            self::$qualificationPolicyCache[$event->id] = FestParticipationPolicy::where('event_id', $event->id)
+                ->whereNull('class_group')
+                ->first();
+        }
+        $policy = self::$qualificationPolicyCache[$event->id];
 
         if (! ($policy?->require_school_qualification ?? false)) {
             return null;

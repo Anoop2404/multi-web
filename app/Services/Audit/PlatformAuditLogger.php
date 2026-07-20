@@ -38,38 +38,44 @@ class PlatformAuditLogger
         ]);
     }
 
+    // $email is nullable throughout this group of methods: accounts created via
+    // TenantUserProvisioner can have no email at all ("log in by username only"),
+    // and User::$email is genuinely null for them — passing that through a
+    // non-nullable string $email parameter threw a TypeError on every successful
+    // login for those accounts.
+
     /** @param  array<string, mixed>  $context */
-    public function login(int $userId, string $email, array $context = []): ?AuditLog
+    public function login(int $userId, ?string $email, array $context = []): ?AuditLog
     {
         return $this->dispatchAuthLog('login', $userId, $email, $context);
     }
 
     /** @param  array<string, mixed>  $context */
-    public function loginFailed(string $email, string $reason, ?int $userId = null, array $context = []): ?AuditLog
+    public function loginFailed(?string $email, string $reason, ?int $userId = null, array $context = []): ?AuditLog
     {
         return $this->dispatchAuthLog('login.failed', $userId, $email, array_merge(['reason' => $reason], $context));
     }
 
     /** @param  array<string, mixed>  $context */
-    public function loginPortalRejected(int $userId, string $email, string $reason, array $context = []): ?AuditLog
+    public function loginPortalRejected(int $userId, ?string $email, string $reason, array $context = []): ?AuditLog
     {
         return $this->dispatchAuthLog('login.portal_rejected', $userId, $email, array_merge(['reason' => $reason], $context));
     }
 
     /** @param  array<string, mixed>  $context */
-    public function loginNoPortal(int $userId, string $email, array $context = []): ?AuditLog
+    public function loginNoPortal(int $userId, ?string $email, array $context = []): ?AuditLog
     {
         return $this->dispatchAuthLog('login.no_portal', $userId, $email, $context);
     }
 
     /** @param  array<string, mixed>  $context */
-    public function logout(int $userId, string $email, array $context = []): ?AuditLog
+    public function logout(int $userId, ?string $email, array $context = []): ?AuditLog
     {
         return $this->dispatchAuthLog('logout', $userId, $email, $context);
     }
 
     /** @param  array<string, mixed>  $context */
-    private function dispatchAuthLog(string $action, ?int $userId, string $email, array $context = []): ?AuditLog
+    private function dispatchAuthLog(string $action, ?int $userId, ?string $email, array $context = []): ?AuditLog
     {
         $context['ip'] = $context['ip'] ?? $this->request?->ip();
 
@@ -79,12 +85,14 @@ class PlatformAuditLogger
             return null;
         }
 
+        $label = $email ?? 'username-only account';
+
         return match ($action) {
-            'login' => $this->log('login', "User logged in: {$email}", properties: array_merge(['email' => $email], $context), userId: $userId, category: 'auth'),
+            'login' => $this->log('login', "User logged in: {$label}", properties: array_merge(['email' => $email], $context), userId: $userId, category: 'auth'),
             'login.failed' => $this->log('login.failed', 'Failed login attempt', properties: array_merge(['email' => $email, 'reason' => $context['reason'] ?? ''], $context), userId: $userId, category: 'auth'),
-            'login.portal_rejected' => $this->log('login.portal_rejected', "Login rejected (wrong portal): {$email}", properties: array_merge(['email' => $email, 'reason' => $context['reason'] ?? ''], $context), userId: $userId, category: 'auth'),
-            'login.no_portal' => $this->log('login.no_portal', "Login rejected (no portal): {$email}", properties: array_merge(['email' => $email], $context), userId: $userId, category: 'auth'),
-            'logout' => $this->log('logout', "User logged out: {$email}", properties: array_merge(['email' => $email], $context), userId: $userId, category: 'auth'),
+            'login.portal_rejected' => $this->log('login.portal_rejected', "Login rejected (wrong portal): {$label}", properties: array_merge(['email' => $email, 'reason' => $context['reason'] ?? ''], $context), userId: $userId, category: 'auth'),
+            'login.no_portal' => $this->log('login.no_portal', "Login rejected (no portal): {$label}", properties: array_merge(['email' => $email], $context), userId: $userId, category: 'auth'),
+            'logout' => $this->log('logout', "User logged out: {$label}", properties: array_merge(['email' => $email], $context), userId: $userId, category: 'auth'),
             default => null,
         };
     }

@@ -176,11 +176,13 @@ class FestSchoolReportController extends SchoolAdminController
             $partIds = FestParticipant::where('student_id', $student->id)
                 ->whereHas('registration', fn ($q) => $q
                     ->where('event_id', $event->id)
-                    ->where('school_id', $this->school->id))
+                    ->where('school_id', $this->school->id)
+                    ->active())
                 ->pluck('id');
 
             $regs = FestRegistration::where('event_id', $event->id)
                 ->where('school_id', $this->school->id)
+                ->active()
                 ->whereHas('participants', fn ($q) => $q->where('student_id', $student->id))
                 ->with('item')
                 ->get();
@@ -277,11 +279,13 @@ class FestSchoolReportController extends SchoolAdminController
             $partIds = FestParticipant::where('teacher_id', $teacher->id)
                 ->whereHas('registration', fn ($q) => $q
                     ->where('event_id', $event->id)
-                    ->where('school_id', $this->school->id))
+                    ->where('school_id', $this->school->id)
+                    ->active())
                 ->pluck('id');
 
             $regs = FestRegistration::where('event_id', $event->id)
                 ->where('school_id', $this->school->id)
+                ->active()
                 ->whereHas('participants', fn ($q) => $q->where('teacher_id', $teacher->id))
                 ->with('item')
                 ->get();
@@ -322,9 +326,10 @@ class FestSchoolReportController extends SchoolAdminController
             $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get();
             foreach ($students as $student) {
                 $partIds = FestParticipant::where('student_id', $student->id)
-                    ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('school_id', $this->school->id))
+                    ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('school_id', $this->school->id)->active())
                     ->pluck('id');
                 $items = FestRegistration::where('event_id', $event->id)->where('school_id', $this->school->id)
+                    ->active()
                     ->whereHas('participants', fn ($q) => $q->where('student_id', $student->id))
                     ->with('item')->get()->pluck('item.title')->filter()->implode('; ');
                 $marks = FestMark::where('event_id', $event->id)->whereIn('participant_id', $partIds)->with('item')->get();
@@ -346,9 +351,10 @@ class FestSchoolReportController extends SchoolAdminController
             $teachers = \App\Models\Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get();
             foreach ($teachers as $teacher) {
                 $partIds = FestParticipant::where('teacher_id', $teacher->id)
-                    ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('school_id', $this->school->id))
+                    ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('school_id', $this->school->id)->active())
                     ->pluck('id');
                 $items = FestRegistration::where('event_id', $event->id)->where('school_id', $this->school->id)
+                    ->active()
                     ->whereHas('participants', fn ($q) => $q->where('teacher_id', $teacher->id))
                     ->with('item')->get()->pluck('item.title')->filter()->implode('; ');
                 $marks = FestMark::where('event_id', $event->id)->whereIn('participant_id', $partIds)->with('item')->get();

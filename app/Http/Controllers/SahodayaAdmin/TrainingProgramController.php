@@ -179,17 +179,23 @@ class TrainingProgramController extends SahodayaAdminController
             ->orderBy('label')
             ->get(['id', 'code', 'label']);
 
+        // Not filtered to is_active: this dropdown lets a program pin a *specific* saved
+        // template by id, which should work regardless of which one happens to be the
+        // platform-wide "active" default for its certificate type (see
+        // TrainingCertificateService::resolveTemplate() — an explicit pick always wins over
+        // the is_active flag). Excluding inactive templates here meant they could never be
+        // selected at all, even though picking one by id doesn't depend on that flag.
         $certificateTemplates = CertificateTemplate::where('tenant_id', $this->sahodaya->id)
             ->where('event_type', 'training')
-            ->where('is_active', true)
             ->orderBy('certificate_type')
             ->orderByDesc('id')
-            ->get(['id', 'title', 'certificate_type', 'background_path'])
+            ->get(['id', 'title', 'certificate_type', 'background_path', 'is_active'])
             ->map(fn (CertificateTemplate $t) => [
                 'id' => $t->id,
                 'title' => $t->title ?: 'Certificate',
                 'certificate_type' => $t->certificate_type,
                 'has_background' => filled($t->background_path),
+                'is_active' => $t->is_active,
             ]);
 
         return $this->inertia('Sahodaya/Training/Show', [

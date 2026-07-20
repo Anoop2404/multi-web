@@ -14,10 +14,22 @@ use Illuminate\Support\Facades\Schema;
  */
 class FestEligibilityRuleEngine
 {
+    /**
+     * Both caches are static and keyed so they survive across the per-student
+     * loop in FestRegistrationEligibilityService::validateStudent() — the rule
+     * set (and whether the table even exists) is identical for every student
+     * checked against the same event/item, but was previously re-queried from
+     * scratch on every single call.
+     */
+    private static ?bool $hasTableCache = null;
+
+    /** @var array<string, \Illuminate\Support\Collection<int, FestEligibilityRule>> */
+    private static array $rulesCache = [];
+
     /** @return list<string> */
     public function validateStudent(Student $student, FestEvent $event, FestEventItem $item): array
     {
-        if (! Schema::hasTable('fest_eligibility_rules')) {
+        if (! (self::$hasTableCache ??= Schema::hasTable('fest_eligibility_rules'))) {
             return [];
         }
 
@@ -53,6 +65,12 @@ class FestEligibilityRuleEngine
     /** @return \Illuminate\Support\Collection<int, FestEligibilityRule> */
     private function rulesFor(FestEvent $event, FestEventItem $item)
     {
+        $cacheKey = $event->id.'|'.$item->id.'|'.($item->area_id ?? '0');
+
+        if (isset(self::$rulesCache[$cacheKey])) {
+            return self::$rulesCache[$cacheKey];
+        }
+
         $scopes = [
             [FestEligibilityRule::SCOPE_EVENT, $event->id],
             [FestEligibilityRule::SCOPE_ITEM, $item->id],
@@ -62,7 +80,7 @@ class FestEligibilityRuleEngine
             $scopes[] = [FestEligibilityRule::SCOPE_AREA, $item->area_id];
         }
 
-        return FestEligibilityRule::query()
+        return self::$rulesCache[$cacheKey] = FestEligibilityRule::query()
             ->where('tenant_id', $event->tenant_id)
             ->where('is_active', true)
             ->where(function ($q) use ($scopes) {

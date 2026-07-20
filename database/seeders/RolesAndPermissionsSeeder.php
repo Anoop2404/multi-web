@@ -55,6 +55,7 @@ class RolesAndPermissionsSeeder extends Seeder
         Role::firstOrCreate(['name' => 'certificate_collector',    'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'data_entry',               'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'event_coordinator',        'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'event_admin',               'guard_name' => 'web']);
 
         foreach (TenantUserCatalog::allPermissions() as $permission) {
             PlatformPermission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);

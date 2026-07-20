@@ -40,6 +40,39 @@ class UsernameGenerator
         return $this->nextSequence("{$prefix}/{$roleCode}", 3);
     }
 
+    /**
+     * Human-readable username derived from a person's name, e.g. "Anoop John"
+     * -> "anoop.john". Used for staff/coordinator/admin-tier accounts so the
+     * login identifier is something the person can actually remember, instead
+     * of a role-code sequence like "SAH/ADM/003". Falls back to a numeric
+     * suffix ("anoop.john2") if the slug is already taken, and to a generic
+     * "user" base if the name has no usable characters at all.
+     *
+     * @param  int|string|null  $excludeUserId  current user's own id when
+     *         renaming, so it doesn't collide with itself
+     */
+    public function fromName(string $name, int|string|null $excludeUserId = null): string
+    {
+        $base = Str::slug($name, '.');
+        if ($base === '') {
+            $base = 'user';
+        }
+
+        $candidate = $base;
+        $suffix = 1;
+
+        while (
+            User::where('username', $candidate)
+                ->when($excludeUserId, fn ($q) => $q->where('id', '!=', $excludeUserId))
+                ->exists()
+        ) {
+            $suffix++;
+            $candidate = "{$base}{$suffix}";
+        }
+
+        return $candidate;
+    }
+
     public function roleCodeFor(string $role): string
     {
         return match ($role) {

@@ -46,9 +46,16 @@
                         v-if="form.event_type === 'training'"
                         label="Background (PDF or image)"
                         class-extra="sm:col-span-2"
-                        hint="PDF first page is converted to an image and used as the certificate backdrop. Recipient/body text is placed on top."
+                        :hint="editingId
+                            ? 'PDF first page is converted to an image and used as the certificate backdrop. Leave blank to keep the current background — only choose a file to replace it.'
+                            : 'PDF first page is converted to an image and used as the certificate backdrop. Recipient/body text is placed on top.'"
                     >
                         <template #default="{ id }">
+                            <div v-if="editingId && editingTemplate?.background_url" class="mb-2 flex items-center gap-2">
+                                <img :src="editingTemplate.background_url" alt="Current background"
+                                     class="h-16 w-auto rounded border border-slate-200 object-contain bg-slate-50">
+                                <span class="text-xs text-slate-500">Current background</span>
+                            </div>
                             <input :id="id" type="file" accept=".pdf,.png,.jpg,.jpeg"
                                    class="field"
                                    @change="e => form.template_file = e.target.files[0]">
@@ -207,22 +214,42 @@
                             <textarea :id="id" v-model="form.body" class="field font-mono text-xs" rows="8"></textarea>
                         </template>
                     </FormField>
-                    <FormField label="Logo (optional — unused when background is set)">
+                    <FormField label="Logo (optional — unused when background is set)"
+                               :hint="editingId && editingTemplate?.logo_url ? 'Leave blank to keep the current logo.' : null">
                         <template #default="{ id }">
+                            <div v-if="editingId && editingTemplate?.logo_url" class="mb-2 flex items-center gap-2">
+                                <img :src="editingTemplate.logo_url" alt="Current logo"
+                                     class="h-10 w-auto rounded border border-slate-200 object-contain bg-slate-50">
+                                <span class="text-xs text-slate-500">Current logo</span>
+                            </div>
                             <input :id="id" type="file" accept="image/*" class="field" @change="e => form.logo = e.target.files[0]">
                         </template>
                     </FormField>
-                    <FormField label="Seal (optional — unused when background is set)">
+                    <FormField label="Seal (optional — unused when background is set)"
+                               :hint="editingId && editingTemplate?.seal_url ? 'Leave blank to keep the current seal.' : null">
                         <template #default="{ id }">
+                            <div v-if="editingId && editingTemplate?.seal_url" class="mb-2 flex items-center gap-2">
+                                <img :src="editingTemplate.seal_url" alt="Current seal"
+                                     class="h-10 w-auto rounded border border-slate-200 object-contain bg-slate-50">
+                                <span class="text-xs text-slate-500">Current seal</span>
+                            </div>
                             <input :id="id" type="file" accept="image/*" class="field" @change="e => form.seal = e.target.files[0]">
                         </template>
                     </FormField>
                     <div class="sm:col-span-2 space-y-3">
                         <p class="text-sm font-semibold text-slate-700">Signatories (unused when background PDF includes officers)</p>
+                        <p v-if="editingId" class="text-xs text-slate-500 -mt-2">Leave a signature file blank to keep the existing signature image.</p>
                         <div v-for="(sig, i) in form.signatories" :key="i" class="grid gap-2 sm:grid-cols-3 border rounded-lg p-3">
                             <input v-model="sig.name" class="field text-sm" placeholder="Name">
                             <input v-model="sig.designation" class="field text-sm" placeholder="Designation">
-                            <input type="file" accept="image/*" class="field text-xs" @change="e => sig.signature = e.target.files[0]">
+                            <div>
+                                <div v-if="editingId && editingTemplate?.signatories?.[i]?.signature_url" class="mb-1 flex items-center gap-2">
+                                    <img :src="editingTemplate.signatories[i].signature_url" alt="Current signature"
+                                         class="h-8 w-auto rounded border border-slate-200 object-contain bg-slate-50">
+                                    <span class="text-xs text-slate-500">Current</span>
+                                </div>
+                                <input type="file" accept="image/*" class="field text-xs" @change="e => sig.signature = e.target.files[0]">
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -336,6 +363,7 @@ const trainingCertificateTypes = [
 ];
 
 const editingId = ref(null);
+const editingTemplate = ref(null);
 
 function isTruthy(value) {
     return value === true || value === 1 || value === '1' || value === 'true';
@@ -415,6 +443,7 @@ watch(() => form.event_type, (type) => {
 
 function editTemplate(template) {
     editingId.value = template.id;
+    editingTemplate.value = template;
     form.event_type = template.event_type || 'training';
     form.certificate_type = template.certificate_type || 'participation';
     form.title = template.title || 'Certificate of Participation';
@@ -438,6 +467,7 @@ function editTemplate(template) {
 
 function cancelEdit() {
     editingId.value = null;
+    editingTemplate.value = null;
     form.event_type = 'training';
     form.certificate_type = 'participation';
     form.title = 'Certificate of Participation';

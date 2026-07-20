@@ -21,6 +21,17 @@ class CertificateTemplateController extends SahodayaAdminController
                 $row['background_url'] = $t->background_path
                     ? TenantStorage::logoUrl($this->sahodaya, $t->background_path)
                     : null;
+                $row['logo_url'] = $t->logo_path
+                    ? TenantStorage::logoUrl($this->sahodaya, $t->logo_path)
+                    : null;
+                $row['seal_url'] = $t->seal_path
+                    ? TenantStorage::logoUrl($this->sahodaya, $t->seal_path)
+                    : null;
+                $row['signatories'] = collect($t->signatories ?? [])->map(fn ($s) => array_merge($s, [
+                    'signature_url' => ! empty($s['signature_path'])
+                        ? TenantStorage::logoUrl($this->sahodaya, $s['signature_path'])
+                        : null,
+                ]))->all();
 
                 return $row;
             });

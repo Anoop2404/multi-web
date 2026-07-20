@@ -27,6 +27,11 @@
                         <input :id="id" v-model="form.email" type="email" class="field" placeholder="Email (optional)">
                     </template>
                 </FormField>
+                <FormField label="Username (leave blank to auto-generate from name)" :error="form.errors.username">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.username" class="field" placeholder="e.g. anoop.john">
+                    </template>
+                </FormField>
                 <FormField label="Password" :error="form.errors.password" class-extra="sm:col-span-2" required>
                     <template #default="{ id }">
                         <input :id="id" v-model="form.password" type="password" class="field" placeholder="Password (min 8)" minlength="8" required>
@@ -134,7 +139,7 @@
                 <thead>
                     <tr>
                         <th>Name</th>
-                        <th>Email</th>
+                        <th>Email / Username</th>
                         <th>Roles & assignments</th>
                         <th></th>
                     </tr>
@@ -142,7 +147,10 @@
                 <tbody>
                     <tr v-for="u in users" :key="u.id">
                         <td class="font-medium text-slate-900">{{ u.name }}</td>
-                        <td class="text-slate-600">{{ u.email }}</td>
+                        <td class="text-slate-600">
+                            {{ u.email || '—' }}
+                            <div class="text-xs text-slate-400 font-mono">{{ u.username }}</div>
+                        </td>
                         <td class="text-xs">
                             <div class="flex flex-wrap gap-1">
                                 <span v-for="r in u.roles" :key="r"
@@ -171,6 +179,7 @@
                         </td>
                         <td class="text-right whitespace-nowrap">
                             <button type="button" @click="openEdit(u)" class="btn-ghost text-indigo-600">Edit</button>
+                            <button type="button" @click="resetPw(u)" class="btn-ghost text-slate-600">Reset PW</button>
                             <button type="button" @click="remove(u)" class="btn-ghost text-red-600">Remove</button>
                         </td>
                     </tr>
@@ -189,6 +198,11 @@
                 <FormField label="Email (optional)" :error="editForm.errors.email">
                     <template #default="{ id }">
                         <input :id="id" v-model="editForm.email" type="email" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Username" :error="editForm.errors.username" hint="What this person logs in with — change carefully, they'll need to be told the new one.">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="editForm.username" class="field">
                     </template>
                 </FormField>
                 <FormField label="New password" hint="Leave blank to keep current password">
@@ -295,14 +309,14 @@ const props = defineProps({
 });
 
 const form = useForm({
-    name: '', email: '', password: '', roles: [], permissions: [],
+    name: '', email: '', username: '', password: '', roles: [], permissions: [],
     fest_ops_event_id: '', fest_ops_duties: [],
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
 });
 const editing = ref(null);
 const editForm = useForm({
-    name: '', email: '', password: '', roles: [], permissions: [],
+    name: '', email: '', username: '', password: '', roles: [], permissions: [],
     fest_ops_event_id: '', fest_ops_duties: [],
     event_admin_event_ids: [],
     exam_staff_exam_id: '', exam_staff_role: 'staff',
@@ -379,6 +393,7 @@ function openEdit(user) {
     editing.value = user;
     editForm.name = user.name;
     editForm.email = user.email;
+    editForm.username = user.username;
     editForm.password = '';
     editForm.roles = [...user.roles];
     editForm.permissions = [...(user.permissions || [])];
@@ -408,5 +423,10 @@ function saveEdit() {
 function remove(user) {
     if (!confirm(`Remove ${user.name}?`)) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/users/${user.id}`, { preserveScroll: true });
+}
+
+function resetPw(user) {
+    if (!confirm(`Reset password for ${user.name}?`)) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/users/${user.id}/reset-password`, {}, { preserveScroll: true });
 }
 </script>

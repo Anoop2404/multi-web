@@ -150,6 +150,11 @@
                         <input :id="id" v-model="form.email" type="email" class="field" placeholder="Email" required>
                     </template>
                 </FormField>
+                <FormField label="Username (leave blank to auto-generate from name)" :error="form.errors.username">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="form.username" class="field" placeholder="e.g. anoop.john">
+                    </template>
+                </FormField>
                 <FormField label="Password" :error="form.errors.password" class-extra="sm:col-span-2"
                            hint="Leave blank to auto-generate a temporary password">
                     <template #default="{ id }">
@@ -265,6 +270,11 @@
                         <input :id="id" v-model="editForm.email" type="email" class="field" required>
                     </template>
                 </FormField>
+                <FormField label="Username" :error="editForm.errors.username" hint="What this person logs in with — change carefully, they'll need to be told the new one.">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="editForm.username" class="field">
+                    </template>
+                </FormField>
                 <FormField label="New password" hint="Leave blank to keep current password">
                     <template #default="{ id }">
                         <input :id="id" v-model="editForm.password" type="password" class="field">
@@ -352,7 +362,7 @@ const visibleUsers = computed(() =>
 );
 
 const form = useForm({
-    name: '', email: '', password: '', roles: ['school_event_coordinator'],
+    name: '', email: '', username: '', password: '', roles: ['school_event_coordinator'],
     permissions: [], group_classes: [], school_house_id: '', event_scopes: [],
 });
 const contactForm = useForm({
@@ -379,7 +389,7 @@ watch(coordinatorMode, (on) => {
 }, { immediate: true });
 const editing = ref(null);
 const editForm = useForm({
-    name: '', email: '', password: '', roles: [], permissions: [],
+    name: '', email: '', username: '', password: '', roles: [], permissions: [],
     group_classes: [], school_house_id: '', event_scopes: [],
 });
 
@@ -463,6 +473,7 @@ function openEdit(user) {
     editing.value = user;
     editForm.name = user.name;
     editForm.email = user.email;
+    editForm.username = user.username;
     editForm.password = '';
     editForm.roles = [user.roles[0] ?? 'school_staff'];
     editForm.permissions = [...(user.permissions || [])];

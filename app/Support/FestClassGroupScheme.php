@@ -13,6 +13,17 @@ class FestClassGroupScheme
 
     public const KEYS = ['lp', 'up', 'hs', 'hss', 'open'];
 
+    /**
+     * Cached per tenant per request. resolve() is called once per student inside
+     * FestRegistrationEligibilityService::annotateStudents()'s per-student loop
+     * (and again per student in validateStudent()); without this cache the
+     * SahodayaProfile lookup below re-runs on every call even though the result
+     * is identical for every student in the same event/tenant.
+     *
+     * @var array<string, ?string>
+     */
+    private static array $profileSchemeCache = [];
+
     public static function options(): array
     {
         return config('fest_class_group_schemes.options', []);
@@ -48,7 +59,14 @@ class FestClassGroupScheme
         $tenantId = $sahodaya?->id ?? $event?->tenant_id;
         if ($tenantId) {
             try {
-                $profileScheme = SahodayaProfile::where('tenant_id', $tenantId)->value('fest_class_group_scheme');
+                // array_key_exists (not ??=) so a genuinely-null result (no profile
+                // row, or the column unset) is cached too — otherwise every tenant
+                // without this field set would re-query on every single call.
+                if (! array_key_exists($tenantId, self::$profileSchemeCache)) {
+                    self::$profileSchemeCache[$tenantId] = SahodayaProfile::where('tenant_id', $tenantId)
+                        ->value('fest_class_group_scheme');
+                }
+                $profileScheme = self::$profileSchemeCache[$tenantId];
                 if (self::isValid($profileScheme)) {
                     return $profileScheme;
                 }

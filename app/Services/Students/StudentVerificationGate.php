@@ -9,8 +9,17 @@ use App\Models\Student;
 
 class StudentVerificationGate
 {
-    /** @var array<string, bool> */
-    private array $requiredGloballyCache = [];
+    /**
+     * Static (not per-instance): this class isn't bound as a singleton, so
+     * app(StudentVerificationGate::class) hands out a fresh instance on every
+     * call. Callers like FestRegistrationEligibilityService::validateStudent()
+     * resolve it fresh once PER STUDENT inside a loop — with an instance
+     * property the cache was reset every time, turning what should be one
+     * SahodayaProfile query per tenant per request into one per student.
+     *
+     * @var array<string, bool>
+     */
+    private static array $requiredGloballyCache = [];
 
     public function requiredGlobally(?string $sahodayaId): bool
     {
@@ -18,7 +27,7 @@ class StudentVerificationGate
             return false;
         }
 
-        return $this->requiredGloballyCache[$sahodayaId] ??= (bool) (
+        return self::$requiredGloballyCache[$sahodayaId] ??= (bool) (
             SahodayaProfile::where('tenant_id', $sahodayaId)->value('require_student_verification') ?? true
         );
     }

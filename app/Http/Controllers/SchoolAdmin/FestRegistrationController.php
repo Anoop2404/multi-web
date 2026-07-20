@@ -120,6 +120,14 @@ class FestRegistrationController extends SchoolAdminController
         $lazyStudents = $studentCount > $lazyThreshold;
         $focusEventId = $request->query('event') ? (int) $request->query('event') : null;
 
+        // With a large roster (lazy mode) and no event explicitly focused, students
+        // are normally left unloaded until the school picks one. When there's only
+        // one event on screen there's nothing to pick — auto-focus it so the page
+        // doesn't render an empty "No students match" table with no explanation.
+        if ($lazyStudents && $focusEventId === null && $events->count() === 1) {
+            $focusEventId = $events->first()->id;
+        }
+
         $eligibilityService = app(FestRegistrationEligibilityService::class);
         $studentsByEvent = collect();
         if (! $lazyStudents) {

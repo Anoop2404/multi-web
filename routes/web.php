@@ -572,6 +572,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/users', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'index'])->name('users.index');
         Route::post('/users', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'store'])->name('users.store');
         Route::put('/users/{user}', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'update'])->name('users.update');
+        Route::post('/users/{user}/reset-password', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'resetPassword'])->name('users.reset-password');
         Route::delete('/users/{user}', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'destroy'])->name('users.destroy');
 
         Route::get('/settings/nav-visibility', [\App\Http\Controllers\SahodayaAdmin\NavVisibilityController::class, 'edit'])->name('settings.nav-visibility');

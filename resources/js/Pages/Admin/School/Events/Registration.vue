@@ -19,7 +19,7 @@
                 <button v-if="events.length" type="button" class="btn-secondary text-sm" @click="showBulkImport = !showBulkImport">
                     Import CSV
                 </button>
-                <a :href="`${programBase}/reports`" class="btn-secondary text-sm">Reports →</a>
+                <a :href="`${programBase}/reports`" class="btn-secondary text-sm">All events reports →</a>
             </template>
         </PageHeader>
 
@@ -241,7 +241,7 @@
                         :event-registrations="event.event_registrations ?? []"
                         :register-url="`${programBase}/events/${event.id}/register-students`"
                         :items-url="`#item-registration-${event.id}`"
-                        :reports-href="`${programBase}/reports/${event.id}/registration-register`"
+                        :reports-href="`${programBase}/reports/${event.id}`"
                         :student-event-reg-fee="Number(event.student_event_reg_fee ?? 0)"
                         :school-classes="schoolClasses"
                     />

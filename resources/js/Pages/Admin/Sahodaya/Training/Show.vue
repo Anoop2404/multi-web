@@ -88,7 +88,7 @@
                             <select :id="id" v-model="form.certificate_template_id" class="field flex-1">
                                 <option value="">— Match by certificate type —</option>
                                 <option v-for="t in certificateTemplates" :key="t.id" :value="t.id">
-                                    {{ t.title }} ({{ formatCertType(t.certificate_type) }}){{ t.has_background ? ' · background' : '' }}
+                                    {{ t.title }} ({{ formatCertType(t.certificate_type) }}){{ t.has_background ? ' · background' : '' }}{{ t.is_active ? '' : ' · inactive' }}
                                 </option>
                             </select>
                             <a :href="certificatePreviewUrl"

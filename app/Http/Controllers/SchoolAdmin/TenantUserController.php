@@ -69,6 +69,7 @@ class TenantUserController extends SchoolAdminController
         $data = $request->validate([
             'name'            => 'required|string|max:255',
             'email'           => 'required|email|max:255|unique:users,email',
+            'username'        => 'nullable|string|max:255|regex:/^[a-zA-Z0-9_.-]+$/|unique:users,username',
             'password'        => 'nullable|string|min:8',
             'roles'           => 'required|array|min:1',
             'roles.*'         => ['string', Rule::in($assignable)],
@@ -101,16 +102,16 @@ class TenantUserController extends SchoolAdminController
         }
 
         $result = $provisioner->upsert(
-            $this->school->id,
-            $data['roles'],
-            $perms,
-            $data['name'],
-            $data['email'],
-            $data['password'] ?? null,
-            null,
-            $groupClasses,
-            $houseId,
-            $request->user()?->id,
+            tenantId: $this->school->id,
+            roles: $data['roles'],
+            permissions: $perms,
+            name: $data['name'],
+            email: $data['email'],
+            password: $data['password'] ?? null,
+            groupClasses: $groupClasses,
+            schoolHouseId: $houseId,
+            createdByUserId: $request->user()?->id,
+            username: $data['username'] ?? null,
         );
 
         if (in_array('school_event_coordinator', $data['roles'], true)) {
@@ -277,6 +278,7 @@ class TenantUserController extends SchoolAdminController
         $data = $request->validate([
             'name'            => 'required|string|max:255',
             'email'           => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'username'        => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9_.-]+$/', Rule::unique('users', 'username')->ignore($user->id)],
             'password'        => 'nullable|string|min:8',
             'roles'           => 'required|array|min:1',
             'roles.*'         => ['string', Rule::in($assignable)],
@@ -313,15 +315,16 @@ class TenantUserController extends SchoolAdminController
         }
 
         $result = $provisioner->upsert(
-            $this->school->id,
-            $data['roles'],
-            $perms,
-            $data['name'],
-            $data['email'],
-            $password,
-            $user->id,
-            $groupClasses,
-            $houseId,
+            tenantId: $this->school->id,
+            roles: $data['roles'],
+            permissions: $perms,
+            name: $data['name'],
+            email: $data['email'],
+            password: $password,
+            userId: $user->id,
+            groupClasses: $groupClasses,
+            schoolHouseId: $houseId,
+            username: $data['username'] ?? null,
         );
 
         if (in_array('school_event_coordinator', $data['roles'], true)) {

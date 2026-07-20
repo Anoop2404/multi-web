@@ -14,11 +14,26 @@ class FestSportsAgeGroup
     /** @var list<string> */
     public const KEYS = ['u8', 'u10', 'u11', 'u12', 'u14', 'u17', 'u19', 'open'];
 
+    /**
+     * Cached per tenant per request. FestSportsAgeGroupRegistry::forTenant() returns
+     * a fresh clone with its internal row cache reset, and this method used to be
+     * called ~20-30 times per student during eligibility annotation — for a school
+     * with 2000 students that meant 100,000+ redundant DB queries per page load
+     * (each clone re-runs an exists() check plus a fresh get() query). Caching the
+     * per-tenant registry instance here means the clone — and its row cache — is
+     * built once per tenant per request.
+     *
+     * @var array<string, FestSportsAgeGroupRegistry>
+     */
+    private static array $registryCache = [];
+
     private static function registry(?string $tenantId = null): FestSportsAgeGroupRegistry
     {
-        $registry = app(FestSportsAgeGroupRegistry::class);
+        if (! $tenantId) {
+            return app(FestSportsAgeGroupRegistry::class);
+        }
 
-        return $tenantId ? $registry->forTenant($tenantId) : $registry;
+        return self::$registryCache[$tenantId] ??= app(FestSportsAgeGroupRegistry::class)->forTenant($tenantId);
     }
 
     /** @return array<string, string> */

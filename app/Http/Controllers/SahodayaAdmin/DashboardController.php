@@ -126,7 +126,7 @@ class DashboardController extends SahodayaAdminController
                 ->count(),
             'fest_registrations' => $festEventIds->isEmpty()
                 ? 0
-                : FestRegistration::whereIn('event_id', $festEventIds)->count(),
+                : FestRegistration::whereIn('event_id', $festEventIds)->active()->count(),
             'mcq_exams'          => McqExam::where('tenant_id', $this->sahodaya->id)->count(),
             'training_programs'  => TrainingProgram::where('tenant_id', $this->sahodaya->id)->count(),
             'cpd_hours'          => $cpdHours,
@@ -141,7 +141,7 @@ class DashboardController extends SahodayaAdminController
 
         $activeEvents = FestEvent::where('tenant_id', $this->sahodaya->id)
             ->whereIn('status', $activeStatuses)
-            ->withCount('registrations')
+            ->withCount(['registrations' => fn ($q) => $q->whereIn('status', FestRegistration::ACTIVE_STATUSES)])
             ->orderByDesc('event_start')
             ->limit(6)
             ->get(['id', 'title', 'event_type', 'status', 'event_start']);

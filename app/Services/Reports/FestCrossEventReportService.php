@@ -167,7 +167,7 @@ class FestCrossEventReportService
         return match ($reportId) {
             'RPT-FST-001' => FestEvent::where('tenant_id', $sahodayaId)
                 ->when(! empty($filters['event_id']), fn ($q) => $q->where('id', $filters['event_id']))
-                ->withCount('registrations')
+                ->withCount(['registrations' => fn ($q) => $q->whereNotIn('status', ['withdrawn', 'rejected'])])
                 ->orderByDesc('event_start')
                 ->get()
                 ->map(fn (FestEvent $e) => [
@@ -249,6 +249,7 @@ class FestCrossEventReportService
     private function schoolRegistrationSummary(Collection $eventIds): Collection
     {
         return FestRegistration::whereIn('event_id', $eventIds)
+            ->whereNotIn('status', ['withdrawn', 'rejected'])
             ->with(['event:id,title', 'school:id,name'])
             ->get()
             ->groupBy(fn (FestRegistration $r) => $r->event_id.'|'.$r->school_id)
@@ -316,7 +317,8 @@ class FestCrossEventReportService
     private function chestNumberList(Collection $eventIds, array $filters): Collection
     {
         return FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $eventIds)
-            ->when(! empty($filters['school_id']), fn ($q2) => $q2->where('school_id', $filters['school_id'])))
+            ->when(! empty($filters['school_id']), fn ($q2) => $q2->where('school_id', $filters['school_id']))
+            ->whereNotIn('status', ['withdrawn', 'rejected']))
             ->with(['registration.event:id,title', 'registration.school:id,name', 'registration.item:id,title', 'student:id,name'])
             ->whereNotNull('chest_no')
             ->get()
@@ -335,6 +337,7 @@ class FestCrossEventReportService
     {
         return FestRegistration::whereIn('event_id', $eventIds)
             ->when(! empty($filters['school_id']), fn ($q) => $q->where('school_id', $filters['school_id']))
+            ->whereNotIn('status', ['withdrawn', 'rejected'])
             ->with(['event:id,title', 'school:id,name', 'item:id,title', 'participants'])
             ->get()
             ->map(fn (FestRegistration $r) => [
@@ -448,6 +451,7 @@ class FestCrossEventReportService
     private function headWiseSummary(Collection $eventIds, array $filters = []): Collection
     {
         return FestRegistration::whereIn('event_id', $eventIds)
+            ->whereNotIn('status', ['withdrawn', 'rejected'])
             ->with(['event:id,title', 'item.head:id,name', 'participants'])
             ->get()
             ->when(! empty($filters['head_id']), function ($c) use ($filters) {
@@ -473,6 +477,7 @@ class FestCrossEventReportService
     private function genderOrClassParticipation(Collection $eventIds, bool $byGender): Collection
     {
         return FestRegistration::whereIn('event_id', $eventIds)
+            ->whereNotIn('status', ['withdrawn', 'rejected'])
             ->with(['event:id,title', 'item:id,class_group,gender', 'participants'])
             ->get()
             ->groupBy(fn (FestRegistration $r) => $r->event_id.'|'.($byGender ? ($r->item?->gender ?? 'open') : ($r->item?->class_group ?? '—')))
@@ -493,6 +498,7 @@ class FestCrossEventReportService
     private function ageGroupMatrix(Collection $eventIds): Collection
     {
         return FestRegistration::whereIn('event_id', $eventIds)
+            ->whereNotIn('status', ['withdrawn', 'rejected'])
             ->with(['event:id,title', 'school:id,name', 'item:id,age_group', 'participants'])
             ->get()
             ->groupBy(fn (FestRegistration $r) => $r->event_id.'|'.$r->school_id.'|'.($r->item?->age_group ?? '—'))
@@ -597,7 +603,7 @@ class FestCrossEventReportService
         return FestEvent::where('tenant_id', $sahodayaId)
             ->when($eventType, fn ($q) => $q->where('event_type', $eventType))
             ->when(! empty($filters['event_id']), fn ($q) => $q->where('id', $filters['event_id']))
-            ->withCount('registrations')
+            ->withCount(['registrations' => fn ($q) => $q->whereNotIn('status', ['withdrawn', 'rejected'])])
             ->orderByDesc('registration_open')
             ->get()
             ->map(fn (FestEvent $e) => [
@@ -706,7 +712,8 @@ class FestCrossEventReportService
     /** @param  Collection<int, int|string>  $eventIds */
     private function idCardIssuedLog(Collection $eventIds): Collection
     {
-        return FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $eventIds))
+        return FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $eventIds)
+            ->whereNotIn('status', ['withdrawn', 'rejected']))
             ->where(fn ($q) => $q->whereNotNull('chest_no')->orWhereNotNull('item_registration_number'))
             ->with(['registration.event:id,title', 'registration.school:id,name', 'student:id,name'])
             ->limit(500)
@@ -724,12 +731,14 @@ class FestCrossEventReportService
     {
         return FestEvent::where('tenant_id', $sahodayaId)
             ->where('event_type', $eventType)
-            ->withCount('registrations')
+            ->withCount(['registrations' => fn ($q) => $q->whereNotIn('status', ['withdrawn', 'rejected'])])
             ->get()
             ->map(fn (FestEvent $e) => [
                 'event'         => $e->title,
                 'level'         => $e->level ?? 'local',
-                'schools'       => FestRegistration::where('event_id', $e->id)->distinct('school_id')->count('school_id'),
+                'schools'       => FestRegistration::where('event_id', $e->id)
+                    ->whereNotIn('status', ['withdrawn', 'rejected'])
+                    ->distinct('school_id')->count('school_id'),
                 'registrations' => $e->registrations_count,
             ]);
     }
@@ -872,6 +881,7 @@ class FestCrossEventReportService
     {
         return FestRegistration::whereIn('event_id', $eventIds)
             ->when(! empty($filters['school_id']), fn ($q) => $q->where('school_id', $filters['school_id']))
+            ->whereNotIn('status', ['withdrawn', 'rejected'])
             ->with(['event:id,title', 'school:id,name', 'item:id,title', 'participants.student:id,name'])
             ->get()
             ->map(fn (FestRegistration $r) => [
@@ -914,7 +924,7 @@ class FestCrossEventReportService
             ->map(fn (FestEventItem $i) => [
                 'event'        => FestEvent::find($i->event_id)?->title,
                 'item'         => $i->title,
-                'participants' => $i->registrations()->count(),
+                'participants' => $i->registrations()->whereNotIn('status', ['withdrawn', 'rejected'])->count(),
                 'avg_mark'     => round((float) FestMark::where('item_id', $i->id)->avg('score'), 2),
             ]);
     }
@@ -1017,7 +1027,9 @@ class FestCrossEventReportService
         return FestEvent::whereIn('id', $eventIds)->get()->map(fn (FestEvent $e) => [
             'event'  => $e->title,
             'metric' => 'Report KAL-'.$suffix,
-            'value'  => FestRegistration::where('event_id', $e->id)->count(),
+            'value'  => FestRegistration::where('event_id', $e->id)
+                ->whereNotIn('status', ['withdrawn', 'rejected'])
+                ->count(),
         ]);
     }
 }

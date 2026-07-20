@@ -9,6 +9,7 @@ use App\Models\McqExam;
 use App\Models\McqExamStaff;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Auth\TenantUserProvisioner;
+use App\Services\Auth\UserCredentialService;
 use App\Support\TenantUserCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -29,6 +30,7 @@ class TenantUserController extends SahodayaAdminController
                 'id'          => $u->id,
                 'name'        => $u->name,
                 'email'       => $u->email,
+                'username'    => $u->username,
                 'roles'       => $u->getRoleNames()->values()->all(),
                 'permissions' => $u->getPermissionNames()->values()->all(),
                 'fest_assignments' => FestEventStaff::where('user_id', $u->id)
@@ -73,6 +75,7 @@ class TenantUserController extends SahodayaAdminController
                 'value' => $d,
                 'label' => TenantUserCatalog::dutyLabels()[$d] ?? $d,
             ])->values(),
+            'newCredentials'  => session('newCredentials'),
         ]);
     }
 
@@ -83,6 +86,7 @@ class TenantUserController extends SahodayaAdminController
         $data = $request->validate([
             'name'          => 'required|string|max:255',
             'email'         => 'nullable|email|max:255|unique:users,email',
+            'username'      => 'nullable|string|max:255|regex:/^[a-zA-Z0-9_.-]+$/|unique:users,username',
             'password'      => 'nullable|string|min:8',
             'roles'         => 'required|array|min:1',
             'roles.*'       => ['string', Rule::in($roles)],
@@ -100,16 +104,14 @@ class TenantUserController extends SahodayaAdminController
         $perms = $data['permissions'] ?? $provisioner->defaultPermissionsForRoles($data['roles'], 'sahodaya');
 
         $result = $provisioner->upsert(
-            $this->sahodaya->id,
-            $data['roles'],
-            $perms,
-            $data['name'],
-            $data['email'] ?? null,
-            $data['password'] ?? null,
-            null,
-            null,
-            null,
-            $request->user()?->id,
+            tenantId: $this->sahodaya->id,
+            roles: $data['roles'],
+            permissions: $perms,
+            name: $data['name'],
+            email: $data['email'] ?? null,
+            password: $data['password'] ?? null,
+            createdByUserId: $request->user()?->id,
+            username: $data['username'] ?? null,
         );
 
         $user = $result['user'];
@@ -137,6 +139,7 @@ class TenantUserController extends SahodayaAdminController
         $data = $request->validate([
             'name'          => 'required|string|max:255',
             'email'         => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'username'      => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9_.-]+$/', Rule::unique('users', 'username')->ignore($user->id)],
             'password'      => 'nullable|string|min:8',
             'roles'         => 'required|array|min:1',
             'roles.*'       => ['string', Rule::in($roles)],
@@ -155,13 +158,14 @@ class TenantUserController extends SahodayaAdminController
         $perms = $data['permissions'] ?? $provisioner->defaultPermissionsForRoles($data['roles'], 'sahodaya');
 
         $result = $provisioner->upsert(
-            $this->sahodaya->id,
-            $data['roles'],
-            $perms,
-            $data['name'],
-            $data['email'] ?? null,
-            $password,
-            $user->id,
+            tenantId: $this->sahodaya->id,
+            roles: $data['roles'],
+            permissions: $perms,
+            name: $data['name'],
+            email: $data['email'] ?? null,
+            password: $password,
+            userId: $user->id,
+            username: $data['username'] ?? null,
         );
 
         $updated = $result['user'];
@@ -172,6 +176,22 @@ class TenantUserController extends SahodayaAdminController
         $audit->userUpdated($updated);
 
         return back()->with('success', 'User updated.');
+    }
+
+    public function resetPassword(string $tenantId, User $user, UserCredentialService $credentials, PlatformAuditLogger $audit)
+    {
+        abort_if($user->tenant_id !== $this->sahodaya->id, 403);
+
+        $result = $credentials->resetPassword($user, request()->user()?->id);
+        $audit->userUpdated($result['user']);
+
+        return back()->with([
+            'success'        => 'Password reset.',
+            'newCredentials' => [
+                'username' => $result['user']->username,
+                'password' => $result['password'],
+            ],
+        ]);
     }
 
     public function destroy(string $tenantId, User $user, TenantUserProvisioner $provisioner, PlatformAuditLogger $audit)

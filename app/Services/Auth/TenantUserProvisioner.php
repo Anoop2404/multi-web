@@ -69,13 +69,21 @@ class TenantUserProvisioner
 
         $user->save();
 
-        if (! $user->username) {
-            $school = \App\Models\Tenant::find($tenantId);
-            $primaryRole = $roles[0] ?? 'school_staff';
-            $generated = $username ?? ($school
-                ? $this->usernameGenerator->forSchoolRole($school, $this->usernameGenerator->roleCodeFor($primaryRole))
-                : $this->usernameGenerator->forSahodayaRole($tenantId, $this->usernameGenerator->roleCodeFor($primaryRole)));
-            $user->update(['username' => $generated]);
+        // An admin-supplied username always wins (create or edit) — trimmed and
+        // checked for uniqueness against every other user, since that's a login
+        // identifier. If left blank, fall back to a name-based username ("Anoop
+        // John" -> "anoop.john") rather than the old role-code/sequence pattern
+        // (e.g. "SAH/ADM/003"), which nobody could remember or type back in.
+        $requestedUsername = $username !== null ? trim($username) : null;
+
+        if ($requestedUsername !== null && $requestedUsername !== '' && $requestedUsername !== $user->username) {
+            $taken = User::where('username', $requestedUsername)->where('id', '!=', $user->id)->exists();
+            if ($taken) {
+                throw ValidationException::withMessages(['username' => 'That username is already taken.']);
+            }
+            $user->update(['username' => $requestedUsername]);
+        } elseif (! $user->username) {
+            $user->update(['username' => $this->usernameGenerator->fromName($name, $user->id)]);
         }
 
         $user->syncRoles($roles);

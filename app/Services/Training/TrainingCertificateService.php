@@ -105,11 +105,15 @@ class TrainingCertificateService
         }
 
         if ($program->certificate_template_id) {
+            // An explicit per-program pick always wins, regardless of the template's
+            // is_active flag — that flag only governs which template a program picks up
+            // implicitly by certificate_type below. Requiring is_active here too meant a
+            // program could point at a specific template and still silently fall through to
+            // a different one the moment that template wasn't the platform-wide active one.
             $chosen = CertificateTemplate::query()
                 ->where('tenant_id', $program->tenant_id)
                 ->where('event_type', 'training')
                 ->whereKey($program->certificate_template_id)
-                ->where('is_active', true)
                 ->first();
 
             if ($chosen) {
@@ -313,11 +317,13 @@ class TrainingCertificateService
     private function resolveSampleTemplate(Tenant $sahodaya, ?int $templateId, ?string $certificateType): ?CertificateTemplate
     {
         if ($templateId) {
+            // Same reasoning as resolveTemplate(): an explicit template_id (from the
+            // program's saved choice, or the ?template_id= preview override) should preview
+            // exactly that template, active or not.
             $template = CertificateTemplate::query()
                 ->where('tenant_id', $sahodaya->id)
                 ->where('event_type', 'training')
                 ->whereKey($templateId)
-                ->where('is_active', true)
                 ->first();
             if ($template) {
                 return $template;
