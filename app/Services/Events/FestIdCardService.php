@@ -651,10 +651,16 @@ class FestIdCardService
         $photoUrl = $this->portraitUrl($p) ?: $this->defaultAvatarDataUri($gender);
         $photoSrc = $this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender);
 
+        $eventDate = $event->starts_at ? $event->starts_at->format('d M Y') : '25 Aug 2025';
+        $venue = $event->venue_name ?: 'Govt. HSS, Kannur';
+        $sahodayaName = 'Kannur Sahodaya';
+        $category = $itemLabel ?: ($classCategory ?: 'GK Quiz Category 2');
+
         return [
             'card_type'       => 'individual',
             'audience'        => 'student',
             'role_label'      => $isTeacher ? 'TEACHER' : 'STUDENT',
+            'role_title'      => $isTeacher ? 'Teacher' : 'Participant',
             'role_class'      => $isTeacher ? 'staff' : 'student',
             'name'            => $name,
             'initials'        => $this->initials($name),
@@ -662,13 +668,19 @@ class FestIdCardService
             'photo_url'       => $photoUrl,
             'photo_src'       => $photoSrc,
             'subtitle'        => $school,
+            'school_name'     => $school,
             'student_class'   => $studentClass,
             'class_category'  => $classCategory,
+            'event_name'      => $event->title,
+            'event_date'      => $eventDate,
+            'venue'           => $venue,
+            'sahodaya_name'   => $sahodayaName,
+            'category'        => $category,
             'detail'          => $item !== '—' ? $item : null,
             'head_label'      => $headName,
             'item_label'      => $itemLabel ?: ($headName ?: null),
             'age_group_label' => $ageGroupLabel,
-            'chest_number'    => null,
+            'chest_number'    => $chestNumber,
             'schedule'        => $scheduleLine,
             'id_label'        => 'Reg ID',
             'id_number'       => $festId,

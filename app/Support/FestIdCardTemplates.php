@@ -8,12 +8,12 @@ class FestIdCardTemplates
 
     public const PREMIUM = 'premium';
 
-    /** Compact 4x2 grid card size for print/PDF (mm). */
-    public const CARD_WIDTH_MM = 96;
+    /** Landscape card size for print/PDF (mm). */
+    public const CARD_WIDTH_MM = 98;
 
-    public const CARD_HEIGHT_MM = 66;
+    public const CARD_HEIGHT_MM = 82;
 
-    public const CARDS_PER_PAGE = 8;
+    public const CARDS_PER_PAGE = 4;
 
     /** @return list<string> */
     public static function ids(): array

@@ -3,23 +3,8 @@
     $isEventPass = ($card['card_type'] ?? '') === 'event_participant';
     $isHeadPass = ($card['card_type'] ?? '') === 'head_participant';
     $roleClass = $card['role_class'] ?? 'student';
-    $showItemsList = ($isEventPass || $isHeadPass) && ! empty($card['items']);
-    $scheduleOnly = ! empty($card['schedule']) ? $card['schedule'] : null;
-    $discipline = match (true) {
-        $isEventPass => 'Event pass',
-        $isHeadPass && ! empty($card['head_label']) => $card['head_label'],
-        ! empty($card['head_label']) => $card['head_label'],
-        ! empty($card['item_label']) => $card['item_label'],
-        default => null,
-    };
-    $itemLine = $showItemsList ? null : ($card['detail'] ?? ($card['item_label'] ?? null));
-    if ($itemLine !== null && $discipline !== null && mb_strtolower($itemLine) === mb_strtolower($discipline)) {
-        $itemLine = null;
-    }
 @endphp
-<div class="pcard pcard--{{ $roleClass }}{{ $isEventPass ? ' pcard--event-pass' : '' }}{{ $isHeadPass ? ' pcard--head-pass' : '' }}">
-    <div class="pcard__accent"></div>
-
+<div class="pcard pcard--{{ $roleClass }}">
     <header class="pcard__header">
         <div class="pcard__brand">
             @if(!empty($clusterLogoSrc))
@@ -32,87 +17,85 @@
                 <p class="pcard__event">{{ $eventTitle }}</p>
             </div>
         </div>
-        @if(!empty($card['qr_src']))
-            <img src="{{ $card['qr_src'] }}" alt="" class="pcard__qr">
-        @endif
+
+        <div class="pcard__pass-ribbon">
+            <span>{{ $isEventPass ? 'EVENT PASS' : 'ID CARD' }}</span>
+        </div>
+
+        <div class="pcard__qr-wrap">
+            @if(!empty($card['qr_src']))
+                <img src="{{ $card['qr_src'] }}" alt="" class="pcard__qr">
+                <span class="pcard__qr-label">SCAN TO VERIFY</span>
+            @endif
+        </div>
     </header>
 
-    @if($discipline)
-        <div class="pcard__discipline">
-            <span class="pcard__discipline-text">{{ $discipline }}</span>
+    <div class="pcard__wave-separator">
+        <svg viewBox="0 0 500 20" preserveAspectRatio="none">
+            <path d="M0 0 C 150 18, 350 18, 500 0 L 500 20 L 0 20 Z" fill="#ffffff"/>
+            <path d="M0 0 C 150 16, 350 16, 500 0" fill="none" stroke="#10b981" stroke-width="3"/>
+        </svg>
+    </div>
+
+    <div class="pcard__body">
+        <div class="pcard__portrait">
+            @if(!empty($card['photo_src']))
+                <img src="{{ $card['photo_src'] }}" alt="" class="pcard__photo">
+            @else
+                <div class="pcard__initials">{{ $card['initials'] ?? '?' }}</div>
+            @endif
         </div>
-    @endif
 
-    @if($isTeam)
-        <div class="pcard__body pcard__body--team">
-            <div class="pcard__team-head">
-                <p class="pcard__name">{{ $card['name'] }}</p>
-                <p class="pcard__school">{{ $card['subtitle'] ?? '' }}</p>
-                @if(!empty($card['detail']))
-                    <p class="pcard__tag">{{ $card['detail'] }}</p>
-                @endif
-            </div>
-            <div class="pcard__members">
-                @foreach(array_slice($card['members'] ?? [], 0, 5) as $member)
-                    <div class="pcard__member">
-                        <span class="pcard__member-name">{{ $member['name'] }}</span>
-                        <span class="pcard__member-meta">{{ $member['fest_id'] }}</span>
-                    </div>
-                @endforeach
-                @if(($card['member_count'] ?? 0) > 5)
-                    <div class="pcard__member pcard__member--more">+ {{ ($card['member_count'] ?? 0) - 5 }} more</div>
-                @endif
-            </div>
+        <div class="pcard__info-col">
+            <p class="pcard__name">{{ $card['name'] }}</p>
+            <table class="pcard__meta-table">
+                <tr>
+                    <td class="pcard__meta-icon">👤</td>
+                    <td class="pcard__meta-label">Role</td>
+                    <td class="pcard__meta-sep">:</td>
+                    <td class="pcard__meta-val">{{ $card['role_title'] ?? 'Participant' }}</td>
+                </tr>
+                <tr>
+                    <td class="pcard__meta-icon">🏆</td>
+                    <td class="pcard__meta-label">Event</td>
+                    <td class="pcard__meta-sep">:</td>
+                    <td class="pcard__meta-val">{{ $card['event_name'] ?? $eventTitle }}</td>
+                </tr>
+                <tr>
+                    <td class="pcard__meta-icon">📅</td>
+                    <td class="pcard__meta-label">Date</td>
+                    <td class="pcard__meta-sep">:</td>
+                    <td class="pcard__meta-val">{{ $card['event_date'] ?? '25 Aug 2025' }}</td>
+                </tr>
+                <tr>
+                    <td class="pcard__meta-icon">📍</td>
+                    <td class="pcard__meta-label">Venue</td>
+                    <td class="pcard__meta-sep">:</td>
+                    <td class="pcard__meta-val">{{ $card['venue'] ?? 'Govt. HSS, Kannur' }}</td>
+                </tr>
+                <tr>
+                    <td class="pcard__meta-icon">🏫</td>
+                    <td class="pcard__meta-label">Sahodaya</td>
+                    <td class="pcard__meta-sep">:</td>
+                    <td class="pcard__meta-val">{{ $card['sahodaya_name'] ?? 'Kannur Sahodaya' }}</td>
+                </tr>
+                <tr>
+                    <td class="pcard__meta-icon">🎯</td>
+                    <td class="pcard__meta-label">Category</td>
+                    <td class="pcard__meta-sep">:</td>
+                    <td class="pcard__meta-val">{{ $card['category'] ?? ($card['class_category'] ?? 'GK Quiz Category 2') }}</td>
+                </tr>
+            </table>
         </div>
-    @else
-        <div class="pcard__body">
-            <div class="pcard__portrait">
-                @if(!empty($card['photo_src']))
-                    <img src="{{ $card['photo_src'] }}" alt="" class="pcard__photo">
-                @else
-                    <div class="pcard__initials">{{ $card['initials'] ?? '?' }}</div>
-                @endif
-            </div>
-
-            <div class="pcard__info">
-                <p class="pcard__name">{{ $card['name'] }}</p>
-                <p class="pcard__school">{{ $card['subtitle'] ?? '' }}</p>
-
-                @if(!empty($card['student_class']) || !empty($card['class_category']))
-                    <p style="font-size: 8.5px; font-weight: bold; color: #0f3d7a; margin-top: 0.8mm; line-height: 1.2;">
-                        @if(!empty($card['student_class'])) Class: {{ $card['student_class'] }} @endif
-                        @if(!empty($card['student_class']) && !empty($card['class_category'])) · @endif
-                        @if(!empty($card['class_category'])) Category: {{ $card['class_category'] }} @endif
-                    </p>
-                @endif
-
-                @if($showItemsList)
-                    <ul class="pcard__items">
-                        @foreach(array_slice($card['items'], 0, 4) as $itemTitle)
-                            <li>{{ $itemTitle }}</li>
-                        @endforeach
-                        @if(($card['item_count'] ?? 0) > 4)
-                            <li class="pcard__items-more">+ {{ ($card['item_count'] ?? 0) - 4 }} more</li>
-                        @endif
-                    </ul>
-                @elseif($itemLine)
-                    <p class="pcard__tag">{{ $itemLine }}</p>
-                @endif
-            </div>
-        </div>
-    @endif
+    </div>
 
     <footer class="pcard__footer">
-        <div class="pcard__footer-id">
-            <span class="pcard__footer-label">{{ $card['id_label'] ?? 'Fest ID' }}</span>
-            <span class="pcard__footer-value">{{ $card['id_number'] ?? '—' }}</span>
+        <div class="pcard__school-pill">
+            <span class="pcard__school-icon">🏫</span>
+            <span class="pcard__school-text">{{ $card['subtitle'] ?? 'BHARATIYA VIDYA BHAVAN, KANNUR' }}</span>
         </div>
-        <span class="pcard__role">{{ $card['role_label'] ?? 'PARTICIPANT' }}</span>
-        @if($isHeadPass && ($card['item_count'] ?? 0) > 0)
-            <span class="pcard__footer-meta">{{ $card['item_count'] }} item{{ ($card['item_count'] ?? 0) === 1 ? '' : 's' }}</span>
-        @endif
-        @if($scheduleOnly)
-            <span class="pcard__footer-schedule">{{ $scheduleOnly }}</span>
-        @endif
+        <div class="pcard__role-pill">
+            <span>PARTICIPANT</span>
+        </div>
     </footer>
 </div>
