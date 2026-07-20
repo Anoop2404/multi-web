@@ -408,6 +408,9 @@ class FestIdCardService
             if (! empty($filters['school_id'])) {
                 $q->where('school_id', $filters['school_id']);
             }
+            if (! empty($filters['item_id'])) {
+                $q->where('item_id', $filters['item_id']);
+            }
         })
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
