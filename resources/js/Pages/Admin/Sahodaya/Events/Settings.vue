@@ -7,6 +7,11 @@
             </template>
         </PageHeader>
 
+        <SportsSetupSubNav v-if="isSports"
+                           :sahodaya-id="sahodaya.id" :event-id="event.id"
+                           :event="event" active="settings" class="mb-4" />
+        <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="settings" class="mb-4" />
+
         <EventSettingsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event" :active-tab="activeTab" />
 
         <div class="grid lg:grid-cols-3 gap-6">
@@ -103,6 +108,8 @@
 import { provide, computed, onMounted, watch, nextTick } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventSettingsSubNav from '@/Components/sahodaya/EventSettingsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import { useEventSettingsForms } from '@/composables/useEventSettingsForms.js';

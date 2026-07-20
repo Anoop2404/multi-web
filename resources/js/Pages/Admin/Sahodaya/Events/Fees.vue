@@ -20,6 +20,12 @@
             </template>
         </PageHeader>
 
+        <!-- Header Navigation Bar -->
+        <SportsSetupSubNav v-if="event.event_type === 'sports'"
+                           :sahodaya-id="sahodaya.id" :event-id="event.id"
+                           :event="event" active="fees" class="mb-4" />
+        <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="fees" class="mb-4" />
+
         <!-- Guidance Banner Card -->
         <div class="mb-5 rounded-xl border border-indigo-200/80 bg-indigo-50/50 p-4 text-xs text-indigo-950 shadow-sm space-y-1.5">
             <div class="flex flex-wrap items-center justify-between gap-2">
@@ -228,6 +234,8 @@
 import { router, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
 const props = defineProps({
