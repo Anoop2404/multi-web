@@ -79,7 +79,7 @@
 @endif
 
 @php
-    $chunks = array_chunk($cards, 4);
+    $chunks = array_chunk($cards, \App\Support\FestIdCardTemplates::CARDS_PER_PAGE);
 @endphp
 
 @foreach($chunks as $pageIndex => $pageCards)
