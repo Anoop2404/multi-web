@@ -119,7 +119,7 @@
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
                                 <th class="p-3.5 w-44">Rank</th>
                                 <th class="p-3.5 w-28">Marks / Score</th>
-                                <th v-if="!isSports" class="p-3.5 w-24">Grade</th>
+                                <th v-if="showGradeColumn" class="p-3.5 w-24">Grade</th>
                                 <th class="p-3.5 text-right w-24">Actions</th>
                             </tr>
                         </thead>
@@ -194,8 +194,8 @@
                                            :disabled="isAbsent(participant, item)">
                                 </td>
 
-                                <!-- Grade (Non-Sports) -->
-                                <td v-if="!isSports" class="p-3.5">
+                                <!-- Grade (Optional for Kalolsavam / Fest) -->
+                                <td v-if="showGradeColumn" class="p-3.5">
                                     <select v-model="markForms[participant.id].grade" class="field text-xs" :disabled="isAbsent(participant, item)">
                                         <option value="">—</option>
                                         <option>A</option>
@@ -260,6 +260,12 @@ const props = defineProps({
 const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/import`);
 const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
 const isSports = computed(() => props.event?.event_type === 'sports');
+
+const showGradeToggle = ref(false);
+const showGradeColumn = computed(() => {
+    if (showGradeToggle.value) return true;
+    return props.event?.event_type === 'kalolsavam' || props.event?.event_type === 'fest';
+});
 
 const markEntrySheetUrl = computed(() => {
     let url = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/mark-entry-sheet`;

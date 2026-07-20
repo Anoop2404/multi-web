@@ -970,6 +970,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/chest-numbers/generate', [FestChestNumberController::class, 'generate'])->name('chest-numbers.generate');
             Route::post('/{event}/chest-numbers/assign-missing', [FestChestNumberController::class, 'assignMissing'])->name('chest-numbers.assign-missing');
             Route::post('/{event}/chest-numbers/assign-item-ids', [FestChestNumberController::class, 'assignItemRegIds'])->name('chest-numbers.assign-item-ids');
+            Route::post('/{event}/chest-numbers/clear-all', [FestChestNumberController::class, 'clearAll'])->name('chest-numbers.clear-all');
             Route::post('/{event}/chest-numbers/{participant}/clear', [FestChestNumberController::class, 'clearChest'])->name('chest-numbers.clear');
             Route::post('/{event}/chest-numbers/{participant}/reveal', [FestChestNumberController::class, 'revealChest'])->name('chest-numbers.reveal');
             Route::get('/{event}/chest-numbers/print', [FestChestNumberController::class, 'print'])->name('chest-numbers.print');

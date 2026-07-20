@@ -148,4 +148,35 @@ class FestChestNumberService
             'chest_revealed_at' => null,
         ]);
     }
+
+    public function clearAllForEvent(FestEvent $event, ?FestEventItem $item = null): int
+    {
+        $participantQuery = FestParticipant::query()
+            ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id));
+
+        if ($item) {
+            $participantQuery->whereHas('registration', fn ($q) => $q->where('item_id', $item->id));
+        }
+
+        $clearedCount = $participantQuery->whereNotNull('chest_no')->count();
+
+        $participantQuery->update([
+            'chest_no'          => null,
+            'chest_revealed_at' => null,
+        ]);
+
+        $groupQuery = \App\Models\FestRegistrationGroup::query()
+            ->whereHas('registrations', fn ($q) => $q->where('event_id', $event->id));
+
+        if ($item) {
+            $groupQuery->whereHas('registrations', fn ($q) => $q->where('item_id', $item->id));
+        }
+
+        $groupQuery->update([
+            'chest_no'          => null,
+            'chest_revealed_at' => null,
+        ]);
+
+        return $clearedCount;
+    }
 }

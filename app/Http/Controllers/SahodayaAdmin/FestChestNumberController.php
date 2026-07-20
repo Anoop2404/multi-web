@@ -143,6 +143,25 @@ class FestChestNumberController extends SahodayaAdminController
         return back()->with('success', 'Chest number cleared.');
     }
 
+    public function clearAll(Request $request, string $tenantId, FestEvent $event, FestChestNumberService $service, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $itemId = $request->integer('item_id') ?: null;
+        $item = $itemId ? FestEventItem::where('event_id', $event->id)->find($itemId) : null;
+
+        $cleared = $service->clearAllForEvent($event, $item);
+
+        $scopeLabel = $item ? "for item '{$item->title}'" : "for the entire event '{$event->title}'";
+
+        $audit->festEvent($event, FestPageActivity::CHEST_NUMBERS, 'fest.chest_numbers.cleared_all', "Cleared all chest numbers {$scopeLabel}", [
+            'count'   => $cleared,
+            'item_id' => $item?->id,
+        ]);
+
+        return back()->with('success', "Cleared {$cleared} chest number(s) {$scopeLabel}.");
+    }
+
     public function revealChest(string $tenantId, FestEvent $event, FestParticipant $participant, FestChestNumberService $service, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

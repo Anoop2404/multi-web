@@ -35,6 +35,9 @@
                     <div class="flex flex-wrap gap-2">
                         <button type="button" class="btn-primary text-sm" @click="generate">Assign missing chest</button>
                         <button type="button" class="btn-secondary text-sm" @click="assignItemReg">Assign missing item reg</button>
+                        <button type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-50 border-rose-200 font-semibold" @click="clearAllChests">
+                            Reset / Clear All Chests
+                        </button>
                         <a :href="printUrl" target="_blank" class="btn-secondary text-sm">Print list</a>
                         <a :href="cardsUrl" target="_blank" class="btn-secondary text-sm">Print chest cards</a>
                         <a :href="csvUrl" class="btn-secondary text-sm">CSV</a>
@@ -167,6 +170,16 @@ function postAction(path) {
 }
 function generate() { postAction(`${base.value}/generate`); }
 function assignItemReg() { postAction(`${base.value}/assign-item-ids`); }
+function clearAllChests() {
+    const scopeMsg = props.selectedItemId
+        ? `Are you sure you want to reset/clear ALL chest numbers for "${props.selectedItem?.title || 'this item'}"?`
+        : `Are you sure you want to reset/clear ALL chest numbers across the ENTIRE event "${props.event.title}"?`;
+
+    if (!confirm(scopeMsg)) return;
+
+    const payload = props.selectedItemId ? { item_id: props.selectedItemId } : {};
+    router.post(`${base.value}/clear-all`, payload, { preserveScroll: true });
+}
 function clearChest(id) {
     if (!confirm('Clear chest number?')) return;
     router.post(`${base.value}/${id}/clear`, {}, { preserveScroll: true });
