@@ -618,9 +618,12 @@ class FestReportService
             ->groupBy(fn ($row) => $row['item'] ?? 'Item')
             ->sortKeys();
 
+        $sahodaya = Tenant::find($this->event->tenant_id);
+
         return Pdf::loadView('fest.reports.attendance-sheet', [
             'event'      => $this->event,
-            'sahodaya'   => Tenant::find($this->event->tenant_id),
+            'sahodaya'   => $sahodaya,
+            'logo'       => $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null,
             'rowsByItem' => $rowsByItem,
             'audience'   => $audience,
         ])->download($this->slug().'-attendance.pdf');

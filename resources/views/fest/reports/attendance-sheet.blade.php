@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Attendance — {{ $event->title }}</title>
 <style>
-body{font-family:DejaVu Sans,sans-serif;font-size:10px;color:#111}
-.header{text-align:center;margin-bottom:14px}
-.header .sahodaya{font-size:15px;font-weight:bold}
-.header .event{font-size:13px;margin-top:2px}
+body{font-family:DejaVu Sans,sans-serif;font-size:10px;color:#111;margin-top:80px}
+.running-header{position:fixed;top:-70px;left:0;right:0;text-align:center}
+.running-header img{height:40px;margin-bottom:4px}
+.running-header .sahodaya{font-size:15px;font-weight:bold}
+.running-header .event{font-size:12px;margin-top:2px}
+.running-footer{position:fixed;bottom:-30px;left:0;right:0;text-align:center;font-size:9px;color:#666}
 .item-heading{font-size:12px;font-weight:bold;background:#eef2ff;padding:5px 6px;margin-top:16px;border:1px solid #c7d2fe}
 .item-heading:first-of-type{margin-top:0}
 table{width:100%;border-collapse:collapse;margin-top:0}
@@ -12,10 +14,15 @@ th,td{border:1px solid #ccc;padding:4px}
 th{background:#f3f4f6;text-align:left}
 </style>
 </head><body>
-<div class="header">
+
+<div class="running-header">
+    @if($logo ?? null)
+        <img src="{{ $logo }}" alt="">
+    @endif
     <p class="sahodaya">{{ $sahodaya->name ?? 'Sahodaya' }}</p>
     <p class="event">{{ $event->title }} — Attendance Sheet</p>
 </div>
+<div class="running-footer">Page {PAGE_NUM} of {PAGE_COUNT}</div>
 
 @forelse($rowsByItem as $itemName => $rows)
     <div class="item-heading">{{ $itemName }} ({{ count($rows) }} participant{{ count($rows) === 1 ? '' : 's' }})</div>
@@ -28,8 +35,7 @@ th{background:#f3f4f6;text-align:left}
                     <th>Name</th>
                     <th>School</th>
                 @endif
-                <th style="width:70px">Present</th>
-                <th style="width:70px">Absent</th>
+                <th style="width:110px">Attendance</th>
             </tr>
         </thead>
         <tbody>
@@ -41,7 +47,6 @@ th{background:#f3f4f6;text-align:left}
                         <td>{{ $row['name'] ?? '' }}</td>
                         <td>{{ $row['school'] ?? '' }}</td>
                     @endif
-                    <td></td>
                     <td></td>
                 </tr>
             @endforeach
