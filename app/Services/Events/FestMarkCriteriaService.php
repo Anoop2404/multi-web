@@ -100,17 +100,19 @@ class FestMarkCriteriaService
 
         foreach ($rows as $i => $row) {
             $label = trim((string) ($row['label'] ?? ''));
+            $maxScore = (float) ($row['max_score'] ?? 10);
+
             if ($label === '') {
-                continue;
+                $label = 'Criterion ' . ($i + 1);
             }
 
             $criterion = FestMarkCriterion::updateOrCreate(
                 ['id' => $row['id'] ?? null, 'item_id' => $item->id],
                 [
-                    'event_id' => $event->id,
-                    'item_id' => $item->id,
-                    'label' => $label,
-                    'max_score' => (float) ($row['max_score'] ?? 10),
+                    'event_id'   => $event->id,
+                    'item_id'    => $item->id,
+                    'label'      => $label,
+                    'max_score'  => $maxScore > 0 ? $maxScore : 10,
                     'sort_order' => $i,
                 ]
             );

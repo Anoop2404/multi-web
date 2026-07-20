@@ -113,14 +113,20 @@
                 <div class="space-y-2">
                     <p class="text-xs text-slate-500">
                         Scoring columns printed on each judge's paper sheet (e.g. "Content", "Presentation"). SL NO,
-                        CHEST NO. and TOTAL are always included automatically — only name the columns in between.
+                        CHEST NO. and TOTAL are always included automatically — name the criteria columns in between.
                     </p>
+                    <div v-if="columnDraft.length" class="grid grid-cols-12 gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">
+                        <div class="col-span-1">#</div>
+                        <div class="col-span-8">Column / Criterion Name</div>
+                        <div class="col-span-2">Max Marks</div>
+                        <div class="col-span-1"></div>
+                    </div>
                     <div v-for="(row, idx) in columnDraft" :key="row._key" class="flex items-center gap-2">
                         <span class="text-[10px] font-bold text-slate-400 w-5">{{ idx + 1 }}.</span>
-                        <input v-model="row.label" type="text" placeholder="Column name (e.g. Content)"
+                        <input v-model="row.label" type="text" :placeholder="`Criterion ${idx + 1} (e.g. Content / Presentation)`"
                                class="field text-xs flex-1">
                         <input v-model.number="row.max_score" type="number" min="0.5" step="0.5" placeholder="Max"
-                               class="field text-xs w-20">
+                               class="field text-xs w-24">
                         <button type="button" class="text-rose-500 hover:underline text-xs font-semibold"
                                 @click="removeColumnRow(idx)">
                             Remove
@@ -503,9 +509,11 @@ function removeColumnRow(idx) {
 function saveColumnConfig() {
     if (!props.selectedItemId) return;
     savingColumns.value = true;
-    const rows = columnDraft
-        .filter((r) => (r.label ?? '').trim() !== '')
-        .map((r) => ({ id: r.id, label: r.label.trim(), max_score: r.max_score || 10 }));
+    const rows = columnDraft.map((r, idx) => ({
+        id: r.id,
+        label: (r.label ?? '').trim() || `Criterion ${idx + 1}`,
+        max_score: r.max_score || 10,
+    }));
 
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria`,

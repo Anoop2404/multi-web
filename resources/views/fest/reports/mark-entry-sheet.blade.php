@@ -25,28 +25,43 @@
 <body>
     @foreach($sheets as $sheet)
         <div class="sheet">
-            <div class="header">
-                <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+            <div class="header" style="margin-bottom: 12px;">
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
                     <tr>
                         @if(!empty($logoSrc))
-                            <td style="width:44px;vertical-align:middle;padding:0 8px 0 0;">
-                                <img src="{{ $logoSrc }}" alt="" style="width:36px;height:36px;object-fit:contain;">
+                            <td style="width: 55px; vertical-align: middle; padding-right: 12px;">
+                                <img src="{{ $logoSrc }}" alt="Logo" style="width: 48px; height: 48px; object-fit: contain;">
                             </td>
                         @endif
-                        <td style="vertical-align:middle;">
-                            <div class="title">{{ $sahodaya->name ?? 'SAHODAYA SCHOOLS COMPLEX' }}</div>
+                        <td style="vertical-align: middle;">
+                            <div style="font-size: 17px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.1;">
+                                {{ $sahodaya->name ?? 'SAHODAYA SCHOOLS COMPLEX' }}
+                            </div>
+                            <div style="font-size: 11px; font-weight: 600; color: #475569; margin-top: 3px;">
+                                CBSE Sahodaya Inter-School Competitions & Events
+                            </div>
+                        </td>
+                        <td style="text-align: right; vertical-align: middle;">
+                            <div style="display: inline-block; background: #0f172a; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">
+                                OFFICIAL EVALUATION SHEET
+                            </div>
                         </td>
                     </tr>
                 </table>
-                <div class="subtitle">
-                    {{ $event->title }} — MARK ENTRY & SCORE EVALUATION SHEET
-                    @if(!empty($sheet['sheet_label']))
-                        &nbsp;·&nbsp; {{ $sheet['sheet_label'] }}
-                    @endif
-                </div>
-                <div class="meta">
-                    <strong>ITEM:</strong> {{ $sheet['item']->item_code ? "[{$sheet['item']->item_code}] " : '' }}{{ $sheet['item']->title }}
-                    &nbsp;|&nbsp; <strong>TOTAL PARTICIPANTS:</strong> {{ count($sheet['rows']) }}
+
+                <div style="border-bottom: 2px solid #0f172a; margin-bottom: 8px;"></div>
+
+                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 6px 10px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 10px; color: #1e293b;">
+                        <tr>
+                            <td style="padding: 2px 0;"><strong>EVENT:</strong> {{ strtoupper($event->title) }}</td>
+                            <td style="padding: 2px 0; text-align: right;"><strong>SHEET:</strong> {{ !empty($sheet['sheet_label']) ? $sheet['sheet_label'] : 'MARK ENTRY SHEET' }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 2px 0;"><strong>ITEM:</strong> {{ $sheet['item']->item_code ? "[{$sheet['item']->item_code}] " : '' }}{{ $sheet['item']->title }}</td>
+                            <td style="padding: 2px 0; text-align: right;"><strong>TOTAL PARTICIPANTS:</strong> {{ count($sheet['rows']) }}</td>
+                        </tr>
+                    </table>
                 </div>
             </div>
 
@@ -128,9 +143,20 @@
             @endif
 
             <div class="sign-box">
-                <div class="sign-col">Judge 1 Signature: __________________</div>
-                <div class="sign-col">Judge 2 Signature: __________________</div>
-                <div class="sign-col">Convener Signature: __________________</div>
+                @php
+                    $jCount = max(1, (int) ($sheet['judge_count'] ?? 1));
+                    $colsCount = !empty($sheet['is_sum_sheet']) ? ($jCount + 1) : 2;
+                    $colWidth = floor(100 / max(1, $colsCount));
+                @endphp
+                @if(!empty($sheet['is_sum_sheet']))
+                    @for($j = 1; $j <= $jCount; $j++)
+                        <div class="sign-col" style="width: {{ $colWidth }}%;">Judge {{ $j }} Signature: __________________</div>
+                    @endfor
+                    <div class="sign-col" style="width: {{ $colWidth }}%;">Convenor Signature: __________________</div>
+                @else
+                    <div class="sign-col" style="width: 50%;">Judge Signature: __________________</div>
+                    <div class="sign-col" style="width: 50%;">Convenor Signature: __________________</div>
+                @endif
                 <div class="clear"></div>
             </div>
         </div>
