@@ -46,12 +46,12 @@ class FestIdCardController extends SahodayaAdminController
         $filters = $this->idCardFilters($request);
 
         if ($data['audience'] === 'student') {
-            $scope = $filters['scope'] ?? 'item';
+            $scope = $filters['scope'] ?? 'event';
             if ($scope === 'item' && empty($filters['item_id'])) {
-                return response()->json(['cards' => [], 'message' => 'Select an item to preview cards.']);
+                $filters['scope'] = 'event';
             }
             if ($scope === 'head' && empty($filters['head_id'])) {
-                return response()->json(['cards' => [], 'message' => 'Select an item head to preview cards.']);
+                $filters['scope'] = 'event';
             }
         }
 

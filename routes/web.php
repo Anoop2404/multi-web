@@ -883,6 +883,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/items/{item}', [FestEventController::class, 'destroyItem'])->name('items.destroy');
             Route::get('/{event}/registrations/import', [FestRegistrationReviewController::class, 'importForm'])->name('registrations.import-form');
             Route::get('/{event}/registrations', [FestRegistrationReviewController::class, 'index'])->name('registrations.index');
+            Route::get('/{event}/registrations/approved-pdf', [FestRegistrationReviewController::class, 'printApproved'])->name('registrations.approved-pdf');
             Route::post('/{event}/registrations/on-behalf', [FestRegistrationReviewController::class, 'storeOnBehalf'])->name('registrations.on-behalf');
             Route::post('/{event}/registrations/bulk-approve', [FestRegistrationReviewController::class, 'bulkApprove'])->name('registrations.bulk-approve');
             Route::post('/{event}/registrations/bulk-reject', [FestRegistrationReviewController::class, 'bulkReject'])->name('registrations.bulk-reject');

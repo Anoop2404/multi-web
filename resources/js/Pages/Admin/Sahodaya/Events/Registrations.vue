@@ -4,6 +4,9 @@
         <PageHeader :title="`${event.title} — Registrations`" eyebrow="Registrations"
                     :description="filterDescription">
             <template #actions>
+                <a :href="approvedPdfUrl" target="_blank" class="btn-secondary text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-semibold">
+                    🖨️ Approved List PDF
+                </a>
                 <Link v-if="competitionUrl" :href="competitionUrl" class="btn-secondary text-xs">← {{ event.event_type === 'sports' ? 'By Event Head' : 'By item head' }}</Link>
                 <button type="button" class="btn-primary text-xs" @click="openOnBehalf">Register on behalf</button>
                 <Link :href="`${base}/registrations/import`" class="btn-secondary text-xs">Import CSV</Link>
@@ -328,6 +331,16 @@ const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const filterSchoolId = ref('');
 const filterItemId = ref('');
 const filterStatus = ref('');
+
+const approvedPdfUrl = computed(() => {
+    const p = new URLSearchParams();
+    if (filterSchoolId.value) p.set('school_id', filterSchoolId.value);
+    if (filterItemId.value) p.set('item_id', filterItemId.value);
+    if (props.selectedItemId) p.set('item_id', String(props.selectedItemId));
+    if (searchQuery.value) p.set('search', searchQuery.value);
+    const query = p.toString();
+    return `${base}/registrations/approved-pdf${query ? '?' + query : ''}`;
+});
 const searchQuery = ref(props.filters?.search ?? '');
 const selectedIds = ref([]);
 const overrideLifecycle = ref(false);

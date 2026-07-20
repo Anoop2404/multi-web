@@ -2,9 +2,7 @@
     <SahodayaEventsLayout :title="`${event.title} — ID Cards`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — ID Card Creator`" eyebrow="Output"
-                    :description="isSports
-                        ? 'Event Head passes for participants, plus staff and volunteer lanyards. Four cards per A4 sheet.'
-                        : 'Item head passes for participants, plus staff and volunteer lanyards. Four cards per A4 sheet.'">
+                    description="Generate ID cards for approved participants, plus staff and volunteer lanyards. Four cards per A4 sheet.">
         </PageHeader>
 
         <div class="grid lg:grid-cols-3 gap-6">
@@ -19,17 +17,16 @@
                                     : 'bg-white border-slate-200 text-slate-700 hover:border-[#0f3d7a]/40'"
                                 @click="selectAudience(t.id)">
                             {{ t.label }}
-                            <span class="ml-1 opacity-75">({{ meta[t.countKey] ?? 0 }})</span>
                         </button>
                     </div>
                     <p class="text-xs text-slate-500">{{ activeType.hint }}</p>
                 </div>
 
-                <div v-if="audience === 'head'" class="card space-y-4">
+                <div v-if="audience === 'head' || audience === 'participant'" class="card space-y-4">
                     <div>
-                        <h3 class="section-title text-sm">1. {{ isSports ? 'Event Head' : 'Item head' }} & filters</h3>
+                        <h3 class="section-title text-sm">1. Card style & filters</h3>
                         <p class="text-xs text-slate-500 mt-1">
-                            One lanyard per student per {{ isSports ? 'Event Head' : 'item head' }} (e.g. Athletics). All items under that head are listed on the card.
+                            Generate ID lanyards for approved participants. All items for each participant are listed on the card.
                         </p>
                     </div>
 
@@ -45,27 +42,21 @@
                     </div>
 
                     <div class="grid sm:grid-cols-2 gap-3">
-                        <FormField :label="isSports ? 'Event Head' : 'Item head'" required>
-                            <select v-model="filters.head_id" class="field text-sm" required @change="loadPreview">
-                                <option value="">Select {{ isSports ? 'Event Head' : 'item head' }}…</option>
-                                <option v-for="head in heads" :key="head.id" :value="String(head.id)">
-                                    {{ head.name }} ({{ head.count }} cards)
-                                </option>
-                            </select>
-                        </FormField>
                         <FormField label="School filter">
                             <select v-model="filters.school_id" class="field text-sm" @change="loadPreview">
                                 <option value="">All schools</option>
                                 <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
                             </select>
                         </FormField>
+                        <FormField label="Item filter (optional)">
+                            <select v-model="filters.item_id" class="field text-sm" @change="loadPreview">
+                                <option value="">All items</option>
+                                <option v-for="item in items" :key="item.id" :value="item.id">{{ item.title }}</option>
+                            </select>
+                        </FormField>
                     </div>
 
-                    <div v-if="!filters.head_id" class="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                        Select {{ isSports ? 'an Event Head' : 'an item head' }} above, or download all heads as one PDF.
-                    </div>
-
-                    <div v-else-if="loading" class="text-sm text-slate-500 py-6 text-center">Loading preview…</div>
+                    <div v-if="loading" class="text-sm text-slate-500 py-6 text-center">Loading preview…</div>
 
                     <div v-else-if="previewCards.length" class="space-y-3">
                         <div class="flex items-center justify-between gap-3">
@@ -80,8 +71,8 @@
                         </div>
                     </div>
 
-                    <EmptyState v-else title="No participants"
-                                :description="`No approved participants for this ${isSports ? 'Event Head' : 'item head'} and school filter.`" icon="🪪" class="py-8" />
+                    <EmptyState v-else title="No approved participants"
+                                description="No approved participants found for the selected school or item filter." icon="🪪" class="py-8" />
                 </div>
 
                 <div v-else-if="audience === 'volunteer'" class="card space-y-4">
@@ -127,7 +118,7 @@
                 <div class="card space-y-3">
                     <h3 class="section-title text-sm">Layout</h3>
                     <ul class="text-xs text-slate-600 space-y-1.5 list-disc pl-4">
-                        <li><strong>{{ isSports ? 'Event Head' : 'Item head' }}</strong> — one card per student per head; items listed on card</li>
+                        <li><strong>Approved Participants</strong> — one card per student; items listed on card</li>
                         <li><strong>Volunteers</strong> — event-day volunteer passes</li>
                         <li><strong>Staff</strong> — portal users on event staff duty</li>
                         <li>99 × 85 mm landscape cards</li>
@@ -138,9 +129,6 @@
 
                 <div class="card space-y-3">
                     <h3 class="section-title text-sm">Generate</h3>
-                    <p v-if="audience === 'head' && !filters.head_id" class="text-xs text-amber-700">
-                        Select {{ isSports ? 'an Event Head' : 'an item head' }} for a single-head PDF, or use “All heads” below.
-                    </p>
                     <a :href="previewUrl" target="_blank" rel="noopener"
                        class="btn-secondary w-full text-sm text-center block"
                        :class="{ 'pointer-events-none opacity-50': !canGenerate }">
@@ -149,11 +137,6 @@
                     <a :href="pdfUrl" class="btn-primary w-full text-sm text-center block"
                        :class="{ 'pointer-events-none opacity-50': !canGenerate }">
                         Download PDF ↓
-                    </a>
-                    <a v-if="audience === 'head'"
-                       :href="pdfAllHeadsUrl"
-                       class="btn-secondary w-full text-sm text-center block">
-                        Download all heads (PDF) ↓
                     </a>
                 </div>
             </aside>
@@ -164,7 +147,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, onMounted } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
@@ -172,18 +155,16 @@ import IdCardPreviewTile from '@/Components/fest/IdCardPreviewTile.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
-    event: Object, heads: { type: Array, default: () => [] }, meta: Object, schools: Array,
+    event: Object, items: { type: Array, default: () => [] }, meta: Object, schools: Array,
     activityLogs: { type: Array, default: () => [] },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/id-cards`;
 const audience = ref('head');
 const cardTemplate = ref('premium');
-const filters = reactive({ school_id: '', head_id: '' });
+const filters = reactive({ school_id: '', item_id: '' });
 const previewCards = ref([]);
 const loading = ref(false);
-
-const isSports = computed(() => props.event?.event_type === 'sports');
 
 const templates = [
     { id: 'premium', label: 'Premium' },
@@ -193,22 +174,17 @@ const templates = [
 const types = computed(() => [
     {
         id: 'head',
-        label: isSports.value ? 'Event Head' : 'Item head',
-        countKey: 'heads',
-        hint: isSports.value
-            ? 'One card per student per Event Head — Fest ID, school, items under that head.'
-            : 'One card per student per item head — Fest ID, school, items under that head.',
+        label: 'Approved Participants',
+        hint: 'Event participant passes for approved students/teachers. Four cards per A4 sheet.',
     },
     {
         id: 'volunteer',
         label: 'Volunteers',
-        countKey: 'volunteers',
         hint: 'Event-day volunteers from settings.',
     },
     {
         id: 'staff',
         label: 'Staff',
-        countKey: 'staff',
         hint: 'Portal users assigned as event staff.',
     },
 ]);
@@ -216,8 +192,8 @@ const types = computed(() => [
 const activeType = computed(() => types.value.find(t => t.id === audience.value) ?? types.value[0]);
 
 const canGenerate = computed(() => {
-    if (audience.value === 'head') {
-        return Boolean(filters.head_id);
+    if (audience.value === 'head' || audience.value === 'participant') {
+        return true;
     }
     return (props.meta?.[audience.value === 'volunteer' ? 'volunteers' : 'staff'] ?? 0) > 0;
 });
@@ -233,10 +209,10 @@ function apiAudience() {
 
 function queryString() {
     const p = new URLSearchParams({ template: cardTemplate.value, audience: apiAudience() });
-    if (audience.value === 'head') {
-        p.set('scope', 'head');
+    if (audience.value === 'head' || audience.value === 'participant') {
+        p.set('scope', 'event');
         if (filters.school_id) p.set('school_id', filters.school_id);
-        if (filters.head_id) p.set('head_id', filters.head_id);
+        if (filters.item_id) p.set('item_id', filters.item_id);
     }
     return p.toString();
 }
@@ -244,30 +220,19 @@ function queryString() {
 const previewUrl = computed(() => `${base}/preview?${queryString()}`);
 const pdfUrl = computed(() => `${base}/pdf?${queryString()}`);
 
-const pdfAllHeadsUrl = computed(() => {
-    const p = new URLSearchParams({ audience: 'student', template: cardTemplate.value });
-    if (filters.school_id) p.set('school_id', filters.school_id);
-    return `${base}/pdf-all-heads?${p.toString()}`;
-});
-
 function selectAudience(id) {
     audience.value = id;
     loadPreview();
 }
 
 async function loadPreview() {
-    if (audience.value === 'head' && !filters.head_id) {
-        previewCards.value = [];
-        return;
-    }
-
     loading.value = true;
     try {
         const params = new URLSearchParams({ audience: apiAudience() });
-        if (audience.value === 'head') {
-            params.set('scope', 'head');
+        if (audience.value === 'head' || audience.value === 'participant') {
+            params.set('scope', 'event');
             if (filters.school_id) params.set('school_id', filters.school_id);
-            if (filters.head_id) params.set('head_id', filters.head_id);
+            if (filters.item_id) params.set('item_id', filters.item_id);
         }
         const res = await fetch(`${base}/cards?${params.toString()}`, {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -280,4 +245,8 @@ async function loadPreview() {
         loading.value = false;
     }
 }
+
+onMounted(() => {
+    loadPreview();
+});
 </script>

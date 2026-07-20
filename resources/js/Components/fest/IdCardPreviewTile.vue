@@ -47,7 +47,7 @@
         <template v-else>
             <div class="id-card-tile__body">
                 <div class="id-card-tile__avatar">
-                    <img v-if="card.photo_url" :src="card.photo_url" :alt="card.name" class="id-card-tile__photo">
+                    <img v-if="card.photo_url || card.photo_src" :src="card.photo_url || card.photo_src" :alt="card.name" class="id-card-tile__photo">
                     <span v-else class="id-card-tile__initials">{{ card.initials }}</span>
                 </div>
                 <div class="id-card-tile__info">
@@ -60,6 +60,10 @@
                         </li>
                     </ul>
                     <p v-else-if="itemLine" class="id-card-tile__tag">{{ itemLine }}</p>
+                </div>
+                <div v-if="card.chest_number" class="id-card-tile__badge">
+                    <span class="id-card-tile__badge-label">Chest</span>
+                    <span class="id-card-tile__badge-value">{{ card.chest_number }}</span>
                 </div>
             </div>
         </template>

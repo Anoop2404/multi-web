@@ -29,18 +29,18 @@ class FestIdCardService
             return;
         }
 
-        $scope = $filters['scope'] ?? 'item';
+        $scope = $filters['scope'] ?? 'event';
 
         if (in_array($scope, ['event', 'head_all'], true)) {
             return;
         }
 
         if ($scope === 'head' && empty($filters['head_id'])) {
-            abort(422, 'Select an item head before generating student ID cards.');
+            return; // Allow fallback to event scope
         }
 
         if ($scope === 'item' && empty($filters['item_id'])) {
-            abort(422, 'Select a fest item before generating student ID cards.');
+            return; // Allow fallback to event scope
         }
     }
 
@@ -615,17 +615,14 @@ class FestIdCardService
         // which items they're eligible for — both worth surfacing on the
         // printed card face, not just buried in reports.
         $isSports = $event->event_type === 'sports';
-        $chestNumber = null;
+        $chestLabel = $this->chestService->participantLabel($p);
+        $chestNumber = ($chestLabel && $chestLabel !== '—') ? $chestLabel : null;
         $ageGroupLabel = null;
-        if ($isSports) {
-            $chestLabel = $this->chestService->participantLabel($p);
-            $chestNumber = ($chestLabel && $chestLabel !== '—') ? $chestLabel : null;
 
-            if ($itemModel) {
-                $ageKey = FestSportsAgeGroup::resolveForItem($itemModel->age_group, $itemModel->class_group, 'sports');
-                if ($ageKey && $ageKey !== 'open') {
-                    $ageGroupLabel = FestSportsAgeGroup::labels($event->tenant_id)[$ageKey] ?? strtoupper($ageKey);
-                }
+        if ($isSports && $itemModel) {
+            $ageKey = FestSportsAgeGroup::resolveForItem($itemModel->age_group, $itemModel->class_group, 'sports');
+            if ($ageKey && $ageKey !== 'open') {
+                $ageGroupLabel = FestSportsAgeGroup::labels($event->tenant_id)[$ageKey] ?? strtoupper($ageKey);
             }
         }
 

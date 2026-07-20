@@ -375,4 +375,75 @@ class FestRegistrationReviewController extends SahodayaAdminController
             ->with($result['imported'] > 0 ? 'success' : 'error', $message)
             ->with('importErrors', array_slice($result['errors'], 0, 20));
     }
+
+    public function printApproved(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $schoolId = $request->input('school_id') ?: null;
+        $itemId = $request->integer('item_id') ?: null;
+        $search = $request->input('search');
+
+        $query = FestRegistration::where('event_id', $event->id)
+            ->where('status', 'approved')
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->when($itemId, fn ($q) => $q->where('item_id', $itemId))
+            ->with(['item', 'participants.student', 'participants.teacher', 'participants.group', 'school']);
+
+        if ($search) {
+            $term = '%'.$search.'%';
+            $query->where(function ($inner) use ($term) {
+                $inner->whereHas('participants.student', fn ($s) => $s
+                    ->where('name', 'like', $term)
+                    ->orWhere('reg_no', 'like', $term))
+                    ->orWhereHas('participants.teacher', fn ($t) => $t
+                        ->where('name', 'like', $term));
+            });
+        }
+
+        $registrations = $query->latest()->get();
+        $numbering = app(\App\Services\Events\FestNumberingService::class);
+        $schools = Tenant::where('parent_id', $this->sahodaya->id)->pluck('name', 'id');
+
+        $rows = [];
+        foreach ($registrations as $reg) {
+            $isGroup = $reg->item ? $numbering->isGroupItem($reg->item) : false;
+            $schoolName = $schools[$reg->school_id] ?? $reg->school_id;
+
+            foreach ($reg->participants as $p) {
+                if ($p->participant_role === 'standby') {
+                    continue;
+                }
+
+                $chest = ($isGroup && $p->group_id && $p->group)
+                    ? $p->group->chest_no
+                    : $numbering->effectiveChestNumber($p);
+
+                $rows[] = [
+                    'chest_no'         => $chest,
+                    'participant_name' => $p->student?->name ?? $p->teacher?->name ?? $p->group?->team_name ?? 'Participant',
+                    'school_name'      => $schoolName,
+                    'item_title'       => $reg->item?->title ?? '—',
+                    'fest_id'          => $p->level_registration_number ?? $p->student?->reg_no ?? '—',
+                    'is_team'          => $isGroup,
+                ];
+            }
+        }
+
+        usort($rows, function ($a, $b) {
+            return strcmp($a['item_title'], $b['item_title'])
+                ?: ((int) ($a['chest_no'] ?? 999999) <=> (int) ($b['chest_no'] ?? 999999));
+        });
+
+        $logoSrc = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.approved-registrations', [
+            'event'    => $event,
+            'sahodaya' => $this->sahodaya,
+            'rows'     => $rows,
+            'logoSrc'  => $logoSrc,
+        ]);
+
+        return $pdf->stream("approved-registrations-event-{$event->id}.pdf");
+    }
 }
