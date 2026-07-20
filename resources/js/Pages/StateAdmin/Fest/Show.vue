@@ -7,6 +7,7 @@
             <table class="w-full text-sm border" v-if="registrations?.length">
                 <thead>
                     <tr class="text-left bg-slate-50">
+                        <th class="p-2">Sl No</th>
                         <th class="p-2">Item</th>
                         <th class="p-2">Participant</th>
                         <th class="p-2">School</th>
@@ -14,10 +15,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="registration in registrations" :key="registration.id" class="border-t">
+                    <tr v-for="(registration, idx) in registrations" :key="registration.id" class="border-t">
+                        <td class="p-2">{{ idx + 1 }}</td>
                         <td class="p-2">{{ registration.item_code }}</td>
                         <td class="p-2">{{ registration.participants?.[0]?.student_name || 'Participant' }}</td>
-                        <td class="p-2">{{ registration.school_name || registration.school_id }}</td>
+                        <td class="p-2">{{ (registration.school_name || '').toUpperCase() || registration.school_id }}</td>
                         <td class="p-2">{{ registration.status }}</td>
                     </tr>
                 </tbody>

@@ -13,6 +13,7 @@
                 <table v-if="results.length" class="data-table">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Event</th>
                             <th>Item</th>
                             <th>Athlete</th>
@@ -23,13 +24,14 @@
                     </thead>
                     <tbody>
                         <tr v-for="(row, i) in results" :key="i">
+                            <td>{{ i + 1 }}</td>
                             <td>{{ row.event_title }}</td>
                             <td class="font-medium">{{ row.item_title }}</td>
                             <td>
                                 <span class="font-medium">{{ row.student_name }}</span>
                                 <span v-if="row.reg_no" class="block text-xs text-slate-500 font-mono">{{ row.reg_no }}</span>
                             </td>
-                            <td>{{ row.school_name }}</td>
+                            <td>{{ (row.school_name || '').toUpperCase() }}</td>
                             <td>{{ row.position }}</td>
                             <td class="font-mono text-sm">{{ row.measurement || row.score || '—' }}</td>
                         </tr>

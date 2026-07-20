@@ -32,6 +32,7 @@
                 <table class="data-table min-w-[720px] text-sm">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Teacher</th>
                             <th>School</th>
                             <th>Overall</th>
@@ -44,12 +45,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="row in feedback" :key="row.id">
+                        <tr v-for="(row, idx) in feedback" :key="row.id">
+                            <td>{{ idx + 1 }}</td>
                             <td>
                                 <div class="font-medium">{{ row.teacher_name || '—' }}</div>
                                 <div class="text-xs text-gray-400">{{ row.teacher_email || '' }}</div>
                             </td>
-                            <td>{{ row.school_name || '—' }}</td>
+                            <td>{{ (row.school_name || '').toUpperCase() || '—' }}</td>
                             <td class="font-semibold">{{ row.rating }}/5</td>
                             <td>{{ row.content_rating ?? '—' }}</td>
                             <td>{{ row.trainer_rating ?? '—' }}</td>

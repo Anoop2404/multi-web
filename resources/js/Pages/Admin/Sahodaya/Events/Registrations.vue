@@ -89,6 +89,7 @@
                 <thead class="bg-gray-50 text-left">
                     <tr>
                         <th class="p-3 w-8"></th>
+                        <th class="p-3 w-12">Sl No</th>
                         <th class="p-3">School</th>
                         <th class="p-3">Item</th>
                         <th class="p-3">Status</th>
@@ -97,11 +98,12 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="reg in filteredRegistrations" :key="reg.id" class="border-t align-top">
+                    <tr v-for="(reg, idx) in filteredRegistrations" :key="reg.id" class="border-t align-top">
                         <td class="p-3">
                             <input v-if="reg.status === 'submitted'" type="checkbox" :value="reg.id" v-model="selectedIds">
                         </td>
-                        <td class="p-3">{{ schools[reg.school_id] ?? reg.school_id }}</td>
+                        <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
+                        <td class="p-3">{{ (schools[reg.school_id] ?? reg.school_id ?? '').toString().toUpperCase() }}</td>
                         <td class="p-3">{{ reg.item?.title ?? '—' }}</td>
                         <td class="p-3">
                             <span :class="statusClass(reg.status)" class="text-xs font-semibold px-2 py-0.5 rounded">

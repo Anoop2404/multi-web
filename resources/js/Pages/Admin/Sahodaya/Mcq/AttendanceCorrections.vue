@@ -16,6 +16,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Student</th>
                             <th>School</th>
                             <th>Change</th>
@@ -26,9 +27,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="r in requests" :key="r.id">
+                        <tr v-for="(r, idx) in requests" :key="r.id">
+                            <td>{{ idx + 1 }}</td>
                             <td>{{ r.student_name || '—' }} <span class="text-slate-400 text-xs font-mono">{{ r.hall_ticket_no }}</span></td>
-                            <td class="text-xs">{{ r.school_name || '—' }}</td>
+                            <td class="text-xs">{{ (r.school_name || '').toUpperCase() || '—' }}</td>
                             <td class="text-xs whitespace-nowrap capitalize">{{ r.previous_status || 'pending' }} → <span class="font-semibold">{{ r.requested_status }}</span></td>
                             <td class="text-xs max-w-xs">{{ r.requested_note || '—' }}</td>
                             <td class="text-xs">{{ r.requested_by || '—' }}<br><span class="text-slate-400">{{ formatDateTime(r.created_at) }}</span></td>
@@ -47,7 +49,7 @@
                             </td>
                         </tr>
                         <tr v-if="!requests.length">
-                            <td colspan="7" class="p-6 text-center text-slate-400">No correction requests for this exam.</td>
+                            <td colspan="8" class="p-6 text-center text-slate-400">No correction requests for this exam.</td>
                         </tr>
                     </tbody>
                 </table>

@@ -70,6 +70,7 @@
             <table class="w-full text-sm">
                 <thead>
                     <tr style="background-color: var(--color-primary)">
+                        <th class="text-left px-5 py-3 text-white font-semibold">Sl No</th>
                         <th class="text-left px-5 py-3 text-white font-semibold">Rank</th>
                         <th class="text-left px-5 py-3 text-white font-semibold">School</th>
                         <th class="text-right px-5 py-3 text-white font-semibold">Total Points</th>
@@ -83,10 +84,11 @@
                         $points = is_array($row) ? ($row['total_points'] ?? 0) : ($row->total_points ?? 0);
                     @endphp
                     <tr class="{{ $i < 3 ? 'font-semibold' : '' }} hover:bg-gray-50 transition">
+                        <td class="px-5 py-3 text-gray-900">{{ $i + 1 }}</td>
                         <td class="px-5 py-3">
                             <span class="text-lg">{{ ['🥇','🥈','🥉'][$i] ?? $rank }}</span>
                         </td>
-                        <td class="px-5 py-3 text-gray-900">{{ $schoolName }}</td>
+                        <td class="px-5 py-3 text-gray-900">{{ strtoupper($schoolName ?? '') }}</td>
                         <td class="px-5 py-3 text-right font-bold" style="color: var(--color-primary)">
                             {{ $points }}
                         </td>

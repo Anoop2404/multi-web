@@ -45,7 +45,7 @@ th{background:#f3f4f6;text-align:left}
                     <td>{{ $row['reference'] ?? '—' }}</td>
                     @if(($audience ?? 'staff') === 'staff')
                         <td>{{ $row['name'] ?? '' }}</td>
-                        <td>{{ $row['school'] ?? '' }}</td>
+                        <td>{{ strtoupper($row['school'] ?? '') }}</td>
                     @endif
                     <td></td>
                 </tr>

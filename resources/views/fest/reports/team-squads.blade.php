@@ -4,11 +4,11 @@
 </head><body>
 <h2 style="text-align:center">{{ $event->title }} — Team / Group Squads</h2>
 @forelse($rows as $row)
-<h3>{{ $row['item_title'] }} — {{ $row['school_name'] ?? 'School' }}</h3>
-<table><thead><tr><th>Name</th><th>Reg no</th><th>Role</th></tr></thead>
+<h3>{{ $row['item_title'] }} — {{ strtoupper($row['school_name'] ?? 'School') }}</h3>
+<table><thead><tr><th>Sl No</th><th>Name</th><th>Reg no</th><th>Role</th></tr></thead>
 <tbody>
 @foreach($row['members'] as $m)
-<tr><td>{{ $m['name'] ?? '—' }}</td><td>{{ $m['reg_no'] ?? '—' }}</td><td>{{ $m['role'] ?? 'performer' }}</td></tr>
+<tr><td>{{ $loop->iteration }}</td><td>{{ $m['name'] ?? '—' }}</td><td>{{ $m['reg_no'] ?? '—' }}</td><td>{{ $m['role'] ?? 'performer' }}</td></tr>
 @endforeach
 </tbody></table>
 @empty

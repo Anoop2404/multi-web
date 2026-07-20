@@ -11,14 +11,15 @@ th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
 </style>
 </head><body>
 <h2>{{ $event->title }}</h2>
-<p class="meta">{{ $school->name }} — Head-wise participants</p>
+<p class="meta">{{ strtoupper($school->name) }} — Head-wise participants</p>
 
 <p class="section">Summary by head</p>
 <table>
-<thead><tr><th>Head</th><th>Items</th><th>Regs</th><th>Approved</th><th>Pending</th><th>Participants</th><th>Max item</th></tr></thead>
+<thead><tr><th>Sl No</th><th>Head</th><th>Items</th><th>Regs</th><th>Approved</th><th>Pending</th><th>Participants</th><th>Max item</th></tr></thead>
 <tbody>
 @foreach($summary as $s)
 <tr>
+    <td>{{ $loop->iteration }}</td>
     <td>{{ $s['head_name'] }}</td>
     <td>{{ $s['item_count'] }}</td>
     <td>{{ $s['registration_count'] ?? 0 }}</td>
@@ -33,10 +34,11 @@ th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
 
 <p class="section">Participant list</p>
 <table>
-<thead><tr><th>Head</th><th>Participant</th><th>Reg no</th><th>Item</th><th>Fest ID</th><th>Item reg</th><th>Chest</th></tr></thead>
+<thead><tr><th>Sl No</th><th>Head</th><th>Participant</th><th>Reg no</th><th>Item</th><th>Fest ID</th><th>Item reg</th><th>Chest</th></tr></thead>
 <tbody>
 @forelse($rows as $row)
 <tr>
+    <td>{{ $loop->iteration }}</td>
     <td>{{ $row['head_name'] ?? '—' }}</td>
     <td>{{ $row['student'] }}</td>
     <td>{{ $row['reg_no'] }}</td>
@@ -46,7 +48,7 @@ th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
     <td>{{ $row['chest_no'] ?? '—' }}</td>
 </tr>
 @empty
-<tr><td colspan="7" style="text-align:center;padding:16px">No participants.</td></tr>
+<tr><td colspan="8" style="text-align:center;padding:16px">No participants.</td></tr>
 @endforelse
 </tbody></table>
 </body></html>

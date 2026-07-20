@@ -55,13 +55,15 @@
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
+                        <th class="p-3 w-12">Sl No</th>
                         <th class="p-3">School</th><th class="p-3">Items</th><th class="p-3">Total due</th>
                         <th class="p-3">Status</th><th class="p-3">Receipt</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="s in schoolSummaries" :key="s.school_id" class="border-t">
-                        <td class="p-3 font-medium">{{ s.school_name }}</td>
+                    <tr v-for="(s, idx) in schoolSummaries" :key="s.school_id" class="border-t">
+                        <td class="p-3 text-slate-400">{{ idx + 1 }}</td>
+                        <td class="p-3 font-medium">{{ (s.school_name || '').toUpperCase() }}</td>
                         <td class="p-3">{{ s.item_count }}</td>
                         <td class="p-3 font-semibold">₹{{ s.total_due }}</td>
                         <td class="p-3"><span :class="feeStatusClass(s.fee_status)" class="text-xs font-semibold px-2 py-0.5 rounded">{{ s.fee_status }}</span></td>
@@ -75,6 +77,7 @@
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
+                        <th class="p-3 w-12">Sl No</th>
                         <th class="p-3">{{ event.event_type === 'sports' ? 'Sport Event' : 'Head' }}</th>
                         <th class="p-3">School</th>
                         <th class="p-3">Participant</th>
@@ -88,13 +91,14 @@
                 <tbody>
                     <template v-for="(row, idx) in displayRows" :key="row.participant_id">
                         <tr v-if="idx === 0 || row.head_name !== displayRows[idx - 1]?.head_name" class="bg-slate-50/80">
-                            <td colspan="8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            <td colspan="9" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 {{ row.head_name ?? 'Other items' }}
                             </td>
                         </tr>
                         <tr class="border-t align-top">
+                            <td class="p-3 text-xs text-slate-400">{{ idx + 1 }}</td>
                             <td class="p-3 text-xs text-slate-400">{{ row.head_name ?? '—' }}</td>
-                            <td class="p-3 text-xs">{{ row.school_name }}</td>
+                            <td class="p-3 text-xs">{{ (row.school_name || '').toUpperCase() }}</td>
                              <td class="p-3">
                                  <span class="font-medium text-slate-800">{{ row.participant_name }}</span>
                                  <p class="text-xs font-mono text-[#0f3d7a]">{{ row.participant_reg_no }}</p>
@@ -123,7 +127,7 @@
                         </tr>
                     </template>
                     <tr v-if="!displayRows.length">
-                        <td colspan="8" class="p-8 text-center text-gray-400">No registrations match filters.</td>
+                        <td colspan="9" class="p-8 text-center text-gray-400">No registrations match filters.</td>
                     </tr>
                 </tbody>
             </table>

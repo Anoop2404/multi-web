@@ -3,17 +3,18 @@
 <style>body{font-family:DejaVu Sans,sans-serif;font-size:10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px}th{background:#f3f4f6}</style>
 </head><body>
 <h2 style="text-align:center">{{ $event->title }} — Mark Entry: {{ $item?->title }}</h2>
-<table><thead><tr><th>Order</th><th>Ref</th>
+<table><thead><tr><th>Sl No</th><th>Order</th><th>Ref</th>
 @if(($audience ?? 'staff') === 'staff')<th>Name</th><th>School</th>@endif
 <th>Position</th><th>Grade</th><th>Score</th></tr></thead>
 <tbody>
 @foreach($rows as $row)
 <tr>
+<td>{{ $loop->iteration }}</td>
 <td>{{ $row['order'] ?? '—' }}</td>
 <td>{{ $row['reference'] ?? '—' }}</td>
 @if(($audience ?? 'staff') === 'staff')
 <td>{{ $row['name'] ?? '—' }}</td>
-<td>{{ $row['school'] ?? '—' }}</td>
+<td>{{ strtoupper($row['school'] ?? '—') }}</td>
 @endif
 <td></td><td></td><td></td>
 </tr>

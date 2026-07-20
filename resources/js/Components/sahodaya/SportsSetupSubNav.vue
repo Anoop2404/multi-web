@@ -40,6 +40,8 @@ const tabs = computed(() => {
         { key: 'attendance', label: 'Attendance', icon: '📋', href: `${base.value}/attendance` },
         { key: 'marks', label: 'Marks', icon: '✍️', href: `${base.value}/marks` },
         { key: 'results', label: 'Results', icon: '🥇', href: `${base.value}/results` },
+        { key: 'schedule', label: 'Schedule', icon: '📅', href: `${base.value}/schedule` },
+        { key: 'activity', label: 'Activity log', icon: '🕒', href: `${base.value}/activity` },
     ];
 });
 </script>

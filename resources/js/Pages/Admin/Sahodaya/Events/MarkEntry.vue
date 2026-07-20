@@ -5,6 +5,7 @@
                     :description="filterDescription">
             <template #actions>
                 <Link v-if="competitionUrl" :href="competitionUrl" class="btn-secondary shrink-0 text-sm">← {{ isSports ? 'By Event Head' : 'By item head' }}</Link>
+                <a v-if="cumulativeSheetUrl" :href="cumulativeSheetUrl" target="_blank" class="btn-secondary shrink-0 text-sm">Cumulative sheet ↓</a>
                 <Link :href="importUrl" class="btn-secondary shrink-0">Import marks</Link>
             </template>
         </PageHeader>
@@ -43,15 +44,44 @@
         </p>
 
         <!-- Filters Panel -->
-        <div v-if="isSports && childEvents.length" class="card mb-4">
+        <div v-if="(isSports && childEvents.length) || itemOptions.length > 1" class="card mb-4">
             <div class="flex flex-wrap gap-3 items-center">
-                <div>
+                <div v-if="isSports && childEvents.length">
                     <label class="text-xs font-semibold text-gray-600">Select Sport Event</label>
                     <select :value="event.id" @change="switchSportEvent" class="field text-sm mt-1 w-64">
                         <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
                             {{ ev.title }} {{ ev.parent_event_id === null ? '(Season Hub)' : '' }}
                         </option>
                     </select>
+                </div>
+                <div v-if="itemOptions.length > 1">
+                    <label class="text-xs font-semibold text-gray-600">Select item</label>
+                    <select :value="selectedItemId" @change="switchItem" class="field text-sm mt-1 w-64">
+                        <option v-for="it in itemOptions" :key="it.id" :value="it.id">{{ it.title }}</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="selectedItemId" class="card mb-4">
+            <button type="button" class="flex items-center justify-between w-full text-sm font-semibold text-slate-700" @click="showCriteriaPanel = !showCriteriaPanel">
+                <span>Marking criteria / judge columns {{ hasCriteria ? `(${criteria.length} configured)` : '(none — using single grade/score)' }}</span>
+                <span class="text-xs text-indigo-600">{{ showCriteriaPanel ? 'Hide' : 'Configure' }}</span>
+            </button>
+            <div v-if="showCriteriaPanel" class="mt-3 space-y-2">
+                <p class="text-xs text-slate-500">
+                    Add one row per judge or criterion (e.g. "Judge 1", "Content", "Presentation"). The total is the sum of all rows and becomes this item's mark automatically. Leave empty to keep the plain grade/score entry.
+                </p>
+                <div v-for="(row, idx) in criteriaDraft" :key="idx" class="flex items-center gap-2">
+                    <input v-model="row.label" type="text" class="field text-sm flex-1" placeholder="e.g. Judge 1 / Content">
+                    <input v-model.number="row.max_score" type="number" min="0.5" step="0.5" class="field text-sm w-24" placeholder="Max">
+                    <button type="button" class="text-red-600 text-xs font-semibold" @click="criteriaDraft.splice(idx, 1)">Remove</button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-secondary text-xs" @click="criteriaDraft.push({ id: null, label: '', max_score: 10 })">+ Add row</button>
+                    <button type="button" class="btn-primary text-xs" :disabled="savingCriteria" @click="saveCriteriaConfig">
+                        {{ savingCriteria ? 'Saving…' : 'Save criteria' }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -143,8 +173,12 @@
                                 <th v-if="showMeasurement(section.item)" class="min-w-[8rem]">Time / distance</th>
                                 <th v-if="showMeasurement(section.item)" class="min-w-[4rem] w-20">Unit</th>
                                 <th :class="isSports ? 'min-w-[11rem]' : 'w-28'" title="Same rank allowed for ties">Rank</th>
-                                <th v-if="!isSports" class="w-28">Grade</th>
-                                <th v-if="!isSports" class="w-28">Points</th>
+                                <th v-if="!isSports && !hasCriteria" class="w-28">Grade</th>
+                                <th v-if="!isSports && !hasCriteria" class="w-28">Points</th>
+                                <template v-if="!isSports && hasCriteria">
+                                    <th v-for="c in criteria" :key="c.id" class="w-24">{{ c.label }}<br><small class="font-normal text-slate-400">/ {{ c.max_score }}</small></th>
+                                    <th class="w-24">Total</th>
+                                </template>
                                 <th class="w-28 text-right">Action</th>
                             </tr>
                         </thead>
@@ -201,7 +235,7 @@
                                            class="field w-full" placeholder="Rank" title="Ties allowed"
                                            @input="applyRankPoints(participant.id, item, markForms)">
                                 </td>
-                                <td v-if="!isSports">
+                                <td v-if="!isSports && !hasCriteria">
                                     <select v-model="markForms[participant.id].grade" class="field w-full">
                                         <option value="">—</option>
                                         <option>A</option>
@@ -210,10 +244,17 @@
                                         <option>C</option>
                                     </select>
                                 </td>
-                                <td v-if="!isSports">
+                                <td v-if="!isSports && !hasCriteria">
                                     <input v-model.number="markForms[participant.id].score" type="number" min="0"
                                            class="field w-full" placeholder="Pts">
                                 </td>
+                                <template v-if="!isSports && hasCriteria">
+                                    <td v-for="c in criteria" :key="c.id">
+                                        <input v-model.number="criteriaForms[participant.id][c.id]" type="number" min="0" :max="c.max_score" step="0.5"
+                                               class="field w-full" placeholder="0">
+                                    </td>
+                                    <td class="font-mono font-semibold text-slate-700">{{ criteriaTotal(participant.id) }}</td>
+                                </template>
                                 <td class="text-right align-middle">
                                     <div class="flex items-center justify-end gap-2">
                                         <span v-if="savedIds.has(participant.id)" class="text-xs font-semibold text-emerald-600">Saved ✓</span>
@@ -257,12 +298,37 @@ const props = defineProps({
     competitionUrl: { type: String, default: null },
     rankPoints: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
+    criteria: { type: Array, default: () => [] },
+    criterionScores: { type: Object, default: () => ({}) },
+    cumulativeSheetUrl: { type: String, default: null },
 });
 
 const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/import`);
 const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
 const settingsPointsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/settings/points`);
 const isSports = computed(() => props.event?.event_type === 'sports');
+
+// Mark entry is always scoped to one item (no "all items" combined view) —
+// this dropdown lets admins jump between items without going back through
+// the item head picker every time.
+const itemOptions = computed(() => {
+    const items = (props.event?.items ?? []).filter((it) => it.is_enabled !== false);
+    if (props.selectedHeadId == null) {
+        return items;
+    }
+    if (props.selectedHeadId === 'other') {
+        return items.filter((it) => it.head_id == null);
+    }
+    return items.filter((it) => String(it.head_id) === String(props.selectedHeadId));
+});
+
+function switchItem(evt) {
+    const params = { item_id: evt.target.value };
+    if (props.selectedHeadId != null) {
+        params.head_id = props.selectedHeadId;
+    }
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, params, { preserveScroll: true });
+}
 
 const {
     bulkRank,
@@ -313,6 +379,48 @@ for (const reg of props.registrations ?? []) {
     }
 }
 
+// Multi-criteria / judge-column mark entry: when the selected item has
+// configured criteria, per-participant scores are entered per criterion and
+// summed into a total that becomes the item's mark automatically.
+const hasCriteria = computed(() => (props.criteria ?? []).length > 0);
+const criteria = computed(() => props.criteria ?? []);
+
+const criteriaForms = reactive({});
+for (const reg of props.registrations ?? []) {
+    for (const p of reg.participants ?? []) {
+        const existing = props.criterionScores?.[p.id] ?? {};
+        const form = {};
+        for (const c of props.criteria ?? []) {
+            form[c.id] = existing[c.id] ?? null;
+        }
+        criteriaForms[p.id] = form;
+    }
+}
+
+function criteriaTotal(participantId) {
+    const form = criteriaForms[participantId] ?? {};
+    return Object.values(form).reduce((sum, v) => sum + (Number(v) || 0), 0);
+}
+
+const showCriteriaPanel = ref(false);
+const criteriaDraft = reactive(
+    (props.criteria ?? []).map((c) => ({ id: c.id, label: c.label, max_score: Number(c.max_score) })),
+);
+const savingCriteria = ref(false);
+
+function saveCriteriaConfig() {
+    if (!props.selectedItemId || savingCriteria.value) {
+        return;
+    }
+    savingCriteria.value = true;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria`, {
+        criteria: criteriaDraft.filter((row) => (row.label ?? '').trim() !== ''),
+    }, {
+        preserveScroll: true,
+        onFinish: () => { savingCriteria.value = false; },
+    });
+}
+
 function participantName(participant) {
     if (participant._is_team) {
         return participant._team_name;
@@ -336,9 +444,17 @@ function markAttendance(participant, item, status) {
     }, { preserveScroll: true });
 }
 
+function markPayloadWithCriteria(participant, item) {
+    const payload = buildMarkPayload(participant, item, markForms);
+    if (hasCriteria.value) {
+        payload.criteria_scores = { ...criteriaForms[participant.id] };
+    }
+    return payload;
+}
+
 function saveMark(participant, item) {
     savingIds.value = new Set([...savingIds.value, participant.id]);
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, buildMarkPayload(participant, item, markForms), {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, markPayloadWithCriteria(participant, item), {
         preserveScroll: true,
         onSuccess: () => {
             savedIds.value = new Set([...savedIds.value, participant.id]);
@@ -361,7 +477,7 @@ async function saveAll() {
     for (const { participant, item } of iterSaveRows()) {
         await new Promise((resolve) => {
             savingIds.value = new Set([...savingIds.value, participant.id]);
-            router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, buildMarkPayload(participant, item, markForms), {
+            router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, markPayloadWithCriteria(participant, item), {
                 preserveScroll: true,
                 onSuccess: () => {
                     savedIds.value = new Set([...savedIds.value, participant.id]);

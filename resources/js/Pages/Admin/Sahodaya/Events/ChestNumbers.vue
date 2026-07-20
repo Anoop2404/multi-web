@@ -11,13 +11,14 @@
         </PageHeader>
 
         <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="chest-numbers" :event="event" />
+        <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="chest-numbers" class="mb-4" />
 
         <ReportHeadItemNavigator :groups="headItemGroups"
                                  :base-url="base"
                                  :selected-head-id="selectedHeadId"
                                  :selected-item-id="selectedItemId"
                                  :has-item-heads="hasItemHeads"
-                                 :is-sports="true"
+                                 :is-sports="event.event_type === 'sports'"
                                  :hint="'Select a competition item to view or assign chest numbers — each student holds one chest number for the whole event, reused automatically across every item they compete in.'"
                                  empty-heads-text="No enabled items on this event yet. Import items from the catalog first.">
 
@@ -49,10 +50,11 @@
                         <h3 class="font-semibold text-sm mb-2 text-emerald-900">Green room</h3>
                         <table class="w-full text-sm bg-white border rounded-lg overflow-hidden">
                             <thead class="bg-gray-50"><tr>
-                                <th class="p-2 text-left">Chest</th><th class="p-2 text-left">Fest ID</th><th class="p-2 text-left">Name</th><th class="p-2"></th>
+                                <th class="p-2 text-left">Sl No</th><th class="p-2 text-left">Chest</th><th class="p-2 text-left">Fest ID</th><th class="p-2 text-left">Name</th><th class="p-2"></th>
                             </tr></thead>
                             <tbody>
-                                <tr v-for="p in greenRoom" :key="p.id" class="border-t">
+                                <tr v-for="(p, idx) in greenRoom" :key="p.id" class="border-t">
+                                    <td class="p-2 text-gray-500">{{ idx + 1 }}</td>
                                     <td class="p-2 font-mono">{{ p.chest_no ?? '—' }}</td>
                                     <td class="p-2 font-mono text-xs">{{ p.fest_id ?? '—' }}</td>
                                     <td class="p-2">{{ p.name }}</td>
@@ -60,7 +62,7 @@
                                         <button @click="reveal(p.id)" class="text-indigo-600 text-xs font-semibold">Reveal</button>
                                     </td>
                                 </tr>
-                                <tr v-if="!greenRoom.length"><td colspan="4" class="p-3 text-gray-400 text-center">None waiting</td></tr>
+                                <tr v-if="!greenRoom.length"><td colspan="5" class="p-3 text-gray-400 text-center">None waiting</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -69,13 +71,14 @@
                         <table class="w-full text-sm">
                             <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                                 <tr>
-                                    <th class="p-3">Chest</th><th class="p-3">Fest ID</th><th class="p-3">Item reg</th>
+                                    <th class="p-3">Sl No</th><th class="p-3">Chest</th><th class="p-3">Fest ID</th><th class="p-3">Item reg</th>
                                     <th class="p-3">Participant / Team</th><th class="p-3">School</th><th class="p-3">Status</th>
                                     <th class="p-3">{{ hasTeamRows ? 'Members' : 'Team' }}</th><th class="p-3"></th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="p in participants" :key="p.id" class="border-t">
+                                <tr v-for="(p, idx) in participants" :key="p.id" class="border-t">
+                                    <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
                                     <td class="p-3 font-mono font-bold">{{ p.chest_no ?? '—' }}</td>
                                     <td class="p-3 font-mono text-xs text-[#0f3d7a]">{{ p.fest_id ?? '—' }}</td>
                                     <td class="p-3 font-mono text-xs">{{ p.item_reg ?? '—' }}</td>
@@ -85,7 +88,7 @@
                                             Team · {{ p.member_count }}
                                         </span>
                                     </td>
-                                    <td class="p-3 text-xs">{{ p.school }}</td>
+                                    <td class="p-3 text-xs">{{ (p.school || '').toUpperCase() }}</td>
                                     <td class="p-3 text-xs" :class="p.reg_status === 'approved' ? 'text-emerald-700' : 'text-amber-700'">{{ p.reg_status }}</td>
                                     <td class="p-3 text-xs">{{ p.group ?? '—' }}</td>
                                     <td class="p-3 text-right whitespace-nowrap">
@@ -95,7 +98,7 @@
                                     </td>
                                 </tr>
                                 <tr v-if="!participants.length">
-                                    <td colspan="8" class="p-8 text-center text-gray-400">No participants for this item.</td>
+                                    <td colspan="9" class="p-8 text-center text-gray-400">No participants for this item.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -116,6 +119,7 @@ import { computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
+import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
 

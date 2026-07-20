@@ -7,17 +7,18 @@
 @if($schedule) {{ $schedule->scheduled_at?->format('d M Y H:i') }} · Stage: {{ $schedule->stage ?? '—' }} @else Schedule TBA @endif
 @if(($audience ?? 'staff') === 'public') · Public copy (chest/reg only) @endif
 </p>
-<table><thead><tr><th>Order</th><th>Ref</th>
+<table><thead><tr><th>Sl No</th><th>Order</th><th>Ref</th>
 @if(($audience ?? 'staff') === 'staff')<th>School</th><th>Participant</th>@endif
 @foreach($criteria as $c)<th>{{ $c->name }}<br><small>/ {{ $c->max_marks }}</small></th>@endforeach
 <th>Total</th><th>Remarks</th></tr></thead>
 <tbody>
 @foreach($rows as $row)
 <tr>
+<td>{{ $loop->iteration }}</td>
 <td>{{ $row['order'] ?? '—' }}</td>
 <td>{{ $row['reference'] ?? '—' }}</td>
 @if(($audience ?? 'staff') === 'staff')
-<td>{{ $row['school'] ?? '—' }}</td>
+<td>{{ strtoupper($row['school'] ?? '—') }}</td>
 <td>{{ $row['name'] ?? '—' }}</td>
 @endif
 @foreach($criteria as $c)<td class="score-cell"></td>@endforeach

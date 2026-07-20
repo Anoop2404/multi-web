@@ -24,26 +24,29 @@
             <table class="data-table min-w-max">
                 <thead>
                     <tr>
+                        <th>Sl No</th>
                         <th>School</th>
                         <th v-for="ag in matrix.age_groups" :key="ag.key">{{ ag.label }}</th>
                         <th>Total</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="school in matrix.schools" :key="school.id">
-                        <td class="font-medium whitespace-nowrap">{{ school.name }}</td>
+                    <tr v-for="(school, idx) in matrix.schools" :key="school.id">
+                        <td>{{ idx + 1 }}</td>
+                        <td class="font-medium whitespace-nowrap">{{ (school.name || '').toUpperCase() }}</td>
                         <td v-for="ag in matrix.age_groups" :key="ag.key">
                             {{ matrix.matrix[school.id]?.[ag.key] ?? 0 }}
                         </td>
                         <td class="font-semibold">{{ rowTotal(school.id) }}</td>
                     </tr>
                     <tr v-if="matrix.schools?.length" class="bg-slate-50 font-semibold">
+                        <td></td>
                         <td>Total</td>
                         <td v-for="ag in matrix.age_groups" :key="ag.key">{{ matrix.totals?.[ag.key] ?? 0 }}</td>
                         <td>{{ grandTotal }}</td>
                     </tr>
                     <tr v-if="!matrix.schools?.length">
-                        <td :colspan="(matrix.age_groups?.length ?? 0) + 2" class="p-6 text-center text-slate-400">
+                        <td :colspan="(matrix.age_groups?.length ?? 0) + 3" class="p-6 text-center text-slate-400">
                             No registrations with age groups yet.
                         </td>
                     </tr>

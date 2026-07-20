@@ -20,6 +20,7 @@
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
+                        <th class="p-3">Sl No</th>
                         <th class="p-3">School</th>
                         <th class="p-3">Student</th>
                         <th class="p-3">Requested changes</th>
@@ -29,8 +30,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="req in requests.data" :key="req.id" class="border-t align-top">
-                        <td class="p-3 text-xs">{{ req.school?.name ?? req.school_id }}</td>
+                    <tr v-for="(req, idx) in requests.data" :key="req.id" class="border-t align-top">
+                        <td class="p-3">{{ idx + 1 }}</td>
+                        <td class="p-3 text-xs">{{ (req.school?.name || '').toUpperCase() || req.school_id }}</td>
                         <td class="p-3">
                             <span v-if="req.change_type === 'create'" class="font-medium text-emerald-800">New student</span>
                             <template v-else>
@@ -59,7 +61,7 @@
                         </td>
                     </tr>
                     <tr v-if="!requests.data?.length">
-                        <td colspan="6" class="p-8 text-center text-gray-400">No requests</td>
+                        <td colspan="7" class="p-8 text-center text-gray-400">No requests</td>
                     </tr>
                 </tbody>
             </table>

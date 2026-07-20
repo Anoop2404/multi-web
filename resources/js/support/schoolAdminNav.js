@@ -202,10 +202,14 @@ function programLinks(schoolId, excludeSlug = null, navVisibility = null) {
 
 function festToolItems(schoolId) {
     return [
-        { label: 'Fest Hub', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'star' },
+        // "Meal requests" (Catering) has no standalone school-wide page — it's
+        // per-event only (routes/web.php: /fest/{event}/catering) — so it's
+        // reached via a card inside Fest Hub, not a separate sidebar link
+        // that would otherwise just duplicate this href. See
+        // SCHOOL_ADMIN_CLEANUP_PLAN.md #1/#3.
+        { label: 'Fest Hub (meal requests inside)', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'star' },
         { label: 'All fest reports', href: schoolAdminHref(schoolId, 'fest', 'reports'), icon: 'file-text', exact: true },
         { label: 'School Events', href: schoolAdminHref(schoolId, 'fest-programs'), icon: 'calendar' },
-        { label: 'Meal requests', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'coffee' },
         { label: 'Food Coupons', href: schoolAdminHref(schoolId, 'food-coupons'), icon: 'clipboard' },
         { label: 'Circulars', href: schoolAdminHref(schoolId, 'circulars'), icon: 'file-text' },
         { label: 'Notifications', href: schoolAdminHref(schoolId, 'notifications'), icon: 'bell' },
@@ -251,7 +255,7 @@ export function schoolFestScopedNav(schoolId, options = {}) {
         groups.push(
             { section: 'Fest', items: [{ label: 'Fest Hub', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'star' }] },
             { section: 'Programs', items: programLinks(schoolId).map((item) => ({ ...item })) },
-            { section: 'Fest & tools', items: festToolItems(schoolId).filter((item) => item.label !== 'Fest Hub') },
+            { section: 'Fest & tools', items: festToolItems(schoolId).filter((item) => !item.label.startsWith('Fest Hub')) },
         );
     }
 

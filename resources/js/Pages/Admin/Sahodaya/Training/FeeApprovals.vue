@@ -46,6 +46,7 @@
                 <table class="data-table min-w-[720px] text-sm">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>School</th>
                             <th>Teachers</th>
                             <th>Due</th>
@@ -55,8 +56,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="sf in schoolFees" :key="sf.id">
-                            <td class="font-medium">{{ sf.school_name || '—' }}</td>
+                        <tr v-for="(sf, idx) in schoolFees" :key="sf.id">
+                            <td>{{ idx + 1 }}</td>
+                            <td class="font-medium">{{ (sf.school_name || '').toUpperCase() || '—' }}</td>
                             <td>{{ sf.teacher_count }}</td>
                             <td class="font-mono text-xs">
                                 ₹{{ fmt(sf.total_due) }}
@@ -102,7 +104,7 @@
                             </td>
                         </tr>
                         <tr v-if="!schoolFees.length">
-                            <td colspan="6" class="text-center text-gray-400 py-8">No school fees yet — fees appear when schools nominate teachers.</td>
+                            <td colspan="7" class="text-center text-gray-400 py-8">No school fees yet — fees appear when schools nominate teachers.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -115,6 +117,7 @@
                 <table class="data-table min-w-[760px] text-sm">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Teacher</th>
                             <th>School</th>
                             <th>Source</th>
@@ -125,12 +128,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="row in rows" :key="row.id">
+                        <tr v-for="(row, idx) in rows" :key="row.id">
+                            <td>{{ idx + 1 }}</td>
                             <td>
                                 <div class="font-medium">{{ row.teacher_name || `#${row.id}` }}</div>
                                 <div class="text-xs text-gray-400">{{ row.teacher_email || '' }}</div>
                             </td>
-                            <td>{{ row.school_name || '—' }}</td>
+                            <td>{{ (row.school_name || '').toUpperCase() || '—' }}</td>
                             <td>
                                 <span v-if="row.source === 'qr'"
                                       class="text-[10px] uppercase tracking-wide text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
@@ -188,7 +192,7 @@
                             </td>
                         </tr>
                         <tr v-if="!rows.length">
-                            <td colspan="7" class="text-center text-gray-400 py-8">No registrations yet.</td>
+                            <td colspan="8" class="text-center text-gray-400 py-8">No registrations yet.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -205,6 +209,7 @@
                 <table class="data-table min-w-[560px] text-sm">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Teacher</th>
                             <th>School</th>
                             <th>Fee status</th>
@@ -212,9 +217,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="row in rows" :key="`ref-${row.id}`">
+                        <tr v-for="(row, idx) in rows" :key="`ref-${row.id}`">
+                            <td>{{ idx + 1 }}</td>
                             <td>{{ row.teacher_name || `#${row.id}` }}</td>
-                            <td>{{ row.school_name || '—' }}</td>
+                            <td>{{ (row.school_name || '').toUpperCase() || '—' }}</td>
                             <td class="text-xs capitalize">{{ (row.fee_status || '—').replace('_', ' ') }}</td>
                             <td class="capitalize text-gray-600">{{ row.status }}</td>
                         </tr>

@@ -78,6 +78,7 @@
             <table class="data-table w-full text-sm">
                 <thead>
                     <tr>
+                        <th>Sl No</th>
                         <th>School</th>
                         <th>Student</th>
                         <th>Reg no</th>
@@ -87,8 +88,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="row in filteredRows" :key="row.student_id" class="border-t">
-                        <td class="text-xs">{{ row.school_name }}</td>
+                    <tr v-for="(row, idx) in filteredRows" :key="row.student_id" class="border-t">
+                        <td>{{ idx + 1 }}</td>
+                        <td class="text-xs">{{ (row.school_name || '').toUpperCase() }}</td>
                         <td class="font-medium">{{ row.name }}</td>
                         <td class="font-mono text-xs">{{ row.reg_no }}</td>
                         <td>{{ row.item_count }}</td>
@@ -98,7 +100,7 @@
                         </td>
                     </tr>
                     <tr v-if="!filteredRows.length">
-                        <td colspan="6" class="p-8 text-center text-slate-400">No students match filters.</td>
+                        <td colspan="7" class="p-8 text-center text-slate-400">No students match filters.</td>
                     </tr>
                 </tbody>
             </table>

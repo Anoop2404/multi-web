@@ -38,7 +38,7 @@
                     <button class="btn-secondary text-sm shrink-0" :disabled="!presetForm.preset">Apply</button>
                 </form>
 
-                <div v-if="showPartitionUi && event.event_type === 'kalolsavam'" class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 space-y-2">
+                <div v-if="showPartitionUi" class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 space-y-2">
                     <p class="text-xs text-slate-600">
                         Create a partition per membership region and assign every school by its
                         <a :href="`/sahodaya-admin/${sahodaya.id}/regions`" class="link-brand font-semibold">region assignment</a> in one step.

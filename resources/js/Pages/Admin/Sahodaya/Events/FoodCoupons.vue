@@ -27,6 +27,7 @@
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left">
                     <tr>
+                        <th class="p-3">Sl No</th>
                         <th class="p-3">Code</th>
                         <th class="p-3">School</th>
                         <th class="p-3">Meal</th>
@@ -37,9 +38,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="c in coupons" :key="c.id" class="border-t">
+                    <tr v-for="(c, idx) in coupons" :key="c.id" class="border-t">
+                        <td class="p-3">{{ idx + 1 }}</td>
                         <td class="p-3 font-mono text-xs">{{ c.coupon_code }}</td>
-                        <td class="p-3">{{ c.school_name }}</td>
+                        <td class="p-3">{{ (c.school_name || '').toUpperCase() }}</td>
                         <td class="p-3 capitalize">{{ c.meal_type }}</td>
                         <td class="p-3">{{ formatCalendarDate(c.valid_date) }}</td>
                         <td class="p-3">{{ c.head_count }}</td>
@@ -49,7 +51,7 @@
                         </td>
                     </tr>
                     <tr v-if="!coupons.length">
-                        <td colspan="7" class="p-8 text-center text-gray-400">No coupons yet. Confirm catering orders first, then issue.</td>
+                        <td colspan="8" class="p-8 text-center text-gray-400">No coupons yet. Confirm catering orders first, then issue.</td>
                     </tr>
                 </tbody>
             </table>

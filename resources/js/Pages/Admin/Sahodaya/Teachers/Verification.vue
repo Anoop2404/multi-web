@@ -180,6 +180,7 @@
                             <th class="w-10">
                                 <input type="checkbox" :checked="allPendingOnPageSelected" :disabled="!pendingOnPage.length" @change="toggleSelectAll($event.target.checked)">
                             </th>
+                            <th>Sl No</th>
                             <th class="w-14">Photo</th>
                             <th v-if="!selectedSchool">School</th>
                             <th>Teacher</th>
@@ -190,10 +191,11 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="t in teachers?.data ?? []" :key="t.id" class="align-top">
+                        <tr v-for="(t, idx) in teachers?.data ?? []" :key="t.id" class="align-top">
                             <td class="py-3">
                                 <input v-if="!t.is_verified" type="checkbox" :value="t.id" v-model="selectedIds">
                             </td>
+                            <td class="py-3">{{ idx + 1 }}</td>
                             <td class="py-3">
                                 <div class="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center shrink-0">
                                     <img v-if="t.photo_url" :src="t.photo_url" :alt="t.name" class="w-full h-full object-cover">
@@ -202,7 +204,7 @@
                             </td>
                             <td v-if="!selectedSchool" class="py-3 text-sm">
                                 <button type="button" class="text-[#0f3d7a] hover:underline text-left font-medium" @click="openSchoolById(t.school_id, t.school_name)">
-                                    {{ t.school_name || '—' }}
+                                    {{ (t.school_name || '').toUpperCase() || '—' }}
                                 </button>
                             </td>
                             <td class="py-3">
@@ -226,7 +228,7 @@
                             </td>
                         </tr>
                         <tr v-if="!(teachers?.data?.length)">
-                            <td :colspan="selectedSchool ? 7 : 8" class="p-8 text-center text-slate-400">No teachers match the filters.</td>
+                            <td :colspan="selectedSchool ? 8 : 9" class="p-8 text-center text-slate-400">No teachers match the filters.</td>
                         </tr>
                     </tbody>
                 </table>

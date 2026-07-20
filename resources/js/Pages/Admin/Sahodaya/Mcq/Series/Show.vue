@@ -78,12 +78,13 @@
                 </div>
                 <div v-if="exam.promotion?.qualifiers?.length" class="overflow-x-auto border border-slate-100 rounded-lg">
                     <table class="data-table">
-                        <thead><tr><th>Rank</th><th>Student</th><th>School</th><th>Score</th></tr></thead>
+                        <thead><tr><th>Sl No</th><th>Rank</th><th>Student</th><th>School</th><th>Score</th></tr></thead>
                         <tbody>
-                            <tr v-for="q in exam.promotion.qualifiers.slice(0, 20)" :key="q.student_id">
+                            <tr v-for="(q, idx) in exam.promotion.qualifiers.slice(0, 20)" :key="q.student_id">
+                                <td>{{ idx + 1 }}</td>
                                 <td>{{ q.rank ?? '—' }}</td>
                                 <td>{{ q.student_name }} <span class="text-slate-400 text-xs">{{ q.reg_no }}</span></td>
-                                <td class="text-xs">{{ q.school_name }}</td>
+                                <td class="text-xs">{{ (q.school_name || '').toUpperCase() }}</td>
                                 <td>{{ q.score ?? '—' }}</td>
                             </tr>
                         </tbody>

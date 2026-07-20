@@ -13,6 +13,7 @@
                 <table v-if="rankings.length" class="data-table">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Rank</th>
                             <th>School</th>
                             <th>Gold</th>
@@ -22,9 +23,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="row in rankings" :key="row.school_id">
+                        <tr v-for="(row, idx) in rankings" :key="row.school_id">
+                            <td>{{ idx + 1 }}</td>
                             <td class="font-semibold">{{ row.rank }}</td>
-                            <td class="font-medium">{{ row.school_name }}</td>
+                            <td class="font-medium">{{ (row.school_name || '').toUpperCase() }}</td>
                             <td>{{ row.gold }}</td>
                             <td>{{ row.silver }}</td>
                             <td>{{ row.bronze }}</td>

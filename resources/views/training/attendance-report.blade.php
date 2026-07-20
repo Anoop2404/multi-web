@@ -91,7 +91,7 @@
                         <td class="sl">{{ $i + 1 }}</td>
                         <td>{{ $row['teacher_name'] !== '' ? $row['teacher_name'] : '—' }}</td>
                         <td>{{ ($row['category'] ?? '') !== '' ? $row['category'] : '—' }}</td>
-                        <td>{{ $row['school_name'] !== '' ? $row['school_name'] : '—' }}</td>
+                        <td>{{ $row['school_name'] !== '' ? strtoupper($row['school_name']) : '—' }}</td>
                         <td>{{ $row['days_present'] }}/{{ $row['total_sessions'] }}</td>
                         @foreach($sessions as $session)
                             @php $mark = $row['session_'.$session->id] ?? 'unmarked'; @endphp

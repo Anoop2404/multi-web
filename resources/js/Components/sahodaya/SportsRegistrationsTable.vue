@@ -18,6 +18,7 @@
                     <thead class="bg-gray-50/60 text-left">
                         <tr>
                             <th class="p-3 w-8"></th>
+                            <th class="p-3 w-12">Sl No</th>
                             <th class="p-3">School</th>
                             <th class="p-3">Event</th>
                             <th class="p-3">Status</th>
@@ -26,13 +27,14 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="reg in group" :key="reg.id" class="border-t align-top">
+                        <tr v-for="(reg, idx) in group" :key="reg.id" class="border-t align-top">
                             <td class="p-3">
                                 <input v-if="reg.status === 'submitted'" type="checkbox" :value="reg.id"
                                        :checked="selectedIds.includes(reg.id)"
                                        @change="$emit('toggle-select', reg.id)">
                             </td>
-                            <td class="p-3 text-xs">{{ schools[reg.school_id] ?? reg.school_id }}</td>
+                            <td class="p-3 text-xs text-gray-500">{{ idx + 1 }}</td>
+                            <td class="p-3 text-xs">{{ (schools[reg.school_id] ?? reg.school_id ?? '').toString().toUpperCase() }}</td>
                             <td class="p-3">
                                 <p class="font-medium text-slate-800 text-xs">{{ reg.item?.title ?? '—' }}</p>
                                 <p v-if="reg.item?.age_group" class="text-[11px] text-indigo-600 mt-0.5">

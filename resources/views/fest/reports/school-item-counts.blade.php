@@ -8,14 +8,15 @@ th,td{border:1px solid #ccc;padding:3px 4px} th{background:#f3f4f6}
 .section{font-weight:bold;margin:8px 0 4px}
 </style></head><body>
 <h2>{{ $event->title }}</h2>
-<p class="meta">{{ $school->name }} — Item registration &amp; fees</p>
+<p class="meta">{{ strtoupper($school->name) }} — Item registration &amp; fees</p>
 
 <p class="section">Summary by {{ ($event->event_type ?? null) === 'sports' ? 'Event Head' : 'item head' }}</p>
 <table><thead><tr>
-    <th>Head</th><th>Items</th><th>Regs</th><th>Approved</th><th>Pending</th><th>Participants</th><th>Max item regs</th><th>Est. fee</th>
+    <th>Sl No</th><th>Head</th><th>Items</th><th>Regs</th><th>Approved</th><th>Pending</th><th>Participants</th><th>Max item regs</th><th>Est. fee</th>
 </tr></thead><tbody>
 @foreach($headSummary as $h)
 <tr>
+    <td>{{ $loop->iteration }}</td>
     <td>{{ $h['head_name'] }}</td>
     <td>{{ $h['item_count'] }}</td>
     <td>{{ $h['registration_count'] ?? 0 }}</td>
@@ -30,10 +31,11 @@ th,td{border:1px solid #ccc;padding:3px 4px} th{background:#f3f4f6}
 
 <p class="section">By competition item</p>
 <table><thead><tr>
-    <th>Head</th><th>Item</th><th>Approved</th><th>Pending</th><th>Participants</th><th>Item IDs</th><th>Max</th><th>Fee/item</th><th>Line fee</th>
+    <th>Sl No</th><th>Head</th><th>Item</th><th>Approved</th><th>Pending</th><th>Participants</th><th>Item IDs</th><th>Max</th><th>Fee/item</th><th>Line fee</th>
 </tr></thead><tbody>
 @foreach($rows as $r)
 <tr>
+    <td>{{ $loop->iteration }}</td>
     <td>{{ $r['head_name'] ?? '—' }}</td>
     <td>{{ $r['title'] }}</td>
     <td>{{ $r['approved'] }}</td>

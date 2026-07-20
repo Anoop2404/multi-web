@@ -4,15 +4,16 @@
 </head><body>
 <h2 style="text-align:center">{{ $event->title }} — Green Room List</h2>
 <p style="text-align:center;color:#666">Staff only — includes participant names and schools</p>
-<table><thead><tr><th>Item</th><th>Level Reg</th><th>Chest</th><th>Name</th><th>School</th><th>Revealed</th></tr></thead>
+<table><thead><tr><th>Sl No</th><th>Item</th><th>Level Reg</th><th>Chest</th><th>Name</th><th>School</th><th>Revealed</th></tr></thead>
 <tbody>
 @foreach($rows as $row)
 <tr>
+<td>{{ $loop->iteration }}</td>
 <td>{{ $row['item'] ?? '—' }}</td>
 <td>{{ $row['level_reg'] ?? '—' }}</td>
 <td>{{ $row['reference'] ?? '—' }}</td>
 <td>{{ $row['name'] ?? '—' }}</td>
-<td>{{ $row['school'] ?? '—' }}</td>
+<td>{{ strtoupper($row['school'] ?? '—') }}</td>
 <td>{{ ($row['revealed'] ?? false) ? 'Yes' : 'No' }}</td>
 </tr>
 @endforeach

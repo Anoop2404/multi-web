@@ -18,6 +18,7 @@
             <table class="data-table min-w-[720px]">
                 <thead>
                     <tr>
+                        <th>Sl No</th>
                         <th>Subject</th>
                         <th>Student</th>
                         <th>School</th>
@@ -28,15 +29,16 @@
                 </thead>
                 <tbody>
                     <tr v-for="(row, i) in rows" :key="i">
+                        <td>{{ i + 1 }}</td>
                         <td class="font-medium">{{ row.subject }}</td>
                         <td>{{ row.student_name }}</td>
-                        <td>{{ row.school_name }}</td>
+                        <td>{{ (row.school_name || '').toUpperCase() }}</td>
                         <td>{{ row.marks }}</td>
                         <td>{{ row.stream || '—' }}</td>
                         <td>{{ row.class || '—' }}</td>
                     </tr>
                     <tr v-if="!rows.length">
-                        <td colspan="6" class="p-8 text-center text-slate-400">No subject marks found for this year.</td>
+                        <td colspan="7" class="p-8 text-center text-slate-400">No subject marks found for this year.</td>
                     </tr>
                 </tbody>
             </table>

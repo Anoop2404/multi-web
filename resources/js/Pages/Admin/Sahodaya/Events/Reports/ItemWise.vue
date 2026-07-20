@@ -35,6 +35,7 @@
                     <table class="data-table w-full text-sm">
                         <thead>
                             <tr>
+                                <th>Sl No</th>
                                 <th>School</th>
                                 <th>Participant</th>
                                 <th>Reg no</th>
@@ -48,8 +49,9 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="p in participants" :key="p.id">
-                                <td class="text-xs">{{ p.school }}</td>
+                            <tr v-for="(p, idx) in participants" :key="p.id">
+                                <td class="text-xs text-slate-400">{{ idx + 1 }}</td>
+                                <td class="text-xs">{{ (p.school || '').toUpperCase() }}</td>
                                 <td class="font-medium">{{ p.participant }}</td>
                                 <td class="font-mono text-xs">{{ p.reg_no ?? '—' }}</td>
                                 <td class="font-mono text-xs">{{ p.fest_id ?? '—' }}</td>
@@ -61,7 +63,7 @@
                                 <td>{{ p.score ?? '—' }}</td>
                             </tr>
                             <tr v-if="!participants.length">
-                                <td colspan="10" class="p-8 text-center text-slate-400">No participants for this item.</td>
+                                <td colspan="11" class="p-8 text-center text-slate-400">No participants for this item.</td>
                             </tr>
                         </tbody>
                     </table>

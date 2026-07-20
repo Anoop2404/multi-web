@@ -19,6 +19,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Exam</th>
                             <th>School</th>
                             <th>Students</th>
@@ -28,12 +29,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="fee in fees.data" :key="fee.id">
+                        <tr v-for="(fee, idx) in fees.data" :key="fee.id">
+                            <td>{{ idx + 1 }}</td>
                             <td>
                                 <Link :href="fee.payments_url" class="link-brand font-medium">{{ fee.exam_title }}</Link>
                                 <p v-if="fee.exam_level > 1" class="text-[10px] text-indigo-700">Level {{ fee.exam_level }}</p>
                             </td>
-                            <td>{{ fee.school_name }}</td>
+                            <td>{{ (fee.school_name || '').toUpperCase() }}</td>
                             <td>{{ fee.student_count }}</td>
                             <td class="font-semibold">₹{{ fee.total_due }}</td>
                             <td class="text-xs whitespace-nowrap">{{ formatDateTime(fee.updated_at) }}</td>

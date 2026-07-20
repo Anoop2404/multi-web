@@ -59,13 +59,15 @@
                 <table class="data-table min-w-[720px] text-sm">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Teacher</th>
                             <th>School</th>
                             <th>Attendance</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="r in confirmedRegistrations" :key="r.id">
+                        <tr v-for="(r, idx) in confirmedRegistrations" :key="r.id">
+                            <td>{{ idx + 1 }}</td>
                             <td>
                                 <div>{{ r.teacher?.name || `#${r.id}` }}</div>
                                 <span v-if="r.teacher && !r.teacher.verified_at"
@@ -73,7 +75,7 @@
                                     Unverified
                                 </span>
                             </td>
-                            <td class="text-gray-500">{{ r.school?.name || r.teacher?.school_name || '—' }}</td>
+                            <td class="text-gray-500">{{ (r.school?.name || r.teacher?.school_name || '').toUpperCase() || '—' }}</td>
                             <td>
                                 <div class="flex flex-wrap gap-1">
                                     <button v-for="opt in statusOptions" :key="opt.value" type="button"
@@ -88,7 +90,7 @@
                             </td>
                         </tr>
                         <tr v-if="!confirmedRegistrations.length">
-                            <td colspan="3" class="text-center text-gray-400 py-4">No confirmed registrations.</td>
+                            <td colspan="4" class="text-center text-gray-400 py-4">No confirmed registrations.</td>
                         </tr>
                     </tbody>
                 </table>

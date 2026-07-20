@@ -77,6 +77,7 @@
                     <table class="w-full text-sm">
                         <thead class="bg-gray-50">
                             <tr>
+                                <th class="th">Sl No</th>
                                 <th class="th">School</th>
                                 <th class="th">Membership</th>
                                 <th class="th">Payment</th>
@@ -88,8 +89,9 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
-                            <tr v-for="s in schools.data" :key="s.id" class="hover:bg-gray-50/50">
-                                <td class="td font-medium text-gray-800">{{ s.name }}</td>
+                            <tr v-for="(s, idx) in schools.data" :key="s.id" class="hover:bg-gray-50/50">
+                                <td class="td">{{ idx + 1 }}</td>
+                                <td class="td font-medium text-gray-800">{{ (s.name || '').toUpperCase() }}</td>
                                 <td class="td"><StatusPill :status="s.membership_status" /></td>
                                 <td class="td">
                                     <PaymentStatusPill :status="s.payment_status" :label="s.payment_status_label" :amount="s.payment_amount" />
@@ -144,6 +146,7 @@
                                            :checked="allUnpaidOnPageSelected"
                                            @change="toggleSelectAllUnpaid($event.target.checked)">
                                 </th>
+                                <th class="th">Sl No</th>
                                 <th class="th">School</th>
                                 <th class="th">Membership</th>
                                 <th class="th">Payment</th>
@@ -155,13 +158,14 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
-                            <tr v-for="s in approvedUnpaid.data" :key="s.id" class="hover:bg-gray-50/50">
+                            <tr v-for="(s, idx) in approvedUnpaid.data" :key="s.id" class="hover:bg-gray-50/50">
                                 <td class="td">
                                     <input type="checkbox" class="rounded"
                                            :checked="selectedUnpaidIds.includes(s.id)"
                                            @change="toggleUnpaidSelect(s.id, $event.target.checked)">
                                 </td>
-                                <td class="td font-medium text-gray-800">{{ s.name }}</td>
+                                <td class="td">{{ idx + 1 }}</td>
+                                <td class="td font-medium text-gray-800">{{ (s.name || '').toUpperCase() }}</td>
                                 <td class="td"><StatusPill :status="s.membership_status" /></td>
                                 <td class="td">
                                     <PaymentStatusPill :status="s.payment_status" :label="s.payment_status_label" :amount="s.payment_amount" />

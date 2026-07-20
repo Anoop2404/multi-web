@@ -117,14 +117,16 @@
                     <table class="w-full text-sm">
                         <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                             <tr>
+                                <th class="p-3">Sl No</th>
                                 <th class="p-3">School</th>
                                 <th class="p-3">Code</th>
                                 <th class="p-3 w-64">Region</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            <tr v-for="school in schools" :key="school.id" class="bg-white">
-                                <td class="p-3 font-medium text-slate-700">{{ school.name }}</td>
+                            <tr v-for="(school, idx) in schools" :key="school.id" class="bg-white">
+                                <td class="p-3">{{ idx + 1 }}</td>
+                                <td class="p-3 font-medium text-slate-700">{{ (school.name || '').toUpperCase() }}</td>
                                 <td class="p-3 font-mono text-xs text-slate-500">{{ school.school_prefix || '—' }}</td>
                                 <td class="p-3">
                                     <select v-model="assignMap[school.id]" class="field !py-1 !text-xs" @change="dirty = true">

@@ -76,9 +76,10 @@ class FestExportService
      * (the whole point of reviewing this report before/during the event) was silently
      * missing rather than showing as blank/"Not marked".
      */
-    public function attendance(FestEvent $event): StreamedResponse
+    public function attendance(FestEvent $event, ?int $itemId = null): StreamedResponse
     {
         $schools = $this->schoolNames($event);
+        $numbering = app(FestNumberingService::class);
 
         $attendance = FestAttendance::where('event_id', $event->id)
             ->get()
@@ -86,29 +87,35 @@ class FestExportService
 
         $rows = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
-            ->where('status', 'approved'))
+            ->where('status', 'approved')
+            ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId)))
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
-            ->with(['student', 'teacher', 'registration.item', 'registration.school'])
+            ->with(['student', 'teacher', 'registration.item', 'registration.school', 'group'])
             ->get()
             ->sortBy(fn (FestParticipant $p) => $p->registration?->item?->title)
-            ->map(function (FestParticipant $p) use ($attendance, $schools) {
+            ->values()
+            ->map(function (FestParticipant $p, int $index) use ($attendance, $schools, $numbering) {
                 $a = $attendance->get($p->registration?->item_id.'-'.$p->id);
+                $schoolName = $schools[$p->registration?->school_id] ?? $p->registration?->school_id ?? '';
 
                 return [
+                    $index + 1,
                     $p->registration?->item?->title ?? '',
                     $p->student?->name ?? $p->teacher?->name ?? '',
-                    $schools[$p->registration?->school_id] ?? $p->registration?->school_id ?? '',
-                    $p->chest_no ?? '',
+                    strtoupper((string) $schoolName),
+                    $numbering->effectiveChestNumber($p) ?? '',
                     $a?->status ?? 'Not marked',
                     $a?->marked_at?->format('Y-m-d H:i') ?? '',
                 ];
             })
             ->values();
 
+        $filenameSuffix = $itemId ? 'attendance-item-'.$itemId : 'attendance';
+
         return ExcelExport::download(
-            $this->filename($event, 'attendance'),
-            ['Item', 'Participant', 'School', 'Chest No', 'Status', 'Marked At'],
+            $this->filename($event, $filenameSuffix),
+            ['Sl No', 'Item', 'Participant', 'School', 'Chest No', 'Status', 'Marked At'],
             $rows,
         );
     }

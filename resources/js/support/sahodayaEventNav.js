@@ -108,6 +108,7 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
             { label: 'All registrations', href: `${base}/registrations`, icon: 'inbox', permissions: FEST_REGISTRATIONS },
             { label: 'Clash requests', href: `${base}/clash-requests`, icon: 'alert-circle', permissions: FEST_REGISTRATIONS },
             { label: 'Substitutions', href: `${base}/substitution-requests`, icon: 'repeat', permissions: FEST_REGISTRATIONS },
+            { label: 'Chest numbers', href: `${base}/chest-numbers`, icon: 'hash', permissions: FEST_MANAGE },
             { label: 'Attendance', href: `${base}/attendance`, icon: 'check-square', permissions: FEST_REGISTRATIONS },
         ],
     });

@@ -6,12 +6,13 @@
 @if(($audience ?? 'staff') === 'public')
 <p style="text-align:center;color:#666">Public schedule — participant identity hidden until results published.</p>
 @endif
-<table><thead><tr><th>Order</th><th>Time</th><th>Item</th><th>Stage</th><th>Ref</th>
+<table><thead><tr><th>Sl No</th><th>Order</th><th>Time</th><th>Item</th><th>Stage</th><th>Ref</th>
 @if(($audience ?? 'staff') === 'staff')<th>Participant</th><th>School</th>@endif
 </tr></thead>
 <tbody>
 @foreach($rows as $row)
 <tr>
+<td>{{ $loop->iteration }}</td>
 <td>{{ $row['order'] ?? '—' }}</td>
 <td>{{ $row['time'] ?? '—' }}</td>
 <td>{{ $row['item'] ?? '—' }}</td>
@@ -19,7 +20,7 @@
 <td>{{ $row['reference'] ?? '—' }}</td>
 @if(($audience ?? 'staff') === 'staff')
 <td>{{ $row['name'] ?? '—' }}</td>
-<td>{{ $row['school'] ?? '—' }}</td>
+<td>{{ strtoupper($row['school'] ?? '—') }}</td>
 @endif
 </tr>
 @endforeach

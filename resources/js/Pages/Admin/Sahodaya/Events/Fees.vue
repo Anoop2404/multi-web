@@ -109,7 +109,7 @@
                         <tr v-for="(row, idx) in filteredRows" :key="row.id" class="hover:bg-slate-50/70 transition align-top">
                             <td class="p-3.5 text-slate-400 text-center font-mono font-medium">{{ idx + 1 }}</td>
                             <td class="p-3.5 font-bold text-slate-900 max-w-[15rem]">
-                                {{ row.school }}
+                                {{ (row.school || '').toUpperCase() }}
                             </td>
                             <td class="p-3.5">
                                 <template v-if="event.event_type === 'sports' && row.sports_participation">
@@ -242,6 +242,13 @@ function isNoFeeDue(row) {
     return Number(row.total_due) === 0 && row.status === 'approved';
 }
 
+function hasRegisteredItems(row) {
+    if (props.event.event_type === 'sports' && row.sports_participation) {
+        return (row.sports_participation.team_count > 0 || row.sports_participation.indiv_count > 0);
+    }
+    return (row.participation_item_count > 0) || (row.items && row.items.length > 0) || Number(row.total_due) > 0;
+}
+
 function isUnpaidPending(row) {
     return row.status === 'pending' && !isNoFeeDue(row);
 }
@@ -249,14 +256,15 @@ function isUnpaidPending(row) {
 const statusFilter = ref('all');
 const statusFilterOptions = computed(() => {
     const rows = props.rows;
+    const activeRows = rows.filter(hasRegisteredItems);
     return [
-        { value: 'all', label: 'Uploaded / reviewed', count: rows.filter(r => !isUnpaidPending(r)).length },
-        { value: 'proof_uploaded', label: 'Awaiting approval', count: rows.filter(r => r.status === 'proof_uploaded').length },
-        { value: 'partial', label: 'Partial', count: rows.filter(r => r.status === 'partial').length },
-        { value: 'approved', label: 'Approved', count: rows.filter(r => r.status === 'approved' && !isNoFeeDue(r)).length },
-        { value: 'rejected', label: 'Rejected', count: rows.filter(r => r.status === 'rejected').length },
-        { value: 'pending', label: 'Not uploaded yet', count: rows.filter(isUnpaidPending).length },
-        { value: 'everything', label: 'Everything', count: rows.length },
+        { value: 'all', label: 'Registered schools', count: activeRows.filter(r => !isUnpaidPending(r)).length },
+        { value: 'proof_uploaded', label: 'Awaiting approval', count: activeRows.filter(r => r.status === 'proof_uploaded').length },
+        { value: 'partial', label: 'Partial', count: activeRows.filter(r => r.status === 'partial').length },
+        { value: 'approved', label: 'Approved', count: activeRows.filter(r => r.status === 'approved' && !isNoFeeDue(r)).length },
+        { value: 'rejected', label: 'Rejected', count: activeRows.filter(r => r.status === 'rejected').length },
+        { value: 'pending', label: 'Not uploaded yet', count: activeRows.filter(isUnpaidPending).length },
+        { value: 'everything', label: 'All schools (incl. 0 items)', count: rows.length },
     ];
 });
 
@@ -264,13 +272,13 @@ const filteredRows = computed(() => {
     let rows = props.rows;
 
     if (statusFilter.value === 'all') {
-        rows = rows.filter(r => !isUnpaidPending(r));
+        rows = rows.filter(r => hasRegisteredItems(r) && !isUnpaidPending(r));
     } else if (statusFilter.value === 'pending') {
-        rows = rows.filter(isUnpaidPending);
+        rows = rows.filter(r => hasRegisteredItems(r) && isUnpaidPending(r));
     } else if (statusFilter.value === 'approved') {
-        rows = rows.filter(r => r.status === 'approved' && !isNoFeeDue(r));
+        rows = rows.filter(r => hasRegisteredItems(r) && r.status === 'approved' && !isNoFeeDue(r));
     } else if (statusFilter.value !== 'everything') {
-        rows = rows.filter(r => r.status === statusFilter.value);
+        rows = rows.filter(r => hasRegisteredItems(r) && r.status === statusFilter.value);
     }
 
     const q = search.value.trim().toLowerCase();

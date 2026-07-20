@@ -97,10 +97,11 @@
                 <a :href="exportBase + '/school-performance/export'" class="btn-secondary text-sm">Export ↓</a>
             </div>
             <table class="data-table">
-                <thead><tr><th>School</th><th>Registered</th><th>Examined</th><th>Avg</th><th>Pass %</th><th>Top 10</th></tr></thead>
+                <thead><tr><th>Sl No</th><th>School</th><th>Registered</th><th>Examined</th><th>Avg</th><th>Pass %</th><th>Top 10</th></tr></thead>
                 <tbody>
                     <tr v-for="(row, i) in schoolPerformance" :key="i">
-                        <td>{{ row.school_name }}</td>
+                        <td>{{ i + 1 }}</td>
+                        <td>{{ (row.school_name || '').toUpperCase() }}</td>
                         <td>{{ row.registered }}</td>
                         <td>{{ row.examined }}</td>
                         <td>{{ row.avg_score ?? '—' }}</td>
@@ -116,10 +117,11 @@
                 <h3 class="section-title !mb-0">Fee summary preview</h3>
             </div>
             <table class="data-table">
-                <thead><tr><th>School</th><th>Students</th><th>Due</th><th>Status</th></tr></thead>
+                <thead><tr><th>Sl No</th><th>School</th><th>Students</th><th>Due</th><th>Status</th></tr></thead>
                 <tbody>
                     <tr v-for="(row, i) in feeSummary" :key="i">
-                        <td>{{ row.school_name }}</td>
+                        <td>{{ i + 1 }}</td>
+                        <td>{{ (row.school_name || '').toUpperCase() }}</td>
                         <td>{{ row.student_count }}</td>
                         <td>₹{{ row.total_due }}</td>
                         <td class="text-xs capitalize">{{ row.status?.replace('_', ' ') }}</td>
@@ -135,12 +137,13 @@
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Hall ticket</th><th>Student</th><th>School</th><th>Approval</th><th>Attendance</th></tr></thead>
+                    <thead><tr><th>Sl No</th><th>Hall ticket</th><th>Student</th><th>School</th><th>Approval</th><th>Attendance</th></tr></thead>
                     <tbody>
                         <tr v-for="(row, i) in registrations.slice(0, 50)" :key="i">
+                            <td>{{ i + 1 }}</td>
                             <td>{{ row.hall_ticket_no || '—' }}</td>
                             <td>{{ row.student_name }}</td>
-                            <td>{{ row.school_name }}</td>
+                            <td>{{ (row.school_name || '').toUpperCase() }}</td>
                             <td class="text-xs">{{ row.approval_status }}</td>
                             <td class="text-xs">{{ row.attendance_status || '—' }}</td>
                         </tr>

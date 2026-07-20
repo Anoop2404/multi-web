@@ -61,7 +61,7 @@
                             <td>{{ i + 1 }}</td>
                             <td>{{ row.teacher_name || '—' }}</td>
                             <td>{{ row.category || '—' }}</td>
-                            <td>{{ row.school_name || '—' }}</td>
+                            <td>{{ (row.school_name || '').toUpperCase() || '—' }}</td>
                             <td>{{ row.days_present }}/{{ row.total_sessions }}</td>
                             <td v-for="session in sessions" :key="session.id">
                                 <span :class="markClass(row[`session_${session.id}`])">

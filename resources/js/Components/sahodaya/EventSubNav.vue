@@ -32,6 +32,11 @@ const tabs = computed(() => {
         { key: 'items', label: 'Catalog & rules', href: `${base.value}/items` },
         { key: 'items-list', label: 'All items', href: `${base.value}/items/list` },
         { key: 'levels', label: 'Rounds & promotion', href: `${base.value}/levels` },
+        { key: 'registrations', label: 'Registrations', href: `${base.value}/registrations` },
+        { key: 'chest-numbers', label: 'Chest Numbers', href: `${base.value}/chest-numbers` },
+        { key: 'attendance', label: 'Attendance', href: `${base.value}/attendance` },
+        { key: 'marks', label: 'Marks', href: `${base.value}/marks` },
+        { key: 'results', label: 'Results', href: `${base.value}/results` },
     ];
     if (resolvedEventType.value === 'sports') {
         list.splice(1, 0,

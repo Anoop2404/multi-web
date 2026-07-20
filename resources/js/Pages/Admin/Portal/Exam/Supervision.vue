@@ -20,6 +20,7 @@
             <table class="data-table min-w-[640px] text-sm">
                 <thead>
                     <tr>
+                        <th>Sl No</th>
                         <th>Student</th>
                         <th>School</th>
                         <th>Reg. no.</th>
@@ -31,9 +32,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="r in registrations" :key="r.id">
+                    <tr v-for="(r, idx) in registrations" :key="r.id">
+                        <td>{{ idx + 1 }}</td>
                         <td>{{ r.student_name }}</td>
-                        <td>{{ r.school_name }}</td>
+                        <td>{{ (r.school_name || '').toUpperCase() }}</td>
                         <td>{{ r.hall_ticket_no || '—' }}</td>
                         <td class="capitalize">{{ r.attendance_status }}</td>
                         <td class="capitalize">{{ r.status }}</td>

@@ -924,6 +924,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/event-staff/{assignment}', [\App\Http\Controllers\SahodayaAdmin\FestEventStaffController::class, 'destroy'])->name('event-staff.destroy');
             Route::get('/{event}/marks', [FestMarkEntryController::class, 'index'])->name('marks.index');
             Route::post('/{event}/marks', [FestMarkEntryController::class, 'store'])->name('marks.store');
+            Route::post('/{event}/items/{item}/mark-criteria', [FestMarkEntryController::class, 'saveCriteria'])->name('items.mark-criteria.save');
+            Route::get('/{event}/reports/mark-criteria-sheet', [FestMarkEntryController::class, 'cumulativeSheet'])->name('reports.mark-criteria-sheet');
             Route::post('/{event}/items/{item}/auto-rank', [FestMarkEntryController::class, 'autoRankItem'])->name('items.auto-rank');
             Route::get('/{event}/results', [FestResultsController::class, 'show'])->name('results.show');
             Route::post('/{event}/results/publish', [FestResultsController::class, 'publish'])->name('results.publish');

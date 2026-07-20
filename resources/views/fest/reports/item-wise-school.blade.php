@@ -10,13 +10,14 @@ th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
 </style>
 </head><body>
 <h2>{{ $event->title }}</h2>
-<p class="meta">{{ $school->name }} — {{ $item->title }}</p>
+<p class="meta">{{ strtoupper($school->name) }} — {{ $item->title }}</p>
 
 <table>
-<thead><tr><th>Participant</th><th>Reg no</th><th>Class</th><th>Fest ID</th><th>Item reg</th><th>Chest</th><th>Status</th></tr></thead>
+<thead><tr><th>Sl No</th><th>Participant</th><th>Reg no</th><th>Class</th><th>Fest ID</th><th>Item reg</th><th>Chest</th><th>Status</th></tr></thead>
 <tbody>
 @forelse($rows as $row)
 <tr>
+    <td>{{ $loop->iteration }}</td>
     <td>{{ $row['name'] ?? $row['participant'] ?? '—' }}</td>
     <td>{{ $row['reg_no'] ?? '—' }}</td>
     <td>{{ $row['class'] ?? '—' }}</td>
@@ -26,7 +27,7 @@ th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
     <td>{{ ucfirst($row['status'] ?? '—') }}</td>
 </tr>
 @empty
-<tr><td colspan="7" style="text-align:center;padding:16px">No participants.</td></tr>
+<tr><td colspan="8" style="text-align:center;padding:16px">No participants.</td></tr>
 @endforelse
 </tbody></table>
 </body></html>

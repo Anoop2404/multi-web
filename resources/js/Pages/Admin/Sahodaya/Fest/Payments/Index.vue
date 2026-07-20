@@ -31,6 +31,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Event</th>
                             <th>Program</th>
                             <th>School</th>
@@ -40,14 +41,15 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="fee in fees.data" :key="fee.id">
+                        <tr v-for="(fee, idx) in fees.data" :key="fee.id">
+                            <td>{{ idx + 1 }}</td>
                             <td>
                                 <a v-if="fee.event_fees_url" :href="fee.event_fees_url" class="link-brand font-medium">{{ fee.event_title }}</a>
                                 <span v-else class="font-medium">{{ fee.event_title }}</span>
                                 <p v-if="fee.level_round" class="text-[10px] text-slate-500 capitalize">{{ fee.level_round }}</p>
                             </td>
                             <td class="text-xs">{{ fee.program_label }}</td>
-                            <td>{{ fee.school_name }}</td>
+                            <td>{{ (fee.school_name || '').toUpperCase() }}</td>
                             <td class="font-semibold">₹{{ fee.total_due }}</td>
                             <td class="text-xs whitespace-nowrap">{{ formatDateTime(fee.updated_at) }}</td>
                             <td class="text-xs whitespace-nowrap text-right space-x-2">

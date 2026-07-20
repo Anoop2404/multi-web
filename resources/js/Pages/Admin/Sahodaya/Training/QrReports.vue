@@ -37,6 +37,7 @@
             <table v-if="report.pending_school_rows?.length" class="w-full text-sm">
                 <thead class="text-left text-xs text-gray-500">
                     <tr>
+                        <th class="pb-2">Sl No</th>
                         <th class="pb-2">School</th>
                         <th class="pb-2">Code</th>
                         <th class="pb-2">Contact</th>
@@ -45,8 +46,9 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y">
-                    <tr v-for="row in report.pending_school_rows" :key="row.id">
-                        <td class="py-2">{{ row.school_name }}</td>
+                    <tr v-for="(row, idx) in report.pending_school_rows" :key="row.id">
+                        <td class="py-2">{{ idx + 1 }}</td>
+                        <td class="py-2">{{ (row.school_name || '').toUpperCase() }}</td>
                         <td class="py-2">{{ row.school_code || '—' }}</td>
                         <td class="py-2">{{ row.contact_name }} · {{ row.contact_email || row.contact_phone || '—' }}</td>
                         <td class="py-2 capitalize">{{ row.status }}</td>
@@ -82,6 +84,7 @@
             <table v-if="report.registrations?.length" class="w-full text-sm">
                 <thead class="text-left text-xs text-gray-500">
                     <tr>
+                        <th class="pb-2">Sl No</th>
                         <th class="pb-2">Teacher</th>
                         <th class="pb-2">Designation</th>
                         <th class="pb-2">School</th>
@@ -90,14 +93,15 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y">
-                    <tr v-for="row in report.registrations" :key="row.id">
+                    <tr v-for="(row, idx) in report.registrations" :key="row.id">
+                        <td class="py-2">{{ idx + 1 }}</td>
                         <td class="py-2">
                             <div>{{ row.teacher_name }}</div>
                             <div class="text-xs text-gray-400">{{ row.email }} · {{ row.mobile || '—' }}</div>
                         </td>
                         <td class="py-2">{{ row.designation || '—' }}</td>
                         <td class="py-2">
-                            <div>{{ row.school || '—' }}</div>
+                            <div>{{ (row.school || '').toUpperCase() || '—' }}</div>
                             <div class="text-xs text-gray-400">{{ row.school_code || '' }} {{ row.membership ? `· ${row.membership}` : '' }}</div>
                         </td>
                         <td class="py-2 text-xs">

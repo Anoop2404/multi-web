@@ -15,6 +15,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>School</th>
                             <th>Students</th>
                             <th>Amount</th>
@@ -24,8 +25,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="sf in schoolFees" :key="sf.id">
-                            <td class="font-medium">{{ sf.school_name }}</td>
+                        <tr v-for="(sf, idx) in schoolFees" :key="sf.id">
+                            <td>{{ idx + 1 }}</td>
+                            <td class="font-medium">{{ (sf.school_name || '').toUpperCase() }}</td>
                             <td>{{ sf.student_count }}</td>
                             <td class="font-semibold">₹{{ sf.total_due }}</td>
                             <td class="text-xs capitalize">{{ sf.status?.replace('_', ' ') }}</td>

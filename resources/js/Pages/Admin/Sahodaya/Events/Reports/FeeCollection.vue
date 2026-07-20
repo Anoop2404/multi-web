@@ -62,6 +62,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
+                        <th>Sl No</th>
                         <th>School</th>
                         <th>Due</th>
                         <th>Paid</th>
@@ -70,8 +71,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="row in rows" :key="row.school_id">
-                        <td class="font-medium">{{ row.school_name }}</td>
+                    <tr v-for="(row, idx) in rows" :key="row.school_id">
+                        <td>{{ idx + 1 }}</td>
+                        <td class="font-medium">{{ (row.school_name || '').toUpperCase() }}</td>
                         <td>₹{{ row.total_due }}</td>
                         <td>₹{{ row.paid }}</td>
                         <td>
@@ -80,7 +82,7 @@
                         <td class="text-xs font-mono">{{ row.receipt_no ?? '—' }}</td>
                     </tr>
                     <tr v-if="!rows.length">
-                        <td colspan="5" class="p-6 text-center text-slate-400">No fee records for this event.</td>
+                        <td colspan="6" class="p-6 text-center text-slate-400">No fee records for this event.</td>
                     </tr>
                 </tbody>
             </table>

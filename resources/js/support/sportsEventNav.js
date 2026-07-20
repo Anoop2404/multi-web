@@ -19,7 +19,13 @@ import {
     FEST_VIEW,
 } from './sahodayaEventNavPermissions.js';
 
-/** Season hub — no Items / registrations (those live on child sport events). */
+/**
+ * Season hub sidebar — no Items / registrations (those live on child sport
+ * events). Unreachable in current builds: `isSportsSeasonEvent()` below is
+ * hardcoded to return false after the Head = Event unification, so callers
+ * never take this branch. Left in place (not deleted) in case season hub is
+ * re-enabled later — see SPORTS_NAV_CLEANUP_PLAN.md #8.
+ */
 export function sportsSeasonSidebarNav(sahodayaId, eventId) {
     const base = `/sahodaya-admin/${sahodayaId}/events/${eventId}`;
     const sportsHub = `/sahodaya-admin/${sahodayaId}/sports`;

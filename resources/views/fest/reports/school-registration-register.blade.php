@@ -11,7 +11,7 @@ th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
 </style>
 </head><body>
 <h2>{{ $event->title }}</h2>
-<p class="meta">{{ $school->name }} — Registration &amp; fees register</p>
+<p class="meta">{{ strtoupper($school->name) }} — Registration &amp; fees register</p>
 @if($summary)
 <div class="summary">
     Items: <strong>{{ $summary['item_count'] ?? '—' }}</strong> &nbsp;|&nbsp;
@@ -22,11 +22,12 @@ th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
 @endif
 <table>
 <thead><tr>
-    <th>Head</th><th>Participant</th><th>School reg</th><th>Fest ID</th><th>Item</th><th>Item reg</th><th>Status</th><th>Chest</th><th>Fee</th>
+    <th>Sl No</th><th>Head</th><th>Participant</th><th>School reg</th><th>Fest ID</th><th>Item</th><th>Item reg</th><th>Status</th><th>Chest</th><th>Fee</th>
 </tr></thead>
 <tbody>
 @forelse($rows as $row)
 <tr>
+    <td>{{ $loop->iteration }}</td>
     <td>{{ $row['head_name'] ?? '—' }}</td>
     <td>{{ $row['participant_name'] }}</td>
     <td>{{ $row['participant_reg_no'] }}</td>
@@ -38,7 +39,7 @@ th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
     <td>@if($row['item_fee'] !== null) ₹{{ $row['item_fee'] }}@else — @endif</td>
 </tr>
 @empty
-<tr><td colspan="9" style="text-align:center;padding:16px">No registrations.</td></tr>
+<tr><td colspan="10" style="text-align:center;padding:16px">No registrations.</td></tr>
 @endforelse
 </tbody></table>
 </body></html>

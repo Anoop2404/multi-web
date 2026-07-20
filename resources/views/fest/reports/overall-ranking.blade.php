@@ -6,6 +6,6 @@
 <table><thead><tr><th>#</th><th>School</th><th>Gold</th><th>Silver</th><th>Bronze</th><th>Total Pts</th></tr></thead>
 <tbody>
 @foreach($schools as $i => $s)
-<tr><td>{{ $s->rank ?? ($i+1) }}</td><td>{{ $s->name }}</td><td>{{ $s->gold }}</td><td>{{ $s->silver }}</td><td>{{ $s->bronze }}</td><td>{{ $s->total_points }}</td></tr>
+<tr><td>{{ $s->rank ?? ($i+1) }}</td><td>{{ strtoupper($s->name) }}</td><td>{{ $s->gold }}</td><td>{{ $s->silver }}</td><td>{{ $s->bronze }}</td><td>{{ $s->total_points }}</td></tr>
 @endforeach
 </tbody></table></body></html>

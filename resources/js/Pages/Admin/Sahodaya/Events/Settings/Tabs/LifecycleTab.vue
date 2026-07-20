@@ -25,6 +25,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
+                        <th>Sl No</th>
                         <th>School</th>
                         <th>Verified</th>
                         <th>Notes</th>
@@ -32,8 +33,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="row in schoolVerifications" :key="row.school_id">
-                        <td>{{ row.school_name }}</td>
+                    <tr v-for="(row, idx) in schoolVerifications" :key="row.school_id">
+                        <td>{{ idx + 1 }}</td>
+                        <td>{{ (row.school_name || '').toUpperCase() }}</td>
                         <td>
                             <span class="text-xs px-2 py-0.5 rounded-full"
                                   :class="row.documents_verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">

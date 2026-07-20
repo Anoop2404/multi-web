@@ -48,6 +48,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Student</th>
                             <th>School</th>
                             <th>Item 1</th>
@@ -57,8 +58,9 @@
                     </thead>
                     <tbody>
                         <tr v-for="(c, i) in filteredParticipant" :key="'p-'+i">
+                            <td>{{ i + 1 }}</td>
                             <td>{{ c.student_name }}</td>
-                            <td>{{ c.school_name }}</td>
+                            <td>{{ (c.school_name || '').toUpperCase() }}</td>
                             <td>{{ c.event1 }}</td>
                             <td>{{ c.event2 }}</td>
                             <td class="text-xs">{{ c.time }}</td>
@@ -74,6 +76,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th>Sl No</th>
                             <th>Stage</th>
                             <th>Item 1</th>
                             <th>Item 2</th>
@@ -82,6 +85,7 @@
                     </thead>
                     <tbody>
                         <tr v-for="(c, i) in filteredStage" :key="'s-'+i">
+                            <td>{{ i + 1 }}</td>
                             <td>{{ c.stage }}<span v-if="c.venue" class="text-slate-400"> · {{ c.venue }}</span></td>
                             <td>{{ c.item1 }}</td>
                             <td>{{ c.item2 }}</td>
