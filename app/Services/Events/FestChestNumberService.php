@@ -3,6 +3,7 @@
 namespace App\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestSchedule;
 use Symfony\Component\HttpKernel\Exception\HttpException;
