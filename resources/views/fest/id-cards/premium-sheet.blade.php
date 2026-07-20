@@ -6,7 +6,7 @@
     <style>
         @page { size: A4 portrait; margin: 10mm; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8.5px; color: #0f172a; background: #f1f5f9; }
+        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9px; color: #0f172a; background: #f1f5f9; }
         .sheet-title { text-align: center; font-size: 11px; font-weight: bold; color: #334155; margin-bottom: 3mm; }
         @media print {
             .sheet-title { display: none !important; }
@@ -43,16 +43,14 @@
         /* Header */
         .pcard__header {
             flex-shrink: 0;
-            height: 32mm;
+            height: 28mm;
             background: #042a5b;
             color: #ffffff;
-            padding: 3mm 4mm 1mm;
+            padding: 3mm 4mm 2mm;
             display: flex;
-            flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
             position: relative;
-            text-align: center;
         }
         .pcard__pass-ribbon {
             position: absolute;
@@ -63,24 +61,24 @@
             color: #ffffff;
             font-size: 8px;
             font-weight: 800;
-            padding: 1.5mm 6mm 1.8mm;
+            padding: 1.2mm 6mm 1.5mm;
             border-bottom-left-radius: 2.5mm;
             border-bottom-right-radius: 2.5mm;
             letter-spacing: 0.08em;
             text-transform: uppercase;
         }
-        .pcard__brand-center {
+        .pcard__brand {
             display: flex;
             align-items: center;
-            justify-content: center;
             gap: 2.5mm;
-            margin-top: 3.5mm;
-            width: 100%;
+            flex: 1;
+            min-width: 0;
+            margin-top: 2mm;
         }
         .pcard__logo,
         .pcard__logo-fallback {
-            width: 13.5mm;
-            height: 13.5mm;
+            width: 14mm;
+            height: 14mm;
             border-radius: 50%;
             border: 0.45mm solid #10b981;
             background: #ffffff;
@@ -101,7 +99,7 @@
             flex: 1;
         }
         .pcard__cluster {
-            font-size: 7.5px;
+            font-size: 8px;
             font-weight: 800;
             letter-spacing: 0.06em;
             text-transform: uppercase;
@@ -112,7 +110,7 @@
             text-overflow: ellipsis;
         }
         .pcard__event {
-            font-size: 14px;
+            font-size: 14.5px;
             font-weight: 800;
             color: #ffffff;
             line-height: 1.15;
@@ -120,6 +118,28 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+        .pcard__qr-wrap {
+            text-align: center;
+            flex-shrink: 0;
+            margin-top: 2mm;
+        }
+        .pcard__qr {
+            width: 14.5mm;
+            height: 14.5mm;
+            background: #ffffff;
+            border-radius: 1mm;
+            padding: 0.5mm;
+            display: block;
+        }
+        .pcard__qr-label {
+            display: block;
+            font-size: 5px;
+            font-weight: 800;
+            color: #10b981;
+            letter-spacing: 0.06em;
+            margin-top: 0.5mm;
+            text-transform: uppercase;
         }
 
         /* Wave separator */
@@ -140,23 +160,24 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            padding: 2mm 4mm 3mm;
+            padding: 3mm 4.5mm 3mm;
             background: #ffffff;
             position: relative;
         }
-        .pcard__portrait-wrap {
-            text-align: center;
-            margin-bottom: 2mm;
+        .pcard__body-main {
+            display: flex;
+            align-items: flex-start;
+            gap: 4mm;
+            width: 100%;
         }
         .pcard__portrait {
-            width: 38mm;
-            height: 46mm;
+            width: 36mm;
+            height: 44mm;
             border-radius: 2.5mm;
             border: 0.5mm solid #0d9488;
             overflow: hidden;
             background: #f8fafc;
-            margin: 0 auto;
+            flex-shrink: 0;
         }
         .pcard__photo {
             width: 100%;
@@ -170,83 +191,53 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: bold;
             color: #042a5b;
             background: #e0f2fe;
         }
-        .pcard__name {
-            font-size: 14.5px;
-            font-weight: 800;
-            color: #042a5b;
-            text-transform: uppercase;
-            text-align: center;
-            line-height: 1.15;
-            margin-bottom: 2.5mm;
-            width: 100%;
-            word-wrap: break-word;
-        }
-        .pcard__content-grid {
-            width: 100%;
-            display: flex;
-            align-items: flex-start;
-            gap: 2mm;
-        }
         .pcard__info-col {
             flex: 1;
             min-width: 0;
+            border-left: 0.35mm solid #cbd5e1;
+            padding-left: 3.5mm;
+        }
+        .pcard__name {
+            font-size: 15px;
+            font-weight: 800;
+            color: #042a5b;
+            text-transform: uppercase;
+            line-height: 1.15;
+            margin-bottom: 2.5mm;
+            word-wrap: break-word;
         }
         .pcard__meta-table {
             width: 100%;
             border-collapse: collapse;
         }
         .pcard__meta-table td {
-            font-size: 8px;
-            line-height: 1.4;
-            padding: 0.4mm 0;
+            font-size: 9.5px;
+            line-height: 1.45;
+            padding: 0.5mm 0;
             vertical-align: middle;
         }
         .pcard__meta-icon {
-            width: 4mm;
-            font-size: 8px;
+            width: 4.5mm;
+            font-size: 9px;
         }
         .pcard__meta-label {
             color: #475569;
             font-weight: 600;
-            width: 16mm;
+            width: 18mm;
         }
         .pcard__meta-sep {
             color: #64748b;
-            width: 2mm;
+            width: 2.5mm;
             text-align: center;
         }
         .pcard__meta-val {
             color: #0f172a;
             font-weight: 700;
-        }
-        .pcard__qr-col {
-            width: 20mm;
-            text-align: center;
-            flex-shrink: 0;
-        }
-        .pcard__qr {
-            width: 19mm;
-            height: 19mm;
-            background: #ffffff;
-            border-radius: 1.2mm;
-            border: 0.3mm solid #cbd5e1;
-            padding: 0.6mm;
-            display: block;
-            margin: 0 auto;
-        }
-        .pcard__qr-label {
-            display: block;
-            font-size: 5.2px;
-            font-weight: 800;
-            color: #10b981;
-            letter-spacing: 0.06em;
-            margin-top: 0.8mm;
-            text-transform: uppercase;
         }
 
         /* Footer */
@@ -262,16 +253,16 @@
         .pcard__school-pill {
             display: inline-flex;
             align-items: center;
-            gap: 1mm;
+            gap: 1.2mm;
             background: #07264a;
             border: 0.2mm solid #1e3a8a;
             border-radius: 999px;
-            padding: 1mm 3mm;
+            padding: 1mm 3.5mm;
             max-width: 72%;
         }
-        .pcard__school-icon { font-size: 7px; }
+        .pcard__school-icon { font-size: 7.5px; }
         .pcard__school-text {
-            font-size: 7px;
+            font-size: 7.5px;
             font-weight: 800;
             color: #ffffff;
             text-transform: uppercase;
@@ -282,9 +273,9 @@
         .pcard__role-pill {
             background: #059669;
             color: #ffffff;
-            font-size: 7px;
+            font-size: 7.5px;
             font-weight: 800;
-            padding: 1mm 3.5mm;
+            padding: 1mm 4mm;
             border-radius: 999px;
             letter-spacing: 0.06em;
             text-transform: uppercase;

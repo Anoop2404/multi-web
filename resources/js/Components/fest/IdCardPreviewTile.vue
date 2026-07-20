@@ -6,13 +6,18 @@
                 <span>{{ card.card_type === 'event_participant' ? 'EVENT PASS' : 'ID CARD' }}</span>
             </div>
 
-            <div class="id-card-tile__brand-center">
+            <div class="id-card-tile__brand">
                 <img v-if="clusterLogoUrl" :src="clusterLogoUrl" :alt="clusterName" class="id-card-tile__logo">
                 <div v-else class="id-card-tile__logo-fallback">{{ clusterInitials }}</div>
                 <div class="id-card-tile__head-text">
                     <span class="id-card-tile__org">{{ clusterName }}</span>
                     <span class="id-card-tile__event">{{ eventTitle || card.event_name || 'GK QUIZ' }}</span>
                 </div>
+            </div>
+
+            <div v-if="card.qr_src" class="id-card-tile__qr-wrap">
+                <img :src="card.qr_src" alt="" class="id-card-tile__qr">
+                <span class="id-card-tile__qr-label">SCAN VERIFY</span>
             </div>
         </header>
 
@@ -26,29 +31,20 @@
 
         <!-- Body -->
         <div class="id-card-tile__body">
-            <div class="id-card-tile__portrait-wrap">
+            <div class="id-card-tile__body-main">
                 <div class="id-card-tile__portrait">
                     <img v-if="card.photo_url || card.photo_src" :src="card.photo_url || card.photo_src" :alt="card.name" class="id-card-tile__photo">
                     <span v-else class="id-card-tile__initials">{{ card.initials }}</span>
                 </div>
-            </div>
 
-            <p class="id-card-tile__name">{{ card.name }}</p>
-
-            <div class="id-card-tile__content-grid">
                 <div class="id-card-tile__info-col">
+                    <p class="id-card-tile__name">{{ card.name }}</p>
                     <table class="id-card-tile__meta-table">
                         <tr>
                             <td class="id-card-tile__meta-icon">👤</td>
                             <td class="id-card-tile__meta-label">Role</td>
                             <td class="id-card-tile__meta-sep">:</td>
                             <td class="id-card-tile__meta-val">{{ card.role_title || 'Participant' }}</td>
-                        </tr>
-                        <tr>
-                            <td class="id-card-tile__meta-icon">🏆</td>
-                            <td class="id-card-tile__meta-label">Event</td>
-                            <td class="id-card-tile__meta-sep">:</td>
-                            <td class="id-card-tile__meta-val">{{ card.event_name || eventTitle }}</td>
                         </tr>
                         <tr>
                             <td class="id-card-tile__meta-icon">📅</td>
@@ -62,24 +58,25 @@
                             <td class="id-card-tile__meta-sep">:</td>
                             <td class="id-card-tile__meta-val">{{ card.venue || '—' }}</td>
                         </tr>
-                        <tr>
-                            <td class="id-card-tile__meta-icon">🏫</td>
-                            <td class="id-card-tile__meta-label">Sahodaya</td>
+                        <tr v-if="card.student_class">
+                            <td class="id-card-tile__meta-icon">📚</td>
+                            <td class="id-card-tile__meta-label">Class</td>
                             <td class="id-card-tile__meta-sep">:</td>
-                            <td class="id-card-tile__meta-val">{{ card.sahodaya_name || clusterName }}</td>
+                            <td class="id-card-tile__meta-val">Class {{ card.student_class }}</td>
                         </tr>
-                        <tr>
-                            <td class="id-card-tile__meta-icon">🎯</td>
+                        <tr v-if="card.class_category">
+                            <td class="id-card-tile__meta-icon">🏷️</td>
                             <td class="id-card-tile__meta-label">Category</td>
                             <td class="id-card-tile__meta-sep">:</td>
-                            <td class="id-card-tile__meta-val">{{ card.category || card.class_category || '—' }}</td>
+                            <td class="id-card-tile__meta-val">{{ card.class_category }}</td>
+                        </tr>
+                        <tr v-if="itemsList.length > 0">
+                            <td class="id-card-tile__meta-icon">🎯</td>
+                            <td class="id-card-tile__meta-label">Items</td>
+                            <td class="id-card-tile__meta-sep">:</td>
+                            <td class="id-card-tile__meta-val">{{ itemsList.slice(0, 2).join(', ') }}</td>
                         </tr>
                     </table>
-                </div>
-
-                <div class="id-card-tile__qr-col">
-                    <img v-if="card.qr_src" :src="card.qr_src" alt="" class="id-card-tile__qr">
-                    <span class="id-card-tile__qr-label">SCAN TO VERIFY</span>
                 </div>
             </div>
         </div>
@@ -117,6 +114,12 @@ const clusterInitials = computed(() =>
         .map((word) => word.charAt(0).toUpperCase())
         .join('') || 'S',
 );
+
+const itemsList = computed(() => {
+    if (props.card.items?.length) return props.card.items;
+    if (props.card.detail) return [props.card.detail];
+    return [];
+});
 </script>
 
 <style scoped>
@@ -135,16 +138,14 @@ const clusterInitials = computed(() =>
 
 .id-card-tile__head {
     flex-shrink: 0;
-    height: 4.8rem;
+    height: 4.2rem;
     background: #042a5b;
     color: #ffffff;
-    padding: 0.4rem 0.6rem 0.2rem;
+    padding: 0.45rem 0.6rem 0.25rem;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     position: relative;
-    text-align: center;
 }
 .id-card-tile__pass-ribbon {
     position: absolute;
@@ -153,26 +154,26 @@ const clusterInitials = computed(() =>
     transform: translateX(-50%);
     background: #059669;
     color: #ffffff;
-    font-size: 0.6rem;
+    font-size: 0.62rem;
     font-weight: 800;
-    padding: 0.2rem 0.8rem 0.25rem;
+    padding: 0.18rem 0.8rem 0.22rem;
     border-bottom-left-radius: 0.35rem;
     border-bottom-right-radius: 0.35rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
-.id-card-tile__brand-center {
+.id-card-tile__brand {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 0.4rem;
-    margin-top: 0.5rem;
-    width: 100%;
+    flex: 1;
+    min-width: 0;
+    margin-top: 0.3rem;
 }
 .id-card-tile__logo,
 .id-card-tile__logo-fallback {
-    width: 2rem;
-    height: 2rem;
+    width: 2.1rem;
+    height: 2.1rem;
     border-radius: 9999px;
     border: 1.5px solid #10b981;
     background: #ffffff;
@@ -190,7 +191,7 @@ const clusterInitials = computed(() =>
 .id-card-tile__head-text { text-align: left; min-width: 0; flex: 1; }
 .id-card-tile__org {
     display: block;
-    font-size: 0.55rem;
+    font-size: 0.58rem;
     font-weight: 800;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -201,13 +202,31 @@ const clusterInitials = computed(() =>
 }
 .id-card-tile__event {
     display: block;
-    font-size: 0.98rem;
+    font-size: 1.05rem;
     font-weight: 800;
     color: #ffffff;
     margin-top: 0.05rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.id-card-tile__qr-wrap { text-align: center; flex-shrink: 0; margin-top: 0.3rem; }
+.id-card-tile__qr {
+    width: 2.2rem;
+    height: 2.2rem;
+    background: #ffffff;
+    border-radius: 0.2rem;
+    padding: 0.08rem;
+    display: block;
+}
+.id-card-tile__qr-label {
+    display: block;
+    font-size: 0.36rem;
+    font-weight: 800;
+    color: #10b981;
+    letter-spacing: 0.06em;
+    margin-top: 0.05rem;
+    text-transform: uppercase;
 }
 
 .id-card-tile__wave {
@@ -222,22 +241,23 @@ const clusterInitials = computed(() =>
     flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    padding: 0.3rem 0.6rem 0.4rem;
+    padding: 0.4rem 0.65rem 0.4rem;
     background: #ffffff;
 }
-.id-card-tile__portrait-wrap {
-    text-align: center;
-    margin-bottom: 0.3rem;
+.id-card-tile__body-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    width: 100%;
 }
 .id-card-tile__portrait {
-    width: 5.6rem;
-    height: 6.8rem;
+    width: 5.2rem;
+    height: 6.4rem;
     border-radius: 0.4rem;
     border: 1.5px solid #0d9488;
     overflow: hidden;
     background: #f8fafc;
-    margin: 0 auto;
+    flex-shrink: 0;
 }
 .id-card-tile__photo { width: 100%; height: 100%; object-fit: cover; display: block; }
 .id-card-tile__initials {
@@ -246,65 +266,37 @@ const clusterInitials = computed(() =>
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.6rem;
+    font-size: 1.5rem;
     font-weight: 800;
     color: #042a5b;
     background: #e0f2fe;
 }
+.id-card-tile__info-col {
+    flex: 1;
+    min-width: 0;
+    border-left: 1px solid #cbd5e1;
+    padding-left: 0.5rem;
+}
 .id-card-tile__name {
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     font-weight: 800;
     color: #042a5b;
     text-transform: uppercase;
-    text-align: center;
     line-height: 1.15;
     margin-bottom: 0.35rem;
-    width: 100%;
     word-wrap: break-word;
 }
-.id-card-tile__content-grid {
-    width: 100%;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.3rem;
-}
-.id-card-tile__info-col { flex: 1; min-width: 0; }
 .id-card-tile__meta-table { width: 100%; border-collapse: collapse; }
 .id-card-tile__meta-table td {
-    font-size: 0.58rem;
-    line-height: 1.4;
-    padding: 0.05rem 0;
+    font-size: 0.68rem;
+    line-height: 1.45;
+    padding: 0.08rem 0;
     vertical-align: middle;
 }
-.id-card-tile__meta-icon { width: 0.65rem; font-size: 0.55rem; }
-.id-card-tile__meta-label { color: #475569; font-weight: 600; width: 2.3rem; }
-.id-card-tile__meta-sep { color: #64748b; width: 0.35rem; text-align: center; }
+.id-card-tile__meta-icon { width: 0.75rem; font-size: 0.65rem; }
+.id-card-tile__meta-label { color: #475569; font-weight: 600; width: 2.6rem; }
+.id-card-tile__meta-sep { color: #64748b; width: 0.4rem; text-align: center; }
 .id-card-tile__meta-val { color: #0f172a; font-weight: 700; }
-
-.id-card-tile__qr-col {
-    width: 2.8rem;
-    text-align: center;
-    flex-shrink: 0;
-}
-.id-card-tile__qr {
-    width: 2.7rem;
-    height: 2.7rem;
-    background: #ffffff;
-    border-radius: 0.2rem;
-    border: 1px solid #cbd5e1;
-    padding: 0.08rem;
-    display: block;
-    margin: 0 auto;
-}
-.id-card-tile__qr-label {
-    display: block;
-    font-size: 0.38rem;
-    font-weight: 800;
-    color: #10b981;
-    letter-spacing: 0.06em;
-    margin-top: 0.1rem;
-    text-transform: uppercase;
-}
 
 .id-card-tile__footer {
     flex-shrink: 0;
@@ -325,9 +317,9 @@ const clusterInitials = computed(() =>
     padding: 0.12rem 0.45rem;
     max-width: 72%;
 }
-.id-card-tile__school-icon { font-size: 0.52rem; }
+.id-card-tile__school-icon { font-size: 0.55rem; }
 .id-card-tile__school-text {
-    font-size: 0.52rem;
+    font-size: 0.55rem;
     font-weight: 800;
     color: #ffffff;
     text-transform: uppercase;
@@ -338,9 +330,9 @@ const clusterInitials = computed(() =>
 .id-card-tile__role-pill {
     background: #059669;
     color: #ffffff;
-    font-size: 0.52rem;
+    font-size: 0.55rem;
     font-weight: 800;
-    padding: 0.12rem 0.5rem;
+    padding: 0.12rem 0.55rem;
     border-radius: 9999px;
     letter-spacing: 0.06em;
     text-transform: uppercase;

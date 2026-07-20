@@ -3,6 +3,7 @@
     $isEventPass = ($card['card_type'] ?? '') === 'event_participant';
     $isHeadPass = ($card['card_type'] ?? '') === 'head_participant';
     $roleClass = $card['role_class'] ?? 'student';
+    $itemsList = !empty($card['items']) ? $card['items'] : (!empty($card['detail']) ? [$card['detail']] : []);
 @endphp
 <div class="pcard pcard--{{ $roleClass }}">
     <header class="pcard__header">
@@ -10,7 +11,7 @@
             <span>{{ $isEventPass ? 'EVENT PASS' : 'ID CARD' }}</span>
         </div>
 
-        <div class="pcard__brand-center">
+        <div class="pcard__brand">
             @if(!empty($clusterLogoSrc))
                 <img src="{{ $clusterLogoSrc }}" alt="{{ $clusterName }}" class="pcard__logo">
             @else
@@ -21,6 +22,13 @@
                 <p class="pcard__event">{{ $eventTitle }}</p>
             </div>
         </div>
+
+        @if(!empty($card['qr_src']))
+            <div class="pcard__qr-wrap">
+                <img src="{{ $card['qr_src'] }}" alt="" class="pcard__qr">
+                <span class="pcard__qr-label">SCAN VERIFY</span>
+            </div>
+        @endif
     </header>
 
     <div class="pcard__wave-separator">
@@ -31,7 +39,7 @@
     </div>
 
     <div class="pcard__body">
-        <div class="pcard__portrait-wrap">
+        <div class="pcard__body-main">
             <div class="pcard__portrait">
                 @if(!empty($card['photo_src']))
                     <img src="{{ $card['photo_src'] }}" alt="" class="pcard__photo">
@@ -39,24 +47,15 @@
                     <div class="pcard__initials">{{ $card['initials'] ?? '?' }}</div>
                 @endif
             </div>
-        </div>
 
-        <p class="pcard__name">{{ $card['name'] }}</p>
-
-        <div class="pcard__content-grid">
             <div class="pcard__info-col">
+                <p class="pcard__name">{{ $card['name'] }}</p>
                 <table class="pcard__meta-table">
                     <tr>
                         <td class="pcard__meta-icon">👤</td>
                         <td class="pcard__meta-label">Role</td>
                         <td class="pcard__meta-sep">:</td>
                         <td class="pcard__meta-val">{{ $card['role_title'] ?? 'Participant' }}</td>
-                    </tr>
-                    <tr>
-                        <td class="pcard__meta-icon">🏆</td>
-                        <td class="pcard__meta-label">Event</td>
-                        <td class="pcard__meta-sep">:</td>
-                        <td class="pcard__meta-val">{{ $card['event_name'] ?? $eventTitle }}</td>
                     </tr>
                     <tr>
                         <td class="pcard__meta-icon">📅</td>
@@ -70,26 +69,31 @@
                         <td class="pcard__meta-sep">:</td>
                         <td class="pcard__meta-val">{{ $card['venue'] ?? '—' }}</td>
                     </tr>
-                    <tr>
-                        <td class="pcard__meta-icon">🏫</td>
-                        <td class="pcard__meta-label">Sahodaya</td>
-                        <td class="pcard__meta-sep">:</td>
-                        <td class="pcard__meta-val">{{ $card['sahodaya_name'] ?? ($clusterName ?? 'Sahodaya') }}</td>
-                    </tr>
-                    <tr>
-                        <td class="pcard__meta-icon">🎯</td>
-                        <td class="pcard__meta-label">Category</td>
-                        <td class="pcard__meta-sep">:</td>
-                        <td class="pcard__meta-val">{{ $card['category'] ?? ($card['class_category'] ?? '—') }}</td>
-                    </tr>
+                    @if(!empty($card['student_class']))
+                        <tr>
+                            <td class="pcard__meta-icon">📚</td>
+                            <td class="pcard__meta-label">Class</td>
+                            <td class="pcard__meta-sep">:</td>
+                            <td class="pcard__meta-val">Class {{ $card['student_class'] }}</td>
+                        </tr>
+                    @endif
+                    @if(!empty($card['class_category']))
+                        <tr>
+                            <td class="pcard__meta-icon">🏷️</td>
+                            <td class="pcard__meta-label">Category</td>
+                            <td class="pcard__meta-sep">:</td>
+                            <td class="pcard__meta-val">{{ $card['class_category'] }}</td>
+                        </tr>
+                    @endif
+                    @if(!empty($itemsList))
+                        <tr>
+                            <td class="pcard__meta-icon">🎯</td>
+                            <td class="pcard__meta-label">Items</td>
+                            <td class="pcard__meta-sep">:</td>
+                            <td class="pcard__meta-val">{{ implode(', ', array_slice($itemsList, 0, 2)) }}</td>
+                        </tr>
+                    @endif
                 </table>
-            </div>
-
-            <div class="pcard__qr-col">
-                @if(!empty($card['qr_src']))
-                    <img src="{{ $card['qr_src'] }}" alt="" class="pcard__qr">
-                    <span class="pcard__qr-label">SCAN TO VERIFY</span>
-                @endif
             </div>
         </div>
     </div>

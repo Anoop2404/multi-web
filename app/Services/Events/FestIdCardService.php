@@ -651,10 +651,14 @@ class FestIdCardService
         $photoUrl = $this->portraitUrl($p) ?: $this->defaultAvatarDataUri($gender);
         $photoSrc = $this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender);
 
-        $eventDate = $event->starts_at ? $event->starts_at->format('d M Y') : ($event->start_date ? date('d M Y', strtotime($event->start_date)) : '—');
-        $venue = $event->venue_name ?: ($event->venue ?: '—');
+        $rawDate = $event->event_start ?? $event->starts_at ?? $event->start_date;
+        $eventDate = $rawDate ? date('d M Y', strtotime((string) $rawDate)) : null;
+        if (! $eventDate && $event->event_end) {
+            $eventDate = date('d M Y', strtotime((string) $event->event_end));
+        }
+        $venue = $event->venue ?: ($event->venue_name ?: '—');
         $sahodayaName = $event->tenant?->name ?? 'Sahodaya';
-        $category = $itemLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : '—'));
+        $category = $classCategory ?: ($studentClass ? "Class {$studentClass}" : null);
 
         return [
             'card_type'       => 'individual',
