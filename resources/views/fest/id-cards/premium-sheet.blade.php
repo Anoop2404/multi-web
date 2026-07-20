@@ -216,10 +216,10 @@
             border-collapse: collapse;
         }
         .pcard__meta-table td {
-            font-size: 9.5px;
-            line-height: 1.45;
-            padding: 0.5mm 0;
-            vertical-align: middle;
+            font-size: 9.2px;
+            line-height: 1.4;
+            padding: 0.6mm 0;
+            vertical-align: top;
         }
         .pcard__meta-icon {
             width: 4.5mm;
@@ -228,16 +228,17 @@
         .pcard__meta-label {
             color: #475569;
             font-weight: 600;
-            width: 18mm;
+            width: 17mm;
         }
         .pcard__meta-sep {
             color: #64748b;
-            width: 2.5mm;
+            width: 2mm;
             text-align: center;
         }
         .pcard__meta-val {
-            color: #0f172a;
+            color: #042a5b;
             font-weight: 700;
+            padding-left: 0.5mm;
         }
 
         /* Footer */

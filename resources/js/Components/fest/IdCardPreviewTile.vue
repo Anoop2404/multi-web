@@ -289,14 +289,14 @@ const itemsList = computed(() => {
 .id-card-tile__meta-table { width: 100%; border-collapse: collapse; }
 .id-card-tile__meta-table td {
     font-size: 0.68rem;
-    line-height: 1.45;
+    line-height: 1.4;
     padding: 0.08rem 0;
-    vertical-align: middle;
+    vertical-align: top;
 }
 .id-card-tile__meta-icon { width: 0.75rem; font-size: 0.65rem; }
-.id-card-tile__meta-label { color: #475569; font-weight: 600; width: 2.6rem; }
-.id-card-tile__meta-sep { color: #64748b; width: 0.4rem; text-align: center; }
-.id-card-tile__meta-val { color: #0f172a; font-weight: 700; }
+.id-card-tile__meta-label { color: #475569; font-weight: 600; width: 2.5rem; }
+.id-card-tile__meta-sep { color: #64748b; width: 0.35rem; text-align: center; }
+.id-card-tile__meta-val { color: #042a5b; font-weight: 700; padding-left: 0.1rem; }
 
 .id-card-tile__footer {
     flex-shrink: 0;
