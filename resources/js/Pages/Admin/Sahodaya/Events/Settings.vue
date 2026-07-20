@@ -31,7 +31,7 @@
                 <!-- Group Tab 3: Venues & Numbering -->
                 <template v-else-if="['venues', 'numbering', 'volunteers'].includes(activeTab)">
                     <div id="section-venues" class="scroll-mt-6"><VenuesTab /></div>
-                    <div v-if="isSports" id="section-numbering" class="scroll-mt-6"><NumberingTab /></div>
+                    <div id="section-numbering" class="scroll-mt-6"><NumberingTab /></div>
                     <div id="section-volunteers" class="scroll-mt-6"><VolunteersTab /></div>
                 </template>
 
@@ -202,8 +202,8 @@ const activeCategory = computed(() => {
     if (['venues', 'numbering', 'volunteers'].includes(a)) {
         const sections = [
             { id: 'venues', label: 'Venues & Grounds', href: `${base.value}/settings/venues` },
+            { id: 'numbering', label: 'Chest Numbering Ranges', href: `${base.value}/settings/numbering` },
         ];
-        if (isSports.value) sections.push({ id: 'numbering', label: 'Chest Numbering Ranges', href: `${base.value}/settings/numbering` });
         sections.push({ id: 'volunteers', label: 'Volunteers & Staff', href: `${base.value}/settings/volunteers` });
         return { title: '📍 Venues & Numbering', sections };
     }

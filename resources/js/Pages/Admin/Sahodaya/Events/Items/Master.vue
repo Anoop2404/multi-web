@@ -140,7 +140,13 @@
                                             <p class="font-bold text-slate-900 leading-snug truncate">{{ item.title }}</p>
                                             <FestItemMetaIcons :gender="item.gender" :participant-type="item.participant_type" />
                                         </div>
-                                        <p class="text-xs text-slate-500 mt-0.5">{{ itemDetails(item) }}</p>
+                                        <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                            <span v-for="(detail, dIdx) in itemDetails(item)" :key="dIdx"
+                                                  class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200/60">
+                                                <span class="text-slate-400 font-normal text-[10px] uppercase tracking-wide">{{ detail.label }}:</span>
+                                                <span class="font-semibold text-slate-800">{{ detail.value }}</span>
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3 text-xs shrink-0">

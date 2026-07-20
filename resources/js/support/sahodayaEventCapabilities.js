@@ -51,7 +51,7 @@ export function settingsTabsForEvent(event) {
     return [
         { id: 'fees', label: caps.isSports ? '💳 Fees & Windows' : '💳 Fees & Registration', icon: '💳' },
         { id: 'points', label: caps.isSports ? '🏆 Scoring & Rules' : '🏆 Points & Rules', icon: '🏆' },
-        { id: 'venues', label: caps.isSports ? '📍 Venues & Numbering' : '📍 Venues & Logistics', icon: '📍' },
+        { id: 'venues', label: '📍 Venues & Numbering', icon: '📍' },
         { id: 'lifecycle', label: '⚙️ General & Operations', icon: '⚙️' },
     ];
 }
