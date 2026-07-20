@@ -309,7 +309,7 @@
     ];
 @endphp
 
-@if($renderSections)
+@if(!empty($renderSections) && !empty($sections))
     @foreach($sections as $sectionIndex => $section)
         @if($sectionIndex > 0)<div class="page-break"></div>@endif
         <p class="section-title">{{ $section['item_title'] ?? 'Item' }}</p>
