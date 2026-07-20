@@ -166,11 +166,11 @@ class FestChestNumberService
             'chest_revealed_at' => null,
         ]);
 
-        $groupQuery = \App\Models\FestRegistrationGroup::query()
-            ->whereHas('registrations', fn ($q) => $q->where('event_id', $event->id));
+        $groupQuery = \App\Models\FestGroup::query()
+            ->where('event_id', $event->id);
 
         if ($item) {
-            $groupQuery->whereHas('registrations', fn ($q) => $q->where('item_id', $item->id));
+            $groupQuery->whereHas('registration', fn ($q) => $q->where('item_id', $item->id));
         }
 
         $groupQuery->update([
