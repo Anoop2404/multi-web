@@ -115,24 +115,30 @@
                         Scoring columns printed on each judge's paper sheet (e.g. "Content", "Presentation"). SL NO,
                         CHEST NO. and TOTAL are always included automatically — name the criteria columns in between.
                     </p>
-                    <div v-if="columnDraft.length" class="grid grid-cols-12 gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">
-                        <div class="col-span-1">#</div>
-                        <div class="col-span-8">Column / Criterion Name</div>
-                        <div class="col-span-2">Max Marks</div>
-                        <div class="col-span-1"></div>
+                    <div v-if="columnDraft.length" class="grid grid-cols-12 gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 items-center">
+                        <div class="col-span-1 text-center">#</div>
+                        <div class="col-span-7">Column / Criterion Name</div>
+                        <div class="col-span-3">Max Marks</div>
+                        <div class="col-span-1 text-right"></div>
                     </div>
-                    <div v-for="(row, idx) in columnDraft" :key="row._key" class="flex items-center gap-2">
-                        <span class="text-[10px] font-bold text-slate-400 w-5">{{ idx + 1 }}.</span>
-                        <input v-model="row.label" type="text" :placeholder="`Criterion ${idx + 1} (e.g. Content / Presentation)`"
-                               class="field text-xs flex-1">
-                        <input v-model.number="row.max_score" type="number" min="0.5" step="0.5" placeholder="Max"
-                               class="field text-xs w-24">
-                        <button type="button" class="text-rose-500 hover:underline text-xs font-semibold"
-                                @click="removeColumnRow(idx)">
-                            Remove
-                        </button>
+                    <div v-for="(row, idx) in columnDraft" :key="row._key" class="grid grid-cols-12 gap-2 items-center px-1">
+                        <div class="col-span-1 text-center text-xs font-bold text-slate-400">{{ idx + 1 }}.</div>
+                        <div class="col-span-7">
+                            <input v-model="row.label" type="text" :placeholder="`e.g. Content / Presentation / Criterion ${idx + 1}`"
+                                   class="field text-xs w-full">
+                        </div>
+                        <div class="col-span-3">
+                            <input v-model.number="row.max_score" type="number" min="0.5" step="0.5" placeholder="10"
+                                   class="field text-xs w-full">
+                        </div>
+                        <div class="col-span-1 text-right">
+                            <button type="button" class="text-rose-500 hover:underline text-xs font-semibold"
+                                    @click="removeColumnRow(idx)">
+                                Remove
+                            </button>
+                        </div>
                     </div>
-                    <button type="button" class="btn-secondary text-xs !py-1 !px-3" @click="addColumnRow">
+                    <button type="button" class="btn-secondary text-xs !py-1 !px-3 mt-1" @click="addColumnRow">
                         + Add Column
                     </button>
                 </div>
