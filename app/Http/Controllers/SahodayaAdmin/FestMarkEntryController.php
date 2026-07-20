@@ -18,6 +18,7 @@ use App\Services\Events\FestNumberingService;
 use App\Services\Events\FestRankPointService;
 use App\Services\Events\FestSportsAutoRankService;
 use App\Support\FestPageActivity;
+use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
@@ -92,14 +93,16 @@ class FestMarkEntryController extends SahodayaAdminController
         }
 
         $criteria = [];
-        $criterionScores = [];
+        $judgeCount = 1;
+        $judgeScores = [];
         $sheetUploads = [];
         $selectedItemModel = $itemId ? FestEventItem::find($itemId) : null;
         if ($selectedItemModel) {
             $criteriaService = app(FestMarkCriteriaService::class);
             $criteria = $criteriaService->criteriaForItem($selectedItemModel)->values()->all();
-            if ($criteria) {
-                $criterionScores = $criteriaService->scoresForItem($selectedItemModel);
+            $judgeCount = $criteriaService->judgeCountForItem($selectedItemModel);
+            if ($judgeCount > 1) {
+                $judgeScores = $criteriaService->judgeScoresForItem($selectedItemModel);
             }
 
             $sheetUploads = FestMarkSheetUpload::where('item_id', $itemId)
@@ -129,9 +132,10 @@ class FestMarkEntryController extends SahodayaAdminController
                 : [],
             'childEvents'      => $childEvents,
             'criteria'         => $criteria,
-            'criterionScores'  => $criterionScores,
+            'judgeCount'       => $judgeCount,
+            'judgeScores'      => $judgeScores,
             'sheetUploads'     => $sheetUploads,
-            'cumulativeSheetUrl' => $itemId
+            'cumulativeSheetUrl' => ($itemId && $judgeCount > 1)
                 ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/reports/mark-criteria-sheet?item_id={$itemId}"
                 : null,
         ]));
@@ -151,13 +155,13 @@ class FestMarkEntryController extends SahodayaAdminController
             'score'             => 'nullable|numeric|min:0',
             'measurement_value' => 'nullable|string|max:50',
             'measurement_unit'  => 'nullable|string|max:20',
-            'criteria_scores'   => 'nullable|array',
-            'criteria_scores.*' => 'nullable|numeric|min:0',
+            'judge_scores'      => 'nullable|array',
+            'judge_scores.*'    => 'nullable|numeric|min:0',
         ]);
 
         $item = FestEventItem::find($data['item_id']);
-        $criteriaScores = $data['criteria_scores'] ?? null;
-        unset($data['criteria_scores']);
+        $judgeScores = $data['judge_scores'] ?? null;
+        unset($data['judge_scores']);
 
         $teamParticipantIds = $this->expandToTeam($event, (int) $data['item_id'], (int) $data['participant_id']);
 
@@ -165,8 +169,8 @@ class FestMarkEntryController extends SahodayaAdminController
         foreach ($teamParticipantIds as $participantId) {
             $rowData = $data;
 
-            if ($item && $criteriaScores !== null && $criteriaService->hasCriteria($item)) {
-                $rowData['score'] = $criteriaService->saveParticipantScores($item, $participantId, $criteriaScores);
+            if ($item && $judgeScores !== null && $criteriaService->hasJudgePanel($item)) {
+                $rowData['score'] = $criteriaService->saveParticipantJudgeScores($item, $participantId, $judgeScores);
                 $rowData['grade'] = null;
             }
 
@@ -188,6 +192,7 @@ class FestMarkEntryController extends SahodayaAdminController
         abort_if($item->event_id !== $event->id, 404);
 
         $data = $request->validate([
+            'judge_count'           => 'nullable|integer|min:1|max:20',
             'criteria'              => 'nullable|array',
             'criteria.*.id'         => 'nullable|integer',
             'criteria.*.label'      => 'required|string|max:100',
@@ -195,10 +200,12 @@ class FestMarkEntryController extends SahodayaAdminController
         ]);
 
         $criteria = $criteriaService->saveCriteria($event, $item, $data['criteria'] ?? []);
+        $criteriaService->setJudgeCount($item, $data['judge_count'] ?? 1);
 
         $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark.criteria.saved', "Mark criteria updated for item #{$item->id}", [
             'item_id' => $item->id,
             'criteria_count' => $criteria->count(),
+            'judge_count' => $data['judge_count'] ?? 1,
         ]);
 
         return back()->with('success', 'Marking criteria saved.');
@@ -229,9 +236,10 @@ class FestMarkEntryController extends SahodayaAdminController
     }
 
     /**
-     * Digitally-filled cumulative mark sheet for an item that has configured
-     * scoring criteria — Sl No / chest / reg id / one column per criterion /
-     * total, one row per participant (or per team for group items).
+     * Digitally-filled Sum Sheet for a judge-panel item — Sl No / chest /
+     * reg id / one column per judge (their subtotal, as already typed into
+     * Mark Entry) / grand total, one row per participant (or per team for
+     * group items). Mirrors the printed blank Sum Sheet, but pre-filled.
      */
     public function cumulativeSheet(Request $request, string $tenantId, FestEvent $event, FestMarkCriteriaService $criteriaService, FestNumberingService $numbering)
     {
@@ -243,8 +251,8 @@ class FestMarkEntryController extends SahodayaAdminController
         $item = FestEventItem::findOrFail($itemId);
         abort_if($item->event_id !== $event->id, 404);
 
-        $criteria = $criteriaService->criteriaForItem($item);
-        $scores = $criteria->isNotEmpty() ? $criteriaService->scoresForItem($item) : [];
+        $judgeCount = $criteriaService->judgeCountForItem($item);
+        $scores = $judgeCount > 1 ? $criteriaService->judgeScoresForItem($item) : [];
 
         $isGroup = $numbering->isGroupItem($item);
 
@@ -275,12 +283,17 @@ class FestMarkEntryController extends SahodayaAdminController
             $regNo = $p->student?->reg_no ?? $p->teacher?->reg_no ?? null;
             $rowScores = $scores[$p->id] ?? [];
 
+            $judgeValues = [];
+            for ($j = 1; $j <= $judgeCount; $j++) {
+                $judgeValues[] = $rowScores[$j] ?? null;
+            }
+
             $rows[] = [
                 'chest_no' => $chest,
                 'reg_no'   => $regNo,
                 'name'     => $name,
                 'school'   => strtoupper($p->registration?->school?->name ?? ''),
-                'scores'   => $criteria->map(fn ($c) => $rowScores[$c->id] ?? null)->all(),
+                'scores'   => $judgeValues,
                 'total'    => array_sum(array_map(fn ($v) => (float) ($v ?? 0), $rowScores)),
             ];
         }
@@ -288,11 +301,13 @@ class FestMarkEntryController extends SahodayaAdminController
         usort($rows, fn ($a, $b) => ($a['chest_no'] ?? PHP_INT_MAX) <=> ($b['chest_no'] ?? PHP_INT_MAX));
 
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-criteria-sheet', [
-            'event'    => $event,
-            'item'     => $item,
-            'criteria' => $criteria,
-            'rows'     => $rows,
-        ])->download("mark-criteria-sheet-{$item->id}.pdf");
+            'event'      => $event,
+            'item'       => $item,
+            'judgeCount' => $judgeCount,
+            'rows'       => $rows,
+            'orgName'    => $this->sahodaya->name ?? 'Sahodaya',
+            'logoSrc'    => TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->download("mark-sum-sheet-{$item->id}.pdf");
     }
 
     /**
@@ -320,6 +335,7 @@ class FestMarkEntryController extends SahodayaAdminController
         foreach ($items as $item) {
             $isGroup = $numbering->isGroupItem($item);
             $criteria = $criteriaService->criteriaForItem($item);
+            $judgeCount = $criteriaService->judgeCountForItem($item);
 
             $participants = FestParticipant::whereHas('registration', fn ($q) => $q
                     ->where('event_id', $event->id)
@@ -348,17 +364,47 @@ class FestMarkEntryController extends SahodayaAdminController
 
             usort($rows, fn ($a, $b) => (int) ($a['chest_no'] ?? 999999) <=> (int) ($b['chest_no'] ?? 999999));
 
-            $sheets[] = [
-                'item'     => $item,
-                'criteria' => $criteria,
-                'rows'     => $rows,
-            ];
+            if ($judgeCount > 1) {
+                // One identical blank sheet per judge, then a consolidated
+                // Sum Sheet (one column per judge + a blank Grand Total) used
+                // to combine the judges' paper subtotals before typing the
+                // per-judge totals into the online Mark Entry page.
+                for ($judgeNumber = 1; $judgeNumber <= $judgeCount; $judgeNumber++) {
+                    $sheets[] = [
+                        'item'         => $item,
+                        'criteria'     => $criteria,
+                        'rows'         => $rows,
+                        'sheet_label'  => "JUDGE {$judgeNumber} SHEET",
+                        'is_sum_sheet' => false,
+                        'judge_count'  => $judgeCount,
+                    ];
+                }
+
+                $sheets[] = [
+                    'item'         => $item,
+                    'criteria'     => $criteria,
+                    'rows'         => $rows,
+                    'sheet_label'  => 'SUM SHEET',
+                    'is_sum_sheet' => true,
+                    'judge_count'  => $judgeCount,
+                ];
+            } else {
+                $sheets[] = [
+                    'item'         => $item,
+                    'criteria'     => $criteria,
+                    'rows'         => $rows,
+                    'sheet_label'  => null,
+                    'is_sum_sheet' => false,
+                    'judge_count'  => 1,
+                ];
+            }
         }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-entry-sheet', [
             'sahodaya' => $this->sahodaya,
             'event'    => $event,
             'sheets'   => $sheets,
+            'logoSrc'  => TenantBranding::logoEmbedSrc($this->sahodaya),
         ])->setPaper('a4', 'landscape');
 
         $fileName = $itemId

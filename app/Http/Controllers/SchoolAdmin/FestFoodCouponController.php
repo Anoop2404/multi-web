@@ -4,6 +4,8 @@ namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\FestEvent;
 use App\Models\FestFoodCoupon;
+use App\Models\Tenant;
+use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class FestFoodCouponController extends SchoolAdminController
@@ -42,10 +44,14 @@ class FestFoodCouponController extends SchoolAdminController
             ->orderBy('coupon_code')
             ->get();
 
+        $sahodaya = Tenant::find($event->tenant_id);
+
         return Pdf::loadView('fest.catering.food-coupons', [
-            'event'   => $event,
-            'school'  => $this->school,
-            'coupons' => $coupons,
+            'event'    => $event,
+            'school'   => $this->school,
+            'coupons'  => $coupons,
+            'sahodaya' => $sahodaya,
+            'logoSrc'  => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
         ])->download('food-coupons-'.$this->school->school_prefix.'-'.$event->id.'.pdf');
     }
 }

@@ -6,7 +6,7 @@ body{font-family:DejaVu Sans,sans-serif;font-size:10px}
 .code{font-size:18px;font-weight:bold;letter-spacing:2px}
 </style>
 </head><body>
-<h2 style="text-align:center">{{ $sahodaya->name }} — {{ $event->title }}</h2>
+@include('partials.pdf-branding-header', ['orgName' => ($sahodaya->name ?? 'Sahodaya') . ' — ' . $event->title, 'logoSrc' => $logoSrc ?? null])
 <p style="text-align:center;color:#666">Food coupons</p>
 @foreach($coupons as $c)
 <div class="coupon">

@@ -2,6 +2,8 @@
 <html><head><meta charset="utf-8"><title>Item Schedule</title>
 <style>body{font-family:DejaVu Sans,sans-serif;font-size:10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px}th{background:#f3f4f6}.meta{margin-bottom:10px;color:#444}</style>
 </head><body>
+@include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
+
 <h2 style="text-align:center">{{ $event->title }} — Item schedule</h2>
 <p class="meta" style="text-align:center">
     {{ $summary['scheduled'] }} scheduled · {{ $summary['unscheduled'] }} not scheduled · {{ $summary['total'] }} items

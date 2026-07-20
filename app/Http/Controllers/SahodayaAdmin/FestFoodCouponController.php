@@ -8,6 +8,7 @@ use App\Models\FestEvent;
 use App\Models\FestFoodCoupon;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
@@ -106,6 +107,7 @@ class FestFoodCouponController extends SahodayaAdminController
         return Pdf::loadView('fest.catering.food-coupons', [
             'event'    => $event,
             'sahodaya' => $this->sahodaya,
+            'logoSrc'  => TenantBranding::logoEmbedSrc($this->sahodaya),
             'coupons'  => $coupons,
         ])->download('food-coupons-'.$event->id.'.pdf');
     }

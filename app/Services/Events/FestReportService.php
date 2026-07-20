@@ -17,6 +17,7 @@ use App\Models\Student;
 use App\Models\Tenant;
 use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
+use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -25,6 +26,21 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class FestReportService
 {
     public function __construct(public FestEvent $event) {}
+
+    /**
+     * Sahodaya branding (org name + logo data URI) for PDF report headers.
+     *
+     * @return array{orgName: string, logoSrc: ?string}
+     */
+    private function brandingData(): array
+    {
+        $sahodaya = Tenant::find($this->event->tenant_id);
+
+        return [
+            'orgName' => $sahodaya?->name ?? 'Sahodaya',
+            'logoSrc' => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
+        ];
+    }
 
     public function schools(): Collection
     {
@@ -456,6 +472,7 @@ class FestReportService
         return Pdf::loadView('fest.reports.registration-list', [
             'event' => $this->event,
             'rows'  => $regs,
+            ...$this->brandingData(),
         ])->download($this->slug().'-registration-list.pdf');
     }
 
@@ -470,6 +487,7 @@ class FestReportService
         return Pdf::loadView('fest.reports.school-wise', [
             'event'   => $this->event,
             'marks'   => $marks,
+            ...$this->brandingData(),
         ])->download($this->slug().'-school-wise.pdf');
     }
 
@@ -478,6 +496,7 @@ class FestReportService
         return Pdf::loadView('fest.reports.overall-ranking', [
             'event'   => $this->event,
             'schools' => $this->schoolRankingRows(),
+            ...$this->brandingData(),
         ])->download($this->slug().'-overall-ranking.pdf');
     }
 
@@ -490,6 +509,7 @@ class FestReportService
             'event'  => $this->event,
             'houses' => $houses,
             'board'  => $board,
+            ...$this->brandingData(),
         ])->download($this->slug().'-house-wise.pdf');
     }
 
@@ -512,6 +532,7 @@ class FestReportService
         return Pdf::loadView('fest.reports.item-list', [
             'event' => $this->event,
             'items' => $items,
+            ...$this->brandingData(),
         ])->download($this->slug().'-item-list.pdf');
     }
 
@@ -535,6 +556,7 @@ class FestReportService
             'item'  => $item,
             'marks' => $marks,
             'topN'  => $topN,
+            ...$this->brandingData(),
         ])->download($this->slug().'-item-wise.pdf');
     }
 
@@ -543,6 +565,7 @@ class FestReportService
         return Pdf::loadView('fest.reports.cumulative', [
             'event'   => $this->event,
             'schools' => $this->schoolRankingRows(),
+            ...$this->brandingData(),
         ])->download($this->slug().'-cumulative.pdf');
     }
 
@@ -590,6 +613,7 @@ class FestReportService
             'date'     => $date,
             'rows'     => $rows,
             'audience' => $audience,
+            ...$this->brandingData(),
         ])->download($this->slug()."-day-{$date}.pdf");
     }
 
@@ -653,6 +677,7 @@ class FestReportService
             'event'       => $this->event,
             'school'      => $school,
             'studentRows' => $studentRows,
+            ...$this->brandingData(),
         ])->setPaper('a4', 'landscape')->download($this->slug()."-attendance-{$school->id}.pdf");
     }
 
@@ -680,6 +705,7 @@ class FestReportService
             'schedule' => $schedule,
             'rows'     => $this->participantReportRows($participants, $audience),
             'audience' => $audience,
+            ...$this->brandingData(),
         ])->download($this->slug()."-judge-{$itemId}.pdf");
     }
 
@@ -690,11 +716,15 @@ class FestReportService
         $audience = $this->reportAudience($request);
         $participants = $this->participantsFlat($itemId, null, null, null, null, true);
 
+        $sahodaya = Tenant::find($this->event->tenant_id);
+
         return Pdf::loadView('fest.reports.mark-entry-sheet', [
             'event'    => $this->event,
             'item'     => $item,
             'rows'     => $this->participantReportRows($participants, $audience),
             'audience' => $audience,
+            'sahodaya' => $sahodaya,
+            'logoSrc'  => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
         ])->download($this->slug()."-mark-entry-{$itemId}.pdf");
     }
 
@@ -731,6 +761,7 @@ class FestReportService
             'event' => $this->event,
             'item'  => $item,
             'rows'  => $rows,
+            ...$this->brandingData(),
         ])->download($this->slug()."-item-order-{$itemId}.pdf");
     }
 
@@ -758,6 +789,7 @@ class FestReportService
         return Pdf::loadView('fest.reports.green-room-list', [
             'event' => $this->event,
             'rows'  => $rows,
+            ...$this->brandingData(),
         ])->download($this->slug().'-green-room.pdf');
     }
 
@@ -827,6 +859,7 @@ class FestReportService
             'date'    => $date,
             'rows'    => $this->itemScheduleRows($date, $stageId),
             'summary' => $this->itemScheduleSummary(),
+            ...$this->brandingData(),
         ])->download($this->slug().'-item-schedule.pdf');
     }
 
@@ -840,6 +873,7 @@ class FestReportService
             'event'     => $this->event,
             'school'    => $school,
             'conflicts' => $conflicts,
+            ...$this->brandingData(),
         ])->download($this->slug()."-clash-{$school->id}.pdf");
     }
 
@@ -874,6 +908,7 @@ class FestReportService
         return Pdf::loadView('fest.reports.promotion-sheet', [
             'event'  => $this->event,
             'quals'  => $quals,
+            ...$this->brandingData(),
         ])->download($this->slug().'-promotions.pdf');
     }
 
@@ -974,6 +1009,7 @@ class FestReportService
         return Pdf::loadView('fest.reports.admit-cards', [
             'event'        => $this->event,
             'participants' => $participants,
+            ...$this->brandingData(),
         ])->download($this->slug().'-admit-cards.pdf');
     }
 
@@ -983,6 +1019,7 @@ class FestReportService
             'event'   => $this->event,
             'schools' => $this->schoolRankingRows(),
             'title'   => 'Sahodaya School Ranking',
+            ...$this->brandingData(),
         ])->download($this->slug().'-sahodaya-ranking.pdf');
     }
 

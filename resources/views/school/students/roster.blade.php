@@ -9,6 +9,7 @@ th,td{border:1px solid #cbd5e1;padding:3px 4px;vertical-align:top}
 th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
 </style>
 </head><body>
+@include('partials.pdf-branding-header', ['orgName' => $orgName ?? 'Sahodaya', 'logoSrc' => $logoSrc ?? null])
 <h2>{{ $school->name }}</h2>
 <p class="meta">Student roster — generated {{ now()->format('d M Y') }}</p>
 <table>

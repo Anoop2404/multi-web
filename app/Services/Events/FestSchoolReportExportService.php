@@ -5,6 +5,7 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\Tenant;
 use App\Support\ExcelExport;
+use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -12,6 +13,21 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FestSchoolReportExportService
 {
+    /**
+     * Sahodaya branding (org name + logo data URI) for PDF report headers.
+     *
+     * @return array{orgName: string, logoSrc: ?string}
+     */
+    private function brandingData(FestEvent $event): array
+    {
+        $sahodaya = Tenant::find($event->tenant_id);
+
+        return [
+            'orgName' => $sahodaya?->name ?? 'Sahodaya',
+            'logoSrc' => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
+        ];
+    }
+
     public function registrationRegisterPdf(
         FestEvent $event,
         Tenant $school,
@@ -25,6 +41,7 @@ class FestSchoolReportExportService
             'school'  => $school,
             'rows'    => $data['rows'],
             'summary' => $data['school_summaries'][0] ?? null,
+            ...$this->brandingData($event),
         ])->setPaper('a4', 'landscape')->download("{$slug}-registration-register.pdf");
     }
 
@@ -42,6 +59,7 @@ class FestSchoolReportExportService
             'school'  => $school,
             'summary' => $analytics->headRegistrationSummary(),
             'rows'    => $analytics->headWiseParticipantRows($headId),
+            ...$this->brandingData($event),
         ])->setPaper('a4', 'landscape')->download("{$slug}-head-wise-participants.pdf");
     }
 
@@ -60,6 +78,7 @@ class FestSchoolReportExportService
             'school' => $school,
             'item'   => $item,
             'rows'   => $rows,
+            ...$this->brandingData($event),
         ])->download("{$slug}-{$itemSlug}-participants.pdf");
     }
 
@@ -94,6 +113,7 @@ class FestSchoolReportExportService
             'event'  => $event,
             'school' => $school,
             'rows'   => $rows,
+            ...$this->brandingData($event),
         ])->download("{$slug}-discipline-participation.pdf");
     }
 
@@ -106,6 +126,7 @@ class FestSchoolReportExportService
             'school' => $school,
             'used'   => $used,
             'limits' => $limits,
+            ...$this->brandingData($event),
         ])->download("{$slug}-participation-limits.pdf");
     }
 
@@ -118,6 +139,7 @@ class FestSchoolReportExportService
             'school'  => $school,
             'rows'    => $rows,
             'summary' => $summary,
+            ...$this->brandingData($event),
         ])->setPaper('a4', 'landscape')->download("{$slug}-mark-entry-status.pdf");
     }
 
@@ -137,6 +159,7 @@ class FestSchoolReportExportService
             'headSummary' => $headSummary,
             'rows'        => $rows,
             'totals'      => $totals,
+            ...$this->brandingData($event),
         ])->setPaper('a4', 'landscape')->download("{$slug}-item-registration-counts.pdf");
     }
 

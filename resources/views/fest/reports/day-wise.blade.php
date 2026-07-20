@@ -2,6 +2,8 @@
 <html><head><meta charset="utf-8"><title>Day Schedule</title>
 <style>body{font-family:DejaVu Sans,sans-serif;font-size:10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px}th{background:#f3f4f6}</style>
 </head><body>
+@include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
+
 <h2 style="text-align:center">{{ $event->title }} — Schedule for {{ $date }}</h2>
 @if(($audience ?? 'staff') === 'public')
 <p style="text-align:center;color:#666">Public schedule — participant identity hidden until results published.</p>

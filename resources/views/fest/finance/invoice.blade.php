@@ -18,7 +18,7 @@ th{background:#1d3557;color:#fff}
     $sl = 0;
 @endphp
 <div class="header">
-    <h2>{{ $sahodaya->name }}</h2>
+    @include('partials.pdf-branding-header', ['orgName' => $sahodaya->name ?? 'Sahodaya', 'logoSrc' => $logoSrc ?? null])
     <p>Fest Participation Invoice</p>
     <p><strong>{{ $event->title }}</strong></p>
 </div>

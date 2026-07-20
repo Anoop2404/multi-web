@@ -19,6 +19,7 @@ use App\Models\Tenant;
 use App\Support\ExcelExport;
 use App\Support\FestIdCardTemplates;
 use App\Services\Events\FestIdCardService;
+use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -26,6 +27,21 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class FestEventReportAnalyticsService
 {
     public function __construct(public FestEvent $event) {}
+
+    /**
+     * Sahodaya branding (org name + logo data URI) for PDF report headers.
+     *
+     * @return array{orgName: string, logoSrc: ?string}
+     */
+    private function brandingData(): array
+    {
+        $sahodaya = Tenant::find($this->event->tenant_id);
+
+        return [
+            'orgName' => $sahodaya?->name ?? 'Sahodaya',
+            'logoSrc' => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
+        ];
+    }
 
     /** @return list<array<string, mixed>> */
     public function disciplineRegistrationRows(?string $schoolId = null): array
@@ -1066,6 +1082,7 @@ class FestEventReportAnalyticsService
         return Pdf::loadView('fest.reports.team-squads', [
             'event' => $this->event,
             'rows'  => $this->teamSquadRows($schoolId),
+            ...$this->brandingData(),
         ])->download(str($this->event->title)->slug()->limit(40).'-team-squads.pdf');
     }
 
@@ -1074,6 +1091,7 @@ class FestEventReportAnalyticsService
         return Pdf::loadView('fest.reports.medal-tally', [
             'event' => $this->event,
             'rows'  => $this->medalTallyBySchool(),
+            ...$this->brandingData(),
         ])->download(str($this->event->title)->slug()->limit(40).'-medal-tally.pdf');
     }
 
@@ -1231,12 +1249,13 @@ class FestEventReportAnalyticsService
         $headSuffix = $headId ? "-head-{$headId}" : '-all-heads';
 
         return Pdf::loadView($view, [
-            'cards'       => [],
-            'sections'    => $sections,
-            'clusterName' => $cluster?->name ?? 'Sahodaya',
-            'eventTitle'  => $this->event->title,
-            'audience'    => 'student',
-            'showTitle'   => true,
+            'cards'          => [],
+            'sections'       => $sections,
+            'clusterName'    => $cluster?->name ?? 'Sahodaya',
+            'clusterLogoSrc' => $cluster ? TenantBranding::logoEmbedSrc($cluster) : null,
+            'eventTitle'     => $this->event->title,
+            'audience'       => 'student',
+            'showTitle'      => true,
         ])->download("{$slug}{$headSuffix}-id-cards.pdf");
     }
 

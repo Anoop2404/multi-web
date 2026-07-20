@@ -55,6 +55,12 @@
         .sign-label { font-size: 10px; color: #64748b; margin-top: 2px; }
         .uuid { text-align: center; font-size: 9px; color: #94a3b8; margin-top: 16px; }
         .qr-box { position: absolute; bottom: 18px; right: 18px; }
+        .logo-overlay {
+            position: absolute; top: 16px; left: 16px; display: flex; align-items: center;
+            gap: 6px; background: rgba(255,255,255,0.72); border-radius: 4px; padding: 4px 8px;
+        }
+        .logo-overlay img { height: 40px; width: auto; max-width: 40px; object-fit: contain; }
+        .logo-overlay span { font-size: 9px; font-weight: 700; color: #1e293b; max-width: 120px; line-height: 1.2; }
 
         /* Legacy fixed design (used when no template is configured) */
         .cert-legacy {
@@ -106,6 +112,18 @@
 
     @if($hasBackground)
         <div class="page has-background" style="background-image:url('{{ $backgroundUrl }}');">
+            {{-- Sahodaya branding is otherwise entirely dependent on the uploaded
+                 background image, which may not carry any logo/name of its own.
+                 Keep a small, unobtrusive overlay so branding is always present. --}}
+            @if(!empty($logoUrl) || !empty($sahodaya?->name))
+                <div class="logo-overlay">
+                    @if(!empty($logoUrl))
+                        <img src="{{ $logoUrl }}" alt="">
+                    @endif
+                    <span>{{ $fieldValues['sahodaya_name'] ?? ($sahodaya->name ?? '') }}</span>
+                </div>
+            @endif
+
             @if(! $showParticipationLabel)
                 @php $c = $layout['participation_label_cover'] ?? []; @endphp
                 <div class="overlay-field" style="top:{{ $c['top'] ?? 28 }}%;left:{{ $c['left'] ?? 18 }}%;width:{{ $c['width'] ?? 64 }}%;height:{{ $c['height'] ?? 7 }}%;background:#f7f3e8;border-radius:2px;"></div>

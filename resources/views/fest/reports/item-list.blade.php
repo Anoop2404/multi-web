@@ -7,6 +7,8 @@ h2{text-align:center;margin:0 0 4px}
 table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:3px 4px}th{background:#f3f4f6}
 </style>
 </head><body>
+@include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
+
 <h2>{{ $event->title }} — Item registration counts</h2>
 <p class="meta">All schools · submitted and approved registrations</p>
 <table>

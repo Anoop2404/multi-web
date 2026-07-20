@@ -14,7 +14,7 @@
                         🖨️ Mark Entry Sheet PDF
                     </a>
                     <a v-if="cumulativeSheetUrl" :href="cumulativeSheetUrl" target="_blank" class="btn-secondary text-xs">
-                        Cumulative Sheet ↓
+                        Digital Sum Sheet ↓
                     </a>
                     <Link :href="importUrl" class="btn-primary text-xs">
                         Import Marks
@@ -96,17 +96,28 @@
                 </div>
             </div>
 
-            <!-- Column (criteria) configuration panel -->
-            <div v-if="showColumnConfig" class="border-t border-slate-100 pt-3 space-y-3">
-                <p class="text-xs text-slate-500">
-                    Define the mark-entry columns for this item (e.g. "Judge 1", "Content", "Presentation"). The entry
-                    table and printed mark sheet will show exactly these columns plus a Total.
-                </p>
+            <!-- Judge count + paper column configuration panel -->
+            <div v-if="showColumnConfig" class="border-t border-slate-100 pt-3 space-y-4">
+                <div class="flex items-center gap-3">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        No. of Judges
+                    </label>
+                    <input v-model.number="judgeCountDraft" type="number" min="1" max="20"
+                           class="field text-xs !py-1 w-20">
+                    <p class="text-[11px] text-slate-400">
+                        1 = single evaluator, entered directly online. 2+ = each judge gets their own printed sheet,
+                        plus a Sum Sheet, and you type each judge's paper subtotal into the table below.
+                    </p>
+                </div>
 
                 <div class="space-y-2">
+                    <p class="text-xs text-slate-500">
+                        Scoring columns printed on each judge's paper sheet (e.g. "Content", "Presentation"). SL NO,
+                        CHEST NO. and TOTAL are always included automatically — only name the columns in between.
+                    </p>
                     <div v-for="(row, idx) in columnDraft" :key="row._key" class="flex items-center gap-2">
                         <span class="text-[10px] font-bold text-slate-400 w-5">{{ idx + 1 }}.</span>
-                        <input v-model="row.label" type="text" placeholder="Column name (e.g. Judge 1)"
+                        <input v-model="row.label" type="text" placeholder="Column name (e.g. Content)"
                                class="field text-xs flex-1">
                         <input v-model.number="row.max_score" type="number" min="0.5" step="0.5" placeholder="Max"
                                class="field text-xs w-20">
@@ -115,15 +126,15 @@
                             Remove
                         </button>
                     </div>
-                </div>
-
-                <div class="flex items-center justify-between gap-2 pt-1">
                     <button type="button" class="btn-secondary text-xs !py-1 !px-3" @click="addColumnRow">
                         + Add Column
                     </button>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
                     <button type="button" class="btn-primary text-xs !py-1.5 !px-4"
                             :disabled="savingColumns" @click="saveColumnConfig">
-                        {{ savingColumns ? 'Saving…' : 'Save Columns' }}
+                        {{ savingColumns ? 'Saving…' : 'Save Settings' }}
                     </button>
                 </div>
             </div>
@@ -187,9 +198,9 @@
                                 <th class="p-3.5 w-32">Attendance</th>
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
                                 <th class="p-3.5 w-44">Rank</th>
-                                <template v-if="hasCriteria">
-                                    <th v-for="c in criteria" :key="c.id" class="p-3.5 w-20">{{ c.label }}</th>
-                                    <th class="p-3.5 w-24">Total</th>
+                                <template v-if="hasJudgePanel">
+                                    <th v-for="j in judgeNumbers" :key="j" class="p-3.5 w-20">Judge {{ j }}</th>
+                                    <th class="p-3.5 w-24">Grand Total</th>
                                 </template>
                                 <th v-else class="p-3.5 w-28">Marks / Score</th>
                                 <th v-if="showGradeColumn" class="p-3.5 w-24">Grade</th>
@@ -260,15 +271,15 @@
                                     </select>
                                 </td>
 
-                                <!-- Criteria columns + computed Total -->
-                                <template v-if="hasCriteria">
-                                    <td v-for="c in criteria" :key="c.id" class="p-3.5">
-                                        <input v-model.number="criteriaForms[participant.id][c.id]" type="number" min="0" :max="c.max_score || undefined" step="0.5"
+                                <!-- Per-judge subtotal columns + computed Grand Total -->
+                                <template v-if="hasJudgePanel">
+                                    <td v-for="j in judgeNumbers" :key="j" class="p-3.5">
+                                        <input v-model.number="judgeForms[participant.id][j]" type="number" min="0" step="0.5"
                                                class="field text-xs tabular-nums w-16" placeholder="0"
                                                :disabled="isAbsent(participant, item)">
                                     </td>
                                     <td class="p-3.5 font-mono font-bold text-slate-900 tabular-nums">
-                                        {{ participantTotal(participant.id) }}
+                                        {{ participantGrandTotal(participant.id) }}
                                     </td>
                                 </template>
 
@@ -338,7 +349,8 @@ const props = defineProps({
     itemHeads: { type: Array, default: () => [] },
     initialItemCriteria: { type: Array, default: () => [] },
     criteria: { type: Array, default: () => [] },
-    criterionScores: { type: Object, default: () => ({}) },
+    judgeCount: { type: Number, default: 1 },
+    judgeScores: { type: Object, default: () => ({}) },
     cumulativeSheetUrl: { type: String, default: null },
     sheetUploads: { type: Array, default: () => [] },
 });
@@ -428,26 +440,32 @@ for (const reg of props.registrations ?? []) {
     }
 }
 
-// Multi-criteria (judge column) scoring
-const hasCriteria = computed(() => (props.criteria ?? []).length > 0);
-const criteriaForms = reactive({});
+// Judge-panel scoring: one input column per judge (that judge's paper
+// subtotal), plus a computed Grand Total (sum across judges).
+const hasJudgePanel = computed(() => (props.judgeCount ?? 1) > 1);
+const judgeNumbers = computed(() => {
+    const n = props.judgeCount ?? 1;
+    return Array.from({ length: n }, (_, i) => i + 1);
+});
+
+const judgeForms = reactive({});
 for (const reg of props.registrations ?? []) {
     for (const p of reg.participants ?? []) {
-        const existing = props.criterionScores?.[p.id] ?? {};
+        const existing = props.judgeScores?.[p.id] ?? {};
         const row = {};
-        for (const c of props.criteria ?? []) {
-            row[c.id] = existing[c.id] ?? null;
+        for (let j = 1; j <= (props.judgeCount ?? 1); j++) {
+            row[j] = existing[j] ?? null;
         }
-        criteriaForms[p.id] = row;
+        judgeForms[p.id] = row;
     }
 }
 
-function participantTotal(participantId) {
-    const row = criteriaForms[participantId] ?? {};
+function participantGrandTotal(participantId) {
+    const row = judgeForms[participantId] ?? {};
     let total = 0;
     let any = false;
-    for (const c of props.criteria ?? []) {
-        const v = row[c.id];
+    for (let j = 1; j <= (props.judgeCount ?? 1); j++) {
+        const v = row[j];
         if (v !== null && v !== '' && v !== undefined) {
             total += Number(v);
             any = true;
@@ -456,14 +474,15 @@ function participantTotal(participantId) {
     return any ? total : '—';
 }
 
-function criteriaScoresPayload(participantId) {
-    return { ...(criteriaForms[participantId] ?? {}) };
+function judgeScoresPayload(participantId) {
+    return { ...(judgeForms[participantId] ?? {}) };
 }
 
-// Column (criteria) configuration
+// Judge count + paper-column configuration
 let draftKeySeq = 0;
 const showColumnConfig = ref(false);
 const savingColumns = ref(false);
+const judgeCountDraft = ref(props.judgeCount ?? 1);
 const columnDraft = reactive(
     (props.criteria ?? []).map((c) => ({
         _key: draftKeySeq++,
@@ -490,7 +509,7 @@ function saveColumnConfig() {
 
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria`,
-        { criteria: rows },
+        { judge_count: judgeCountDraft.value || 1, criteria: rows },
         {
             preserveScroll: true,
             onFinish: () => {
@@ -551,8 +570,8 @@ const bulkSaving = ref(false);
 
 function payloadFor(participant, item) {
     const payload = buildMarkPayload(participant, item, markForms);
-    if (hasCriteria.value) {
-        payload.criteria_scores = criteriaScoresPayload(participant.id);
+    if (hasJudgePanel.value) {
+        payload.judge_scores = judgeScoresPayload(participant.id);
     }
     return payload;
 }

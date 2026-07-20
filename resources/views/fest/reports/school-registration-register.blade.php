@@ -10,6 +10,8 @@ th,td{border:1px solid #cbd5e1;padding:3px 4px;vertical-align:top}
 th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
 </style>
 </head><body>
+@include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
+
 <h2>{{ $event->title }}</h2>
 <p class="meta">{{ strtoupper($school->name) }} — Registration &amp; fees register</p>
 @if($summary)

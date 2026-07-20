@@ -19,7 +19,7 @@ table.data th{background:#1d3557;color:#fff;text-align:left}
     $sl = 0;
 @endphp
 <div class="header">
-    <h2 style="margin:0">{{ $sahodaya->name }}</h2>
+    @include('partials.pdf-branding-header', ['orgName' => $sahodaya->name ?? 'Sahodaya', 'logoSrc' => $logoSrc ?? null])
     <p style="margin:4px 0 0">Festival Participation — Payment Demand Notice</p>
     <p style="margin:4px 0 0"><strong>{{ $event->title }}</strong></p>
 </div>

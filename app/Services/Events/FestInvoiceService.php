@@ -7,6 +7,7 @@ use App\Models\FestEventInvoice;
 use App\Models\FestSchoolEventFee;
 use App\Models\Tenant;
 use App\Services\Events\FestItemFeeResolver;
+use App\Support\TenantBranding;
 
 class FestInvoiceService
 {
@@ -211,6 +212,7 @@ class FestInvoiceService
             'event' => $event,
             'invoice' => $invoice,
             'sahodaya' => $sahodaya,
+            'logoSrc' => TenantBranding::logoEmbedSrc($sahodaya),
             'participationLines' => $this->participationLines($event, $invoice),
         ];
     }

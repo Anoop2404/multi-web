@@ -7,6 +7,8 @@ table{width:100%;border-collapse:collapse;margin-bottom:12px}
 th,td{border:1px solid #ccc;padding:3px 4px} th{background:#f3f4f6}
 .section{font-weight:bold;margin:8px 0 4px}
 </style></head><body>
+@include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
+
 <h2>{{ $event->title }}</h2>
 <p class="meta">{{ strtoupper($school->name) }} — Item registration &amp; fees</p>
 

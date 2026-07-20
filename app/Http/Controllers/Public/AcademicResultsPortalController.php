@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Models\Topper;
 use App\Services\BoardResults\RankingEngine;
 use App\Support\AcademicYear;
+use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -125,6 +126,7 @@ class AcademicResultsPortalController extends Controller
 
         return Pdf::loadView('public.academic-results.merit-list-pdf', [
             'sahodaya' => $tenant,
+            'logoSrc' => TenantBranding::logoEmbedSrc($tenant),
             'year' => $year,
             'class' => $class,
             'toppers' => $toppers,

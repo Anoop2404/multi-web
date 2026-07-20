@@ -18,6 +18,7 @@ use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\EventContext;
 use App\Services\Events\FestPublicVisibilityService;
 use App\Services\Events\FestWinnerPosterService;
+use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -238,10 +239,12 @@ class FestPortalController extends Controller
         $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($item->title)) ?: 'item';
 
         return Pdf::loadView('fest.reports.item-wise', [
-            'event' => $event,
-            'item'  => $item,
-            'marks' => $marks,
-            'topN'  => $marks->count(),
+            'event'   => $event,
+            'item'    => $item,
+            'marks'   => $marks,
+            'topN'    => $marks->count(),
+            'orgName' => $tenant->name ?? 'Sahodaya',
+            'logoSrc' => TenantBranding::logoEmbedSrc($tenant),
         ])->download("{$slug}-results.pdf");
     }
 

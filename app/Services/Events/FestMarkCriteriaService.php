@@ -6,20 +6,79 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMarkCriterion;
 use App\Models\FestMarkCriterionScore;
+use App\Models\FestMarkJudgeScore;
 use Illuminate\Support\Collection;
 
 /**
- * Configurable multi-column judge/criteria mark entry.
+ * Judge-panel mark entry.
  *
- * An item can optionally define N scoring criteria (e.g. "Content", "Voice
- * modulation", "Time management" for an elocution item, or "Judge 1",
- * "Judge 2", "Judge 3" for a panel-judged item). When criteria exist for an
- * item, Mark Entry renders one input column per criterion instead of a
- * single free-form score, and the final mark is the sum of the criterion
- * scores.
+ * An item can define N named scoring columns (e.g. "Content", "Voice
+ * modulation", "Time management") that are printed on a blank paper sheet
+ * for each judge to fill in by hand, and a judge count. When judge count
+ * > 1, the printed mark-entry sheet produces one such blank sheet per judge
+ * plus a consolidated Sum Sheet, and online Mark Entry shows one input
+ * column per judge — that judge's paper subtotal — instead of per-criterion
+ * inputs. The final mark saved to FestMark.score is the sum across judges.
  */
 class FestMarkCriteriaService
 {
+    public function judgeCountForItem(FestEventItem $item): int
+    {
+        return max(1, (int) ($item->mark_judge_count ?? 1));
+    }
+
+    public function setJudgeCount(FestEventItem $item, int $count): void
+    {
+        $item->update(['mark_judge_count' => max(1, $count)]);
+    }
+
+    public function hasJudgePanel(FestEventItem $item): bool
+    {
+        return $this->judgeCountForItem($item) > 1;
+    }
+
+    /**
+     * @return array<int, array<int, float|null>> participant_id => [judge_number => score]
+     */
+    public function judgeScoresForItem(FestEventItem $item): array
+    {
+        $rows = FestMarkJudgeScore::where('item_id', $item->id)
+            ->get(['participant_id', 'judge_number', 'score']);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row->participant_id][$row->judge_number] = $row->score === null ? null : (float) $row->score;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Persist one participant's per-judge subtotals and return the grand
+     * total (sum across judges), which becomes FestMark.score.
+     *
+     * @param array<int|string, mixed> $scores judge_number => score
+     */
+    public function saveParticipantJudgeScores(FestEventItem $item, int $participantId, array $scores): float
+    {
+        $judgeCount = $this->judgeCountForItem($item);
+        $total = 0.0;
+
+        for ($judgeNumber = 1; $judgeNumber <= $judgeCount; $judgeNumber++) {
+            $raw = $scores[$judgeNumber] ?? null;
+            $value = ($raw === null || $raw === '') ? null : (float) $raw;
+
+            FestMarkJudgeScore::updateOrCreate(
+                ['item_id' => $item->id, 'participant_id' => $participantId, 'judge_number' => $judgeNumber],
+                ['score' => $value]
+            );
+
+            $total += (float) ($value ?? 0);
+        }
+
+        return round($total, 2);
+    }
+
     /** @return Collection<int, FestMarkCriterion> */
     public function criteriaForItem(FestEventItem $item): Collection
     {

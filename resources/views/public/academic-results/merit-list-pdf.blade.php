@@ -13,7 +13,7 @@
     </style>
 </head>
 <body>
-<h1>{{ $sahodaya->name }} — Merit List</h1>
+@include('partials.pdf-branding-header', ['orgName' => ($sahodaya->name ?? 'Sahodaya') . ' — Merit List', 'logoSrc' => $logoSrc ?? null])
 <h2>Academic year {{ $year }}@if($class) · Class {{ $class }}@endif</h2>
 <table>
     <thead>

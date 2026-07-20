@@ -19,7 +19,7 @@ class FestEventItem extends Model
         'fee_amount', 'is_enabled', 'is_mandatory', 'head_id', 'area_id', 'reg_start', 'reg_end',
         'competition_start', 'competition_end', 'competition_time',
         'results_published_at', 'item_reg_id_start', 'chest_no_start',
-        'quota_eligible', 'tiebreak_mode', 'tiebreak_secondary',
+        'quota_eligible', 'tiebreak_mode', 'tiebreak_secondary', 'mark_judge_count',
     ];
 
     protected $casts = [

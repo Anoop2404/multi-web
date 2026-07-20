@@ -7,6 +7,7 @@ use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Models\Tenant;
 use App\Models\UploadedFileBackup;
 use App\Jobs\ImportStudentsJob;
 use App\Services\Audit\DataChangeLogger;
@@ -19,6 +20,7 @@ use App\Services\Students\StudentRecordCreator;
 use App\Services\Students\StudentRegistrationNumberGenerator;
 use App\Services\Students\StudentSportsProfileService;
 use App\Support\StudentPhotoNaming;
+use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -668,9 +670,13 @@ class StudentController extends SchoolAdminController
         $prefix = $this->school->school_prefix ?: 'school';
         $filename = "{$prefix}-students-".now()->format('Y-m-d').'.pdf';
 
+        $sahodaya = Tenant::find($this->school->parent_id);
+
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('school.students.roster', [
-            'school' => $this->school,
-            'rows'   => $rows,
+            'school'   => $this->school,
+            'rows'     => $rows,
+            'orgName'  => $sahodaya?->name ?? 'Sahodaya',
+            'logoSrc'  => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
         ])->setPaper('a4', 'landscape')->download($filename);
     }
 

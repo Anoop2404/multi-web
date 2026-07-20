@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SchoolAdmin;
 use App\Http\Controllers\Concerns\ManagesTeacherPortalCredentials;
 use App\Models\SchoolClass;
 use App\Models\Teacher;
+use App\Models\Tenant;
 use App\Models\UploadedFileBackup;
 use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
@@ -17,6 +18,7 @@ use App\Services\Portal\TeacherPortalProvisioner;
 use App\Services\Spreadsheet\SpreadsheetReader;
 use App\Services\Spreadsheet\SpreadsheetWriter;
 use App\Support\AcademicYear;
+use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -191,9 +193,13 @@ class TeacherController extends SchoolAdminController
         $prefix = $this->school->school_prefix ?: 'school';
         $filename = "{$prefix}-teachers-".now()->format('Y-m-d').".pdf";
 
+        $sahodaya = Tenant::find($this->school->parent_id);
+
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('school.teachers.roster', [
-            'school' => $this->school,
-            'rows'   => $rows,
+            'school'  => $this->school,
+            'rows'    => $rows,
+            'orgName' => $sahodaya?->name ?? 'Sahodaya',
+            'logoSrc' => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
         ])->setPaper('a4', 'landscape')->download($filename);
     }
 

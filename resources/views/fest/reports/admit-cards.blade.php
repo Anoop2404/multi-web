@@ -6,6 +6,8 @@ body{font-family:DejaVu Sans,sans-serif;font-size:11px}
 h3{margin:0 0 6px;color:#1e3a8a;font-size:14px}
 .meta{font-size:10px;color:#475569}
 </style></head><body>
+@include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
+
 <h2 style="text-align:center">{{ $event->title }} — Participant Admit Cards</h2>
 @foreach($participants as $p)
 <div class="card">
