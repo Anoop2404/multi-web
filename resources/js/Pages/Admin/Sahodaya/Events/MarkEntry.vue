@@ -303,9 +303,9 @@ const props = defineProps({
     initialItemCriteria: { type: Array, default: () => [] },
 });
 
-const displayCtx = useFestMarkEntryDisplay(props);
+const isSports = computed(() => props.event?.event_type === 'sports');
+const displayCtx = useFestMarkEntryDisplay(props, isSports);
 const {
-    isSports,
     filterDescription,
     cumulativeSheetUrl,
     importUrl,
