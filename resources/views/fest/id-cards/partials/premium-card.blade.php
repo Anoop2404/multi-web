@@ -62,25 +62,25 @@
                         <td class="pcard__meta-icon">📅</td>
                         <td class="pcard__meta-label">Date</td>
                         <td class="pcard__meta-sep">:</td>
-                        <td class="pcard__meta-val">{{ $card['event_date'] ?? '25 Aug 2025' }}</td>
+                        <td class="pcard__meta-val">{{ $card['event_date'] ?? '—' }}</td>
                     </tr>
                     <tr>
                         <td class="pcard__meta-icon">📍</td>
                         <td class="pcard__meta-label">Venue</td>
                         <td class="pcard__meta-sep">:</td>
-                        <td class="pcard__meta-val">{{ $card['venue'] ?? 'Govt. HSS, Kannur' }}</td>
+                        <td class="pcard__meta-val">{{ $card['venue'] ?? '—' }}</td>
                     </tr>
                     <tr>
                         <td class="pcard__meta-icon">🏫</td>
                         <td class="pcard__meta-label">Sahodaya</td>
                         <td class="pcard__meta-sep">:</td>
-                        <td class="pcard__meta-val">{{ $card['sahodaya_name'] ?? 'Kannur Sahodaya' }}</td>
+                        <td class="pcard__meta-val">{{ $card['sahodaya_name'] ?? ($clusterName ?? 'Sahodaya') }}</td>
                     </tr>
                     <tr>
                         <td class="pcard__meta-icon">🎯</td>
                         <td class="pcard__meta-label">Category</td>
                         <td class="pcard__meta-sep">:</td>
-                        <td class="pcard__meta-val">{{ $card['category'] ?? ($card['class_category'] ?? 'GK Quiz Category 2') }}</td>
+                        <td class="pcard__meta-val">{{ $card['category'] ?? ($card['class_category'] ?? '—') }}</td>
                     </tr>
                 </table>
             </div>
@@ -97,10 +97,10 @@
     <footer class="pcard__footer">
         <div class="pcard__school-pill">
             <span class="pcard__school-icon">🏫</span>
-            <span class="pcard__school-text">{{ $card['subtitle'] ?? 'BHARATIYA VIDYA BHAVAN, KANNUR' }}</span>
+            <span class="pcard__school-text">{{ $card['subtitle'] ?? ($card['school_name'] ?? '—') }}</span>
         </div>
         <div class="pcard__role-pill">
-            <span>PARTICIPANT</span>
+            <span>{{ $card['role_label'] ?? 'PARTICIPANT' }}</span>
         </div>
     </footer>
 </div>

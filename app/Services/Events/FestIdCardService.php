@@ -651,10 +651,10 @@ class FestIdCardService
         $photoUrl = $this->portraitUrl($p) ?: $this->defaultAvatarDataUri($gender);
         $photoSrc = $this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender);
 
-        $eventDate = $event->starts_at ? $event->starts_at->format('d M Y') : '25 Aug 2025';
-        $venue = $event->venue_name ?: 'Govt. HSS, Kannur';
-        $sahodayaName = 'Kannur Sahodaya';
-        $category = $itemLabel ?: ($classCategory ?: 'GK Quiz Category 2');
+        $eventDate = $event->starts_at ? $event->starts_at->format('d M Y') : ($event->start_date ? date('d M Y', strtotime($event->start_date)) : '—');
+        $venue = $event->venue_name ?: ($event->venue ?: '—');
+        $sahodayaName = $event->tenant?->name ?? 'Sahodaya';
+        $category = $itemLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : '—'));
 
         return [
             'card_type'       => 'individual',

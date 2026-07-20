@@ -54,25 +54,25 @@
                             <td class="id-card-tile__meta-icon">📅</td>
                             <td class="id-card-tile__meta-label">Date</td>
                             <td class="id-card-tile__meta-sep">:</td>
-                            <td class="id-card-tile__meta-val">{{ card.event_date || '25 Aug 2025' }}</td>
+                            <td class="id-card-tile__meta-val">{{ card.event_date || '—' }}</td>
                         </tr>
                         <tr>
                             <td class="id-card-tile__meta-icon">📍</td>
                             <td class="id-card-tile__meta-label">Venue</td>
                             <td class="id-card-tile__meta-sep">:</td>
-                            <td class="id-card-tile__meta-val">{{ card.venue || 'Govt. HSS, Kannur' }}</td>
+                            <td class="id-card-tile__meta-val">{{ card.venue || '—' }}</td>
                         </tr>
                         <tr>
                             <td class="id-card-tile__meta-icon">🏫</td>
                             <td class="id-card-tile__meta-label">Sahodaya</td>
                             <td class="id-card-tile__meta-sep">:</td>
-                            <td class="id-card-tile__meta-val">{{ card.sahodaya_name || 'Kannur Sahodaya' }}</td>
+                            <td class="id-card-tile__meta-val">{{ card.sahodaya_name || clusterName }}</td>
                         </tr>
                         <tr>
                             <td class="id-card-tile__meta-icon">🎯</td>
                             <td class="id-card-tile__meta-label">Category</td>
                             <td class="id-card-tile__meta-sep">:</td>
-                            <td class="id-card-tile__meta-val">{{ card.category || card.class_category || 'GK Quiz Category 2' }}</td>
+                            <td class="id-card-tile__meta-val">{{ card.category || card.class_category || '—' }}</td>
                         </tr>
                     </table>
                 </div>
@@ -88,10 +88,10 @@
         <footer class="id-card-tile__footer">
             <div class="id-card-tile__school-pill">
                 <span class="id-card-tile__school-icon">🏫</span>
-                <span class="id-card-tile__school-text">{{ card.subtitle || card.school_name || 'BHARATIYA VIDYA BHAVAN, KANNUR' }}</span>
+                <span class="id-card-tile__school-text">{{ card.subtitle || card.school_name || '—' }}</span>
             </div>
             <div class="id-card-tile__role-pill">
-                <span>PARTICIPANT</span>
+                <span>{{ card.role_label || 'PARTICIPANT' }}</span>
             </div>
         </footer>
     </div>
