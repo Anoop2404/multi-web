@@ -492,7 +492,12 @@ class FestEventReportAnalyticsService
                     ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)));
 
             $performers = (clone $performerQuery)->count();
-            $chestAssigned = (clone $performerQuery)->whereNotNull('chest_no')->count();
+            $chestAssigned = (clone $performerQuery)
+                ->where(function ($q) {
+                    $q->whereNotNull('chest_no')
+                      ->orWhereHas('group', fn ($g) => $g->whereNotNull('chest_no'));
+                })
+                ->count();
             $itemRegAssigned = (clone $performerQuery)->whereNotNull('item_registration_number')->count();
 
             $scheduledParticipants = FestSchedule::query()

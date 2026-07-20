@@ -321,6 +321,7 @@ class FestHeadItemNavigationService
     {
         $rows = FestParticipant::query()
             ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
+            ->leftJoin('fest_groups', 'fest_participants.group_id', '=', 'fest_groups.id')
             ->where('fest_registrations.event_id', $event->id)
             ->whereIn('fest_registrations.status', \App\Models\FestRegistration::ACTIVE_STATUSES)
             ->whereNotNull('fest_registrations.item_id')
@@ -329,7 +330,7 @@ class FestHeadItemNavigationService
             ->select([
                 'fest_registrations.item_id',
                 DB::raw('COUNT(*) as participant_count'),
-                DB::raw('SUM(CASE WHEN fest_participants.chest_no IS NOT NULL THEN 1 ELSE 0 END) as chest_assigned'),
+                DB::raw('SUM(CASE WHEN fest_participants.chest_no IS NOT NULL OR fest_groups.chest_no IS NOT NULL THEN 1 ELSE 0 END) as chest_assigned'),
                 DB::raw('SUM(CASE WHEN fest_participants.item_registration_number IS NOT NULL THEN 1 ELSE 0 END) as item_reg_assigned'),
             ])
             ->get();

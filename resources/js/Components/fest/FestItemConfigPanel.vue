@@ -5,12 +5,14 @@
             <p class="section-desc text-xs">
                 {{ isSports
                     ? 'Dates and Sport Event assignment. Fees come from the Sport Event (items inherit rates).'
-                    : 'Override head dates, assign a different head, set fee, or disable this item on the event.' }}
+                    : headsForAssign.length
+                        ? 'Override head dates, assign a different head, set fee, or disable this item on the event.'
+                        : 'Override dates, set fee, or disable this item on the event.' }}
             </p>
         </div>
 
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <FormField :label="isSports ? 'Sport Event' : 'Item head'">
+            <FormField v-if="headsForAssign.length" :label="isSports ? 'Sport Event' : 'Item head'">
                 <select v-model="row.head_id" class="field text-sm">
                     <option :value="null">Unassigned</option>
                     <option v-for="h in headsForAssign" :key="h.id" :value="h.id">{{ h.name }}</option>

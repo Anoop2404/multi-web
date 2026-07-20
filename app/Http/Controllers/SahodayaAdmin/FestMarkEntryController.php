@@ -291,7 +291,7 @@ class FestMarkEntryController extends SahodayaAdminController
         if ($itemId) {
             $query->where('id', $itemId);
         }
-        $items = $query->orderBy('code')->orderBy('title')->get();
+        $items = $query->orderBy('display_order')->orderBy('title')->get();
 
         abort_if($items->isEmpty(), 404, 'No competition items found.');
 

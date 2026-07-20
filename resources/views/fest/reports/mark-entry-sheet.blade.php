@@ -29,7 +29,7 @@
                 <div class="title">{{ $sahodaya->name ?? 'SAHODAYA SCHOOLS COMPLEX' }}</div>
                 <div class="subtitle">{{ $event->title }} — MARK ENTRY & SCORE EVALUATION SHEET</div>
                 <div class="meta">
-                    <strong>ITEM:</strong> {{ $sheet['item']->code ? "[{$sheet['item']->code}] " : '' }}{{ $sheet['item']->title }}
+                    <strong>ITEM:</strong> {{ $sheet['item']->item_code ? "[{$sheet['item']->item_code}] " : '' }}{{ $sheet['item']->title }}
                     @if($sheet['item']->category) &nbsp;|&nbsp; <strong>CATEGORY:</strong> {{ strtoupper($sheet['item']->category) }} @endif
                     &nbsp;|&nbsp; <strong>TOTAL PARTICIPANTS:</strong> {{ count($sheet['rows']) }}
                 </div>
@@ -41,6 +41,7 @@
                         <th class="center" style="width: 30px;">#</th>
                         <th style="width: 90px;">CHEST NO.</th>
                         <th style="width: 110px;">REG NO.</th>
+                        <th>SCHOOL</th>
                         <th class="center" style="width: 100px;">ATTENDANCE</th>
                         <th class="center" style="width: 90px;">MARKS / SCORE</th>
                         <th class="center" style="width: 70px;">GRADE</th>
@@ -58,6 +59,9 @@
                             <td style="font-family: monospace; font-size: 10px; color: #334155;">
                                 {{ $row['reg_no'] ?? '—' }}
                             </td>
+                            <td style="font-size: 10px;">
+                                {{ $row['school'] ?? '—' }}
+                            </td>
                             <td class="center" style="font-size: 9px; color: #475569;">
                                 [ &nbsp; ] P &nbsp;&nbsp; [ &nbsp; ] A
                             </td>
@@ -68,7 +72,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="center" style="padding: 16px; color: #64748b;">
+                            <td colspan="9" class="center" style="padding: 16px; color: #64748b;">
                                 No approved registrations for this item.
                             </td>
                         </tr>
