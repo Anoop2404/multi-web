@@ -3,11 +3,20 @@
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Attendance`" eyebrow="Registration"
                     description="Mark participant attendance by item." />
+        <div class="flex flex-wrap gap-2 mb-4 border-b border-gray-200 pb-3">
+            <button type="button" @click="itemFilter = ''"
+                    :class="itemFilter === '' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-50'"
+                    class="px-3 py-1.5 rounded-lg text-sm font-semibold border">
+                All items
+            </button>
+            <button v-for="item in event.items" :key="item.id" type="button" @click="itemFilter = item.id"
+                    :class="itemFilter === item.id ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border-gray-200 hover:bg-gray-50'"
+                    class="px-3 py-1.5 rounded-lg text-sm font-semibold border">
+                {{ item.title }}
+            </button>
+        </div>
+
         <div class="flex flex-wrap gap-3 mb-4">
-            <select v-model="itemFilter" class="border rounded-lg px-3 py-2 text-sm">
-                <option value="">All items</option>
-                <option v-for="item in event.items" :key="item.id" :value="item.id">{{ item.title }}</option>
-            </select>
             <button v-if="itemFilter" type="button" @click="bulkMark('present')"
                     class="btn-primary px-3 py-2 rounded-lg text-sm">Mark all present</button>
             <button v-if="itemFilter" type="button" @click="bulkMark('absent')"
