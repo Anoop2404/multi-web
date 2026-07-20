@@ -927,6 +927,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/items/{item}/mark-criteria', [FestMarkEntryController::class, 'saveCriteria'])->name('items.mark-criteria.save');
             Route::get('/{event}/reports/mark-entry-sheet', [FestMarkEntryController::class, 'markEntrySheet'])->name('reports.mark-entry-sheet');
             Route::get('/{event}/reports/mark-criteria-sheet', [FestMarkEntryController::class, 'cumulativeSheet'])->name('reports.mark-criteria-sheet');
+            Route::post('/{event}/items/{item}/mark-sheet-uploads', [FestMarkEntryController::class, 'uploadSheet'])->name('items.mark-sheet-uploads.store');
+            Route::get('/{event}/mark-sheet-uploads/{upload}', [FestMarkEntryController::class, 'downloadSheetUpload'])->name('mark-sheet-uploads.download');
+            Route::delete('/{event}/mark-sheet-uploads/{upload}', [FestMarkEntryController::class, 'destroySheetUpload'])->name('mark-sheet-uploads.destroy');
             Route::post('/{event}/items/{item}/auto-rank', [FestMarkEntryController::class, 'autoRankItem'])->name('items.auto-rank');
             Route::get('/{event}/results', [FestResultsController::class, 'show'])->name('results.show');
             Route::post('/{event}/results/publish', [FestResultsController::class, 'publish'])->name('results.publish');

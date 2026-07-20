@@ -23,6 +23,37 @@
             </template>
         </PageHeader>
 
+        <!-- Signed Mark Sheet Upload -->
+        <div v-if="props.selectedItemId" class="card !p-4 mb-5 space-y-3 border border-slate-200">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Signed mark sheet (scanned copy)</h3>
+                <div class="flex items-center gap-2">
+                    <input ref="uploadInput" type="file" accept=".pdf,.jpg,.jpeg,.png" class="text-xs"
+                           @change="onUploadFileChange">
+                    <button type="button" class="btn-secondary text-xs !py-1 !px-3"
+                            :disabled="!uploadFile || uploading" @click="uploadSheet">
+                        {{ uploading ? 'Uploading…' : 'Upload' }}
+                    </button>
+                </div>
+            </div>
+
+            <div v-if="sheetUploads.length" class="divide-y divide-slate-100">
+                <div v-for="u in sheetUploads" :key="u.id" class="flex items-center justify-between gap-3 py-2 text-xs">
+                    <div class="flex items-center gap-2 text-slate-600">
+                        <span>📎</span>
+                        <a :href="u.downloadUrl" target="_blank" class="font-semibold text-indigo-700 hover:underline">
+                            {{ u.original_name || 'Sheet' }}
+                        </a>
+                        <span class="text-slate-400">{{ u.uploaded_by }} · {{ u.uploaded_at }}</span>
+                    </div>
+                    <button type="button" class="text-rose-600 hover:underline font-semibold" @click="deleteUpload(u)">
+                        Remove
+                    </button>
+                </div>
+            </div>
+            <p v-else class="text-xs text-slate-400">No signed sheet uploaded yet for this item.</p>
+        </div>
+
         <!-- Sub Navigation Bar -->
         <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
                            :event="event" active="marks" class="mb-4" />
@@ -118,7 +149,11 @@
                                 <th class="p-3.5 w-32">Attendance</th>
                                 <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
                                 <th class="p-3.5 w-44">Rank</th>
-                                <th class="p-3.5 w-28">Marks / Score</th>
+                                <template v-if="hasCriteria">
+                                    <th v-for="c in criteria" :key="c.id" class="p-3.5 w-20">{{ c.label }}</th>
+                                    <th class="p-3.5 w-24">Total</th>
+                                </template>
+                                <th v-else class="p-3.5 w-28">Marks / Score</th>
                                 <th v-if="showGradeColumn" class="p-3.5 w-24">Grade</th>
                                 <th class="p-3.5 text-right w-24">Actions</th>
                             </tr>
@@ -187,8 +222,20 @@
                                     </select>
                                 </td>
 
+                                <!-- Criteria columns + computed Total -->
+                                <template v-if="hasCriteria">
+                                    <td v-for="c in criteria" :key="c.id" class="p-3.5">
+                                        <input v-model.number="criteriaForms[participant.id][c.id]" type="number" min="0" :max="c.max_score || undefined" step="0.5"
+                                               class="field text-xs tabular-nums w-16" placeholder="0"
+                                               :disabled="isAbsent(participant, item)">
+                                    </td>
+                                    <td class="p-3.5 font-mono font-bold text-slate-900 tabular-nums">
+                                        {{ participantTotal(participant.id) }}
+                                    </td>
+                                </template>
+
                                 <!-- Marks / Score (Optional) -->
-                                <td class="p-3.5">
+                                <td v-else class="p-3.5">
                                     <input v-model.number="markForms[participant.id].score" type="number" min="0" step="0.5"
                                            class="field text-xs font-bold tabular-nums" placeholder="Pts (Optional)"
                                            :disabled="isAbsent(participant, item)">
@@ -255,6 +302,7 @@ const props = defineProps({
     criteria: { type: Array, default: () => [] },
     criterionScores: { type: Object, default: () => ({}) },
     cumulativeSheetUrl: { type: String, default: null },
+    sheetUploads: { type: Array, default: () => [] },
 });
 
 const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/import`);
@@ -342,6 +390,71 @@ for (const reg of props.registrations ?? []) {
     }
 }
 
+// Multi-criteria (judge column) scoring
+const hasCriteria = computed(() => (props.criteria ?? []).length > 0);
+const criteriaForms = reactive({});
+for (const reg of props.registrations ?? []) {
+    for (const p of reg.participants ?? []) {
+        const existing = props.criterionScores?.[p.id] ?? {};
+        const row = {};
+        for (const c of props.criteria ?? []) {
+            row[c.id] = existing[c.id] ?? null;
+        }
+        criteriaForms[p.id] = row;
+    }
+}
+
+function participantTotal(participantId) {
+    const row = criteriaForms[participantId] ?? {};
+    let total = 0;
+    let any = false;
+    for (const c of props.criteria ?? []) {
+        const v = row[c.id];
+        if (v !== null && v !== '' && v !== undefined) {
+            total += Number(v);
+            any = true;
+        }
+    }
+    return any ? total : '—';
+}
+
+function criteriaScoresPayload(participantId) {
+    return { ...(criteriaForms[participantId] ?? {}) };
+}
+
+// Signed mark sheet upload
+const uploadInput = ref(null);
+const uploadFile = ref(null);
+const uploading = ref(false);
+
+function onUploadFileChange(evt) {
+    uploadFile.value = evt.target.files?.[0] ?? null;
+}
+
+function uploadSheet() {
+    if (!uploadFile.value || !props.selectedItemId) return;
+    uploading.value = true;
+    const form = new FormData();
+    form.append('file', uploadFile.value);
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-sheet-uploads`,
+        form,
+        {
+            preserveScroll: true,
+            forceFormData: true,
+            onFinish: () => {
+                uploading.value = false;
+                uploadFile.value = null;
+                if (uploadInput.value) uploadInput.value.value = '';
+            },
+        }
+    );
+}
+
+function deleteUpload(upload) {
+    router.delete(upload.downloadUrl, { preserveScroll: true });
+}
+
 function participantRegNo(participant) {
     return participant.student?.fest_registration_id ?? participant.event_reg_id ?? null;
 }
@@ -358,11 +471,19 @@ const savedIds = ref(new Set());
 const savingIds = ref(new Set());
 const bulkSaving = ref(false);
 
+function payloadFor(participant, item) {
+    const payload = buildMarkPayload(participant, item, markForms);
+    if (hasCriteria.value) {
+        payload.criteria_scores = criteriaScoresPayload(participant.id);
+    }
+    return payload;
+}
+
 function saveMark(participant, item) {
     if (isAbsent(participant, item)) return;
 
     savingIds.value = new Set([...savingIds.value, participant.id]);
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, buildMarkPayload(participant, item, markForms), {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, payloadFor(participant, item), {
         preserveScroll: true,
         onSuccess: () => {
             savedIds.value = new Set([...savedIds.value, participant.id]);
@@ -382,7 +503,7 @@ async function saveAll() {
 
         await new Promise((resolve) => {
             savingIds.value = new Set([...savingIds.value, participant.id]);
-            router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, buildMarkPayload(participant, item, markForms), {
+            router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, payloadFor(participant, item), {
                 preserveScroll: true,
                 onSuccess: () => {
                     savedIds.value = new Set([...savedIds.value, participant.id]);

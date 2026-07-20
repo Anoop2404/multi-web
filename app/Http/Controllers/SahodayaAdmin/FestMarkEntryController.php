@@ -7,6 +7,7 @@ use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
+use App\Models\FestMarkSheetUpload;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Services\Audit\PlatformAuditLogger;
@@ -17,6 +18,7 @@ use App\Services\Events\FestNumberingService;
 use App\Services\Events\FestRankPointService;
 use App\Services\Events\FestSportsAutoRankService;
 use App\Support\FestPageActivity;
+use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 
 class FestMarkEntryController extends SahodayaAdminController
@@ -91,6 +93,7 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $criteria = [];
         $criterionScores = [];
+        $sheetUploads = [];
         $selectedItemModel = $itemId ? FestEventItem::find($itemId) : null;
         if ($selectedItemModel) {
             $criteriaService = app(FestMarkCriteriaService::class);
@@ -98,6 +101,19 @@ class FestMarkEntryController extends SahodayaAdminController
             if ($criteria) {
                 $criterionScores = $criteriaService->scoresForItem($selectedItemModel);
             }
+
+            $sheetUploads = FestMarkSheetUpload::where('item_id', $itemId)
+                ->with('uploadedBy:id,name')
+                ->latest()
+                ->get()
+                ->map(fn (FestMarkSheetUpload $u) => [
+                    'id'            => $u->id,
+                    'original_name' => $u->original_name,
+                    'uploaded_by'   => $u->uploadedBy?->name,
+                    'uploaded_at'   => $u->created_at?->format('d M Y, h:i A'),
+                    'downloadUrl'   => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/mark-sheet-uploads/{$u->id}",
+                ])
+                ->all();
         }
 
         return $this->inertia('Sahodaya/Events/MarkEntry', $this->withEventActivity($event, FestPageActivity::MARKS, [
@@ -114,6 +130,7 @@ class FestMarkEntryController extends SahodayaAdminController
             'childEvents'      => $childEvents,
             'criteria'         => $criteria,
             'criterionScores'  => $criterionScores,
+            'sheetUploads'     => $sheetUploads,
             'cumulativeSheetUrl' => $itemId
                 ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/reports/mark-criteria-sheet?item_id={$itemId}"
                 : null,
@@ -279,9 +296,12 @@ class FestMarkEntryController extends SahodayaAdminController
     }
 
     /**
-     * Generate printable / downloadable Mark Entry Evaluation Sheet PDF.
+     * Printable blank scoring sheet for judges: Sl No, Chest No, one blank
+     * column per configured marking criterion (or a single "Marks / Score"
+     * column when the item has none), and a Total column — nothing else.
+     * Landscape, since the criteria columns can run wide.
      */
-    public function markEntrySheet(Request $request, string $tenantId, FestEvent $event, FestNumberingService $numbering)
+    public function markEntrySheet(Request $request, string $tenantId, FestEvent $event, FestNumberingService $numbering, FestMarkCriteriaService $criteriaService)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
@@ -299,6 +319,7 @@ class FestMarkEntryController extends SahodayaAdminController
 
         foreach ($items as $item) {
             $isGroup = $numbering->isGroupItem($item);
+            $criteria = $criteriaService->criteriaForItem($item);
 
             $participants = FestParticipant::whereHas('registration', fn ($q) => $q
                     ->where('event_id', $event->id)
@@ -318,29 +339,19 @@ class FestMarkEntryController extends SahodayaAdminController
                     }
                     $seenGroups[$p->group_id] = true;
                     $chest = $p->group?->chest_no;
-                    $regNo = $p->student?->reg_no ?? $p->teacher?->reg_no ?? "GRP-{$p->group_id}";
                 } else {
                     $chest = $numbering->effectiveChestNumber($p);
-                    $regNo = $p->student?->reg_no ?? $p->teacher?->reg_no ?? "REG-{$p->id}";
                 }
 
-                $rows[] = [
-                    'chest_no' => $chest,
-                    'reg_no'   => $regNo,
-                    'school'   => strtoupper($p->registration?->school?->name ?? '—'),
-                ];
+                $rows[] = ['chest_no' => $chest];
             }
 
-            usort($rows, function ($a, $b) {
-                if ($a['chest_no'] && $b['chest_no']) {
-                    return (int) $a['chest_no'] <=> (int) $b['chest_no'];
-                }
-                return strcmp($a['reg_no'] ?? '', $b['reg_no'] ?? '');
-            });
+            usort($rows, fn ($a, $b) => (int) ($a['chest_no'] ?? 999999) <=> (int) ($b['chest_no'] ?? 999999));
 
             $sheets[] = [
-                'item' => $item,
-                'rows' => $rows,
+                'item'     => $item,
+                'criteria' => $criteria,
+                'rows'     => $rows,
             ];
         }
 
@@ -348,7 +359,7 @@ class FestMarkEntryController extends SahodayaAdminController
             'sahodaya' => $this->sahodaya,
             'event'    => $event,
             'sheets'   => $sheets,
-        ]);
+        ])->setPaper('a4', 'landscape');
 
         $fileName = $itemId
             ? "mark-entry-sheet-item-{$itemId}.pdf"
@@ -366,5 +377,65 @@ class FestMarkEntryController extends SahodayaAdminController
         $result = $ranker->rankItem($event, $item);
 
         return back()->with('success', "Auto-ranked {$result['ranked']} athlete(s) for {$result['item_title']}.");
+    }
+
+    /**
+     * Attach a scanned photo/PDF of the physically-signed judge mark sheet
+     * to an item, as an audit-trail record. Purely a stored document — no
+     * data is extracted or written to FestMark/FestMarkCriterionScore.
+     */
+    public function uploadSheet(Request $request, string $tenantId, FestEvent $event, FestEventItem $item, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($item->event_id !== $event->id, 404);
+
+        $data = $request->validate([
+            'file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+        ]);
+
+        $path = TenantStorage::storeUploadedFile($data['file'], "fest-mark-sheets/{$event->id}");
+
+        $upload = FestMarkSheetUpload::create([
+            'event_id'            => $event->id,
+            'item_id'             => $item->id,
+            'file_path'           => $path,
+            'original_name'       => $data['file']->getClientOriginalName(),
+            'uploaded_by_user_id' => $request->user()->id,
+        ]);
+
+        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark_sheet.uploaded', "Signed mark sheet uploaded for {$item->title}", [
+            'item_id'   => $item->id,
+            'upload_id' => $upload->id,
+        ]);
+
+        return back()->with('success', 'Signed mark sheet uploaded.');
+    }
+
+    public function downloadSheetUpload(string $tenantId, FestEvent $event, FestMarkSheetUpload $upload)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($upload->event_id !== $event->id, 404);
+
+        $disk = config('filesystems.upload_disk', 'shared');
+        if (in_array($disk, ['s3', 'private'], true)) {
+            return redirect(\Illuminate\Support\Facades\Storage::disk($disk)->temporaryUrl($upload->file_path, now()->addMinutes(15)));
+        }
+
+        return TenantStorage::downloadResponse($this->sahodaya, $upload->file_path);
+    }
+
+    public function destroySheetUpload(string $tenantId, FestEvent $event, FestMarkSheetUpload $upload, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($upload->event_id !== $event->id, 404);
+
+        $itemId = $upload->item_id;
+        $upload->delete();
+
+        $audit->festEvent($event, FestPageActivity::MARKS, 'fest.mark_sheet.deleted', 'Signed mark sheet upload removed', [
+            'item_id' => $itemId,
+        ]);
+
+        return back()->with('success', 'Upload removed.');
     }
 }
