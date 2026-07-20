@@ -113,7 +113,13 @@
                         </td>
                         <td class="p-3 text-right text-xs space-y-1">
                             <button v-if="!isNoFeeDue(row)" @click="recalculateFee(row.id)"
-                                    class="text-slate-500 hover:text-slate-900 font-semibold block mb-1">Recalculate</button>
+                                    title="Refresh this school's fee from current registrations/settings"
+                                    class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900 font-semibold mb-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                                    <path fill-rule="evenodd" d="M15.312 5.312a5.5 5.5 0 0 0-9.201 2.466.75.75 0 0 1-1.453-.373 7 7 0 0 1 11.712-3.138l1.005 1.005V3.5a.75.75 0 0 1 1.5 0V7a.75.75 0 0 1-.75.75h-3.5a.75.75 0 0 1 0-1.5h1.938l-.951-.938ZM4.688 14.688a5.5 5.5 0 0 0 9.201-2.466.75.75 0 1 1 1.453.373 7 7 0 0 1-11.712 3.138l-1.005-1.005V16.5a.75.75 0 0 1-1.5 0V13a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5H3.437l.951.938Z" clip-rule="evenodd" />
+                                </svg>
+                                Refresh
+                            </button>
                             <a v-if="row.fee_receipt?.file_path"
                                :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/school-fees/${row.id}/proof`"
                                target="_blank" rel="noopener"

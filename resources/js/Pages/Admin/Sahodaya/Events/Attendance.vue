@@ -35,24 +35,27 @@
                     <tr>
                         <th class="p-3">Chest</th>
                         <th class="p-3">Participant</th>
+                        <th class="p-3">School</th>
                         <th class="p-3">Item</th>
-                        <th class="p-3">Status</th>
-                        <th class="p-3"></th>
+                        <th class="p-3">Attendance</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="p in filteredParticipants" :key="p.id" class="border-t">
                         <td class="p-3 font-mono text-xs">{{ p.chest_no ?? '—' }}</td>
                         <td class="p-3 font-medium">{{ p.student?.name ?? p.teacher?.name }}</td>
+                        <td class="p-3 text-gray-500">{{ p.registration?.school?.name ?? '—' }}</td>
                         <td class="p-3 text-gray-500">{{ p.registration?.item?.title }}</td>
                         <td class="p-3">
-                            <span v-if="statusFor(p) === 'present'" class="text-green-700 text-xs font-medium">Present</span>
-                            <span v-else-if="statusFor(p) === 'absent'" class="text-red-600 text-xs font-medium">Absent</span>
-                            <span v-else class="text-gray-400 text-xs">Not marked</span>
-                        </td>
-                        <td class="p-3 text-right space-x-2">
-                            <button @click="mark(p, 'present')" class="text-green-600 text-xs">Present</button>
-                            <button @click="mark(p, 'absent')" class="text-red-600 text-xs">Absent</button>
+                            <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
+                                <button @click="mark(p, 'present')"
+                                        :class="statusFor(p) === 'present' ? 'bg-green-600 text-white' : 'bg-white text-green-700 hover:bg-green-50'"
+                                        class="px-3 py-1.5">Present</button>
+                                <button @click="mark(p, 'absent')"
+                                        :class="statusFor(p) === 'absent' ? 'bg-red-600 text-white' : 'bg-white text-red-600 hover:bg-red-50'"
+                                        class="px-3 py-1.5 border-l border-gray-200">Absent</button>
+                            </div>
+                            <span v-if="!statusFor(p)" class="ml-2 text-gray-400 text-xs">Not marked</span>
                         </td>
                     </tr>
                 </tbody>

@@ -22,7 +22,12 @@ class FestAttendanceController extends SahodayaAdminController
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->where('status', 'approved'))
-            ->with(['registration.item', 'student', 'teacher'])
+            // Exclude unfilled standby slots and any row with no actual person
+            // attached (student_id/teacher_id both null) — these aren't real
+            // attendees and were showing up as blank rows with no name.
+            ->where('participant_role', '!=', 'standby')
+            ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
+            ->with(['registration.item', 'registration.school', 'student', 'teacher'])
             ->get();
 
         $attendance = FestAttendance::where('event_id', $event->id)

@@ -174,6 +174,7 @@ class FestPublicVisibilityService
             'name'      => $showName ? ($participant->student?->name ?? $participant->teacher?->name) : null,
             'school'    => $showSchool ? ($participant->registration?->school?->name ?? Tenant::find($participant->registration?->school_id)?->name) : null,
             'order'     => $schedule?->sort_order,
+            'item'      => $participant->registration?->item?->title,
         ];
     }
 

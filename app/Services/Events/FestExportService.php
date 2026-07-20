@@ -87,6 +87,8 @@ class FestExportService
         $rows = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->where('status', 'approved'))
+            ->where('participant_role', '!=', 'standby')
+            ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->with(['student', 'teacher', 'registration.item', 'registration.school'])
             ->get()
             ->sortBy(fn (FestParticipant $p) => $p->registration?->item?->title)

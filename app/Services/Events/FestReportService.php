@@ -312,7 +312,7 @@ class FestReportService
         return $request->input('audience', 'staff') === 'public' ? 'public' : 'staff';
     }
 
-    /** @return list<array{reference: string, name: ?string, school: ?string, order: ?int}> */
+    /** @return list<array{reference: string, name: ?string, school: ?string, order: ?int, item: ?string}> */
     private function participantReportRows($participants, string $audience): array
     {
         $visibility = app(FestPublicVisibilityService::class);
@@ -602,14 +602,27 @@ class FestReportService
             null,
             null,
             true,
-        );
+        )
+            // Unfilled standby slots and rows with no student/teacher attached aren't
+            // real attendees — exclude them so the printed sheet has no blank rows.
+            ->filter(fn ($p) => $p->participant_role !== 'standby' && ($p->student_id || $p->teacher_id))
+            ->values();
 
         $audience = $this->reportAudience($request);
 
+        // Grouped by item — when generated for "All items" this previously dumped
+        // every participant into one undifferentiated list with no indication of
+        // which item they belonged to. Filtering to a single item still works the
+        // same way (one group). Sahodaya name/logo added for print branding.
+        $rowsByItem = collect($this->participantReportRows($participants, $audience))
+            ->groupBy(fn ($row) => $row['item'] ?? 'Item')
+            ->sortKeys();
+
         return Pdf::loadView('fest.reports.attendance-sheet', [
-            'event'    => $this->event,
-            'rows'     => $this->participantReportRows($participants, $audience),
-            'audience' => $audience,
+            'event'      => $this->event,
+            'sahodaya'   => Tenant::find($this->event->tenant_id),
+            'rowsByItem' => $rowsByItem,
+            'audience'   => $audience,
         ])->download($this->slug().'-attendance.pdf');
     }
 
