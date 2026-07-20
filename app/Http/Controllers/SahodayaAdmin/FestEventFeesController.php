@@ -71,7 +71,9 @@ class FestEventFeesController extends SahodayaAdminController
                     'items' => $regs->map(fn ($r) => $r->item?->title)->filter()->values(),
                     'sports_participation' => $sportsParticipation,
                 ];
-            });
+            })
+            ->sortBy(fn ($row) => strtolower($row['school']))
+            ->values();
 
         $summary = [
             'total_due'  => $schoolFees->sum('total_due'),

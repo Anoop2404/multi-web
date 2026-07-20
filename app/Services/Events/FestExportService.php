@@ -5,6 +5,7 @@ namespace App\Services\Events;
 use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestMark;
+use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Models\Tenant;
@@ -69,28 +70,43 @@ class FestExportService
         );
     }
 
+    /**
+     * Every approved participant, not just the ones already marked — previously this
+     * only listed rows already present in fest_attendance, so anyone not yet marked
+     * (the whole point of reviewing this report before/during the event) was silently
+     * missing rather than showing as blank/"Not marked".
+     */
     public function attendance(FestEvent $event): StreamedResponse
     {
-        $event->load('items');
-        $itemTitles = $event->items->pluck('title', 'id');
+        $schools = $this->schoolNames($event);
 
-        $rows = FestAttendance::where('fest_attendance.event_id', $event->id)
-            ->with(['participant.student', 'participant.teacher'])
-            ->join('fest_event_items', 'fest_attendance.item_id', '=', 'fest_event_items.id')
-            ->orderBy('fest_event_items.title')
-            ->select('fest_attendance.*')
+        $attendance = FestAttendance::where('event_id', $event->id)
             ->get()
-            ->map(fn (FestAttendance $a) => [
-                $itemTitles[$a->item_id] ?? '',
-                $a->participant?->student?->name ?? $a->participant?->teacher?->name ?? '',
-                $a->participant?->chest_no ?? '',
-                $a->status,
-                $a->marked_at?->format('Y-m-d H:i') ?? '',
-            ]);
+            ->keyBy(fn (FestAttendance $a) => $a->item_id.'-'.$a->participant_id);
+
+        $rows = FestParticipant::whereHas('registration', fn ($q) => $q
+            ->where('event_id', $event->id)
+            ->where('status', 'approved'))
+            ->with(['student', 'teacher', 'registration.item', 'registration.school'])
+            ->get()
+            ->sortBy(fn (FestParticipant $p) => $p->registration?->item?->title)
+            ->map(function (FestParticipant $p) use ($attendance, $schools) {
+                $a = $attendance->get($p->registration?->item_id.'-'.$p->id);
+
+                return [
+                    $p->registration?->item?->title ?? '',
+                    $p->student?->name ?? $p->teacher?->name ?? '',
+                    $schools[$p->registration?->school_id] ?? $p->registration?->school_id ?? '',
+                    $p->chest_no ?? '',
+                    $a?->status ?? 'Not marked',
+                    $a?->marked_at?->format('Y-m-d H:i') ?? '',
+                ];
+            })
+            ->values();
 
         return ExcelExport::download(
             $this->filename($event, 'attendance'),
-            ['Item', 'Participant', 'Chest No', 'Status', 'Marked At'],
+            ['Item', 'Participant', 'School', 'Chest No', 'Status', 'Marked At'],
             $rows,
         );
     }

@@ -45,10 +45,17 @@
             </div>
         </div>
 
+        <div class="flex items-center justify-between gap-3 mb-3">
+            <input v-model="search" type="search" placeholder="Search school…"
+                   class="field text-sm w-full max-w-xs">
+            <span class="text-xs text-gray-500 whitespace-nowrap">{{ filteredRows.length }} of {{ rows.length }} schools</span>
+        </div>
+
         <div class="card card--flush">
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left">
                     <tr>
+                        <th class="p-3">Sl. No.</th>
                         <th class="p-3">School</th>
                         <th class="p-3">Items</th>
                         <th class="p-3">Breakdown</th>
@@ -58,7 +65,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="row in rows" :key="row.id" class="border-t align-top">
+                    <tr v-for="(row, idx) in filteredRows" :key="row.id" class="border-t align-top">
+                        <td class="p-3 text-gray-400">{{ idx + 1 }}</td>
                         <td class="p-3 font-medium">{{ row.school }}</td>
                         <td class="p-3 text-xs">
                             <template v-if="event.event_type === 'sports' && row.sports_participation">
@@ -91,7 +99,10 @@
                         </td>
                         <td class="p-3 font-semibold">₹{{ row.total_due }}</td>
                         <td class="p-3">
-                            <span :class="statusClass(row.status)" class="text-xs font-semibold px-2 py-0.5 rounded"
+                            <span v-if="isNoFeeDue(row)" class="text-xs font-semibold px-2 py-0.5 rounded bg-gray-50 text-gray-500">
+                                No fee due
+                            </span>
+                            <span v-else :class="statusClass(row.status)" class="text-xs font-semibold px-2 py-0.5 rounded"
                                   :title="row.status === 'rejected' ? row.fee_receipt?.rejection_reason : null">
                                 {{ row.status }}
                             </span>
@@ -101,11 +112,13 @@
                             </p>
                         </td>
                         <td class="p-3 text-right text-xs space-y-1">
-                            <button @click="recalculateFee(row.id)" class="text-slate-500 hover:text-slate-900 font-semibold block mb-1">Recalculate</button>
+                            <button v-if="!isNoFeeDue(row)" @click="recalculateFee(row.id)"
+                                    class="text-slate-500 hover:text-slate-900 font-semibold block mb-1">Recalculate</button>
+                            <a v-if="row.fee_receipt?.file_path"
+                               :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/school-fees/${row.id}/proof`"
+                               target="_blank" rel="noopener"
+                               class="block text-indigo-600 font-semibold">View proof ↗</a>
                             <template v-if="row.status === 'proof_uploaded'">
-                                <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/school-fees/${row.id}/proof`"
-                                   target="_blank" rel="noopener"
-                                   class="block text-indigo-600 font-semibold">View proof ↗</a>
                                 <button @click="approve(row.id)" class="text-green-600 font-semibold block">Approve</button>
                                 <button @click="reject(row.id)" class="text-red-600 font-semibold block">Reject</button>
                             </template>
@@ -114,8 +127,10 @@
                             </span>
                         </td>
                     </tr>
-                    <tr v-if="!rows.length">
-                        <td colspan="6" class="p-8 text-center text-gray-400">No school fees yet.</td>
+                    <tr v-if="!filteredRows.length">
+                        <td colspan="7" class="p-8 text-center text-gray-400">
+                            {{ rows.length ? 'No schools match your search.' : 'No school fees yet.' }}
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -126,6 +141,7 @@
 
 <script setup>
 import { router, Link } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
@@ -134,6 +150,21 @@ const props = defineProps({
     event: Object, rows: Array, summary: Object, levelLabel: String, feeSchedule: Object,
     activityLogs: { type: Array, default: () => [] },
 });
+
+const search = ref('');
+const filteredRows = computed(() => {
+    const q = search.value.trim().toLowerCase();
+    if (!q) return props.rows;
+    return props.rows.filter(row => (row.school ?? '').toLowerCase().includes(q));
+});
+
+// "No items registered, ₹0 due" rows were showing a green "approved" badge, which
+// reads as if a payment was reviewed and cleared — there was never anything to
+// approve. Show a neutral "No fee due" label instead, without changing the
+// underlying stored status (isFullyPaid()/dashboard tiles still rely on it).
+function isNoFeeDue(row) {
+    return Number(row.total_due) === 0 && row.status === 'approved';
+}
 
 function statusClass(status) {
     return {

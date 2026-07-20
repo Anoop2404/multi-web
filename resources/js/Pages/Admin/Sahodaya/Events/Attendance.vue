@@ -17,6 +17,18 @@
             <button type="button" class="btn-secondary text-xs" :disabled="!importFile" @click="submitImport">Import attendance</button>
         </div>
 
+        <div class="flex flex-wrap gap-2 mb-4">
+            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/export/attendance`"
+               class="btn-secondary text-xs">
+                Download attendance report (XLSX) ↓
+            </a>
+            <a :href="attendanceSheetPdfHref"
+               target="_blank" rel="noopener"
+               class="btn-secondary text-xs">
+                Print blank attendance sheet (PDF) ↗
+            </a>
+        </div>
+
         <div class="card card--flush">
             <table class="w-full text-sm">
                 <thead class="bg-gray-50 text-left">
@@ -69,6 +81,14 @@ const importForm = useForm({ file: null });
 const filteredParticipants = computed(() => {
     if (!itemFilter.value) return props.participants;
     return props.participants.filter(p => p.registration?.item_id == itemFilter.value);
+});
+
+// Blank, printable sheet (chest no / name / school, no status filled in) for marking
+// by hand at the venue — pre-built PDF report, just not linked from this page before.
+// Scoped to the currently selected item when one is chosen, same as bulk-marking.
+const attendanceSheetPdfHref = computed(() => {
+    const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet`;
+    return itemFilter.value ? `${base}?item_id=${itemFilter.value}` : base;
 });
 
 function attendanceKey(p) {
