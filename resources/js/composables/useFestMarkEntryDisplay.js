@@ -2,7 +2,8 @@ import { computed, reactive } from 'vue';
 
 const GROUP_PARTICIPANT_TYPES = ['team', 'group', 'pair', 'trio'];
 
-export function useFestMarkEntryDisplay(props, isSports) {
+export function useFestMarkEntryDisplay(props, isSportsParam = null) {
+    const isSports = isSportsParam ?? computed(() => props.event?.event_type === 'sports');
     const bulkRank = reactive({});
 
     // Team/group items: the mark applies to the whole squad, so show one
