@@ -23,6 +23,10 @@ class FestInvoiceService
             return $this->issueForSchoolPerHead($event, $school, $feeService, $existing, $issuedBy);
         }
 
+        if (($schedule['fee_model'] ?? 'none') === 'sports_composite') {
+            return $this->issueForSchoolSportsComposite($event, $school, $feeService, $schedule, $existing, $issuedBy);
+        }
+
         $fee = FestSchoolEventFee::where('event_id', $event->id)
             ->where('school_id', $school->id)
             ->first();
@@ -100,6 +104,68 @@ class FestInvoiceService
                 'breakdown_json'            => [
                     'per_head' => true,
                     'heads' => $headLines,
+                ],
+                'status'    => $status,
+                'issued_at' => $existing?->issued_at ?? now(),
+                'issued_by' => $issuedBy ?? $existing?->issued_by,
+            ]
+        );
+    }
+
+    /**
+     * Sports composite billing (Head = Event): the per-student/per-team breakdown
+     * lives on the FestSchoolEventFee's own `lines` (school_reg/student_reg/item_fee/
+     * team_fee), computed by FestSportsCompositeFeeService. The generic path above
+     * (participationLinesForSchool -> FestItemFeeResolver::participationBreakdown)
+     * is for the item_catalog fee model and was previously used unconditionally,
+     * producing invoices with per-line unit rates (e.g. ₹200) that didn't add up
+     * to the actual total due (e.g. ₹2000 for team items billed per participant).
+     */
+    private function issueForSchoolSportsComposite(
+        FestEvent $event,
+        Tenant $school,
+        FestSchoolEventFeeService $feeService,
+        array $schedule,
+        ?FestEventInvoice $existing,
+        ?int $issuedBy,
+    ): FestEventInvoice {
+        $fee = $feeService->recalculate($event, $school->id);
+        $fee->loadMissing('lines');
+
+        $schoolReg = (float) $fee->school_registration_fee;
+        $total = (float) $fee->total_due;
+        $partFee = round($total - $schoolReg, 2);
+        $itemCount = (int) $fee->participation_item_count;
+
+        $participationLines = $fee->lines
+            ->where('line_type', '!=', 'school_reg')
+            ->map(fn ($line) => [
+                'label' => $line->label,
+                'amount' => (float) $line->amount,
+                'item_id' => $line->meta['item_id'] ?? null,
+                'item_title' => $line->label,
+                'head_name' => $line->meta['head_name'] ?? null,
+            ])
+            ->values()
+            ->all();
+
+        $status = ($fee->status === 'approved' || $existing?->status === 'paid')
+            ? 'paid'
+            : ($existing?->status ?? 'issued');
+
+        return FestEventInvoice::updateOrCreate(
+            ['event_id' => $event->id, 'school_id' => $school->id],
+            [
+                'invoice_number'            => $existing?->invoice_number ?? FestEventInvoice::generateNumber($event),
+                'school_registration_fee'   => $schoolReg,
+                'participation_fee'         => $partFee,
+                'participation_item_count'  => $itemCount,
+                'total_amount'              => $total,
+                'breakdown_json'            => [
+                    'schedule' => $schedule,
+                    'school_registration' => $schoolReg,
+                    'participation' => ['items' => $itemCount, 'amount' => $partFee],
+                    'participation_lines' => $participationLines,
                 ],
                 'status'    => $status,
                 'issued_at' => $existing?->issued_at ?? now(),
