@@ -78,6 +78,14 @@
                 <p class="pcard__name">{{ $card['name'] }}</p>
                 <p class="pcard__school">{{ $card['subtitle'] ?? '' }}</p>
 
+                @if(!empty($card['student_class']) || !empty($card['class_category']))
+                    <p style="font-size: 8.5px; font-weight: bold; color: #0f3d7a; margin-top: 0.8mm; line-height: 1.2;">
+                        @if(!empty($card['student_class'])) Class: {{ $card['student_class'] }} @endif
+                        @if(!empty($card['student_class']) && !empty($card['class_category'])) · @endif
+                        @if(!empty($card['class_category'])) Category: {{ $card['class_category'] }} @endif
+                    </p>
+                @endif
+
                 @if($showItemsList)
                     <ul class="pcard__items">
                         @foreach(array_slice($card['items'], 0, 4) as $itemTitle)
@@ -91,13 +99,6 @@
                     <p class="pcard__tag">{{ $itemLine }}</p>
                 @endif
             </div>
-
-            @if(!empty($card['chest_number']))
-                <div class="pcard__badge">
-                    <span class="pcard__badge-label">Chest No.</span>
-                    <span class="pcard__badge-value">{{ $card['chest_number'] }}</span>
-                </div>
-            @endif
         </div>
     @endif
 

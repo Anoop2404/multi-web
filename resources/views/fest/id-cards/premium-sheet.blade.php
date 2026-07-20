@@ -4,12 +4,16 @@
     <meta charset="utf-8">
     <title>Premium ID Cards — {{ $eventTitle }}</title>
     <style>
-        @page { size: A4 portrait; margin: 5mm; }
+        @page { size: A4 portrait; margin: 4mm; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #0f172a; background: #f1f5f9; }
+        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8.5px; color: #0f172a; background: #f1f5f9; }
         .sheet-title { text-align: center; font-size: 11px; font-weight: bold; color: #334155; margin-bottom: 3mm; }
+        @media print {
+            .sheet-title { display: none !important; }
+            body { background: #fff; }
+        }
         .section-title {
-            font-size: 9px;
+            font-size: 9.5px;
             font-weight: bold;
             color: #0f3d7a;
             text-transform: uppercase;
@@ -18,7 +22,7 @@
             padding-bottom: 1mm;
             border-bottom: 0.3mm solid #cbd5e1;
         }
-        .grid { width: 100%; border-collapse: separate; border-spacing: 2.5mm 2.5mm; }
+        .grid { width: 100%; border-collapse: separate; border-spacing: 3mm 3mm; }
         .grid td { width: 50%; vertical-align: top; padding: 0; }
         .page-break { page-break-after: always; }
 
@@ -29,19 +33,19 @@
             overflow: hidden;
             page-break-inside: avoid;
             background: #fff;
-            border: 0.3mm solid #cbd5e1;
-            box-shadow: 0 0.8mm 2mm rgba(10, 45, 92, 0.1);
+            border: 0.35mm solid #0f3d7a;
+            box-shadow: 0 0.8mm 2mm rgba(10, 45, 92, 0.12);
             display: flex;
             flex-direction: column;
             position: relative;
         }
         .pcard__accent {
             flex-shrink: 0;
-            height: 1.2mm;
-            background: linear-gradient(90deg, #8b6914 0%, #c9a227 25%, #f5e6b8 50%, #c9a227 75%, #8b6914 100%);
+            height: 1.5mm;
+            background: linear-gradient(90deg, #b45309 0%, #f59e0b 25%, #fef08a 50%, #f59e0b 75%, #b45309 100%);
         }
         .pcard--event-pass .pcard__accent {
-            background: linear-gradient(90deg, #065f46 0%, #10b981 50%, #065f46 100%);
+            background: linear-gradient(90deg, #047857 0%, #10b981 50%, #047857 100%);
         }
 
         /* Header */
@@ -52,7 +56,7 @@
             justify-content: space-between;
             gap: 2mm;
             padding: 2mm 2.5mm 1.8mm;
-            background: linear-gradient(180deg, #0a2d5c 0%, #0f3d7a 100%);
+            background: linear-gradient(180deg, #071e3d 0%, #0f3d7a 100%);
             color: #fff;
         }
         .pcard--volunteer .pcard__header { background: linear-gradient(180deg, #064e3b 0%, #047857 100%); }
@@ -60,17 +64,17 @@
         .pcard__brand {
             display: flex;
             align-items: center;
-            gap: 2mm;
+            gap: 2.2mm;
             min-width: 0;
             flex: 1;
         }
         .pcard__logo,
         .pcard__logo-fallback {
-            width: 12mm;
-            height: 12mm;
+            width: 12.5mm;
+            height: 12.5mm;
             border-radius: 50%;
             flex-shrink: 0;
-            border: 0.4mm solid rgba(201, 162, 39, 0.9);
+            border: 0.45mm solid #f5e6b8;
             background: #fff;
             object-fit: cover;
         }
@@ -79,62 +83,63 @@
             align-items: center;
             justify-content: center;
             color: #0f3d7a;
-            font-size: 8px;
+            font-size: 8.5px;
             font-weight: bold;
         }
         .pcard__brand-text { min-width: 0; flex: 1; }
         .pcard__cluster {
-            font-size: 7px;
-            font-weight: bold;
-            letter-spacing: 0.1em;
+            font-size: 7.5px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            line-height: 1.2;
-            opacity: 0.88;
+            line-height: 1.1;
+            color: #ffffff;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .pcard__event {
-            font-size: 10.5px;
-            font-weight: bold;
-            margin-top: 0.4mm;
+            font-size: 11px;
+            font-weight: 800;
+            margin-top: 0.5mm;
             line-height: 1.15;
-            letter-spacing: 0.02em;
+            letter-spacing: 0.03em;
+            color: #fef08a;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .pcard__qr {
-            width: 13mm;
-            height: 13mm;
+            width: 13.5mm;
+            height: 13.5mm;
             background: #fff;
             border-radius: 1mm;
             padding: 0.5mm;
             flex-shrink: 0;
         }
 
-        /* Discipline strip */
+        /* Discipline / Sub-header strip */
         .pcard__discipline {
             flex-shrink: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 1mm 2.5mm;
-            background: #f8fafc;
-            border-bottom: 0.2mm solid #e2e8f0;
+            padding: 1.2mm 2.5mm;
+            background: #0f172a;
+            border-bottom: 0.2mm solid #334155;
         }
         .pcard__discipline-text {
-            font-size: 8px;
-            font-weight: bold;
-            letter-spacing: 0.1em;
+            font-size: 8.5px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
             text-align: center;
-            color: #0f3d7a;
+            color: #38bdf8;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .pcard--event-pass .pcard__discipline-text { color: #047857; }
+        .pcard--event-pass .pcard__discipline-text { color: #34d399; }
 
         /* Body */
         .pcard__body {
@@ -142,7 +147,7 @@
             min-height: 0;
             display: flex;
             align-items: stretch;
-            gap: 2mm;
+            gap: 2.5mm;
             padding: 2.5mm;
             background: #fff;
             position: relative;
@@ -154,20 +159,21 @@
         .pcard__portrait { flex-shrink: 0; }
         .pcard__photo,
         .pcard__initials {
-            width: 22mm;
-            height: 27mm;
+            width: 24mm;
+            height: 29mm;
             border-radius: 1.5mm;
-            border: 0.45mm solid #c9a227;
+            border: 0.5mm solid #d97706;
             display: block;
-            background: #f1f5f9;
+            background: #f8fafc;
         }
         .pcard__photo { object-fit: cover; }
         .pcard__initials {
             color: #0f3d7a;
-            font-size: 17px;
+            font-size: 18px;
             font-weight: bold;
             text-align: center;
-            line-height: 26mm;
+            line-height: 28mm;
+            background: #e0f2fe;
         }
         .pcard__info {
             min-width: 0;
@@ -175,20 +181,22 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            padding-right: 1mm;
         }
         .pcard__name {
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 14.5px;
+            font-weight: 800;
             line-height: 1.15;
             color: #0f172a;
+            text-transform: uppercase;
             word-wrap: break-word;
         }
         .pcard__school {
-            font-size: 9px;
-            color: #64748b;
-            margin-top: 0.8mm;
+            font-size: 9.5px;
+            font-weight: 700;
+            color: #334155;
+            margin-top: 1mm;
             line-height: 1.25;
+            text-transform: uppercase;
         }
         .pcard__tag {
             display: inline-block;
@@ -207,46 +215,48 @@
             text-overflow: ellipsis;
         }
         .pcard__items {
-            margin: 1mm 0 0 0;
-            padding: 0 0 0 3mm;
-            font-size: 7.5px;
-            color: #334155;
-            line-height: 1.45;
+            margin: 1.2mm 0 0 0;
+            padding: 0 0 0 3.2mm;
+            font-size: 8.5px;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.4;
         }
         .pcard__items-more {
-            color: #94a3b8;
+            color: #64748b;
             list-style: none;
-            margin-left: -3mm;
+            margin-left: -3.2mm;
+            font-weight: bold;
         }
 
-        /* Secondary info badge (reg no, access, etc.) */
+        /* Secondary info badge (Chest No.) */
         .pcard__badge {
             flex-shrink: 0;
             align-self: center;
-            width: 18mm;
+            width: 19mm;
             text-align: center;
-            padding: 1.5mm 1mm;
-            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            padding: 1.8mm 1mm;
+            background: #f8fafc;
             border-radius: 1.5mm;
-            border: 0.3mm solid #cbd5e1;
+            border: 0.35mm solid #0f3d7a;
             color: #0f3d7a;
         }
         .pcard__badge-label {
             display: block;
             font-size: 6.5px;
-            font-weight: bold;
-            letter-spacing: 0.12em;
+            font-weight: 800;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            opacity: 0.85;
+            color: #475569;
         }
         .pcard__badge-value {
             display: block;
-            font-size: 13px;
-            font-weight: bold;
+            font-size: 15px;
+            font-weight: 800;
             font-family: DejaVu Sans Mono, monospace;
             line-height: 1;
-            margin-top: 0.5mm;
-            letter-spacing: -0.02em;
+            margin-top: 0.6mm;
+            color: #0f172a;
         }
 
         /* Team */

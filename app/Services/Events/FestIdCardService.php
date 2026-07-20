@@ -634,6 +634,23 @@ class FestIdCardService
             $itemLabel = $itemLabel ? "{$itemLabel} · {$ageGroupLabel}" : $ageGroupLabel;
         }
 
+        $studentClass = $p->student?->schoolClass?->name ?? $p->student?->class ?? null;
+        $classCategory = null;
+        if ($itemModel?->class_group) {
+            $schemeLabels = \App\Support\FestClassGroupScheme::labels(null, $event);
+            $classCategory = $schemeLabels[$itemModel->class_group] ?? strtoupper($itemModel->class_group);
+        }
+
+        $rawGender = strtolower((string) ($p->student?->gender ?? $p->teacher?->gender ?? ''));
+        $gender = match (true) {
+            str_starts_with($rawGender, 'f') || $rawGender === 'girl' || $rawGender === 'female' => 'female',
+            str_starts_with($rawGender, 'm') || $rawGender === 'boy' || $rawGender === 'male'    => 'male',
+            default                                                                               => 'neutral',
+        };
+
+        $photoUrl = $this->portraitUrl($p) ?: $this->defaultAvatarDataUri($gender);
+        $photoSrc = $this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender);
+
         return [
             'card_type'       => 'individual',
             'audience'        => 'student',
@@ -641,16 +658,19 @@ class FestIdCardService
             'role_class'      => $isTeacher ? 'staff' : 'student',
             'name'            => $name,
             'initials'        => $this->initials($name),
-            'photo_url'       => $this->portraitUrl($p),
-            'photo_src'       => $this->portraitDataUri($p),
+            'gender'          => $gender,
+            'photo_url'       => $photoUrl,
+            'photo_src'       => $photoSrc,
             'subtitle'        => $school,
+            'student_class'   => $studentClass,
+            'class_category'  => $classCategory,
             'detail'          => $item !== '—' ? $item : null,
             'head_label'      => $headName,
             'item_label'      => $itemLabel ?: ($headName ?: null),
             'age_group_label' => $ageGroupLabel,
-            'chest_number'    => $chestNumber,
+            'chest_number'    => null,
             'schedule'        => $scheduleLine,
-            'id_label'        => 'Fest ID',
+            'id_label'        => 'Reg ID',
             'id_number'       => $festId,
             'secondary_label' => null,
             'secondary_value' => null,
@@ -869,5 +889,16 @@ class FestIdCardService
             'footer'          => null,
             'entity_id'       => 'sample-head-'.$head->id,
         ];
+    }
+
+    public function defaultAvatarDataUri(string $gender): string
+    {
+        $svg = match ($gender) {
+            'female' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#fdf2f8" rx="8"/><path fill="#ec4899" d="M14 56c0-10 8-18 18-18s18 8 18 18z"/><circle cx="32" cy="24" r="13" fill="#fde047"/><path fill="#831843" d="M16 24c0-9 7-15 16-15s16 6 16 15c-3-6-9-8-16-8s-13 2-16 8z"/><circle cx="27" cy="25" r="2" fill="#1e293b"/><circle cx="37" cy="25" r="2" fill="#1e293b"/><path fill="none" stroke="#1e293b" stroke-width="1.5" stroke-linecap="round" d="M28 31c2 2 6 2 8 0"/></svg>',
+            'male'   => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#eff6ff" rx="8"/><path fill="#3b82f6" d="M14 56c0-10 8-18 18-18s18 8 18 18z"/><circle cx="32" cy="24" r="13" fill="#fde047"/><path fill="#1e3a8a" d="M18 22c0-8 6-13 14-13s14 5 14 13c-4-4-10-5-14-5s-10 1-14 5z"/><circle cx="27" cy="25" r="2" fill="#1e293b"/><circle cx="37" cy="25" r="2" fill="#1e293b"/><path fill="none" stroke="#1e293b" stroke-width="1.5" stroke-linecap="round" d="M28 31c2 2 6 2 8 0"/></svg>',
+            default  => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#f1f5f9" rx="8"/><path fill="#64748b" d="M14 56c0-10 8-18 18-18s18 8 18 18z"/><circle cx="32" cy="24" r="13" fill="#cbd5e1"/><circle cx="27" cy="25" r="2" fill="#334155"/><circle cx="37" cy="25" r="2" fill="#334155"/><path fill="none" stroke="#334155" stroke-width="1.5" stroke-linecap="round" d="M28 31c2 2 6 2 8 0"/></svg>',
+        };
+
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 }

@@ -53,6 +53,11 @@
                 <div class="id-card-tile__info">
                     <p class="id-card-tile__name">{{ card.name }}</p>
                     <p class="id-card-tile__school">{{ card.subtitle }}</p>
+                    <p v-if="card.student_class || card.class_category" class="id-card-tile__class-meta">
+                        <span v-if="card.student_class">Class: {{ card.student_class }}</span>
+                        <span v-if="card.student_class && card.class_category"> · </span>
+                        <span v-if="card.class_category">Category: {{ card.class_category }}</span>
+                    </p>
                     <ul v-if="showItemsList" class="id-card-tile__items">
                         <li v-for="(itemTitle, idx) in card.items.slice(0, 4)" :key="idx">{{ itemTitle }}</li>
                         <li v-if="(card.item_count ?? 0) > 4" class="id-card-tile__items-more">
@@ -213,9 +218,10 @@ const itemLine = computed(() => {
 }
 .id-card-tile__event {
     display: block;
-    font-size: 0.68rem;
-    font-weight: 700;
+    font-size: 0.72rem;
+    font-weight: 800;
     margin-top: 0.04rem;
+    color: #fef08a;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -235,21 +241,21 @@ const itemLine = computed(() => {
     align-items: center;
     justify-content: center;
     padding: 0.22rem 0.55rem;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
+    background: #0f172a;
+    border-bottom: 1px solid #334155;
 }
 .id-card-tile__discipline-text {
-    font-size: 0.58rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     text-align: center;
-    color: #0f3d7a;
+    color: #38bdf8;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.id-card-tile--event-pass .id-card-tile__discipline-text { color: #047857; }
+.id-card-tile--event-pass .id-card-tile__discipline-text { color: #34d399; }
 
 .id-card-tile__body {
     flex: 1;
@@ -271,8 +277,8 @@ const itemLine = computed(() => {
     height: 4.1rem;
     border-radius: 0.35rem;
     object-fit: cover;
-    border: 2px solid #c9a227;
-    background: #f1f5f9;
+    border: 2px solid #d97706;
+    background: #f8fafc;
 }
 .id-card-tile__initials {
     display: flex;
@@ -281,6 +287,7 @@ const itemLine = computed(() => {
     color: #0f3d7a;
     font-weight: 700;
     font-size: 1.05rem;
+    background: #e0f2fe;
 }
 .id-card-tile__info {
     min-width: 0;
@@ -290,15 +297,26 @@ const itemLine = computed(() => {
     justify-content: center;
 }
 .id-card-tile__name {
-    font-weight: 700;
-    font-size: 0.92rem;
+    font-weight: 800;
+    font-size: 0.95rem;
     line-height: 1.15;
+    text-transform: uppercase;
+    color: #0f172a;
 }
 .id-card-tile__school {
-    color: #64748b;
+    color: #334155;
+    font-weight: 700;
     line-height: 1.25;
-    margin-top: 0.1rem;
+    margin-top: 0.12rem;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+}
+.id-card-tile__class-meta {
+    color: #0f3d7a;
+    font-weight: 800;
     font-size: 0.62rem;
+    margin-top: 0.12rem;
+    line-height: 1.2;
 }
 .id-card-tile__tag {
     display: inline-block;
@@ -318,11 +336,12 @@ const itemLine = computed(() => {
 .id-card-tile__items {
     margin: 0.15rem 0 0 0.75rem;
     padding: 0;
-    color: #334155;
-    font-size: 0.58rem;
+    color: #1e293b;
+    font-weight: 600;
+    font-size: 0.62rem;
     line-height: 1.35;
 }
-.id-card-tile__items-more { color: #94a3b8; list-style: none; margin-left: -0.75rem; }
+.id-card-tile__items-more { color: #64748b; font-weight: bold; list-style: none; margin-left: -0.75rem; }
 
 .id-card-tile__badge {
     flex-shrink: 0;
@@ -330,18 +349,18 @@ const itemLine = computed(() => {
     width: 3.2rem;
     text-align: center;
     padding: 0.28rem 0.2rem;
-    background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+    background: #f8fafc;
     border-radius: 0.35rem;
-    border: 1px solid #cbd5e1;
+    border: 1.5px solid #0f3d7a;
     color: #0f3d7a;
 }
 .id-card-tile__badge-label {
     display: block;
     font-size: 0.48rem;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    opacity: 0.85;
+    color: #475569;
 }
 .id-card-tile__badge-value {
     display: block;
