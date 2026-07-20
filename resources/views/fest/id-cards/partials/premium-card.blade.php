@@ -6,7 +6,11 @@
 @endphp
 <div class="pcard pcard--{{ $roleClass }}">
     <header class="pcard__header">
-        <div class="pcard__brand">
+        <div class="pcard__pass-ribbon">
+            <span>{{ $isEventPass ? 'EVENT PASS' : 'ID CARD' }}</span>
+        </div>
+
+        <div class="pcard__brand-center">
             @if(!empty($clusterLogoSrc))
                 <img src="{{ $clusterLogoSrc }}" alt="{{ $clusterName }}" class="pcard__logo">
             @else
@@ -16,17 +20,6 @@
                 <p class="pcard__cluster">{{ $clusterName }}</p>
                 <p class="pcard__event">{{ $eventTitle }}</p>
             </div>
-        </div>
-
-        <div class="pcard__pass-ribbon">
-            <span>{{ $isEventPass ? 'EVENT PASS' : 'ID CARD' }}</span>
-        </div>
-
-        <div class="pcard__qr-wrap">
-            @if(!empty($card['qr_src']))
-                <img src="{{ $card['qr_src'] }}" alt="" class="pcard__qr">
-                <span class="pcard__qr-label">SCAN TO VERIFY</span>
-            @endif
         </div>
     </header>
 
@@ -38,54 +31,66 @@
     </div>
 
     <div class="pcard__body">
-        <div class="pcard__portrait">
-            @if(!empty($card['photo_src']))
-                <img src="{{ $card['photo_src'] }}" alt="" class="pcard__photo">
-            @else
-                <div class="pcard__initials">{{ $card['initials'] ?? '?' }}</div>
-            @endif
+        <div class="pcard__portrait-wrap">
+            <div class="pcard__portrait">
+                @if(!empty($card['photo_src']))
+                    <img src="{{ $card['photo_src'] }}" alt="" class="pcard__photo">
+                @else
+                    <div class="pcard__initials">{{ $card['initials'] ?? '?' }}</div>
+                @endif
+            </div>
         </div>
 
-        <div class="pcard__info-col">
-            <p class="pcard__name">{{ $card['name'] }}</p>
-            <table class="pcard__meta-table">
-                <tr>
-                    <td class="pcard__meta-icon">👤</td>
-                    <td class="pcard__meta-label">Role</td>
-                    <td class="pcard__meta-sep">:</td>
-                    <td class="pcard__meta-val">{{ $card['role_title'] ?? 'Participant' }}</td>
-                </tr>
-                <tr>
-                    <td class="pcard__meta-icon">🏆</td>
-                    <td class="pcard__meta-label">Event</td>
-                    <td class="pcard__meta-sep">:</td>
-                    <td class="pcard__meta-val">{{ $card['event_name'] ?? $eventTitle }}</td>
-                </tr>
-                <tr>
-                    <td class="pcard__meta-icon">📅</td>
-                    <td class="pcard__meta-label">Date</td>
-                    <td class="pcard__meta-sep">:</td>
-                    <td class="pcard__meta-val">{{ $card['event_date'] ?? '25 Aug 2025' }}</td>
-                </tr>
-                <tr>
-                    <td class="pcard__meta-icon">📍</td>
-                    <td class="pcard__meta-label">Venue</td>
-                    <td class="pcard__meta-sep">:</td>
-                    <td class="pcard__meta-val">{{ $card['venue'] ?? 'Govt. HSS, Kannur' }}</td>
-                </tr>
-                <tr>
-                    <td class="pcard__meta-icon">🏫</td>
-                    <td class="pcard__meta-label">Sahodaya</td>
-                    <td class="pcard__meta-sep">:</td>
-                    <td class="pcard__meta-val">{{ $card['sahodaya_name'] ?? 'Kannur Sahodaya' }}</td>
-                </tr>
-                <tr>
-                    <td class="pcard__meta-icon">🎯</td>
-                    <td class="pcard__meta-label">Category</td>
-                    <td class="pcard__meta-sep">:</td>
-                    <td class="pcard__meta-val">{{ $card['category'] ?? ($card['class_category'] ?? 'GK Quiz Category 2') }}</td>
-                </tr>
-            </table>
+        <p class="pcard__name">{{ $card['name'] }}</p>
+
+        <div class="pcard__content-grid">
+            <div class="pcard__info-col">
+                <table class="pcard__meta-table">
+                    <tr>
+                        <td class="pcard__meta-icon">👤</td>
+                        <td class="pcard__meta-label">Role</td>
+                        <td class="pcard__meta-sep">:</td>
+                        <td class="pcard__meta-val">{{ $card['role_title'] ?? 'Participant' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="pcard__meta-icon">🏆</td>
+                        <td class="pcard__meta-label">Event</td>
+                        <td class="pcard__meta-sep">:</td>
+                        <td class="pcard__meta-val">{{ $card['event_name'] ?? $eventTitle }}</td>
+                    </tr>
+                    <tr>
+                        <td class="pcard__meta-icon">📅</td>
+                        <td class="pcard__meta-label">Date</td>
+                        <td class="pcard__meta-sep">:</td>
+                        <td class="pcard__meta-val">{{ $card['event_date'] ?? '25 Aug 2025' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="pcard__meta-icon">📍</td>
+                        <td class="pcard__meta-label">Venue</td>
+                        <td class="pcard__meta-sep">:</td>
+                        <td class="pcard__meta-val">{{ $card['venue'] ?? 'Govt. HSS, Kannur' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="pcard__meta-icon">🏫</td>
+                        <td class="pcard__meta-label">Sahodaya</td>
+                        <td class="pcard__meta-sep">:</td>
+                        <td class="pcard__meta-val">{{ $card['sahodaya_name'] ?? 'Kannur Sahodaya' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="pcard__meta-icon">🎯</td>
+                        <td class="pcard__meta-label">Category</td>
+                        <td class="pcard__meta-sep">:</td>
+                        <td class="pcard__meta-val">{{ $card['category'] ?? ($card['class_category'] ?? 'GK Quiz Category 2') }}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="pcard__qr-col">
+                @if(!empty($card['qr_src']))
+                    <img src="{{ $card['qr_src'] }}" alt="" class="pcard__qr">
+                    <span class="pcard__qr-label">SCAN TO VERIFY</span>
+                @endif
+            </div>
         </div>
     </div>
 

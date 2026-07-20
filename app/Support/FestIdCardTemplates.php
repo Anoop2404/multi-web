@@ -8,10 +8,10 @@ class FestIdCardTemplates
 
     public const PREMIUM = 'premium';
 
-    /** Landscape card size for print/PDF (mm). */
-    public const CARD_WIDTH_MM = 98;
+    /** Portrait ID Card size for A4 print (92.5mm x 136mm, 2x2 grid). */
+    public const CARD_WIDTH_MM = 92.5;
 
-    public const CARD_HEIGHT_MM = 82;
+    public const CARD_HEIGHT_MM = 136;
 
     public const CARDS_PER_PAGE = 4;
 
