@@ -18,6 +18,23 @@
             <strong>State program</strong> — propagated from central admin.
         </div>
 
+        <div v-if="mistakenSeasonIssue" class="notice-banner notice-banner--warning mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <strong>Visibility issue detected</strong> — this event
+                <span v-if="mistakenSeasonIssue.navHidden">is hidden from schools</span>
+                <span v-if="mistakenSeasonIssue.navHidden && mistakenSeasonIssue.partitionRole === 'sports_season'"> and </span>
+                <span v-if="mistakenSeasonIssue.partitionRole === 'sports_season'">is tagged as a season hub</span>,
+                but it {{ mistakenSeasonIssue.children ? 'only has empty sport events under it' : 'has no sport events under it' }} —
+                this usually happens by mistake, not because it's a real multi-sport season.
+                <span v-if="mistakenSeasonIssue.emptyChildren">
+                    ({{ mistakenSeasonIssue.emptyChildren }} empty child event{{ mistakenSeasonIssue.emptyChildren === 1 ? '' : 's' }} with zero registrations.)
+                </span>
+            </div>
+            <button type="button" class="btn-primary text-xs whitespace-nowrap" :disabled="fixingSeason" @click="fixMistakenSeason">
+                {{ fixingSeason ? 'Fixing…' : 'Fix visibility' }}
+            </button>
+        </div>
+
         <div class="grid sm:grid-cols-3 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ stats.items }}</p>
@@ -189,8 +206,8 @@
 </template>
 
 <script setup>
-import { Link, useForm } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Link, useForm, router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
@@ -207,9 +224,21 @@ const props = defineProps({
     academicYearOptions: { type: Array, default: () => [] },
     sportsAgeGroupsUrl: { type: String, default: '' },
     eventHeadNav: { type: Object, default: () => ({ headItemGroups: [] }) },
+    mistakenSeasonIssue: { type: Object, default: null },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+
+const fixingSeason = ref(false);
+function fixMistakenSeason() {
+    fixingSeason.value = true;
+    router.post(`${base}/fix-mistaken-season`, {
+        delete_empty_children: !!props.mistakenSeasonIssue?.emptyChildren,
+    }, {
+        preserveScroll: true,
+        onFinish: () => { fixingSeason.value = false; },
+    });
+}
 const isSports = computed(() => props.event.event_type === 'sports');
 const statusHint = computed(() => (isSports.value
     ? 'Setup → Registration open (schools see event) → Ongoing → Complete. Publish results separately.'

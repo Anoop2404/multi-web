@@ -44,13 +44,17 @@ class FestSportsEventSyncService
         }
 
         $hasChildren = FestEvent::where('parent_event_id', $season->id)->exists();
-        $hasSeasonHeads = FestItemHead::forTenant($season->tenant_id)
-            ->where('event_id', $season->id)
-            ->exists();
 
         // A standalone sport event from the new flow is not a season hub — never
-        // tag it or seed catalog sports under it.
-        if (! $hasChildren && ! $hasSeasonHeads && $season->partition_role !== 'sports_season' && ! $createMissing) {
+        // tag it or seed catalog sports under it. A stray FestItemHead row with
+        // event_id = this event's own id (legacy catalog leftover) must NOT count
+        // as "having season heads" here — that previously caused standalone sport
+        // events to get mistakenly re-tagged sports_season on every passive sync
+        // (page visit), which then hid them from schools via
+        // hideSeasonHubIfChildrenExist() once a duplicate child got created. Only
+        // real children or an explicit "Add sport" action (createMissing=true)
+        // should ever promote an event to a season hub.
+        if (! $hasChildren && $season->partition_role !== 'sports_season' && ! $createMissing) {
             return ['created' => 0, 'updated' => 0];
         }
 
@@ -255,6 +259,83 @@ class FestSportsEventSyncService
         }
 
         return $created;
+    }
+
+    /**
+     * Reset a standalone sport event that got mistakenly tagged
+     * partition_role=sports_season (and consequently nav_hidden=true) back to a
+     * normal, visible standalone event. Shared by the fest:unmark-mistaken-season
+     * command and the "Fix visibility" admin action on the event Overview page.
+     *
+     * Safe by construction: only deletes empty (zero-registration) child events
+     * when $deleteEmptyChildren is explicitly true, and refuses to touch anything
+     * once a child has real registrations (returns ok=false in that case).
+     *
+     * @return array{ok: bool, changed: bool, message: string, children: int, emptyChildren: int}
+     */
+    public function repairMistakenSeason(FestEvent $event, bool $deleteEmptyChildren = false, bool $dryRun = false): array
+    {
+        if ($event->event_type !== 'sports' || $event->parent_event_id !== null) {
+            return ['ok' => false, 'changed' => false, 'message' => 'Not a top-level sports event — nothing to do.', 'children' => 0, 'emptyChildren' => 0];
+        }
+
+        $children = FestEvent::where('parent_event_id', $event->id)->withCount('registrations')->get();
+        $emptyChildren = $children->filter(fn (FestEvent $c) => $c->registrations_count === 0);
+        $busyChildren = $children->filter(fn (FestEvent $c) => $c->registrations_count > 0);
+
+        if ($busyChildren->isNotEmpty()) {
+            return [
+                'ok' => false,
+                'changed' => false,
+                'message' => $busyChildren->count().' child event(s) have real registrations — this is probably a genuine season hub, not a mistake. Not touched.',
+                'children' => $children->count(),
+                'emptyChildren' => $emptyChildren->count(),
+            ];
+        }
+
+        $changed = false;
+
+        if ($emptyChildren->isNotEmpty() && $deleteEmptyChildren) {
+            if (! $dryRun) {
+                foreach ($emptyChildren as $child) {
+                    $child->delete();
+                }
+            }
+            $changed = true;
+        }
+
+        if ($event->partition_role === 'sports_season') {
+            if (! $dryRun) {
+                $event->update(['partition_role' => null]);
+            }
+            $changed = true;
+        }
+
+        $noChildrenWillRemain = $children->isEmpty() || $deleteEmptyChildren;
+        if ($event->nav_hidden && $noChildrenWillRemain) {
+            if (! $dryRun) {
+                $event->update(['nav_hidden' => false]);
+            }
+            $changed = true;
+        }
+
+        if ($emptyChildren->isNotEmpty() && ! $deleteEmptyChildren) {
+            return [
+                'ok' => true,
+                'changed' => $changed,
+                'message' => $emptyChildren->count().' empty child event(s) remain — delete them to fully unhide this event.',
+                'children' => $children->count(),
+                'emptyChildren' => $emptyChildren->count(),
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'changed' => $changed,
+            'message' => $changed ? 'Fixed — this event is now a normal, visible standalone sport event.' : 'Nothing to fix — this event was already normal.',
+            'children' => $children->count(),
+            'emptyChildren' => $emptyChildren->count(),
+        ];
     }
 
     /**

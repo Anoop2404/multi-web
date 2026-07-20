@@ -257,14 +257,23 @@ class FestSportsCompositeFeeService
             ];
         }
 
+        // Nothing configured on the event itself and no linked legacy head — fall
+        // back to the sahodaya-wide sports fee defaults (config('fest_fees.level_defaults.sports')),
+        // same as resolveSchedule() does for display. Without this, a standalone
+        // sport event that was never opened on Settings → Fee settings silently
+        // billed everyone ₹0 while the Fees page schedule still showed the
+        // platform defaults as "active" — the actual charge and the displayed
+        // schedule disagreed.
+        $defaults = config('fest_fees.level_defaults.sports', []);
+
         return [
-            'school_registration_fee' => null,
-            'student_registration_fee' => null,
-            'team_registration_fee' => null,
-            'included_items_per_student' => 0,
-            'included_teams' => 0,
-            'default_item_fee' => null,
-            'extra_item_fee' => null,
+            'school_registration_fee' => $defaults['school_registration_flat'] ?? null,
+            'student_registration_fee' => $defaults['per_student_amount'] ?? null,
+            'team_registration_fee' => $defaults['team_registration_fee'] ?? null,
+            'included_items_per_student' => $defaults['included_items_per_student'] ?? 0,
+            'included_teams' => $defaults['included_teams'] ?? 0,
+            'default_item_fee' => $defaults['default_item_fee'] ?? null,
+            'extra_item_fee' => $defaults['extra_item_fee'] ?? null,
         ];
     }
 

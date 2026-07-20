@@ -230,7 +230,59 @@ class FestEventController extends SahodayaAdminController
             'stats'        => $stats,
             'lifecycle'       => \App\Services\Events\FestLifecycleService::for($event)->checklist(),
             'suggestedStatus' => \App\Services\Events\FestLifecycleService::for($event)->suggestedStatus(),
+            'mistakenSeasonIssue' => $this->mistakenSeasonIssue($event),
         ]);
+    }
+
+    /**
+     * Detects a standalone sport event that's stuck hidden/mistagged from a past
+     * season-hub mix-up, so the Overview page can offer a one-click "Fix
+     * visibility" action instead of requiring shell access. Never flags a
+     * genuine season hub with real (registered) children.
+     */
+    private function mistakenSeasonIssue(FestEvent $event): ?array
+    {
+        if ($event->event_type !== 'sports' || $event->parent_event_id !== null) {
+            return null;
+        }
+
+        $looksMistaken = $event->partition_role === 'sports_season' || $event->nav_hidden;
+        if (! $looksMistaken) {
+            return null;
+        }
+
+        $children = FestEvent::where('parent_event_id', $event->id)->withCount('registrations')->get();
+        $busyChildren = $children->filter(fn (FestEvent $c) => $c->registrations_count > 0);
+
+        if ($busyChildren->isNotEmpty()) {
+            // Genuine season hub with real registrations under it — not a mistake.
+            return null;
+        }
+
+        return [
+            'children' => $children->count(),
+            'emptyChildren' => $children->count() - $busyChildren->count(),
+            'navHidden' => (bool) $event->nav_hidden,
+            'partitionRole' => $event->partition_role,
+        ];
+    }
+
+    /**
+     * One-click fix for the Overview page: resets a standalone sport event
+     * mistakenly tagged/hidden as a season hub. Same safe logic as the
+     * fest:unmark-mistaken-season command — refuses to touch anything if a
+     * child event has real registrations.
+     */
+    public function fixMistakenSeason(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $deleteEmpty = $request->boolean('delete_empty_children');
+
+        $result = app(\App\Services\Events\FestSportsEventSyncService::class)
+            ->repairMistakenSeason($event, $deleteEmpty);
+
+        return back()->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 
     public function items(string $tenantId, FestEvent $event)

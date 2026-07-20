@@ -861,6 +861,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/levels', [FestEventController::class, 'levels'])->name('levels');
             Route::get('/{event}/activity', [\App\Http\Controllers\SahodayaAdmin\FestEventActivityController::class, 'index'])->name('activity');
             Route::post('/{event}/toggle-nav-hidden', [FestEventController::class, 'toggleNavHidden'])->name('toggle-nav-hidden');
+            Route::post('/{event}/fix-mistaken-season', [FestEventController::class, 'fixMistakenSeason'])->name('fix-mistaken-season');
             Route::get('/{event}', [FestEventController::class, 'show'])->name('show');
             Route::put('/{event}', [FestEventController::class, 'update'])->name('update');
             Route::delete('/{event}', [FestEventController::class, 'destroy'])->name('destroy');

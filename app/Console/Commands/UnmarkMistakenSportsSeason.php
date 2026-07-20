@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\FestEvent;
 use App\Models\Tenant;
+use App\Services\Events\FestSportsEventSyncService;
 use Illuminate\Console\Command;
 
 /**
@@ -84,46 +85,15 @@ class UnmarkMistakenSportsSeason extends Command
                         $this->line("  Child #{$child->id}: {$child->title} — {$child->registrations_count} registration(s)");
                     }
 
-                    $emptyChildren = $children->filter(fn (FestEvent $c) => $c->registrations_count === 0);
-                    $busyChildren = $children->filter(fn (FestEvent $c) => $c->registrations_count > 0);
+                    $result = app(FestSportsEventSyncService::class)->repairMistakenSeason($event, $deleteEmpty, $dryRun);
 
-                    if ($busyChildren->isNotEmpty()) {
-                        $this->warn(
-                            '  '.$busyChildren->count().' child event(s) have real registrations — not touching partition_role '
-                            .'or deleting anything. This event is probably a genuine season hub; investigate further before running this again.'
-                        );
+                    if (! $result['ok']) {
+                        $this->warn('  '.$result['message']);
 
                         return;
                     }
 
-                    if ($emptyChildren->isNotEmpty()) {
-                        if ($deleteEmpty) {
-                            foreach ($emptyChildren as $child) {
-                                $this->line("  ".($dryRun ? 'Would delete' : 'Deleting')." empty child #{$child->id}: {$child->title}");
-                                if (! $dryRun) {
-                                    $child->delete();
-                                }
-                            }
-                        } else {
-                            $this->line('  '.$emptyChildren->count().' empty child event(s) found — pass --delete-empty-children to remove them.');
-                        }
-                    }
-
-                    if ($event->partition_role === 'sports_season') {
-                        $this->line('  '.($dryRun ? 'Would reset' : 'Resetting')." partition_role to null on event #{$event->id}.");
-                        if (! $dryRun) {
-                            $event->update(['partition_role' => null]);
-                        }
-                    } else {
-                        $this->line("  partition_role is already '{$event->partition_role}' — nothing to reset.");
-                    }
-
-                    if ($event->nav_hidden && $emptyChildren->isNotEmpty() && ($deleteEmpty || $dryRun)) {
-                        $this->line('  '.($dryRun ? 'Would also unhide' : 'Unhiding')." event #{$event->id} from school nav (nav_hidden was set for a season hub).");
-                        if (! $dryRun) {
-                            $event->update(['nav_hidden' => false]);
-                        }
-                    }
+                    $this->line('  '.($dryRun ? '[dry run] ' : '').$result['message']);
                 });
             } catch (\Throwable $e) {
                 $this->warn("  ✗ {$tenant->name}: {$e->getMessage()}");
