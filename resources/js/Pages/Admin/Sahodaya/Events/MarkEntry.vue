@@ -3,7 +3,7 @@
                           :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         
         <!-- Header Actions -->
-        <PageHeader :title="`${event.title} — Mark entry`" eyebrow="Mark & Results Entry"
+        <PageHeader :title="`${event.title} — Mark entry`" eyebrow="Mark entry"
                     :description="filterDescription">
             <template #actions>
                 <div class="flex flex-wrap items-center gap-2">
@@ -47,6 +47,16 @@
 
         <!-- Filter & Item Selector Toolbar Card -->
         <div class="card !p-4 space-y-3.5 mb-5">
+            <!-- Child Event Selector for Sports -->
+            <div v-if="isSports && childEvents.length" class="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Sport Event:</label>
+                <select :value="event.id" @change="switchSportEvent" class="field text-xs !py-1 w-64">
+                    <option v-for="ev in childEvents" :key="ev.id" :value="ev.id">
+                        {{ ev.title }} {{ ev.parent_event_id === null ? '(Season Hub)' : '' }}
+                    </option>
+                </select>
+            </div>
+
             <!-- Item Pill Chips -->
             <div v-if="itemOptions.length > 1" class="space-y-2 border-b border-slate-100 pb-3">
                 <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Select Competition Item</p>
@@ -63,21 +73,21 @@
 
             <!-- Judge Criteria Toggle & Save All Bar -->
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <button type="button" class="btn-secondary text-xs flex items-center gap-1.5" @click="showCriteriaPanel = !showCriteriaPanel">
+                <button v-if="selectedItemId && !isSports" type="button" class="btn-secondary text-xs flex items-center gap-1.5" @click="showCriteriaPanel = !showCriteriaPanel">
                     <span>⚖️ Marking Criteria / Judge Columns</span>
                     <span class="text-[11px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">
                         {{ hasCriteria ? `${criteria.length} configured` : 'Single grade/score' }}
                     </span>
                 </button>
 
-                <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4"
+                <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4 ml-auto"
                         :disabled="bulkSaving" @click="saveAll">
                     {{ bulkSaving ? 'Saving all…' : 'Save All Marks ✓' }}
                 </button>
             </div>
 
             <!-- Expandable Criteria Panel -->
-            <div v-if="showCriteriaPanel" class="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3 text-xs pt-3">
+            <div v-if="showCriteriaPanel && !isSports" class="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3 text-xs pt-3">
                 <h4 class="font-bold text-slate-900">Configure Judge Criteria / Sub-Scores</h4>
                 <p class="text-slate-500 leading-relaxed">
                     Add rows per judge or criterion (e.g. "Judge 1", "Content", "Presentation"). The sum becomes the participant's mark. Leave empty to use plain grade/score entry.
@@ -301,49 +311,191 @@ const props = defineProps({
     childEvents: { type: Array, default: () => [] },
     itemHeads: { type: Array, default: () => [] },
     initialItemCriteria: { type: Array, default: () => [] },
+    criteria: { type: Array, default: () => [] },
+    criterionScores: { type: Object, default: () => ({}) },
+    cumulativeSheetUrl: { type: String, default: null },
 });
 
+const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/import`);
+const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
+const settingsPointsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/settings/points`);
 const isSports = computed(() => props.event?.event_type === 'sports');
+
+const filterDescription = computed(() => (
+    isSports.value
+        ? 'Sports event marks, attendance, times/distances, and ranks.'
+        : 'Entering marks for competition items — rank, grade, score, or judge criteria.'
+));
+
+const itemOptions = computed(() => {
+    const items = (props.event?.items ?? []).filter((it) => it.is_enabled !== false);
+    if (props.selectedHeadId == null) {
+        return items;
+    }
+    if (props.selectedHeadId === 'other') {
+        return items.filter((it) => it.head_id == null);
+    }
+    return items.filter((it) => String(it.head_id) === String(props.selectedHeadId));
+});
+
+function selectItem(id) {
+    const params = { item_id: id };
+    if (props.selectedHeadId != null) {
+        params.head_id = props.selectedHeadId;
+    }
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, params, { preserveScroll: true });
+}
+
+function switchSportEvent(evt) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${evt.target.value}/marks`);
+}
+
 const displayCtx = useFestMarkEntryDisplay(props, isSports);
 const {
-    filterDescription,
-    cumulativeSheetUrl,
-    importUrl,
-    registrationsUrl,
-    settingsPointsUrl,
-    itemOptions,
-    sections,
-    criteria,
-    hasCriteria,
-    criteriaDraft,
-    showCriteriaPanel,
-    savedIds,
-    savingIds,
-    bulkSaving,
-    savingCriteria,
-    markForms,
-    criteriaForms,
     bulkRank,
-    rankOptionsForItem,
-    participantName,
-    participantRegNo,
+    sections,
+    markableParticipants,
+    attendanceKey,
     attendanceStatus,
     isAbsent,
     showMeasurement,
-    formatDate,
     rankLabel,
-    criteriaTotal,
-    markAttendance,
+    rankOptionsForItem,
     setRank,
+    pointsForRank,
+    displayTeamPts,
     applyRankPoints,
     applyBulkRank,
-    autoRank,
-    saveMark,
-    saveAll,
-    saveCriteriaConfig,
+    buildMarkPayload,
+    iterSaveRows,
 } = displayCtx;
 
-function selectItem(id) {
-    router.get(window.location.pathname, { item_id: id }, { preserveScroll: true });
+// Form state per participant
+const markForms = reactive({});
+for (const reg of props.registrations ?? []) {
+    for (const p of reg.participants ?? []) {
+        const existing = props.marks?.[p.id] ?? {};
+        markForms[p.id] = {
+            position: existing.position ?? null,
+            grade: existing.grade ?? '',
+            score: existing.score ?? null,
+            measurement_value: existing.measurement_value ?? '',
+            measurement_unit: existing.measurement_unit ?? '',
+        };
+    }
+}
+
+// Criteria / judge sub-score state
+const hasCriteria = computed(() => (props.criteria ?? []).length > 0);
+const criteria = computed(() => props.criteria ?? []);
+
+const criteriaForms = reactive({});
+for (const reg of props.registrations ?? []) {
+    for (const p of reg.participants ?? []) {
+        const existing = props.criterionScores?.[p.id] ?? {};
+        const form = {};
+        for (const c of props.criteria ?? []) {
+            form[c.id] = existing[c.id] ?? null;
+        }
+        criteriaForms[p.id] = form;
+    }
+}
+
+function criteriaTotal(participantId) {
+    const form = criteriaForms[participantId] ?? {};
+    return Object.values(form).reduce((sum, v) => sum + (Number(v) || 0), 0);
+}
+
+const showCriteriaPanel = ref(false);
+const criteriaDraft = reactive(
+    (props.criteria ?? []).map((c) => ({ id: c.id, label: c.label, max_score: Number(c.max_score) })),
+);
+const savingCriteria = ref(false);
+
+function saveCriteriaConfig() {
+    if (!props.selectedItemId || savingCriteria.value) {
+        return;
+    }
+    savingCriteria.value = true;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria`, {
+        criteria: criteriaDraft.filter((row) => (row.label ?? '').trim() !== ''),
+    }, {
+        preserveScroll: true,
+        onFinish: () => { savingCriteria.value = false; },
+    });
+}
+
+function participantName(participant) {
+    if (participant._is_team) {
+        return participant._team_name;
+    }
+    return participant.student?.name ?? participant.teacher?.name ?? 'Participant';
+}
+
+function participantRegNo(participant) {
+    return participant.student?.fest_registration_id ?? participant.event_reg_id ?? null;
+}
+
+function markAttendance(participant, item, status) {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/attendance`, {
+        participant_id: participant.id,
+        item_id: item.id,
+        status,
+    }, { preserveScroll: true });
+}
+
+function markPayloadWithCriteria(participant, item) {
+    const payload = buildMarkPayload(participant, item, markForms);
+    if (hasCriteria.value) {
+        payload.criteria_scores = { ...criteriaForms[participant.id] };
+    }
+    return payload;
+}
+
+const savedIds = ref(new Set());
+const savingIds = ref(new Set());
+const bulkSaving = ref(false);
+
+function saveMark(participant, item) {
+    savingIds.value = new Set([...savingIds.value, participant.id]);
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, markPayloadWithCriteria(participant, item), {
+        preserveScroll: true,
+        onSuccess: () => {
+            savedIds.value = new Set([...savedIds.value, participant.id]);
+        },
+        onFinish: () => {
+            const next = new Set(savingIds.value);
+            next.delete(participant.id);
+            savingIds.value = next;
+        },
+    });
+}
+
+async function saveAll() {
+    bulkSaving.value = true;
+    for (const { participant, item } of iterSaveRows()) {
+        await new Promise((resolve) => {
+            savingIds.value = new Set([...savingIds.value, participant.id]);
+            router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks`, markPayloadWithCriteria(participant, item), {
+                preserveScroll: true,
+                onSuccess: () => {
+                    savedIds.value = new Set([...savedIds.value, participant.id]);
+                },
+                onFinish: () => {
+                    const next = new Set(savingIds.value);
+                    next.delete(participant.id);
+                    savingIds.value = next;
+                    resolve();
+                },
+            });
+        });
+    }
+    bulkSaving.value = false;
+}
+
+function autoRank(item) {
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/auto-rank`, {
+        item_id: item.id,
+    }, { preserveScroll: true });
 }
 </script>
