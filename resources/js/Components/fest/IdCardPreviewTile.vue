@@ -150,8 +150,8 @@ const itemLine = computed(() => {
     background: #fff;
     font-size: 0.8rem;
     color: #0f172a;
-    aspect-ratio: 99 / 85;
-    min-height: 13.5rem;
+    aspect-ratio: 96 / 66;
+    min-height: 11.5rem;
     display: flex;
     flex-direction: column;
     box-shadow: 0 4px 16px rgba(10, 45, 92, 0.08);
