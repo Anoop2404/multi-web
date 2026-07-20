@@ -35,8 +35,11 @@
                     <div class="flex flex-wrap gap-2">
                         <button type="button" class="btn-primary text-sm" @click="generate">Assign missing chest</button>
                         <button type="button" class="btn-secondary text-sm" @click="assignItemReg">Assign missing item reg</button>
-                        <button type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-50 border-rose-200 font-semibold" @click="clearAllChests">
-                            Reset / Clear All Chests
+                        <button type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-50 border-rose-200 font-semibold" @click="clearEntireEventChests">
+                            Reset All Chests (Entire Event)
+                        </button>
+                        <button v-if="selectedItemId" type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-50 border-rose-200 font-semibold" @click="clearAllChests">
+                            Clear Item Chests
                         </button>
                         <a :href="printUrl" target="_blank" class="btn-secondary text-sm">Print list</a>
                         <a :href="cardsUrl" target="_blank" class="btn-secondary text-sm">Print chest cards</a>
@@ -170,15 +173,15 @@ function postAction(path) {
 }
 function generate() { postAction(`${base.value}/generate`); }
 function assignItemReg() { postAction(`${base.value}/assign-item-ids`); }
+function clearEntireEventChests() {
+    if (!confirm(`Are you sure you want to reset and clear ALL chest numbers across the ENTIRE event "${props.event.title}"?\n\nThis will wipe chest numbers for all items so numbering starts back at 100.`)) return;
+
+    router.post(`${base.value}/clear-all`, {}, { preserveScroll: true });
+}
 function clearAllChests() {
-    const scopeMsg = props.selectedItemId
-        ? `Are you sure you want to reset/clear ALL chest numbers for "${props.selectedItem?.title || 'this item'}"?`
-        : `Are you sure you want to reset/clear ALL chest numbers across the ENTIRE event "${props.event.title}"?`;
+    if (!confirm(`Are you sure you want to clear chest numbers for item "${props.selectedItem?.title || ''}"?`)) return;
 
-    if (!confirm(scopeMsg)) return;
-
-    const payload = props.selectedItemId ? { item_id: props.selectedItemId } : {};
-    router.post(`${base.value}/clear-all`, payload, { preserveScroll: true });
+    router.post(`${base.value}/clear-all`, { item_id: props.selectedItemId }, { preserveScroll: true });
 }
 function clearChest(id) {
     if (!confirm('Clear chest number?')) return;

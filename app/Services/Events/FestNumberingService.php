@@ -22,7 +22,7 @@ class FestNumberingService
         $defaults = [
             'event_reg_start' => 1,
             'event_reg_prefix' => '',
-            'chest_no_start' => 1,
+            'chest_no_start' => 100,
             'chest_no_prefix' => '',
             'auto_assign_on_approve' => true,
             'auto_assign_chest_on_create' => false,
@@ -58,16 +58,6 @@ class FestNumberingService
         return $prefix.sprintf('%04d', $next);
     }
 
-    /**
-     * Chest scope: always event-wide now. Sports used to scope this per item
-     * head when one FestEvent (the "season") held many disciplines, each its
-     * own head — different heads needed independent chest ranges. Since the
-     * Head = Event rebuild, every discipline is its own standalone FestEvent,
-     * so "per head" and "per event" are the same thing; a student should hold
-     * exactly one chest number across every item they compete in within a
-     * sports event, same as any other fest type. Stored as chest_head_id
-     * (always 0 now — kept as a column for schema/backward compatibility).
-     */
     public function chestHeadScope(FestEvent $event, FestEventItem $item): int
     {
         return self::CHEST_SCOPE_EVENT;
@@ -79,24 +69,39 @@ class FestNumberingService
             FestEvent::where('id', $event->id)->lockForUpdate()->first();
 
             $settings = $this->settings($event);
-            $start = (int) ($item->chest_no_start ?? $settings['chest_no_start'] ?? 1);
-            $headScope = $this->chestHeadScope($event, $item);
+            $start = (int) ($item->chest_no_start ?? $settings['chest_no_start'] ?? 100);
+            
+            // Scope chest number sequence per competition item
+            $scopeByItem = ($settings['chest_scope'] ?? 'item') === 'item' 
+                || (bool) $item->chest_no_start 
+                || ($event->event_type === 'custom')
+                || ($event->event_type === 'fest')
+                || ($event->event_type === 'kalolsavam');
 
-            $max = FestParticipant::where('event_id', $event->id)
-                ->where('chest_head_id', $headScope)
-                ->whereNotNull('chest_no')
-                ->max('chest_no');
+            if ($scopeByItem) {
+                $max = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('item_id', $item->id))
+                    ->whereNotNull('chest_no')
+                    ->max('chest_no');
 
-            // Team/group squads share the same numeric pool as individuals
-            // (one sequence per event), so a squad number never collides
-            // with an individual's number or vice versa.
-            $groupMax = FestGroup::where('event_id', $event->id)
-                ->whereNotNull('chest_no')
-                ->max('chest_no');
+                $groupMax = FestGroup::whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('item_id', $item->id))
+                    ->whereNotNull('chest_no')
+                    ->max('chest_no');
+            } else {
+                $headScope = $this->chestHeadScope($event, $item);
 
-            $max = max((int) $max, (int) $groupMax);
+                $max = FestParticipant::where('event_id', $event->id)
+                    ->where('chest_head_id', $headScope)
+                    ->whereNotNull('chest_no')
+                    ->max('chest_no');
 
-            return max($start, $max + 1);
+                $groupMax = FestGroup::where('event_id', $event->id)
+                    ->whereNotNull('chest_no')
+                    ->max('chest_no');
+            }
+
+            $highest = max((int) $max, (int) $groupMax);
+
+            return $highest > 0 ? max($start, $highest + 1) : $start;
         });
     }
 
