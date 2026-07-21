@@ -30,9 +30,9 @@ return new class extends Migration
 
         $driver = Schema::getConnection()->getDriverName();
 
-        if ($driver === 'mysql' || $driver === 'mariadb') {
-            DB::statement("ALTER TABLE `{$table}` MODIFY `{$column}` VARCHAR(40) NOT NULL");
-
+        if ($driver === 'pgsql') {
+            DB::statement("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS {$table}_{$column}_check");
+            DB::statement("ALTER TABLE {$table} ALTER COLUMN {$column} TYPE VARCHAR(40)");
             return;
         }
 
