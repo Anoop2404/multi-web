@@ -62,7 +62,17 @@ class CertificateTemplateController extends SahodayaAdminController
     public function preview(string $tenantId, CertificateTemplate $template)
     {
         abort_if($template->tenant_id !== $this->sahodaya->id, 403);
-        abort_unless($template->event_type === 'training', 422, 'Preview is available for training templates.');
+
+        if ($template->event_type === 'training') {
+            $render = app(TrainingCertificateService::class)
+                ->sampleRenderContextForTemplate($template, $this->sahodaya);
+
+            return view('training.certificate', array_merge($render, [
+                'registration' => null,
+                'sahodaya'     => $this->sahodaya,
+                'isSample'     => true,
+            ]));
+        }
 
         $render = app(TrainingCertificateService::class)
             ->sampleRenderContextForTemplate($template, $this->sahodaya);
