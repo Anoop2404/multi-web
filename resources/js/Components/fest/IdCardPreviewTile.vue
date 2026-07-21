@@ -7,7 +7,7 @@
                 <div v-else class="id-card-tile__logo-fallback">{{ clusterInitials }}</div>
                 <div class="id-card-tile__head-text">
                     <span class="id-card-tile__org">{{ clusterName }}</span>
-                    <span class="id-card-tile__event">{{ eventTitle || card.event_name || 'GK QUIZ' }}</span>
+                    <span class="id-card-tile__event">{{ eventTitle || card.event_name }}</span>
                 </div>
             </div>
 
@@ -35,37 +35,37 @@
                 <p class="id-card-tile__name">{{ card.name }}</p>
                 <table class="id-card-tile__meta-table">
                     <tr>
-                        <td class="id-card-tile__meta-icon">👤</td>
+                        <td class="id-card-tile__meta-dot"><span class="dot dot--blue"></span></td>
                         <td class="id-card-tile__meta-label">Role</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.role_title || 'Participant' }}</td>
                     </tr>
                     <tr>
-                        <td class="id-card-tile__meta-icon">🏆</td>
+                        <td class="id-card-tile__meta-dot"><span class="dot dot--amber"></span></td>
                         <td class="id-card-tile__meta-label">Event</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.event_name || eventTitle }}</td>
                     </tr>
                     <tr>
-                        <td class="id-card-tile__meta-icon">📅</td>
+                        <td class="id-card-tile__meta-dot"><span class="dot dot--pink"></span></td>
                         <td class="id-card-tile__meta-label">Date</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.event_date || '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="id-card-tile__meta-icon">📍</td>
+                        <td class="id-card-tile__meta-dot"><span class="dot dot--red"></span></td>
                         <td class="id-card-tile__meta-label">Venue</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.venue || '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="id-card-tile__meta-icon">🏫</td>
+                        <td class="id-card-tile__meta-dot"><span class="dot dot--teal"></span></td>
                         <td class="id-card-tile__meta-label">Shodaya</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.sahodaya_name || clusterName }}</td>
                     </tr>
                     <tr>
-                        <td class="id-card-tile__meta-icon">🎯</td>
+                        <td class="id-card-tile__meta-dot"><span class="dot dot--orange"></span></td>
                         <td class="id-card-tile__meta-label">Category</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.category || card.class_category || '—' }}</td>
@@ -125,13 +125,14 @@ const clusterInitials = computed(() =>
     display: flex;
     flex-direction: column;
     position: relative;
-    box-shadow: 0 4px 16px rgba(4, 42, 91, 0.12);
+    box-shadow: 0 3px 12px rgba(4, 42, 91, 0.12);
 }
 
+/* Header */
 .id-card-tile__head {
     flex-shrink: 0;
-    height: 2.8rem;
-    background: #042a5b;
+    height: 30%;
+    background: linear-gradient(135deg, #042a5b 0%, #0a3d7a 100%);
     color: #ffffff;
     padding: 0.3rem 0.5rem 0.15rem;
     display: flex;
@@ -148,10 +149,10 @@ const clusterInitials = computed(() =>
 }
 .id-card-tile__logo,
 .id-card-tile__logo-fallback {
-    width: 1.8rem;
-    height: 1.8rem;
+    width: 1.75rem;
+    height: 1.75rem;
     border-radius: 9999px;
-    border: 1.5px solid #10b981;
+    border: 1.5px solid rgba(16, 185, 129, 0.6);
     background: #ffffff;
     object-fit: cover;
     flex-shrink: 0;
@@ -161,24 +162,24 @@ const clusterInitials = computed(() =>
     align-items: center;
     justify-content: center;
     color: #042a5b;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 800;
 }
 .id-card-tile__head-text { min-width: 0; flex: 1; }
 .id-card-tile__org {
     display: block;
-    font-size: 0.5rem;
+    font-size: 0.48rem;
     font-weight: 800;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #ffffff;
+    color: rgba(255,255,255,0.9);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 .id-card-tile__event {
     display: block;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     font-weight: 800;
     color: #ffffff;
     margin-top: 0.04rem;
@@ -189,26 +190,28 @@ const clusterInitials = computed(() =>
 .id-card-tile__pass-ribbon {
     position: absolute;
     top: 0;
-    right: 2rem;
+    right: 0.6rem;
     background: #059669;
     color: #ffffff;
-    font-size: 0.52rem;
+    font-size: 0.48rem;
     font-weight: 800;
-    padding: 0.12rem 0.5rem 0.18rem;
+    padding: 0.1rem 0.42rem 0.15rem;
     border-bottom-left-radius: 0.25rem;
     border-bottom-right-radius: 0.25rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
 
+/* Wave */
 .id-card-tile__wave {
-    height: 0.55rem;
-    margin-top: -0.55rem;
+    height: 0.5rem;
+    margin-top: -0.5rem;
     position: relative;
     z-index: 2;
 }
 .id-card-tile__wave svg { width: 100%; height: 100%; display: block; }
 
+/* Body */
 .id-card-tile__body {
     flex: 1;
     display: flex;
@@ -218,12 +221,12 @@ const clusterInitials = computed(() =>
     background: #ffffff;
 }
 .id-card-tile__portrait {
-    width: 3.2rem;
-    height: 4rem;
-    border-radius: 0.3rem;
+    width: 22%;
+    aspect-ratio: 4/5;
+    border-radius: 0.25rem;
     border: 1.5px solid #0d9488;
     overflow: hidden;
-    background: #f8fafc;
+    background: #f0fdf4;
     flex-shrink: 0;
 }
 .id-card-tile__photo { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -233,7 +236,7 @@ const clusterInitials = computed(() =>
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 800;
     color: #042a5b;
     background: #e0f2fe;
@@ -241,48 +244,62 @@ const clusterInitials = computed(() =>
 .id-card-tile__info-col {
     flex: 1;
     min-width: 0;
-    padding-right: 0.2rem;
 }
 .id-card-tile__name {
-    font-size: 0.88rem;
+    font-size: 0.82rem;
     font-weight: 800;
     color: #042a5b;
     text-transform: uppercase;
     line-height: 1.15;
-    margin-bottom: 0.15rem;
+    margin-bottom: 0.12rem;
     word-wrap: break-word;
 }
+
+/* Meta table */
 .id-card-tile__meta-table { width: 100%; border-collapse: collapse; }
 .id-card-tile__meta-table td {
-    font-size: 0.52rem;
+    font-size: 0.5rem;
     line-height: 1.35;
-    padding: 0.02rem 0;
-    vertical-align: top;
+    padding: 0.025rem 0;
+    vertical-align: middle;
 }
-.id-card-tile__meta-icon { width: 0.6rem; font-size: 0.5rem; }
-.id-card-tile__meta-label { color: #475569; font-weight: 600; width: 2.1rem; }
-.id-card-tile__meta-sep { color: #64748b; width: 0.35rem; text-align: center; }
+.id-card-tile__meta-dot { width: 0.6rem; padding-right: 0.1rem; }
+.dot {
+    display: inline-block;
+    width: 0.38rem;
+    height: 0.38rem;
+    border-radius: 50%;
+}
+.dot--blue   { background: #3b82f6; }
+.dot--amber  { background: #f59e0b; }
+.dot--pink   { background: #ec4899; }
+.dot--red    { background: #ef4444; }
+.dot--teal   { background: #14b8a6; }
+.dot--orange { background: #f97316; }
+.id-card-tile__meta-label { color: #475569; font-weight: 600; width: 2rem; }
+.id-card-tile__meta-sep { color: #64748b; width: 0.3rem; text-align: center; }
 .id-card-tile__meta-val { color: #0f172a; font-weight: 700; }
 
+/* QR column */
 .id-card-tile__qr-col {
-    width: 2.5rem;
+    width: 18%;
     text-align: center;
     flex-shrink: 0;
     align-self: center;
 }
 .id-card-tile__qr {
-    width: 2.4rem;
-    height: 2.4rem;
+    width: 100%;
+    aspect-ratio: 1;
     background: #ffffff;
-    border-radius: 0.2rem;
-    border: 1px solid #cbd5e1;
+    border-radius: 0.15rem;
+    border: 1px solid #d1d5db;
     padding: 0.06rem;
     display: block;
     margin: 0 auto;
 }
 .id-card-tile__qr-label {
     display: block;
-    font-size: 0.35rem;
+    font-size: 0.32rem;
     font-weight: 800;
     color: #10b981;
     letter-spacing: 0.06em;
@@ -290,9 +307,10 @@ const clusterInitials = computed(() =>
     text-transform: uppercase;
 }
 
+/* Footer */
 .id-card-tile__footer {
     flex-shrink: 0;
-    height: 1.25rem;
+    height: 11%;
     background: #042a5b;
     padding: 0 0.5rem;
     display: flex;
@@ -302,16 +320,16 @@ const clusterInitials = computed(() =>
 .id-card-tile__school-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.18rem;
-    background: #07264a;
-    border: 1px solid #1e3a8a;
+    gap: 0.15rem;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
     border-radius: 9999px;
-    padding: 0.1rem 0.38rem;
-    max-width: 70%;
+    padding: 0.08rem 0.35rem;
+    max-width: 68%;
 }
-.id-card-tile__school-icon { font-size: 0.48rem; }
+.id-card-tile__school-icon { font-size: 0.45rem; }
 .id-card-tile__school-text {
-    font-size: 0.48rem;
+    font-size: 0.45rem;
     font-weight: 800;
     color: #ffffff;
     text-transform: uppercase;
@@ -322,9 +340,9 @@ const clusterInitials = computed(() =>
 .id-card-tile__role-pill {
     background: #059669;
     color: #ffffff;
-    font-size: 0.48rem;
+    font-size: 0.45rem;
     font-weight: 800;
-    padding: 0.1rem 0.42rem;
+    padding: 0.08rem 0.42rem;
     border-radius: 9999px;
     letter-spacing: 0.06em;
     text-transform: uppercase;

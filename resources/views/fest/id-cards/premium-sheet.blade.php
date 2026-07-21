@@ -26,6 +26,7 @@
         .grid td { width: 50%; vertical-align: top; padding: 0; }
         .page-break { page-break-after: always; }
 
+        /* ========= Card ========= */
         .pcard {
             width: {{ \App\Support\FestIdCardTemplates::CARD_WIDTH_MM }}mm;
             height: {{ \App\Support\FestIdCardTemplates::CARD_HEIGHT_MM }}mm;
@@ -34,7 +35,7 @@
             page-break-inside: avoid;
             background: #ffffff;
             border: 0.4mm solid #042a5b;
-            box-shadow: 0 1mm 3mm rgba(4, 42, 91, 0.15);
+            box-shadow: 0 1mm 3mm rgba(4, 42, 91, 0.12);
             display: flex;
             flex-direction: column;
             position: relative;
@@ -43,8 +44,8 @@
         /* Header */
         .pcard__header {
             flex-shrink: 0;
-            height: 19mm;
-            background: #042a5b;
+            height: 18mm;
+            background: linear-gradient(135deg, #042a5b 0%, #0a3d7a 100%);
             color: #ffffff;
             padding: 2mm 3mm 1mm;
             display: flex;
@@ -55,16 +56,16 @@
         .pcard__brand {
             display: flex;
             align-items: center;
-            gap: 2mm;
+            gap: 2.2mm;
             flex: 1;
             min-width: 0;
         }
         .pcard__logo,
         .pcard__logo-fallback {
-            width: 11.5mm;
-            height: 11.5mm;
+            width: 11mm;
+            height: 11mm;
             border-radius: 50%;
-            border: 0.4mm solid #10b981;
+            border: 0.4mm solid rgba(16, 185, 129, 0.6);
             background: #ffffff;
             object-fit: cover;
             flex-shrink: 0;
@@ -74,22 +75,22 @@
             align-items: center;
             justify-content: center;
             color: #042a5b;
-            font-size: 7.5px;
+            font-size: 7px;
             font-weight: bold;
         }
         .pcard__cluster {
-            font-size: 6.8px;
+            font-size: 6.5px;
             font-weight: 800;
-            letter-spacing: 0.06em;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            color: #ffffff;
+            color: rgba(255,255,255,0.9);
             line-height: 1.1;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .pcard__event {
-            font-size: 12.5px;
+            font-size: 12px;
             font-weight: 800;
             color: #ffffff;
             line-height: 1.15;
@@ -101,12 +102,12 @@
         .pcard__pass-ribbon {
             position: absolute;
             top: 0;
-            right: 12mm;
+            right: 3mm;
             background: #059669;
             color: #ffffff;
-            font-size: 7px;
+            font-size: 6.5px;
             font-weight: 800;
-            padding: 1.2mm 4.5mm 1.5mm;
+            padding: 1mm 4mm 1.3mm;
             border-bottom-left-radius: 1.8mm;
             border-bottom-right-radius: 1.8mm;
             letter-spacing: 0.08em;
@@ -115,8 +116,8 @@
 
         /* Wave separator */
         .pcard__wave-separator {
-            height: 3.5mm;
-            margin-top: -3.5mm;
+            height: 3mm;
+            margin-top: -3mm;
             position: relative;
             z-index: 2;
         }
@@ -134,15 +135,14 @@
             gap: 2.5mm;
             padding: 1.5mm 3mm 1mm;
             background: #ffffff;
-            position: relative;
         }
         .pcard__portrait {
-            width: 21mm;
-            height: 26mm;
+            width: 20mm;
+            height: 25mm;
             border-radius: 1.5mm;
             border: 0.45mm solid #0d9488;
             overflow: hidden;
-            background: #f8fafc;
+            background: #f0fdf4;
             flex-shrink: 0;
         }
         .pcard__photo {
@@ -157,7 +157,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: bold;
             color: #042a5b;
             background: #e0f2fe;
@@ -165,10 +165,9 @@
         .pcard__info-col {
             flex: 1;
             min-width: 0;
-            padding-right: 1mm;
         }
         .pcard__name {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 800;
             color: #042a5b;
             text-transform: uppercase;
@@ -183,13 +182,28 @@
         .pcard__meta-table td {
             font-size: 6.8px;
             line-height: 1.35;
-            padding: 0.15mm 0;
-            vertical-align: top;
+            padding: 0.2mm 0;
+            vertical-align: middle;
         }
-        .pcard__meta-icon {
-            width: 3.2mm;
-            font-size: 6.5px;
+
+        /* Colored dot bullets matching reference */
+        .pcard__meta-dot {
+            width: 3.5mm;
+            padding-right: 0.5mm;
         }
+        .dot {
+            display: inline-block;
+            width: 2mm;
+            height: 2mm;
+            border-radius: 50%;
+        }
+        .dot--blue   { background: #3b82f6; }
+        .dot--amber  { background: #f59e0b; }
+        .dot--pink   { background: #ec4899; }
+        .dot--red    { background: #ef4444; }
+        .dot--teal   { background: #14b8a6; }
+        .dot--orange { background: #f97316; }
+
         .pcard__meta-label {
             color: #475569;
             font-weight: 600;
@@ -204,19 +218,21 @@
             color: #0f172a;
             font-weight: 700;
         }
+
+        /* QR column */
         .pcard__qr-col {
-            width: 16mm;
+            width: 17mm;
             text-align: center;
             flex-shrink: 0;
             align-self: center;
         }
         .pcard__qr {
-            width: 15mm;
-            height: 15mm;
+            width: 15.5mm;
+            height: 15.5mm;
             background: #ffffff;
             border-radius: 1mm;
-            border: 0.3mm solid #cbd5e1;
-            padding: 0.4mm;
+            border: 0.3mm solid #d1d5db;
+            padding: 0.5mm;
             display: block;
             margin: 0 auto;
         }
@@ -226,14 +242,14 @@
             font-weight: 800;
             color: #10b981;
             letter-spacing: 0.06em;
-            margin-top: 0.4mm;
+            margin-top: 0.5mm;
             text-transform: uppercase;
         }
 
         /* Footer */
         .pcard__footer {
             flex-shrink: 0;
-            height: 7.5mm;
+            height: 7mm;
             background: #042a5b;
             padding: 0 3mm;
             display: flex;
@@ -243,16 +259,16 @@
         .pcard__school-pill {
             display: inline-flex;
             align-items: center;
-            gap: 1mm;
-            background: #07264a;
-            border: 0.2mm solid #1e3a8a;
+            gap: 0.8mm;
+            background: rgba(255,255,255,0.08);
+            border: 0.2mm solid rgba(255,255,255,0.15);
             border-radius: 999px;
-            padding: 0.8mm 2.5mm;
-            max-width: 70%;
+            padding: 0.6mm 2.5mm;
+            max-width: 68%;
         }
-        .pcard__school-icon { font-size: 6px; }
+        .pcard__school-icon { font-size: 5.5px; }
         .pcard__school-text {
-            font-size: 6px;
+            font-size: 5.8px;
             font-weight: 800;
             color: #ffffff;
             text-transform: uppercase;
@@ -263,9 +279,9 @@
         .pcard__role-pill {
             background: #059669;
             color: #ffffff;
-            font-size: 6px;
+            font-size: 5.8px;
             font-weight: 800;
-            padding: 0.8mm 3mm;
+            padding: 0.7mm 3mm;
             border-radius: 999px;
             letter-spacing: 0.06em;
             text-transform: uppercase;
