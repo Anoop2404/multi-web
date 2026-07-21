@@ -2,17 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ strtoupper($event->title) }} — Fee Status Report</title>
+    <title>{{ strtoupper($event->title) }} — Full Fee Status & Payment Report</title>
     <style>
         @page {
             size: A4 landscape;
-            margin: 12mm 15mm;
+            margin: 10mm 12mm;
         }
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            font-size: 11px;
+            font-size: 10px;
             color: #1e293b;
-            line-height: 1.4;
+            line-height: 1.35;
             background: #fff;
             margin: 0;
             padding: 0;
@@ -20,17 +20,17 @@
         .header-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
-            border-b: 2px solid #0f3d7a;
-            padding-bottom: 10px;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #0f3d7a;
+            padding-bottom: 8px;
         }
         .header-logo {
-            width: 70px;
+            width: 65px;
             vertical-align: top;
         }
         .header-logo img {
-            max-width: 65px;
-            max-height: 65px;
+            max-width: 60px;
+            max-height: 60px;
             object-fit: contain;
         }
         .header-title {
@@ -38,39 +38,39 @@
             padding-left: 10px;
         }
         .header-title h1 {
-            font-size: 18px;
-            margin: 0 0 3px 0;
+            font-size: 17px;
+            margin: 0 0 2px 0;
             color: #0f3d7a;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         .header-title h2 {
-            font-size: 13px;
-            margin: 0 0 4px 0;
+            font-size: 12px;
+            margin: 0 0 3px 0;
             color: #334155;
             font-weight: 600;
         }
         .header-title p {
-            font-size: 10px;
+            font-size: 9.5px;
             margin: 0;
             color: #64748b;
         }
         .header-meta {
             text-align: right;
             vertical-align: top;
-            font-size: 10px;
+            font-size: 9.5px;
             color: #475569;
         }
         .summary-box {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            border-radius: 6px;
+            border-radius: 5px;
         }
         .summary-box td {
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-right: 1px solid #e2e8f0;
             text-align: center;
         }
@@ -78,15 +78,15 @@
             border-right: none;
         }
         .summary-label {
-            font-size: 9px;
+            font-size: 8.5px;
             text-transform: uppercase;
             color: #64748b;
             font-weight: bold;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
             margin-bottom: 2px;
         }
         .summary-value {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             color: #0f172a;
         }
@@ -97,23 +97,23 @@
         .data-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 10px;
+            font-size: 9.5px;
         }
         .data-table th {
             background: #0f3d7a;
             color: #ffffff;
             font-weight: bold;
             text-transform: uppercase;
-            font-size: 9px;
+            font-size: 8.5px;
             letter-spacing: 0.4px;
-            padding: 7px 8px;
+            padding: 6px 7px;
             border: 1px solid #0f3d7a;
             text-align: left;
         }
         .data-table td {
-            padding: 6px 8px;
+            padding: 5px 7px;
             border: 1px solid #cbd5e1;
-            vertical-align: middle;
+            vertical-align: top;
         }
         .data-table tr:nth-child(even) td {
             background: #f8fafc;
@@ -122,11 +122,26 @@
         .text-center { text-align: center; }
         .font-bold { font-weight: bold; }
 
+        .item-list-sub {
+            font-size: 8.5px;
+            color: #475569;
+            margin-top: 3px;
+            line-height: 1.25;
+            font-style: italic;
+        }
+        .receipt-pill {
+            display: block;
+            font-size: 8.5px;
+            color: #1e293b;
+            line-height: 1.25;
+            margin-bottom: 2px;
+        }
+
         .badge {
             display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 8.5px;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 8px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.3px;
@@ -138,13 +153,13 @@
         .badge-rejected { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 
         .footer-notes {
-            margin-top: 20px;
+            margin-top: 15px;
             width: 100%;
             border-collapse: collapse;
         }
         .footer-notes td {
             vertical-align: top;
-            font-size: 9.5px;
+            font-size: 9px;
             color: #64748b;
         }
         .sign-box {
@@ -154,7 +169,7 @@
         .sign-title {
             font-weight: bold;
             color: #1e293b;
-            margin-top: 30px;
+            margin-top: 25px;
         }
     </style>
 </head>
@@ -169,12 +184,12 @@
             @endif
             <td class="header-title">
                 <h1>{{ $sahodaya->name }}</h1>
-                <h2>{{ strtoupper($event->title) }} — FEE STATUS REPORT</h2>
+                <h2>{{ strtoupper($event->title) }} — FULL FEE STATUS &amp; ITEM REPORT</h2>
                 <p>Academic Year: {{ $event->academic_year_id ?? '2026-27' }} · Event Date: {{ $event->event_start ? \Carbon\Carbon::parse($event->event_start)->format('d M Y') : '—' }}</p>
             </td>
             <td class="header-meta">
                 <p><strong>Report Date:</strong> {{ $generatedAt }}</p>
-                <p><strong>Total Schools:</strong> {{ $summary['total_schools'] }}</p>
+                <p><strong>Active Schools:</strong> {{ $summary['total_schools'] }}</p>
             </td>
         </tr>
     </table>
@@ -182,7 +197,7 @@
     <table class="summary-box">
         <tr>
             <td>
-                <div class="summary-label">Participating Schools</div>
+                <div class="summary-label">Active Schools</div>
                 <div class="summary-value">{{ $summary['total_schools'] }}</div>
             </td>
             <td>
@@ -190,7 +205,7 @@
                 <div class="summary-value">₹{{ number_format($summary['total_due'], 2) }}</div>
             </td>
             <td>
-                <div class="summary-label">Total Collected (Paid)</div>
+                <div class="summary-label">Total Collected</div>
                 <div class="summary-value text-green">₹{{ number_format($summary['total_paid'], 2) }}</div>
             </td>
             <td>
@@ -217,23 +232,33 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th style="width: 25px;" class="text-center">#</th>
-                <th>School Name</th>
-                <th style="width: 75px;" class="text-center">Items</th>
-                <th style="width: 85px;" class="text-right">Total Due (₹)</th>
-                <th style="width: 85px;" class="text-right">Amount Paid (₹)</th>
-                <th style="width: 85px;" class="text-right">Balance (₹)</th>
-                <th style="width: 95px;" class="text-center">Status</th>
-                <th style="width: 100px;">Receipt # / Ref</th>
-                <th style="width: 85px;" class="text-center">Payment Date</th>
+                <th style="width: 22px;" class="text-center">#</th>
+                <th>School Name &amp; Registered Items</th>
+                <th style="width: 55px;" class="text-center">Entries</th>
+                <th style="width: 75px;" class="text-right">School Reg (₹)</th>
+                <th style="width: 75px;" class="text-right">Item/Student (₹)</th>
+                <th style="width: 80px;" class="text-right">Total Due (₹)</th>
+                <th style="width: 80px;" class="text-right">Paid (₹)</th>
+                <th style="width: 80px;" class="text-right">Balance (₹)</th>
+                <th style="width: 85px;" class="text-center">Status</th>
+                <th style="width: 120px;">Receipts &amp; Txn Ref</th>
             </tr>
         </thead>
         <tbody>
             @forelse($rows as $index => $row)
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
-                    <td class="font-bold">{{ $row['school_name'] }}</td>
-                    <td class="text-center">{{ $row['item_count'] }}</td>
+                    <td>
+                        <div class="font-bold" style="color: #0f172a;">{{ $row['school_name'] }}</div>
+                        @if(!empty($row['items']))
+                            <div class="item-list-sub">
+                                <strong>Items ({{ count($row['items']) }}):</strong> {{ implode(', ', $row['items']) }}
+                            </div>
+                        @endif
+                    </td>
+                    <td class="text-center font-bold">{{ $row['item_count'] }}</td>
+                    <td class="text-right">₹{{ number_format($row['school_registration_fee'], 2) }}</td>
+                    <td class="text-right">₹{{ number_format($row['participation_fee'], 2) }}</td>
                     <td class="text-right font-bold">₹{{ number_format($row['total_due'], 2) }}</td>
                     <td class="text-right" style="color: #15803d; font-weight: bold;">₹{{ number_format($row['amount_paid'], 2) }}</td>
                     <td class="text-right" style="{{ $row['balance_due'] > 0 ? 'color: #b91c1c; font-weight: bold;' : 'color: #64748b;' }}">
@@ -253,13 +278,29 @@
                         @endphp
                         <span class="badge badge-{{ $st }}">{{ $label }}</span>
                     </td>
-                    <td>{{ $row['receipt_no'] ?: ($row['txn_ref'] ?: '—') }}</td>
-                    <td class="text-center">{{ $row['payment_date'] ?: '—' }}</td>
+                    <td>
+                        @if(!empty($row['receipts']) && count($row['receipts']) > 0)
+                            @foreach($row['receipts'] as $r)
+                                <span class="receipt-pill">
+                                    <strong>{{ $r['receipt_number'] ?: ($r['transaction_ref'] ?: 'Receipt') }}</strong>:
+                                    ₹{{ number_format($r['amount'], 2) }}
+                                    @if($r['payment_date']) ({{ $r['payment_date'] }}) @endif
+                                </span>
+                            @endforeach
+                        @elseif($row['receipt_no'] || $row['txn_ref'])
+                            <span class="receipt-pill">
+                                <strong>{{ $row['receipt_no'] ?: $row['txn_ref'] }}</strong>
+                                @if($row['payment_date']) ({{ $row['payment_date'] }}) @endif
+                            </span>
+                        @else
+                            <span style="color: #94a3b8;">—</span>
+                        @endif
+                    </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9" class="text-center" style="padding: 20px; color: #64748b;">
-                        No school fee records found for this event.
+                    <td colspan="10" class="text-center" style="padding: 20px; color: #64748b;">
+                        No active school fee records found for this event.
                     </td>
                 </tr>
             @endforelse
@@ -268,12 +309,14 @@
             <tfoot>
                 <tr style="background: #f1f5f9; font-weight: bold;">
                     <td colspan="3" class="text-right">TOTALS:</td>
+                    <td class="text-right">₹{{ number_format($rows->sum('school_registration_fee'), 2) }}</td>
+                    <td class="text-right">₹{{ number_format($rows->sum('participation_fee'), 2) }}</td>
                     <td class="text-right">₹{{ number_format($summary['total_due'], 2) }}</td>
                     <td class="text-right" style="color: #15803d;">₹{{ number_format($summary['total_paid'], 2) }}</td>
                     <td class="text-right" style="{{ $summary['total_balance'] > 0 ? 'color: #b91c1c;' : '' }}">
                         ₹{{ number_format($summary['total_balance'], 2) }}
                     </td>
-                    <td colspan="3"></td>
+                    <td colspan="2"></td>
                 </tr>
             </tfoot>
         @endif
@@ -282,7 +325,7 @@
     <table class="footer-notes">
         <tr>
             <td>
-                <p>This report is generated automatically by Sahodaya ERP Management Platform.</p>
+                <p>This report includes all active participating schools, registered items, fee component breakdowns, and payment receipt records.</p>
                 <p>Confidential — For official Sahodaya administration use only.</p>
             </td>
             <td class="sign-box">

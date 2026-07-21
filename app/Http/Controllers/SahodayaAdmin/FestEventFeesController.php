@@ -126,22 +126,41 @@ class FestEventFeesController extends SahodayaAdminController
 
         $schoolFees = FestSchoolEventFee::where('event_id', $event->id)
             ->forAmountAggregation()
-            ->with(['school', 'feeReceipt', 'head'])
+            ->with(['school', 'feeReceipt', 'receipts', 'head'])
             ->orderBy('school_id')
             ->get()
             ->filter(fn ($fee) => (int) $fee->participation_item_count > 0 || (float) $fee->total_due > 0)
-            ->map(function (FestSchoolEventFee $fee) {
+            ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event) {
+                $regs = FestRegistration::where('event_id', $fee->event_id)
+                    ->where('school_id', $fee->school_id)
+                    ->whereIn('status', ['submitted', 'approved'])
+                    ->with(['item', 'participants'])
+                    ->get();
+
+                $receipts = $fee->receipts->map(fn ($r) => [
+                    'receipt_number'  => $r->receipt_number,
+                    'amount'          => (float) $r->amount,
+                    'status'          => $r->status,
+                    'transaction_ref' => $r->transaction_ref,
+                    'payment_date'    => $r->payment_date?->format('d M Y'),
+                ]);
+
                 return [
-                    'school_name' => $fee->school?->name ?? $fee->school_id,
-                    'head_name'   => $fee->head?->name,
-                    'status'      => $fee->status,
-                    'total_due'   => (float) $fee->total_due,
-                    'amount_paid' => (float) $fee->amount_paid,
-                    'balance_due' => (float) $fee->outstandingBalance(),
-                    'item_count'  => (int) $fee->participation_item_count,
-                    'receipt_no'  => $fee->feeReceipt?->receipt_number,
-                    'payment_date'=> $fee->feeReceipt?->payment_date?->format('d M Y'),
-                    'txn_ref'     => $fee->feeReceipt?->transaction_ref,
+                    'school_name'             => $fee->school?->name ?? $fee->school_id,
+                    'head_name'               => $fee->head?->name,
+                    'status'                  => $fee->status,
+                    'school_registration_fee' => (float) $fee->school_registration_fee,
+                    'participation_fee'       => (float) $fee->participation_fee,
+                    'total_due'               => (float) $fee->total_due,
+                    'amount_paid'             => (float) $fee->amount_paid,
+                    'balance_due'             => (float) $fee->outstandingBalance(),
+                    'item_count'              => (int) $fee->participation_item_count,
+                    'receipt_no'              => $fee->feeReceipt?->receipt_number,
+                    'payment_date'            => $fee->feeReceipt?->payment_date?->format('d M Y'),
+                    'txn_ref'                 => $fee->feeReceipt?->transaction_ref,
+                    'breakdown'               => $feeService->breakdown($event, $fee, $schedule),
+                    'items'                   => $regs->map(fn ($r) => $r->item?->title)->filter()->unique()->values()->all(),
+                    'receipts'                => $receipts,
                 ];
             })
             ->sortBy(fn ($row) => strtolower($row['school_name']))
@@ -160,6 +179,7 @@ class FestEventFeesController extends SahodayaAdminController
         ];
 
         $logoUrl = \App\Support\TenantBranding::logoUrl($this->sahodaya);
+        $isDetailed = $request->boolean('detailed') || $request->query('view') === 'detailed';
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.fest-fee-status-pdf', [
             'event'       => $event,
@@ -167,6 +187,7 @@ class FestEventFeesController extends SahodayaAdminController
             'logoUrl'     => $logoUrl,
             'rows'        => $schoolFees,
             'summary'     => $summary,
+            'isDetailed'  => $isDetailed,
             'generatedAt' => now()->format('d M Y, h:i A'),
         ])->setPaper('a4', 'landscape');
 
