@@ -1420,9 +1420,9 @@ function itemStatusMeta(event, item) {
 
     if (status === 'partial') {
         return {
-            label: 'Open',
-            badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-            hint: `${regs}/${max} entries · ${eligible} ${participantNoun}${eligible === 1 ? '' : 's'} eligible`,
+            label: `Registered (${regs}/${max})`,
+            badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            hint: `${regs} of ${max} entries registered · ${eligible} ${participantNoun}${eligible === 1 ? '' : 's'} eligible for more entries`,
         };
     }
 
