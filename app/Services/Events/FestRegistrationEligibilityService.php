@@ -96,6 +96,10 @@ class FestRegistrationEligibilityService
      */
     public function annotateStudents(Collection $students, FestEvent $event, ?string $schoolId = null): Collection
     {
+        if ($students->isEmpty()) {
+            return collect();
+        }
+
         $eventRegByStudent = [];
         if ($schoolId) {
             $studentIds = $students->pluck('id');
@@ -107,25 +111,36 @@ class FestRegistrationEligibilityService
                 ->all();
         }
 
-        return $students->map(function (Student $student) use ($event, $eventRegByStudent) {
+        $eventType = $event->event_type ?? 'kalolsavam';
+        $isSports = $eventType === 'sports';
+        $isKalolsav = $eventType === 'kalolsavam';
+        $isKidsFest = $eventType === 'kids_fest';
+
+        return $students->map(function (Student $student) use ($event, $eventRegByStudent, $isSports, $isKalolsav, $isKidsFest) {
             $classNum = FestStudentClassResolver::classNumberFromStudent($student);
             $eventRegNo = $eventRegByStudent[$student->id] ?? null;
 
-            return array_merge($student->only(['id', 'name', 'reg_no', 'gender', 'dob', 'academic_year_id']), [
+            return [
+                'id' => $student->id,
+                'name' => $student->name,
+                'reg_no' => $student->reg_no,
+                'gender' => $student->gender,
+                'dob' => $student->dob?->toDateString() ?? $student->dob,
+                'academic_year_id' => $student->academic_year_id,
                 'class_name' => $student->schoolClass?->name,
                 'class_number' => $classNum,
                 'is_verified' => $student->isVerified(),
                 'verified_at' => $student->verified_at?->toIso8601String(),
                 'event_registered' => $eventRegNo !== null,
                 'event_registration_number' => $eventRegNo,
-                'kalolsav_class_group' => FestStudentClassResolver::classGroupForStudent($student, $event),
-                'kids_fest_band' => FestStudentClassResolver::kidsFestBandForStudent($student),
-                'sports_age_group' => FestSportsAgeGroup::primaryAgeGroupForStudent($student, $event),
-                'eligible_sports_groups' => FestSportsAgeGroup::eligibleAgeGroupsForStudent($student, $event),
-                'sports_age_on_cutoff' => FestSportsAgeGroup::ageOnCutoff($student, $event),
-                'eligible_kalolsav' => FestStudentClassResolver::isKalolsavEligible($student),
-                'eligible_kids_fest' => FestStudentClassResolver::isKidsFestEligible($student),
-            ]);
+                'kalolsav_class_group' => $isKalolsav ? FestStudentClassResolver::classGroupForStudent($student, $event) : null,
+                'kids_fest_band' => $isKidsFest ? FestStudentClassResolver::kidsFestBandForStudent($student) : null,
+                'sports_age_group' => $isSports ? FestSportsAgeGroup::primaryAgeGroupForStudent($student, $event) : null,
+                'eligible_sports_groups' => $isSports ? FestSportsAgeGroup::eligibleAgeGroupsForStudent($student, $event) : [],
+                'sports_age_on_cutoff' => $isSports ? FestSportsAgeGroup::ageOnCutoff($student, $event) : null,
+                'eligible_kalolsav' => $isKalolsav ? FestStudentClassResolver::isKalolsavEligible($student) : false,
+                'eligible_kids_fest' => $isKidsFest ? FestStudentClassResolver::isKidsFestEligible($student) : false,
+            ];
         });
     }
 

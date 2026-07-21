@@ -218,19 +218,31 @@ class FestRegistrationController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $studentRows = Student::where('tenant_id', $this->school->id)
+        $classId = $request->query('class_id');
+        $search = $request->query('search');
+
+        $studentQuery = Student::where('tenant_id', $this->school->id)
             ->active()
             ->with('schoolClass')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if ($classId) {
+            $studentQuery->where('class_id', $classId);
+        }
+
+        if (filled($search)) {
+            $term = strtolower(trim((string) $search));
+            $studentQuery->where(function ($q) use ($term) {
+                $q->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
+                  ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"]);
+            });
+        }
+
+        $studentRows = $studentQuery->get();
 
         $annotated = app(FestRegistrationEligibilityService::class)
             ->annotateStudents($studentRows, $event, $this->school->id)
             ->values();
-
-        if ($request->wantsJson() || $request->boolean('json')) {
-            return response()->json(['students' => $annotated]);
-        }
 
         return response()->json(['students' => $annotated]);
     }
@@ -257,14 +269,35 @@ class FestRegistrationController extends SchoolAdminController
         $feeService = app(FestSchoolEventFeeService::class);
         $hydrated = $this->hydrateEventForSchoolRegistration($event, $feeService);
 
-        $studentRows = Student::where('tenant_id', $this->school->id)
+        $studentQuery = Student::where('tenant_id', $this->school->id)
             ->active()
             ->with('schoolClass')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        $studentCount = $studentQuery->count();
+        $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 300);
+        $lazyStudents = $studentCount > $lazyThreshold;
 
         $eligibilityService = app(FestRegistrationEligibilityService::class);
-        $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
+
+        if ($lazyStudents && $event->event_type === 'sports') {
+            $eventRegisteredStudentIds = \App\Models\FestLevelRegistration::query()
+                ->where('event_id', $event->id)
+                ->where('status', 'active')
+                ->pluck('student_id');
+
+            $studentRows = Student::where('tenant_id', $this->school->id)
+                ->active()
+                ->whereIn('id', $eventRegisteredStudentIds)
+                ->with('schoolClass')
+                ->orderBy('name')
+                ->get();
+
+            $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
+        } else {
+            $studentRows = $studentQuery->get();
+            $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
+        }
 
         $registrations = FestRegistration::where('school_id', $this->school->id)
             ->whereIn('event_id', $this->registrationEventIdsForSchoolView(collect([$event])))
@@ -274,21 +307,23 @@ class FestRegistrationController extends SchoolAdminController
         return $this->inertia('School/Events/Registration', array_merge(
             $this->schoolFestEventNavProps($event, $meta['slug']),
             [
-                'program'         => $meta['slug'],
-                'programMeta'     => $meta,
-                'events'          => collect([$hydrated]),
-                'registrations'   => $registrations,
-                'students'        => $students,
-                'studentsByEvent' => collect([$event->id => $students]),
-                'schoolClasses'   => $this->schoolClasses()->values(),
-                'eventType'       => $meta['eventType'],
-                'teachers'        => Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no', 'designation']),
-                'isTeacherFest'   => $meta['eventType'] === 'teacher_fest',
-                'presets'         => config('fest_participation_presets'),
-                'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
-                'focusEventId'    => $event->id,
-                'singleEventMode' => true,
-                'profile'         => $this->eventPaymentProfileProp(),
+                'program'          => $meta['slug'],
+                'programMeta'      => $meta,
+                'events'           => collect([$hydrated]),
+                'registrations'    => $registrations,
+                'students'         => $students,
+                'studentsByEvent'  => collect([$event->id => $students]),
+                'lazyLoadStudents' => $lazyStudents,
+                'studentCount'     => $studentCount,
+                'schoolClasses'    => $this->schoolClasses()->values(),
+                'eventType'        => $meta['eventType'],
+                'teachers'         => Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no', 'designation']),
+                'isTeacherFest'    => $meta['eventType'] === 'teacher_fest',
+                'presets'          => config('fest_participation_presets'),
+                'studentEditLock'  => app(StudentEditLockService::class)->metaForSchool($this->school),
+                'focusEventId'     => $event->id,
+                'singleEventMode'  => true,
+                'profile'          => $this->eventPaymentProfileProp(),
             ],
         ));
     }
