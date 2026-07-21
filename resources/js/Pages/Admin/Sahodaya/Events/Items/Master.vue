@@ -316,102 +316,104 @@
         </div>
 
         <!-- EDIT ITEM MODAL DIALOG -->
-        <div v-if="editingItem" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto" @click.self="editingItem = null">
-            <form @submit.prevent="saveEditItem" class="card w-full max-w-xl shadow-2xl space-y-4 my-auto bg-white border border-slate-200">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 class="section-title !mb-0">Edit Item: {{ editingItem.title }}</h3>
-                    <button type="button" class="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none" @click="editingItem = null">×</button>
+        <div v-if="editingItem" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="editingItem = null">
+            <form @submit.prevent="saveEditItem" class="card w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl bg-white border border-slate-200 !p-0 overflow-hidden">
+                <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3.5 bg-slate-50 shrink-0">
+                    <h3 class="section-title !mb-0 text-slate-900 font-bold">Edit Item: {{ editingItem.title }}</h3>
+                    <button type="button" class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none" @click="editingItem = null">×</button>
                 </div>
 
-                <FormGrid>
-                    <FormField label="Title" class-extra="sm:col-span-2">
-                        <input v-model="editForm.title" class="field" required>
-                    </FormField>
-
-                    <FormField label="Item Code">
-                        <input v-model="editForm.item_code" class="field font-mono" placeholder="e.g. ATH-101">
-                    </FormField>
-
-                    <FormField v-if="isSports" label="Age Group">
-                        <select v-model="editForm.age_group" class="field">
-                            <option value="">None / Open</option>
-                            <option v-for="(label, key) in taxonomy.age_group" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                    </FormField>
-
-                    <FormField v-else-if="event.event_type === 'kids_fest'" label="Kids Fest Band">
-                        <select v-model="editForm.kids_band" class="field">
-                            <option value="">None / Open</option>
-                            <option v-for="(label, key) in (taxonomy.kids_band || {})" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                    </FormField>
-
-                    <FormField v-else label="Class Category / Group">
-                        <select v-model="editForm.class_group" class="field">
-                            <option value="">Open / All Classes</option>
-                            <option v-for="(label, key) in (taxonomy.class_group || {})" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                    </FormField>
-
-                    <FormField label="Gender">
-                        <select v-model="editForm.gender" class="field">
-                            <option value="open">Open / Mixed</option>
-                            <option v-for="(label, key) in taxonomy.gender" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                    </FormField>
-
-                    <FormField label="Participant Type">
-                        <select v-model="editForm.participant_type" class="field">
-                            <option v-for="(label, key) in taxonomy.participant_type" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                    </FormField>
-
-                    <FormField label="Max per School">
-                        <input v-model.number="editForm.max_per_school" type="number" min="1" class="field" placeholder="e.g. 2">
-                    </FormField>
-
-                    <template v-if="['group', 'team'].includes(editForm.participant_type)">
-                        <FormField label="Min Team Size">
-                            <input v-model.number="editForm.min_group_size" type="number" min="1" class="field" placeholder="e.g. 2">
+                <div class="p-5 overflow-y-auto space-y-4 flex-1">
+                    <FormGrid>
+                        <FormField label="Title" class-extra="sm:col-span-2">
+                            <input v-model="editForm.title" class="field" required>
                         </FormField>
 
-                        <FormField label="Max Team Size">
-                            <input v-model.number="editForm.max_group_size" type="number" min="1" class="field" placeholder="e.g. 10">
+                        <FormField label="Item Code">
+                            <input v-model="editForm.item_code" class="field font-mono" placeholder="e.g. ATH-101">
                         </FormField>
 
-                        <FormField label="Max Substitutes (Standbys)">
-                            <input v-model.number="editForm.standbys" type="number" min="0" class="field" placeholder="e.g. 2">
+                        <FormField v-if="isSports" label="Age Group">
+                            <select v-model="editForm.age_group" class="field">
+                                <option value="">None / Open</option>
+                                <option v-for="(label, key) in taxonomy.age_group" :key="key" :value="key">{{ label }}</option>
+                            </select>
                         </FormField>
-                    </template>
 
-                    <FormField label="Qualifiers Count">
-                        <input v-model.number="editForm.qualify_count" type="number" min="1" class="field" placeholder="e.g. 2">
-                    </FormField>
+                        <FormField v-else-if="event.event_type === 'kids_fest'" label="Kids Fest Band">
+                            <select v-model="editForm.kids_band" class="field">
+                                <option value="">None / Open</option>
+                                <option v-for="(label, key) in (taxonomy.kids_band || {})" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                        </FormField>
 
-                    <FormField label="Stage / Category Type">
-                        <select v-model="editForm.stage_type" class="field">
-                            <option value="">Default / None</option>
-                            <option v-for="(label, key) in (taxonomy.stage_type || {})" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                    </FormField>
+                        <FormField v-else label="Class Category / Group">
+                            <select v-model="editForm.class_group" class="field">
+                                <option value="">Open / All Classes</option>
+                                <option v-for="(label, key) in (taxonomy.class_group || {})" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                        </FormField>
 
-                    <FormField label="Est. Duration (Mins)">
-                        <input v-model.number="editForm.duration_minutes" type="number" min="1" class="field" placeholder="e.g. 30">
-                    </FormField>
+                        <FormField label="Gender">
+                            <select v-model="editForm.gender" class="field">
+                                <option value="open">Open / Mixed</option>
+                                <option v-for="(label, key) in taxonomy.gender" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                        </FormField>
 
-                    <FormField label="Result Method">
-                        <select v-model="editForm.result_method" class="field">
-                            <option value="">Default</option>
-                            <option v-for="(label, key) in (taxonomy.result_method || {})" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                    </FormField>
+                        <FormField label="Participant Type">
+                            <select v-model="editForm.participant_type" class="field">
+                                <option v-for="(label, key) in taxonomy.participant_type" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                        </FormField>
 
-                    <FormField label="Fee Override (₹)" class-extra="sm:col-span-2">
-                        <input v-model.number="editForm.fee_amount" type="number" min="0" class="field" placeholder="Default fee">
-                    </FormField>
-                </FormGrid>
+                        <FormField label="Max per School">
+                            <input v-model.number="editForm.max_per_school" type="number" min="1" class="field" placeholder="e.g. 2">
+                        </FormField>
 
-                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                        <template v-if="['group', 'team'].includes(editForm.participant_type)">
+                            <FormField label="Min Team Size">
+                                <input v-model.number="editForm.min_group_size" type="number" min="1" class="field" placeholder="e.g. 2">
+                            </FormField>
+
+                            <FormField label="Max Team Size">
+                                <input v-model.number="editForm.max_group_size" type="number" min="1" class="field" placeholder="e.g. 10">
+                            </FormField>
+
+                            <FormField label="Max Substitutes (Standbys)">
+                                <input v-model.number="editForm.standbys" type="number" min="0" class="field" placeholder="e.g. 2">
+                            </FormField>
+                        </template>
+
+                        <FormField label="Qualifiers Count">
+                            <input v-model.number="editForm.qualify_count" type="number" min="1" class="field" placeholder="e.g. 2">
+                        </FormField>
+
+                        <FormField label="Stage / Category Type">
+                            <select v-model="editForm.stage_type" class="field">
+                                <option value="">Default / None</option>
+                                <option v-for="(label, key) in (taxonomy.stage_type || {})" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                        </FormField>
+
+                        <FormField label="Est. Duration (Mins)">
+                            <input v-model.number="editForm.duration_minutes" type="number" min="1" class="field" placeholder="e.g. 30">
+                        </FormField>
+
+                        <FormField label="Result Method">
+                            <select v-model="editForm.result_method" class="field">
+                                <option value="">Default</option>
+                                <option v-for="(label, key) in (taxonomy.result_method || {})" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                        </FormField>
+
+                        <FormField label="Fee Override (₹)" class-extra="sm:col-span-2">
+                            <input v-model.number="editForm.fee_amount" type="number" min="0" class="field" placeholder="Default fee">
+                        </FormField>
+                    </FormGrid>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-200 bg-slate-50 shrink-0">
                     <button type="button" @click="editingItem = null" class="btn-secondary text-sm">Cancel</button>
                     <button type="submit" class="btn-primary text-sm" :disabled="editForm.processing">Save Changes</button>
                 </div>
@@ -561,9 +563,10 @@ function addItem() {
 const editingItem = ref(null);
 const editForm = useForm({
     title: '', item_code: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
-    venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', result_method: '',
+    stage_type: '', venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', result_method: '',
     category: '', area_id: '', tiebreak_mode: 'none',
     max_per_school: null, qualify_count: null, duration_minutes: null,
+    min_group_size: null, max_group_size: null, standbys: null,
     fee_amount: null,
 });
 
@@ -572,10 +575,17 @@ function startEditItem(item) {
     editForm.title = item.title ?? '';
     editForm.item_code = item.item_code ?? '';
     editForm.gender = item.gender ?? 'open';
+    editForm.class_group = item.class_group ?? '';
     editForm.age_group = item.age_group ?? '';
+    editForm.kids_band = item.kids_band ?? '';
+    editForm.stage_type = item.stage_type ?? '';
+    editForm.area_id = item.area_id ?? '';
     editForm.participant_type = item.participant_type ?? 'individual';
     editForm.result_method = item.result_method ?? '';
     editForm.max_per_school = item.max_per_school ?? null;
+    editForm.min_group_size = item.min_group_size ?? null;
+    editForm.max_group_size = item.max_group_size ?? null;
+    editForm.standbys = item.standbys ?? null;
     editForm.qualify_count = item.qualify_count ?? null;
     editForm.duration_minutes = item.duration_minutes ?? null;
     editForm.fee_amount = item.fee_amount ?? null;
