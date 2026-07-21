@@ -944,6 +944,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/fees', [FestEventFeesController::class, 'index'])->name('fees.index');
             Route::get('/{event}/fees/ledger', [FestEventFeesController::class, 'ledger'])->name('fees.ledger');
             Route::get('/{event}/fees/export', [FestEventFeesController::class, 'exportPayments'])->name('fees.export');
+            Route::get('/{event}/fees/pdf', [FestEventFeesController::class, 'pdfReport'])->name('fees.pdf');
             Route::get('/{event}/finance', [\App\Http\Controllers\SahodayaAdmin\FestFinanceController::class, 'index'])->name('finance.index');
             Route::post('/{event}/finance/issue-all', [\App\Http\Controllers\SahodayaAdmin\FestFinanceController::class, 'issueAll'])->name('finance.issue-all');
             Route::post('/{event}/finance/schools/{schoolId}', [\App\Http\Controllers\SahodayaAdmin\FestFinanceController::class, 'issueSchool'])->name('finance.issue-school');

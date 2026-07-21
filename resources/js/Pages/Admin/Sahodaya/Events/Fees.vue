@@ -13,6 +13,12 @@
                     <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/fees/ledger`" class="btn-primary text-xs">
                         Payment Ledger →
                     </Link>
+                    <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/fees/pdf?preview=1`" target="_blank" class="btn-primary text-xs">
+                        <span>📄 Fee Report PDF ↗</span>
+                    </a>
+                    <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/fees/pdf?download=1`" class="btn-secondary text-xs">
+                        Download PDF ↓
+                    </a>
                     <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/fees/export`" class="btn-secondary text-xs">
                         Export CSV ↓
                     </a>

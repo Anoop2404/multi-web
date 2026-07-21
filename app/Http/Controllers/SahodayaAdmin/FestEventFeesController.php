@@ -73,6 +73,7 @@ class FestEventFeesController extends SahodayaAdminController
                     'sports_participation' => $sportsParticipation,
                 ];
             })
+            ->filter(fn ($row) => ($row['participation_item_count'] ?? 0) > 0 || count($row['items'] ?? []) > 0 || (float) ($row['total_due'] ?? 0) > 0)
             ->sortBy(fn ($row) => strtolower($row['school']))
             ->values();
 
@@ -116,6 +117,69 @@ class FestEventFeesController extends SahodayaAdminController
         ]));
     }
 
+    public function pdfReport(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $feeService = app(FestSchoolEventFeeService::class);
+        $schedule = $feeService->resolveSchedule($event);
+
+        $schoolFees = FestSchoolEventFee::where('event_id', $event->id)
+            ->forAmountAggregation()
+            ->with(['school', 'feeReceipt', 'head'])
+            ->orderBy('school_id')
+            ->get()
+            ->filter(fn ($fee) => (int) $fee->participation_item_count > 0 || (float) $fee->total_due > 0)
+            ->map(function (FestSchoolEventFee $fee) {
+                return [
+                    'school_name' => $fee->school?->name ?? $fee->school_id,
+                    'head_name'   => $fee->head?->name,
+                    'status'      => $fee->status,
+                    'total_due'   => (float) $fee->total_due,
+                    'amount_paid' => (float) $fee->amount_paid,
+                    'balance_due' => (float) $fee->outstandingBalance(),
+                    'item_count'  => (int) $fee->participation_item_count,
+                    'receipt_no'  => $fee->feeReceipt?->receipt_number,
+                    'payment_date'=> $fee->feeReceipt?->payment_date?->format('d M Y'),
+                    'txn_ref'     => $fee->feeReceipt?->transaction_ref,
+                ];
+            })
+            ->sortBy(fn ($row) => strtolower($row['school_name']))
+            ->values();
+
+        $summary = [
+            'total_schools' => $schoolFees->count(),
+            'total_due'     => $schoolFees->sum('total_due'),
+            'total_paid'    => $schoolFees->sum('amount_paid'),
+            'total_balance' => $schoolFees->sum('balance_due'),
+            'approved'      => $schoolFees->where('status', 'approved')->count(),
+            'proof_uploaded'=> $schoolFees->where('status', 'proof_uploaded')->count(),
+            'partial'       => $schoolFees->where('status', 'partial')->count(),
+            'pending'       => $schoolFees->where('status', 'pending')->count(),
+            'rejected'      => $schoolFees->where('status', 'rejected')->count(),
+        ];
+
+        $logoUrl = \App\Support\TenantBranding::logoUrl($this->sahodaya);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.fest-fee-status-pdf', [
+            'event'       => $event,
+            'sahodaya'    => $this->sahodaya,
+            'logoUrl'     => $logoUrl,
+            'rows'        => $schoolFees,
+            'summary'     => $summary,
+            'generatedAt' => now()->format('d M Y, h:i A'),
+        ])->setPaper('a4', 'landscape');
+
+        $slug = \Illuminate\Support\Str::slug($event->title);
+        $filename = "{$slug}-fee-status-report.pdf";
+
+        if ($request->boolean('download')) {
+            return $pdf->download($filename);
+        }
+
+        return $pdf->stream($filename);
+    }
+
     public function exportPayments(string $tenantId, FestEvent $event): StreamedResponse
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -124,7 +188,8 @@ class FestEventFeesController extends SahodayaAdminController
             ->forAmountAggregation()
             ->with(['school', 'feeReceipt', 'head'])
             ->orderBy('school_id')
-            ->get();
+            ->get()
+            ->filter(fn ($fee) => (int) $fee->participation_item_count > 0 || (float) $fee->total_due > 0);
 
         $filename = 'event-fees-'.str($event->title)->slug('-').'.csv';
 
