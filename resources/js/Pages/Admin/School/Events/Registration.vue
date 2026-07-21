@@ -897,6 +897,10 @@ function studentsForEvent(eventId) {
         ?? [];
 }
 
+function requireVerifiedForEvent(event) {
+    return event?.require_verified_students !== false;
+}
+
 const GROUP_ALIASES = {
     lp: ['lp', 'category1', 'category_1', 'cat1', 'category 1', 'cat 1'],
     up: ['up', 'category2', 'category_2', 'cat2', 'category 2', 'cat 2'],

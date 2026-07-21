@@ -334,14 +334,28 @@
 
                     <FormField v-if="isSports" label="Age Group">
                         <select v-model="editForm.age_group" class="field">
-                            <option value="">None</option>
+                            <option value="">None / Open</option>
                             <option v-for="(label, key) in taxonomy.age_group" :key="key" :value="key">{{ label }}</option>
+                        </select>
+                    </FormField>
+
+                    <FormField v-else-if="event.event_type === 'kids_fest'" label="Kids Fest Band">
+                        <select v-model="editForm.kids_band" class="field">
+                            <option value="">None / Open</option>
+                            <option v-for="(label, key) in (taxonomy.kids_band || {})" :key="key" :value="key">{{ label }}</option>
+                        </select>
+                    </FormField>
+
+                    <FormField v-else label="Class Category / Group">
+                        <select v-model="editForm.class_group" class="field">
+                            <option value="">Open / All Classes</option>
+                            <option v-for="(label, key) in (taxonomy.class_group || {})" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </FormField>
 
                     <FormField label="Gender">
                         <select v-model="editForm.gender" class="field">
-                            <option value="open">Open</option>
+                            <option value="open">Open / Mixed</option>
                             <option v-for="(label, key) in taxonomy.gender" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </FormField>
@@ -356,8 +370,29 @@
                         <input v-model.number="editForm.max_per_school" type="number" min="1" class="field" placeholder="e.g. 2">
                     </FormField>
 
+                    <template v-if="['group', 'team'].includes(editForm.participant_type)">
+                        <FormField label="Min Team Size">
+                            <input v-model.number="editForm.min_group_size" type="number" min="1" class="field" placeholder="e.g. 2">
+                        </FormField>
+
+                        <FormField label="Max Team Size">
+                            <input v-model.number="editForm.max_group_size" type="number" min="1" class="field" placeholder="e.g. 10">
+                        </FormField>
+
+                        <FormField label="Max Substitutes (Standbys)">
+                            <input v-model.number="editForm.standbys" type="number" min="0" class="field" placeholder="e.g. 2">
+                        </FormField>
+                    </template>
+
                     <FormField label="Qualifiers Count">
                         <input v-model.number="editForm.qualify_count" type="number" min="1" class="field" placeholder="e.g. 2">
+                    </FormField>
+
+                    <FormField label="Stage / Category Type">
+                        <select v-model="editForm.stage_type" class="field">
+                            <option value="">Default / None</option>
+                            <option v-for="(label, key) in (taxonomy.stage_type || {})" :key="key" :value="key">{{ label }}</option>
+                        </select>
                     </FormField>
 
                     <FormField label="Est. Duration (Mins)">
