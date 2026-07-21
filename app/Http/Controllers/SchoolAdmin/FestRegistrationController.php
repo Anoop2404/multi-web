@@ -129,21 +129,11 @@ class FestRegistrationController extends SchoolAdminController
         }
 
         $eligibilityService = app(FestRegistrationEligibilityService::class);
-        $studentsByEvent = collect();
-        if (! $lazyStudents) {
-            $studentsByEvent = $events->mapWithKeys(function (FestEvent $event) use ($studentRows, $eligibilityService) {
-                return [
-                    $event->id => $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values(),
-                ];
-            });
-        } elseif ($focusEventId) {
-            $focusEvent = $events->firstWhere('id', $focusEventId);
-            if ($focusEvent) {
-                $studentsByEvent = collect([
-                    $focusEventId => $eligibilityService->annotateStudents($studentRows, $focusEvent, $this->school->id)->values(),
-                ]);
-            }
-        }
+        $studentsByEvent = $events->mapWithKeys(function (FestEvent $event) use ($studentRows, $eligibilityService) {
+            return [
+                $event->id => $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values(),
+            ];
+        });
 
         return $this->inertia('School/Events/Registration', [
             'program'       => $program,
