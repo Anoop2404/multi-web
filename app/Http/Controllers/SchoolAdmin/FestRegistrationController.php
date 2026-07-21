@@ -227,7 +227,7 @@ class FestRegistrationController extends SchoolAdminController
             ->orderBy('name');
 
         if ($classId) {
-            $studentQuery->where('class_id', $classId);
+            $studentQuery->where('school_class_id', $classId);
         }
 
         if (filled($search)) {
@@ -271,8 +271,7 @@ class FestRegistrationController extends SchoolAdminController
 
         $studentQuery = Student::where('tenant_id', $this->school->id)
             ->active()
-            ->select(['id', 'tenant_id', 'name', 'reg_no', 'gender', 'dob', 'class_id', 'academic_year_id', 'verified_at'])
-            ->with('schoolClass:id,name')
+            ->with('schoolClass')
             ->orderBy('name');
 
         $studentRows = $studentQuery->get();
