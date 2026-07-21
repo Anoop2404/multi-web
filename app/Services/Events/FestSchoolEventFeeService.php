@@ -341,10 +341,6 @@ class FestSchoolEventFeeService
             }
         }
 
-        if ($record->exists && (float) $record->total_due > 0 && $record->isFullyPaid()) {
-            return $record;
-        }
-
         $record->fill([
             'head_id' => null,
             'school_registration_fee' => $composite['school_reg'],
@@ -406,11 +402,6 @@ class FestSchoolEventFeeService
             'school_id' => $schoolId,
             'head_id' => $head->id,
         ]);
-
-        // Only freeze records that already have a positive balance fully settled.
-        if ($record->exists && (float) $record->total_due > 0 && $record->isFullyPaid()) {
-            return $record;
-        }
 
         $record->fill([
             'school_registration_fee' => $composite['school_reg'],
@@ -583,12 +574,6 @@ class FestSchoolEventFeeService
             'event_id' => $event->id,
             'school_id' => $schoolId,
         ]);
-
-        // Only freeze records that already have a positive balance fully settled.
-        // Zero-total "approved" stubs (created before fees were configured) must be recalculated.
-        if ($record->exists && (float) $record->total_due > 0 && $record->isFullyPaid()) {
-            return $record;
-        }
 
         $record->fill(array_filter([
             'school_registration_fee' => $schoolRegFee,
