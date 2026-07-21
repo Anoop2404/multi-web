@@ -174,42 +174,49 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($schoolEventFee->event_id !== $event->id, 403);
 
-        $data = $request->validate(['reason' => 'required|string|max:500']);
+        $data = $request->validate(['reason' => 'nullable|string|max:500']);
 
         $schoolEventFee->refresh();
-        $paid = (float) $schoolEventFee->amount_paid;
-        $shortfall = round(max(0, (float) $schoolEventFee->total_due - $paid), 2);
+        $due = (float) $schoolEventFee->total_due;
 
-        abort_if($shortfall <= 0, 422, 'This fee is already fully paid — nothing to override.');
+        $receipt = $schoolEventFee->feeReceipt
+            ?? $schoolEventFee->receipts()->latest('id')->first();
 
-        $fullyPaid = DB::transaction(function () use ($schoolEventFee, $paid, $event) {
-            $schoolEventFee->update(['total_due' => $paid]);
-            $schoolEventFee->refresh();
-            $schoolEventFee->refreshPaidState();
-            $fullyPaid = $schoolEventFee->fresh()->isFullyPaid();
-
-            if ($fullyPaid) {
-                app(\App\Services\Events\FestRegistrationApprovalService::class)
-                    ->approveSchoolEvent($event, $schoolEventFee->school_id, $schoolEventFee->head_id);
-
-                if ($schoolEventFee->head_id === null) {
-                    FestEventInvoice::where('event_id', $schoolEventFee->event_id)
-                        ->where('school_id', $schoolEventFee->school_id)
-                        ->update(['status' => 'paid']);
-                }
+        DB::transaction(function () use ($schoolEventFee, $receipt, $due, $event, $request) {
+            if ($receipt) {
+                $nextNo = $receipt->receipt_number ?: ('EF-'.str_pad((string) app(SahodayaReceiptNumberAllocator::class)->next($this->sahodaya->id), 4, '0', STR_PAD_LEFT));
+                $receipt->update([
+                    'status' => 'approved',
+                    'amount' => $due,
+                    'receipt_number' => $nextNo,
+                    'reviewed_by' => $request->user()->id,
+                    'reviewed_at' => now(),
+                ]);
+                $schoolEventFee->update(['fee_receipt_id' => $receipt->id]);
             }
 
-            return $fullyPaid;
+            $schoolEventFee->refreshPaidState();
+
+            app(\App\Services\Events\FestRegistrationApprovalService::class)
+                ->approveSchoolEvent($event, $schoolEventFee->school_id, $schoolEventFee->head_id);
+
+            if ($schoolEventFee->head_id === null) {
+                FestEventInvoice::where('event_id', $schoolEventFee->event_id)
+                    ->where('school_id', $schoolEventFee->school_id)
+                    ->update(['status' => 'paid']);
+            }
         });
 
-        $audit->festEvent($event, FestPageActivity::FEES, 'fest.fee.force_approved', 'School event fee manually approved (due/paid mismatch override)', [
-            'school_id'      => $schoolEventFee->school_id,
-            'waived_amount'  => $shortfall,
-            'reason'         => $data['reason'],
+        if ($receipt) {
+            app(FestFeeLedgerService::class)->postApprovedReceipt($receipt->fresh());
+        }
+
+        $audit->festEvent($event, FestPageActivity::FEES, 'fest.fee.force_approved', 'School event fee manually approved in full', [
+            'school_id' => $schoolEventFee->school_id,
+            'total_due' => $due,
+            'reason'    => $data['reason'] ?? 'Manual admin approval',
         ]);
 
-        return back()->with('success', $fullyPaid
-            ? '₹'.number_format($shortfall, 2).' waived to reconcile total due against amount paid — registrations approved.'
-            : 'Could not reconcile — balance still outstanding.');
+        return back()->with('success', 'School event fee approved in full (₹'.number_format($due, 2).') — registrations approved.');
     }
 }
