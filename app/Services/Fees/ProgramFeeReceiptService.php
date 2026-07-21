@@ -156,6 +156,10 @@ class ProgramFeeReceiptService
         $receipt->loadMissing('feeable');
         $feeable = $receipt->feeable;
 
+        if ($receipt->feeable_type === FestSchoolEventFee::class && $feeable instanceof FestSchoolEventFee) {
+            return $this->renderFestSchoolEventFee($feeable, $receipt);
+        }
+
         $updated = match ($receipt->feeable_type) {
             McqSchoolFee::class => $this->issueMcqSchoolBatch($feeable, $receipt),
             McqRegistration::class => $this->issueMcqRegistration($feeable, $receipt),
@@ -167,10 +171,10 @@ class ProgramFeeReceiptService
         return $updated ? $this->readGeneratedReceipt($updated) : null;
     }
 
-    public function renderFestSchoolEventFee(FestSchoolEventFee $schoolFee): ?string
+    public function renderFestSchoolEventFee(FestSchoolEventFee $schoolFee, ?FeeReceipt $receipt = null): ?string
     {
         $schoolFee->loadMissing(['feeReceipt', 'event', 'school']);
-        $receipt = $schoolFee->feeReceipt;
+        $receipt = $receipt ?? $schoolFee->feeReceipt;
 
         if (! $receipt || $receipt->status !== 'approved') {
             return null;
