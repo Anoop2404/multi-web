@@ -211,7 +211,14 @@
                                     </button>
                                 </div>
 
-                                <span v-if="row.fee_receipt?.receipt_number" class="text-[11px] font-mono font-bold text-emerald-700 block">
+                                <a v-if="row.fee_receipt?.receipt_number && row.fee_receipt?.id && row.fee_receipt?.status === 'approved'"
+                                   :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/receipts/${row.fee_receipt.id}`"
+                                   target="_blank" rel="noopener"
+                                   title="View & print official fee receipt"
+                                   class="text-[11px] font-mono font-bold text-emerald-700 hover:text-emerald-900 underline decoration-emerald-300 hover:decoration-emerald-600 inline-flex items-center gap-0.5 mt-0.5 transition">
+                                    #{{ row.fee_receipt.receipt_number }} ↗
+                                </a>
+                                <span v-else-if="row.fee_receipt?.receipt_number" class="text-[11px] font-mono font-bold text-emerald-700 block">
                                     #{{ row.fee_receipt.receipt_number }}
                                 </span>
                             </td>
