@@ -255,38 +255,56 @@
             <!-- Extras: stats, actions, deadlines -->
             <div v-if="dashboardExtras && Object.keys(dashboardExtras).length" class="space-y-6">
                 <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    <DashboardStatCard label="Teachers" :value="dashboardExtras.teacherCount ?? 0" icon="👩‍🏫" tone="indigo" />
-                    <DashboardStatCard label="Talent Search registrations" :value="dashboardExtras.mcqRegistered ?? 0" icon="📝" tone="navy" />
+                    <DashboardStatCard label="Student Roster" :value="props.stats?.[0]?.value ?? 0" icon="👨‍🎓" tone="navy" :href="`${base}/students`" />
+                    <DashboardStatCard label="Talent Search registrations" :value="dashboardExtras.mcqRegistered ?? 0" icon="📝" tone="indigo" />
                     <DashboardStatCard label="Training enrolled" :value="dashboardExtras.trainingRegistered ?? 0" icon="🎓" tone="green" />
                     <DashboardStatCard label="Fees due" :value="`₹${fmt(dashboardExtras.pendingPayments?.total)}`" icon="💳" tone="amber" />
                 </div>
 
-                <div v-if="dashboardExtras.pendingActions?.length" class="card border-amber-200 bg-gradient-to-br from-amber-50/80 to-white">
-                    <h3 class="section-title mb-4 text-base text-amber-900">Action required</h3>
+                <div v-if="dashboardExtras.pendingActions?.length" class="card border-amber-200/90 bg-gradient-to-br from-amber-50/90 via-white to-amber-50/40 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="section-title text-base text-amber-950 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                            Action required
+                        </h3>
+                        <span class="text-xs font-semibold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                            {{ dashboardExtras.pendingActions.length }} pending
+                        </span>
+                    </div>
                     <div class="grid gap-3 sm:grid-cols-2">
                         <component
                             :is="a.url ? Link : 'div'"
                             v-for="(a, i) in dashboardExtras.pendingActions"
                             :key="i"
                             v-bind="a.url ? { href: a.url } : {}"
-                            class="rounded-xl border border-amber-200/80 bg-white/90 p-4 transition"
-                            :class="a.url ? 'cursor-pointer hover:border-amber-400 hover:shadow-sm' : ''"
+                            class="rounded-xl border border-amber-200 bg-white p-4 transition-all hover:border-amber-400 hover:shadow-md flex items-center justify-between gap-3 group"
                         >
-                            <p class="text-[10px] font-bold uppercase tracking-wide text-amber-700/80">{{ actionTypeLabel(a.type) }}</p>
-                            <p class="mt-1 text-sm font-semibold text-amber-950">{{ a.label }}</p>
-                            <p v-if="a.count > 1" class="mt-1 text-xs text-amber-700">{{ a.count }} items</p>
-                            <p v-if="a.url" class="mt-2 text-xs font-semibold text-[#0f3d7a]">Open →</p>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[10px] font-bold uppercase tracking-wider text-amber-700/90">{{ actionTypeLabel(a.type) }}</p>
+                                <p class="mt-1 text-sm font-bold text-slate-900 group-hover:text-[#0f3d7a] transition-colors truncate">{{ a.label }}</p>
+                                <p v-if="a.count > 1" class="mt-0.5 text-xs text-amber-700 font-medium">{{ a.count }} items pending</p>
+                            </div>
+                            <div v-if="a.url" class="shrink-0">
+                                <span class="inline-flex items-center gap-1 text-xs font-bold text-[#0f3d7a] bg-slate-100 group-hover:bg-[#0f3d7a] group-hover:text-white px-3 py-1.5 rounded-lg transition-all shadow-xs">
+                                    Open →
+                                </span>
+                            </div>
                         </component>
                     </div>
                 </div>
 
                 <div v-if="dashboardExtras.upcoming?.length" class="card">
-                    <h3 class="section-title mb-3 text-base">Upcoming deadlines</h3>
-                    <ul class="divide-y text-sm">
-                        <li v-for="(u, i) in dashboardExtras.upcoming" :key="i" class="flex justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                            <Link v-if="u.url" :href="u.url" class="link-brand truncate font-medium">{{ u.title }}</Link>
-                            <span v-else class="truncate font-medium">{{ u.title }}</span>
-                            <span class="shrink-0 text-xs text-slate-500">{{ u.date }}</span>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="section-title text-base flex items-center gap-2">
+                            <span>⏳</span> Upcoming deadlines
+                        </h3>
+                        <span class="text-xs text-slate-400 font-medium">{{ dashboardExtras.upcoming.length }} dates</span>
+                    </div>
+                    <ul class="divide-y divide-slate-100 text-sm">
+                        <li v-for="(u, i) in dashboardExtras.upcoming" :key="i" class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0 hover:bg-slate-50/60 px-2 rounded-lg transition-colors">
+                            <Link v-if="u.url" :href="u.url" class="link-brand truncate font-semibold text-slate-800 hover:text-[#0f3d7a]">{{ u.title }}</Link>
+                            <span v-else class="truncate font-semibold text-slate-800">{{ u.title }}</span>
+                            <span class="shrink-0 text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200/80">{{ u.date }}</span>
                         </li>
                     </ul>
                 </div>
