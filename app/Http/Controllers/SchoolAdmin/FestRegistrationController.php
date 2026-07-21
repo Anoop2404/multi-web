@@ -271,33 +271,17 @@ class FestRegistrationController extends SchoolAdminController
 
         $studentQuery = Student::where('tenant_id', $this->school->id)
             ->active()
-            ->with('schoolClass')
+            ->select(['id', 'tenant_id', 'name', 'reg_no', 'gender', 'dob', 'class_id', 'academic_year_id', 'verified_at'])
+            ->with('schoolClass:id,name')
             ->orderBy('name');
 
-        $studentCount = $studentQuery->count();
+        $studentRows = $studentQuery->get();
+        $studentCount = $studentRows->count();
         $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 300);
         $lazyStudents = $studentCount > $lazyThreshold;
 
         $eligibilityService = app(FestRegistrationEligibilityService::class);
-
-        if ($lazyStudents && $event->event_type === 'sports') {
-            $eventRegisteredStudentIds = \App\Models\FestLevelRegistration::query()
-                ->where('event_id', $event->id)
-                ->where('status', 'active')
-                ->pluck('student_id');
-
-            $studentRows = Student::where('tenant_id', $this->school->id)
-                ->active()
-                ->whereIn('id', $eventRegisteredStudentIds)
-                ->with('schoolClass')
-                ->orderBy('name')
-                ->get();
-
-            $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
-        } else {
-            $studentRows = $studentQuery->get();
-            $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
-        }
+        $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
 
         $registrations = FestRegistration::where('school_id', $this->school->id)
             ->whereIn('event_id', $this->registrationEventIdsForSchoolView(collect([$event])))
