@@ -1152,14 +1152,12 @@ function withdraw(id) {
     router.post(`${programBase.value}/registrations/${id}/withdraw`, {}, { preserveScroll: true });
 }
 
-// Editing is allowed under the same conditions the school can still cancel the
-// registration (mirrors FestRegistrationCreateService::updateForSchool's gate) —
-// once cancellation is blocked (e.g. fee already paid/approved), editing is too.
-// Also blocked once the fest-day schedule has been published for this event.
 function canEdit(reg) {
+    if (['withdrawn', 'rejected'].includes(reg.status)) return false;
     const event = props.events.find(e => e.id === reg.event_id);
-    if (event?.schedule_published) return false;
-    return canWithdraw(reg);
+    if (!event) return reg.status === 'submitted';
+    if (event.schedule_published || event.results_published || ['completed', 'cancelled'].includes(event.status)) return false;
+    return event.status === 'registration_open' || reg.status === 'submitted';
 }
 
 function resetItemForm(eventId, itemId) {

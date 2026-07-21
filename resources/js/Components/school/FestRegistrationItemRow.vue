@@ -143,11 +143,11 @@
                 <span v-if="selectedCount > 0" class="text-[10px] text-[#0f3d7a] font-semibold whitespace-nowrap">
                     {{ selectedCount }} ready
                 </span>
-                <button v-if="!isTeacherFest && showStandbyPicker"
+                <button v-if="showStandbyPicker"
                         type="button"
                         class="btn-secondary text-xs !min-h-0 !px-2 !py-1"
                         :disabled="blocked"
-                        @click="standbyPickerOpen = true">
+                        @click="openStandbyPicker">
                     Standbys ({{ standbySelectedCount }})
                 </button>
                 <span v-else-if="selectedAgeNotes.length" class="text-[10px] text-amber-700 whitespace-nowrap">
@@ -262,7 +262,13 @@ watch(() => props.editingRegistrationId, (id) => {
 const pickerOpen = ref(false);
 const standbyPickerOpen = ref(false);
 
-const showStandbyPicker = computed(() => props.eventType !== 'teacher_fest');
+const showStandbyPicker = computed(() => {
+    if (props.isTeacherFest) return false;
+    if (props.item.max_subs === 0 || props.item.standbys === 0) return false;
+    if (props.item.max_subs != null && props.item.max_subs > 0) return true;
+    if (props.item.standbys != null && props.item.standbys > 0) return true;
+    return isGroup.value;
+});
 
 const isGroup = computed(() => ['group', 'team'].includes(props.item.participant_type));
 
@@ -425,10 +431,21 @@ function formatMoney(value) {
 }
 
 function openPicker() {
+    if (!isEditing.value && props.registrations?.length > 0 && props.registrations[0]) {
+        emit('edit', props.registrations[0]);
+        return;
+    }
     if (!isEditing.value && isGroup.value && !String(props.form.team_name ?? '').trim()) {
         props.form.team_name = nextTeamName.value;
     }
     pickerOpen.value = true;
+}
+
+function openStandbyPicker() {
+    if (!isEditing.value && props.registrations?.length > 0 && props.registrations[0]) {
+        emit('edit', props.registrations[0]);
+    }
+    standbyPickerOpen.value = true;
 }
 
 function handleMainPickerConfirm() {
