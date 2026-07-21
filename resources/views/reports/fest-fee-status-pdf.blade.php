@@ -179,7 +179,7 @@
         <tr>
             @if($logoUrl)
                 <td class="header-logo">
-                    <img src="{{ $logoUrl }}" alt="{{ $sahodaya->name }}">
+                    <img src="{{ $logoUrl }}" alt="" style="max-width: 55px; max-height: 55px; display: block;">
                 </td>
             @endif
             <td class="header-title">

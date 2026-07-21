@@ -162,9 +162,20 @@ class FestEventFeesController extends SahodayaAdminController
                     'items'                   => $regs->map(fn ($r) => $r->item?->title)->filter()->unique()->values()->all(),
                     'receipts'                => $receipts,
                 ];
-            })
-            ->sortBy(fn ($row) => strtolower($row['school_name']))
-            ->values();
+            });
+
+        $statusRank = [
+            'approved'       => 1,
+            'proof_uploaded' => 2,
+            'partial'        => 3,
+            'pending'        => 4,
+            'rejected'       => 5,
+        ];
+
+        $schoolFees = $schoolFees->sortBy(function ($row) use ($statusRank) {
+            $rank = $statusRank[$row['status']] ?? 9;
+            return sprintf('%d_%s', $rank, strtolower($row['school_name']));
+        })->values();
 
         $summary = [
             'total_schools' => $schoolFees->count(),
@@ -178,7 +189,7 @@ class FestEventFeesController extends SahodayaAdminController
             'rejected'      => $schoolFees->where('status', 'rejected')->count(),
         ];
 
-        $logoUrl = \App\Support\TenantBranding::logoUrl($this->sahodaya);
+        $logoUrl = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya) ?? \App\Support\TenantBranding::logoUrl($this->sahodaya);
         $isDetailed = $request->boolean('detailed') || $request->query('view') === 'detailed';
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.fest-fee-status-pdf', [
