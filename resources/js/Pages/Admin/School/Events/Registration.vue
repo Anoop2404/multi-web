@@ -43,7 +43,7 @@
                                     :program-prefix="programPrefix"
                                     :event-id="event.id"
                                     :is-sports="isSports"
-                                    current-step="registration" />
+                                    :current-step="getTab(event.id) === 'athletes' ? 'event-reg' : (getTab(event.id) === 'items' ? 'item-reg' : 'payment')" />
 
         <div v-if="showBulkImport && events.length" class="card mb-5 max-w-2xl text-sm border-indigo-100">
             <div class="flex items-center justify-between gap-2 mb-3">
@@ -499,10 +499,16 @@ const activeTabMap = reactive({});
 
 function getTab(eventId) {
     if (!activeTabMap[eventId]) {
-        const ev = (props.events || []).find(e => e.id === eventId);
-        if (ev?.school_fee?.status && ['proof_uploaded', 'approved'].includes(ev.school_fee.status)) {
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const tabParam = urlParams ? urlParams.get('tab') : null;
+
+        if (tabParam === 'event-reg' || tabParam === 'athletes') {
+            activeTabMap[eventId] = 'athletes';
+        } else if (tabParam === 'item-reg' || tabParam === 'items') {
+            activeTabMap[eventId] = 'items';
+        } else if (tabParam === 'payment' || tabParam === 'billing') {
             activeTabMap[eventId] = 'payment';
-        } else if (props.eventType === 'sports') {
+        } else if (props.eventType === 'sports' || isSports.value) {
             activeTabMap[eventId] = 'athletes';
         } else {
             activeTabMap[eventId] = 'items';
