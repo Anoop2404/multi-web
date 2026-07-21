@@ -4,21 +4,22 @@
     <meta charset="utf-8">
     <title>Premium ID Cards — {{ $eventTitle }}</title>
     <style>
-        @page { size: A4 portrait; margin: 6mm; }
+        @page { size: A4 landscape; margin: 6mm; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #0f172a; background: #f1f5f9; }
         .sheet-title { text-align: center; font-size: 10px; font-weight: bold; color: #334155; margin-bottom: 2mm; }
 
         /*
-         * .page is sized to exactly match the @page content box (A4 210mm
-         * minus the 6mm margin on each side = 198mm), with NO extra padding
-         * of its own. That makes it a no-op inset when the @page margin is
-         * already physically applied (DomPDF PDF export, and a real browser
-         * Ctrl+P print) — it just fills the box exactly, margin:auto
-         * resolving to 0. In a plain on-screen browser view (the /preview
-         * route opened normally, not printed) there is no @page margin at
-         * all, so this same fixed 198mm width + auto margins is what keeps
-         * the grid from stretching across the full viewport instead.
+         * .page is sized to exactly match the @page content box (A4
+         * LANDSCAPE 297mm minus the 6mm margin on each side = 285mm), with
+         * NO extra padding of its own. That makes it a no-op inset when the
+         * @page margin is already physically applied (DomPDF PDF export,
+         * and a real browser Ctrl+P print) — it just fills the box exactly,
+         * margin:auto resolving to 0. In a plain on-screen browser view (the
+         * /preview route opened normally, not printed) there is no @page
+         * margin at all, so this same fixed 285mm width + auto margins is
+         * what keeps the grid from stretching across the full viewport
+         * instead.
          *
          * Important: DomPDF defaults to media_type "screen" (see
          * vendor/barryvdh/laravel-dompdf/config/dompdf.php), so @media
@@ -26,7 +27,7 @@
          * unconditionally, not rely on an @media print override.
          */
         .page {
-            width: 198mm;
+            width: 285mm;
             margin: 0 auto 8mm;
             background: #ffffff;
         }
@@ -44,7 +45,7 @@
             padding-bottom: 0.8mm;
             border-bottom: 0.3mm solid #cbd5e1;
         }
-        .grid { width: 100%; border-collapse: separate; border-spacing: 2mm 3mm; }
+        .grid { width: 100%; border-collapse: separate; border-spacing: 2mm 4mm; }
         .grid td { width: 50%; vertical-align: top; padding: 0; }
         .page-break { page-break-after: always; }
 
@@ -66,10 +67,10 @@
         /* Header */
         .pcard__header {
             flex-shrink: 0;
-            height: 32mm;
+            height: 20mm;
             background: linear-gradient(135deg, #042a5b 0%, #0a3d7a 100%);
             color: #ffffff;
-            padding: 3.5mm 5mm 1.5mm;
+            padding: 2.5mm 4mm 1mm;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -78,16 +79,16 @@
         .pcard__brand {
             display: flex;
             align-items: center;
-            gap: 3.5mm;
+            gap: 2.8mm;
             flex: 1;
             min-width: 0;
         }
         .pcard__logo,
         .pcard__logo-fallback {
-            width: 17mm;
-            height: 17mm;
+            width: 13mm;
+            height: 13mm;
             border-radius: 50%;
-            border: 0.5mm solid rgba(16, 185, 129, 0.6);
+            border: 0.45mm solid rgba(16, 185, 129, 0.6);
             background: #ffffff;
             object-fit: cover;
             flex-shrink: 0;
@@ -97,11 +98,11 @@
             align-items: center;
             justify-content: center;
             color: #042a5b;
-            font-size: 10px;
+            font-size: 8px;
             font-weight: bold;
         }
         .pcard__cluster {
-            font-size: 9px;
+            font-size: 7px;
             font-weight: 800;
             letter-spacing: 0.1em;
             text-transform: uppercase;
@@ -112,11 +113,11 @@
             text-overflow: ellipsis;
         }
         .pcard__event {
-            font-size: 18px;
+            font-size: 13px;
             font-weight: 800;
             color: #ffffff;
             line-height: 1.2;
-            margin-top: 0.8mm;
+            margin-top: 0.6mm;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -124,22 +125,22 @@
         .pcard__pass-ribbon {
             position: absolute;
             top: 0;
-            right: 4mm;
+            right: 3.5mm;
             background: #059669;
             color: #ffffff;
-            font-size: 8px;
+            font-size: 6.5px;
             font-weight: 800;
-            padding: 1.4mm 5mm 1.7mm;
-            border-bottom-left-radius: 2mm;
-            border-bottom-right-radius: 2mm;
+            padding: 1.1mm 4mm 1.4mm;
+            border-bottom-left-radius: 1.8mm;
+            border-bottom-right-radius: 1.8mm;
             letter-spacing: 0.08em;
             text-transform: uppercase;
         }
 
         /* Wave separator */
         .pcard__wave-separator {
-            height: 4mm;
-            margin-top: -4mm;
+            height: 3mm;
+            margin-top: -3mm;
             position: relative;
             z-index: 2;
         }
@@ -154,15 +155,15 @@
             flex: 1;
             display: flex;
             align-items: center;
-            gap: 4.5mm;
-            padding: 4mm 5mm;
+            gap: 3.5mm;
+            padding: 2.5mm 4mm;
             background: #ffffff;
         }
         .pcard__portrait {
-            width: 32mm;
-            height: 40mm;
-            border-radius: 2mm;
-            border: 0.6mm solid #0d9488;
+            width: 26mm;
+            height: 33mm;
+            border-radius: 1.5mm;
+            border: 0.5mm solid #0d9488;
             overflow: hidden;
             background: #f0fdf4;
             flex-shrink: 0;
@@ -179,7 +180,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 22px;
+            font-size: 18px;
             font-weight: bold;
             color: #042a5b;
             background: #e0f2fe;
@@ -187,37 +188,38 @@
         .pcard__info-col {
             flex: 1;
             min-width: 0;
-            padding-top: 1mm;
         }
         .pcard__name {
-            font-size: 16px;
+            font-size: 13px;
             font-weight: 800;
             color: #042a5b;
             text-transform: uppercase;
             line-height: 1.2;
-            margin-bottom: 2.5mm;
-            word-wrap: break-word;
+            margin-bottom: 1.5mm;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .pcard__meta-table {
             width: 100%;
             border-collapse: collapse;
         }
         .pcard__meta-table td {
-            font-size: 9.5px;
-            line-height: 1.9;
-            padding: 0.6mm 0;
+            font-size: 8px;
+            line-height: 1.5;
+            padding: 0.35mm 0;
             vertical-align: middle;
         }
 
         /* Colored dot bullets matching reference */
         .pcard__meta-dot {
-            width: 5mm;
-            padding-right: 1mm;
+            width: 4mm;
+            padding-right: 0.8mm;
         }
         .dot {
             display: inline-block;
-            width: 2.8mm;
-            height: 2.8mm;
+            width: 2.3mm;
+            height: 2.3mm;
             border-radius: 50%;
         }
         .dot--blue   { background: #3b82f6; }
@@ -230,51 +232,54 @@
         .pcard__meta-label {
             color: #475569;
             font-weight: 600;
-            width: 19mm;
+            width: 15mm;
         }
         .pcard__meta-sep {
             color: #64748b;
-            width: 2.5mm;
+            width: 2mm;
             text-align: center;
         }
         .pcard__meta-val {
             color: #0f172a;
             font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* QR column */
         .pcard__qr-col {
-            width: 26mm;
+            width: 20mm;
             text-align: center;
             flex-shrink: 0;
             align-self: center;
         }
         .pcard__qr {
-            width: 24mm;
-            height: 24mm;
+            width: 18mm;
+            height: 18mm;
             background: #ffffff;
-            border-radius: 1.5mm;
-            border: 0.4mm solid #d1d5db;
-            padding: 0.8mm;
+            border-radius: 1.2mm;
+            border: 0.35mm solid #d1d5db;
+            padding: 0.6mm;
             display: block;
             margin: 0 auto;
         }
         .pcard__qr-label {
             display: block;
-            font-size: 6.5px;
+            font-size: 5px;
             font-weight: 800;
             color: #10b981;
             letter-spacing: 0.06em;
-            margin-top: 1mm;
+            margin-top: 0.7mm;
             text-transform: uppercase;
         }
 
         /* Footer */
         .pcard__footer {
             flex-shrink: 0;
-            height: 11mm;
+            height: 8mm;
             background: #042a5b;
-            padding: 0 5mm;
+            padding: 0 4mm;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -282,16 +287,14 @@
         .pcard__school-pill {
             display: inline-flex;
             align-items: center;
-            gap: 1.2mm;
             background: rgba(255,255,255,0.08);
-            border: 0.25mm solid rgba(255,255,255,0.15);
+            border: 0.2mm solid rgba(255,255,255,0.15);
             border-radius: 999px;
-            padding: 1mm 3.5mm;
+            padding: 0.8mm 3mm;
             max-width: 68%;
         }
-        .pcard__school-icon { font-size: 8px; }
         .pcard__school-text {
-            font-size: 8px;
+            font-size: 6.5px;
             font-weight: 800;
             color: #ffffff;
             text-transform: uppercase;
@@ -302,9 +305,9 @@
         .pcard__role-pill {
             background: #059669;
             color: #ffffff;
-            font-size: 8px;
+            font-size: 6.5px;
             font-weight: 800;
-            padding: 1mm 4mm;
+            padding: 0.8mm 3.5mm;
             border-radius: 999px;
             letter-spacing: 0.06em;
             text-transform: uppercase;

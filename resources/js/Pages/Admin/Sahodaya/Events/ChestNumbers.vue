@@ -3,8 +3,12 @@
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="pageTitle" eyebrow="Chest numbers"
                     :description="selectedItem
-                        ? `Chest starts at ${selectedItem.chest_no_start} · one chest number per student, shared across every item in this event`
-                        : 'Pick an item — participants load only at the item level, but each student keeps a single chest number across the whole event.'">
+                        ? (event.event_type === 'sports'
+                            ? `Chest starts at ${selectedItem.chest_no_start} · one chest number per student, shared across sports items`
+                            : `Chest starts at ${selectedItem.chest_no_start} · unique chest numbers assigned per item participant`)
+                        : (event.event_type === 'sports'
+                            ? 'Pick an item — each student keeps a single chest number across the sports event.'
+                            : 'Pick an item — view or assign chest numbers per competition item.')">
             <template #actions>
                 <Link :href="numberingUrl" class="btn-secondary text-sm">Numbering settings</Link>
             </template>
@@ -19,7 +23,9 @@
                                  :selected-item-id="selectedItemId"
                                  :has-item-heads="hasItemHeads"
                                  :is-sports="event.event_type === 'sports'"
-                                 :hint="'Select a competition item to view or assign chest numbers — each student holds one chest number for the whole event, reused automatically across every item they compete in.'"
+                                 :hint="event.event_type === 'sports'
+                                     ? 'Select a competition item to view or assign chest numbers — each student holds one chest number for the whole sports event.'
+                                     : 'Select a competition item to view or assign chest numbers for participants in that item.'"
                                  empty-heads-text="No enabled items on this event yet. Import items from the catalog first.">
 
             <template #default="{ item, head }">

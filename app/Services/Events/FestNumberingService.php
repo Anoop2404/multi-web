@@ -60,7 +60,11 @@ class FestNumberingService
 
     public function chestHeadScope(FestEvent $event, FestEventItem $item): int
     {
-        return self::CHEST_SCOPE_EVENT;
+        if ($event->event_type === 'sports') {
+            return (int) ($item->head_id ?? self::CHEST_SCOPE_EVENT);
+        }
+
+        return (int) $item->id;
     }
 
     public function nextChestNumber(FestEvent $event, FestEventItem $item): int
@@ -70,34 +74,17 @@ class FestNumberingService
 
             $settings = $this->settings($event);
             $start = (int) ($item->chest_no_start ?? $settings['chest_no_start'] ?? 100);
-            
-            // Scope chest number sequence per competition item
-            $scopeByItem = ($settings['chest_scope'] ?? 'item') === 'item' 
-                || (bool) $item->chest_no_start 
-                || ($event->event_type === 'custom')
-                || ($event->event_type === 'fest')
-                || ($event->event_type === 'kalolsavam');
+            $headScope = $this->chestHeadScope($event, $item);
 
-            if ($scopeByItem) {
-                $max = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('item_id', $item->id))
-                    ->whereNotNull('chest_no')
-                    ->max('chest_no');
+            $max = FestParticipant::where('event_id', $event->id)
+                ->where('chest_head_id', $headScope)
+                ->whereNotNull('chest_no')
+                ->max('chest_no');
 
-                $groupMax = FestGroup::whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('item_id', $item->id))
-                    ->whereNotNull('chest_no')
-                    ->max('chest_no');
-            } else {
-                $headScope = $this->chestHeadScope($event, $item);
-
-                $max = FestParticipant::where('event_id', $event->id)
-                    ->where('chest_head_id', $headScope)
-                    ->whereNotNull('chest_no')
-                    ->max('chest_no');
-
-                $groupMax = FestGroup::where('event_id', $event->id)
-                    ->whereNotNull('chest_no')
-                    ->max('chest_no');
-            }
+            $groupMax = FestGroup::where('event_id', $event->id)
+                ->whereHas('registration', fn ($q) => $q->where('item_id', $item->id))
+                ->whereNotNull('chest_no')
+                ->max('chest_no');
 
             $highest = max((int) $max, (int) $groupMax);
 

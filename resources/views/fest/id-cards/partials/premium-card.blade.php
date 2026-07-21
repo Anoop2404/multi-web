@@ -91,7 +91,6 @@
 
     <footer class="pcard__footer">
         <div class="pcard__school-pill">
-            <span class="pcard__school-icon">🏫</span>
             <span class="pcard__school-text">{{ $card['subtitle'] ?? ($card['school_name'] ?? '—') }}</span>
         </div>
         <div class="pcard__role-pill">
