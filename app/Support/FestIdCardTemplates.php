@@ -8,10 +8,17 @@ class FestIdCardTemplates
 
     public const PREMIUM = 'premium';
 
-    /** Landscape ID Card size matching reference template (98mm x 62mm, 4 per A4 page). */
-    public const CARD_WIDTH_MM = 98;
+    /**
+     * ID card size, 4 per A4 page (2 columns x 2 rows). Height is
+     * deliberately large — at 62mm the 2x2 block only filled ~45% of the
+     * page height, leaving a huge blank strip at the bottom of every
+     * printed sheet. 130mm fills the page properly (2 x 130mm + gutters
+     * ≈ the full usable A4 height).
+     */
+    /** 96mm x 2 + (2mm border-spacing x 3 gaps) = 198mm, exactly the A4 content width after margins. */
+    public const CARD_WIDTH_MM = 96;
 
-    public const CARD_HEIGHT_MM = 62;
+    public const CARD_HEIGHT_MM = 130;
 
     public const CARDS_PER_PAGE = 4;
 
