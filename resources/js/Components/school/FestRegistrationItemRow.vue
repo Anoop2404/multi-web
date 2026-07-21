@@ -301,9 +301,11 @@ const standbySelectedCount = computed(() => standbyModel.value?.length ?? 0);
 
 const standbyEntries = computed(() => {
     const performerIds = props.form.student_ids ?? [];
-    return (props.allStudents ?? []).map((student) => {
-        const eligible = !performerIds.includes(student.id)
-            && (props.eligibleStudents ?? []).some(s => s.id === student.id);
+    const pool = (props.eligibleStudents?.length ?? 0) > 0 ? props.eligibleStudents : (props.allStudents ?? []);
+    const eligibleSet = new Set((props.eligibleStudents ?? []).map(s => s.id));
+
+    return pool.map((student) => {
+        const eligible = !performerIds.includes(student.id) && eligibleSet.has(student.id);
         return {
             id: student.id,
             name: student.name,
@@ -319,8 +321,11 @@ const standbyEntries = computed(() => {
 
 const rosterEntries = computed(() => {
     if (props.isTeacherFest) return [];
-    return (props.allStudents ?? []).map((student) => {
-        const eligible = (props.eligibleStudents ?? []).some(s => s.id === student.id);
+    const pool = (props.eligibleStudents?.length ?? 0) > 0 ? props.eligibleStudents : (props.allStudents ?? []);
+    const eligibleSet = new Set((props.eligibleStudents ?? []).map(s => s.id));
+
+    return pool.map((student) => {
+        const eligible = eligibleSet.has(student.id);
         const reason = eligible ? null : (props.studentIneligibilityReason?.(student) ?? 'Not eligible for this item');
         return {
             id: student.id,
