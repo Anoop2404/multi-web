@@ -503,11 +503,11 @@ function getTab(eventId) {
         const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
         const tabParam = urlParams ? urlParams.get('tab') : null;
 
-        if (tabParam === 'event-reg' || tabParam === 'athletes') {
+        if (tabParam === 'event-reg' || tabParam === 'athletes' || tabParam === 'student-reg') {
             activeTabMap[eventId] = 'athletes';
         } else if (tabParam === 'item-reg' || tabParam === 'items') {
             activeTabMap[eventId] = 'items';
-        } else if (tabParam === 'payment' || tabParam === 'billing') {
+        } else if (tabParam === 'payment' || tabParam === 'billing' || tabParam === 'fees') {
             activeTabMap[eventId] = 'payment';
         } else if (props.eventType === 'sports' || isSports.value) {
             activeTabMap[eventId] = 'athletes';
@@ -522,7 +522,7 @@ function setTab(eventId, tab) {
     activeTabMap[eventId] = tab;
     if (typeof window !== 'undefined') {
         const url = new URL(window.location.href);
-        const tabKeyMap = { athletes: 'event-reg', items: 'item-reg', payment: 'payment' };
+        const tabKeyMap = { athletes: 'student-reg', items: 'item-reg', payment: 'fees' };
         url.searchParams.set('tab', tabKeyMap[tab] || tab);
         window.history.replaceState({}, '', url.toString());
     }

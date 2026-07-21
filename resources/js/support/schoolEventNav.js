@@ -100,18 +100,20 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
 
     if (isSports) {
         workflowItems.push(
-            { label: 'Step 1 · Register students', href: `${eventBase}/registration`, icon: 'clipboard' },
-            { label: 'Step 2 · Register items', href: `${eventBase}/registration#item-registration-${eventId}`, icon: 'layers' },
-            { label: 'All reports', href: reportsBase, icon: 'file-text' },
+            { label: 'Step 1 · Event Athletes', href: `${eventBase}/registration?tab=student-reg`, icon: 'clipboard', matchQuery: { tab: 'student-reg' } },
+            { label: 'Step 2 · Item Registration', href: `${eventBase}/registration?tab=item-reg`, icon: 'layers', matchQuery: { tab: 'item-reg' } },
+            { label: 'Step 3 · Billing & Payment', href: `${eventBase}/registration?tab=fees`, icon: 'credit-card', matchQuery: { tab: 'fees' } },
         );
     } else {
         workflowItems.push(
-            { label: 'Register students', href: `${eventBase}/registration`, icon: 'clipboard' },
-            { label: 'All reports', href: reportsBase, icon: 'file-text' },
+            { label: 'Step 1 · Participant Roster', href: `${eventBase}/registration?tab=student-reg`, icon: 'clipboard', matchQuery: { tab: 'student-reg' } },
+            { label: 'Step 2 · Item Registration', href: `${eventBase}/registration?tab=item-reg`, icon: 'layers', matchQuery: { tab: 'item-reg' } },
+            { label: 'Step 3 · Billing & Payment', href: `${eventBase}/registration?tab=fees`, icon: 'credit-card', matchQuery: { tab: 'fees' } },
         );
     }
 
     workflowItems.push(
+        { label: 'Reports & ID Cards', href: reportsBase, icon: 'file-text' },
         { label: 'Clash requests', href: `${eventBase}/clash-requests`, icon: 'alert-circle' },
         { label: 'Substitutions', href: `${eventBase}/substitution-requests`, icon: 'repeat' },
         { label: 'Fest day view', href: `${programBase}/fest-day/${eventId}`, icon: 'calendar' },
