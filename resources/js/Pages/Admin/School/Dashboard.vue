@@ -25,18 +25,50 @@
                 </div>
             </div>
 
+            <!-- Live Events & Fests Spotlight Banner -->
+            <div v-if="openProgramSummaries.length" 
+                 class="p-4 rounded-2xl bg-gradient-to-r from-indigo-950 via-slate-900 to-blue-950 text-white shadow-lg border border-indigo-700/40 flex flex-wrap items-center justify-between gap-4 transition-all">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center text-xl shrink-0">
+                        🏆
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                Live Registrations Open
+                            </span>
+                        </div>
+                        <p class="text-sm font-semibold text-white mt-1">
+                            {{ openProgramSummaries.length }} fest program{{ openProgramSummaries.length === 1 ? '' : 's' }} active for your school
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <Link v-for="p in openProgramSummaries" :key="p.slug" :href="p.hub_url" 
+                          class="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-semibold text-white transition-all transform hover:-translate-y-0.5 flex items-center gap-1.5 shadow-sm">
+                        <span>{{ programIcon(p.slug) }} {{ p.label }}</span>
+                        <span class="text-amber-300">→</span>
+                    </Link>
+                </div>
+            </div>
+
             <!-- Alerts -->
             <div v-if="alertItems.length" class="space-y-3">
                 <div v-for="(alert, i) in alertItems" :key="i"
-                     class="notice-banner"
+                     class="notice-banner shadow-sm transition-all hover:shadow"
                      :class="alert.tone === 'success' ? 'notice-banner--success' : 'notice-banner--warning'">
-                    <p class="font-semibold">{{ alert.title }}</p>
-                    <p class="mt-1 text-sm">
-                        {{ alert.body }}
-                        <Link v-if="alert.href" :href="alert.href" class="ml-1 font-semibold underline">
-                            {{ alert.linkLabel }} →
-                        </Link>
-                    </p>
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <p class="font-semibold">{{ alert.title }}</p>
+                            <p class="mt-1 text-sm">
+                                {{ alert.body }}
+                                <Link v-if="alert.href" :href="alert.href" class="ml-1 font-semibold underline">
+                                    {{ alert.linkLabel }} →
+                                </Link>
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
