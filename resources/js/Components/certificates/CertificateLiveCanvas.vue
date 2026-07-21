@@ -1,88 +1,79 @@
 <template>
-    <div class="certificate-live-canvas relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-lg select-none">
-        <!-- Aspect ratio container (Landscape 16:11 ~ 1.414 A4 landscape) -->
-        <div class="relative w-full pb-[70.7%] bg-slate-800">
-            <!-- Background Image -->
-            <img v-if="bgUrl" :src="bgUrl" alt="Certificate Background"
-                 class="absolute inset-0 h-full w-full object-cover">
-            
-            <div v-else class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-slate-400">
-                <span class="text-3xl mb-2">📜</span>
-                <p class="text-xs font-semibold text-slate-300">Default Certificate Backdrop</p>
-                <p class="text-[11px] text-slate-500 mt-0.5">Upload a PDF or image background to see custom artwork</p>
-            </div>
+    <div class="certificate-live-canvas relative w-full overflow-hidden rounded-xl border border-slate-300 bg-slate-950 shadow-lg select-none" ref="wrapperRef">
+        <!-- Aspect ratio container (1123 x 794 A4 Landscape = ~70.703%) -->
+        <div class="relative w-full pb-[70.703%] bg-slate-900">
+            <!-- Scaled Inner 1123x794 Canvas Container matching Blade certificate.blade.php -->
+            <div class="absolute top-0 left-0 w-[1123px] h-[794px] origin-top-left bg-white transition-all overflow-hidden"
+                 :style="{ transform: `scale(${scaleFactor})` }">
+                
+                <!-- Background Image Backdrop -->
+                <div v-if="bgUrl" class="w-full h-full bg-cover bg-center bg-no-repeat"
+                     :style="{ backgroundImage: `url('${bgUrl}')` }">
+                </div>
 
-            <!-- Participation Label Cover (if disabled) -->
-            <div v-if="!showParticipationLabel && participationLabelCover"
-                 class="absolute bg-white/95"
-                 :style="{
-                     top: `${participationLabelCover.top}%`,
-                     left: `${participationLabelCover.left}%`,
-                     width: `${participationLabelCover.width}%`,
-                     height: `${participationLabelCover.height}%`,
-                 }">
-            </div>
+                <div v-else class="w-full h-full flex flex-col items-center justify-center p-12 text-center bg-slate-100 text-slate-400 border-8 border-double border-indigo-900">
+                    <span class="text-6xl mb-4">📜</span>
+                    <p class="text-xl font-bold text-slate-700">Default Certificate Backdrop</p>
+                    <p class="text-sm text-slate-500 mt-1">Upload a PDF or image background to view custom artwork</p>
+                </div>
 
-            <!-- Recipient Name Overlay -->
-            <div v-if="showRecipientName && recipientNameLayout"
-                 class="absolute text-center transform -translate-x-1/2 w-full px-4 truncate transition-all"
-                 :style="{
-                     top: `${recipientNameLayout.top}%`,
-                     left: '50%',
-                     fontSize: `${scaledFontSize(recipientNameLayout.font_size)}px`,
-                     fontFamily: recipientNameLayout.font_family || 'Georgia',
-                     fontWeight: recipientNameLayout.font_weight || 'bold',
-                     fontStyle: recipientNameLayout.font_style || 'normal',
-                     color: '#0f172a',
-                 }">
-                {{ sampleRecipientName }}
-            </div>
+                <!-- Participation Label Cover (if disabled) -->
+                <div v-if="!showParticipationLabel && participationLabelCover"
+                     class="absolute bg-white/95"
+                     :style="{
+                         top: `${participationLabelCover.top ?? 28}%`,
+                         left: `${participationLabelCover.left ?? 18}%`,
+                         width: `${participationLabelCover.width ?? 64}%`,
+                         height: `${participationLabelCover.height ?? 7}%`,
+                     }">
+                </div>
 
-            <!-- Body Text Paragraph Overlay -->
-            <div v-if="bodyLayout"
-                 class="absolute text-center transform -translate-x-1/2 transition-all leading-relaxed"
-                 :style="{
-                     top: `${bodyLayout.top}%`,
-                     left: '50%',
-                     width: `${bodyLayout.width || 76}%`,
-                     fontSize: `${scaledFontSize(bodyLayout.font_size)}px`,
-                     fontFamily: bodyLayout.font_family || 'Times New Roman',
-                     fontWeight: bodyLayout.font_weight || 'normal',
-                     fontStyle: bodyLayout.font_style || 'normal',
-                     color: '#334155',
-                 }">
-                <div v-html="renderedBodyHtml"></div>
-            </div>
+                <!-- Recipient Name Overlay -->
+                <div v-if="showRecipientName && recipientNameLayout"
+                     class="absolute text-center text-slate-900 leading-snug whitespace-nowrap overflow-hidden text-ellipsis"
+                     :style="overlayStyle(recipientNameLayout, { top: 38, left: 10, width: 80, font_size: 28, font_family: 'Georgia', font_weight: 'bold' })">
+                    {{ sampleRecipientName }}
+                </div>
 
-            <!-- Date Overlay -->
-            <div v-if="dateLayout"
-                 class="absolute transition-all"
-                 :style="{
-                     top: `${dateLayout.top}%`,
-                     left: `${dateLayout.left}%`,
-                     fontSize: `${scaledFontSize(dateLayout.font_size)}px`,
-                     fontFamily: dateLayout.font_family || 'Times New Roman',
-                     fontWeight: dateLayout.font_weight || 'normal',
-                     fontStyle: dateLayout.font_style || 'normal',
-                     color: '#475569',
-                 }">
-                Dated: 22nd July 2026
+                <!-- Body Text Paragraph Overlay -->
+                <div v-if="bodyLayout"
+                     class="absolute text-center text-slate-700 leading-relaxed"
+                     :style="overlayStyle(bodyLayout, { top: 48, left: 12, width: 76, font_size: 13, font_family: 'Times New Roman' })">
+                    <p v-for="(paragraph, idx) in paragraphs" :key="idx" class="mb-2" v-html="paragraph"></p>
+                </div>
+
+                <!-- Date Overlay -->
+                <div v-if="dateLayout"
+                     class="absolute text-slate-800"
+                     :style="overlayStyle(dateLayout, { top: 72, left: 8, width: 42, font_size: 12, font_family: 'Times New Roman', align: 'left' })">
+                    <strong v-if="boldVariables">Date : </strong>
+                    <span v-else>Date : </span>
+                    <strong v-if="boldVariables">22 July 2026</strong>
+                    <span v-else>22 July 2026</span>
+                </div>
+
+                <!-- Verification UUID Overlay -->
+                <div v-if="uuidLayout"
+                     class="absolute text-slate-400 text-center tracking-wide text-[8px]"
+                     :style="overlayStyle(uuidLayout, { top: 92, left: 5, width: 90, font_size: 8, font_family: 'Arial' })">
+                    Verification: Sample-Demo-UUID-12345
+                </div>
             </div>
         </div>
 
-        <!-- Canvas Controls Footer -->
+        <!-- Canvas Footer -->
         <div class="bg-slate-950 px-4 py-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800">
             <span class="flex items-center gap-1.5 text-emerald-400 font-semibold">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                Live Template Overlay Active
+                100% Pixel-Match Canvas (1123 × 794 A4)
             </span>
-            <span class="font-mono text-slate-500">Aspect 1.41 (A4 Landscape)</span>
+            <span class="font-mono text-slate-500">Scale: {{ (scaleFactor * 100).toFixed(0) }}%</span>
         </div>
     </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 
 const props = defineProps({
     backgroundUrl: { type: String, default: null },
@@ -92,6 +83,26 @@ const props = defineProps({
     eventType: { type: String, default: 'training' },
     title: { type: String, default: '' },
 });
+
+const wrapperRef = ref(null);
+const wrapperWidth = ref(560);
+
+function updateWidth() {
+    if (wrapperRef.value) {
+        wrapperWidth.value = wrapperRef.value.clientWidth || 560;
+    }
+}
+
+onMounted(() => {
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('resize', updateWidth);
+});
+
+const scaleFactor = computed(() => Math.max(0.2, wrapperWidth.value / 1123));
 
 const bgUrl = computed(() => props.localFileUrl || props.backgroundUrl);
 
@@ -103,6 +114,38 @@ const participationLabelCover = computed(() => props.layout?.participation_label
 const recipientNameLayout = computed(() => props.layout?.recipient_name);
 const bodyLayout = computed(() => props.layout?.body);
 const dateLayout = computed(() => props.layout?.certificate_date);
+const uuidLayout = computed(() => props.layout?.uuid);
+
+const fontFamilyStackMap = {
+    'Georgia': 'Georgia, "Times New Roman", Times, serif',
+    'Arial': 'Arial, Helvetica, sans-serif',
+    'Helvetica': 'Helvetica, Arial, sans-serif',
+    'Verdana': 'Verdana, Geneva, sans-serif',
+    'Courier New': '"Courier New", Courier, monospace',
+    'Palatino Linotype': '"Palatino Linotype", Palatino, "Book Antiqua", serif',
+    'Garamond': 'Garamond, "Times New Roman", Times, serif',
+    'Times New Roman': '"Times New Roman", Times, serif',
+};
+
+function overlayStyle(field = {}, fallback = {}) {
+    const size = Math.max(6, Math.min(96, Number(field.font_size ?? fallback.font_size ?? 13)));
+    const familyKey = field.font_family ?? fallback.font_family ?? 'Times New Roman';
+    const fontFamily = fontFamilyStackMap[familyKey] || '"Times New Roman", Times, serif';
+    const fontWeight = (field.font_weight ?? fallback.font_weight ?? 'normal') === 'bold' ? '700' : '400';
+    const fontStyle = (field.font_style ?? fallback.font_style ?? 'normal') === 'italic' ? 'italic' : 'normal';
+    const align = field.align ?? fallback.align ?? 'center';
+
+    return {
+        top: `${field.top ?? fallback.top ?? 0}%`,
+        left: `${field.left ?? fallback.left ?? 10}%`,
+        width: `${field.width ?? fallback.width ?? 80}%`,
+        fontSize: `${size}px`,
+        fontFamily,
+        fontWeight,
+        fontStyle,
+        textAlign: align,
+    };
+}
 
 const sampleRecipientName = computed(() => {
     if (props.eventType === 'fest') return 'MADHAV AJITH';
@@ -132,7 +175,7 @@ const sampleData = computed(() => ({
     achievement_line: 'secured First Place in 100m Sprint',
 }));
 
-const renderedBodyHtml = computed(() => {
+const paragraphs = computed(() => {
     let raw = props.bodyText;
     if (!raw) {
         if (props.eventType === 'fest') {
@@ -151,12 +194,6 @@ const renderedBodyHtml = computed(() => {
         raw = raw.replace(pattern, formattedVal);
     }
 
-    return raw.replace(/\n/g, '<br>');
+    return raw.split(/\n\s*\n/).filter(p => p.trim());
 });
-
-function scaledFontSize(px) {
-    if (!px) return 14;
-    // Scale font size proportionally for screen canvas
-    return Math.max(10, Math.round(Number(px) * 0.72));
-}
 </script>
