@@ -43,7 +43,8 @@
                                     :program-prefix="programPrefix"
                                     :event-id="event.id"
                                     :is-sports="isSports"
-                                    :current-step="getTab(event.id) === 'athletes' ? 'event-reg' : (getTab(event.id) === 'items' ? 'item-reg' : 'payment')" />
+                                    :current-step="getTab(event.id) === 'athletes' ? 'event-reg' : (getTab(event.id) === 'items' ? 'item-reg' : 'payment')"
+                                    @select-step="step => setTab(event.id, step.tab)" />
 
         <div v-if="showBulkImport && events.length" class="card mb-5 max-w-2xl text-sm border-indigo-100">
             <div class="flex items-center justify-between gap-2 mb-3">
@@ -519,6 +520,12 @@ function getTab(eventId) {
 
 function setTab(eventId, tab) {
     activeTabMap[eventId] = tab;
+    if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        const tabKeyMap = { athletes: 'event-reg', items: 'item-reg', payment: 'payment' };
+        url.searchParams.set('tab', tabKeyMap[tab] || tab);
+        window.history.replaceState({}, '', url.toString());
+    }
 }
 
 function registeredItemCount(event) {

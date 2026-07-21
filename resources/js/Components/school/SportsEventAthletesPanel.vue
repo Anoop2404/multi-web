@@ -201,65 +201,95 @@ const ageGroupOptions = computed(() => {
         }));
 });
 
+const ageLabelCache = new Map();
+
 function ageLabelForStudent(student) {
-    const primary = student.sports_age_group
-        ? String(student.sports_age_group).toLowerCase()
-        : null;
+    if (!student) return null;
+    const primary = student.sports_age_group;
     if (primary) {
-        return ageGroupLabels.value[primary] ?? primary.toUpperCase();
+        return ageGroupLabels.value[String(primary).toLowerCase()] ?? String(primary).toUpperCase();
     }
-    const groups = (student.eligible_sports_groups ?? []).map((g) => String(g).toLowerCase());
-    if (!groups.length) return null;
-    const first = groups.sort((a, b) => {
-        const ai = SPORTS_AGE_ORDER.indexOf(a);
-        const bi = SPORTS_AGE_ORDER.indexOf(b);
-        return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
-    })[0];
-    return ageGroupLabels.value[first] ?? first.toUpperCase();
+    const groups = student.eligible_sports_groups;
+    if (!groups || !groups.length) return null;
+
+    const cacheKey = groups.join(',');
+    if (ageLabelCache.has(cacheKey)) return ageLabelCache.get(cacheKey);
+
+    const first = groups[0];
+    const label = ageGroupLabels.value[String(first).toLowerCase()] ?? String(first).toUpperCase();
+    ageLabelCache.set(cacheKey, label);
+    return label;
 }
 
 function studentMatchesAgeFilter(student, filterKey) {
     if (!filterKey) return true;
     const key = String(filterKey).toLowerCase();
-    const eligible = (student.eligible_sports_groups ?? []).map((g) => String(g).toLowerCase());
-    return eligible.includes(key)
-        || String(student.sports_age_group ?? '').toLowerCase() === key;
+    const eligible = student.eligible_sports_groups;
+    if (eligible && eligible.length) {
+        for (let i = 0; i < eligible.length; i++) {
+            if (String(eligible[i]).toLowerCase() === key) return true;
+        }
+    }
+    return String(student.sports_age_group ?? '').toLowerCase() === key;
 }
 
-const rows = computed(() => (props.students ?? []).map((s) => {
-    const id = normalizeId(s.id);
-    const reg = regByStudent.value[id];
-    const eventRegNumber = reg?.registration_number ?? s.event_registration_number ?? null;
-    const registered = Boolean(reg || s.event_registered || eventRegNumber);
-    const hasDob = !!s.dob;
-    const needsVerification = requireVerified.value && s.is_verified === false;
-    return {
-        id,
-        name: s.name,
-        reg_no: s.reg_no,
-        class_name: s.class_name ?? s.school_class?.name,
-        age_label: ageLabelForStudent(s),
-        eligible_sports_groups: s.eligible_sports_groups ?? [],
-        sports_age_group: s.sports_age_group ?? null,
-        registered,
-        event_reg_number: eventRegNumber,
-        hasDob,
-        isVerified: s.is_verified !== false,
-        ineligible_reason: !hasDob ? 'DOB required' : (needsVerification ? 'Verification required' : null),
-    };
-}));
+const rows = computed(() => {
+    const list = props.students ?? [];
+    const len = list.length;
+    const regMap = regByStudent.value;
+    const reqVerified = requireVerified.value;
+    const result = new Array(len);
+
+    for (let i = 0; i < len; i++) {
+        const s = list[i];
+        const id = normalizeId(s.id);
+        const reg = regMap[id];
+        const eventRegNumber = reg?.registration_number ?? s.event_registration_number ?? null;
+        const registered = Boolean(reg || s.event_registered || eventRegNumber);
+        const hasDob = !!s.dob;
+        const needsVerification = reqVerified && s.is_verified === false;
+        result[i] = {
+            id,
+            name: s.name,
+            reg_no: s.reg_no,
+            class_name: s.class_name ?? s.school_class?.name,
+            age_label: ageLabelForStudent(s),
+            eligible_sports_groups: s.eligible_sports_groups ?? [],
+            sports_age_group: s.sports_age_group ?? null,
+            registered,
+            event_reg_number: eventRegNumber,
+            hasDob,
+            isVerified: s.is_verified !== false,
+            ineligible_reason: !hasDob ? 'DOB required' : (needsVerification ? 'Verification required' : null),
+        };
+    }
+    return result;
+});
 
 const visibleRows = computed(() => {
     const q = search.value.trim().toLowerCase();
-    return rows.value.filter((row) => {
-        if (showUnregisteredOnly.value && row.registered) return false;
-        if (classFilter.value && row.class_name !== classFilter.value) return false;
-        if (ageFilter.value && !studentMatchesAgeFilter(row, ageFilter.value)) return false;
-        if (!q) return true;
-        return String(row.name ?? '').toLowerCase().includes(q)
-            || String(row.reg_no ?? '').toLowerCase().includes(q)
-            || String(row.class_name ?? '').toLowerCase().includes(q);
-    });
+    const classVal = classFilter.value;
+    const ageVal = ageFilter.value ? String(ageFilter.value).toLowerCase() : null;
+    const unregOnly = showUnregisteredOnly.value;
+
+    const allRows = rows.value;
+    const len = allRows.length;
+    const result = [];
+
+    for (let i = 0; i < len; i++) {
+        const row = allRows[i];
+        if (unregOnly && row.registered) continue;
+        if (classVal && row.class_name !== classVal) continue;
+        if (ageVal && !studentMatchesAgeFilter(row, ageVal)) continue;
+        if (q) {
+            const nameMatch = row.name && String(row.name).toLowerCase().includes(q);
+            const regMatch = row.reg_no && String(row.reg_no).toLowerCase().includes(q);
+            const classMatch = row.class_name && String(row.class_name).toLowerCase().includes(q);
+            if (!nameMatch && !regMatch && !classMatch) continue;
+        }
+        result.push(row);
+    }
+    return result;
 });
 
 const hasActiveFilters = computed(() =>
