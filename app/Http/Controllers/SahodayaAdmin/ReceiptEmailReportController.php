@@ -12,7 +12,7 @@ class ReceiptEmailReportController extends SahodayaAdminController
 {
     public function index(Request $request, ProgramFeeReceiptService $receiptService)
     {
-        $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
+        $schoolIds = collect(TenancyDatabase::schoolIdsFor($this->sahodaya->id));
 
         $filters = $request->validate([
             'status' => 'nullable|in:all,sent,failed,skipped,queued,pending',
@@ -67,7 +67,7 @@ class ReceiptEmailReportController extends SahodayaAdminController
 
     public function resend(string $tenantId, FeeReceipt $feeReceipt, ProgramFeeReceiptService $receiptService, ReceiptEmailResendService $resend)
     {
-        $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
+        $schoolIds = collect(TenancyDatabase::schoolIdsFor($this->sahodaya->id));
         $schoolId = $receiptService->schoolIdForReceipt($feeReceipt);
         abort_unless($schoolId && $schoolIds->contains($schoolId), 403);
 
