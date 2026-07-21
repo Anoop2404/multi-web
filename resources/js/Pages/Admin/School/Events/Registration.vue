@@ -908,12 +908,13 @@ function studentMatchesItem(student, event, item, { skipVerification = false } =
     if (event?.academic_year_id && student.academic_year_id && event.academic_year_id !== student.academic_year_id) {
         return false;
     }
-    if (props.eventType === 'kalolsavam') {
-        if (!student.eligible_kalolsav) return false;
-        if (item.class_group && item.class_group !== 'open' && student.kalolsav_class_group !== item.class_group) return false;
-    }
-    if (props.eventType === 'custom') {
-        if (item.class_group && item.class_group !== 'open' && student.kalolsav_class_group !== item.class_group) return false;
+    if (['kalolsavam', 'custom'].includes(props.eventType)) {
+        if (props.eventType === 'kalolsavam' && student.eligible_kalolsav === false) return false;
+        if (item.class_group && item.class_group !== 'open') {
+            const studentGrp = String(student.kalolsav_class_group ?? '').toLowerCase();
+            const itemGrp = String(item.class_group).toLowerCase();
+            if (studentGrp !== itemGrp) return false;
+        }
     }
     if (props.eventType === 'kids_fest') {
         if (!student.eligible_kids_fest) return false;

@@ -113,7 +113,7 @@ class FestRegistrationEligibilityService
 
         $eventType = $event->event_type ?? 'kalolsavam';
         $isSports = $eventType === 'sports';
-        $isKalolsav = $eventType === 'kalolsavam';
+        $isKalolsav = in_array($eventType, ['kalolsavam', 'custom'], true);
         $isKidsFest = $eventType === 'kids_fest';
 
         return $students->map(function (Student $student) use ($event, $eventRegByStudent, $isSports, $isKalolsav, $isKidsFest) {
