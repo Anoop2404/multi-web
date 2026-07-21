@@ -8,9 +8,22 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #0f172a; background: #f1f5f9; }
         .sheet-title { text-align: center; font-size: 10px; font-weight: bold; color: #334155; margin-bottom: 2mm; }
+
+        /* On-screen preview only: constrain each page to true A4 print width
+           (210mm minus the 6mm @page margin on each side = 198mm) so the
+           browser preview matches the printed/exported PDF exactly instead
+           of stretching the grid across the full viewport width. */
+        .page {
+            width: 210mm;
+            margin: 0 auto 8mm;
+            background: #ffffff;
+            padding: 3mm;
+            box-shadow: 0 1mm 4mm rgba(15, 23, 42, 0.12);
+        }
         @media print {
             .sheet-title { display: none !important; }
             body { background: #fff; }
+            .page { width: auto; margin: 0; padding: 0; box-shadow: none; }
         }
         .section-title {
             font-size: 9px;
@@ -22,7 +35,7 @@
             padding-bottom: 0.8mm;
             border-bottom: 0.3mm solid #cbd5e1;
         }
-        .grid { width: 100%; border-collapse: separate; border-spacing: 3mm 3mm; }
+        .grid { width: 100%; border-collapse: separate; border-spacing: 2mm 3mm; }
         .grid td { width: 50%; vertical-align: top; padding: 0; }
         .page-break { page-break-after: always; }
 
@@ -309,10 +322,29 @@
 @if(!empty($renderSections) && !empty($sections))
     @foreach($sections as $sectionIndex => $section)
         @if($sectionIndex > 0)<div class="page-break"></div>@endif
-        <p class="section-title">{{ $section['item_title'] ?? 'Item' }}</p>
         @php $chunks = array_chunk($section['cards'] ?? [], \App\Support\FestIdCardTemplates::CARDS_PER_PAGE); @endphp
         @foreach($chunks as $pageIndex => $pageCards)
             @if($pageIndex > 0)<div class="page-break"></div>@endif
+            <div class="page">
+                <p class="section-title">{{ $section['item_title'] ?? 'Item' }}</p>
+                <table class="grid">
+                    @foreach(array_chunk($pageCards, 2) as $row)
+                    <tr>
+                        @foreach($row as $card)
+                        <td>@include('fest.id-cards.partials.premium-card', array_merge($cardBranding, ['card' => $card]))</td>
+                        @endforeach
+                        @if(count($row) === 1)<td></td>@endif
+                    </tr>
+                    @endforeach
+                </table>
+            </div>
+        @endforeach
+    @endforeach
+@else
+    @php $chunks = array_chunk($cards ?? [], \App\Support\FestIdCardTemplates::CARDS_PER_PAGE); @endphp
+    @foreach($chunks as $pageIndex => $pageCards)
+        @if($pageIndex > 0)<div class="page-break"></div>@endif
+        <div class="page">
             <table class="grid">
                 @foreach(array_chunk($pageCards, 2) as $row)
                 <tr>
@@ -323,22 +355,7 @@
                 </tr>
                 @endforeach
             </table>
-        @endforeach
-    @endforeach
-@else
-    @php $chunks = array_chunk($cards ?? [], \App\Support\FestIdCardTemplates::CARDS_PER_PAGE); @endphp
-    @foreach($chunks as $pageIndex => $pageCards)
-        @if($pageIndex > 0)<div class="page-break"></div>@endif
-        <table class="grid">
-            @foreach(array_chunk($pageCards, 2) as $row)
-            <tr>
-                @foreach($row as $card)
-                <td>@include('fest.id-cards.partials.premium-card', array_merge($cardBranding, ['card' => $card]))</td>
-                @endforeach
-                @if(count($row) === 1)<td></td>@endif
-            </tr>
-            @endforeach
-        </table>
+        </div>
     @endforeach
 @endif
 
