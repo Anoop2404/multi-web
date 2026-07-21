@@ -338,17 +338,17 @@ class FestEvent extends Model
 
     public function isRegistrationOpen(): bool
     {
-        if ($this->status !== 'registration_open') {
+        if (! in_array($this->status, ['registration_open', 'published'], true)) {
             return false;
         }
 
-        $today = now()->startOfDay();
+        $today = now();
 
-        if ($this->registration_open && $today->lt($this->registration_open)) {
+        if ($this->registration_open && $today->lt($this->registration_open->startOfDay())) {
             return false;
         }
 
-        if ($this->registration_close && $today->gt($this->registration_close)) {
+        if ($this->registration_close && $today->gt($this->registration_close->endOfDay())) {
             return false;
         }
 

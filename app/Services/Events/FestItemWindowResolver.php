@@ -102,7 +102,7 @@ class FestItemWindowResolver
 
     public function isRegistrationOpen(FestEventItem $item): bool
     {
-        $today = now()->startOfDay();
+        $today = now();
         $start = $this->effectiveRegStart($item);
         $end = $this->effectiveRegEnd($item);
 
@@ -110,7 +110,7 @@ class FestItemWindowResolver
             return false;
         }
 
-        if ($end && $today->gt($end->startOfDay())) {
+        if ($end && $today->gt($end->endOfDay())) {
             return false;
         }
 
