@@ -80,7 +80,7 @@ class FestRegionPartitionService
      */
     public function assertRegionSelected(FestEvent $event, Tenant $school): void
     {
-        if ($event->event_type !== 'kalolsavam') {
+        if (($event->conduct_mode ?? 'standard') !== 'partitioned' && $event->event_type !== 'kalolsavam') {
             return;
         }
 
@@ -91,7 +91,7 @@ class FestRegionPartitionService
 
         if ($this->schoolRegion($sahodayaId, $school->id) === null) {
             throw ValidationException::withMessages([
-                'region' => 'Select your Kalotsav region before registering. Set it in annual registration, or ask your Sahodaya to assign it.',
+                'region' => 'Select your region before registering. Set it in annual registration, or ask your Sahodaya to assign it.',
             ]);
         }
     }
@@ -105,7 +105,6 @@ class FestRegionPartitionService
     public function syncPartitionsFromRegions(FestEvent $hub): array
     {
         abort_if($hub->parent_event_id, 422, 'Sync regions on the hub event, not a partition.');
-        abort_unless($hub->event_type === 'kalolsavam', 422, 'Region partitions apply to Kalotsav only.');
 
         $regions = Region::forTenant($hub->tenant_id)->active()->orderBy('sort_order')->orderBy('name')->get();
         abort_if($regions->isEmpty(), 422, 'No active regions configured for this Sahodaya.');
