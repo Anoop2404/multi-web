@@ -99,12 +99,12 @@
             @endif
             <div class="org-info">
                 <h1>{{ $sahodaya->name }}</h1>
-                <p>Sahodaya Schools Complex · Official Fee Receipt</p>
+                <p>Sahodaya Schools Complex · Fee Receipt</p>
                 <p>Date: {{ $receipt->payment_date?->format('d M Y') ?? now()->format('d M Y') }}</p>
             </div>
         </div>
 
-        <div class="receipt-title">{{ strtoupper($event->title) }} — OFFICIAL FEE RECEIPT</div>
+        <div class="receipt-title">{{ strtoupper($event->title) }} — FEE RECEIPT</div>
 
         <table>
             <tr>
@@ -169,7 +169,7 @@
                 <p class="sign-label">Authorised Signatory</p>
                 <p class="sign-label">{{ $sahodaya->name }}</p>
             </div>
-            <p style="font-size:10px;color:#94a3b8;">This is an official computer-generated receipt.</p>
+            <p style="font-size:10px;color:#94a3b8;">This is a computer-generated receipt.</p>
         </div>
     </div>
     <p class="no-print" style="text-align:center;margin-top:16px;font-family:sans-serif;font-size:13px;">
