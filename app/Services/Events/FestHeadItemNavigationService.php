@@ -319,12 +319,22 @@ class FestHeadItemNavigationService
     /** @return array<int, array{participant_count: int, chest_assigned: int, item_reg_assigned: int}> */
     private function participantStatsByItem(FestEvent $event, ?string $schoolId): array
     {
-        $rows = FestParticipant::query()
+        $items = FestEventItem::query()
+            ->where('event_id', $event->id)
+            ->get(['id', 'participant_type']);
+
+        $multiPersonItemIds = $items->filter(fn ($i) => \App\Support\FestTeamSquadRules::isMultiPerson($i->participant_type))->pluck('id')->all();
+
+        $map = [];
+
+        // Individual items count student rows
+        $indivRows = FestParticipant::query()
             ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
             ->leftJoin('fest_groups', 'fest_participants.group_id', '=', 'fest_groups.id')
             ->where('fest_registrations.event_id', $event->id)
             ->whereIn('fest_registrations.status', \App\Models\FestRegistration::ACTIVE_STATUSES)
             ->whereNotNull('fest_registrations.item_id')
+            ->when(! empty($multiPersonItemIds), fn ($q) => $q->whereNotIn('fest_registrations.item_id', $multiPersonItemIds))
             ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
             ->groupBy('fest_registrations.item_id')
             ->select([
@@ -335,13 +345,38 @@ class FestHeadItemNavigationService
             ])
             ->get();
 
-        $map = [];
-        foreach ($rows as $row) {
+        foreach ($indivRows as $row) {
             $map[(int) $row->item_id] = [
                 'participant_count'  => (int) $row->participant_count,
                 'chest_assigned'     => (int) $row->chest_assigned,
                 'item_reg_assigned'  => (int) $row->item_reg_assigned,
             ];
+        }
+
+        // Team / group items count team squads (FestGroup)
+        if (! empty($multiPersonItemIds)) {
+            $teamRows = \App\Models\FestGroup::query()
+                ->join('fest_registrations', 'fest_groups.registration_id', '=', 'fest_registrations.id')
+                ->where('fest_registrations.event_id', $event->id)
+                ->whereIn('fest_registrations.status', \App\Models\FestRegistration::ACTIVE_STATUSES)
+                ->whereIn('fest_registrations.item_id', $multiPersonItemIds)
+                ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+                ->groupBy('fest_registrations.item_id')
+                ->select([
+                    'fest_registrations.item_id',
+                    DB::raw('COUNT(*) as participant_count'),
+                    DB::raw('SUM(CASE WHEN fest_groups.chest_no IS NOT NULL THEN 1 ELSE 0 END) as chest_assigned'),
+                    DB::raw('SUM(CASE WHEN fest_groups.chest_no IS NOT NULL THEN 1 ELSE 0 END) as item_reg_assigned'),
+                ])
+                ->get();
+
+            foreach ($teamRows as $row) {
+                $map[(int) $row->item_id] = [
+                    'participant_count'  => (int) $row->participant_count,
+                    'chest_assigned'     => (int) $row->chest_assigned,
+                    'item_reg_assigned'  => (int) $row->item_reg_assigned,
+                ];
+            }
         }
 
         return $map;
