@@ -361,29 +361,38 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
         });
     }
 
-    // ── Membership ────────────────────────────────────────────────────
+    // ── Schools & Membership ──────────────────────────────────────────
     if (canNav('membership') && menuOn('membership')) {
         groups.push({
-            section: 'Membership',
+            section: 'Schools & Membership',
             items: [
                 { label: 'Schools', href: `${base}/schools`, icon: 'building', badge: approvedSchoolsCount },
-                { label: 'Regions', href: `${base}/regions`, icon: 'map-pin' },
                 { label: 'Pending applications', href: `${base}/schools/applications`, icon: 'inbox', badge: pendingSchoolsCount, hidden: !pendingSchoolsCount },
                 { label: 'Membership fees', href: `${base}/membership/payments`, icon: 'credit-card', badge: pendingPaymentsCount },
-                { label: 'Student change requests', href: `${base}/student-change-requests`, icon: 'inbox', badge: pendingChangeRequests },
-                { label: 'Registration windows', href: `${base}/students/registration-windows`, icon: 'calendar' },
-                { label: 'Profile change requests', href: `${base}/users/profile-change-requests`, icon: 'inbox' },
                 { label: 'Student verification', href: `${base}/students/verification${unverifiedStudentsCount ? '?verification=unverified' : ''}`, icon: 'users', badge: unverifiedStudentsCount },
                 { label: 'Teacher verification', href: `${base}/teachers/verification`, icon: 'users' },
-                { label: 'Unverified students', href: `${base}/students/verification?verification=unverified`, icon: 'users', hidden: true },
+            ],
+        });
+
+        groups.push({
+            section: 'Queues & Verification',
+            items: [
+                { label: 'Student change requests', href: `${base}/student-change-requests`, icon: 'inbox', badge: pendingChangeRequests, hidden: !pendingChangeRequests },
+                { label: 'Profile change requests', href: `${base}/users/profile-change-requests`, icon: 'inbox' },
+                { label: 'Student counts', href: `${base}/membership/submissions`, icon: 'inbox', badge: pendingSubmissionsCount, hidden: !pendingSubmissionsCount },
+                { label: 'Document review', href: `${base}/documents/review`, icon: 'file-text' },
+            ],
+        });
+
+        groups.push({
+            section: 'Academic & Reports',
+            items: [
                 { label: 'Academic Years', href: `${base}/academic-years`, icon: 'calendar' },
-                { label: 'Student counts', href: `${base}/membership/submissions`, icon: 'inbox', badge: pendingSubmissionsCount },
+                { label: 'Registration windows', href: `${base}/students/registration-windows`, icon: 'calendar' },
+                { label: 'Regions', href: `${base}/regions`, icon: 'map-pin' },
+                { label: 'Board results', href: `${base}/board-results/verification`, icon: 'bar-chart' },
                 { label: 'Membership reports', href: `${base}/membership/reports`, icon: 'bar-chart' },
                 { label: 'Reports hub', href: `${base}/reports/hub`, icon: 'inbox' },
-                { label: 'Login audit', href: `${base}/auth/login-audit`, icon: 'shield' },
-                { label: 'Document review', href: `${base}/documents/review`, icon: 'file-text' },
-                { label: 'Board results', href: `${base}/board-results/verification`, icon: 'bar-chart' },
-                { label: 'Board reports', href: `${base}/board-results/reports`, icon: 'file-text' },
                 { label: 'Program calendar', href: `${base}/calendar`, icon: 'calendar' },
             ],
         });
