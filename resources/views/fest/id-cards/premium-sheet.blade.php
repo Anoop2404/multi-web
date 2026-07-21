@@ -211,28 +211,10 @@
             vertical-align: middle;
         }
 
-        /* Colored dot bullets matching reference */
-        .pcard__meta-dot {
-            width: 4mm;
-            padding-right: 0.8mm;
-        }
-        .dot {
-            display: inline-block;
-            width: 2.3mm;
-            height: 2.3mm;
-            border-radius: 50%;
-        }
-        .dot--blue   { background: #3b82f6; }
-        .dot--amber  { background: #f59e0b; }
-        .dot--pink   { background: #ec4899; }
-        .dot--red    { background: #ef4444; }
-        .dot--teal   { background: #14b8a6; }
-        .dot--orange { background: #f97316; }
-
         .pcard__meta-label {
             color: #475569;
             font-weight: 600;
-            width: 15mm;
+            width: 17mm;
         }
         .pcard__meta-sep {
             color: #64748b;

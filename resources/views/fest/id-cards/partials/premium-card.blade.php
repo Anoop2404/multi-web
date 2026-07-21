@@ -43,37 +43,31 @@
             <p class="pcard__name">{{ $card['name'] }}</p>
             <table class="pcard__meta-table">
                 <tr>
-                    <td class="pcard__meta-dot"><span class="dot dot--blue"></span></td>
                     <td class="pcard__meta-label">Role</td>
                     <td class="pcard__meta-sep">:</td>
                     <td class="pcard__meta-val">{{ $card['role_title'] ?? 'Participant' }}</td>
                 </tr>
                 <tr>
-                    <td class="pcard__meta-dot"><span class="dot dot--amber"></span></td>
                     <td class="pcard__meta-label">Event</td>
                     <td class="pcard__meta-sep">:</td>
                     <td class="pcard__meta-val">{{ $card['event_name'] ?? $eventTitle }}</td>
                 </tr>
                 <tr>
-                    <td class="pcard__meta-dot"><span class="dot dot--pink"></span></td>
                     <td class="pcard__meta-label">Date</td>
                     <td class="pcard__meta-sep">:</td>
                     <td class="pcard__meta-val">{{ $card['event_date'] ?? '—' }}</td>
                 </tr>
                 <tr>
-                    <td class="pcard__meta-dot"><span class="dot dot--red"></span></td>
                     <td class="pcard__meta-label">Venue</td>
                     <td class="pcard__meta-sep">:</td>
                     <td class="pcard__meta-val">{{ $card['venue'] ?? '—' }}</td>
                 </tr>
                 <tr>
-                    <td class="pcard__meta-dot"><span class="dot dot--teal"></span></td>
                     <td class="pcard__meta-label">Shodaya</td>
                     <td class="pcard__meta-sep">:</td>
                     <td class="pcard__meta-val">{{ $card['sahodaya_name'] ?? ($clusterName ?? 'Sahodaya') }}</td>
                 </tr>
                 <tr>
-                    <td class="pcard__meta-dot"><span class="dot dot--orange"></span></td>
                     <td class="pcard__meta-label">Category</td>
                     <td class="pcard__meta-sep">:</td>
                     <td class="pcard__meta-val">{{ $card['category'] ?? ($card['class_category'] ?? '—') }}</td>
