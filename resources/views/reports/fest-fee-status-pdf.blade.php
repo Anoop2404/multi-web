@@ -202,16 +202,16 @@
             </td>
             <td>
                 <div class="summary-label">Total Billed Due</div>
-                <div class="summary-value">₹{{ number_format($summary['total_due'], 2) }}</div>
+                <div class="summary-value">Rs.{{ number_format($summary['total_due'], 2) }}</div>
             </td>
             <td>
                 <div class="summary-label">Total Collected</div>
-                <div class="summary-value text-green">₹{{ number_format($summary['total_paid'], 2) }}</div>
+                <div class="summary-value text-green">Rs.{{ number_format($summary['total_paid'], 2) }}</div>
             </td>
             <td>
                 <div class="summary-label">Pending Balance</div>
                 <div class="summary-value {{ $summary['total_balance'] > 0 ? 'text-red' : 'text-green' }}">
-                    ₹{{ number_format($summary['total_balance'], 2) }}
+                    Rs.{{ number_format($summary['total_balance'], 2) }}
                 </div>
             </td>
             <td>
@@ -233,13 +233,13 @@
         <thead>
             <tr>
                 <th style="width: 22px;" class="text-center">#</th>
-                <th>School Name &amp; Registered Items</th>
-                <th style="width: 55px;" class="text-center">Entries</th>
-                <th style="width: 75px;" class="text-right">School Reg (₹)</th>
-                <th style="width: 75px;" class="text-right">Item/Student (₹)</th>
-                <th style="width: 80px;" class="text-right">Total Due (₹)</th>
-                <th style="width: 80px;" class="text-right">Paid (₹)</th>
-                <th style="width: 80px;" class="text-right">Balance (₹)</th>
+                <th>School Name &amp; Item Breakdown</th>
+                <th style="width: 55px;" class="text-center">Reg Count</th>
+                <th style="width: 75px;" class="text-right">School Reg (Rs.)</th>
+                <th style="width: 75px;" class="text-right">Item/Student (Rs.)</th>
+                <th style="width: 80px;" class="text-right">Total Due (Rs.)</th>
+                <th style="width: 80px;" class="text-right">Paid (Rs.)</th>
+                <th style="width: 80px;" class="text-right">Balance (Rs.)</th>
                 <th style="width: 85px;" class="text-center">Status</th>
                 <th style="width: 120px;">Receipts &amp; Txn Ref</th>
             </tr>
@@ -249,20 +249,33 @@
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>
-                        <div class="font-bold" style="color: #0f172a;">{{ $row['school_name'] }}</div>
-                        @if(!empty($row['items']))
+                        <div class="font-bold" style="color: #0f172a; font-size: 10px;">{{ $row['school_name'] }}</div>
+                        @if(!empty($row['breakdown']['items']))
+                            <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 8.5px;">
+                                @foreach($row['breakdown']['items'] as $itemLine)
+                                    <tr>
+                                        <td style="border: none; padding: 1px 0; color: #334155;">
+                                            • {{ $itemLine['label'] }}
+                                        </td>
+                                        <td style="border: none; padding: 1px 0; text-align: right; color: #0f172a; font-weight: bold; width: 60px;">
+                                            Rs.{{ number_format($itemLine['amount'], 2) }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </table>
+                        @elseif(!empty($row['items']))
                             <div class="item-list-sub">
                                 <strong>Items ({{ count($row['items']) }}):</strong> {{ implode(', ', $row['items']) }}
                             </div>
                         @endif
                     </td>
-                    <td class="text-center font-bold">{{ $row['item_count'] }}</td>
-                    <td class="text-right">₹{{ number_format($row['school_registration_fee'], 2) }}</td>
-                    <td class="text-right">₹{{ number_format($row['participation_fee'], 2) }}</td>
-                    <td class="text-right font-bold">₹{{ number_format($row['total_due'], 2) }}</td>
-                    <td class="text-right" style="color: #15803d; font-weight: bold;">₹{{ number_format($row['amount_paid'], 2) }}</td>
+                    <td class="text-center font-bold" style="font-size: 10px;">{{ $row['item_count'] }}</td>
+                    <td class="text-right">Rs.{{ number_format($row['school_registration_fee'], 2) }}</td>
+                    <td class="text-right">Rs.{{ number_format($row['participation_fee'], 2) }}</td>
+                    <td class="text-right font-bold">Rs.{{ number_format($row['total_due'], 2) }}</td>
+                    <td class="text-right" style="color: #15803d; font-weight: bold;">Rs.{{ number_format($row['amount_paid'], 2) }}</td>
                     <td class="text-right" style="{{ $row['balance_due'] > 0 ? 'color: #b91c1c; font-weight: bold;' : 'color: #64748b;' }}">
-                        ₹{{ number_format($row['balance_due'], 2) }}
+                        Rs.{{ number_format($row['balance_due'], 2) }}
                     </td>
                     <td class="text-center">
                         @php
@@ -283,7 +296,7 @@
                             @foreach($row['receipts'] as $r)
                                 <span class="receipt-pill">
                                     <strong>{{ $r['receipt_number'] ?: ($r['transaction_ref'] ?: 'Receipt') }}</strong>:
-                                    ₹{{ number_format($r['amount'], 2) }}
+                                    Rs.{{ number_format($r['amount'], 2) }}
                                     @if($r['payment_date']) ({{ $r['payment_date'] }}) @endif
                                 </span>
                             @endforeach
@@ -309,12 +322,12 @@
             <tfoot>
                 <tr style="background: #f1f5f9; font-weight: bold;">
                     <td colspan="3" class="text-right">TOTALS:</td>
-                    <td class="text-right">₹{{ number_format($rows->sum('school_registration_fee'), 2) }}</td>
-                    <td class="text-right">₹{{ number_format($rows->sum('participation_fee'), 2) }}</td>
-                    <td class="text-right">₹{{ number_format($summary['total_due'], 2) }}</td>
-                    <td class="text-right" style="color: #15803d;">₹{{ number_format($summary['total_paid'], 2) }}</td>
+                    <td class="text-right">Rs.{{ number_format($rows->sum('school_registration_fee'), 2) }}</td>
+                    <td class="text-right">Rs.{{ number_format($rows->sum('participation_fee'), 2) }}</td>
+                    <td class="text-right">Rs.{{ number_format($summary['total_due'], 2) }}</td>
+                    <td class="text-right" style="color: #15803d;">Rs.{{ number_format($summary['total_paid'], 2) }}</td>
                     <td class="text-right" style="{{ $summary['total_balance'] > 0 ? 'color: #b91c1c;' : '' }}">
-                        ₹{{ number_format($summary['total_balance'], 2) }}
+                        Rs.{{ number_format($summary['total_balance'], 2) }}
                     </td>
                     <td colspan="2"></td>
                 </tr>
