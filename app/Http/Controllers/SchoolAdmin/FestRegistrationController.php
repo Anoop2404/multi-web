@@ -129,10 +129,29 @@ class FestRegistrationController extends SchoolAdminController
         }
 
         $eligibilityService = app(FestRegistrationEligibilityService::class);
-        $studentsByEvent = $events->mapWithKeys(function (FestEvent $event) use ($studentRows, $eligibilityService) {
-            return [
-                $event->id => $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values(),
-            ];
+        $primaryEvent = $events->first();
+        $baseStudents = $primaryEvent
+            ? $eligibilityService->annotateStudents($studentRows, $primaryEvent, $this->school->id)->values()
+            : collect();
+
+        $eventRegMap = \App\Models\FestLevelRegistration::query()
+            ->whereIn('event_id', $events->pluck('id'))
+            ->where('status', 'active')
+            ->whereIn('student_id', $studentRows->pluck('id'))
+            ->get()
+            ->groupBy('event_id')
+            ->map(fn ($regs) => $regs->pluck('registration_number', 'student_id')->all());
+
+        $studentsByEvent = $events->mapWithKeys(function (FestEvent $event) use ($baseStudents, $eventRegMap) {
+            $regMap = $eventRegMap->get($event->id) ?? [];
+            $eventStudents = $baseStudents->map(function ($s) use ($regMap) {
+                $regNo = $regMap[$s['id']] ?? null;
+                return array_merge($s, [
+                    'event_registered' => $regNo !== null,
+                    'event_registration_number' => $regNo,
+                ]);
+            });
+            return [$event->id => $eventStudents];
         });
 
         return $this->inertia('School/Events/Registration', [
