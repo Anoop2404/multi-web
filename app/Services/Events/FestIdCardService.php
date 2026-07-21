@@ -658,7 +658,7 @@ class FestIdCardService
         }
         $venue = $event->venue ?: ($event->venue_name ?: '—');
         $sahodayaName = $event->tenant?->name ?? 'Sahodaya';
-        $category = $classCategory ?: ($studentClass ? "Class {$studentClass}" : null);
+        $category = $itemLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : '—'));
 
         return [
             'card_type'       => 'individual',
