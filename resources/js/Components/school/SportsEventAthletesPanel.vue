@@ -51,7 +51,7 @@
             Showing {{ visibleRows.length }} of {{ rows.length }} students
         </p>
 
-        <div class="overflow-x-auto max-h-64 overflow-y-auto bg-white">
+        <div class="overflow-x-auto max-h-[700px] min-h-[350px] overflow-y-auto bg-white">
             <table class="data-table w-full text-sm">
                 <thead class="sticky top-0 bg-slate-50 z-[1]">
                     <tr>
