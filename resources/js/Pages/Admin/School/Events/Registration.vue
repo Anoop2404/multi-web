@@ -897,8 +897,25 @@ function studentsForEvent(eventId) {
         ?? [];
 }
 
-function requireVerifiedForEvent(event) {
-    return event?.require_verified_students !== false;
+const GROUP_ALIASES = {
+    lp: ['lp', 'category1', 'category_1', 'cat1', 'category 1', 'cat 1'],
+    up: ['up', 'category2', 'category_2', 'cat2', 'category 2', 'cat 2'],
+    hs: ['hs', 'category3', 'category_3', 'cat3', 'category 3', 'cat 3'],
+    hss: ['hss', 'category4', 'category_4', 'cat4', 'category 4', 'cat 4'],
+};
+
+function matchesClassGroup(studentGrpRaw, itemGrpRaw) {
+    if (!itemGrpRaw || itemGrpRaw === 'open') return true;
+    const studentGrp = String(studentGrpRaw ?? '').toLowerCase().trim();
+    const itemGrp = String(itemGrpRaw ?? '').toLowerCase().trim();
+    if (studentGrp === itemGrp) return true;
+
+    for (const [, aliases] of Object.entries(GROUP_ALIASES)) {
+        if (aliases.includes(studentGrp) && aliases.includes(itemGrp)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function studentMatchesItem(student, event, item, { skipVerification = false } = {}) {
@@ -911,9 +928,7 @@ function studentMatchesItem(student, event, item, { skipVerification = false } =
     if (['kalolsavam', 'custom'].includes(props.eventType)) {
         if (props.eventType === 'kalolsavam' && student.eligible_kalolsav === false) return false;
         if (item.class_group && item.class_group !== 'open') {
-            const studentGrp = String(student.kalolsav_class_group ?? '').toLowerCase();
-            const itemGrp = String(item.class_group).toLowerCase();
-            if (studentGrp !== itemGrp) return false;
+            if (!matchesClassGroup(student.kalolsav_class_group, item.class_group)) return false;
         }
     }
     if (props.eventType === 'kids_fest') {
