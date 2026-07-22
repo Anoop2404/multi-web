@@ -59,44 +59,61 @@ class ErpReportQueryService
         $reportId = ErpReportMeta::resolveId($reportId);
 
         if ($this->festReports->supports($reportId)) {
-            return $this->festReports->rows($sahodayaId, $reportId, $filters);
+            $rows = $this->festReports->rows($sahodayaId, $reportId, $filters);
+        } else {
+            $rows = match ($reportId) {
+                'RPT-PAY-006' => $this->paymentDueAll($sahodayaId, $filters),
+                'RPT-PAY-013' => $this->lateFeeCollected($sahodayaId, $filters),
+                'RPT-PAY-014' => $this->waiverRegister($sahodayaId),
+                'RPT-PAY-019' => $this->dailyCollection($sahodayaId, $filters),
+                'RPT-SCH-007' => $this->documentCompliance($sahodayaId),
+                'RPT-STU-005' => $this->studentsByAgeCategory($sahodayaId),
+                'RPT-STU-010' => $this->studentImportErrors($sahodayaId),
+                'RPT-STU-011' => $this->studentsPhotoMissing($sahodayaId, $filters),
+                'RPT-STU-012' => $this->duplicateAdmissionNumbers($sahodayaId),
+                'RPT-STU-013' => $this->monthlyAdmissions($sahodayaId, $filters),
+                'RPT-TCH-012' => $this->teachersMissingEmail($sahodayaId, $filters),
+                'RPT-EML-004' => $this->templateUsageCounts(),
+                'RPT-EML-005' => $this->emailsByModuleMonthly($filters),
+                'RPT-MCQ-006' => $this->mcqSessionLog($sahodayaId, $filters),
+                'RPT-MCQ-013' => $this->mcqIpAudit($sahodayaId, $filters),
+                'RPT-AUTH-001' => $this->studentLoginReport($sahodayaId, $filters),
+                'RPT-AUTH-002' => $this->teacherLoginReport($sahodayaId, $filters),
+                'RPT-AUTH-003' => $this->neverLoggedInStudents($sahodayaId, $filters),
+                'RPT-AUTH-004' => $this->neverLoggedInTeachers($sahodayaId, $filters),
+                'RPT-AUTH-005' => $this->failedLoginAttempts($filters),
+                'RPT-DOC-003' => $this->expiringDocuments($sahodayaId),
+                'RPT-DOC-004' => $this->rejectedDocuments($sahodayaId),
+                'RPT-DSH-001' => $this->sahodayaKpiSnapshot($sahodayaId),
+                'RPT-DSH-003' => $this->financeDashboardSnapshot($sahodayaId),
+                'RPT-DSH-005' => $this->registrationFunnel($sahodayaId),
+                'RPT-TRN-003' => $this->trainingEligibilityRejections($sahodayaId),
+                'RPT-TRN-009' => $this->trainingCapacityUtilization($sahodayaId),
+                'RPT-TRN-010' => $this->trainingFinancialPending($sahodayaId),
+                'RPT-PAY-008' => $this->paymentRejectedLog($sahodayaId),
+                'RPT-PAY-020' => $this->modulePaymentMix($sahodayaId),
+                'RPT-FIN-011' => $this->paymentDueAll($sahodayaId, $filters),
+                'RPT-MCQ-011' => $this->mcqSchoolPerformance($sahodayaId, $filters),
+                default => $this->extendedReportRows($sahodayaId, $reportId, $filters),
+            };
         }
 
-        return match ($reportId) {
-            'RPT-PAY-006' => $this->paymentDueAll($sahodayaId, $filters),
-            'RPT-PAY-013' => $this->lateFeeCollected($sahodayaId, $filters),
-            'RPT-PAY-014' => $this->waiverRegister($sahodayaId),
-            'RPT-PAY-019' => $this->dailyCollection($sahodayaId, $filters),
-            'RPT-SCH-007' => $this->documentCompliance($sahodayaId),
-            'RPT-STU-005' => $this->studentsByAgeCategory($sahodayaId),
-            'RPT-STU-010' => $this->studentImportErrors($sahodayaId),
-            'RPT-STU-011' => $this->studentsPhotoMissing($sahodayaId, $filters),
-            'RPT-STU-012' => $this->duplicateAdmissionNumbers($sahodayaId),
-            'RPT-STU-013' => $this->monthlyAdmissions($sahodayaId, $filters),
-            'RPT-TCH-012' => $this->teachersMissingEmail($sahodayaId, $filters),
-            'RPT-EML-004' => $this->templateUsageCounts(),
-            'RPT-EML-005' => $this->emailsByModuleMonthly($filters),
-            'RPT-MCQ-006' => $this->mcqSessionLog($sahodayaId, $filters),
-            'RPT-MCQ-013' => $this->mcqIpAudit($sahodayaId, $filters),
-            'RPT-AUTH-001' => $this->studentLoginReport($sahodayaId, $filters),
-            'RPT-AUTH-002' => $this->teacherLoginReport($sahodayaId, $filters),
-            'RPT-AUTH-003' => $this->neverLoggedInStudents($sahodayaId, $filters),
-            'RPT-AUTH-004' => $this->neverLoggedInTeachers($sahodayaId, $filters),
-            'RPT-AUTH-005' => $this->failedLoginAttempts($filters),
-            'RPT-DOC-003' => $this->expiringDocuments($sahodayaId),
-            'RPT-DOC-004' => $this->rejectedDocuments($sahodayaId),
-            'RPT-DSH-001' => $this->sahodayaKpiSnapshot($sahodayaId),
-            'RPT-DSH-003' => $this->financeDashboardSnapshot($sahodayaId),
-            'RPT-DSH-005' => $this->registrationFunnel($sahodayaId),
-            'RPT-TRN-003' => $this->trainingEligibilityRejections($sahodayaId),
-            'RPT-TRN-009' => $this->trainingCapacityUtilization($sahodayaId),
-            'RPT-TRN-010' => $this->trainingFinancialPending($sahodayaId),
-            'RPT-PAY-008' => $this->paymentRejectedLog($sahodayaId),
-            'RPT-PAY-020' => $this->modulePaymentMix($sahodayaId),
-            'RPT-FIN-011' => $this->paymentDueAll($sahodayaId, $filters),
-            'RPT-MCQ-011' => $this->mcqSchoolPerformance($sahodayaId, $filters),
-            default => $this->extendedReportRows($sahodayaId, $reportId, $filters),
-        };
+        return $rows->map(function ($row) {
+            if (is_array($row)) {
+                foreach (['school_name', 'school', 'institution', 'institution_name', 'school_title'] as $key) {
+                    if (isset($row[$key]) && is_string($row[$key])) {
+                        $row[$key] = mb_strtoupper($row[$key], 'UTF-8');
+                    }
+                }
+            } elseif (is_object($row)) {
+                foreach (['school_name', 'school', 'institution', 'institution_name', 'school_title'] as $key) {
+                    if (isset($row->$key) && is_string($row->$key)) {
+                        $row->$key = mb_strtoupper($row->$key, 'UTF-8');
+                    }
+                }
+            }
+            return $row;
+        });
     }
 
     /** @param  list<string>  $cols */

@@ -124,8 +124,8 @@ const categoryOptions = computed(() =>
 
 const orderedGroups = computed(() => {
     let list = (props.interactive ?? []).map((r) => enrichInteractiveReport(r, props.event?.event_type === 'sports'));
-    if (props.hasItemHeads) {
-        list = list.filter((p) => p.id !== 'head-wise-participants');
+    if (!props.hasItemHeads) {
+        list = list.filter((p) => p.id !== 'head-wise-participants' && p.id !== 'discipline-registration');
     }
     list = filterReportsByQuery(list, searchQuery.value);
     if (activeCategory.value) {

@@ -34,6 +34,28 @@ class FestCrossEventReportService
     /** @param  array<string, mixed>  $filters */
     public function rows(string $sahodayaId, string $reportId, array $filters = []): Collection
     {
+        $rows = $this->resolveRows($sahodayaId, $reportId, $filters);
+
+        return $rows->map(function ($row) {
+            if (is_array($row)) {
+                foreach (['school_name', 'school', 'institution', 'institution_name', 'school_title'] as $key) {
+                    if (isset($row[$key]) && is_string($row[$key])) {
+                        $row[$key] = mb_strtoupper($row[$key], 'UTF-8');
+                    }
+                }
+            } elseif (is_object($row)) {
+                foreach (['school_name', 'school', 'institution', 'institution_name', 'school_title'] as $key) {
+                    if (isset($row->$key) && is_string($row->$key)) {
+                        $row->$key = mb_strtoupper($row->$key, 'UTF-8');
+                    }
+                }
+            }
+            return $row;
+        });
+    }
+
+    private function resolveRows(string $sahodayaId, string $reportId, array $filters = []): Collection
+    {
         if (str_starts_with($reportId, 'RPT-FST-')) {
             return $this->festHubRows($sahodayaId, $reportId, $filters);
         }

@@ -135,16 +135,24 @@ const activePhase = ref(null);
 
 const eventBase = computed(() => `${programBase.value}/reports/${props.event.id}`);
 
+// Report cards whose content is only meaningful when the event actually has
+// multiple item heads/disciplines (a "by head" breakdown of a single flat
+// item — e.g. a standalone chess event — degenerates into an empty or
+// one-row report). Hidden when the event has no heads; still shown for real
+// multi-head sports seasons.
+const HEAD_ONLY_REPORT_IDS = ['head-wise', 'discipline-participation', 'results-publish-status'];
+
+function filterHeadOnlyReports(reports) {
+    return reports.filter((r) => !HEAD_ONLY_REPORT_IDS.includes(r.id) || props.hasItemHeads);
+}
+
 const featuredReports = computed(() => {
-    let reports = featuredSchoolReports(programSlug.value)
-        .filter((r) => r.id !== 'head-wise' || !props.hasItemHeads);
+    let reports = filterHeadOnlyReports(featuredSchoolReports(programSlug.value));
     return filterReportsByPhase(reports, activePhase.value);
 });
 
 const totalReportCount = computed(() => {
-    let reports = schoolReportsForProgram(programSlug.value)
-        .filter((r) => r.id !== 'head-wise' || !props.hasItemHeads);
-    return reports.length;
+    return filterHeadOnlyReports(schoolReportsForProgram(programSlug.value)).length;
 });
 
 const categoryOptions = computed(() =>
@@ -154,8 +162,7 @@ const categoryOptions = computed(() =>
 );
 
 const orderedGroups = computed(() => {
-    let reports = schoolReportsForProgram(programSlug.value)
-        .filter((r) => r.id !== 'head-wise' || !props.hasItemHeads);
+    let reports = filterHeadOnlyReports(schoolReportsForProgram(programSlug.value));
     reports = filterReportsByQuery(reports, searchQuery.value);
     reports = filterReportsByPhase(reports, activePhase.value);
     if (activeCategory.value) {

@@ -57,6 +57,18 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'school_setup_wizard_dismissed', 'nav_overrides',
         ];
     }
+    public function getNameAttribute($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        if (($this->attributes['type'] ?? $this->type) === 'school') {
+            return mb_strtoupper((string) $value, 'UTF-8');
+        }
+
+        return $value;
+    }
 
     // ── Relationships ────────────────────────────────────────────────────────
 
