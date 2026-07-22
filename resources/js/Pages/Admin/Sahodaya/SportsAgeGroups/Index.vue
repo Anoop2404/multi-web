@@ -1,11 +1,10 @@
 <template>
-    <SahodayaEventsLayout title="Sports age categories" :sahodaya="sahodaya" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount" :program="program"
-                         :program-events="programEvents" :show-header-title="false">
+    <SahodayaEventsLayout title="Age categories" :sahodaya="sahodaya" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader
-            title="Sports age categories"
-            eyebrow="Sports Meet"
-            description="Define Under-N bands (U14 = under 14 years, U17 = under 17, etc.) used for item eligibility and fees."
+            title="Age categories"
+            eyebrow="Sahodaya settings"
+            description="Define Under-N bands (U14 = under 14 years, U17 = under 17, etc.) used for item eligibility and fees — shared across every program, not just Sports Meet."
         >
             <template #actions>
                 <button type="button" class="btn-secondary text-sm" @click="confirmReset">Reset to defaults</button>
@@ -145,14 +144,14 @@ const props = defineProps({
     sahodaya: Object,
     publicUrl: String,
     pendingPaymentsCount: Number,
-    program: Object,
-    programEvents: { type: Array, default: () => [] },
     groups: Array,
     activeAcademicYear: Object,
     globalAgeCutoffDate: { type: String, default: null },
 });
 
-const base = `/sahodaya-admin/${props.sahodaya.id}/sports/age-groups`;
+// General Sahodaya-level route (not scoped under any one program's prefix) —
+// age categories are shared across every program, not just Sports Meet.
+const base = `/sahodaya-admin/${props.sahodaya.id}/sports-age-groups`;
 
 const cutoffForm = useForm({
     sports_age_cutoff_date: props.globalAgeCutoffDate ?? '',

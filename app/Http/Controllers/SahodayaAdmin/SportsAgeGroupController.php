@@ -12,6 +12,15 @@ use Illuminate\Validation\Rule;
 
 class SportsAgeGroupController extends SahodayaAdminController
 {
+    /**
+     * Age categories live at the Sahodaya level (fest_sports_age_group_configs
+     * is keyed only by tenant_id, not by program/event_type — it was never
+     * actually sports-specific in the data model, only in where it was
+     * reachable from). Rendered generically, like CompetitionTypeController,
+     * so it shows the common Sahodaya sidebar rather than being locked to
+     * the Sports Meet program's own nav — every program can reach and use
+     * the same age bands.
+     */
     public function index(FestSportsAgeGroupRegistry $registry)
     {
         $registry->forTenant($this->sahodaya->id)->ensureDefaults();
@@ -21,7 +30,7 @@ class SportsAgeGroupController extends SahodayaAdminController
             ->orderBy('group_key')
             ->get();
 
-        return $this->inertia('Sahodaya/SportsAgeGroups/Index', $this->programNavProps('sports-meet') + [
+        return $this->inertia('Sahodaya/SportsAgeGroups/Index', [
             'groups'           => $groups,
             'activeAcademicYear' => \App\Support\AcademicYear::activeRecord(),
             'globalAgeCutoffDate' => SahodayaProfile::where('tenant_id', $this->sahodaya->id)

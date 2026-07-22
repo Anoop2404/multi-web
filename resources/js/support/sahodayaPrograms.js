@@ -255,13 +255,11 @@ export function programScopedNav(sahodayaId, programSlug, events = [], options =
         { label: 'Item catalog', href: sahodayaProgramHref(sahodayaId, programSlug, 'catalog'), icon: 'file-text', permissions: FEST_MANAGE },
         { label: 'Competition types', href: `${base}/competition-types`, icon: 'layers', permissions: FEST_MANAGE },
         { label: 'Category masters', href: `${base}/taxonomy-masters?program=${programSlug}`, icon: 'settings', permissions: FEST_MANAGE },
+        // Sahodaya-wide, common to every program — not scoped under any one
+        // program's own prefix (the underlying config is keyed only by
+        // tenant_id, never by event type).
+        { label: 'Age categories', href: `${base}/sports-age-groups`, icon: 'users', permissions: FEST_MANAGE },
     ];
-
-    if (programSlug === 'sports-meet') {
-        setupItems.push(
-            { label: 'Age groups', href: sahodayaProgramHref(sahodayaId, programSlug, 'age-groups'), icon: 'users', permissions: FEST_MANAGE },
-        );
-    }
 
     if (programSlug === 'kalotsav') {
         setupItems.push(

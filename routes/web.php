@@ -588,9 +588,16 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/financial-years/{financialYear}/current',[AcademicYearController::class, 'setCurrentFinancialYear'])->name('financial.current');
         });
 
+        // Age categories are Sahodaya-wide (fest_sports_age_group_configs is
+        // keyed only by tenant_id, never by program) — reachable here at the
+        // general settings level, common to every program, not nested under
+        // any one program's prefix. The old /{program}/age-groups routes
+        // (routes/includes/sahodaya_event_programs.php) still work too and
+        // hit this same controller, kept for backward-compatible links.
         Route::prefix('sports-age-groups')->name('sports-age-groups.')->group(function () {
-            Route::get('/', fn (string $tenantId) => redirect("/sahodaya-admin/{$tenantId}/sports/age-groups", 301));
+            Route::get('/', [SportsAgeGroupController::class, 'index'])->name('index');
             Route::post('/', [SportsAgeGroupController::class, 'store'])->name('store');
+            Route::put('/global-cutoff', [SportsAgeGroupController::class, 'updateGlobalCutoff'])->name('global-cutoff.update');
             Route::post('/reset-defaults', [SportsAgeGroupController::class, 'resetDefaults'])->name('reset-defaults');
             Route::put('/{sportsAgeGroup}', [SportsAgeGroupController::class, 'update'])->name('update');
             Route::delete('/{sportsAgeGroup}', [SportsAgeGroupController::class, 'destroy'])->name('destroy');
