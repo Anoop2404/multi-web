@@ -660,7 +660,8 @@ class FestSchoolReportController extends SchoolAdminController
         };
         $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, 'student');
 
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $cluster,
             $cards,
@@ -668,8 +669,10 @@ class FestSchoolReportController extends SchoolAdminController
             false,
             null,
             $customTemplate,
-            true,
-        ))->download("{$slug}-{$scopeSuffix}-id-cards.pdf");
+            $isDomPdf,
+        ))->render();
+
+        return \App\Support\PdfGenerator::download($html, "{$slug}-{$scopeSuffix}-id-cards.pdf");
     }
 
     public function idCardsPdfAllHeads(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
@@ -697,7 +700,8 @@ class FestSchoolReportController extends SchoolAdminController
         $slug = str($event->title)->slug('-');
         $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $cluster,
             [],
@@ -705,8 +709,10 @@ class FestSchoolReportController extends SchoolAdminController
             false,
             $sections,
             $customTemplate,
-            true,
-        ))->download("{$slug}-all-heads-id-cards.pdf");
+            $isDomPdf,
+        ))->render();
+
+        return \App\Support\PdfGenerator::download($html, "{$slug}-all-heads-id-cards.pdf");
     }
 
     public function idCardsPdfAllItems(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
@@ -728,7 +734,8 @@ class FestSchoolReportController extends SchoolAdminController
         $slug = str($event->title)->slug('-');
         $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $cluster,
             [],
@@ -736,8 +743,10 @@ class FestSchoolReportController extends SchoolAdminController
             false,
             $sections,
             $customTemplate,
-            true,
-        ))->download("{$slug}-all-items-id-cards.pdf");
+            $isDomPdf,
+        ))->render();
+
+        return \App\Support\PdfGenerator::download($html, "{$slug}-all-items-id-cards.pdf");
     }
 
     public function feeSummary(Request $request, string $tenantId, FestEvent $event, string $program)

@@ -112,7 +112,8 @@ class FestIdCardController extends SahodayaAdminController
             default => $data['audience'],
         };
 
-        return Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $this->sahodaya,
             $cards,
@@ -120,8 +121,10 @@ class FestIdCardController extends SahodayaAdminController
             false,
             null,
             $customTemplate,
-            true,
-        ))->download("{$slug}-{$scopeSuffix}-id-cards.pdf");
+            $isDomPdf,
+        ))->render();
+
+        return \App\Support\PdfGenerator::download($html, "{$slug}-{$scopeSuffix}-id-cards.pdf");
     }
 
     public function pdfAllItems(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
@@ -149,7 +152,8 @@ class FestIdCardController extends SahodayaAdminController
 
         $slug = str($event->title)->slug('-');
 
-        return Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $this->sahodaya,
             [],
@@ -157,8 +161,10 @@ class FestIdCardController extends SahodayaAdminController
             false,
             $sections,
             $customTemplate,
-            true,
-        ))->download("{$slug}-all-items-id-cards.pdf");
+            $isDomPdf,
+        ))->render();
+
+        return \App\Support\PdfGenerator::download($html, "{$slug}-all-items-id-cards.pdf");
     }
 
     public function pdfAllHeads(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
@@ -193,7 +199,8 @@ class FestIdCardController extends SahodayaAdminController
 
         $slug = str($event->title)->slug('-');
 
-        return Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $this->sahodaya,
             [],
@@ -201,8 +208,10 @@ class FestIdCardController extends SahodayaAdminController
             false,
             $sections,
             $customTemplate,
-            true,
-        ))->download("{$slug}-all-heads-id-cards.pdf");
+            $isDomPdf,
+        ))->render();
+
+        return \App\Support\PdfGenerator::download($html, "{$slug}-all-heads-id-cards.pdf");
     }
 
     /** @return array<string, mixed> */
