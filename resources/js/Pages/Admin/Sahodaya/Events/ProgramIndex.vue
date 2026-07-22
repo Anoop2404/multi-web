@@ -288,6 +288,13 @@
                                     {{ ev.has_sports_fees_configured ? 'Composite billing active' : 'Fee config pending' }}
                                 </span>
                                 <div class="flex items-center gap-2">
+                                    <button v-if="!ev.state_program_id"
+                                            type="button"
+                                            class="text-xs font-semibold px-1 py-0.5"
+                                            :class="ev.nav_hidden ? 'text-slate-400 hover:text-slate-600' : 'text-emerald-700 hover:text-emerald-900'"
+                                            @click="toggleNavHidden(ev)">
+                                        {{ ev.nav_hidden ? 'Hidden' : 'Visible' }}
+                                    </button>
                                     <button v-if="!ev.registrations_count && !ev.state_program_id"
                                             type="button"
                                             class="text-xs font-semibold text-rose-600 hover:text-rose-800 px-1 py-0.5"

@@ -263,52 +263,59 @@
                 <div>
                     <h3 class="section-title">Sport event billing</h3>
                     <p class="section-desc">
-                        School / student / team fees for this sport event. Schools pay once for this event.
+                        School, student, item, and team fee configuration for this event.
                     </p>
                 </div>
-                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700 space-y-1">
-                    <p><strong>School fee</strong> — once per school for this event.</p>
-                    <p><strong>Student fee</strong> — once per student registered, added on top of item charges.</p>
-                    <p><strong>Team fee</strong> — once per team entry (relay, group items).</p>
-                    <p><strong>Individual / Team quota</strong> — free item / team entries before fees apply (0 = none free).</p>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700 space-y-2">
+                    <p class="font-bold text-slate-900 flex items-center gap-1 text-sm">
+                        <span>💡</span> Fee Calculation Reference Guide:
+                    </p>
+                    <ul class="list-disc pl-4 space-y-1 text-slate-600">
+                        <li><strong>School fee:</strong> One-time institutional participation fee charged once per school for this event.</li>
+                        <li><strong>Student fee:</strong> Base fee charged once per registered student (added on top of item fees). <em>Leave blank if charging per item entry instead.</em></li>
+                        <li><strong>Team fee:</strong> Fee charged per team entry (relay, group, or squad competitions).</li>
+                        <li><strong>Default item fee:</strong> Standard fee charged for each individual item entry (e.g. ₹350 per item).</li>
+                        <li><strong>Extra item fee:</strong> Fee charged for items beyond the student's included free quota.</li>
+                        <li><strong>Individual / Team quota:</strong> Number of free item or team entries included before fees apply (0 = no free entries).</li>
+                    </ul>
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <FormField label="School fee (₹)" hint="Once per school">
+                    <FormField label="School fee (₹)" hint="One-time institutional participation fee charged once per school for this event (e.g. ₹4,000).">
                         <template #default="{ id }">
-                            <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.school_registration_fee" type="number" min="0" class="field" placeholder="—">
+                            <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.school_registration_fee" type="number" min="0" class="field" placeholder="e.g. 4000">
                         </template>
                     </FormField>
-                    <FormField label="Student fee (₹)" hint="Per student">
+                    <FormField label="Student fee (₹)" hint="Base fee charged once per student registered (leave blank if charging per-item instead).">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.student_registration_fee" type="number" min="0" class="field" placeholder="—">
                         </template>
                     </FormField>
-                    <FormField label="Team fee (₹)" hint="Per team entry">
+                    <FormField label="Team fee (₹)" hint="Fee charged per team entry (relay, group, or squad competitions).">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.team_registration_fee" type="number" min="0" class="field" placeholder="—">
                         </template>
                     </FormField>
-                    <FormField label="Default item fee (₹)">
+                    <FormField label="Default item fee (₹)" hint="Standard fee charged for each individual item entry (e.g. ₹350 per item).">
                         <template #default="{ id }">
-                            <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.default_item_fee" type="number" min="0" class="field" placeholder="—">
+                            <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.default_item_fee" type="number" min="0" class="field" placeholder="e.g. 350">
                         </template>
                     </FormField>
-                    <FormField label="Extra item fee (₹)">
+                    <FormField label="Extra item fee (₹)" hint="Fee charged for additional items beyond the student's free individual quota.">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.extra_item_fee" type="number" min="0" class="field" placeholder="—">
                         </template>
                     </FormField>
-                    <FormField label="Individual quota" hint="Free item entries per student">
+                    <FormField label="Individual quota" hint="Number of free item entries included per student before item fees apply (0 = no free items).">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.included_items_per_student" type="number" min="0" class="field" placeholder="0">
                         </template>
                     </FormField>
-                    <FormField label="Team quota" hint="Free team entries">
+                    <FormField label="Team quota" hint="Number of free team entries included per school before team fees apply (0 = no free teams).">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.included_teams" type="number" min="0" class="field" placeholder="0">
                         </template>
                     </FormField>
-                    <FormField label="Verification policy">
+                    <FormField label="Verification policy" hint="Require Sahodaya-verified students only or allow all student registrations.">
                         <template #default="{ id }">
                             <select :id="id" v-model="feeSettingsForm.sport_event_fees.verification_policy" class="field">
                                 <option value="all_students">All students</option>
@@ -316,7 +323,7 @@
                             </select>
                         </template>
                     </FormField>
-                    <FormField label="Approval policy">
+                    <FormField label="Approval policy" hint="Auto-approve registrations on full payment or require manual admin review.">
                         <template #default="{ id }">
                             <select :id="id" v-model="feeSettingsForm.sport_event_fees.approval_policy" class="field">
                                 <option value="auto">Auto (on full payment)</option>
@@ -324,14 +331,14 @@
                             </select>
                         </template>
                     </FormField>
-                    <FormField label="Max participants" hint="Leave blank for no cap">
+                    <FormField label="Max participants" hint="Maximum total participants allowed per school (leave blank for no limit).">
                         <template #default="{ id }">
-                            <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.max_participants" type="number" min="0" class="field" placeholder="—">
+                            <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.max_participants" type="number" min="0" class="field" placeholder="Leave blank for no cap">
                         </template>
                     </FormField>
-                    <FormField label="Max teams" hint="Leave blank for no cap">
+                    <FormField label="Max teams" hint="Maximum total team entries allowed per school (leave blank for no limit).">
                         <template #default="{ id }">
-                            <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.max_teams" type="number" min="0" class="field" placeholder="—">
+                            <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.max_teams" type="number" min="0" class="field" placeholder="Leave blank for no cap">
                         </template>
                     </FormField>
                 </div>
