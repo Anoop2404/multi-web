@@ -3,6 +3,7 @@
 namespace App\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestEventStaff;
 use App\Models\FestItemHead;
 use App\Models\FestParticipant;
@@ -50,7 +51,12 @@ class FestIdCardService
      */
     public function cardsGroupedByItem(FestEvent $event, array $filters = []): array
     {
-        if ($event->event_type === 'sports') {
+        // Only a genuine season hub with head-tagged items (fest_event_items.head_id
+        // set) should be grouped by head — a standalone sport event (e.g. a single
+        // Chess event with no item heads at all) has no head_id on its items, so
+        // grouping by head would silently return zero participants. See the
+        // matching hasItemHeads fix in FestHeadItemNavigationService/report hubs.
+        if ($event->event_type === 'sports' && FestEventItem::where('event_id', $event->id)->whereNotNull('head_id')->exists()) {
             return collect($this->cardsGroupedByHead($event, $filters))
                 ->map(fn (array $section) => [
                     'item_title' => $section['head_title'],
