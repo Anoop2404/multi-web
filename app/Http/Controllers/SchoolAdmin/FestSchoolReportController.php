@@ -701,13 +701,15 @@ class FestSchoolReportController extends SchoolAdminController
         $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
         $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
+
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $cluster,
-            [],
+            $cards,
             'student',
             false,
-            $sections,
+            null,
             $customTemplate,
             $isDomPdf,
         ))->render();
@@ -735,13 +737,15 @@ class FestSchoolReportController extends SchoolAdminController
         $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
         $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
+
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $cluster,
-            [],
+            $cards,
             'student',
             false,
-            $sections,
+            null,
             $customTemplate,
             $isDomPdf,
         ))->render();

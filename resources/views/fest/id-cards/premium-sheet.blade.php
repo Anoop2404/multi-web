@@ -16,7 +16,15 @@
         }
         @media print {
             .sheet-title { display: none !important; }
-            body { background: #fff; }
+            body { background: #fff !important; margin: 0; padding: 0; }
+            .page { 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                box-shadow: none !important; 
+                width: 100% !important; 
+                min-height: auto !important; 
+            }
+            .page-break { page-break-after: always; height: 0; display: block; overflow: hidden; }
         }
         .section-title {
             font-size: 9px;

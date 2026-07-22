@@ -153,13 +153,15 @@ class FestIdCardController extends SahodayaAdminController
         $slug = str($event->title)->slug('-');
 
         $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
+        
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $this->sahodaya,
-            [],
+            $cards,
             'student',
             false,
-            $sections,
+            null,
             $customTemplate,
             $isDomPdf,
         ))->render();
@@ -200,13 +202,15 @@ class FestIdCardController extends SahodayaAdminController
         $slug = str($event->title)->slug('-');
 
         $isDomPdf = empty(env('PDF_CONVERTER_URL'));
+        $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
+
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $event,
             $this->sahodaya,
-            [],
+            $cards,
             'student',
             false,
-            $sections,
+            null,
             $customTemplate,
             $isDomPdf,
         ))->render();
