@@ -125,9 +125,19 @@ class SchoolDocumentDownloadGateService
         if (! $membershipCleared) {
             $reason = 'Sahodaya membership fee payment is pending.';
         } elseif ($event && ! $eventFeeCleared) {
-            $reason = 'Event fee payment is pending.';
+            $fee = \App\Models\FestSchoolEventFee::where('event_id', $event->id)->where('school_id', $school->id)->first();
+            if ($fee && $fee->status === 'proof_uploaded') {
+                $reason = 'Event fee payment proof is uploaded and awaiting Sahodaya approval. ID card downloads unlock automatically right after approval.';
+            } else {
+                $reason = 'Event fee payment is pending. Upload payment proof and get it approved to unlock ID card downloads.';
+            }
         } elseif ($exam && ! $mcqFeeCleared) {
-            $reason = 'Talent Search exam fee payment is pending.';
+            $fee = \App\Models\McqSchoolFee::where('exam_id', $exam->id)->where('school_id', $school->id)->first();
+            if ($fee && $fee->status === 'proof_uploaded') {
+                $reason = 'Talent Search exam fee payment proof is uploaded and awaiting Sahodaya approval.';
+            } else {
+                $reason = 'Talent Search exam fee payment is pending.';
+            }
         }
 
         return [
