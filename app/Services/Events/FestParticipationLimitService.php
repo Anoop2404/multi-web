@@ -71,7 +71,7 @@ class FestParticipationLimitService
             }
         }
 
-        $errors = array_merge($errors, $this->validateHeadCapacity($item, $policy, $excludeRegistrationId));
+        $errors = array_merge($errors, $this->validateHeadCapacity($item, $policy, $schoolId, $excludeRegistrationId));
 
         $regs = $this->schoolRegistrations($schoolId, $policy, $excludeRegistrationId);
         $isOnStage = ($item->stage_type ?? '') === 'on_stage';
@@ -125,11 +125,11 @@ class FestParticipationLimitService
      *
      * @return list<string>
      */
-    private function validateHeadCapacity(FestEventItem $item, array $policy, ?int $excludeRegistrationId = null): array
+    private function validateHeadCapacity(FestEventItem $item, array $policy, string $schoolId, ?int $excludeRegistrationId = null): array
     {
         // Sports Head = Event: enforce caps on the FestEvent when head_id is absent.
         if ($this->event->event_type === 'sports' && ! $item->head_id) {
-            return $this->validateEventCapacity($item, $policy, $excludeRegistrationId);
+            return $this->validateEventCapacity($item, $policy, $schoolId, $excludeRegistrationId);
         }
 
         if (! $item->head_id) {
@@ -205,8 +205,12 @@ class FestParticipationLimitService
      *
      * @return list<string>
      */
-    private function validateEventCapacity(FestEventItem $item, array $policy, ?int $excludeRegistrationId = null): array
+    private function validateEventCapacity(FestEventItem $item, array $policy, string $schoolId, ?int $excludeRegistrationId = null): array
     {
+        // max_teams / max_participants on a unified sports event are documented
+        // (see FeesTab.vue "Max teams"/"Max participants" hints) as a per-school
+        // budget across every team/individual item on this event — not a global
+        // cap shared across every school. Must be scoped to school_id here.
         $statuses = $this->countableStatuses($policy);
         $isTeam = $item->isTeamItem();
 
@@ -217,6 +221,7 @@ class FestParticipationLimitService
             }
 
             $teamCount = FestRegistration::where('event_id', $this->event->id)
+                ->where('school_id', $schoolId)
                 ->whereIn('status', $statuses)
                 ->whereHas('item', fn ($q) => $q->whereIn('participant_type', ['team', 'group']))
                 ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
@@ -236,6 +241,7 @@ class FestParticipationLimitService
         }
 
         $participantCount = FestRegistration::where('event_id', $this->event->id)
+            ->where('school_id', $schoolId)
             ->whereIn('status', $statuses)
             ->whereHas('item', fn ($q) => $q
                 ->where(function ($q) {
@@ -253,10 +259,10 @@ class FestParticipationLimitService
     }
 
     /** Whether this item's Event Head is at capacity (active regs only — excludes waitlisted). */
-    public function isHeadAtCapacity(FestEventItem $item): bool
+    public function isHeadAtCapacity(FestEventItem $item, ?string $schoolId = null): bool
     {
         if ($this->event->event_type === 'sports' && ! $item->head_id) {
-            return $this->isEventAtCapacity($item);
+            return $this->isEventAtCapacity($item, $schoolId);
         }
 
         if ($this->event->event_type !== 'sports' || ! $item->head_id) {
@@ -305,7 +311,7 @@ class FestParticipationLimitService
         return $participantCount >= $maxParticipants;
     }
 
-    public function isEventAtCapacity(FestEventItem $item): bool
+    public function isEventAtCapacity(FestEventItem $item, ?string $schoolId = null): bool
     {
         if ($this->event->event_type !== 'sports') {
             return false;
@@ -321,6 +327,7 @@ class FestParticipationLimitService
             }
 
             $teamCount = FestRegistration::where('event_id', $this->event->id)
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
                 ->whereIn('status', $statuses)
                 ->whereHas('item', fn ($q) => $q->whereIn('participant_type', ['team', 'group']))
                 ->count();
@@ -334,6 +341,7 @@ class FestParticipationLimitService
         }
 
         $participantCount = FestRegistration::where('event_id', $this->event->id)
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->whereIn('status', $statuses)
             ->whereHas('item', fn ($q) => $q
                 ->where(function ($q) {

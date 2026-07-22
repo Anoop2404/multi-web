@@ -111,7 +111,7 @@ class FestRegistrationCreateService
 
         $item->loadMissing('head');
         $limitService = new FestParticipationLimitService($event);
-        $waitlisted = $event->event_type === 'sports' && $limitService->isHeadAtCapacity($item);
+        $waitlisted = $event->event_type === 'sports' && $limitService->isHeadAtCapacity($item, $school->id);
         $initialStatus = match (true) {
             $waitlisted => 'waitlisted',
             $item->head?->requiresManualApproval() => 'pending_approval',
