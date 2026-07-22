@@ -57,8 +57,7 @@ export function sportsEventSidebarNav(base, caps) {
         section: 'This event',
         items: [
             { label: 'Overview', href: `${base}?overview=1`, icon: 'grid', exact: true, permissions: FEST_VIEW },
-            { label: 'Setup', href: `${base}/setup`, icon: 'settings', permissions: FEST_SETTINGS },
-            { label: 'Settings', href: `${base}/settings`, icon: 'sliders', permissions: FEST_SETTINGS },
+            { label: 'Setup & Settings', href: `${base}/setup`, icon: 'settings', permissions: FEST_SETTINGS },
             { label: 'Activity log', href: `${base}/activity`, icon: 'clock', permissions: FEST_VIEW },
         ],
     });
@@ -67,13 +66,11 @@ export function sportsEventSidebarNav(base, caps) {
         section: 'Competition',
         items: [
             { label: 'Items', href: `${base}/items`, icon: 'list', permissions: FEST_SETTINGS },
-            { label: 'Item listing', href: `${base}/items/list`, icon: 'clipboard', permissions: FEST_VIEW },
             { label: 'Rounds & levels', href: `${base}/levels`, icon: 'repeat', permissions: FEST_MANAGE },
             { label: 'Registrations', href: `${base}/registrations`, icon: 'inbox', permissions: FEST_REGISTRATIONS },
             { label: 'Chest numbers', href: `${base}/chest-numbers`, icon: 'hash', permissions: FEST_MANAGE },
             { label: 'Marks', href: `${base}/marks`, icon: 'edit', permissions: FEST_MARKS },
             { label: 'Results', href: `${base}/results`, icon: 'award', permissions: FEST_RESULTS },
-            { label: 'Leaderboard', href: `${base}/leaderboard`, icon: 'bar-chart', permissions: FEST_RESULTS },
         ],
     });
 
@@ -82,45 +79,28 @@ export function sportsEventSidebarNav(base, caps) {
         items: [
             { label: 'Clash requests', href: `${base}/clash-requests`, icon: 'alert-circle', permissions: FEST_REGISTRATIONS },
             { label: 'Substitutions', href: `${base}/substitution-requests`, icon: 'repeat', permissions: FEST_REGISTRATIONS },
-            { label: 'Attendance', href: `${base}/attendance`, icon: 'check-square', permissions: FEST_REGISTRATIONS },
         ],
     });
 
     groups.push({
-        section: 'Schedule',
+        section: 'Schedule & Reports',
         items: [
             { label: 'Venue schedule', href: `${base}/schedule`, icon: 'calendar', permissions: FEST_SCHEDULE },
-            { label: 'Item schedule', href: `${base}/schedule/items`, icon: 'map-pin', permissions: FEST_SCHEDULE },
+            { label: 'Reports', href: `${base}/reports`, icon: 'file-text', permissions: FEST_VIEW },
+            { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permissions: FEST_CERTIFICATES },
+            { label: 'ID cards', href: `${base}/id-cards`, icon: 'credit-card', permissions: FEST_VIEW },
         ],
     });
 
-    const outputItems = [
-        { label: 'Reports', href: `${base}/reports`, icon: 'file-text', permissions: FEST_VIEW },
-        { label: 'All report types', href: `${base}/reports?all=1`, icon: 'layers', permissions: FEST_VIEW },
-        { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permissions: FEST_CERTIFICATES },
-        { label: 'ID cards', href: `${base}/id-cards`, icon: 'credit-card', permissions: FEST_VIEW },
-    ];
-
     if (caps.hasEventFees) {
-        outputItems.push(
-            { label: 'Registration fees', href: `${base}/fees`, icon: 'credit-card', permissions: FEST_FINANCE },
-            { label: 'Payment ledger', href: `${base}/fees/ledger`, icon: 'layers', permissions: FEST_FINANCE },
-        );
+        groups.push({
+            section: 'Finance',
+            items: [
+                { label: 'Registration fees', href: `${base}/fees`, icon: 'credit-card', permissions: FEST_FINANCE },
+                { label: 'Payment ledger', href: `${base}/fees/ledger`, icon: 'layers', permissions: FEST_FINANCE },
+            ],
+        });
     }
-
-    groups.push({ section: 'Outputs', items: outputItems });
-
-    const adminItems = [
-        { label: 'Event staff', href: `${base}/event-staff`, icon: 'user-check', permissions: FEST_MANAGE },
-        { label: 'Appeals', href: `${base}/appeals`, icon: 'inbox', permissions: FEST_MANAGE },
-        { label: 'School invoices', href: `${base}/finance`, icon: 'file-text', permissions: FEST_FINANCE },
-        { label: 'Athletic records', href: `${base}/athletic-records`, icon: 'star', permissions: FEST_MANAGE },
-        { label: 'Houses', href: `${base}/houses`, icon: 'building', permissions: FEST_MANAGE },
-        { label: 'Catering', href: `${base}/catering`, icon: 'clipboard', permissions: FEST_CATERING },
-        { label: 'Food coupons', href: `${base}/food-coupons`, icon: 'hash', permissions: FEST_CATERING },
-    ];
-
-    groups.push({ section: 'Administration', items: adminItems });
 
     return groups;
 }

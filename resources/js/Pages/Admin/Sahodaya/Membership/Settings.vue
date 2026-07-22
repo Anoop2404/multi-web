@@ -50,6 +50,7 @@
                     <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'class-categories'">Class Categories</button> — Pre-Primary, Primary, Secondary groups</li>
                     <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'class-master'">Class Master</button> — add classes 1, 2, 3… and assign categories</li>
                     <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'fees'">Membership Fees</button> — fee amount or slabs for {{ academicYear }}</li>
+                    <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'age-categories'">Age Categories</button> — U14/U17/Open bands, shared across every program</li>
                 </ul>
             </div>
 
@@ -956,6 +957,93 @@
                     </form>
                 </FormSection>
             </div>
+
+            <!-- Tab: Age Categories -->
+            <div v-show="activeTab === 'age-categories'" class="space-y-5">
+                <p class="text-sm text-gray-500">
+                    Under-N age bands (U14, U17, Open…) used for item eligibility and fees across every program — not just Sports Meet.
+                    These are managed on one shared page; changes here apply everywhere age category is used.
+                </p>
+
+                <FormSection title="Sahodaya-wide age reference date"
+                             hint="Single default used everywhere age category is computed (student lists, item eligibility) unless a specific event sets its own override. Leave blank to fall back to 31 Dec of the competition year.">
+                    <form @submit.prevent="saveAgeCutoff" class="flex flex-wrap items-end gap-3">
+                        <FormField label="Reference date">
+                            <input v-model="ageCutoffForm.sports_age_cutoff_date" type="date" class="field">
+                        </FormField>
+                        <button type="submit" class="btn-secondary mb-0.5" :disabled="ageCutoffForm.processing">Save</button>
+                        <button v-if="ageCutoffForm.sports_age_cutoff_date" type="button" class="text-xs text-gray-500 mb-2"
+                                @click="ageCutoffForm.sports_age_cutoff_date = ''; saveAgeCutoff()">
+                            Clear
+                        </button>
+                    </form>
+                </FormSection>
+
+                <FormSection title="Age Categories">
+                    <div v-if="ageCategories.length" class="space-y-2 mb-4">
+                        <div v-for="g in ageCategories" :key="g.id"
+                             class="p-3 rounded-xl border border-purple-100 bg-purple-50/30 text-sm">
+                            <template v-if="editingAgeCategoryId === g.id">
+                                <div class="flex flex-wrap gap-3 items-end">
+                                    <FormField label="Label" :error="editAgeCategoryForm.errors.label">
+                                        <input v-model="editAgeCategoryForm.label" class="field w-40">
+                                    </FormField>
+                                    <FormField label="Under age" v-if="g.group_key !== 'open'" :error="editAgeCategoryForm.errors.under_age">
+                                        <input v-model.number="editAgeCategoryForm.under_age" type="number" min="1" max="99" class="field w-20">
+                                    </FormField>
+                                    <FormField label="Sort" hint="Lower = first">
+                                        <input v-model.number="editAgeCategoryForm.sort_order" type="number" min="0" class="field w-20">
+                                    </FormField>
+                                    <FormField label="Default fee (₹)">
+                                        <input v-model.number="editAgeCategoryForm.default_fee" type="number" min="0" step="0.01" class="field w-28">
+                                    </FormField>
+                                    <label class="flex items-center gap-2 text-xs text-gray-600 mb-2 cursor-pointer">
+                                        <input v-model="editAgeCategoryForm.is_active" type="checkbox" class="rounded text-purple-600">
+                                        Active
+                                    </label>
+                                </div>
+                                <div class="flex gap-2 mt-3">
+                                    <button type="button" @click="saveAgeCategoryEdit(g)" class="btn-secondary text-xs" :disabled="editAgeCategoryForm.processing">Save</button>
+                                    <button type="button" @click="editingAgeCategoryId = null" class="text-xs text-gray-500">Cancel</button>
+                                </div>
+                            </template>
+                            <template v-else>
+                                <div class="flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <span class="text-xs font-mono text-gray-400 w-6">{{ g.sort_order ?? 0 }}</span>
+                                        <span class="font-mono text-xs text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded">{{ g.group_key }}</span>
+                                        <span class="font-medium text-gray-700">{{ g.label }}</span>
+                                        <span v-if="g.under_age != null" class="text-xs text-gray-500">Under {{ g.under_age }}</span>
+                                        <span v-if="g.default_fee != null" class="text-xs text-gray-500">₹{{ g.default_fee }}</span>
+                                        <span v-if="!g.is_active" class="text-xs text-amber-600">(inactive)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <button type="button" class="text-purple-600 text-xs hover:underline" @click="startAgeCategoryEdit(g)">Edit</button>
+                                        <button type="button" class="text-red-500 text-xs hover:underline" @click="removeAgeCategory(g)">Remove</button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    <p v-else class="text-sm text-gray-400 mb-4">No age categories yet.</p>
+
+                    <form @submit.prevent="addAgeCategory" class="flex flex-wrap gap-3 items-end">
+                        <FormField label="Key" hint="e.g. u14, u17, open">
+                            <input v-model="ageCategoryForm.group_key" class="field font-mono w-24" placeholder="u16" required pattern="^(open|u\d{1,2})$">
+                        </FormField>
+                        <FormField label="Label" :error="ageCategoryForm.errors.label">
+                            <input v-model="ageCategoryForm.label" class="field w-40" placeholder="Under 16" required>
+                        </FormField>
+                        <FormField label="Under age">
+                            <input v-model.number="ageCategoryForm.under_age" type="number" min="1" max="99" class="field w-20" :disabled="ageCategoryForm.group_key === 'open'">
+                        </FormField>
+                        <FormField label="Default fee (₹)">
+                            <input v-model.number="ageCategoryForm.default_fee" type="number" min="0" step="0.01" class="field w-28">
+                        </FormField>
+                        <button type="submit" class="btn-secondary mb-0.5" :disabled="ageCategoryForm.processing">Add Category</button>
+                    </form>
+                </FormSection>
+            </div>
         </div>
     </SahodayaAdminLayout>
 </template>
@@ -994,6 +1082,8 @@ const props = defineProps({
     receiptPlaceholders:     { type: Array, default: () => [] },
     receiptNextNumber:       { type: Number, default: 1 },
     classGroupSchemeOptions: { type: Object, default: () => ({}) },
+    ageCategories:           { type: Array, default: () => [] },
+    globalAgeCutoffDate:     { type: String, default: null },
 });
 
 const tabs = [
@@ -1008,6 +1098,7 @@ const tabs = [
     { key: 'class-master',     label: 'Class Master' },
     { key: 'types',      label: 'Teaching Types' },
     { key: 'subjects',   label: 'Subject Master' },
+    { key: 'age-categories', label: 'Age Categories' },
 ];
 
 const tabKeys = tabs.map((t) => t.key);
@@ -1092,6 +1183,13 @@ const typeForm     = useForm({ code: '', label: '' });
 const subjectForm  = useForm({ code: '', label: '', sort_order: null });
 const editSubjectForm = useForm({ code: '', label: '', sort_order: null, is_active: true });
 const editingSubjectId = ref(null);
+
+// Age categories reuse the general, cross-program /sports-age-groups backend
+// (SportsAgeGroupController) rather than duplicating validation here.
+const ageCategoryForm = useForm({ group_key: '', label: '', under_age: null, default_fee: null, sort_order: 100 });
+const editAgeCategoryForm = useForm({ label: '', under_age: null, sort_order: 0, default_fee: null, is_active: true });
+const editingAgeCategoryId = ref(null);
+const ageCutoffForm = useForm({ sports_age_cutoff_date: props.globalAgeCutoffDate ?? '' });
 const formConfig   = useForm({
     fields: Object.fromEntries(
         Object.entries(props.applicationFormFields).map(([key, field]) => [
@@ -1433,6 +1531,36 @@ function saveSubjectEdit(subject) {
 function removeSubject(s) {
     if (!confirm(`Remove subject "${s.label}"?`)) return;
     router.delete(`/sahodaya-admin/${props.sahodaya.id}/membership/subjects/${s.id}`);
+}
+const ageGroupsBase = `/sahodaya-admin/${props.sahodaya.id}/sports-age-groups`;
+
+function addAgeCategory() {
+    ageCategoryForm.post(ageGroupsBase, {
+        preserveScroll: true,
+        onSuccess: () => ageCategoryForm.reset(),
+    });
+}
+function startAgeCategoryEdit(g) {
+    editingAgeCategoryId.value = g.id;
+    editAgeCategoryForm.label = g.label;
+    editAgeCategoryForm.under_age = g.under_age;
+    editAgeCategoryForm.sort_order = g.sort_order ?? 0;
+    editAgeCategoryForm.default_fee = g.default_fee;
+    editAgeCategoryForm.is_active = g.is_active !== false;
+    editAgeCategoryForm.clearErrors();
+}
+function saveAgeCategoryEdit(g) {
+    editAgeCategoryForm.put(`${ageGroupsBase}/${g.id}`, {
+        preserveScroll: true,
+        onSuccess: () => { editingAgeCategoryId.value = null; },
+    });
+}
+function removeAgeCategory(g) {
+    if (!confirm(`Remove ${g.label}? In-use categories will be deactivated instead.`)) return;
+    router.delete(`${ageGroupsBase}/${g.id}`, { preserveScroll: true });
+}
+function saveAgeCutoff() {
+    ageCutoffForm.put(`${ageGroupsBase}/global-cutoff`, { preserveScroll: true });
 }
 function addType() {
     typeForm.post(`/sahodaya-admin/${props.sahodaya.id}/membership/custom-teaching-types`, {

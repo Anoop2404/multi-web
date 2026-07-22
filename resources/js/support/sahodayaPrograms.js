@@ -175,28 +175,10 @@ export function sahodayaCatalogSectionHref(sahodayaId, programSlug, mode, sectio
 /** Links to leave fest/event pages (dashboard, program hub, event directory). */
 export function festMainMenuNavItems(sahodayaId, program = null) {
     const base = `/sahodaya-admin/${sahodayaId}`;
-    const items = [
+    return [
         { label: 'Sahodaya home', href: base, icon: 'grid', exact: true, permissions: FEST_VIEW },
+        { label: 'All events', href: `${base}/events`, icon: 'calendar', exact: true, permissions: FEST_VIEW },
     ];
-
-    if (program?.slug) {
-        items.push({
-            label: `${program.label} hub`,
-            href: sahodayaProgramHref(sahodayaId, program.slug),
-            icon: program.icon ?? 'layers',
-            permissions: FEST_VIEW,
-        });
-    }
-
-    items.push({
-        label: 'All events',
-        href: `${base}/events`,
-        icon: 'calendar',
-        exact: true,
-        permissions: FEST_VIEW,
-    });
-
-    return items;
 }
 
 /** Per-event sidebar groups on program hub (Manage · Fees · Reports). */
@@ -253,13 +235,17 @@ export function programScopedNav(sahodayaId, programSlug, events = [], options =
     const setupItems = [
         { label: 'Overview', href: programBase, icon: 'grid', exact: true, permissions: FEST_VIEW },
         { label: 'Item catalog', href: sahodayaProgramHref(sahodayaId, programSlug, 'catalog'), icon: 'file-text', permissions: FEST_MANAGE },
-        { label: 'Competition types', href: `${base}/competition-types`, icon: 'layers', permissions: FEST_MANAGE },
-        { label: 'Category masters', href: `${base}/taxonomy-masters?program=${programSlug}`, icon: 'settings', permissions: FEST_MANAGE },
-        // Sahodaya-wide, common to every program — not scoped under any one
-        // program's own prefix (the underlying config is keyed only by
-        // tenant_id, never by event type).
-        { label: 'Age categories', href: `${base}/sports-age-groups`, icon: 'users', permissions: FEST_MANAGE },
     ];
+
+    if (programSlug === 'sports-meet') {
+        setupItems.push(
+            { label: 'Age categories', href: `${base}/sports-age-groups`, icon: 'users', permissions: FEST_MANAGE },
+        );
+    } else {
+        setupItems.push(
+            { label: 'Category masters', href: `${base}/taxonomy-masters?program=${programSlug}`, icon: 'settings', permissions: FEST_MANAGE },
+        );
+    }
 
     if (programSlug === 'kalotsav') {
         setupItems.push(
@@ -283,9 +269,9 @@ export function programScopedNav(sahodayaId, programSlug, events = [], options =
             section: 'Program records',
             items: [
                 { label: 'Athletic records', href: sahodayaProgramHref(sahodayaId, programSlug, 'records'), icon: 'award', permissions: FEST_VIEW },
-                { label: 'House championship', href: sahodayaProgramHref(sahodayaId, programSlug, 'championship'), icon: 'bar-chart', permissions: FEST_VIEW },
                 { label: 'Cluster results', href: sahodayaProgramHref(sahodayaId, programSlug, 'results'), icon: 'bar-chart', permissions: FEST_VIEW },
                 { label: 'School rankings', href: sahodayaProgramHref(sahodayaId, programSlug, 'rankings'), icon: 'star', permissions: FEST_VIEW },
+                { label: 'House championship', href: sahodayaProgramHref(sahodayaId, programSlug, 'championship'), icon: 'bar-chart', permissions: FEST_VIEW },
             ],
         });
     }

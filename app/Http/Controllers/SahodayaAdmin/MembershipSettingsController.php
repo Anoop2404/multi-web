@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\ClassCategory;
 use App\Models\ClassCategoryOverride;
+use App\Models\FestSportsAgeGroupConfig;
 use App\Models\MasterClass;
 use App\Models\MembershipFeeSlab;
 use App\Models\SahodayaProfile;
@@ -11,6 +12,7 @@ use App\Models\SahodayaRegistrationWindow;
 use App\Models\Subject;
 use App\Models\TeachingType;
 use App\Models\TeachingTypeOverride;
+use App\Services\Events\FestSportsAgeGroupRegistry;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Membership\MasterClassService;
 use App\Support\AcademicYear;
@@ -26,7 +28,7 @@ use Illuminate\Validation\ValidationException;
 
 class MembershipSettingsController extends SahodayaAdminController
 {
-    public function index(EffectiveMasterDataResolver $resolver, MasterClassService $masterClassService)
+    public function index(EffectiveMasterDataResolver $resolver, MasterClassService $masterClassService, FestSportsAgeGroupRegistry $ageGroupRegistry)
     {
         $profile = SahodayaProfile::firstOrCreate(
             ['tenant_id' => $this->sahodaya->id],
@@ -34,6 +36,12 @@ class MembershipSettingsController extends SahodayaAdminController
         );
 
         $masterClassService->ensureForSahodaya($this->sahodaya->id);
+
+        $ageGroupRegistry->forTenant($this->sahodaya->id)->ensureDefaults();
+        $ageCategories = FestSportsAgeGroupConfig::where('tenant_id', $this->sahodaya->id)
+            ->orderBy('sort_order')
+            ->orderBy('group_key')
+            ->get();
 
         $categoryOverrides = ClassCategoryOverride::where('sahodaya_id', $this->sahodaya->id)
             ->get()
@@ -87,6 +95,8 @@ class MembershipSettingsController extends SahodayaAdminController
             'receiptPlaceholders'   => config('membership_receipt.placeholders', []),
             'receiptNextNumber'     => $profile->receipt_next_number ?? 1,
             'classGroupSchemeOptions' => FestClassGroupScheme::options(),
+            'ageCategories'      => $ageCategories,
+            'globalAgeCutoffDate' => $profile->sports_age_cutoff_date,
         ]);
     }
 
