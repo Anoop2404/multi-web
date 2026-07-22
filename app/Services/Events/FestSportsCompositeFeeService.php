@@ -62,18 +62,9 @@ class FestSportsCompositeFeeService
             ->get();
 
         $lines = [];
-        $studentsWithItemRegistrations = [];
+        $studentsBilledBase = [];
 
-        // Collect unique students who have at least ONE active item registration (individual or team)
-        foreach ($registrations as $registration) {
-            foreach ($registration->participants as $participant) {
-                if ($participant->participant_role !== 'standby' && $participant->student_id) {
-                    $studentsWithItemRegistrations[$participant->student_id] = true;
-                }
-            }
-        }
-
-        // Student registration fee applies to students who have item registrations.
+        // Count all registered event athletes for this event (Step 1: Event Athletes)
         $eventAthleteIds = FestLevelRegistration::where('event_id', $event->id)
             ->where('school_id', $schoolId)
             ->where('status', 'active')
@@ -81,16 +72,17 @@ class FestSportsCompositeFeeService
             ->filter()
             ->all();
 
-        $studentsBilledBase = [];
-        if (! empty($eventAthleteIds)) {
-            // Only bill students who are registered for the event AND registered for items
-            foreach ($eventAthleteIds as $sid) {
-                if (isset($studentsWithItemRegistrations[$sid])) {
-                    $studentsBilledBase[$sid] = true;
+        foreach ($eventAthleteIds as $sid) {
+            $studentsBilledBase[$sid] = true;
+        }
+
+        // Also collect any students registered directly in items
+        foreach ($registrations as $registration) {
+            foreach ($registration->participants as $participant) {
+                if ($participant->participant_role !== 'standby' && $participant->student_id) {
+                    $studentsBilledBase[$participant->student_id] = true;
                 }
             }
-        } else {
-            $studentsBilledBase = $studentsWithItemRegistrations;
         }
 
         $individualQuotaUsed = [];

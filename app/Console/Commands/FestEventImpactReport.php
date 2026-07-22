@@ -160,7 +160,15 @@ class FestEventImpactReport extends Command
         }
 
         if (count($ids) > 1) {
-            $this->line('This is a season hub with ' . (count($ids) - 1) . ' child event(s): ' . implode(', ', array_diff($ids, [(int) $event->id])));
+            $childIds = array_diff($ids, [(int) $event->id]);
+            $childTitles = DB::table('fest_events')
+                ->whereIn('id', $childIds)
+                ->pluck('title', 'id');
+            $childLabels = collect($childIds)
+                ->map(fn ($id) => "[{$id}] " . ($childTitles[$id] ?? '(untitled)'))
+                ->implode(', ');
+
+            $this->line('This is a season hub with ' . count($childIds) . " child event(s): {$childLabels}");
         }
 
         $rows = [];
