@@ -208,7 +208,7 @@ class ProgramHubDataService
                     ->whereIn('status', ['published', 'registration_open'])
                     ->where('registration_close', '>=', now())
                     ->orderBy('registration_close')
-                    ->limit(3)
+                    ->limit(5)
                     ->get(['id', 'title', 'event_type', 'registration_close'])
                     ->map(fn ($e) => [
                         'type'  => 'fest',
@@ -220,7 +220,7 @@ class ProgramHubDataService
                                 'sports' => 'sports-meet',
                                 default => str_replace('_', '-', $e->event_type),
                             }
-                        ).'/registration',
+                        ).'/events/'.$e->id.'/registration',
                     ])
             )
             ->sortBy('date')
@@ -373,22 +373,21 @@ class ProgramHubDataService
             ->where('school_id', $school->id)
             ->whereIn('event_id', $festEventIds)
             ->where('status', 'pending')
-            ->with('event:id,event_type')
+            ->where('total_due', '>', 0)
+            ->with('event:id,title,event_type')
             ->get()
-            ->groupBy(fn ($fee) => $fee->event?->event_type ?? 'unknown')
-            ->each(function ($fees, $eventType) use (&$actions, $school) {
-                $slug = ProgramRouteMap::slugFromEventType($eventType) ?? str_replace('_', '-', $eventType);
-                $label = ProgramRouteMap::labelForSlug($slug);
+            ->each(function ($fee) use (&$actions, $school) {
+                if (! $fee->event) {
+                    return;
+                }
+                $slug = ProgramRouteMap::slugFromEventType($fee->event->event_type) ?? str_replace('_', '-', $fee->event->event_type);
+                $prefix = ProgramRouteMap::prefixFromSlug($slug);
                 $actions[] = [
                     'type'     => 'fest_fee',
                     'priority' => 1,
-                    'count'    => $fees->count(),
-                    'label'    => "{$label} fees awaiting upload",
-                    // schoolRegistrationUrl() converts the display slug (e.g. "sports-meet")
-                    // back to the actual route prefix (e.g. "sports") — the routes are
-                    // registered under the prefix, not the slug, so building the URL from
-                    // $slug directly (as before) 404'd every time.
-                    'url'      => ProgramRouteMap::schoolRegistrationUrl($school->id, $slug),
+                    'count'    => 1,
+                    'label'    => "{$fee->event->title} fees awaiting upload",
+                    'url'      => "/school-admin/{$school->id}/{$prefix}/events/{$fee->event_id}/registration?tab=fees",
                 ];
             });
 
