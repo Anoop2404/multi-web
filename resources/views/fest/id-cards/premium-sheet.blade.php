@@ -6,12 +6,12 @@
     <style>
         @page { size: A4 landscape; margin: 6mm; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #0f172a; background: #ffffff; }
+        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #0f172a; background: #f1f5f9; }
         .sheet-title { text-align: center; font-size: 10px; font-weight: bold; color: #334155; margin-bottom: 2mm; }
 
         .page {
             width: 285mm;
-            margin: 0 auto;
+            margin: 0 auto 8mm;
             background: #ffffff;
         }
         @media print {
@@ -32,7 +32,7 @@
         .grid td { width: 50%; vertical-align: top; padding: 0; }
         .page-break { page-break-after: always; }
 
-        /* ========= Card (DomPDF Compatible — Matches Vue Preview Tile) ========= */
+        /* ========= Card ========= */
         .pcard {
             width: {{ \App\Support\FestIdCardTemplates::CARD_WIDTH_MM }}mm;
             height: {{ \App\Support\FestIdCardTemplates::CARD_HEIGHT_MM }}mm;
@@ -41,143 +41,141 @@
             page-break-inside: avoid;
             background: #ffffff;
             border: 0.4mm solid #042a5b;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* ---- Header ---- */
+        /* Header */
         .pcard__header {
-            display: table;
-            width: 100%;
-            height: 19mm;
+            flex-shrink: 0;
+            height: 20mm;
             background: #042a5b;
             color: #ffffff;
-            padding: 2.5mm 3.5mm 1mm;
+            padding: 2.5mm 4mm 1mm;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        .pcard__brand-cell {
-            display: table-cell;
-            vertical-align: middle;
-            width: 72%;
-        }
-        .pcard__logo-cell {
-            display: table-cell;
-            vertical-align: middle;
-            width: 13mm;
+        .pcard__brand {
+            display: flex;
+            align-items: center;
+            gap: 2.8mm;
+            flex: 1;
+            min-width: 0;
         }
         .pcard__logo,
         .pcard__logo-fallback {
-            width: 12mm;
-            height: 12mm;
+            width: 13mm;
+            height: 13mm;
             border-radius: 50%;
-            border: 0.4mm solid #10b981;
+            border: 0.45mm solid rgba(16, 185, 129, 0.6);
             background: #ffffff;
+            flex-shrink: 0;
             display: block;
         }
         .pcard__logo-fallback {
-            text-align: center;
-            line-height: 12mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: #042a5b;
-            font-size: 7px;
+            font-size: 8px;
             font-weight: bold;
+            text-align: center;
+            line-height: 13mm;
         }
-        .pcard__text-cell {
-            display: table-cell;
-            vertical-align: middle;
-            padding-left: 2.5mm;
+        .pcard__brand-text {
+            flex: 1;
+            min-width: 0;
         }
         .pcard__cluster {
-            font-size: 6.5px;
+            font-size: 7px;
             font-weight: 800;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            color: #cbd5e1;
-            line-height: 1.1;
+            color: rgba(255,255,255,0.9);
+            line-height: 1.2;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .pcard__event {
-            font-size: 11.5px;
+            font-size: 13px;
             font-weight: 800;
             color: #ffffff;
-            line-height: 1.15;
-            margin-top: 0.5mm;
+            line-height: 1.2;
+            margin-top: 0.6mm;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .pcard__ribbon-cell {
-            display: table-cell;
-            vertical-align: top;
-            text-align: right;
-            width: 28%;
-        }
         .pcard__pass-ribbon {
-            display: inline-block;
             background: #059669;
             color: #ffffff;
-            font-size: 6px;
+            font-size: 6.5px;
             font-weight: 800;
-            padding: 1.2mm 3.5mm;
+            padding: 1.1mm 4mm 1.4mm;
             border-bottom-left-radius: 1.8mm;
             border-bottom-right-radius: 1.8mm;
             letter-spacing: 0.08em;
             text-transform: uppercase;
+            align-self: flex-start;
+            flex-shrink: 0;
         }
 
-        /* ---- Divider ---- */
+        /* Divider */
         .pcard__divider {
             height: 1mm;
             background: #10b981;
-            width: 100%;
+            flex-shrink: 0;
         }
 
-        /* ---- Body ---- */
+        /* Body */
         .pcard__body {
-            display: table;
-            width: 100%;
-            padding: 2.5mm 3.5mm 1.5mm;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 3.5mm;
+            padding: 2.5mm 4mm;
             background: #ffffff;
         }
-        .pcard__portrait-cell {
-            display: table-cell;
-            vertical-align: top;
-            width: 26mm;
-        }
         .pcard__portrait {
-            width: 25mm;
-            height: 32mm;
+            width: 26mm;
+            height: 33mm;
             border-radius: 1.5mm;
-            border: 0.4mm solid #0d9488;
+            border: 0.5mm solid #0d9488;
             overflow: hidden;
             background: #f0fdf4;
+            flex-shrink: 0;
         }
         .pcard__photo {
-            width: 25mm;
-            height: 32mm;
+            width: 26mm;
+            height: 33mm;
             display: block;
         }
         .pcard__initials {
-            width: 25mm;
-            height: 32mm;
-            text-align: center;
-            line-height: 32mm;
-            font-size: 16px;
+            width: 26mm;
+            height: 33mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
             font-weight: bold;
             color: #042a5b;
             background: #e0f2fe;
+            text-align: center;
+            line-height: 33mm;
         }
-        .pcard__info-cell {
-            display: table-cell;
-            vertical-align: top;
-            padding-left: 3mm;
-            padding-right: 1.5mm;
+        .pcard__info-col {
+            flex: 1;
+            min-width: 0;
         }
         .pcard__name {
-            font-size: 11.5px;
+            font-size: 13px;
             font-weight: 800;
             color: #042a5b;
             text-transform: uppercase;
             line-height: 1.2;
-            margin-bottom: 1mm;
+            margin-bottom: 1.5mm;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -187,15 +185,15 @@
             border-collapse: collapse;
         }
         .pcard__meta-table td {
-            font-size: 7.5px;
-            line-height: 1.45;
-            padding: 0.25mm 0;
+            font-size: 8px;
+            line-height: 1.5;
+            padding: 0.35mm 0;
             vertical-align: middle;
         }
         .pcard__meta-label {
             color: #475569;
             font-weight: 600;
-            width: 16mm;
+            width: 17mm;
         }
         .pcard__meta-sep {
             color: #64748b;
@@ -210,79 +208,69 @@
             text-overflow: ellipsis;
         }
 
-        /* ---- QR ---- */
-        .pcard__qr-cell {
-            display: table-cell;
-            vertical-align: top;
+        /* QR column */
+        .pcard__qr-col {
             width: 20mm;
             text-align: center;
+            flex-shrink: 0;
+            align-self: center;
         }
         .pcard__qr {
             width: 18mm;
             height: 18mm;
             background: #ffffff;
-            border-radius: 1mm;
-            border: 0.3mm solid #cbd5e1;
-            padding: 0.5mm;
+            border-radius: 1.2mm;
+            border: 0.35mm solid #d1d5db;
+            padding: 0.6mm;
             display: block;
             margin: 0 auto;
         }
         .pcard__qr-label {
             display: block;
-            font-size: 4.8px;
+            font-size: 5px;
             font-weight: 800;
             color: #10b981;
-            letter-spacing: 0.05em;
-            margin-top: 0.6mm;
+            letter-spacing: 0.06em;
+            margin-top: 0.7mm;
             text-transform: uppercase;
         }
 
-        /* ---- Footer ---- */
+        /* Footer */
         .pcard__footer {
-            display: table;
-            width: 100%;
+            flex-shrink: 0;
             height: 8mm;
             background: #042a5b;
-            padding: 0 3.5mm;
-        }
-        .pcard__school-cell {
-            display: table-cell;
-            vertical-align: middle;
-            width: 70%;
+            padding: 0 4mm;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         .pcard__school-pill {
-            display: inline-block;
-            background: #0b376d;
-            border: 0.2mm solid #1e4d88;
-            border-radius: 3mm;
-            padding: 0.6mm 2.5mm;
-            max-width: 95%;
+            display: inline-flex;
+            align-items: center;
+            background: rgba(255,255,255,0.08);
+            border: 0.2mm solid rgba(255,255,255,0.15);
+            border-radius: 999px;
+            padding: 0.8mm 3mm;
+            max-width: 68%;
         }
         .pcard__school-text {
-            font-size: 6.2px;
+            font-size: 6.5px;
             font-weight: 800;
             color: #ffffff;
             text-transform: uppercase;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            display: block;
-        }
-        .pcard__role-cell {
-            display: table-cell;
-            vertical-align: middle;
-            text-align: right;
-            width: 30%;
         }
         .pcard__role-pill {
-            display: inline-block;
             background: #059669;
             color: #ffffff;
-            font-size: 6.2px;
+            font-size: 6.5px;
             font-weight: 800;
-            padding: 0.6mm 3mm;
-            border-radius: 3mm;
-            letter-spacing: 0.05em;
+            padding: 0.8mm 3.5mm;
+            border-radius: 999px;
+            letter-spacing: 0.06em;
             text-transform: uppercase;
         }
     </style>

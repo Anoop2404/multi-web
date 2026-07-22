@@ -1,32 +1,26 @@
 @php
-    $isTeam = ($card['card_type'] ?? 'individual') === 'team';
     $isEventPass = ($card['card_type'] ?? '') === 'event_participant';
-    $isHeadPass = ($card['card_type'] ?? '') === 'head_participant';
-    $roleClass = $card['role_class'] ?? 'student';
+    $isHeadPass  = ($card['card_type'] ?? '') === 'head_participant';
+    $roleClass   = $card['role_class'] ?? 'student';
+    $photoSrc    = !empty($card['photo_src']) ? $card['photo_src'] : (!empty($card['photo_url']) ? $card['photo_url'] : null);
 @endphp
 <div class="pcard pcard--{{ $roleClass }}">
 
     {{-- ── Header ── --}}
     <div class="pcard__header">
-        <div class="pcard__brand-cell">
-            <div style="display: table; width: 100%;">
-                <div class="pcard__logo-cell">
-                    @if(!empty($clusterLogoSrc))
-                        <img src="{{ $clusterLogoSrc }}" alt="{{ $clusterName }}" class="pcard__logo">
-                    @else
-                        <div class="pcard__logo-fallback">{{ $clusterInitials ?? 'S' }}</div>
-                    @endif
-                </div>
-                <div class="pcard__text-cell">
-                    <div class="pcard__cluster">{{ $clusterName }}</div>
-                    <div class="pcard__event">{{ $eventTitle }}</div>
-                </div>
+        <div class="pcard__brand">
+            @if(!empty($clusterLogoSrc))
+                <img src="{{ $clusterLogoSrc }}" alt="{{ $clusterName }}" class="pcard__logo">
+            @else
+                <div class="pcard__logo-fallback">{{ $clusterInitials ?? 'S' }}</div>
+            @endif
+            <div class="pcard__brand-text">
+                <p class="pcard__cluster">{{ $clusterName }}</p>
+                <p class="pcard__event">{{ $eventTitle }}</p>
             </div>
         </div>
 
-        <div class="pcard__ribbon-cell">
-            <span class="pcard__pass-ribbon">{{ $isEventPass ? 'EVENT PASS' : ($isHeadPass ? 'HEAD PASS' : 'ID CARD') }}</span>
-        </div>
+        <span class="pcard__pass-ribbon">{{ $isEventPass ? 'EVENT PASS' : ($isHeadPass ? 'HEAD PASS' : 'ID CARD') }}</span>
     </div>
 
     {{-- ── Green divider ── --}}
@@ -34,21 +28,16 @@
 
     {{-- ── Body ── --}}
     <div class="pcard__body">
-        <div class="pcard__portrait-cell">
-            <div class="pcard__portrait">
-                @php
-                    $photoSrc = !empty($card['photo_src']) ? $card['photo_src'] : (!empty($card['photo_url']) ? $card['photo_url'] : null);
-                @endphp
-                @if(!empty($photoSrc))
-                    <img src="{{ $photoSrc }}" alt="" class="pcard__photo">
-                @else
-                    <div class="pcard__initials">{{ $card['initials'] ?? '?' }}</div>
-                @endif
-            </div>
+        <div class="pcard__portrait">
+            @if(!empty($photoSrc))
+                <img src="{{ $photoSrc }}" alt="" class="pcard__photo">
+            @else
+                <div class="pcard__initials">{{ $card['initials'] ?? '?' }}</div>
+            @endif
         </div>
 
-        <div class="pcard__info-cell">
-            <div class="pcard__name">{{ $card['name'] }}</div>
+        <div class="pcard__info-col">
+            <p class="pcard__name">{{ $card['name'] }}</p>
             <table class="pcard__meta-table">
                 <tr>
                     <td class="pcard__meta-label">Role</td>
@@ -71,7 +60,7 @@
                     <td class="pcard__meta-val">{{ $card['venue'] ?? '—' }}</td>
                 </tr>
                 <tr>
-                    <td class="pcard__meta-label">Shodaya</td>
+                    <td class="pcard__meta-label">Sahodaya</td>
                     <td class="pcard__meta-sep">:</td>
                     <td class="pcard__meta-val">{{ $card['sahodaya_name'] ?? ($clusterName ?? 'Sahodaya') }}</td>
                 </tr>
@@ -83,7 +72,7 @@
             </table>
         </div>
 
-        <div class="pcard__qr-cell">
+        <div class="pcard__qr-col">
             @if(!empty($card['qr_src']))
                 <img src="{{ $card['qr_src'] }}" alt="" class="pcard__qr">
                 <span class="pcard__qr-label">SCAN TO VERIFY</span>
@@ -92,17 +81,13 @@
     </div>
 
     {{-- ── Footer ── --}}
-    <div class="pcard__footer">
-        <div class="pcard__school-cell">
-            <div class="pcard__school-pill">
-                <span class="pcard__school-text">{{ $card['subtitle'] ?? ($card['school_name'] ?? '—') }}</span>
-            </div>
+    <footer class="pcard__footer">
+        <div class="pcard__school-pill">
+            <span class="pcard__school-text">{{ $card['subtitle'] ?? ($card['school_name'] ?? '—') }}</span>
         </div>
-        <div class="pcard__role-cell">
-            <div class="pcard__role-pill">
-                <span>{{ $card['role_label'] ?? 'PARTICIPANT' }}</span>
-            </div>
+        <div class="pcard__role-pill">
+            <span>{{ $card['role_label'] ?? 'PARTICIPANT' }}</span>
         </div>
-    </div>
+    </footer>
 
 </div>
