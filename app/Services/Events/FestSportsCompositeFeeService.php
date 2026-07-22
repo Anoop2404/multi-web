@@ -49,7 +49,7 @@ class FestSportsCompositeFeeService
         $teamQuota = max(0, (int) ($fees['included_teams'] ?? 0));
         $defaultItemFee = $fees['default_item_fee'] ?? null;
         $extraItemFee = $fees['extra_item_fee'] ?? null;
-        $label = $event->title ?: 'Sport event';
+        $eventTitle = $event->title ?: 'Sport event';
 
         $registrations = FestRegistration::where('event_id', $event->id)
             ->where('school_id', $schoolId)
@@ -63,6 +63,19 @@ class FestSportsCompositeFeeService
 
         $lines = [];
         $studentsBilledBase = [];
+
+        // Count all registered event athletes for this school
+        $eventAthleteIds = FestLevelRegistration::where('event_id', $event->id)
+            ->where('school_id', $schoolId)
+            ->where('status', 'active')
+            ->pluck('student_id')
+            ->filter()
+            ->all();
+
+        foreach ($eventAthleteIds as $sid) {
+            $studentsBilledBase[$sid] = true;
+        }
+
         $individualQuotaUsed = [];
         $itemFeeTotal = 0.0;
 
@@ -132,12 +145,12 @@ class FestSportsCompositeFeeService
             if ($waived) {
                 $teamQuotaUsed++;
                 $amount = 0.0;
-                $label = ($registration->item->title ?? 'Team item').' — team fee (free quota)';
+                $itemLineLabel = ($registration->item->title ?? 'Team item').' — team fee (free quota)';
                 $quantity = 1;
                 $unitAmount = 0.0;
             } elseif ($itemOverride !== null) {
                 $amount = $itemOverride;
-                $label = ($registration->item->title ?? 'Team item').' — team fee (override)';
+                $itemLineLabel = ($registration->item->title ?? 'Team item').' — team fee (override)';
                 $quantity = 1;
                 $unitAmount = $itemOverride;
             } else {
@@ -147,12 +160,12 @@ class FestSportsCompositeFeeService
                         ->count();
                     $itemFee = (float) ($defaultItemFee ?? $studentRegRate);
                     $amount = $itemFee * $performersCount;
-                    $label = ($registration->item->title ?? 'Team item')." ({$performersCount} × ₹".number_format($itemFee, 0).")";
+                    $itemLineLabel = ($registration->item->title ?? 'Team item')." ({$performersCount} × ₹".number_format($itemFee, 0).")";
                     $quantity = $performersCount;
                     $unitAmount = $itemFee;
                 } else {
                     $amount = $teamRegRate;
-                    $label = ($registration->item->title ?? 'Team item').' — team fee';
+                    $itemLineLabel = ($registration->item->title ?? 'Team item').' — team fee';
                     $quantity = 1;
                     $unitAmount = $teamRegRate;
                 }
@@ -160,7 +173,7 @@ class FestSportsCompositeFeeService
 
             $lines[] = [
                 'line_type' => $waived ? 'team_fee_waived' : 'team_fee',
-                'label' => $label,
+                'label' => $itemLineLabel,
                 'quantity' => $quantity,
                 'unit_amount' => $unitAmount,
                 'amount' => $amount,
@@ -180,7 +193,7 @@ class FestSportsCompositeFeeService
         if ($schoolReg > 0) {
             $summaryLines[] = [
                 'line_type' => 'school_reg',
-                'label' => 'School registration fee ('.$label.')',
+                'label' => 'School registration fee ('.$eventTitle.')',
                 'quantity' => 1,
                 'unit_amount' => $schoolReg,
                 'amount' => $schoolReg,
@@ -190,7 +203,7 @@ class FestSportsCompositeFeeService
         if ($studentRegTotal > 0) {
             $summaryLines[] = [
                 'line_type' => 'student_reg',
-                'label' => "Student registration ({$label}) — {$studentCount} × ₹".number_format($studentRegRate, 0),
+                'label' => "Student registration ({$eventTitle}) — {$studentCount} × ₹".number_format($studentRegRate, 0),
                 'quantity' => $studentCount,
                 'unit_amount' => $studentRegRate,
                 'amount' => $studentRegTotal,
