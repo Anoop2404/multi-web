@@ -122,11 +122,18 @@
             flex-shrink: 0;
         }
 
-        /* Divider */
-        .pcard__divider {
-            height: 1mm;
-            background: #10b981;
+        /* Wave separator */
+        .pcard__wave-separator {
+            height: 3.5mm;
+            margin-top: -3.5mm;
             flex-shrink: 0;
+            position: relative;
+            z-index: 2;
+        }
+        .pcard__wave-separator svg {
+            width: 100%;
+            height: 100%;
+            display: block;
         }
 
         /* Body */
@@ -185,9 +192,9 @@
             border-collapse: collapse;
         }
         .pcard__meta-table td {
-            font-size: 8px;
+            font-size: 9.5px;
             line-height: 1.5;
-            padding: 0.35mm 0;
+            padding: 0.3mm 0;
             vertical-align: middle;
         }
         .pcard__meta-label {

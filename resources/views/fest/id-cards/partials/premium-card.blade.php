@@ -23,8 +23,13 @@
         <span class="pcard__pass-ribbon">{{ $isEventPass ? 'EVENT PASS' : ($isHeadPass ? 'HEAD PASS' : 'ID CARD') }}</span>
     </div>
 
-    {{-- ── Green divider ── --}}
-    <div class="pcard__divider"></div>
+    {{-- ── Wave separator ── --}}
+    <div class="pcard__wave-separator">
+        <svg viewBox="0 0 500 20" preserveAspectRatio="none">
+            <path d="M0 0 C 150 18, 350 18, 500 0 L 500 20 L 0 20 Z" fill="#ffffff"/>
+            <path d="M0 0 C 150 16, 350 16, 500 0" fill="none" stroke="#10b981" stroke-width="3"/>
+        </svg>
+    </div>
 
     {{-- ── Body ── --}}
     <div class="pcard__body">
