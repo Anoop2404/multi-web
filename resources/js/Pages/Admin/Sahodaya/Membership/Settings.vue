@@ -9,63 +9,69 @@
             description="Manage Sahodaya identity, registration windows, fees, class master, and payment details. Each tab saves independently."
         />
 
-        <div class="max-w-3xl space-y-5">
+        <div class="max-w-7xl space-y-6">
             <!-- Setup checklist — only shown when required settings are incomplete -->
-            <div v-if="incompleteSetup.length" class="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
-                <div class="flex items-start gap-3 mb-3">
-                    <span class="text-xl shrink-0">⚠️</span>
-                    <div>
-                        <p class="font-bold text-amber-900 text-sm">Required setup incomplete</p>
+            <div v-if="incompleteSetup.length" class="rounded-2xl border border-amber-200 bg-amber-50/90 p-4.5 shadow-sm">
+                <div class="flex items-start gap-3">
+                    <div class="p-2.5 rounded-xl bg-amber-100/80 text-amber-800 shrink-0 text-xl">⚠️</div>
+                    <div class="flex-1">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <p class="font-bold text-amber-950 text-sm">Required setup incomplete</p>
+                            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-200/80 text-amber-900">
+                                {{ incompleteSetup.length }} step(s) pending
+                            </span>
+                        </div>
                         <p class="text-xs text-amber-800 mt-0.5">Complete these settings before inviting schools — missing items will block registration or payments.</p>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <button v-for="item in incompleteSetup" :key="item.key"
+                                    type="button"
+                                    @click="activeTab = item.tab"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-900 text-xs font-semibold hover:bg-amber-100 transition shadow-xs">
+                                <span class="font-bold text-amber-950">Go to {{ item.tabLabel }}:</span>
+                                <span class="text-amber-800">{{ item.label }}</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <ul class="space-y-2">
-                    <li v-for="item in incompleteSetup" :key="item.key"
-                        class="flex items-start gap-2.5 text-sm">
-                        <span class="mt-0.5 w-4 h-4 rounded-full border-2 border-amber-400 shrink-0 flex items-center justify-center">
-                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                        </span>
-                        <span class="text-amber-900">
-                            {{ item.label }}
-                            <button type="button"
-                                    @click="activeTab = item.tab"
-                                    class="ml-1 text-amber-700 underline hover:text-amber-950 font-semibold text-xs">
-                                → Go to {{ item.tabLabel }}
-                            </button>
-                        </span>
-                    </li>
-                </ul>
             </div>
-            <div v-else-if="setupDoneOnce" class="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 flex items-center gap-2 text-sm text-green-800">
-                <span>✅</span> All required settings are configured.
+            <div v-else-if="setupDoneOnce" class="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4.5 py-3 flex items-center gap-2.5 text-sm font-medium text-emerald-800 shadow-xs">
+                <span class="text-lg">✅</span> All required membership settings are configured for this Sahodaya.
             </div>
 
-            <!-- Quick guide -->
-            <div class="card card--accent text-sm text-indigo-900">
-                <p class="font-semibold mb-2">Where to change things</p>
-                <p class="text-xs text-indigo-700/80 mb-2">Each tab has its own <strong>Save</strong> button — changes are not shared across tabs until you save that section.</p>
-                <ul class="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-indigo-800/90 text-xs">
-                    <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'profile'">Profile & Rules</button> — name, prefix, academic year, contact</li>
-                    <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'window'">Registration Window</button> — open/close dates for the active year</li>
-                    <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'class-categories'">Class Categories</button> — Pre-Primary, Primary, Secondary groups</li>
-                    <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'class-master'">Class Master</button> — add classes 1, 2, 3… and assign categories</li>
-                    <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'fees'">Membership Fees</button> — fee amount or slabs for {{ academicYear }}</li>
-                    <li><button type="button" class="underline hover:text-indigo-950" @click="activeTab = 'age-categories'">Age Categories</button> — U14/U17/Open bands, shared across every program</li>
-                </ul>
-            </div>
+            <!-- Workspace Grid: Left Categorized Sidebar + Right Form Panel -->
+            <div class="grid lg:grid-cols-12 gap-6 items-start">
 
-            <!-- Tab bar -->
-            <div class="flex flex-wrap gap-1 border-b border-slate-200/90 pb-px">
-                <button v-for="t in tabs" :key="t.key"
-                        type="button"
-                        @click="activeTab = t.key"
-                        :class="['relative rounded-t-xl px-4 py-2.5 text-sm font-semibold transition -mb-px border-b-2',
-                                 activeTab === t.key ? 'border-[#041525] bg-white text-[#041525] shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-800']">
-                    {{ t.label }}
-                    <span v-if="tabsWithWarnings.has(t.key)"
-                          class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400"></span>
-                </button>
-            </div>
+                <!-- Left Sidebar Navigation -->
+                <aside class="lg:col-span-4 xl:col-span-3 space-y-4">
+                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden p-3.5 sticky top-6 space-y-4">
+                        <div v-for="group in tabGroups" :key="group.title" class="space-y-1.5">
+                            <p class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                {{ group.title }}
+                            </p>
+                            <nav class="space-y-1">
+                                <button v-for="t in group.items" :key="t.key"
+                                        type="button"
+                                        @click="activeTab = t.key"
+                                        :class="[
+                                            'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all',
+                                            activeTab === t.key
+                                                ? 'bg-[#041525] text-white shadow-sm font-bold'
+                                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                        ]">
+                                    <span class="flex items-center gap-2.5 truncate">
+                                        <span class="text-sm shrink-0">{{ tabIcons[t.key] || '⚙️' }}</span>
+                                        <span class="truncate">{{ t.label }}</span>
+                                    </span>
+                                    <span v-if="tabsWithWarnings.has(t.key)"
+                                          class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+                                </button>
+                            </nav>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Right Form Workspace -->
+                <main class="lg:col-span-8 xl:col-span-9 bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-xs min-h-[550px]">
 
             <!-- Tab: Profile & Rules -->
             <form v-show="activeTab === 'profile'" @submit.prevent="saveProfile" class="space-y-5">
@@ -1044,6 +1050,8 @@
                     </form>
                 </FormSection>
             </div>
+                </main>
+            </div>
         </div>
     </SahodayaAdminLayout>
 </template>
@@ -1086,20 +1094,57 @@ const props = defineProps({
     globalAgeCutoffDate:     { type: String, default: null },
 });
 
-const tabs = [
-    { key: 'profile',    label: 'Profile & Rules' },
-    { key: 'payment',    label: 'Payment Details' },
-    { key: 'email',      label: 'ZeptoMail API' },
-    { key: 'receipt',    label: 'Receipt Template' },
-    { key: 'form',       label: 'Registration Form' },
-    { key: 'window',     label: 'Registration Window' },
-    { key: 'fees',       label: 'Membership Fees' },
-    { key: 'class-categories', label: 'Class Categories' },
-    { key: 'class-master',     label: 'Class Master' },
-    { key: 'types',      label: 'Teaching Types' },
-    { key: 'subjects',   label: 'Subject Master' },
-    { key: 'age-categories', label: 'Age Categories' },
+const tabGroups = [
+    {
+        title: 'Identity & Access',
+        items: [
+            { key: 'profile', label: 'Profile & Rules' },
+            { key: 'window', label: 'Registration Window' },
+            { key: 'form', label: 'Registration Form' },
+        ],
+    },
+    {
+        title: 'Fees & Receipts',
+        items: [
+            { key: 'payment', label: 'Payment Details' },
+            { key: 'fees', label: 'Membership Fees' },
+            { key: 'receipt', label: 'Receipt Template' },
+            { key: 'email', label: 'ZeptoMail API' },
+        ],
+    },
+    {
+        title: 'Class & Academic Masters',
+        items: [
+            { key: 'class-categories', label: 'Class Categories' },
+            { key: 'class-master', label: 'Class Master' },
+            { key: 'types', label: 'Teaching Types' },
+            { key: 'subjects', label: 'Subject Master' },
+        ],
+    },
+    {
+        title: 'Fest & Program Config',
+        items: [
+            { key: 'age-categories', label: 'Age Categories' },
+        ],
+    },
 ];
+
+const tabIcons = {
+    profile: '🏢',
+    window: '📅',
+    form: '📝',
+    payment: '💳',
+    fees: '💰',
+    receipt: '📄',
+    email: '✉️',
+    'class-categories': '🏷️',
+    'class-master': '🏫',
+    types: '👨‍🏫',
+    subjects: '📚',
+    'age-categories': '🏆',
+};
+
+const tabs = tabGroups.flatMap((g) => g.items);
 
 const tabKeys = tabs.map((t) => t.key);
 
