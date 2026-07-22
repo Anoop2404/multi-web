@@ -663,10 +663,6 @@ class FestSchoolEventFeeService
             $fee->loadMissing('lines');
         }
         $items = [];
-        if ($fee->school_registration_fee > 0) {
-            $items[] = ['label' => 'Optional event registration add-on', 'amount' => (float) $fee->school_registration_fee];
-        }
-
         $feeModel = $schedule['fee_model'] ?? 'none';
 
         if ($feeModel === 'sports_composite') {
@@ -682,10 +678,10 @@ class FestSchoolEventFeeService
 
             if ($items === [] && $fee->total_due > 0) {
                 if ($fee->school_registration_fee > 0) {
-                    $items[] = ['label' => 'School registration fee', 'amount' => (float) $fee->school_registration_fee, 'line_type' => 'school_reg'];
+                    $items[] = ['label' => 'School registration fee ('.$event->title.')', 'amount' => (float) $fee->school_registration_fee, 'line_type' => 'school_reg'];
                 }
                 if ($this->supportsSportsCompositeSchema() && $fee->student_registration_fee > 0) {
-                    $items[] = ['label' => 'Student registration fees', 'amount' => (float) $fee->student_registration_fee, 'line_type' => 'student_reg'];
+                    $items[] = ['label' => 'Student registration fee ('.$event->title.')', 'amount' => (float) $fee->student_registration_fee, 'line_type' => 'student_reg'];
                 }
                 if ($this->supportsSportsCompositeSchema() && $fee->extra_item_fee > 0) {
                     $items[] = ['label' => 'Extra item fees', 'amount' => (float) $fee->extra_item_fee, 'line_type' => 'extra_item'];

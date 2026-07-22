@@ -62,9 +62,18 @@ class FestSportsCompositeFeeService
             ->get();
 
         $lines = [];
-        $studentsBilledBase = [];
+        $studentsWithItemRegistrations = [];
 
-        // Count all registered event athletes for this school
+        // Collect unique students who have at least ONE active item registration (individual or team)
+        foreach ($registrations as $registration) {
+            foreach ($registration->participants as $participant) {
+                if ($participant->participant_role !== 'standby' && $participant->student_id) {
+                    $studentsWithItemRegistrations[$participant->student_id] = true;
+                }
+            }
+        }
+
+        // Student registration fee applies to students who have item registrations.
         $eventAthleteIds = FestLevelRegistration::where('event_id', $event->id)
             ->where('school_id', $schoolId)
             ->where('status', 'active')
@@ -72,8 +81,16 @@ class FestSportsCompositeFeeService
             ->filter()
             ->all();
 
-        foreach ($eventAthleteIds as $sid) {
-            $studentsBilledBase[$sid] = true;
+        $studentsBilledBase = [];
+        if (! empty($eventAthleteIds)) {
+            // Only bill students who are registered for the event AND registered for items
+            foreach ($eventAthleteIds as $sid) {
+                if (isset($studentsWithItemRegistrations[$sid])) {
+                    $studentsBilledBase[$sid] = true;
+                }
+            }
+        } else {
+            $studentsBilledBase = $studentsWithItemRegistrations;
         }
 
         $individualQuotaUsed = [];
