@@ -5,6 +5,8 @@
     $roleClass = $card['role_class'] ?? 'student';
 @endphp
 <div class="pcard pcard--{{ $roleClass }}">
+
+    {{-- ── Header ── --}}
     <div class="pcard__header">
         <div class="pcard__brand-cell">
             <div style="display: table; width: 100%;">
@@ -27,8 +29,12 @@
         </div>
     </div>
 
-    <div class="pcard__divider"></div>
+    {{-- ── Wave separator (CSS arc trick — DomPDF-safe) ── --}}
+    <div class="pcard__wave-outer">
+        <div class="pcard__wave-inner"></div>
+    </div>
 
+    {{-- ── Body ── --}}
     <div class="pcard__body">
         <div class="pcard__portrait-cell">
             <div class="pcard__portrait">
@@ -87,6 +93,7 @@
         </div>
     </div>
 
+    {{-- ── Footer ── --}}
     <div class="pcard__footer">
         <div class="pcard__school-cell">
             <div class="pcard__school-pill">
@@ -99,4 +106,5 @@
             </div>
         </div>
     </div>
+
 </div>

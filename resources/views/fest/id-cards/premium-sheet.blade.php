@@ -32,7 +32,7 @@
         .grid td { width: 50%; vertical-align: top; padding: 0; }
         .page-break { page-break-after: always; }
 
-        /* ========= Card (DomPDF Compatible Table Layout) ========= */
+        /* ========= Card (DomPDF Compatible — Matches Vue Preview Tile) ========= */
         .pcard {
             width: {{ \App\Support\FestIdCardTemplates::CARD_WIDTH_MM }}mm;
             height: {{ \App\Support\FestIdCardTemplates::CARD_HEIGHT_MM }}mm;
@@ -41,10 +41,9 @@
             page-break-inside: avoid;
             background: #ffffff;
             border: 0.4mm solid #042a5b;
-            position: relative;
         }
 
-        /* Header */
+        /* ---- Header ---- */
         .pcard__header {
             display: table;
             width: 100%;
@@ -124,19 +123,26 @@
             text-transform: uppercase;
         }
 
-        /* Divider Line */
-        .pcard__divider {
-            height: 1mm;
-            background: #10b981;
-            width: 100%;
+        /* ---- Wave separator ---- */
+        /* DomPDF cannot render inline SVG reliably, so simulate with a green bar + white top arc using borders */
+        .pcard__wave-outer {
+            height: 3mm;
+            background: #ffffff;
+            overflow: hidden;
+        }
+        .pcard__wave-inner {
+            height: 5mm;
+            background: #042a5b;
+            border-bottom-left-radius: 50% 4mm;
+            border-bottom-right-radius: 50% 4mm;
+            border-bottom: 0.5mm solid #10b981;
         }
 
-        /* Body */
+        /* ---- Body ---- */
         .pcard__body {
             display: table;
             width: 100%;
-            padding: 2.5mm 3.5mm;
-            height: 52mm;
+            padding: 2.5mm 3.5mm 1.5mm;
             background: #ffffff;
         }
         .pcard__portrait-cell {
@@ -194,7 +200,6 @@
             padding: 0.25mm 0;
             vertical-align: middle;
         }
-
         .pcard__meta-label {
             color: #475569;
             font-weight: 600;
@@ -213,6 +218,7 @@
             text-overflow: ellipsis;
         }
 
+        /* ---- QR ---- */
         .pcard__qr-cell {
             display: table-cell;
             vertical-align: top;
@@ -239,7 +245,7 @@
             text-transform: uppercase;
         }
 
-        /* Footer */
+        /* ---- Footer ---- */
         .pcard__footer {
             display: table;
             width: 100%;
