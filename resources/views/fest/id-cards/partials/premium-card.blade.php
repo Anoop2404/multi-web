@@ -32,8 +32,11 @@
     <div class="pcard__body">
         <div class="pcard__portrait-cell">
             <div class="pcard__portrait">
-                @if(!empty($card['photo_src']))
-                    <img src="{{ $card['photo_src'] }}" alt="" class="pcard__photo">
+                @php
+                    $photoSrc = !empty($card['photo_src']) ? $card['photo_src'] : (!empty($card['photo_url']) ? $card['photo_url'] : null);
+                @endphp
+                @if(!empty($photoSrc))
+                    <img src="{{ $photoSrc }}" alt="" class="pcard__photo">
                 @else
                     <div class="pcard__initials">{{ $card['initials'] ?? '?' }}</div>
                 @endif

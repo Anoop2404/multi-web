@@ -9,7 +9,7 @@
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
-                <a v-if="!isAllItems" :href="previewUrl" target="_blank" class="btn-secondary text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
+                <a :href="previewUrl" target="_blank" class="btn-secondary text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
                     Preview in browser ↗
                 </a>
                 <a v-if="cardScope === 'head'" :href="pdfAllHeadsUrl" class="btn-secondary text-sm" :class="{ 'pointer-events-none opacity-50': downloadGate?.blocked }">All heads PDF ↓</a>
@@ -140,10 +140,9 @@
                 <div class="card space-y-3">
                     <h3 class="section-title text-sm">Generate</h3>
                     <div class="space-y-2">
-                        <a v-if="!isAllItems" :href="previewUrl" target="_blank" class="btn-secondary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
+                        <a :href="previewUrl" target="_blank" class="btn-secondary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
                             Preview in browser ↗
                         </a>
-                        <p v-else class="text-xs text-slate-500">"All items" bundles every item into one PDF — download directly below.</p>
                         <a :href="pdfUrl" class="btn-primary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
                             Download PDF ↓
                         </a>

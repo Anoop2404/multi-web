@@ -568,7 +568,7 @@ class FestIdCardService
             $members = $performers->map(function (FestParticipant $p) use ($includeDataUris) {
                 $name = $p->student?->name ?? $p->teacher?->name ?? 'Member';
                 $photoUrl = $this->portraitUrl($p);
-                $photoSrc = $includeDataUris ? ($this->portraitDataUri($p) ?: $photoUrl) : $photoUrl;
+                $photoSrc = $this->portraitDataUri($p) ?: ($photoUrl ?: $this->defaultAvatarDataUri('male'));
 
                 return [
                     'name'      => $name,
@@ -658,10 +658,9 @@ class FestIdCardService
             default                                                                               => 'neutral',
         };
 
-        $photoUrl = $this->portraitUrl($p) ?: $this->defaultAvatarDataUri($gender);
-        $photoSrc = $includeDataUris
-            ? ($this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender))
-            : $photoUrl;
+        $photoUrl = $this->portraitUrl($p);
+        $photoDataUri = $this->portraitDataUri($p);
+        $photoSrc = $photoDataUri ?: ($photoUrl ?: $this->defaultAvatarDataUri($gender));
 
         $rawDate = $event->event_start ?? $event->starts_at ?? $event->start_date;
         $eventDate = $rawDate ? date('d M Y', strtotime((string) $rawDate)) : null;
