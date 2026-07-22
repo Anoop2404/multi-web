@@ -63,7 +63,7 @@
                         type="button"
                         class="btn-secondary text-xs !min-h-0 !px-2 !py-1"
                         :disabled="blocked"
-                        @click="standbyPickerOpen = true">
+                        @click="openStandbyPicker">
                     Standbys{{ standbySelectedCount ? ` (${standbySelectedCount})` : '' }}
                 </button>
                 <button type="button"

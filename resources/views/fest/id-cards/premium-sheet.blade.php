@@ -314,7 +314,7 @@
     ];
 @endphp
 
-@if(!empty($renderSections) && !empty($sections))
+@if(!empty($sections))
     @foreach($sections as $sectionIndex => $section)
         @if($sectionIndex > 0)<div class="page-break"></div>@endif
         @php $chunks = array_chunk($section['cards'] ?? [], \App\Support\FestIdCardTemplates::CARDS_PER_PAGE); @endphp
