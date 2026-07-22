@@ -72,6 +72,7 @@
                     <FormField v-if="cardScope === 'item'" label="Fest item" required>
                         <select v-model="itemId" class="field text-sm" @change="onItemChange">
                             <option value="">Select item…</option>
+                            <option value="all">All items (bundle PDF)</option>
                             <option v-for="item in items" :key="item.id" :value="String(item.id)">
                                 {{ item.title }} ({{ itemCountLabel(item) }})
                             </option>
@@ -136,9 +137,10 @@
                 <div class="card space-y-3">
                     <h3 class="section-title text-sm">Generate</h3>
                     <div class="space-y-2">
-                        <a :href="previewUrl" target="_blank" class="btn-secondary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
+                        <a v-if="!isAllItems" :href="previewUrl" target="_blank" class="btn-secondary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
                             Preview in browser ↗
                         </a>
+                        <p v-else class="text-xs text-slate-500">"All items" bundles every item into one PDF — download directly below.</p>
                         <a :href="pdfUrl" class="btn-primary w-full justify-center text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
                             Download PDF ↓
                         </a>
@@ -196,11 +198,13 @@ const templates = [
     { id: 'standard', label: 'Standard' },
 ];
 
+const isAllItems = computed(() => cardScope.value === 'item' && itemId.value === 'all');
+
 const selectedItem = computed(() =>
     props.items.find((item) => String(item.id) === String(itemId.value)) ?? null,
 );
 const selectedItemSupportsTeam = computed(() =>
-    ['group', 'team'].includes(selectedItem.value?.participant_type),
+    !isAllItems.value && ['group', 'team'].includes(selectedItem.value?.participant_type),
 );
 const canGenerate = computed(() => {
     if (cardScope.value === 'event') return true;
@@ -210,9 +214,17 @@ const canGenerate = computed(() => {
 
 const cardsUrl = computed(() => `${programBase.value}/reports/${props.event.id}/id-cards/cards`);
 
+// "All items" bundles every item into one PDF (grouped, one section per item) —
+// there's no single-page browser preview for that combination, only the PDF.
+const pdfAllItemsUrl = computed(() => {
+    const params = new URLSearchParams({ template: cardTemplate.value });
+    if (layout.value === 'team') params.set('layout', 'team');
+    return `${programBase.value}/reports/${props.event.id}/id-cards/pdf-all-items?${params.toString()}`;
+});
+
 const previewUrl = computed(() => {
     const params = new URLSearchParams({ template: cardTemplate.value, scope: cardScope.value });
-    if (cardScope.value === 'item' && itemId.value) params.set('item_id', itemId.value);
+    if (cardScope.value === 'item' && itemId.value && !isAllItems.value) params.set('item_id', itemId.value);
     if (cardScope.value === 'head' && headId.value) params.set('head_id', headId.value);
     if (cardScope.value === 'item' && layout.value === 'team' && selectedItemSupportsTeam.value) {
         params.set('layout', 'team');
@@ -221,6 +233,8 @@ const previewUrl = computed(() => {
 });
 
 const pdfUrl = computed(() => {
+    if (isAllItems.value) return pdfAllItemsUrl.value;
+
     const params = new URLSearchParams({ template: cardTemplate.value, scope: cardScope.value });
     if (cardScope.value === 'item' && itemId.value) params.set('item_id', itemId.value);
     if (cardScope.value === 'head' && headId.value) params.set('head_id', headId.value);

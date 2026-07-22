@@ -581,6 +581,13 @@ class FestSchoolReportController extends SchoolAdminController
             'school_downloads' => true,
         ]);
 
+        if (($filters['scope'] ?? 'item') === 'item' && $request->input('item_id') === 'all') {
+            $sections = $service->cardsGroupedByItem($event, $filters);
+            $cards = collect($sections)->flatMap(fn ($section) => $section['cards'])->values()->all();
+
+            return response()->json(['cards' => $cards]);
+        }
+
         if (($filters['scope'] ?? 'item') === 'item' && empty($filters['item_id'])) {
             return response()->json(['cards' => [], 'message' => 'Select an item to preview cards.']);
         }
@@ -695,6 +702,36 @@ class FestSchoolReportController extends SchoolAdminController
             $sections,
             $customTemplate,
         ))->download("{$slug}-all-heads-id-cards.pdf");
+    }
+
+    public function idCardsPdfAllItems(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads($event, $this->school);
+
+        $cluster = Tenant::findOrFail($this->school->parent_id);
+        $filters = [
+            'school_id'        => $this->school->id,
+            'school_downloads' => true,
+            'include_data_uris' => true,
+        ];
+        $sections = $service->cardsGroupedByItem($event, $filters);
+
+        abort_if($sections === [], 422, 'No approved participants found for any item.');
+
+        $slug = str($event->title)->slug('-');
+        $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+            $event,
+            $cluster,
+            [],
+            'student',
+            false,
+            $sections,
+            $customTemplate,
+        ))->download("{$slug}-all-items-id-cards.pdf");
     }
 
     public function feeSummary(Request $request, string $tenantId, FestEvent $event, string $program)

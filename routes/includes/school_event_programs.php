@@ -157,6 +157,9 @@ foreach ($festPrograms as $cfg) {
         Route::get('/reports/{event}/id-cards/pdf-all-heads', [FestSchoolReportController::class, 'idCardsPdfAllHeads'])
             ->defaults('program', $slug)
             ->name('reports.id-cards.pdf-all-heads');
+        Route::get('/reports/{event}/id-cards/pdf-all-items', [FestSchoolReportController::class, 'idCardsPdfAllItems'])
+            ->defaults('program', $slug)
+            ->name('reports.id-cards.pdf-all-items');
         Route::get('/reports/{event}/fee-summary', [FestSchoolReportController::class, 'feeSummary'])
             ->defaults('program', $slug)
             ->name('reports.fee-summary');

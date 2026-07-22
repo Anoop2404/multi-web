@@ -35,37 +35,31 @@
                 <p class="id-card-tile__name">{{ card.name }}</p>
                 <table class="id-card-tile__meta-table">
                     <tr>
-                        <td class="id-card-tile__meta-dot"><span class="dot dot--blue"></span></td>
                         <td class="id-card-tile__meta-label">Role</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.role_title || 'Participant' }}</td>
                     </tr>
                     <tr>
-                        <td class="id-card-tile__meta-dot"><span class="dot dot--amber"></span></td>
                         <td class="id-card-tile__meta-label">Event</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.event_name || eventTitle }}</td>
                     </tr>
                     <tr>
-                        <td class="id-card-tile__meta-dot"><span class="dot dot--pink"></span></td>
                         <td class="id-card-tile__meta-label">Date</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.event_date || '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="id-card-tile__meta-dot"><span class="dot dot--red"></span></td>
                         <td class="id-card-tile__meta-label">Venue</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.venue || '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="id-card-tile__meta-dot"><span class="dot dot--teal"></span></td>
                         <td class="id-card-tile__meta-label">Shodaya</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.sahodaya_name || clusterName }}</td>
                     </tr>
                     <tr>
-                        <td class="id-card-tile__meta-dot"><span class="dot dot--orange"></span></td>
                         <td class="id-card-tile__meta-label">Category</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.category || card.class_category || '—' }}</td>
@@ -82,7 +76,6 @@
         <!-- Footer -->
         <footer class="id-card-tile__footer">
             <div class="id-card-tile__school-pill">
-                <span class="id-card-tile__school-icon">🏫</span>
                 <span class="id-card-tile__school-text">{{ card.subtitle || card.school_name || '—' }}</span>
             </div>
             <div class="id-card-tile__role-pill">
@@ -263,20 +256,7 @@ const clusterInitials = computed(() =>
     padding: 0.025rem 0;
     vertical-align: middle;
 }
-.id-card-tile__meta-dot { width: 0.6rem; padding-right: 0.1rem; }
-.dot {
-    display: inline-block;
-    width: 0.38rem;
-    height: 0.38rem;
-    border-radius: 50%;
-}
-.dot--blue   { background: #3b82f6; }
-.dot--amber  { background: #f59e0b; }
-.dot--pink   { background: #ec4899; }
-.dot--red    { background: #ef4444; }
-.dot--teal   { background: #14b8a6; }
-.dot--orange { background: #f97316; }
-.id-card-tile__meta-label { color: #475569; font-weight: 600; width: 2rem; }
+.id-card-tile__meta-label { color: #475569; font-weight: 600; width: 2.6rem; }
 .id-card-tile__meta-sep { color: #64748b; width: 0.3rem; text-align: center; }
 .id-card-tile__meta-val { color: #0f172a; font-weight: 700; }
 
@@ -327,7 +307,6 @@ const clusterInitials = computed(() =>
     padding: 0.08rem 0.35rem;
     max-width: 68%;
 }
-.id-card-tile__school-icon { font-size: 0.45rem; }
 .id-card-tile__school-text {
     font-size: 0.45rem;
     font-weight: 800;
