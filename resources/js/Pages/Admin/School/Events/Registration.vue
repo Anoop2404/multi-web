@@ -1276,7 +1276,11 @@ function itemBlockReason(event, item) {
         return itemRegWindowMessage(item);
     }
 
-    if (isItemFull(event, item)) {
+    // Skip the "full" check when the school is editing one of their own existing
+    // registrations — that registration already counts in the full tally, so we
+    // should not block the edit/standby buttons.
+    const isCurrentlyEditing = editingRegistrationId[itemFormKey(event.id, item.id)] != null;
+    if (!isCurrentlyEditing && isItemFull(event, item)) {
         const max = itemMaxPerSchool(item);
         return max === 1
             ? 'Your school already has an entry for this item (max 1 per school).'
