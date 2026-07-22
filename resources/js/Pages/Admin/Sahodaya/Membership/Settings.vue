@@ -43,7 +43,7 @@
 
                 <!-- Left Sidebar Navigation -->
                 <aside class="lg:col-span-4 xl:col-span-3 space-y-4">
-                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden p-3.5 sticky top-6 space-y-4">
+                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3.5 sticky top-6 max-h-[calc(100vh-2rem)] overflow-y-auto space-y-4">
                         <div v-for="group in tabGroups" :key="group.title" class="space-y-1.5">
                             <p class="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                                 {{ group.title }}
