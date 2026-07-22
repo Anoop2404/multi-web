@@ -603,6 +603,9 @@ class FestSchoolReportController extends SchoolAdminController
 
     public function idCardsPreview(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
+
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(

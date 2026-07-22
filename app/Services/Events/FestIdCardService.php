@@ -659,8 +659,7 @@ class FestIdCardService
         };
 
         $photoUrl = $this->portraitUrl($p);
-        $photoDataUri = $this->portraitDataUri($p);
-        $photoSrc = $photoDataUri ?: ($photoUrl ?: $this->defaultAvatarDataUri($gender));
+        $photoSrc = $this->resolveParticipantPhotoSrc($p, $gender, $includeDataUris);
 
         $rawDate = $event->event_start ?? $event->starts_at ?? $event->start_date;
         $eventDate = $rawDate ? date('d M Y', strtotime((string) $rawDate)) : null;
@@ -737,6 +736,34 @@ class FestIdCardService
         }
 
         return null;
+    }
+
+    private function resolveParticipantPhotoSrc(FestParticipant $p, string $gender, bool $includeDataUris): string
+    {
+        if ($includeDataUris) {
+            return $this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender);
+        }
+
+        $relativePath = $p->student?->photo ?? $p->teacher?->photo;
+        if ($relativePath) {
+            if (str_starts_with($relativePath, 'http://') || str_starts_with($relativePath, 'https://') || str_starts_with($relativePath, 'data:image/')) {
+                return $relativePath;
+            }
+
+            $tenant = $p->student?->relationLoaded('tenant') ? $p->student->tenant : ($p->student ? Tenant::find($p->student->tenant_id) : null);
+            $absolute = $tenant ? TenantStorage::publicFilePath($tenant, $relativePath) : null;
+            if ($absolute && is_file($absolute)) {
+                $publicRoot = base_path('storage/app/public');
+                if (str_starts_with($absolute, $publicRoot)) {
+                    $subPath = ltrim(substr($absolute, strlen($publicRoot)), '/');
+                    return asset('storage/' . $subPath);
+                }
+            }
+
+            return $this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender);
+        }
+
+        return $this->portraitUrl($p) ?: $this->defaultAvatarDataUri($gender);
     }
 
     /** @param  \Illuminate\Support\Collection<int, int|string>  $participantIds */
