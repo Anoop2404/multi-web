@@ -101,7 +101,7 @@ trait DownloadsStudentFestIdCard
 
         $pdf = Pdf::loadView(
             $this->idCardSheetView($request, $customTemplate),
-            $this->idCardViewData($event, $cluster, $cards, 'student', false, null, $customTemplate),
+            $this->idCardViewData($event, $cluster, $cards, 'student', false, null, $customTemplate, true),
         );
 
         return $request->boolean('inline')

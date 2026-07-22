@@ -32,7 +32,7 @@
         .grid td { width: 50%; vertical-align: top; padding: 0; }
         .page-break { page-break-after: always; }
 
-        /* ========= Card ========= */
+        /* ========= Card Base (Flexbox for HTML Browser Preview) ========= */
         .pcard {
             width: {{ \App\Support\FestIdCardTemplates::CARD_WIDTH_MM }}mm;
             height: {{ \App\Support\FestIdCardTemplates::CARD_HEIGHT_MM }}mm;
@@ -88,7 +88,7 @@
             min-width: 0;
         }
         .pcard__cluster {
-            font-size: 7px;
+            font-size: 7.5px;
             font-weight: 800;
             letter-spacing: 0.1em;
             text-transform: uppercase;
@@ -99,7 +99,7 @@
             text-overflow: ellipsis;
         }
         .pcard__event {
-            font-size: 13px;
+            font-size: 13.5px;
             font-weight: 800;
             color: #ffffff;
             line-height: 1.2;
@@ -177,7 +177,7 @@
             min-width: 0;
         }
         .pcard__name {
-            font-size: 13px;
+            font-size: 13.5px;
             font-weight: 800;
             color: #042a5b;
             text-transform: uppercase;
@@ -280,6 +280,92 @@
             letter-spacing: 0.06em;
             text-transform: uppercase;
         }
+
+        /* ========= DomPDF Table Layout Overrides (For PDF Generation Only) ========= */
+        @if(!empty($isPdf))
+        body { background: #ffffff !important; }
+        .page { margin: 0 auto !important; }
+        .pcard {
+            display: table !important;
+            width: {{ \App\Support\FestIdCardTemplates::CARD_WIDTH_MM }}mm !important;
+            height: {{ \App\Support\FestIdCardTemplates::CARD_HEIGHT_MM }}mm !important;
+            table-layout: fixed !important;
+        }
+        .pcard__header {
+            display: table-row !important;
+            height: 19mm !important;
+        }
+        .pcard__brand {
+            display: table-cell !important;
+            vertical-align: middle !important;
+            width: 75% !important;
+            padding-left: 4mm !important;
+            padding-top: 2.5mm !important;
+        }
+        .pcard__logo, .pcard__logo-fallback {
+            display: inline-block !important;
+            vertical-align: middle !important;
+        }
+        .pcard__brand-text {
+            display: inline-block !important;
+            vertical-align: middle !important;
+            margin-left: 2.5mm !important;
+            width: 75% !important;
+        }
+        .pcard__pass-ribbon {
+            display: table-cell !important;
+            vertical-align: top !important;
+            text-align: right !important;
+            padding-right: 4mm !important;
+            width: 25% !important;
+        }
+        .pcard__wave-separator {
+            display: table-row !important;
+            height: 3.5mm !important;
+            background: #ffffff !important;
+            border-top: 0.8mm solid #10b981 !important;
+            margin-top: 0 !important;
+        }
+        .pcard__body {
+            display: table !important;
+            width: 100% !important;
+            height: 55mm !important;
+            table-layout: fixed !important;
+            padding: 2mm 4mm !important;
+        }
+        .pcard__portrait {
+            display: table-cell !important;
+            vertical-align: middle !important;
+            width: 26mm !important;
+        }
+        .pcard__info-col {
+            display: table-cell !important;
+            vertical-align: middle !important;
+            padding-left: 3.5mm !important;
+            padding-right: 1.5mm !important;
+        }
+        .pcard__qr-col {
+            display: table-cell !important;
+            vertical-align: middle !important;
+            width: 20mm !important;
+            text-align: center !important;
+        }
+        .pcard__footer {
+            display: table !important;
+            width: 100% !important;
+            height: 8mm !important;
+            padding: 0 4mm !important;
+        }
+        .pcard__school-pill {
+            display: inline-block !important;
+            vertical-align: middle !important;
+        }
+        .pcard__role-pill {
+            display: inline-block !important;
+            vertical-align: middle !important;
+            float: right !important;
+        }
+        @endif
     </style>
 </head>
 <body>

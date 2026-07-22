@@ -668,6 +668,7 @@ class FestSchoolReportController extends SchoolAdminController
             false,
             null,
             $customTemplate,
+            true,
         ))->download("{$slug}-{$scopeSuffix}-id-cards.pdf");
     }
 
@@ -704,6 +705,7 @@ class FestSchoolReportController extends SchoolAdminController
             false,
             $sections,
             $customTemplate,
+            true,
         ))->download("{$slug}-all-heads-id-cards.pdf");
     }
 
@@ -734,6 +736,7 @@ class FestSchoolReportController extends SchoolAdminController
             false,
             $sections,
             $customTemplate,
+            true,
         ))->download("{$slug}-all-items-id-cards.pdf");
     }
 

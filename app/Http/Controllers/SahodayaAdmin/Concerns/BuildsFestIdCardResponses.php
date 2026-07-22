@@ -59,6 +59,7 @@ trait BuildsFestIdCardResponses
         bool $showTitle,
         ?array $sections = null,
         ?IdCardTemplate $customTemplate = null,
+        bool $isPdf = false,
     ): array {
         $base = [
             'cards'          => $cards,
@@ -68,6 +69,7 @@ trait BuildsFestIdCardResponses
             'eventTitle'     => $event->title,
             'audience'       => $audience,
             'showTitle'      => $showTitle,
+            'isPdf'          => $isPdf,
         ];
 
         if (! $customTemplate) {

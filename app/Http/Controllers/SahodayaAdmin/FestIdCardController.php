@@ -120,6 +120,7 @@ class FestIdCardController extends SahodayaAdminController
             false,
             null,
             $customTemplate,
+            true,
         ))->download("{$slug}-{$scopeSuffix}-id-cards.pdf");
     }
 
@@ -156,6 +157,7 @@ class FestIdCardController extends SahodayaAdminController
             false,
             $sections,
             $customTemplate,
+            true,
         ))->download("{$slug}-all-items-id-cards.pdf");
     }
 
@@ -199,6 +201,7 @@ class FestIdCardController extends SahodayaAdminController
             false,
             $sections,
             $customTemplate,
+            true,
         ))->download("{$slug}-all-heads-id-cards.pdf");
     }
 
