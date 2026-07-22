@@ -1,8 +1,8 @@
 <template>
     <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="close"></div>
-        <div class="relative modal-shell max-w-2xl w-full max-h-[90vh] flex flex-col">
-            <div class="modal-head shrink-0">
+        <div class="relative modal-shell max-w-2xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
+            <div class="modal-head shrink-0 sticky top-0 z-10 bg-white">
                 <div class="min-w-0 pr-4">
                     <h3 class="font-bold text-[#041525] truncate">{{ title }}</h3>
                     <p v-if="subtitle" class="text-xs text-gray-500 mt-0.5">{{ subtitle }}</p>
@@ -59,7 +59,7 @@
                 </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto min-h-0">
+            <div class="min-h-[160px]">
                 <p v-if="!entries.length" class="p-6 text-sm text-amber-800">
                     No students in your school yet.
                     <button type="button" class="link-brand font-semibold" @click="$emit('add-student')">Add student</button>
@@ -128,7 +128,7 @@
                 </div>
             </div>
 
-            <div class="modal-foot shrink-0 flex flex-wrap justify-end gap-2">
+            <div class="modal-foot shrink-0 sticky bottom-0 z-10 bg-white flex flex-wrap justify-end gap-2">
                 <button type="button" class="btn-ghost text-sm" @click="close">Cancel</button>
                 <button
                     type="button"

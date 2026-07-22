@@ -113,7 +113,8 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
     }
 
     workflowItems.push(
-        { label: 'Reports & ID Cards', href: reportsBase, icon: 'file-text' },
+        { label: 'Reports', href: reportsBase, icon: 'file-text', exact: true },
+        { label: 'ID Cards', href: `${reportsBase}/id-cards`, icon: 'credit-card' },
         { label: 'Clash requests', href: `${eventBase}/clash-requests`, icon: 'alert-circle' },
         { label: 'Substitutions', href: `${eventBase}/substitution-requests`, icon: 'repeat' },
         { label: 'Fest day view', href: `${programBase}/fest-day/${eventId}`, icon: 'calendar' },
