@@ -1,7 +1,7 @@
 <template>
     <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="close"></div>
-        <div class="relative modal-shell max-w-2xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
+        <div class="relative modal-shell max-w-2xl w-full max-h-[90vh] !overflow-y-auto flex flex-col">
             <div class="modal-head shrink-0 sticky top-0 z-10 bg-white">
                 <div class="min-w-0 pr-4">
                     <h3 class="font-bold text-[#041525] truncate">{{ title }}</h3>
