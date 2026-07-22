@@ -594,6 +594,36 @@ class FestSchoolReportController extends SchoolAdminController
         ]);
     }
 
+    public function idCardsPreview(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        app(SchoolDocumentDownloadGateService::class)->assertFestEventFeeForDownloads(
+            $event, $this->school, $request->integer('head_id') ?: null,
+        );
+
+        $cluster = Tenant::findOrFail($this->school->parent_id);
+        $filters = array_merge($this->idCardFilters($request), [
+            'school_id'        => $this->school->id,
+            'school_downloads' => true,
+        ]);
+
+        $service->requireStudentItem('student', $filters);
+
+        $cards = $service->cards($event, 'student', $filters);
+        $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, 'student');
+
+        return view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+            $event,
+            $cluster,
+            $cards,
+            'student',
+            true,
+            null,
+            $customTemplate,
+        ));
+    }
+
     public function idCardsPdf(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
@@ -606,6 +636,7 @@ class FestSchoolReportController extends SchoolAdminController
         $filters = array_merge($this->idCardFilters($request), [
             'school_id'        => $this->school->id,
             'school_downloads' => true,
+            'include_data_uris' => true,
         ]);
 
         $service->requireStudentItem('student', $filters);
@@ -640,6 +671,7 @@ class FestSchoolReportController extends SchoolAdminController
         $filters = [
             'school_id'        => $this->school->id,
             'school_downloads' => true,
+            'include_data_uris' => true,
         ];
         $sections = collect($service->cardsGroupedByHead($event, $filters))
             ->map(fn ($section) => [

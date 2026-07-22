@@ -496,10 +496,11 @@ class FestIdCardService
             $query->where('student_id', (int) $filters['student_id']);
         }
 
+        $includeDataUris = (bool) ($filters['include_data_uris'] ?? false);
         $participants = $query->orderBy('id')->get();
         $schedules = $this->schedulesForParticipants($event, $participants->pluck('id'));
 
-        return $participants->map(fn (FestParticipant $p) => $this->participantCard($event, $p, $schedules->get($p->id)))
+        return $participants->map(fn (FestParticipant $p) => $this->participantCard($event, $p, $schedules->get($p->id), $includeDataUris))
             ->values()
             ->all();
     }
@@ -509,6 +510,7 @@ class FestIdCardService
     {
         $schoolId = $filters['school_id'] ?? null;
         $itemId = isset($filters['item_id']) ? (int) $filters['item_id'] : null;
+        $includeDataUris = (bool) ($filters['include_data_uris'] ?? false);
 
         $query = FestRegistration::query()
             ->where('event_id', $event->id);
@@ -537,7 +539,7 @@ class FestIdCardService
         $participantIds = $registrations->flatMap(fn ($r) => $r->participants->pluck('id'));
         $schedules = $this->schedulesForParticipants($event, $participantIds);
 
-        return $registrations->map(function (FestRegistration $registration) use ($event, $schedules) {
+        return $registrations->map(function (FestRegistration $registration) use ($event, $schedules, $includeDataUris) {
             $performers = $registration->participants
                 ->sortBy(fn (FestParticipant $p) => $p->participant_role === 'performer' ? 0 : 1);
 
@@ -557,15 +559,17 @@ class FestIdCardService
                 $chestNumber = null;
             }
 
-            $members = $performers->map(function (FestParticipant $p) {
+            $members = $performers->map(function (FestParticipant $p) use ($includeDataUris) {
                 $name = $p->student?->name ?? $p->teacher?->name ?? 'Member';
+                $photoUrl = $this->portraitUrl($p);
+                $photoSrc = $includeDataUris ? ($this->portraitDataUri($p) ?: $photoUrl) : $photoUrl;
 
                 return [
                     'name'      => $name,
                     'fest_id'   => $p->level_registration_number ?? '—',
                     'initials'  => $this->initials($name),
-                    'photo_url' => $this->portraitUrl($p),
-                    'photo_src' => $this->portraitDataUri($p),
+                    'photo_url' => $photoUrl,
+                    'photo_src' => $photoSrc,
                     'role'      => str($p->participant_role)->replace('_', ' ')->title()->toString(),
                 ];
             })->values()->all();
@@ -600,7 +604,7 @@ class FestIdCardService
     }
 
     /** @return array<string, mixed> */
-    private function participantCard(FestEvent $event, FestParticipant $p, ?FestSchedule $schedule): array
+    private function participantCard(FestEvent $event, FestParticipant $p, ?FestSchedule $schedule, bool $includeDataUris = false): array
     {
         $isTeacher = (bool) $p->teacher_id;
         $name = $p->student?->name ?? $p->teacher?->name ?? 'Participant';
@@ -649,7 +653,9 @@ class FestIdCardService
         };
 
         $photoUrl = $this->portraitUrl($p) ?: $this->defaultAvatarDataUri($gender);
-        $photoSrc = $this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender);
+        $photoSrc = $includeDataUris
+            ? ($this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender))
+            : $photoUrl;
 
         $rawDate = $event->event_start ?? $event->starts_at ?? $event->start_date;
         $eventDate = $rawDate ? date('d M Y', strtotime((string) $rawDate)) : null;

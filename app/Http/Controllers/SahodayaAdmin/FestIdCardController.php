@@ -87,6 +87,7 @@ class FestIdCardController extends SahodayaAdminController
 
         $data = $this->validated($request);
         $filters = $this->idCardFilters($request);
+        $filters['include_data_uris'] = true;
         $service->requireStudentItem($data['audience'], $filters);
         $cards = $service->cards($event, $data['audience'], $filters);
         $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, $data['audience']);
@@ -124,6 +125,7 @@ class FestIdCardController extends SahodayaAdminController
         abort_unless($data['audience'] === 'student', 422, 'Bulk item PDF is available for student cards only.');
 
         $filters = $this->idCardFilters($request);
+        $filters['include_data_uris'] = true;
         unset($filters['item_id'], $filters['scope']);
         $sections = $service->cardsGroupedByItem($event, $filters);
         abort_if($sections === [], 422, 'No approved participants found for any item.');
@@ -159,6 +161,7 @@ class FestIdCardController extends SahodayaAdminController
         abort_unless($data['audience'] === 'student', 422, 'Bulk head PDF is available for student cards only.');
 
         $filters = $this->idCardFilters($request);
+        $filters['include_data_uris'] = true;
         unset($filters['item_id'], $filters['head_id'], $filters['scope']);
         $sections = collect($service->cardsGroupedByHead($event, $filters))
             ->map(fn ($section) => [

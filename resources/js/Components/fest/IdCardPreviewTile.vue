@@ -27,7 +27,7 @@
         <!-- Body -->
         <div class="id-card-tile__body">
             <div class="id-card-tile__portrait">
-                <img v-if="card.photo_url || card.photo_src" :src="card.photo_url || card.photo_src" :alt="card.name" class="id-card-tile__photo">
+                <img v-if="card.photo_url || card.photo_src" :src="card.photo_url || card.photo_src" :alt="card.name" class="id-card-tile__photo" loading="lazy">
                 <span v-else class="id-card-tile__initials">{{ card.initials }}</span>
             </div>
 
