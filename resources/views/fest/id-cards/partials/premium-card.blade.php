@@ -29,10 +29,8 @@
         </div>
     </div>
 
-    {{-- ── Wave separator (CSS arc trick — DomPDF-safe) ── --}}
-    <div class="pcard__wave-outer">
-        <div class="pcard__wave-inner"></div>
-    </div>
+    {{-- ── Green divider ── --}}
+    <div class="pcard__divider"></div>
 
     {{-- ── Body ── --}}
     <div class="pcard__body">

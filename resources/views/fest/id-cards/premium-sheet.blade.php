@@ -123,19 +123,11 @@
             text-transform: uppercase;
         }
 
-        /* ---- Wave separator ---- */
-        /* DomPDF cannot render inline SVG reliably, so simulate with a green bar + white top arc using borders */
-        .pcard__wave-outer {
-            height: 3mm;
-            background: #ffffff;
-            overflow: hidden;
-        }
-        .pcard__wave-inner {
-            height: 5mm;
-            background: #042a5b;
-            border-bottom-left-radius: 50% 4mm;
-            border-bottom-right-radius: 50% 4mm;
-            border-bottom: 0.5mm solid #10b981;
+        /* ---- Divider ---- */
+        .pcard__divider {
+            height: 1mm;
+            background: #10b981;
+            width: 100%;
         }
 
         /* ---- Body ---- */
