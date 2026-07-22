@@ -9,6 +9,9 @@
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
+                <a v-if="!isAllItems" :href="previewUrl" target="_blank" class="btn-secondary text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
+                    Preview in browser ↗
+                </a>
                 <a v-if="cardScope === 'head'" :href="pdfAllHeadsUrl" class="btn-secondary text-sm" :class="{ 'pointer-events-none opacity-50': downloadGate?.blocked }">All heads PDF ↓</a>
                 <a :href="pdfUrl" class="btn-primary text-sm" :class="{ 'pointer-events-none opacity-50': !canGenerate || downloadGate?.blocked }">
                     Download PDF ↓
@@ -165,7 +168,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import IdCardPreviewTile from '@/Components/fest/IdCardPreviewTile.vue';
@@ -185,13 +188,17 @@ const props = defineProps({
 });
 
 const { programLabel, programBase } = useSchoolProgramContext(props);
-const itemId = ref('');
-const headId = ref('');
-const cardTemplate = ref('premium');
 const cardScope = ref(props.event?.event_type === 'sports' ? 'head' : 'item');
+const itemId = ref(cardScope.value === 'item' ? (props.items?.length ? 'all' : '') : '');
+const headId = ref(cardScope.value === 'head' ? (props.heads?.length ? String(props.heads[0].id) : '') : '');
+const cardTemplate = ref('premium');
 const layout = ref('individual');
 const previewCards = ref([]);
 const loading = ref(false);
+
+onMounted(() => {
+    loadPreview();
+});
 
 const templates = [
     { id: 'premium', label: 'Premium' },

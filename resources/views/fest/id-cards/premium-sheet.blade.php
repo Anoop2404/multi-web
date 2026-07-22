@@ -6,29 +6,12 @@
     <style>
         @page { size: A4 landscape; margin: 6mm; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #0f172a; background: #f1f5f9; }
+        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #0f172a; background: #ffffff; }
         .sheet-title { text-align: center; font-size: 10px; font-weight: bold; color: #334155; margin-bottom: 2mm; }
 
-        /*
-         * .page is sized to exactly match the @page content box (A4
-         * LANDSCAPE 297mm minus the 6mm margin on each side = 285mm), with
-         * NO extra padding of its own. That makes it a no-op inset when the
-         * @page margin is already physically applied (DomPDF PDF export,
-         * and a real browser Ctrl+P print) — it just fills the box exactly,
-         * margin:auto resolving to 0. In a plain on-screen browser view (the
-         * /preview route opened normally, not printed) there is no @page
-         * margin at all, so this same fixed 285mm width + auto margins is
-         * what keeps the grid from stretching across the full viewport
-         * instead.
-         *
-         * Important: DomPDF defaults to media_type "screen" (see
-         * vendor/barryvdh/laravel-dompdf/config/dompdf.php), so @media
-         * print rules are NOT applied during PDF export — this must work
-         * unconditionally, not rely on an @media print override.
-         */
         .page {
             width: 285mm;
-            margin: 0 auto 8mm;
+            margin: 0 auto;
             background: #ffffff;
         }
         @media print {
@@ -49,7 +32,7 @@
         .grid td { width: 50%; vertical-align: top; padding: 0; }
         .page-break { page-break-after: always; }
 
-        /* ========= Card ========= */
+        /* ========= Card (DomPDF Compatible Table Layout) ========= */
         .pcard {
             width: {{ \App\Support\FestIdCardTemplates::CARD_WIDTH_MM }}mm;
             height: {{ \App\Support\FestIdCardTemplates::CARD_HEIGHT_MM }}mm;
@@ -58,144 +41,145 @@
             page-break-inside: avoid;
             background: #ffffff;
             border: 0.4mm solid #042a5b;
-            box-shadow: 0 1mm 3mm rgba(4, 42, 91, 0.12);
-            display: flex;
-            flex-direction: column;
             position: relative;
         }
 
         /* Header */
         .pcard__header {
-            flex-shrink: 0;
-            height: 20mm;
-            background: linear-gradient(135deg, #042a5b 0%, #0a3d7a 100%);
+            display: table;
+            width: 100%;
+            height: 19mm;
+            background: #042a5b;
             color: #ffffff;
-            padding: 2.5mm 4mm 1mm;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: relative;
+            padding: 2.5mm 3.5mm 1mm;
         }
-        .pcard__brand {
-            display: flex;
-            align-items: center;
-            gap: 2.8mm;
-            flex: 1;
-            min-width: 0;
+        .pcard__brand-cell {
+            display: table-cell;
+            vertical-align: middle;
+            width: 72%;
+        }
+        .pcard__logo-cell {
+            display: table-cell;
+            vertical-align: middle;
+            width: 13mm;
         }
         .pcard__logo,
         .pcard__logo-fallback {
-            width: 13mm;
-            height: 13mm;
+            width: 12mm;
+            height: 12mm;
             border-radius: 50%;
-            border: 0.45mm solid rgba(16, 185, 129, 0.6);
+            border: 0.4mm solid #10b981;
             background: #ffffff;
-            object-fit: cover;
-            flex-shrink: 0;
+            display: block;
         }
         .pcard__logo-fallback {
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            text-align: center;
+            line-height: 12mm;
             color: #042a5b;
-            font-size: 8px;
+            font-size: 7px;
             font-weight: bold;
         }
+        .pcard__text-cell {
+            display: table-cell;
+            vertical-align: middle;
+            padding-left: 2.5mm;
+        }
         .pcard__cluster {
-            font-size: 7px;
+            font-size: 6.5px;
             font-weight: 800;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: rgba(255,255,255,0.9);
-            line-height: 1.2;
+            color: #cbd5e1;
+            line-height: 1.1;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .pcard__event {
-            font-size: 13px;
+            font-size: 11.5px;
             font-weight: 800;
             color: #ffffff;
-            line-height: 1.2;
-            margin-top: 0.6mm;
+            line-height: 1.15;
+            margin-top: 0.5mm;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        .pcard__ribbon-cell {
+            display: table-cell;
+            vertical-align: top;
+            text-align: right;
+            width: 28%;
+        }
         .pcard__pass-ribbon {
-            position: absolute;
-            top: 0;
-            right: 3.5mm;
+            display: inline-block;
             background: #059669;
             color: #ffffff;
-            font-size: 6.5px;
+            font-size: 6px;
             font-weight: 800;
-            padding: 1.1mm 4mm 1.4mm;
+            padding: 1.2mm 3.5mm;
             border-bottom-left-radius: 1.8mm;
             border-bottom-right-radius: 1.8mm;
             letter-spacing: 0.08em;
             text-transform: uppercase;
         }
 
-        /* Wave separator */
-        .pcard__wave-separator {
-            height: 3mm;
-            margin-top: -3mm;
-            position: relative;
-            z-index: 2;
-        }
-        .pcard__wave-separator svg {
+        /* Divider Line */
+        .pcard__divider {
+            height: 1mm;
+            background: #10b981;
             width: 100%;
-            height: 100%;
-            display: block;
         }
 
         /* Body */
         .pcard__body {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 3.5mm;
-            padding: 2.5mm 4mm;
+            display: table;
+            width: 100%;
+            padding: 2.5mm 3.5mm;
+            height: 52mm;
             background: #ffffff;
         }
-        .pcard__portrait {
+        .pcard__portrait-cell {
+            display: table-cell;
+            vertical-align: top;
             width: 26mm;
-            height: 33mm;
+        }
+        .pcard__portrait {
+            width: 25mm;
+            height: 32mm;
             border-radius: 1.5mm;
-            border: 0.5mm solid #0d9488;
+            border: 0.4mm solid #0d9488;
             overflow: hidden;
             background: #f0fdf4;
-            flex-shrink: 0;
         }
         .pcard__photo {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+            width: 25mm;
+            height: 32mm;
             display: block;
         }
         .pcard__initials {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
+            width: 25mm;
+            height: 32mm;
+            text-align: center;
+            line-height: 32mm;
+            font-size: 16px;
             font-weight: bold;
             color: #042a5b;
             background: #e0f2fe;
         }
-        .pcard__info-col {
-            flex: 1;
-            min-width: 0;
+        .pcard__info-cell {
+            display: table-cell;
+            vertical-align: top;
+            padding-left: 3mm;
+            padding-right: 1.5mm;
         }
         .pcard__name {
-            font-size: 13px;
+            font-size: 11.5px;
             font-weight: 800;
             color: #042a5b;
             text-transform: uppercase;
             line-height: 1.2;
-            margin-bottom: 1.5mm;
+            margin-bottom: 1mm;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -205,16 +189,16 @@
             border-collapse: collapse;
         }
         .pcard__meta-table td {
-            font-size: 8px;
-            line-height: 1.5;
-            padding: 0.35mm 0;
+            font-size: 7.5px;
+            line-height: 1.45;
+            padding: 0.25mm 0;
             vertical-align: middle;
         }
 
         .pcard__meta-label {
             color: #475569;
             font-weight: 600;
-            width: 17mm;
+            width: 16mm;
         }
         .pcard__meta-sep {
             color: #64748b;
@@ -229,69 +213,78 @@
             text-overflow: ellipsis;
         }
 
-        /* QR column */
-        .pcard__qr-col {
+        .pcard__qr-cell {
+            display: table-cell;
+            vertical-align: top;
             width: 20mm;
             text-align: center;
-            flex-shrink: 0;
-            align-self: center;
         }
         .pcard__qr {
             width: 18mm;
             height: 18mm;
             background: #ffffff;
-            border-radius: 1.2mm;
-            border: 0.35mm solid #d1d5db;
-            padding: 0.6mm;
+            border-radius: 1mm;
+            border: 0.3mm solid #cbd5e1;
+            padding: 0.5mm;
             display: block;
             margin: 0 auto;
         }
         .pcard__qr-label {
             display: block;
-            font-size: 5px;
+            font-size: 4.8px;
             font-weight: 800;
             color: #10b981;
-            letter-spacing: 0.06em;
-            margin-top: 0.7mm;
+            letter-spacing: 0.05em;
+            margin-top: 0.6mm;
             text-transform: uppercase;
         }
 
         /* Footer */
         .pcard__footer {
-            flex-shrink: 0;
+            display: table;
+            width: 100%;
             height: 8mm;
             background: #042a5b;
-            padding: 0 4mm;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            padding: 0 3.5mm;
+        }
+        .pcard__school-cell {
+            display: table-cell;
+            vertical-align: middle;
+            width: 70%;
         }
         .pcard__school-pill {
-            display: inline-flex;
-            align-items: center;
-            background: rgba(255,255,255,0.08);
-            border: 0.2mm solid rgba(255,255,255,0.15);
-            border-radius: 999px;
-            padding: 0.8mm 3mm;
-            max-width: 68%;
+            display: inline-block;
+            background: #0b376d;
+            border: 0.2mm solid #1e4d88;
+            border-radius: 3mm;
+            padding: 0.6mm 2.5mm;
+            max-width: 95%;
         }
         .pcard__school-text {
-            font-size: 6.5px;
+            font-size: 6.2px;
             font-weight: 800;
             color: #ffffff;
             text-transform: uppercase;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            display: block;
+        }
+        .pcard__role-cell {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: right;
+            width: 30%;
         }
         .pcard__role-pill {
+            display: inline-block;
             background: #059669;
             color: #ffffff;
-            font-size: 6.5px;
+            font-size: 6.2px;
             font-weight: 800;
-            padding: 0.8mm 3.5mm;
-            border-radius: 999px;
-            letter-spacing: 0.06em;
+            padding: 0.6mm 3mm;
+            border-radius: 3mm;
+            letter-spacing: 0.05em;
             text-transform: uppercase;
         }
     </style>

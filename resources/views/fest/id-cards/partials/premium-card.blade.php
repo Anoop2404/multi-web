@@ -5,42 +5,43 @@
     $roleClass = $card['role_class'] ?? 'student';
 @endphp
 <div class="pcard pcard--{{ $roleClass }}">
-    <header class="pcard__header">
-        <div class="pcard__brand">
-            @if(!empty($clusterLogoSrc))
-                <img src="{{ $clusterLogoSrc }}" alt="{{ $clusterName }}" class="pcard__logo">
-            @else
-                <div class="pcard__logo-fallback">{{ $clusterInitials ?? 'S' }}</div>
-            @endif
-            <div class="pcard__brand-text">
-                <p class="pcard__cluster">{{ $clusterName }}</p>
-                <p class="pcard__event">{{ $eventTitle }}</p>
+    <div class="pcard__header">
+        <div class="pcard__brand-cell">
+            <div style="display: table; width: 100%;">
+                <div class="pcard__logo-cell">
+                    @if(!empty($clusterLogoSrc))
+                        <img src="{{ $clusterLogoSrc }}" alt="{{ $clusterName }}" class="pcard__logo">
+                    @else
+                        <div class="pcard__logo-fallback">{{ $clusterInitials ?? 'S' }}</div>
+                    @endif
+                </div>
+                <div class="pcard__text-cell">
+                    <div class="pcard__cluster">{{ $clusterName }}</div>
+                    <div class="pcard__event">{{ $eventTitle }}</div>
+                </div>
             </div>
         </div>
 
-        <div class="pcard__pass-ribbon">
-            <span>{{ $isEventPass ? 'EVENT PASS' : 'ID CARD' }}</span>
+        <div class="pcard__ribbon-cell">
+            <span class="pcard__pass-ribbon">{{ $isEventPass ? 'EVENT PASS' : ($isHeadPass ? 'HEAD PASS' : 'ID CARD') }}</span>
         </div>
-    </header>
-
-    <div class="pcard__wave-separator">
-        <svg viewBox="0 0 500 20" preserveAspectRatio="none">
-            <path d="M0 0 C 150 18, 350 18, 500 0 L 500 20 L 0 20 Z" fill="#ffffff"/>
-            <path d="M0 0 C 150 16, 350 16, 500 0" fill="none" stroke="#10b981" stroke-width="3"/>
-        </svg>
     </div>
 
+    <div class="pcard__divider"></div>
+
     <div class="pcard__body">
-        <div class="pcard__portrait">
-            @if(!empty($card['photo_src']))
-                <img src="{{ $card['photo_src'] }}" alt="" class="pcard__photo">
-            @else
-                <div class="pcard__initials">{{ $card['initials'] ?? '?' }}</div>
-            @endif
+        <div class="pcard__portrait-cell">
+            <div class="pcard__portrait">
+                @if(!empty($card['photo_src']))
+                    <img src="{{ $card['photo_src'] }}" alt="" class="pcard__photo">
+                @else
+                    <div class="pcard__initials">{{ $card['initials'] ?? '?' }}</div>
+                @endif
+            </div>
         </div>
 
-        <div class="pcard__info-col">
-            <p class="pcard__name">{{ $card['name'] }}</p>
+        <div class="pcard__info-cell">
+            <div class="pcard__name">{{ $card['name'] }}</div>
             <table class="pcard__meta-table">
                 <tr>
                     <td class="pcard__meta-label">Role</td>
@@ -75,7 +76,7 @@
             </table>
         </div>
 
-        <div class="pcard__qr-col">
+        <div class="pcard__qr-cell">
             @if(!empty($card['qr_src']))
                 <img src="{{ $card['qr_src'] }}" alt="" class="pcard__qr">
                 <span class="pcard__qr-label">SCAN TO VERIFY</span>
@@ -83,12 +84,16 @@
         </div>
     </div>
 
-    <footer class="pcard__footer">
-        <div class="pcard__school-pill">
-            <span class="pcard__school-text">{{ $card['subtitle'] ?? ($card['school_name'] ?? '—') }}</span>
+    <div class="pcard__footer">
+        <div class="pcard__school-cell">
+            <div class="pcard__school-pill">
+                <span class="pcard__school-text">{{ $card['subtitle'] ?? ($card['school_name'] ?? '—') }}</span>
+            </div>
         </div>
-        <div class="pcard__role-pill">
-            <span>{{ $card['role_label'] ?? 'PARTICIPANT' }}</span>
+        <div class="pcard__role-cell">
+            <div class="pcard__role-pill">
+                <span>{{ $card['role_label'] ?? 'PARTICIPANT' }}</span>
+            </div>
         </div>
-    </footer>
+    </div>
 </div>
