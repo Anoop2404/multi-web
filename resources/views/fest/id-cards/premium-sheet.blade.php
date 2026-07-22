@@ -134,6 +134,7 @@
         .pcard__wave-separator {
             height: 3.5mm;
             margin-top: -3.5mm;
+            margin-bottom: -1px; /* Overlap with body to hide sub-pixel background bleed */
             flex-shrink: 0;
             position: relative;
             z-index: 2;
