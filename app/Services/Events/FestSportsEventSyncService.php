@@ -341,11 +341,21 @@ class FestSportsEventSyncService
     /**
      * Season hub is a hidden rollup (medal tally, remittance) once sport events
      * exist — schools and navs must only ever see the per-sport events.
+     *
+     * Guard: a genuine season hub never carries registrations directly on
+     * itself — every registration belongs to one of its child sport events.
+     * If $season has its own direct registrations, it's a real standalone
+     * competition (e.g. a leaf sport event like Chess) that got mistakenly
+     * re-tagged/re-spawned a child via promoteIfSeason() — never silently
+     * hide an event that schools have actually registered into. This was the
+     * root cause of a standalone sport event repeatedly reverting to hidden
+     * after "Fix visibility" had already cleared it once.
      */
     public function hideSeasonHubIfChildrenExist(FestEvent $season): void
     {
         if (! $season->nav_hidden
-            && FestEvent::where('parent_event_id', $season->id)->exists()) {
+            && FestEvent::where('parent_event_id', $season->id)->exists()
+            && ! $season->registrations()->exists()) {
             $season->update(['nav_hidden' => true]);
         }
     }

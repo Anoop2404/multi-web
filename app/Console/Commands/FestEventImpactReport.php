@@ -73,7 +73,10 @@ class FestEventImpactReport extends Command
         'fest_house_schools'                   => ['Marks & results', 'House-school links'],
         'fest_record_breaks'                   => ['Marks & results', 'Record breaks'],
         'fest_athletic_records'                => ['Marks & results', 'Athletic records'],
-        'fest_state_submission_outbox'         => ['Marks & results', 'State submission outbox'],
+        // This table's FK is source_event_id, not event_id — see the 'column'
+        // override below, or whereIn('event_id', ...) errors with "column
+        // does not exist" (confirmed against the live schema).
+        'fest_state_submission_outbox'         => ['Marks & results', 'State submission outbox', 'source_event_id'],
 
         // Finance.
         'fest_school_event_fees' => ['Finance', 'School event fee records'],
@@ -163,12 +166,15 @@ class FestEventImpactReport extends Command
         $rows = [];
         $total = 0;
 
-        foreach (self::EVENT_ID_TABLES as $table => [$section, $label]) {
-            if (! $this->tableExists($table)) {
+        foreach (self::EVENT_ID_TABLES as $table => $meta) {
+            [$section, $label] = $meta;
+            $column = $meta[2] ?? 'event_id';
+
+            if (! $this->tableExists($table) || ! $this->columnExists($table, $column)) {
                 continue;
             }
 
-            $count = DB::table($table)->whereIn('event_id', $ids)->count();
+            $count = DB::table($table)->whereIn($column, $ids)->count();
             $rows[] = [$section, $label, $count];
             $total += $count;
         }
@@ -216,5 +222,17 @@ class FestEventImpactReport extends Command
         static $cache = [];
 
         return $cache[$table] ??= \Illuminate\Support\Facades\Schema::hasTable($table);
+    }
+
+    /**
+     * Guards against schema drift (a table existing but not having the
+     * expected FK column, e.g. fest_state_submission_outbox's real column
+     * is source_event_id, not event_id) — skip rather than crash.
+     */
+    private function columnExists(string $table, string $column): bool
+    {
+        static $cache = [];
+
+        return $cache["{$table}.{$column}"] ??= \Illuminate\Support\Facades\Schema::hasColumn($table, $column);
     }
 }

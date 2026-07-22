@@ -229,10 +229,19 @@ class FestItemHeadService
     /**
      * Explicit promotion entry (head creation, migration commands): allowed to
      * create the sport event for the head — including custom, non-catalog heads.
+     *
+     * Guard: never promote an event that already has real registrations
+     * directly on itself — that proves it's a genuine standalone competition
+     * (a leaf sport event, e.g. Chess), not an empty season shell. Without
+     * this, creating an item head under such an event (e.g. via a leftover
+     * legacy "add head" action) would re-tag it as a season hub, spawn a
+     * duplicate child event, and get it auto-hidden from schools again even
+     * after "Fix visibility" had already cleared it once.
      */
     public function promoteIfSeason(FestEvent $event): void
     {
-        if ($event->event_type === 'sports' && $event->parent_event_id === null) {
+        if ($event->event_type === 'sports' && $event->parent_event_id === null
+            && ! $event->registrations()->exists()) {
             app(FestSportsEventSyncService::class)->syncSeason($event, createMissing: true);
         }
     }
