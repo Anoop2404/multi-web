@@ -6,7 +6,7 @@ class SahodayaSiteBuilderCatalog
 {
     /** @var array<string, list<string>> */
     public const SECTION_TYPES = [
-        'hero'                  => ['centered', 'sahodaya-centered', 'split-image', 'gradient-split', 'event-promo', 'with-quicklinks', 'full-bleed', 'cksc-slider'],
+        'hero'                  => ['centered', 'sahodaya-centered', 'split-image', 'gradient-split', 'event-promo', 'with-quicklinks', 'full-bleed', 'full-slider', 'cksc-slider'],
         'about_sahodaya'        => ['single-column', 'with-stats', 'motto-hero', 'vision-mission', 'with-timeline'],
         'office_bearers'        => ['photo-cards', 'modern-grid', 'table-list'],
         'member_schools'        => ['modern-grid', 'card-grid', 'table-list', 'map-view'],

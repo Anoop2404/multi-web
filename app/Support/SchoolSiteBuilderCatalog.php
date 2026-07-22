@@ -6,7 +6,7 @@ class SchoolSiteBuilderCatalog
 {
     /** @var array<string, list<string>> */
     public const SECTION_TYPES = [
-        'hero'                  => ['centered', 'split-image', 'video-bg', 'minimal', 'with-quicklinks', 'gradient-split', 'full-bleed'],
+        'hero'                  => ['centered', 'split-image', 'video-bg', 'minimal', 'with-quicklinks', 'gradient-split', 'full-bleed', 'full-slider'],
         'about'                 => ['text-left', 'text-right', 'two-column', 'with-motto'],
         'principal_message'     => ['card-style', 'full-width', 'with-management'],
         'management'            => ['photo-cards', 'table-list'],

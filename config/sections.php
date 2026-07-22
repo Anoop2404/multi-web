@@ -134,6 +134,25 @@ return [
                 ['key' => 'secondary_cta_url',   'type' => 'url',   'label' => 'Secondary Button URL'],
             ],
         ],
+        'full-slider' => [
+            'label' => 'Full Screen Slider Hero',
+            'description' => 'Full-screen auto-playing hero slider with custom slides, badges, buttons, and background images',
+            'fields' => [
+                ['key' => 'autoplay_seconds', 'type' => 'number', 'label' => 'Autoplay Delay (seconds)', 'default' => 5],
+                ['key' => 'height_vh',        'type' => 'text',   'label' => 'Slider Height (e.g. 75vh or 80vh)', 'default' => '75vh'],
+                ['key' => 'slides',           'type' => 'repeater', 'label' => 'Slides',
+                 'fields' => [
+                     ['key' => 'title',               'type' => 'text',     'label' => 'Slide Title', 'required' => true],
+                     ['key' => 'subtitle',            'type' => 'text',     'label' => 'Subtitle / Badge'],
+                     ['key' => 'description',         'type' => 'textarea', 'label' => 'Description'],
+                     ['key' => 'cta_label',           'type' => 'text',     'label' => 'Primary Button Label'],
+                     ['key' => 'cta_url',             'type' => 'url',      'label' => 'Primary Button URL'],
+                     ['key' => 'secondary_cta_label', 'type' => 'text',     'label' => 'Secondary Button Label'],
+                     ['key' => 'secondary_cta_url',   'type' => 'url',      'label' => 'Secondary Button URL'],
+                     ['key' => 'image_path',          'type' => 'media',    'label' => 'Background Image'],
+                 ]],
+            ],
+        ],
         'cksc-slider' => [
             'label' => 'CKSC Image Slider',
             'description' => 'Full-width slider with circular logo overlay (Confederation style)',

@@ -166,7 +166,7 @@ fetch('/admin/api/section-definitions', { headers: { 'Accept': 'application/json
     .catch(() => {});
 
 const sectionTypeMap = {
-    hero:                 ['centered', 'split-image', 'video-bg', 'minimal', 'with-quicklinks', 'sahodaya-centered', 'event-promo'],
+    hero:                 ['centered', 'split-image', 'video-bg', 'minimal', 'with-quicklinks', 'sahodaya-centered', 'event-promo', 'gradient-split', 'full-bleed', 'full-slider', 'cksc-slider'],
     about:               ['text-left', 'text-right', 'two-column', 'with-motto'],
     about_sahodaya:      ['single-column', 'with-stats', 'motto-hero'],
     principal_message:   ['card-style', 'full-width', 'with-management'],
