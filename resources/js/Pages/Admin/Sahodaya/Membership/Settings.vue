@@ -997,17 +997,18 @@
                                     <FormField label="Under age" v-if="g.group_key !== 'open'" :error="editAgeCategoryForm.errors.under_age">
                                         <input v-model.number="editAgeCategoryForm.under_age" type="number" min="1" max="99" class="field w-20">
                                     </FormField>
-                                    <FormField label="Sort" hint="Lower = first">
+                                    <FormField label="Sort">
                                         <input v-model.number="editAgeCategoryForm.sort_order" type="number" min="0" class="field w-20">
                                     </FormField>
                                     <FormField label="Default fee (₹)">
                                         <input v-model.number="editAgeCategoryForm.default_fee" type="number" min="0" step="0.01" class="field w-28">
                                     </FormField>
-                                    <label class="flex items-center gap-2 text-xs text-gray-600 mb-2 cursor-pointer">
+                                    <label class="flex items-center gap-2 text-xs text-gray-600 h-9 cursor-pointer">
                                         <input v-model="editAgeCategoryForm.is_active" type="checkbox" class="rounded text-purple-600">
                                         Active
                                     </label>
                                 </div>
+                                <p class="text-xs text-gray-400 mt-1">Sort is the display order (lower = first).</p>
                                 <div class="flex gap-2 mt-3">
                                     <button type="button" @click="saveAgeCategoryEdit(g)" class="btn-secondary text-xs" :disabled="editAgeCategoryForm.processing">Save</button>
                                     <button type="button" @click="editingAgeCategoryId = null" class="text-xs text-gray-500">Cancel</button>
@@ -1034,7 +1035,7 @@
                     <p v-else class="text-sm text-gray-400 mb-4">No age categories yet.</p>
 
                     <form @submit.prevent="addAgeCategory" class="flex flex-wrap gap-3 items-end">
-                        <FormField label="Key" hint="e.g. u14, u17, open">
+                        <FormField label="Key">
                             <input v-model="ageCategoryForm.group_key" class="field font-mono w-24" placeholder="u16" required pattern="^(open|u\d{1,2})$">
                         </FormField>
                         <FormField label="Label" :error="ageCategoryForm.errors.label">
@@ -1048,6 +1049,7 @@
                         </FormField>
                         <button type="submit" class="btn-secondary mb-0.5" :disabled="ageCategoryForm.processing">Add Category</button>
                     </form>
+                    <p class="text-xs text-gray-400 mt-1">Key format: u14, u17, open.</p>
                 </FormSection>
             </div>
                 </main>
