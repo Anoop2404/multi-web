@@ -47,7 +47,7 @@
             border-radius: 3mm;
             overflow: hidden;
             page-break-inside: avoid;
-            background: #ffffff;
+            background: #042a5b; /* Prevents white sub-pixel bleeding at the top/bottom edges */
             border: 0.4mm solid #042a5b;
             display: flex;
             flex-direction: column;
@@ -297,7 +297,7 @@
             width: {{ \App\Support\FestIdCardTemplates::CARD_WIDTH_MM }}mm;
             height: {{ \App\Support\FestIdCardTemplates::CARD_HEIGHT_MM }}mm;
             border-radius: 3mm;
-            background: #ffffff;
+            background: #042a5b; /* Prevents white sub-pixel bleeding at the top/bottom edges */
             border: 0.4mm solid #042a5b;
             table-layout: fixed;
             page-break-inside: avoid;
@@ -358,6 +358,7 @@
         .pcard-pdf__body {
             height: 55mm;
             padding: 2mm 4mm;
+            background: #ffffff;
         }
         .pcard-pdf__portrait {
             width: 26mm;
