@@ -281,89 +281,177 @@
             text-transform: uppercase;
         }
 
-        /* ========= DomPDF Table Layout Overrides (For PDF Generation Only) ========= */
+        /* ========= DomPDF Pure Table Layout Overrides ========= */
         @if(!empty($isPdf))
         body { background: #ffffff !important; }
         .page { margin: 0 auto !important; }
-        .pcard {
-            display: table !important;
-            width: {{ \App\Support\FestIdCardTemplates::CARD_WIDTH_MM }}mm !important;
-            height: {{ \App\Support\FestIdCardTemplates::CARD_HEIGHT_MM }}mm !important;
-            table-layout: fixed !important;
+        .pcard-pdf {
+            width: {{ \App\Support\FestIdCardTemplates::CARD_WIDTH_MM }}mm;
+            height: {{ \App\Support\FestIdCardTemplates::CARD_HEIGHT_MM }}mm;
+            border-radius: 3mm;
+            background: #ffffff;
+            border: 0.4mm solid #042a5b;
+            table-layout: fixed;
+            page-break-inside: avoid;
+            border-collapse: collapse;
         }
-        .pcard__header {
-            display: table-row !important;
-            height: 19mm !important;
+        .pcard-pdf__header {
+            height: 19mm;
+            background: #042a5b;
+            color: #ffffff;
         }
-        .pcard__brand {
-            display: table-cell !important;
-            vertical-align: middle !important;
-            width: 75% !important;
-            padding-left: 4mm !important;
-            padding-top: 2.5mm !important;
+        .pcard-pdf__logo, .pcard-pdf__logo-fallback {
+            width: 13mm;
+            height: 13mm;
+            border-radius: 50%;
+            border: 0.45mm solid rgba(16, 185, 129, 0.6);
+            background: #ffffff;
+            display: block;
         }
-        .pcard__logo, .pcard__logo-fallback {
-            display: inline-block !important;
-            vertical-align: middle !important;
+        .pcard-pdf__logo-fallback {
+            text-align: center;
+            line-height: 13mm;
+            color: #042a5b;
+            font-size: 8px;
+            font-weight: bold;
         }
-        .pcard__brand-text {
-            display: inline-block !important;
-            vertical-align: middle !important;
-            margin-left: 2.5mm !important;
-            width: 75% !important;
+        .pcard-pdf__cluster {
+            font-size: 7.5px;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.9);
+            line-height: 1.2;
         }
-        .pcard__pass-ribbon {
-            display: table-cell !important;
-            vertical-align: top !important;
-            text-align: right !important;
-            padding-right: 4mm !important;
-            width: 25% !important;
+        .pcard-pdf__event {
+            font-size: 13.5px;
+            font-weight: 800;
+            color: #ffffff;
+            line-height: 1.2;
+            margin-top: 0.6mm;
         }
-        .pcard__wave-separator {
-            display: table-row !important;
-            height: 3.5mm !important;
-            background: #ffffff !important;
-            border-top: 0.8mm solid #10b981 !important;
-            margin-top: 0 !important;
+        .pcard-pdf__pass-ribbon {
+            display: inline-block;
+            background: #059669;
+            color: #ffffff;
+            font-size: 6.5px;
+            font-weight: 800;
+            padding: 1.1mm 4mm 1.4mm;
+            border-bottom-left-radius: 1.8mm;
+            border-bottom-right-radius: 1.8mm;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
-        .pcard__body {
-            display: table !important;
-            width: 100% !important;
-            height: 55mm !important;
-            table-layout: fixed !important;
-            padding: 2mm 4mm !important;
+        .pcard-pdf__divider {
+            height: 3.5mm;
+            background: #ffffff;
+            border-top: 0.8mm solid #10b981;
         }
-        .pcard__portrait {
-            display: table-cell !important;
-            vertical-align: middle !important;
-            width: 26mm !important;
+        .pcard-pdf__body {
+            height: 55mm;
+            padding: 2mm 4mm;
         }
-        .pcard__info-col {
-            display: table-cell !important;
-            vertical-align: middle !important;
-            padding-left: 3.5mm !important;
-            padding-right: 1.5mm !important;
+        .pcard-pdf__portrait {
+            width: 26mm;
+            height: 33mm;
+            border-radius: 1.5mm;
+            border: 0.5mm solid #0d9488;
+            overflow: hidden;
+            background: #f0fdf4;
         }
-        .pcard__qr-col {
-            display: table-cell !important;
-            vertical-align: middle !important;
-            width: 20mm !important;
-            text-align: center !important;
+        .pcard-pdf__photo {
+            width: 26mm;
+            height: 33mm;
+            display: block;
         }
-        .pcard__footer {
-            display: table !important;
-            width: 100% !important;
-            height: 8mm !important;
-            padding: 0 4mm !important;
+        .pcard-pdf__initials {
+            width: 26mm;
+            height: 33mm;
+            text-align: center;
+            line-height: 33mm;
+            font-size: 18px;
+            font-weight: bold;
+            color: #042a5b;
+            background: #e0f2fe;
         }
-        .pcard__school-pill {
-            display: inline-block !important;
-            vertical-align: middle !important;
+        .pcard-pdf__name {
+            font-size: 13.5px;
+            font-weight: 800;
+            color: #042a5b;
+            text-transform: uppercase;
+            line-height: 1.2;
+            margin-bottom: 1.5mm;
         }
-        .pcard__role-pill {
-            display: inline-block !important;
-            vertical-align: middle !important;
-            float: right !important;
+        .pcard-pdf__meta-table {
+            width: 100%;
+        }
+        .pcard-pdf__meta-table td {
+            font-size: 9.5px;
+            line-height: 1.5;
+            padding: 0.3mm 0;
+            vertical-align: middle;
+        }
+        .pcard-pdf__meta-label {
+            color: #475569;
+            font-weight: 600;
+            width: 17mm;
+        }
+        .pcard-pdf__meta-sep {
+            color: #64748b;
+            width: 2mm;
+            text-align: center;
+        }
+        .pcard-pdf__meta-val {
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .pcard-pdf__qr {
+            width: 18mm;
+            height: 18mm;
+            background: #ffffff;
+            border-radius: 1.2mm;
+            border: 0.35mm solid #d1d5db;
+            padding: 0.6mm;
+            display: block;
+            margin: 0 auto;
+        }
+        .pcard-pdf__qr-label {
+            display: block;
+            font-size: 5px;
+            font-weight: 800;
+            color: #10b981;
+            letter-spacing: 0.06em;
+            margin-top: 0.7mm;
+            text-transform: uppercase;
+        }
+        .pcard-pdf__footer {
+            height: 8mm;
+            background: #042a5b;
+            padding: 0 4mm;
+        }
+        .pcard-pdf__school-pill {
+            display: inline-block;
+            background: rgba(255,255,255,0.08);
+            border: 0.2mm solid rgba(255,255,255,0.15);
+            border-radius: 999px;
+            padding: 0.8mm 3mm;
+        }
+        .pcard-pdf__school-text {
+            font-size: 6.5px;
+            font-weight: 800;
+            color: #ffffff;
+            text-transform: uppercase;
+        }
+        .pcard-pdf__role-pill {
+            display: inline-block;
+            background: #059669;
+            color: #ffffff;
+            font-size: 6.5px;
+            font-weight: 800;
+            padding: 0.8mm 3.5mm;
+            border-radius: 999px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
         }
         @endif
     </style>
@@ -398,7 +486,13 @@
                     @foreach(array_chunk($pageCards, 2) as $row)
                     <tr>
                         @foreach($row as $card)
-                        <td>@include('fest.id-cards.partials.premium-card', array_merge($cardBranding, ['card' => $card]))</td>
+                        <td>
+                            @if(!empty($isPdf))
+                                @include('fest.id-cards.partials.premium-card-pdf', array_merge($cardBranding, ['card' => $card]))
+                            @else
+                                @include('fest.id-cards.partials.premium-card', array_merge($cardBranding, ['card' => $card]))
+                            @endif
+                        </td>
                         @endforeach
                         @if(count($row) === 1)<td></td>@endif
                     </tr>
@@ -416,7 +510,13 @@
                 @foreach(array_chunk($pageCards, 2) as $row)
                 <tr>
                     @foreach($row as $card)
-                    <td>@include('fest.id-cards.partials.premium-card', array_merge($cardBranding, ['card' => $card]))</td>
+                    <td>
+                        @if(!empty($isPdf))
+                            @include('fest.id-cards.partials.premium-card-pdf', array_merge($cardBranding, ['card' => $card]))
+                        @else
+                            @include('fest.id-cards.partials.premium-card', array_merge($cardBranding, ['card' => $card]))
+                        @endif
+                    </td>
                     @endforeach
                     @if(count($row) === 1)<td></td>@endif
                 </tr>
