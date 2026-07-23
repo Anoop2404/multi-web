@@ -30,7 +30,7 @@
                 <select v-model="filterForm.action" class="field">
                     <option value="all">All</option>
                     <option value="login.failed">Failed only</option>
-                    <option value="login.success">Success only</option>
+                    <option value="login">Success only</option>
                 </select>
             </FormField>
             <button type="submit" class="btn-primary text-sm">Apply</button>
@@ -42,7 +42,7 @@
                     <p class="font-semibold">{{ log.properties?.username || log.properties?.email || 'Unknown' }}</p>
                     <span class="text-xs uppercase font-semibold"
                           :class="log.action === 'login.failed' ? 'text-red-700' : 'text-green-700'">
-                        {{ log.action.replace('login.', '') }}
+                        {{ log.action === 'login.failed' ? 'failed' : 'success' }}
                     </span>
                 </div>
                 <p class="text-slate-600 mt-1">{{ log.ip_address }} · {{ log.description }}</p>
