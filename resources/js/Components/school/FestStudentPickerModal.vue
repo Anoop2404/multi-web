@@ -1,11 +1,11 @@
 <template>
     <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="close"></div>
-        <div class="relative modal-shell max-w-2xl w-full max-h-[90vh] !overflow-y-auto flex flex-col">
-            <div class="modal-head shrink-0 sticky top-0 z-10 bg-white">
+        <div class="relative modal-shell max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white shadow-2xl rounded-2xl">
+            <div class="modal-head shrink-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
                 <div class="min-w-0 pr-4">
-                    <h3 class="font-bold text-[#041525] truncate">{{ title }}</h3>
-                    <p v-if="subtitle" class="text-xs text-gray-500 mt-0.5">{{ subtitle }}</p>
+                    <h3 class="font-bold text-[#041525] truncate text-base">{{ title }}</h3>
+                    <p v-if="subtitle" class="text-xs text-slate-500 mt-0.5">{{ subtitle }}</p>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                     <button v-if="showAddStudent" type="button"
@@ -13,11 +13,11 @@
                             @click="requestAddStudent">
                         + Add student
                     </button>
-                    <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl leading-none" @click="close">&times;</button>
+                    <button type="button" class="text-slate-400 hover:text-slate-600 text-2xl leading-none px-1" @click="close">&times;</button>
                 </div>
             </div>
 
-            <div class="px-5 py-3 border-b border-slate-100 shrink-0 space-y-3">
+            <div class="px-5 py-3 border-b border-slate-100 shrink-0 space-y-2.5 bg-slate-50/60">
                 <div class="flex flex-wrap gap-2 items-center">
                     <input
                         ref="searchInput"
@@ -27,39 +27,39 @@
                         placeholder="Search name, reg no, class…"
                         autocomplete="off"
                     >
-                    <label v-if="hasIneligible" class="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap cursor-pointer">
+                    <label v-if="hasIneligible" class="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap cursor-pointer select-none">
                         <input v-model="showIneligible" type="checkbox" class="rounded">
                         Show ineligible
                     </label>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="text-slate-500">
+                    <span class="text-slate-500 font-medium">
                         {{ filteredEligible.length }} eligible
                         <span v-if="!showIneligible && hasIneligible"> · {{ ineligibleCount }} hidden</span>
                     </span>
                     <span v-if="maxSelected" class="text-slate-400">
-                        Max {{ maxSelected }}
+                        · Max {{ maxSelected }}
                     </span>
                     <span v-if="localSelected.length" class="font-semibold text-[#0f3d7a]">
-                        {{ localSelected.length }} selected
+                        · {{ localSelected.length }} selected
                     </span>
                 </div>
-                <div v-if="localSelected.length" class="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
+                <div v-if="localSelected.length" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-1">
                     <button
                         v-for="chip in selectedChips"
                         :key="chip.id"
                         type="button"
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0f3d7a]/10 text-[#0f3d7a] text-[11px] font-medium"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0f3d7a]/10 text-[#0f3d7a] text-[11px] font-medium hover:bg-[#0f3d7a]/20 transition-colors"
                         @click="toggleId(chip.id)"
                     >
                         <span class="font-mono">{{ chip.regNo }}</span>
-                        <span class="truncate max-w-[120px]">{{ chip.name }}</span>
+                        <span class="truncate max-w-[140px]">{{ chip.name }}</span>
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
             </div>
 
-            <div class="min-h-[160px]">
+            <div class="flex-1 overflow-y-auto min-h-[180px] max-h-[45vh] bg-white divide-y divide-slate-100">
                 <p v-if="!entries.length" class="p-6 text-sm text-amber-800">
                     No students in your school yet.
                     <button type="button" class="link-brand font-semibold" @click="$emit('add-student')">Add student</button>
@@ -103,32 +103,32 @@
                 </ul>
             </div>
 
-            <div v-if="teamName !== undefined" class="px-5 py-3 border-t border-slate-100 shrink-0 space-y-3">
+            <div v-if="teamName !== undefined" class="px-5 py-3.5 border-t border-slate-200 shrink-0 space-y-3 bg-white">
                 <div>
-                    <label class="text-xs font-semibold text-slate-600 block mb-1">Team name</label>
+                    <label class="text-xs font-semibold text-slate-700 block mb-1">Team name <span v-if="requireTeamName" class="text-rose-500">*</span></label>
                     <input v-model="localTeamName" type="text" class="field !py-2 !text-sm max-w-sm" placeholder="Required for group items">
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="text-xs font-semibold text-slate-600 block mb-1">Coach name <span class="font-normal text-slate-400">(optional)</span></label>
+                        <label class="text-xs font-semibold text-slate-700 block mb-1">Coach name <span class="font-normal text-slate-400">(optional)</span></label>
                         <input v-model="localCoachName" type="text" class="field !py-2 !text-sm" placeholder="Coach name">
                     </div>
                     <div>
-                        <label class="text-xs font-semibold text-slate-600 block mb-1">Coach phone <span class="font-normal text-slate-400">(optional)</span></label>
+                        <label class="text-xs font-semibold text-slate-700 block mb-1">Coach phone <span class="font-normal text-slate-400">(optional)</span></label>
                         <input v-model="localCoachPhone" type="text" class="field !py-2 !text-sm" placeholder="Phone">
                     </div>
                     <div>
-                        <label class="text-xs font-semibold text-slate-600 block mb-1">Manager name <span class="font-normal text-slate-400">(optional)</span></label>
+                        <label class="text-xs font-semibold text-slate-700 block mb-1">Manager name <span class="font-normal text-slate-400">(optional)</span></label>
                         <input v-model="localManagerName" type="text" class="field !py-2 !text-sm" placeholder="Manager name">
                     </div>
                     <div>
-                        <label class="text-xs font-semibold text-slate-600 block mb-1">Manager phone <span class="font-normal text-slate-400">(optional)</span></label>
+                        <label class="text-xs font-semibold text-slate-700 block mb-1">Manager phone <span class="font-normal text-slate-400">(optional)</span></label>
                         <input v-model="localManagerPhone" type="text" class="field !py-2 !text-sm" placeholder="Phone">
                     </div>
                 </div>
             </div>
 
-            <div class="modal-foot shrink-0 sticky bottom-0 z-10 bg-white flex flex-wrap justify-end gap-2">
+            <div class="modal-foot shrink-0 border-t border-slate-200 bg-white px-6 py-3 flex flex-wrap justify-end gap-2">
                 <button type="button" class="btn-ghost text-sm" @click="close">Cancel</button>
                 <button
                     type="button"
