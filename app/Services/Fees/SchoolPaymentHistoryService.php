@@ -43,47 +43,57 @@ class SchoolPaymentHistoryService
         $schoolNames = $schools->pluck('name', 'id');
 
         $membership = MembershipPayment::whereIn('school_id', $schoolIds)
-            ->with('feeReceipt')
+            ->with('feeReceipt.reviewedBy')
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (MembershipPayment $p) => $this->mapMembershipRow($p, $schoolNames, $urlSchoolId, $sahodayaId));
 
         $fest = FestSchoolEventFee::whereIn('school_id', $schoolIds)
-            ->with(['feeReceipt', 'event'])
+            ->with(['feeReceipt.reviewedBy', 'event'])
             ->get()
             ->map(fn (FestSchoolEventFee $f) => $this->mapFestRow($f, $schoolNames, $urlSchoolId, $sahodayaId));
 
         $training = TrainingRegistration::whereIn('school_id', $schoolIds)
             ->whereNotNull('fee_receipt_id')
-            ->with(['feeReceipt', 'program', 'teacher'])
+            ->with(['feeReceipt.reviewedBy', 'program', 'teacher'])
             ->get()
             ->map(fn (TrainingRegistration $r) => $this->mapTrainingRow($r, $schoolNames, $urlSchoolId, $sahodayaId));
 
         $trainingBatch = TrainingSchoolFee::whereIn('school_id', $schoolIds)
             ->whereNotNull('fee_receipt_id')
-            ->with(['feeReceipt', 'program'])
+            ->with(['feeReceipt.reviewedBy', 'program'])
             ->get()
             ->map(fn (TrainingSchoolFee $f) => $this->mapTrainingBatchRow($f, $schoolNames, $urlSchoolId, $sahodayaId));
 
         $mcqBatch = McqSchoolFee::whereIn('school_id', $schoolIds)
             ->whereNotNull('fee_receipt_id')
-            ->with(['feeReceipt', 'exam'])
+            ->with(['feeReceipt.reviewedBy', 'exam'])
             ->get()
             ->map(fn (McqSchoolFee $f) => $this->mapMcqBatchRow($f, $schoolNames, $urlSchoolId, $sahodayaId));
 
         $mcq = McqRegistration::whereIn('school_id', $schoolIds)
             ->whereNotNull('fee_receipt_id')
-            ->with(['feeReceipt', 'exam', 'student'])
+            ->with(['feeReceipt.reviewedBy', 'exam', 'student'])
             ->get()
             ->map(fn (McqRegistration $r) => $this->mapMcqRow($r, $schoolNames, $urlSchoolId, $sahodayaId));
 
+        // Sort by the actual review/approval timestamp, not payment_date — payment_date is
+        // date-only (no time component) and, for fest/training/mcq rows, is the bank
+        // transaction date the school typed in, which has no relationship to receipt
+        // ordering. Receipt numbers are assigned at approval time (see
+        // SahodayaReceiptNumberAllocator), so reviewed_at is what actually determines
+        // "correct order" — sorting by it keeps the displayed order consistent with the
+        // receipt numbers themselves instead of falling back to arbitrary insertion order
+        // whenever two rows share the same payment_date. Rows with no reviewed_at yet
+        // (still pending/uploaded) fall back to payment_date so they still get a sensible
+        // position in the list.
         return $membership
             ->concat($fest)
             ->concat($training)
             ->concat($trainingBatch)
             ->concat($mcqBatch)
             ->concat($mcq)
-            ->sortByDesc('payment_date')
+            ->sortByDesc(fn (array $row) => $row['reviewed_at'] ?? $row['payment_date'])
             ->values();
     }
 
@@ -106,12 +116,16 @@ class SchoolPaymentHistoryService
             'amount'               => $p->amount,
             'status'               => $p->status,
             'payment_date'         => $p->verified_at?->toDateString() ?? $p->created_at->toDateString(),
+            'reviewed_at'          => $p->feeReceipt?->reviewed_at?->toDateTimeString() ?? $p->verified_at?->toDateTimeString(),
+            'reviewed_by'          => $p->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $p->transaction_ref,
             'receipt_number'       => $p->feeReceipt?->receipt_number,
             'proof_url'            => $this->membershipProofUrl($p, $urlSchoolId),
             'receipt_url'          => $this->membershipReceiptUrl($p, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $p->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $p->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
+            'receipt_email_error'  => $p->feeReceipt?->receipt_email_error,
+            'receipt_email_resend_count' => $p->feeReceipt?->receipt_email_resend_count ?? 0,
             'fee_receipt_id'       => $p->feeReceipt?->id,
             'receipt_status'       => $p->feeReceipt?->status,
             'rejection_reason'     => null,
@@ -143,11 +157,15 @@ class SchoolPaymentHistoryService
             'available_credit'     => $f->outstandingCredit(),
             'status'               => $f->status === 'approved' ? 'approved' : ($f->status === 'proof_uploaded' ? 'uploaded' : $f->status),
             'payment_date'         => $f->feeReceipt?->payment_date?->toDateString(),
+            'reviewed_at'          => $f->feeReceipt?->reviewed_at?->toDateTimeString(),
+            'reviewed_by'          => $f->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $f->feeReceipt?->transaction_ref,
             'receipt_number'       => $f->feeReceipt?->receipt_number,
             'receipt_url'          => $this->programReceiptUrl($f->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId, $f->event),
             'receipt_email_status' => $f->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $f->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
+            'receipt_email_error'  => $f->feeReceipt?->receipt_email_error,
+            'receipt_email_resend_count' => $f->feeReceipt?->receipt_email_resend_count ?? 0,
             'fee_receipt_id'       => $f->feeReceipt?->id,
             'receipt_status'       => $f->feeReceipt?->status,
             'rejection_reason'     => $f->feeReceipt?->status === 'rejected' ? $f->feeReceipt->rejection_reason : null,
@@ -175,11 +193,15 @@ class SchoolPaymentHistoryService
             'balance'              => $r->outstandingBalance(),
             'status'               => $r->fee_status ?: ($r->feeReceipt?->status === 'approved' ? 'approved' : ($r->feeReceipt?->status ?? 'pending')),
             'payment_date'         => $r->feeReceipt?->payment_date?->toDateString(),
+            'reviewed_at'          => $r->feeReceipt?->reviewed_at?->toDateTimeString(),
+            'reviewed_by'          => $r->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $r->feeReceipt?->transaction_ref,
             'receipt_number'       => $r->feeReceipt?->receipt_number,
             'receipt_url'          => $this->programReceiptUrl($r->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $r->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $r->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
+            'receipt_email_error'  => $r->feeReceipt?->receipt_email_error,
+            'receipt_email_resend_count' => $r->feeReceipt?->receipt_email_resend_count ?? 0,
             'fee_receipt_id'       => $r->feeReceipt?->id,
             'receipt_status'       => $r->feeReceipt?->status,
             'rejection_reason'     => $r->feeReceipt?->status === 'rejected' ? $r->feeReceipt->rejection_reason : null,
@@ -207,11 +229,15 @@ class SchoolPaymentHistoryService
             'balance'              => $f->outstandingBalance(),
             'status'               => $f->status === 'approved' ? 'approved' : ($f->status === 'proof_uploaded' ? 'uploaded' : $f->status),
             'payment_date'         => $f->feeReceipt?->payment_date?->toDateString(),
+            'reviewed_at'          => $f->feeReceipt?->reviewed_at?->toDateTimeString(),
+            'reviewed_by'          => $f->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $f->feeReceipt?->transaction_ref,
             'receipt_number'       => $f->feeReceipt?->receipt_number,
             'receipt_url'          => $this->programReceiptUrl($f->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $f->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $f->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
+            'receipt_email_error'  => $f->feeReceipt?->receipt_email_error,
+            'receipt_email_resend_count' => $f->feeReceipt?->receipt_email_resend_count ?? 0,
             'fee_receipt_id'       => $f->feeReceipt?->id,
             'receipt_status'       => $f->feeReceipt?->status,
             'rejection_reason'     => $f->feeReceipt?->status === 'rejected' ? $f->feeReceipt->rejection_reason : null,
@@ -239,11 +265,15 @@ class SchoolPaymentHistoryService
             'balance'              => $f->outstandingBalance(),
             'status'               => $f->status === 'approved' ? 'approved' : ($f->status === 'proof_uploaded' ? 'uploaded' : $f->status),
             'payment_date'         => $f->feeReceipt?->payment_date?->toDateString(),
+            'reviewed_at'          => $f->feeReceipt?->reviewed_at?->toDateTimeString(),
+            'reviewed_by'          => $f->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $f->feeReceipt?->transaction_ref,
             'receipt_number'       => $f->feeReceipt?->receipt_number,
             'receipt_url'          => $this->programReceiptUrl($f->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $f->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $f->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
+            'receipt_email_error'  => $f->feeReceipt?->receipt_email_error,
+            'receipt_email_resend_count' => $f->feeReceipt?->receipt_email_resend_count ?? 0,
             'fee_receipt_id'       => $f->feeReceipt?->id,
             'receipt_status'       => $f->feeReceipt?->status,
             'rejection_reason'     => $f->feeReceipt?->status === 'rejected' ? $f->feeReceipt->rejection_reason : null,
@@ -269,11 +299,15 @@ class SchoolPaymentHistoryService
             'amount'               => $r->feeReceipt?->amount ?? $r->exam?->fee_amount,
             'status'               => $r->feeReceipt?->status === 'approved' ? 'approved' : ($r->feeReceipt?->status ?? 'pending'),
             'payment_date'         => $r->feeReceipt?->payment_date?->toDateString(),
+            'reviewed_at'          => $r->feeReceipt?->reviewed_at?->toDateTimeString(),
+            'reviewed_by'          => $r->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $r->feeReceipt?->transaction_ref,
             'receipt_number'       => $r->feeReceipt?->receipt_number,
             'receipt_url'          => $this->programReceiptUrl($r->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $r->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $r->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
+            'receipt_email_error'  => $r->feeReceipt?->receipt_email_error,
+            'receipt_email_resend_count' => $r->feeReceipt?->receipt_email_resend_count ?? 0,
             'fee_receipt_id'       => $r->feeReceipt?->id,
             'receipt_status'       => $r->feeReceipt?->status,
             'rejection_reason'     => $r->feeReceipt?->status === 'rejected' ? $r->feeReceipt->rejection_reason : null,

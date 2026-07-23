@@ -2,7 +2,7 @@
     <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="close"></div>
         <div class="relative modal-shell max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white shadow-2xl rounded-2xl">
-            <div class="modal-head shrink-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+            <div class="modal-head shrink-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between z-10">
                 <div class="min-w-0 pr-4">
                     <h3 class="font-bold text-[#041525] truncate text-base">{{ title }}</h3>
                     <p v-if="subtitle" class="text-xs text-slate-500 mt-0.5">{{ subtitle }}</p>
@@ -17,122 +17,124 @@
                 </div>
             </div>
 
-            <div class="px-5 py-3 border-b border-slate-100 shrink-0 space-y-2.5 bg-slate-50/60">
-                <div class="flex flex-wrap gap-2 items-center">
-                    <input
-                        ref="searchInput"
-                        v-model="search"
-                        type="search"
-                        class="field flex-1 min-w-[180px] !py-2 !text-sm"
-                        placeholder="Search name, reg no, class…"
-                        autocomplete="off"
-                    >
-                    <label v-if="hasIneligible" class="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap cursor-pointer select-none">
-                        <input v-model="showIneligible" type="checkbox" class="rounded">
-                        Show ineligible
-                    </label>
-                </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="text-slate-500 font-medium">
-                        {{ filteredEligible.length }} eligible
-                        <span v-if="!showIneligible && hasIneligible"> · {{ ineligibleCount }} hidden</span>
-                    </span>
-                    <span v-if="maxSelected" class="text-slate-400">
-                        · Max {{ maxSelected }}
-                    </span>
-                    <span v-if="localSelected.length" class="font-semibold text-[#0f3d7a]">
-                        · {{ localSelected.length }} selected
-                    </span>
-                </div>
-                <div v-if="localSelected.length" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-1">
-                    <button
-                        v-for="chip in selectedChips"
-                        :key="chip.id"
-                        type="button"
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0f3d7a]/10 text-[#0f3d7a] text-[11px] font-medium hover:bg-[#0f3d7a]/20 transition-colors"
-                        @click="toggleId(chip.id)"
-                    >
-                        <span class="font-mono">{{ chip.regNo }}</span>
-                        <span class="truncate max-w-[140px]">{{ chip.name }}</span>
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="flex-1 overflow-y-auto min-h-[180px] max-h-[45vh] bg-white divide-y divide-slate-100">
-                <p v-if="!entries.length" class="p-6 text-sm text-amber-800">
-                    No students in your school yet.
-                    <button type="button" class="link-brand font-semibold" @click="$emit('add-student')">Add student</button>
-                </p>
-                <p v-else-if="!visibleEntries.length" class="p-6 text-sm text-slate-600">
-                    No students match your search.
-                    <button v-if="search" type="button" class="link-brand font-semibold ml-1" @click="search = ''">Clear search</button>
-                </p>
-                <ul v-else class="divide-y divide-slate-100">
-                    <li v-for="entry in visibleEntries" :key="entry.id">
-                        <label
-                            class="flex items-start gap-3 px-5 py-2.5 cursor-pointer transition-colors"
-                            :class="entry.eligible
-                                ? 'hover:bg-slate-50'
-                                : 'bg-slate-50/60 cursor-not-allowed opacity-75'"
+            <div class="flex-1 overflow-y-auto min-h-0 bg-white">
+                <div class="px-5 py-3 border-b border-slate-100 space-y-2.5 bg-slate-50/80 sticky top-0 z-10 backdrop-blur-sm">
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <input
+                            ref="searchInput"
+                            v-model="search"
+                            type="search"
+                            class="field flex-1 min-w-[180px] !py-2 !text-sm"
+                            placeholder="Search name, reg no, class…"
+                            autocomplete="off"
                         >
-                            <input
-                                type="checkbox"
-                                class="rounded mt-1 shrink-0"
-                                :value="entry.id"
-                                :checked="localSelected.includes(entry.id)"
-                                :disabled="!entry.eligible"
-                                @change="toggleId(entry.id)"
-                            >
-                            <span class="min-w-0 flex-1">
-                                <span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                    <span class="font-mono text-xs font-semibold text-[#0f3d7a] shrink-0">
-                                        {{ entry.regNo || '—' }}
-                                    </span>
-                                    <span class="font-medium text-sm text-gray-900">{{ entry.name }}</span>
-                                </span>
-                                <span v-if="entry.meta" class="block text-xs text-gray-500 mt-0.5">{{ entry.meta }}</span>
-                                <span v-if="entry.eventRegistered"
-                                      class="inline-flex mt-0.5 text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                                    Event Reg{{ entry.eventRegNumber ? `: ${entry.eventRegNumber}` : ' registered' }}
-                                </span>
-                                <span v-if="entry.reason" class="block text-xs text-amber-700 mt-0.5">{{ entry.reason }}</span>
-                            </span>
+                        <label v-if="hasIneligible" class="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap cursor-pointer select-none">
+                            <input v-model="showIneligible" type="checkbox" class="rounded">
+                            Show ineligible
                         </label>
-                    </li>
-                </ul>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                        <span class="text-slate-500 font-medium">
+                            {{ filteredEligible.length }} eligible
+                            <span v-if="!showIneligible && hasIneligible"> · {{ ineligibleCount }} hidden</span>
+                        </span>
+                        <span v-if="maxSelected" class="text-slate-400">
+                            · Max {{ maxSelected }}
+                        </span>
+                        <span v-if="localSelected.length" class="font-semibold text-[#0f3d7a]">
+                            · {{ localSelected.length }} selected
+                        </span>
+                    </div>
+                    <div v-if="localSelected.length" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-1">
+                        <button
+                            v-for="chip in selectedChips"
+                            :key="chip.id"
+                            type="button"
+                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0f3d7a]/10 text-[#0f3d7a] text-[11px] font-medium hover:bg-[#0f3d7a]/20 transition-colors"
+                            @click="toggleId(chip.id)"
+                        >
+                            <span class="font-mono">{{ chip.regNo }}</span>
+                            <span class="truncate max-w-[140px]">{{ chip.name }}</span>
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="divide-y divide-slate-100 min-h-[100px]">
+                    <p v-if="!entries.length" class="p-6 text-sm text-amber-800">
+                        No students in your school yet.
+                        <button type="button" class="link-brand font-semibold" @click="$emit('add-student')">Add student</button>
+                    </p>
+                    <p v-else-if="!visibleEntries.length" class="p-6 text-sm text-slate-600">
+                        No students match your search.
+                        <button v-if="search" type="button" class="link-brand font-semibold ml-1" @click="search = ''">Clear search</button>
+                    </p>
+                    <ul v-else class="divide-y divide-slate-100">
+                        <li v-for="entry in visibleEntries" :key="entry.id">
+                            <label
+                                class="flex items-start gap-3 px-5 py-2.5 cursor-pointer transition-colors"
+                                :class="entry.eligible
+                                    ? 'hover:bg-slate-50'
+                                    : 'bg-slate-50/60 cursor-not-allowed opacity-75'"
+                            >
+                                <input
+                                    type="checkbox"
+                                    class="rounded mt-1 shrink-0"
+                                    :value="entry.id"
+                                    :checked="localSelected.includes(entry.id)"
+                                    :disabled="!entry.eligible"
+                                    @change="toggleId(entry.id)"
+                                >
+                                <span class="min-w-0 flex-1">
+                                    <span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                        <span class="font-mono text-xs font-semibold text-[#0f3d7a] shrink-0">
+                                            {{ entry.regNo || '—' }}
+                                        </span>
+                                        <span class="font-medium text-sm text-gray-900">{{ entry.name }}</span>
+                                    </span>
+                                    <span v-if="entry.meta" class="block text-xs text-gray-500 mt-0.5">{{ entry.meta }}</span>
+                                    <span v-if="entry.eventRegistered"
+                                          class="inline-flex mt-0.5 text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                                        Event Reg{{ entry.eventRegNumber ? `: ${entry.eventRegNumber}` : ' registered' }}
+                                    </span>
+                                    <span v-if="entry.reason" class="block text-xs text-amber-700 mt-0.5">{{ entry.reason }}</span>
+                                </span>
+                            </label>
+                        </li>
+                    </ul>
+                </div>
+
+                <div v-if="teamName !== undefined" class="px-5 py-4 border-t border-slate-200 space-y-3 bg-slate-50/50">
+                    <div>
+                        <label class="text-xs font-semibold text-slate-700 block mb-1">Team name <span v-if="requireTeamName" class="text-rose-500">*</span></label>
+                        <input v-model="localTeamName" type="text" class="field !py-2 !text-sm max-w-sm" placeholder="Required for group items">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-700 block mb-1">Coach name <span class="font-normal text-slate-400">(optional)</span></label>
+                            <input v-model="localCoachName" type="text" class="field !py-2 !text-sm" placeholder="Coach name">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-700 block mb-1">Coach phone <span class="font-normal text-slate-400">(optional)</span></label>
+                            <input v-model="localCoachPhone" type="text" class="field !py-2 !text-sm" placeholder="Phone">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-700 block mb-1">Manager name <span class="font-normal text-slate-400">(optional)</span></label>
+                            <input v-model="localManagerName" type="text" class="field !py-2 !text-sm" placeholder="Manager name">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-700 block mb-1">Manager phone <span class="font-normal text-slate-400">(optional)</span></label>
+                            <input v-model="localManagerPhone" type="text" class="field !py-2 !text-sm" placeholder="Phone">
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div v-if="teamName !== undefined" class="px-5 py-3.5 border-t border-slate-200 shrink-0 space-y-3 bg-white">
-                <div>
-                    <label class="text-xs font-semibold text-slate-700 block mb-1">Team name <span v-if="requireTeamName" class="text-rose-500">*</span></label>
-                    <input v-model="localTeamName" type="text" class="field !py-2 !text-sm max-w-sm" placeholder="Required for group items">
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-xs font-semibold text-slate-700 block mb-1">Coach name <span class="font-normal text-slate-400">(optional)</span></label>
-                        <input v-model="localCoachName" type="text" class="field !py-2 !text-sm" placeholder="Coach name">
-                    </div>
-                    <div>
-                        <label class="text-xs font-semibold text-slate-700 block mb-1">Coach phone <span class="font-normal text-slate-400">(optional)</span></label>
-                        <input v-model="localCoachPhone" type="text" class="field !py-2 !text-sm" placeholder="Phone">
-                    </div>
-                    <div>
-                        <label class="text-xs font-semibold text-slate-700 block mb-1">Manager name <span class="font-normal text-slate-400">(optional)</span></label>
-                        <input v-model="localManagerName" type="text" class="field !py-2 !text-sm" placeholder="Manager name">
-                    </div>
-                    <div>
-                        <label class="text-xs font-semibold text-slate-700 block mb-1">Manager phone <span class="font-normal text-slate-400">(optional)</span></label>
-                        <input v-model="localManagerPhone" type="text" class="field !py-2 !text-sm" placeholder="Phone">
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal-foot shrink-0 border-t border-slate-200 bg-white px-6 py-3 flex flex-wrap justify-end gap-2">
+            <div class="modal-foot shrink-0 border-t border-slate-200 bg-white px-6 py-3.5 flex items-center justify-end gap-3 z-10">
                 <button type="button" class="btn-ghost text-sm" @click="close">Cancel</button>
                 <button
                     type="button"
-                    class="btn-primary text-sm"
+                    class="btn-primary text-sm min-w-[120px]"
                     :disabled="!canConfirm"
                     @click="confirm"
                 >

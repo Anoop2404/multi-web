@@ -80,7 +80,7 @@ Services: `MembershipReceiptService`, `ProgramFeeReceiptService`
 
 ### Numbering
 
-Format: `{FY}/{PREFIX}/{SEQ}` e.g. `2025-26/MEM/000123`
+Format: `{PREFIX}-{SEQ}` e.g. `MEM-0123` — matches the same `ProgramFeeReceiptService::formatNumber()` pattern Fest (`EF-0074`) and Training (`TRN-0074`) already use, sharing one atomic per-Sahodaya sequence (`SahodayaReceiptNumberAllocator`). Previously documented as `{FY}/{PREFIX}/{SEQ}` (e.g. `2025-26/MEM/000123`) — that finer-grained, year-prefixed format was never actually implemented for any program, not just Membership; corrected here to match what's live rather than leaving an aspirational format on record. Adopting a real `{FY}/...` scheme would be a separate, larger change affecting Fest/Training/MCQ numbering too, not a Membership-only fix.
 
 ---
 

@@ -138,6 +138,8 @@
                     Download Invoice ↓
                 </a>
             </div>
+
+            <PaymentHistoryList :history="event.school_fee?.receipt_history ?? []" />
         </div>
     </div>
 </template>
@@ -145,6 +147,7 @@
 <script setup>
 import { computed } from 'vue';
 import HeadBillingInvoices from '@/Components/school/HeadBillingInvoices.vue';
+import PaymentHistoryList from '@/Components/school/PaymentHistoryList.vue';
 
 const props = defineProps({
     event: { type: Object, required: true },

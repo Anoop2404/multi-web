@@ -121,11 +121,17 @@ class PlatformAuditLogger
 
     public function paymentVerified(MembershipPayment $payment): AuditLog
     {
+        // receipt_number included so the audit log can double as searchable receipt history
+        // (which receipt number went to which school, when) without having to separately
+        // join out to fee_receipts — see the membership receipt ordering/missing investigation.
+        $receiptNumber = $payment->feeReceipt?->receipt_number;
+
         return $this->log(
             'payment.verified',
-            "Membership payment verified for school #{$payment->school_id}",
+            "Membership payment verified for school #{$payment->school_id}"
+                .($receiptNumber ? " (receipt #{$receiptNumber})" : ''),
             $payment,
-            ['amount' => $payment->amount, 'school_id' => $payment->school_id],
+            ['amount' => $payment->amount, 'school_id' => $payment->school_id, 'receipt_number' => $receiptNumber],
         );
     }
 
@@ -135,7 +141,15 @@ class PlatformAuditLogger
             'payment.rejected',
             "Membership payment rejected for school #{$payment->school_id}",
             $payment,
-            ['reason' => $reason, 'school_id' => $payment->school_id],
+            [
+                'reason' => $reason,
+                'school_id' => $payment->school_id,
+                // Normally null — a rejected payment was never issued a receipt number
+                // (SahodayaReceiptNumberAllocator only runs on verify/approve). Included for
+                // shape consistency with paymentVerified() and in case a payment is rejected
+                // after an earlier receipt was reversed/superseded and re-submitted.
+                'receipt_number' => $payment->feeReceipt?->receipt_number,
+            ],
         );
     }
 

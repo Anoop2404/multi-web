@@ -53,7 +53,14 @@ class MembershipReceiptService
         }
 
         return DB::transaction(function () use ($payment, $school, $sahodaya, $profile, $template, $receipt) {
-            $receiptNo = (string) app(SahodayaReceiptNumberAllocator::class)->next($sahodaya->id);
+            // Same "PREFIX-0000" formatting Fest ('EF') and Training ('TRN') already use via
+            // ProgramFeeReceiptService::formatNumber() — Membership was the one program still
+            // casting the raw allocator sequence straight to a string with no prefix at all,
+            // so its receipts looked like a bare "74" next to every other program's "EF-0074".
+            $receiptNo = app(\App\Services\Fees\ProgramFeeReceiptService::class)->formatNumber(
+                'MEM',
+                app(SahodayaReceiptNumberAllocator::class)->next($sahodaya->id),
+            );
 
             $html = $this->renderHtml($payment, $school, $sahodaya, $profile, $template, $receiptNo);
             $path = $this->storeHtml($sahodaya, $receiptNo, $html);
@@ -232,7 +239,10 @@ class MembershipReceiptService
 
         $profile = SahodayaProfile::where('tenant_id', $sahodaya->id)->first();
         $template = MembershipReceiptTemplate::resolve($profile, $sahodaya);
-        $receiptNo = $receipt->receipt_number ?: (string) app(SahodayaReceiptNumberAllocator::class)->next($sahodaya->id);
+        $receiptNo = $receipt->receipt_number ?: app(\App\Services\Fees\ProgramFeeReceiptService::class)->formatNumber(
+            'MEM',
+            app(SahodayaReceiptNumberAllocator::class)->next($sahodaya->id),
+        );
         $html = $this->renderHtml($payment, $school, $sahodaya, $profile, $template, $receiptNo);
 
         try {

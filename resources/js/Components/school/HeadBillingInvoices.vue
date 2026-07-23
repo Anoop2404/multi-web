@@ -49,6 +49,8 @@
                     View Receipt ↗
                 </a>
             </div>
+
+            <PaymentHistoryList :history="headFee.receipt_history ?? []" />
         </div>
         <div v-if="schoolFee && Number(schoolFee.total_due) > 0"
              class="flex flex-wrap gap-2 items-center text-xs">
@@ -70,6 +72,8 @@
 </template>
 
 <script setup>
+import PaymentHistoryList from '@/Components/school/PaymentHistoryList.vue';
+
 defineProps({
     eventId: [String, Number],
     headFees: { type: Array, default: () => [] },

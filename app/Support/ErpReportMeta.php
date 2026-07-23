@@ -204,7 +204,7 @@ class ErpReportMeta
             'RPT-FIN-005' => ['columns' => ['code', 'account', 'type', 'opening', 'debit', 'credit', 'balance']],
             'RPT-FIN-006' => ['columns' => ['category', 'amount']],
             'RPT-FIN-007' => ['columns' => ['section', 'amount']],
-            'RPT-FIN-008' => ['columns' => ['receipt_number', 'date', 'school', 'amount', 'status']],
+            'RPT-FIN-008' => ['columns' => ['receipt_number', 'date', 'reviewed_at', 'reviewed_by', 'school', 'amount', 'status']],
             'RPT-FIN-009' => ['columns' => ['voucher', 'date', 'payee', 'amount', 'status']],
             'RPT-FIN-010' => ['columns' => ['school', 'source', 'amount', 'status']],
             'RPT-FIN-011' => ['columns' => ['school', 'source', 'program', 'amount', 'status', 'updated_at'], 'filters' => ['status']],

@@ -8,6 +8,7 @@ use App\Models\FestGroup;
 use App\Models\FestItemHead;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\FeeReceipt;
 use App\Models\FestSchoolEventFee;
 use App\Models\Student;
 use App\Models\Teacher;
@@ -515,6 +516,12 @@ class FestRegistrationController extends SchoolAdminController
                 // never had this, so EventBillingPanel.vue had no way to show what's actually
                 // still owed and fell back to a partial, item-only subtotal instead.
                 'outstanding' => (float) $schoolFee->outstandingBalance(),
+                // Every receipt ever submitted against this fee record — uploaded, rejected,
+                // superseded, approved, reversed — via the existing receipts() morphMany
+                // (TracksPartialPayments trait), not just the single current one feeReceipt()
+                // points at. Lets the school see its own track record without contacting the
+                // Sahodaya office (docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §7).
+                'receipt_history' => $this->receiptHistoryPayload($schoolFee),
             ]
         ) : null);
 
@@ -543,6 +550,7 @@ class FestRegistrationController extends SchoolAdminController
                     'rejection_reason' => $fee->status === 'rejected'
                         ? $fee->receipts()->where('status', 'rejected')->latest('id')->value('rejection_reason')
                         : null,
+                    'receipt_history' => $this->receiptHistoryPayload($fee),
                 ];
             })->values()->all());
         }
@@ -919,6 +927,37 @@ class FestRegistrationController extends SchoolAdminController
             'rows'        => $rows,
             'verificationStatus' => $this->verificationStatusForSchool($event),
         ]);
+    }
+
+    /**
+     * Full receipt history for one fee record — every upload, rejection, supersession, and
+     * approval, via the receipts() morphMany relation already provided by the
+     * TracksPartialPayments trait (not just the single current receipt feeReceipt() points
+     * at via fee_receipt_id). See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §7 ("Full
+     * payment history for this event, not just the latest rejection reason").
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function receiptHistoryPayload(FestSchoolEventFee $fee): array
+    {
+        return $fee->receipts()
+            ->with('reviewedBy:id,name')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (FeeReceipt $r) => [
+                'id'               => $r->id,
+                'status'           => $r->status,
+                'amount'           => (float) $r->amount,
+                'transaction_ref'  => $r->transaction_ref,
+                'payment_date'     => $r->payment_date?->toDateString(),
+                'uploaded_at'      => $r->created_at?->toDateTimeString(),
+                'reviewed_at'      => $r->reviewed_at?->toDateTimeString(),
+                'reviewed_by'      => $r->reviewedBy?->name,
+                'rejection_reason' => $r->rejection_reason,
+                'receipt_number'   => $r->receipt_number,
+            ])
+            ->values()
+            ->all();
     }
 
     /** @return array<string, mixed> */

@@ -700,22 +700,31 @@ trait QueriesExtendedReports
             ]);
     }
 
+    /**
+     * Same truncation bug as rptReceiptRegister() had (see that method's docblock): a global
+     * limit(500) across every feeable type, applied before the per-tenant school filter. Fixed
+     * the same way — source from SchoolPaymentHistoryService::rowsForSahodaya(), which scopes
+     * to this Sahodaya's schools before ever touching FeeReceipt in bulk.
+     */
     protected function rptReceiptEmailStatus(string $sahodayaId): Collection
     {
-        $schoolIds = $this->schoolIds($sahodayaId);
-        $receiptService = app(\App\Services\Fees\ProgramFeeReceiptService::class);
+        $sahodaya = Tenant::findOrFail($sahodayaId);
 
-        return FeeReceipt::query()->orderByDesc('updated_at')->limit(500)->get()
-            ->filter(fn (FeeReceipt $r) => ($sid = $receiptService->schoolIdForReceipt($r)) && $schoolIds->contains($sid))
-            ->map(fn (FeeReceipt $r) => [
-                'receipt_number' => $r->receipt_number,
-                'school'         => Tenant::find($receiptService->schoolIdForReceipt($r))?->name,
-                'email_status'   => $r->receipt_email_status ?? '—',
-                'emailed_at'     => $r->receipt_emailed_at?->format('j M Y H:i'),
-                'error'          => $r->receipt_email_error,
-                'resend_count'   => $r->receipt_email_resend_count ?? 0,
-                'status'         => $r->receipt_email_status ?? '—',
-            ])->values();
+        return app(\App\Services\Fees\SchoolPaymentHistoryService::class)
+            ->rowsForSahodaya($sahodaya)
+            ->filter(fn (array $row) => filled($row['receipt_number']))
+            ->map(fn (array $row) => [
+                'receipt_number' => $row['receipt_number'],
+                'school'         => $row['school_name'],
+                'email_status'   => $row['receipt_email_status'] ?? '—',
+                'emailed_at'     => $row['receipt_emailed_at']
+                    ? \Illuminate\Support\Carbon::parse($row['receipt_emailed_at'])->format('j M Y H:i')
+                    : null,
+                'error'          => $row['receipt_email_error'],
+                'resend_count'   => $row['receipt_email_resend_count'] ?? 0,
+                'status'         => $row['receipt_email_status'] ?? '—',
+            ])
+            ->values();
     }
 
     /** @param  array<string, mixed>  $filters */
@@ -875,18 +884,39 @@ trait QueriesExtendedReports
         ]);
     }
 
+    /**
+     * Previously queried FeeReceipt directly across ALL feeable types (Fest/Membership/
+     * Training/MCQ share one table) with a global limit(500) applied BEFORE filtering down
+     * to this Sahodaya's own schools — for any Sahodaya whose combined receipt volume (Fest
+     * is by far the highest-frequency type) exceeded 500, older/lower-volume receipts from
+     * other programs (e.g. Membership) were silently truncated before the tenant filter ever
+     * ran. It also only showed status='approved', so a rejected/reversed receipt had no
+     * history entry here at all.
+     *
+     * Now reuses SchoolPaymentHistoryService::rowsForSahodaya(), which scopes to this
+     * Sahodaya's schools FIRST (querying each fee-carrier table by school_id, same pattern
+     * used by the school-facing payment history page), so there's no cross-tenant truncation
+     * risk. Also picks up that service's reviewed_at-based ordering fix (see
+     * SchoolPaymentHistoryService::buildRows()), so receipt order here matches the actual
+     * approval sequence the receipt numbers were assigned in, not an arbitrary insertion order.
+     */
     protected function rptReceiptRegister(string $sahodayaId): Collection
     {
-        $schoolIds = $this->schoolIds($sahodayaId);
-        $receiptService = app(\App\Services\Fees\ProgramFeeReceiptService::class);
+        $sahodaya = Tenant::findOrFail($sahodayaId);
 
-        return FeeReceipt::where('status', 'approved')->orderByDesc('payment_date')->limit(500)->get()
-            ->filter(fn (FeeReceipt $r) => ($sid = $receiptService->schoolIdForReceipt($r)) && $schoolIds->contains($sid))
-            ->map(fn (FeeReceipt $r) => [
-                'receipt_number' => $r->receipt_number, 'date' => $r->payment_date?->format('Y-m-d'),
-                'school' => Tenant::find($receiptService->schoolIdForReceipt($r))?->name,
-                'amount' => (float) $r->amount, 'status' => $r->status,
-            ])->values();
+        return app(\App\Services\Fees\SchoolPaymentHistoryService::class)
+            ->rowsForSahodaya($sahodaya)
+            ->filter(fn (array $row) => filled($row['receipt_number']))
+            ->map(fn (array $row) => [
+                'receipt_number' => $row['receipt_number'],
+                'date'           => $row['payment_date'],
+                'reviewed_at'    => $row['reviewed_at'],
+                'reviewed_by'    => $row['reviewed_by'],
+                'school'         => $row['school_name'],
+                'amount'         => (float) $row['amount'],
+                'status'         => $row['receipt_status'] ?? $row['status'],
+            ])
+            ->values();
     }
 
     protected function rptPaymentRegister(string $sahodayaId): Collection
