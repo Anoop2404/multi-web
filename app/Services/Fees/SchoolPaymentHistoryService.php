@@ -137,6 +137,10 @@ class SchoolPaymentHistoryService
             'amount'               => $f->total_due,
             'amount_paid'          => (float) $f->amount_paid,
             'balance'              => $f->outstandingBalance(),
+            // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14 — money owed BACK to this
+            // school (rejected/cancelled paid items); 0 for every other program (only fest
+            // has the FestFeeCredit concept).
+            'available_credit'     => $f->outstandingCredit(),
             'status'               => $f->status === 'approved' ? 'approved' : ($f->status === 'proof_uploaded' ? 'uploaded' : $f->status),
             'payment_date'         => $f->feeReceipt?->payment_date?->toDateString(),
             'transaction_ref'      => $f->feeReceipt?->transaction_ref,

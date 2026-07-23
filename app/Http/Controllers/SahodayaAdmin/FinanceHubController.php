@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\FeeReceipt;
 use App\Models\FestEvent;
+use App\Models\FestFeeCredit;
 use App\Models\FestSchoolEventFee;
 use App\Models\McqSchoolFee;
 use App\Models\MembershipPayment;
@@ -26,10 +27,19 @@ class FinanceHubController extends SahodayaAdminController
             ->whereHas('feeReceipt', fn ($q) => $q->where('status', 'uploaded'))
             ->count();
 
-        $festOutstanding = FestSchoolEventFee::whereIn('event_id', $eventIds)
+        $festOutstandingFeeIds = FestSchoolEventFee::whereIn('event_id', $eventIds)
             ->forAmountAggregation()
-            ->whereNotIn('status', ['approved', 'waived'])
-            ->sum('total_due');
+            ->whereNotIn('status', ['approved', 'waived']);
+
+        $festOutstanding = (clone $festOutstandingFeeIds)->sum('total_due');
+
+        // Money already owed BACK to schools (FestFeeCredit) — shown alongside the raw
+        // outstanding total rather than netted into it, so this headline figure keeps its
+        // existing meaning (gross amount still billed) for anyone already relying on it; the
+        // credit total is new, additive context. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.
+        $festCredit = FestFeeCredit::outstanding()
+            ->whereIn('fest_school_event_fee_id', (clone $festOutstandingFeeIds)->pluck('id'))
+            ->sum('amount');
 
         $membershipPending = MembershipPayment::whereIn('school_id', $schoolIds)
             ->where('status', 'submitted')
@@ -86,6 +96,7 @@ class FinanceHubController extends SahodayaAdminController
             'summary' => [
                 'fest_pending'           => $festPending,
                 'fest_outstanding'       => round((float) $festOutstanding, 2),
+                'fest_credit'            => round((float) $festCredit, 2),
                 'membership_pending'     => $membershipPending,
                 'membership_outstanding' => round((float) $membershipOutstanding, 2),
                 'mcq_pending'            => $mcqPending,
@@ -128,13 +139,17 @@ class FinanceHubController extends SahodayaAdminController
             ->orderByDesc('total_due')
             ->get()
             ->map(fn (FestSchoolEventFee $f) => [
-                'source'      => 'fest',
-                'school'      => $f->school?->name,
-                'school_id'   => $f->school_id,
-                'program'     => $f->event?->title,
-                'amount'      => (float) $f->total_due,
-                'status'      => $f->status,
-                'updated_at'  => $f->updated_at?->format('j M Y'),
+                'source'           => 'fest',
+                'school'           => $f->school?->name,
+                'school_id'        => $f->school_id,
+                'program'          => $f->event?->title,
+                'amount'           => (float) $f->total_due,
+                // New, additive — the "amount" field above keeps its existing meaning
+                // (gross total_due) so nothing that already reads it changes; this is
+                // context on top. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.
+                'available_credit' => $f->outstandingCredit(),
+                'status'           => $f->status,
+                'updated_at'       => $f->updated_at?->format('j M Y'),
             ]);
 
         $membershipRows = MembershipPayment::whereIn('school_id', $schoolIds)
@@ -143,13 +158,14 @@ class FinanceHubController extends SahodayaAdminController
             ->orderByDesc('amount')
             ->get()
             ->map(fn (MembershipPayment $p) => [
-                'source'     => 'membership',
-                'school'     => $p->school?->name,
-                'school_id'  => $p->school_id,
-                'program'    => 'Annual membership',
-                'amount'     => (float) $p->amount,
-                'status'     => $p->status,
-                'updated_at' => $p->updated_at?->format('j M Y'),
+                'source'           => 'membership',
+                'school'           => $p->school?->name,
+                'school_id'        => $p->school_id,
+                'program'          => 'Annual membership',
+                'amount'           => (float) $p->amount,
+                'available_credit' => 0.0, // no credit concept for membership payments
+                'status'           => $p->status,
+                'updated_at'       => $p->updated_at?->format('j M Y'),
             ]);
 
         $rows = $festRows->concat($membershipRows)->sortByDesc('amount')->values();
@@ -159,6 +175,7 @@ class FinanceHubController extends SahodayaAdminController
             'totals'  => [
                 'count'  => $rows->count(),
                 'amount' => round($rows->sum('amount'), 2),
+                'credit' => round($rows->sum('available_credit'), 2),
             ],
         ]);
     }

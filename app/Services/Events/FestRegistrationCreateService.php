@@ -220,11 +220,18 @@ class FestRegistrationCreateService
         abort_if($registration->school_id !== $school->id, 403);
         abort_if($school->parent_id !== $event->tenant_id, 403);
 
-        if (! app(FestRegistrationService::class)->canSchoolCancel($registration, $event)) {
+        if (! app(FestRegistrationService::class)->canSchoolEditRoster($registration, $event)) {
             throw ValidationException::withMessages([
-                'registration' => 'This registration can no longer be edited — it may already be approved with payment, past results-publish, or the event has closed.',
+                'registration' => 'This registration can no longer be edited — it may be past results-publish, or the event has closed.',
             ]);
         }
+
+        // Editing in place is allowed even after payment is approved, but only if it doesn't
+        // reduce what's owed — a decrease would need a refund/credit, which this path doesn't
+        // handle (use cancel / cancel-with-refund for that instead). Snapshot the fee now so it
+        // can be compared against the recalculated total after the roster change below.
+        $feeService = app(FestSchoolEventFeeService::class);
+        $dueBefore = (float) ($feeService->currentFeeRecordFor($event, $school->id)?->total_due ?? 0);
 
         if ($item->is_enabled === false) {
             throw ValidationException::withMessages(['registration' => 'This item is not open for registration.']);
@@ -237,7 +244,7 @@ class FestRegistrationCreateService
         }
 
         if ($event->event_type === 'teacher_fest') {
-            return $this->updateTeacherRegistration($registration, $event, $item, $school, $performerIds);
+            return $this->updateTeacherRegistration($registration, $event, $item, $school, $performerIds, $feeService, $dueBefore);
         }
 
         $standbyIds = array_values(array_unique($standbyIds));
@@ -272,7 +279,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['student_ids' => implode(' ', $eligibilityErrors)]);
         }
 
-        return DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts) {
+        return DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $feeService, $dueBefore) {
             $eventRegService = app(FestEventRegistrationService::class);
             foreach (array_merge($performerIds, $standbyIds) as $studentId) {
                 if ($eventRegService->requireEventRegistration($event) && $event->event_type !== 'sports') {
@@ -341,7 +348,16 @@ class FestRegistrationCreateService
                 app(FestNumberingService::class)->assignParticipantNumbers($participant);
             }
 
-            app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+            $feeAfter = $feeService->recalculate($event, $school->id);
+
+            // A decrease needs a refund/credit, which this in-place edit path doesn't create —
+            // send the school to cancel (or cancel-with-refund, once paid) instead. Throwing
+            // here rolls back the whole roster change, including the recalculate() above.
+            if (round((float) $feeAfter->total_due, 2) < round($dueBefore, 2)) {
+                throw ValidationException::withMessages([
+                    'registration' => 'This change would reduce the fee owed — cancel this item instead so the difference can be credited, rather than editing it in place.',
+                ]);
+            }
 
             return $registration->fresh(['participants.student', 'item']);
         });
@@ -371,6 +387,8 @@ class FestRegistrationCreateService
         FestEventItem $item,
         Tenant $school,
         array $teacherIds,
+        FestSchoolEventFeeService $feeService,
+        float $dueBefore,
     ): FestRegistration {
         $teacherIds = array_values(array_unique($teacherIds));
         if ($teacherIds === []) {
@@ -381,7 +399,7 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['teacher_ids' => 'This item allows only one teacher.']);
         }
 
-        return DB::transaction(function () use ($registration, $event, $school, $teacherIds) {
+        return DB::transaction(function () use ($registration, $event, $school, $teacherIds, $feeService, $dueBefore) {
             $registration->participants()->delete();
 
             foreach ($teacherIds as $teacherId) {
@@ -399,7 +417,13 @@ class FestRegistrationCreateService
             }
 
             app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
-            app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
+            $feeAfter = $feeService->recalculate($event, $school->id);
+
+            if (round((float) $feeAfter->total_due, 2) < round($dueBefore, 2)) {
+                throw ValidationException::withMessages([
+                    'registration' => 'This change would reduce the fee owed — cancel this item instead so the difference can be credited, rather than editing it in place.',
+                ]);
+            }
 
             return $registration->fresh(['participants.teacher', 'item']);
         });

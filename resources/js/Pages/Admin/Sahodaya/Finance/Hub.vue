@@ -14,6 +14,12 @@
                 <p class="text-xs uppercase text-slate-500 font-semibold">Fest outstanding</p>
                 <p class="text-2xl font-bold mt-1">₹{{ fmt(summary.fest_outstanding) }}</p>
                 <p class="text-xs text-amber-700 mt-1">{{ summary.fest_pending }} awaiting verify</p>
+                <!-- Money already owed BACK to schools (rejected/cancelled paid items) — shown
+                     separately rather than netted into the total above, so that figure keeps
+                     its existing meaning. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14. -->
+                <p v-if="summary.fest_credit > 0" class="text-xs text-emerald-700 mt-0.5 font-semibold">
+                    ₹{{ fmt(summary.fest_credit) }} owed back to schools (credit)
+                </p>
             </div>
             <div class="card card--muted !py-4">
                 <p class="text-xs uppercase text-slate-500 font-semibold">Membership outstanding</p>

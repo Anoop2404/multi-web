@@ -18,6 +18,7 @@ class FestEventSettingsPayload
             'certificate_collection_open',
             'registration_locked',
             'record_tracking_enabled',
+            'strict_item_payment_gating',
         ], [
             'scoring_locked'                      => false,
             'appeals_open'                        => false,
@@ -27,6 +28,7 @@ class FestEventSettingsPayload
             'certificate_collection_open'         => false,
             'registration_locked'                 => false,
             'record_tracking_enabled'             => false,
+            'strict_item_payment_gating'           => false,
         ]);
     }
 }

@@ -71,6 +71,12 @@ class FestEventFeesController extends SahodayaAdminController
                     'fee_receipt' => $fee->feeReceipt,
                     'items' => $regs->map(fn ($r) => $r->item?->title)->filter()->values(),
                     'sports_participation' => $sportsParticipation,
+                    'available_credit' => $fee->outstandingCredit(),
+                    // Only ever non-empty for item_catalog/per_item billing — see
+                    // FestSchoolEventFeeService::itemPaymentAllocation() §9.3.
+                    'item_allocation' => in_array($schedule['fee_model'] ?? null, ['item_catalog', 'per_item'], true)
+                        ? $feeService->itemPaymentAllocation($event, $fee->school_id)
+                        : [],
                 ];
             })
             ->filter(fn ($row) => ($row['participation_item_count'] ?? 0) > 0 || count($row['items'] ?? []) > 0 || (float) ($row['total_due'] ?? 0) > 0)
@@ -154,6 +160,10 @@ class FestEventFeesController extends SahodayaAdminController
                     'total_due'               => (float) $fee->total_due,
                     'amount_paid'             => (float) $fee->amount_paid,
                     'balance_due'             => (float) $fee->outstandingBalance(),
+                    // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14 — money owed BACK
+                    // to this school (rejected/cancelled paid items), shown alongside
+                    // balance_due rather than netted into it.
+                    'available_credit'        => $fee->outstandingCredit(),
                     'item_count'              => (int) $fee->participation_item_count,
                     'receipt_no'              => $fee->feeReceipt?->receipt_number,
                     'payment_date'            => $fee->feeReceipt?->payment_date?->format('d M Y'),
@@ -182,6 +192,7 @@ class FestEventFeesController extends SahodayaAdminController
             'total_due'     => $schoolFees->sum('total_due'),
             'total_paid'    => $schoolFees->sum('amount_paid'),
             'total_balance' => $schoolFees->sum('balance_due'),
+            'total_credit'  => $schoolFees->sum('available_credit'),
             'approved'      => $schoolFees->where('status', 'approved')->count(),
             'proof_uploaded'=> $schoolFees->where('status', 'proof_uploaded')->count(),
             'partial'       => $schoolFees->where('status', 'partial')->count(),
@@ -227,7 +238,7 @@ class FestEventFeesController extends SahodayaAdminController
 
         return response()->streamDownload(function () use ($rows, $event) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Event', 'School', 'Head', 'Status', 'School reg fee', 'Participation fee', 'Total due', 'Receipt #', 'Payment date', 'Transaction ref']);
+            fputcsv($out, ['Event', 'School', 'Head', 'Status', 'School reg fee', 'Participation fee', 'Total due', 'Receipt #', 'Payment date', 'Transaction ref', 'Credit owed']);
             foreach ($rows as $fee) {
                 fputcsv($out, [
                     $event->title,
@@ -240,6 +251,8 @@ class FestEventFeesController extends SahodayaAdminController
                     $fee->feeReceipt?->receipt_number,
                     $fee->feeReceipt?->payment_date?->toDateString(),
                     $fee->feeReceipt?->transaction_ref,
+                    // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.
+                    $fee->outstandingCredit(),
                 ]);
             }
             fclose($out);

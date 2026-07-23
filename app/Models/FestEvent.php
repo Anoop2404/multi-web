@@ -34,6 +34,7 @@ class FestEvent extends Model
         'reg_start', 'reg_end', 'competition_start', 'competition_end',
         'schedule_mode', 'competition_time',
         'notification_settings',
+        'strict_item_payment_gating',
     ];
 
     protected $casts = [
@@ -51,6 +52,7 @@ class FestEvent extends Model
         'allow_student_self_register'         => 'boolean',
         'record_tracking_enabled'             => 'boolean',
         'is_team_heading'                     => 'boolean',
+        'strict_item_payment_gating'           => 'boolean',
         'conduct_levels'                      => 'array',
         'aggregation_config'                  => 'array',
         'notification_settings'               => 'array',

@@ -36,6 +36,14 @@ class FestBulkRegistrationService
         $created = 0;
         $errors = [];
 
+        // FestRegistrationCreateService::createForSchool() already re-checks this per item
+        // (it isn't bypassed today), but doing it once up front here fails fast with one clear
+        // message instead of the same "registration is closed" error repeated once per
+        // item/student in $errors. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §5/§9.4.
+        if ($school->fest_registration_closed) {
+            return ['created' => 0, 'errors' => ['Fest registration is closed for this school.']];
+        }
+
         if ($registerForEventFirst && $this->eventRegistrationService->requireEventRegistration($event)) {
             try {
                 $this->eventRegistrationService->registerStudents($event, $school, $studentIds);

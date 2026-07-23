@@ -34,6 +34,14 @@
                         <input type="checkbox" v-model="settingsForm.certificate_collection_open"> Allow certificate pickup
                     </label>
                 </FormField>
+                <FormField label="Strict item-level payment gating">
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" v-model="settingsForm.strict_item_payment_gating"> Require this specific item's fee to be covered before approval, not just the school's overall balance
+                    </label>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Only takes effect for "Item catalog" / "Per item" fee models — no effect on tiered, flat, per-student, or sports composite billing. Off by default; review the per-item payment breakdown on the Fees page before turning this on.
+                    </p>
+                </FormField>
                 <FormField label="Publish gates">
                     <div class="space-y-2">
                         <label v-if="!isSports" class="flex items-center gap-2 text-sm text-slate-700">

@@ -65,6 +65,8 @@ class UnifiedPaymentsController extends SahodayaAdminController
             'mcq'        => (float) $rows->where('type', 'mcq')->sum('amount'),
             'approved'   => $rows->whereIn('status', ['verified', 'approved'])->count(),
             'pending'    => $rows->whereIn('status', ['pending', 'uploaded', 'submitted', 'proof_uploaded'])->count(),
+            // Fest-only — see docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.
+            'fest_credit' => (float) $rows->sum('available_credit'),
         ];
 
         return $this->inertia('Sahodaya/Finance/UnifiedPayments', [
@@ -84,7 +86,7 @@ class UnifiedPaymentsController extends SahodayaAdminController
     {
         $rows = $history->rowsForSahodaya($this->sahodaya);
         $filename = 'sahodaya-payments-'.$this->sahodaya->id.'.csv';
-        $headers = ['School', 'Type', 'Label', 'Amount', 'Status', 'Payment date', 'Receipt #', 'Email status', 'Transaction ref'];
+        $headers = ['School', 'Type', 'Label', 'Amount', 'Credit owed', 'Status', 'Payment date', 'Receipt #', 'Email status', 'Transaction ref'];
 
         return $exports->dispatch(
             $request->user(),
@@ -97,6 +99,8 @@ class UnifiedPaymentsController extends SahodayaAdminController
                 $p['type'],
                 $p['label'],
                 $p['amount'],
+                // Fest-only, see docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.
+                $p['available_credit'] ?? '',
                 $p['status'],
                 $p['payment_date'] ?? '',
                 $p['receipt_number'] ?? '',

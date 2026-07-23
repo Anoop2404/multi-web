@@ -136,6 +136,18 @@
                                     class="text-gray-600 text-xs font-semibold">
                                 Cancel
                             </button>
+                            <!-- For a registration whose fee is already paid & approved, plain
+                                 cancel() refuses (server-side) — this is the explicit path for
+                                 that case, see FestRegistrationService::cancelWithRefund() /
+                                 docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §4/§9.4. Always shown
+                                 alongside Cancel since the client doesn't know payment state here;
+                                 the server rejects it with a clear message if it doesn't apply. -->
+                            <button v-if="canCancel(reg)"
+                                    @click="cancelWithRefund(reg.id)"
+                                    title="Use this if the school already paid and the fee was approved — plain Cancel will refuse in that case."
+                                    class="text-amber-700 text-xs font-semibold">
+                                Cancel &amp; refund
+                            </button>
                         </td>
                     </tr>
                     <tr v-if="!filteredRegistrations.length">
@@ -598,6 +610,19 @@ function reject(id) {
 function cancel(id) {
     if (!confirm('Cancel this registration? The school will be notified.')) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${id}/cancel`, {}, { preserveScroll: true });
+}
+
+function cancelWithRefund(id) {
+    const reason = prompt(
+        'This cancels the registration even though its fee was already paid and approved, and issues a fee '
+        + 'credit to the school for the amount freed up. Only use this for a genuinely paid+approved registration '
+        + '— plain Cancel already handles everything else. Reason (required):'
+    );
+    if (!reason) return;
+
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${id}/cancel-with-refund`, {
+        reason,
+    }, { preserveScroll: true });
 }
 
 function bulkApprove() {

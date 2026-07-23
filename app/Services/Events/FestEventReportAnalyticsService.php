@@ -130,12 +130,14 @@ class FestEventReportAnalyticsService
             ->orderBy('school_id')
             ->get()
             ->map(fn (FestSchoolEventFee $fee) => [
-                'school_id'   => $fee->school_id,
-                'school_name' => $schools[$fee->school_id] ?? $fee->school_id,
-                'total_due'   => (float) $fee->total_due,
-                'paid'        => (float) ($fee->feeReceipt?->amount ?? 0),
-                'status'      => $fee->status,
-                'receipt_no'  => $fee->feeReceipt?->receipt_number,
+                'school_id'        => $fee->school_id,
+                'school_name'      => $schools[$fee->school_id] ?? $fee->school_id,
+                'total_due'        => (float) $fee->total_due,
+                'paid'             => (float) ($fee->feeReceipt?->amount ?? 0),
+                'status'           => $fee->status,
+                'receipt_no'       => $fee->feeReceipt?->receipt_number,
+                // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.
+                'available_credit' => $fee->outstandingCredit(),
             ])
             ->all();
     }

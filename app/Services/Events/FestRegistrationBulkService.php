@@ -3,6 +3,7 @@
 namespace App\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestFeeCredit;
 use App\Models\FestRegistration;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\EventLifecycleGate;
@@ -69,8 +70,33 @@ class FestRegistrationBulkService
             ->when($itemId, fn ($q) => $q->where('item_id', $itemId));
 
         foreach ($query->get() as $registration) {
+            // Snapshot the fee record before rejecting, so we can measure what this
+            // rejection actually reduced total_due by — fee-model-agnostic, so it works
+            // the same for flat/tiered/per-item/composite billing. See
+            // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §9.2 for the full rationale.
+            $feeBefore = $feeService->currentFeeRecordFor($event, $registration->school_id);
+            $dueBefore = (float) ($feeBefore?->total_due ?? 0);
+            $paidBefore = (float) ($feeBefore?->amount_paid ?? 0);
+
             $registration->update(['status' => 'rejected']);
-            $feeService->recalculate($event, $registration->school_id);
+            $feeAfter = $feeService->recalculate($event, $registration->school_id);
+
+            // If the school had already paid something and this rejection freed up part of
+            // what they owe, record the freed amount (capped at what was actually paid) as
+            // an outstanding credit rather than letting it silently disappear into an
+            // "overpaid" balance nobody tracks. Deliberately does NOT touch total_due,
+            // amount_paid, or receipt status — this is purely an additive record.
+            $reduction = round($dueBefore - (float) $feeAfter->total_due, 2);
+            if ($reduction > 0 && $paidBefore > 0) {
+                FestFeeCredit::create([
+                    'fest_school_event_fee_id' => $feeAfter->id,
+                    'source_registration_id' => $registration->id,
+                    'amount' => min($reduction, $paidBefore),
+                    'reason' => 'Registration rejected after payment',
+                    'created_by_user_id' => auth()->id(),
+                ]);
+            }
+
             $notifier->registrationRejected($registration);
             $audit->festRegistrationRejected($registration);
             $rejected++;

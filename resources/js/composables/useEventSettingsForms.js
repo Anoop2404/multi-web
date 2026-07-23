@@ -92,6 +92,7 @@ export function useEventSettingsForms(props) {
         record_tracking_enabled: props.event.record_tracking_enabled ?? false,
         default_record_prize_label: props.event.default_record_prize_label ?? 'Record Break Prize',
         student_verification_mode: studentVerificationModeFromEvent(props.event),
+        strict_item_payment_gating: props.event.strict_item_payment_gating ?? false,
     });
 
     const venueForm = useForm({ name: '', location: '', capacity: null });

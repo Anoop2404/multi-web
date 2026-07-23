@@ -16,6 +16,11 @@
             <div class="card card--muted !py-4 text-center">
                 <p class="text-2xl font-bold">₹{{ Number(totals.amount).toLocaleString('en-IN') }}</p>
                 <p class="text-xs text-slate-500 mt-1">Total outstanding</p>
+                <!-- See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14 — shown separately so
+                     "Total outstanding" above keeps its existing meaning (gross amount billed). -->
+                <p v-if="totals.credit > 0" class="text-xs text-emerald-700 mt-1 font-semibold">
+                    ₹{{ Number(totals.credit).toLocaleString('en-IN') }} of this is offset by credit owed to schools
+                </p>
             </div>
         </div>
 
@@ -36,7 +41,12 @@
                         <td class="capitalize text-xs">{{ row.source }}</td>
                         <td>{{ row.school }}</td>
                         <td>{{ row.program }}</td>
-                        <td>₹{{ Number(row.amount).toLocaleString('en-IN') }}</td>
+                        <td>
+                            ₹{{ Number(row.amount).toLocaleString('en-IN') }}
+                            <span v-if="row.available_credit > 0" class="block text-[10px] text-emerald-700 font-semibold">
+                                ₹{{ Number(row.available_credit).toLocaleString('en-IN') }} credit available
+                            </span>
+                        </td>
                         <td><span class="status-pill text-xs status-pill--open capitalize">{{ row.status }}</span></td>
                         <td class="text-xs text-slate-500">{{ formatDateTime(row.updated_at) }}</td>
                     </tr>

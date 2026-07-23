@@ -197,6 +197,13 @@ class FestSchoolEventFeeController extends SahodayaAdminController
 
             $schoolEventFee->refreshPaidState();
 
+            // This is the one place a FestFeeCredit actually gets consumed — see
+            // FestSchoolEventFeeService::markCreditsApplied() and
+            // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13 for why it's wired here rather
+            // than into recalculate()/attachPayment() directly.
+            app(\App\Services\Events\FestSchoolEventFeeService::class)
+                ->markCreditsApplied($schoolEventFee, $due);
+
             app(\App\Services\Events\FestRegistrationApprovalService::class)
                 ->approveSchoolEvent($event, $schoolEventFee->school_id, $schoolEventFee->head_id);
 

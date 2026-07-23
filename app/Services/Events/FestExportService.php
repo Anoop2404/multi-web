@@ -150,6 +150,9 @@ class FestExportService
                     $fee->feeReceipt?->transaction_ref ?? '',
                     $fee->feeReceipt?->payment_date?->format('Y-m-d') ?? '',
                     $fee->feeReceipt?->receipt_number ?? '',
+                    // Money owed BACK to this school (rejected/cancelled paid items) — see
+                    // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14. 0 for the vast majority.
+                    $fee->outstandingCredit(),
                 ]);
             });
 
@@ -158,7 +161,7 @@ class FestExportService
             $headers = array_merge($headers, ['Student Reg', 'Extra Items']);
         }
         $headers = array_merge($headers, [
-            'Student/Item Count', 'Participation Fee', 'Total Due', 'Paid', 'Status', 'Txn Ref', 'Payment Date', 'Receipt No',
+            'Student/Item Count', 'Participation Fee', 'Total Due', 'Paid', 'Status', 'Txn Ref', 'Payment Date', 'Receipt No', 'Credit Owed',
         ]);
 
         return ExcelExport::download(

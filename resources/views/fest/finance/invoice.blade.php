@@ -76,5 +76,8 @@ th{background:#1d3557;color:#fff}
     </tbody>
 </table>
 <p class="total">Total due: ₹{{ number_format((float) $invoice->total_amount, 2) }}</p>
+@if(($schoolCredit ?? 0) > 0)
+    <p class="total" style="color:#0a7a4d">Credit owed to school: ₹{{ number_format((float) $schoolCredit, 2) }}</p>
+@endif
 <p class="muted" style="margin-top:24px">This is a system-generated invoice. Payment proof should be uploaded via the school fest portal.</p>
 </body></html>

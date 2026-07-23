@@ -92,6 +92,9 @@ table.data th{background:#1d3557;color:#fff;text-align:left}
 </table>
 <div class="total-box">
     <strong>Total Amount Due: ₹{{ number_format((float) $invoice->total_amount, 2) }}</strong>
+    @if(($schoolCredit ?? 0) > 0)
+        <br><strong style="color:#0a7a4d">Credit owed to school: ₹{{ number_format((float) $schoolCredit, 2) }}</strong>
+    @endif
 </div>
 <p style="margin-top:20px;font-size:10px;color:#444">
     Please remit payment to the Sahodaya account and upload proof via your school fest portal.

@@ -68,6 +68,11 @@
                     <p v-if="p.rejection_reason" class="text-xs text-red-600 mt-1">
                         Rejected: {{ p.rejection_reason }}
                     </p>
+                    <!-- Fest-only, see docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14 —
+                         money owed back after a paid item was rejected/cancelled. -->
+                    <p v-if="p.available_credit > 0" class="text-xs text-emerald-700 font-semibold mt-1">
+                        ₹{{ fmt(p.available_credit) }} credit owed to you
+                    </p>
                 </div>
                 <div class="flex items-center gap-3">
                     <div class="text-right">

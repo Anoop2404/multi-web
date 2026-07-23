@@ -214,6 +214,12 @@
                     Rs.{{ number_format($summary['total_balance'], 2) }}
                 </div>
             </td>
+            @if(($summary['total_credit'] ?? 0) > 0)
+                <td>
+                    <div class="summary-label">Credit Owed to Schools</div>
+                    <div class="summary-value text-green">Rs.{{ number_format($summary['total_credit'], 2) }}</div>
+                </td>
+            @endif
             <td>
                 <div class="summary-label">Paid / Approved</div>
                 <div class="summary-value text-green">{{ $summary['approved'] }} schools</div>
@@ -276,6 +282,11 @@
                     <td class="text-right" style="color: #15803d; font-weight: bold;">Rs.{{ number_format($row['amount_paid'], 2) }}</td>
                     <td class="text-right" style="{{ $row['balance_due'] > 0 ? 'color: #b91c1c; font-weight: bold;' : 'color: #64748b;' }}">
                         Rs.{{ number_format($row['balance_due'], 2) }}
+                        @if(($row['available_credit'] ?? 0) > 0)
+                            <div style="color: #15803d; font-weight: normal; font-size: 8px;">
+                                Rs.{{ number_format($row['available_credit'], 2) }} credit
+                            </div>
+                        @endif
                     </td>
                     <td class="text-center">
                         @php

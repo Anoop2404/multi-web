@@ -502,6 +502,15 @@ class FestRegistrationController extends SchoolAdminController
                 'rejection_reason' => $schoolFee->status === 'rejected'
                     ? $schoolFee->receipts()->where('status', 'rejected')->latest('id')->value('rejection_reason')
                     : null,
+                // Credit owed back from a rejected-after-payment item (see FestFeeCredit /
+                // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §9.2) — 0 for the overwhelming
+                // majority of schools that have never had a paid item rejected.
+                'available_credit' => $schoolFee->outstandingCredit(),
+                // Per-item payment coverage — only ever populated for item_catalog/per_item
+                // billing (see itemPaymentAllocation() §9.3); [] for every other fee model.
+                'item_allocation' => in_array($schedule['fee_model'] ?? null, ['item_catalog', 'per_item'], true)
+                    ? $feeService->itemPaymentAllocation($event, $this->school->id)
+                    : [],
             ]
         ) : null);
 

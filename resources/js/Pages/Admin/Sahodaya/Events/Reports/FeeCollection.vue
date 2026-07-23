@@ -74,7 +74,12 @@
                     <tr v-for="(row, idx) in rows" :key="row.school_id">
                         <td>{{ idx + 1 }}</td>
                         <td class="font-medium">{{ (row.school_name || '').toUpperCase() }}</td>
-                        <td>₹{{ row.total_due }}</td>
+                        <td>
+                            ₹{{ row.total_due }}
+                            <span v-if="row.available_credit > 0" class="block text-[10px] text-emerald-700 font-semibold">
+                                ₹{{ row.available_credit }} credit owed
+                            </span>
+                        </td>
                         <td>₹{{ row.paid }}</td>
                         <td>
                             <span class="status-pill text-xs" :class="statusClass(row.status)">{{ row.status }}</span>

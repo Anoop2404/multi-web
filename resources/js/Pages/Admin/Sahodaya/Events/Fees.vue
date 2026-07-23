@@ -170,6 +170,26 @@
                                     </div>
                                 </div>
                                 <div v-else class="text-slate-400 italic text-[11px]">No items configured</div>
+
+                                <!-- Per-item payment coverage — only populated for item_catalog/per_item
+                                     billing, see FestSchoolEventFeeService::itemPaymentAllocation() §9.3.
+                                     Informational only unless strict_item_payment_gating is on for this event. -->
+                                <details v-if="row.item_allocation?.length" class="mt-1.5">
+                                    <summary class="text-[10px] font-bold text-indigo-700 cursor-pointer select-none">
+                                        Payment coverage ({{ row.item_allocation.filter(a => a.covered).length }}/{{ row.item_allocation.length }} covered)
+                                    </summary>
+                                    <div class="mt-1 space-y-0.5">
+                                        <div v-for="a in row.item_allocation" :key="a.registration_id"
+                                             class="flex items-center justify-between gap-3 text-[11px]">
+                                            <span :class="a.covered ? 'text-slate-700' : 'text-amber-700 font-semibold'">
+                                                {{ a.covered ? '✓' : '○' }} {{ a.item_title ?? 'Item' }}
+                                            </span>
+                                            <span class="shrink-0 tabular-nums" :class="a.covered ? 'text-slate-600' : 'text-amber-700 font-bold'">
+                                                ₹{{ Number(a.amount).toLocaleString('en-IN') }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </details>
                             </td>
                             <td class="p-3.5">
                                 <span class="font-black text-slate-900 text-base tabular-nums">
@@ -203,6 +223,12 @@
                                 <p v-if="row.status === 'rejected' && row.fee_receipt?.rejection_reason"
                                    class="text-[10px] font-medium text-rose-600 mt-0.5 max-w-[12rem]">
                                     Reason: {{ row.fee_receipt.rejection_reason }}
+                                </p>
+                                <!-- Credit from a paid item rejected after payment — see FestFeeCredit
+                                     / docs FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §9.2. -->
+                                <p v-if="row.available_credit > 0"
+                                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 mt-1">
+                                    Credit owed: ₹{{ Number(row.available_credit).toLocaleString('en-IN') }}
                                 </p>
                             </td>
                             <td class="p-3.5 text-right space-y-1.5">

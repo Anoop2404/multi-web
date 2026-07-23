@@ -205,7 +205,7 @@ class FestInvoiceService
         return $this->participationLinesForSchool($event, $invoice->school_id, $schedule);
     }
 
-    /** @return array{event: FestEvent, invoice: FestEventInvoice, sahodaya: Tenant, participationLines: list<array<string, mixed>>} */
+    /** @return array{event: FestEvent, invoice: FestEventInvoice, sahodaya: Tenant, participationLines: list<array<string, mixed>>, schoolCredit: float} */
     public function invoiceViewData(FestEvent $event, FestEventInvoice $invoice, Tenant $sahodaya): array
     {
         return [
@@ -214,7 +214,25 @@ class FestInvoiceService
             'sahodaya' => $sahodaya,
             'logoSrc' => TenantBranding::logoEmbedSrc($sahodaya),
             'participationLines' => $this->participationLines($event, $invoice),
+            // Outstanding FestFeeCredit for this school on this event (rejection/cancellation
+            // refunds not yet applied against a future due). See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.
+            'schoolCredit' => $this->outstandingCreditForSchool($event, $invoice->school_id),
         ];
+    }
+
+    /**
+     * Sums outstanding credit across every FestSchoolEventFee row for this school on this
+     * event — works unchanged for both the single-fee and per-head-rollup billing shapes.
+     */
+    private function outstandingCreditForSchool(FestEvent $event, string $schoolId): float
+    {
+        return round(
+            (float) FestSchoolEventFee::where('event_id', $event->id)
+                ->where('school_id', $schoolId)
+                ->get()
+                ->sum(fn (FestSchoolEventFee $f) => $f->outstandingCredit()),
+            2
+        );
     }
 
     /** @return list<array{label: string, amount: float, item_id: ?int, item_title: string, head_name: ?string}> */

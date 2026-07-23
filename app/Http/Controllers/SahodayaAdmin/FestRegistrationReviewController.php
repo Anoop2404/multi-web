@@ -265,6 +265,32 @@ class FestRegistrationReviewController extends SahodayaAdminController
         return back()->with('success', 'Registration cancelled.');
     }
 
+    /**
+     * Cancel a registration that already has an approved payment — the case cancel() above
+     * deliberately refuses. See FestRegistrationService::cancelWithRefund() and
+     * docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §4/§9.4. A distinct action rather than a
+     * change to cancel()'s existing behavior, so nothing about the default cancel flow changes.
+     */
+    public function cancelWithRefund(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->event_id !== $event->id, 403);
+
+        $data = $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        abort_unless(
+            app(FestRegistrationService::class)->canAdminCancelWithRefund($registration, $event),
+            422,
+            'Cannot cancel — results are published, the registration is already closed, or it was never paid (use the regular cancel action instead).'
+        );
+
+        app(FestRegistrationService::class)->cancelWithRefund($registration, $event, $data['reason']);
+
+        return back()->with('success', 'Registration cancelled and any applicable fee credit recorded.');
+    }
+
     public function substitute(string $tenantId, FestEvent $event, FestRegistration $registration, FestParticipant $performer, FestParticipant $standby)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

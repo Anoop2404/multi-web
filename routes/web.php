@@ -899,6 +899,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/registrations/{registration}/approve', [FestRegistrationReviewController::class, 'approve'])->name('registrations.approve');
             Route::post('/{event}/registrations/{registration}/reject', [FestRegistrationReviewController::class, 'reject'])->name('registrations.reject');
             Route::post('/{event}/registrations/{registration}/cancel', [FestRegistrationReviewController::class, 'cancel'])->name('registrations.cancel');
+            Route::post('/{event}/registrations/{registration}/cancel-with-refund', [FestRegistrationReviewController::class, 'cancelWithRefund'])->name('registrations.cancel-with-refund');
             Route::post('/{event}/registrations/{registration}/substitute/{performer}/{standby}', [FestRegistrationReviewController::class, 'substitute'])->name('registrations.substitute');
             Route::get('/{event}/substitution-requests', [\App\Http\Controllers\SahodayaAdmin\FestSubstitutionReviewController::class, 'index'])->name('substitution-requests.index');
             Route::post('/{event}/substitution-requests/{substitutionRequest}/approve', [\App\Http\Controllers\SahodayaAdmin\FestSubstitutionReviewController::class, 'approve'])->name('substitution-requests.approve');

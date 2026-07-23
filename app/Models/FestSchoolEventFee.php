@@ -89,6 +89,33 @@ class FestSchoolEventFee extends Model
         return $this->hasMany(FestSchoolEventFeeLine::class, 'fest_school_event_fee_id');
     }
 
+    public function credits(): HasMany
+    {
+        return $this->hasMany(FestFeeCredit::class, 'fest_school_event_fee_id');
+    }
+
+    /** Sum of credits owed to the school that haven't been applied to a fee yet. */
+    public function outstandingCredit(): float
+    {
+        return (float) $this->credits()->outstanding()->sum('amount');
+    }
+
+    /**
+     * outstandingBalance() minus available credit — informational only, e.g. "you owe ₹X
+     * after credit" messaging. Deliberately does NOT feed back into outstandingBalance()
+     * itself, isFullyPaid(), or refreshPaidState(): refreshPaidState() (see
+     * Concerns\TracksPartialPayments) recomputes amount_paid purely from the sum of approved
+     * FeeReceipt rows every time it runs, so anything that tried to fold credit into
+     * amount_paid directly would just get silently overwritten on the next recalculate().
+     * See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13 for the full reasoning and what
+     * actually consumes a credit (FestSchoolEventFeeService::markCreditsApplied(), wired into
+     * the existing forceApprove waiver action rather than fighting refreshPaidState()).
+     */
+    public function effectiveOutstandingBalance(): float
+    {
+        return round(max(0, $this->outstandingBalance() - $this->outstandingCredit()), 2);
+    }
+
     public function isApproved(): bool
     {
         return $this->status === 'approved';

@@ -41,7 +41,7 @@ class PaymentHistoryController extends SchoolAdminController
             'school_payments',
             $filename,
             $rows,
-            ['Type', 'Label', 'Level', 'Amount', 'Paid', 'Balance', 'Status', 'Payment date', 'Receipt #', 'Email status', 'Transaction ref'],
+            ['Type', 'Label', 'Level', 'Amount', 'Paid', 'Balance', 'Credit owed', 'Status', 'Payment date', 'Receipt #', 'Email status', 'Transaction ref'],
             fn (array $p) => [
                 $p['type'],
                 $p['label'],
@@ -49,6 +49,8 @@ class PaymentHistoryController extends SchoolAdminController
                 $p['amount'],
                 $p['amount_paid'] ?? '',
                 $p['balance'] ?? '',
+                // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14 — fest-only, 0/blank elsewhere.
+                $p['available_credit'] ?? '',
                 $p['status'],
                 $p['payment_date'] ?? '',
                 $p['receipt_number'] ?? '',

@@ -38,6 +38,9 @@
                 </div>
                 <p class="text-xl lg:text-2xl font-bold text-purple-950 mt-2 tabular-nums">₹{{ fmt(summary?.fest) }}</p>
                 <p class="text-[11px] text-purple-700 mt-0.5 font-medium">Events participation</p>
+                <p v-if="summary?.fest_credit > 0" class="text-[11px] text-emerald-700 mt-0.5 font-semibold">
+                    ₹{{ fmt(summary.fest_credit) }} credit owed to schools
+                </p>
             </div>
 
             <div class="card !p-4 border border-emerald-200/80 bg-gradient-to-br from-emerald-50/80 to-teal-50/40 shadow-sm hover:shadow transition">
@@ -108,6 +111,10 @@
                         <span class="text-sm font-bold text-slate-900">{{ p.label }}</span>
                     </div>
                     <p class="text-xs font-semibold text-slate-700 mt-0.5">{{ p.school_name }}</p>
+                    <!-- Fest-only, see docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14 -->
+                    <p v-if="p.type === 'fest' && p.available_credit > 0" class="text-[11px] text-emerald-700 font-semibold mt-0.5">
+                        ₹{{ fmt(p.available_credit) }} credit owed
+                    </p>
                     <div class="flex items-center gap-3 text-xs text-slate-500 mt-1.5 flex-wrap">
                         <span v-if="p.payment_date" class="flex items-center gap-1">
                             <span aria-hidden="true">📅</span> {{ formatCalendarDate(p.payment_date) }}

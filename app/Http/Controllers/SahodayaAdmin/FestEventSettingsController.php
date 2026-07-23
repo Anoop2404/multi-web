@@ -266,6 +266,11 @@ class FestEventSettingsController extends SahodayaAdminController
             'record_tracking_enabled'             => 'nullable|boolean',
             'default_record_prize_label'          => 'nullable|string|max:120',
             'student_verification_mode'           => 'nullable|in:inherit,required,optional',
+            // Opt-in, per-event — see FestSchoolEventFeeService::itemPaymentAllocation()/
+            // isPaidForRegistration() and docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §9.3.
+            // Only has any effect for item_catalog/per_item billing; harmless to enable
+            // on other fee models since itemPaymentAllocation() returns [] for those.
+            'strict_item_payment_gating'          => 'nullable|boolean',
         ]);
 
         $data = FestEventSettingsPayload::applyDefaults($data);

@@ -816,11 +816,28 @@ class FestSchoolEventFeeService
      * The fee-clearance check to use for a specific registration: for per-head events, only that
      * registration's own Event Head needs to be paid (a school can have Athletics cleared while
      * Chess is still pending); for every other event/fee model this is identical to isPaid().
+     *
+     * Opt-in exception: when an event has strict_item_payment_gating enabled AND uses
+     * 'item_catalog'/'per_item' billing (the only models where a per-item price is well
+     * defined — see itemPaymentAllocation()), this checks whether THIS item is actually
+     * covered by payment instead of the school's aggregate balance. Defaults false on every
+     * event, so this branch never runs unless a Sahodaya admin has explicitly turned it on
+     * for that one event — every other event keeps the exact behavior below, unchanged.
+     * See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §9.3.
      */
     public function isPaidForRegistration(FestEvent $event, FestRegistration $registration): bool
     {
         if (! $this->feeRequired($event)) {
             return true;
+        }
+
+        if ($event->strict_item_payment_gating
+            && in_array($this->resolveSchedule($event)['fee_model'] ?? null, ['item_catalog', 'per_item'], true)
+        ) {
+            $allocation = collect($this->itemPaymentAllocation($event, $registration->school_id))
+                ->firstWhere('registration_id', $registration->id);
+
+            return $allocation['covered'] ?? false;
         }
 
         $registration->loadMissing('item');
@@ -857,6 +874,130 @@ class FestSchoolEventFeeService
         $fee = $query->first();
 
         return $fee && (float) $fee->amount_paid > 0;
+    }
+
+    /**
+     * The event-wide fee record for a school — a read-only lookup, does NOT create one if
+     * missing (unlike recalculate()). Deliberately always resolves head_id = null: every
+     * recalculate() dispatch branch (plain, sports-event, and the per-head "rollup" via
+     * recalculateAggregateForPerHeadEvent) returns a head_id = null record, so this must match
+     * that exact record to produce a meaningful before/after comparison — a specific Event
+     * Head's row is a different total_due than the event-wide rollup recalculate() returns.
+     * Used to snapshot total_due/amount_paid before a registration is rejected, so the caller
+     * can measure the effect of the rejection without needing to know how any particular fee
+     * model prices an individual item. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §9.2.
+     */
+    public function currentFeeRecordFor(FestEvent $event, string $schoolId): ?FestSchoolEventFee
+    {
+        return FestSchoolEventFee::where('event_id', $event->id)
+            ->where('school_id', $schoolId)
+            ->whereNull('head_id')
+            ->first();
+    }
+
+    /**
+     * Mark outstanding FestFeeCredit rows as consumed, whole-row only (never splits a row —
+     * if the next row would push past $amount, it's left outstanding for a future fee), up to
+     * $amount. Deliberately does NOT touch amount_paid/total_due/status — see
+     * FestSchoolEventFee::effectiveOutstandingBalance() for why folding credit into
+     * amount_paid directly is unsafe (refreshPaidState() recomputes it from approved receipts
+     * every time and would silently discard it). Callers that actually settle a balance using
+     * credit (i.e. FestSchoolEventFeeController::forceApprove(), the system's existing,
+     * already-correct "mark paid without new receipt money" action) call this alongside their
+     * own logic so the credit ledger and the real payment state stay in sync.
+     * See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.
+     */
+    public function markCreditsApplied(FestSchoolEventFee $fee, float $amount): float
+    {
+        if ($amount <= 0) {
+            return 0.0;
+        }
+
+        $applied = 0.0;
+        foreach ($fee->credits()->outstanding()->oldest()->get() as $credit) {
+            $creditAmount = (float) $credit->amount;
+            if ($applied + $creditAmount > $amount) {
+                break;
+            }
+            $credit->update(['applied_at' => now()]);
+            $applied += $creditAmount;
+        }
+
+        return round($applied, 2);
+    }
+
+    /**
+     * Per-item payment coverage for a school's active (submitted/approved) registrations on
+     * this event — ONLY meaningful for 'item_catalog'/'per_item' billing, where each item has
+     * its own fee_amount and a per-item price genuinely exists. For every other fee model
+     * (cksc_tiered, flat_school, per_student, sports_composite) cost is not attributable to a
+     * single item, so this deliberately returns an empty array rather than a misleading number.
+     *
+     * Allocation is "first paid, first covered": registrations ordered oldest-submitted-first,
+     * walking the fee record's amount_paid down that list.
+     *
+     * Read-only — used for display (the school-page item checklist, admin reports) and, only
+     * when an event has strict_item_payment_gating explicitly enabled, by isPaidForRegistration().
+     * Never called from the four existing approval call sites otherwise.
+     *
+     * @return array<int, array{registration_id: int, item_id: ?int, item_title: ?string, amount: float, covered: bool}>
+     */
+    public function itemPaymentAllocation(FestEvent $event, string $schoolId): array
+    {
+        $schedule = $this->resolveSchedule($event);
+        $feeModel = $schedule['fee_model'] ?? 'none';
+
+        if (! in_array($feeModel, ['item_catalog', 'per_item'], true)) {
+            return [];
+        }
+
+        $fee = FestSchoolEventFee::where('event_id', $event->id)
+            ->where('school_id', $schoolId)
+            ->whereNull('head_id')
+            ->first();
+
+        $paidRemaining = (float) ($fee?->amount_paid ?? 0);
+
+        $registrations = FestRegistration::where('event_id', $event->id)
+            ->where('school_id', $schoolId)
+            ->whereIn('status', ['submitted', 'approved'])
+            ->with('item')
+            ->orderBy('submitted_at')
+            ->orderBy('id')
+            ->get();
+
+        $perItemAmount = (float) ($schedule['per_item_amount'] ?? 0);
+
+        $rows = [];
+        foreach ($registrations as $registration) {
+            // BUG FIX: item_catalog pricing has a fallback chain (item override → competition
+            // area → head default → participant-type/age-group/class-group rates → schedule
+            // default) — see FestItemFeeResolver::amountForItem(), the exact method
+            // recalculate() uses via participationTotal(). An earlier version of this method
+            // read $registration->item->fee_amount directly, which is only the FIRST link in
+            // that chain — any item priced via area/head/class-group defaults (the common case,
+            // not the exception) would show as ₹0 here and always read as "covered", silently
+            // diverging from the real total_due and, if strict_item_payment_gating is ever
+            // turned on for such an event, wrongly approving unpaid items.
+            $amount = $feeModel === 'per_item'
+                ? $perItemAmount
+                : $this->itemFeeResolver->amountForItem($registration->item, $schedule, $event);
+
+            $covered = $amount <= 0 || $paidRemaining >= $amount;
+            if ($covered) {
+                $paidRemaining = max(0, $paidRemaining - $amount);
+            }
+
+            $rows[] = [
+                'registration_id' => $registration->id,
+                'item_id' => $registration->item_id,
+                'item_title' => $registration->item?->title,
+                'amount' => round($amount, 2),
+                'covered' => $covered,
+            ];
+        }
+
+        return $rows;
     }
 
     private function applySchoolFeeCap(float $total, array $schedule): float

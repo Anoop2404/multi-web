@@ -22,6 +22,17 @@
             </p>
         </div>
 
+        <!-- Credit from a paid item that was later rejected — see FestFeeCredit / docs
+             FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §9.2. Empty for the vast majority of
+             schools; only appears once a rejection-after-payment has actually happened. -->
+        <div v-if="event.school_fee?.available_credit > 0"
+             class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+            <p class="font-semibold">Available credit: ₹{{ formatMoney(event.school_fee.available_credit) }}</p>
+            <p class="mt-0.5 text-emerald-800">
+                From a previously paid item that was later rejected. This will be applied toward what you owe next — contact the Sahodaya office if you have questions.
+            </p>
+        </div>
+
         <div v-if="paymentDetails" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">How to pay</p>
             <pre class="text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{{ paymentDetails }}</pre>
@@ -57,6 +68,25 @@
             </p>
             <div v-if="isMinFeeApplied" class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950">
                 <strong>Minimum event fee: ₹{{ formatMoney(event.fee_settings?.school_fee_min ?? 1500) }}</strong> — applied because your registered items total less than the minimum event fee.
+            </div>
+
+            <!-- Per-item payment coverage — only populated for item_catalog/per_item billing,
+                 see FestSchoolEventFeeService::itemPaymentAllocation() §9.3. Purely informational;
+                 does not affect approval unless the Sahodaya has explicitly turned on strict
+                 item-level gating for this event. -->
+            <div v-if="event.school_fee?.item_allocation?.length" class="mt-2 pt-2 border-t border-indigo-100">
+                <p class="text-xs font-semibold text-indigo-900 mb-1">What your payment covers so far</p>
+                <ul class="text-xs space-y-0.5">
+                    <li v-for="row in event.school_fee.item_allocation" :key="row.registration_id"
+                        class="flex justify-between gap-4">
+                        <span :class="row.covered ? 'text-indigo-900' : 'text-amber-700'">
+                            {{ row.covered ? '✓' : '○' }} {{ row.item_title ?? 'Item' }}
+                        </span>
+                        <span class="shrink-0" :class="row.covered ? 'text-indigo-700' : 'text-amber-700 font-semibold'">
+                            ₹{{ formatMoney(row.amount) }}{{ row.covered ? '' : ' — not yet covered' }}
+                        </span>
+                    </li>
+                </ul>
             </div>
             <div class="mt-2 flex flex-wrap gap-2 items-center">
                 <span v-if="event.school_fee?.status === 'approved'" class="text-xs text-green-700 font-semibold">Payment approved</span>
