@@ -511,6 +511,10 @@ class FestRegistrationController extends SchoolAdminController
                 'item_allocation' => in_array($schedule['fee_model'] ?? null, ['item_catalog', 'per_item'], true)
                     ? $feeService->itemPaymentAllocation($event, $this->school->id)
                     : [],
+                // Matches the per-head serializer below (line ~536) — the single-invoice path
+                // never had this, so EventBillingPanel.vue had no way to show what's actually
+                // still owed and fell back to a partial, item-only subtotal instead.
+                'outstanding' => (float) $schoolFee->outstandingBalance(),
             ]
         ) : null);
 

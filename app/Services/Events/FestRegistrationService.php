@@ -100,11 +100,13 @@ class FestRegistrationService
         $feeAfter = $feeService->recalculate($event, $registration->school_id);
 
         $reduction = round($dueBefore - (float) $feeAfter->total_due, 2);
+        $creditAmount = null;
         if ($reduction > 0 && $paidBefore > 0) {
+            $creditAmount = min($reduction, $paidBefore);
             $credit = FestFeeCredit::create([
                 'fest_school_event_fee_id' => $feeAfter->id,
                 'source_registration_id' => $registration->id,
-                'amount' => min($reduction, $paidBefore),
+                'amount' => $creditAmount,
                 'reason' => 'Registration cancelled after payment: '.$reason,
                 'created_by_user_id' => auth()->id(),
             ]);
@@ -129,8 +131,11 @@ class FestRegistrationService
 
         app(PlatformAuditLogger::class)->festRegistrationCancelled($registration);
 
+        // Distinct from cancel()'s notification: this one carries the required reason (and the
+        // credit amount, if one was issued) so the school knows why an approved, paid entry was
+        // pulled — see FestEventNotifier::registrationCancelledWithRefund().
         if ($notify) {
-            app(FestEventNotifier::class)->registrationWithdrawn($registration);
+            app(FestEventNotifier::class)->registrationCancelledWithRefund($registration, $reason, $creditAmount);
         }
     }
 

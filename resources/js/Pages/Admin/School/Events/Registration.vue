@@ -1031,6 +1031,14 @@ function studentIneligibilityReason(student, event, item) {
     return 'Not eligible for this item';
 }
 
+// Deliberately excludes the school registration fee line — that's a one-time per-school
+// cost, not a per-item one, and EventBillingPanel.vue shows it separately (reading
+// event.school_fee.school_registration_fee directly) alongside the real grand total
+// (event.school_fee.total_due). This function/itemFeesDue() is only the item-level
+// subtotal shown under "Item fees due" — do NOT use itemFeesDue() as "what the school
+// owes" for gating upload forms or invoice links; use event.school_fee.total_due /
+// .outstanding for that instead, since a school can owe money (school fee) with zero
+// item fees.
 function itemFeeLines(event) {
     const lines = event.school_fee?.breakdown?.items ?? [];
     return lines.filter(line => !String(line.label).toLowerCase().includes('school registration'));
@@ -1038,13 +1046,6 @@ function itemFeeLines(event) {
 
 function itemFeesDue(event) {
     return itemFeeLines(event).reduce((sum, line) => sum + Number(line.amount || 0), 0);
-}
-
-function schoolMembershipFeeAmount(event) {
-    const line = (event.school_fee?.breakdown?.items ?? []).find(
-        l => String(l.label).toLowerCase().includes('school registration'),
-    );
-    return line?.amount ?? event.school_fee?.school_registration_fee ?? 0;
 }
 
 function canRegister(event) {

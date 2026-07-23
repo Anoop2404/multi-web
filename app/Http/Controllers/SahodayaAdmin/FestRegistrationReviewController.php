@@ -232,6 +232,20 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
         EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
 
+        // The UI only ever shows "Reject" for a still-submitted registration (never an
+        // approved/paid one — see Registrations.vue), but this endpoint doesn't otherwise
+        // check status, so a direct request against an approved+paid registration would
+        // silently reject it with no reason and no FestFeeCredit — the same "money just
+        // disappears" gap the docs flagged for bulk rejection, before rejectMany() was fixed
+        // to only ever target 'submitted' rows. Block it here instead of duplicating that
+        // fix: an already-approved, paid registration must go through cancelWithRefund(),
+        // which requires a reason and creates the credit.
+        abort_if(
+            app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration),
+            422,
+            'This registration already has an approved payment — use "Cancel & refund" instead, which requires a reason and credits the school.'
+        );
+
         $registration->loadMissing('item');
         $headId = $registration->item?->head_id;
 

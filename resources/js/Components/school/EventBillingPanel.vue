@@ -53,18 +53,27 @@
 
         <!-- Single-invoice path (non sports_composite) -->
         <div v-else class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm">
-            <ul v-if="itemFeeLines.length" class="text-xs text-indigo-900 space-y-1">
+            <ul v-if="itemFeeLines.length || schoolRegFee > 0" class="text-xs text-indigo-900 space-y-1">
+                <li v-if="schoolRegFee > 0" class="flex justify-between gap-4">
+                    <span>School registration fee</span>
+                    <span class="font-semibold shrink-0">₹{{ formatMoney(schoolRegFee) }}</span>
+                </li>
                 <li v-for="(line, i) in itemFeeLines" :key="i" class="flex justify-between gap-4">
                     <span>{{ line.label }}</span>
                     <span class="font-semibold shrink-0">₹{{ formatMoney(line.amount) }}</span>
                 </li>
             </ul>
             <p v-else class="text-xs text-indigo-800">Register items above to see item fees here.</p>
+            <p v-if="event.school_fee?.participation_item_count" class="text-xs text-indigo-700 mt-1">
+                Item fees: ₹{{ formatMoney(itemFeesDue) }}
+                ({{ event.school_fee.participation_item_count }} item{{ event.school_fee.participation_item_count === 1 ? '' : 's' }})
+            </p>
             <p class="font-semibold text-indigo-900 mt-2 pt-2 border-t border-indigo-100">
-                Item fees due: ₹{{ formatMoney(itemFeesDue) }}
-                <span v-if="event.school_fee?.participation_item_count" class="font-normal text-indigo-700">
-                    ({{ event.school_fee.participation_item_count }} item{{ event.school_fee.participation_item_count === 1 ? '' : 's' }})
-                </span>
+                Total fees due: ₹{{ formatMoney(totalDue) }}
+            </p>
+            <p v-if="amountPaid > 0" class="text-xs text-indigo-800 mt-0.5">
+                Paid so far: ₹{{ formatMoney(amountPaid) }}
+                <span class="font-semibold">· Outstanding: ₹{{ formatMoney(outstanding) }}</span>
             </p>
             <div v-if="isMinFeeApplied" class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950">
                 <strong>Minimum event fee: ₹{{ formatMoney(event.fee_settings?.school_fee_min ?? 1500) }}</strong> — applied because your registered items total less than the minimum event fee.
@@ -90,19 +99,25 @@
             </div>
             <div class="mt-2 flex flex-wrap gap-2 items-center">
                 <span v-if="event.school_fee?.status === 'approved'" class="text-xs text-green-700 font-semibold">Payment approved</span>
+                <span v-else-if="event.school_fee?.status === 'partial'" class="text-xs text-amber-700 font-semibold">
+                    Partially paid — ₹{{ formatMoney(outstanding) }} still due
+                </span>
                 <span v-else-if="event.school_fee?.status === 'proof_uploaded'" class="text-xs text-amber-700 font-semibold">Payment pending approval</span>
                 <span v-else-if="event.school_fee?.status === 'rejected'" class="text-xs text-red-600 font-semibold">
                     Payment rejected — re-upload
                     <span v-if="event.school_fee.rejection_reason" class="font-normal block">Reason: {{ event.school_fee.rejection_reason }}</span>
                 </span>
-                <form v-if="itemFeesDue > 0 && ['pending', 'rejected'].includes(event.school_fee?.status)"
+                <!-- Gated on the real outstanding balance (school + student + item + team fees
+                     minus what's paid), not the old item-only subtotal — a school can owe money
+                     purely from the school registration fee with zero item fees registered. -->
+                <form v-if="outstanding > 0 && ['pending', 'partial', 'rejected'].includes(event.school_fee?.status)"
                       @submit.prevent="$emit('upload-event-payment')" class="flex flex-wrap gap-2 items-center">
                     <input type="file" accept=".pdf,.jpg,.jpeg,.png"
                            @change="e => $emit('set-event-file', e.target.files[0])" class="text-xs" />
                     <input :value="eventPaymentRef"
                            @input="e => $emit('update-event-ref', e.target.value)"
                            class="field text-xs w-36" placeholder="Txn ref (opt)">
-                    <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">Upload item fee proof</button>
+                    <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">Upload payment proof</button>
                 </form>
                 <a v-if="event.school_fee?.status === 'approved'"
                    :href="`${programBase}/events/${event.id}/receipt`"
@@ -110,13 +125,13 @@
                    class="px-2 py-1 bg-green-50 border border-green-300 text-green-700 text-xs font-semibold rounded">
                     View Receipt ↗
                 </a>
-                <a v-if="itemFeesDue > 0"
+                <a v-if="totalDue > 0"
                    :href="`${programBase}/events/${event.id}/invoice?preview=1`"
                    target="_blank" rel="noopener"
                    class="px-2 py-1 bg-white border border-indigo-300 text-indigo-700 text-xs font-semibold rounded">
                     Preview Invoice ↗
                 </a>
-                <a v-if="itemFeesDue > 0"
+                <a v-if="totalDue > 0"
                    :href="`${programBase}/events/${event.id}/invoice`"
                    target="_blank" rel="noopener"
                    class="px-2 py-1 bg-indigo-50 border border-indigo-300 text-indigo-700 text-xs font-semibold rounded">
@@ -128,6 +143,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import HeadBillingInvoices from '@/Components/school/HeadBillingInvoices.vue';
 
 const props = defineProps({
@@ -150,6 +166,19 @@ defineEmits([
     'set-head-file',
     'update-head-ref',
 ]);
+
+// Real, authoritative figures from the school_fee record itself — not the item-only
+// subtotal passed in via itemFeesDue, which excludes the school registration fee and
+// can be ₹0 while the school still genuinely owes money. See FestRegistrationController::
+// hydrateEventForSchoolRegistration() for where these are computed server-side.
+const schoolRegFee = computed(() => Number(props.event.school_fee?.school_registration_fee ?? 0));
+const totalDue = computed(() => Number(props.event.school_fee?.total_due ?? 0));
+const amountPaid = computed(() => Number(props.event.school_fee?.amount_paid ?? 0));
+const outstanding = computed(() => {
+    const explicit = props.event.school_fee?.outstanding;
+    if (explicit !== undefined && explicit !== null) return Number(explicit);
+    return Math.max(totalDue.value - amountPaid.value, 0);
+});
 
 function formatMoney(val) {
     const n = Number(val ?? 0);

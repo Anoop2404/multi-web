@@ -76,6 +76,16 @@ class NotificationTemplatesSeeder extends Seeder
                 'body_template' => 'Registration for {{event_title}} ({{item_title}}) has been cancelled.',
             ],
             [
+                // Distinct from fest.registration.withdrawn — used only when a Sahodaya admin
+                // cancels a registration that already had an approved payment against it (see
+                // FestRegistrationService::cancelWithRefund()). Carries the admin's reason and,
+                // when applicable, the credit amount freed up — the plain withdrawn template is
+                // left untouched for the ordinary pre-payment cancel() path.
+                'slug'          => 'fest.registration.cancelled_with_refund',
+                'title'         => 'Event registration cancelled after payment',
+                'body_template' => 'Your registration for {{event_title}} ({{item_title}}) has been cancelled by your Sahodaya after payment had already been approved. Reason: {{reason}}{{credit_line}}',
+            ],
+            [
                 'slug'          => 'fest.results.published',
                 'title'         => 'Event results published',
                 'body_template' => 'Results for {{event_title}} are now published.',

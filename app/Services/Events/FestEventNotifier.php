@@ -161,6 +161,37 @@ class FestEventNotifier
         $this->notifyHeadExtras($head, $slug, $replacements);
     }
 
+    /**
+     * Distinct from registrationWithdrawn() — fired only for FestRegistrationService::
+     * cancelWithRefund(), where a Sahodaya admin cancels a registration that already had an
+     * approved payment. Carries the admin's required reason and, when a credit was actually
+     * issued, the amount — so the school understands why a paid, approved entry disappeared
+     * rather than just seeing the generic "cancelled" notice. $creditAmount is null when the
+     * cancellation didn't free up any due amount (e.g. nothing was actually paid yet despite
+     * being "approved" in an edge case), in which case the credit line is simply omitted.
+     */
+    public function registrationCancelledWithRefund(FestRegistration $registration, string $reason, ?float $creditAmount = null): void
+    {
+        $registration->load(['event', 'item']);
+        $head = $this->resolveHeadForEvent($registration->event);
+        if ($head && ! $head->notificationEnabledFor('registration_withdrawn')) {
+            return;
+        }
+
+        $slug = $this->resolveTemplateSlug($registration->event, 'fest.registration.cancelled_with_refund');
+        $replacements = [
+            'event_title' => $registration->event->title,
+            'item_title' => $registration->item?->title ?? 'General',
+            'competition_label' => $this->competitionLabel($registration->event),
+            'reason' => $reason,
+            'credit_line' => $creditAmount !== null && $creditAmount > 0
+                ? " A fee credit of ₹{$creditAmount} has been recorded and can be applied toward another item in this event."
+                : '',
+        ];
+        $this->notifySchool($registration->school_id, $slug, $replacements);
+        $this->notifyHeadExtras($head, $slug, $replacements);
+    }
+
     public function registrationOpened(FestEvent $event): void
     {
         $schoolIds = Tenant::query()
