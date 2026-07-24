@@ -796,18 +796,34 @@ class FestRegistrationController extends SchoolAdminController
         // exactly as before, the rest are stored as FeeReceiptAttachment rows on the same
         // receipt. Still one receipt, one review decision. See
         // docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature.
+        // transaction_ref/bank_name/amount are optional here — the school-side upload form
+        // (EventBillingPanel.vue / HeadBillingInvoices.vue) only collects the file + an
+        // optional txn ref, matching Training/MCQ. attachPayment()/attachPaymentForHead()
+        // already default amount to the outstanding balance when not supplied, and store a
+        // null bank_name — this was previously `required` here with no matching frontend
+        // fields, which made the upload form permanently unusable (every submission failed
+        // validation on the missing bank_name/amount). See FLOW_GAP_FIX_PLAN.md.
         $data = $request->validate([
             'payment_proof'    => 'required|array|min:1|max:'.\App\Services\Fees\FeeReceiptAttachmentService::MAX_FILES,
             'payment_proof.*'  => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'transaction_ref'  => 'required|string|max:100',
-            'bank_name'        => 'required|string|max:100',
-            'amount'           => 'required|numeric|min:0.01',
+            'transaction_ref'  => 'nullable|string|max:100',
+            'bank_name'        => 'nullable|string|max:100',
+            'amount'           => 'nullable|numeric|min:0.01',
             'head_id'          => ($usesPerHead ? 'required' : 'nullable').'|integer|exists:fest_item_heads,id',
         ]);
 
         $proofFiles = $request->file('payment_proof');
         $primaryProof = $proofFiles[0];
         $extraProofs = array_slice($proofFiles, 1);
+
+        // Fields are validated as nullable above and may be entirely absent from $data when
+        // not submitted (Laravel's validate() only includes keys present in the request) —
+        // use ?? null rather than direct array access so a missing key doesn't throw, and
+        // pass amount through as null (not cast to 0.0) so the service's own outstanding-
+        // balance default applies.
+        $transactionRef = $data['transaction_ref'] ?? null;
+        $bankName = $data['bank_name'] ?? null;
+        $amount = isset($data['amount']) ? (float) $data['amount'] : null;
 
         if ($usesPerHead) {
             $feeService->attachPaymentForHead(
@@ -816,9 +832,9 @@ class FestRegistrationController extends SchoolAdminController
                 (int) $data['head_id'],
                 $primaryProof,
                 $request->user()->id,
-                $data['transaction_ref'],
-                $data['bank_name'],
-                (float) $data['amount'],
+                $transactionRef,
+                $bankName,
+                $amount,
                 $extraProofs,
             );
             $contextLabel = $event->title.' — '.((FestItemHead::find($data['head_id'])?->name) ?? 'head').' fee';
@@ -828,9 +844,9 @@ class FestRegistrationController extends SchoolAdminController
                 $this->school->id,
                 $primaryProof,
                 $request->user()->id,
-                $data['transaction_ref'],
-                $data['bank_name'],
-                (float) $data['amount'],
+                $transactionRef,
+                $bankName,
+                $amount,
                 $extraProofs,
             );
             $contextLabel = $event->title.' event fee';
