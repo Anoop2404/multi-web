@@ -374,7 +374,7 @@ class FestChestNumberController extends SahodayaAdminController
 
         $numbering = app(FestNumberingService::class);
 
-        $individualRows = $participants
+        $individualRows = $participants->toBase()
             ->filter(fn ($p) => ! $p->registration->item || ! $numbering->isGroupItem($p->registration->item))
             ->whereNotNull('chest_no')
             ->map(fn (FestParticipant $p) => [
@@ -386,7 +386,7 @@ class FestChestNumberController extends SahodayaAdminController
                 'school'   => $p->registration?->school?->name ?? Tenant::find($p->registration->school_id)?->name,
             ]);
 
-        $groupRows = $participants
+        $groupRows = $participants->toBase()
             ->filter(fn ($p) => $p->registration->item && $numbering->isGroupItem($p->registration->item) && $p->group?->chest_no !== null)
             ->groupBy('group_id')
             ->map(function ($members) {
