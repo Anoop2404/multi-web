@@ -41,6 +41,11 @@ class FestRegistrationEligibilityService
                 : ($item->head_id ? $item->head()->first() : null);
             if ($head?->requiresVerifiedStudentsOnly() && ! $student->isVerified()) {
                 $errors[] = "{$student->name}: must be Sahodaya-verified to register under {$head->name}.";
+            } elseif (! $head?->requiresVerifiedStudentsOnly() && $event->requiresVerifiedStudentsOnly() && ! $student->isVerified()) {
+                // Falls back to the event-level policy when the item has no head (Kalotsav
+                // items assigned a plain category instead of a head) — see
+                // docs/KALOTSAV_ITEM_CATEGORY_REPLACES_HEAD_PLAN.md §5 #3.
+                $errors[] = "{$student->name}: must be Sahodaya-verified to register for this event.";
             }
         }
 

@@ -95,6 +95,23 @@ class FestEventNotifier
         });
     }
 
+    /**
+     * Whether a notification trigger should be suppressed. Prefers the Event Head's
+     * own setting when one exists (sports, dual-read during migration); falls back to
+     * the event-level setting otherwise — the only setting there is for a Kalotsav item
+     * assigned a plain category instead of a head, since resolveHeadForEvent() only
+     * ever resolves for sports. See docs/KALOTSAV_ITEM_CATEGORY_REPLACES_HEAD_PLAN.md §5 #3
+     * and the comment on resolveHeadForEvent() above.
+     */
+    private function suppressed(?FestItemHead $head, ?FestEvent $event, string $trigger): bool
+    {
+        if ($head) {
+            return ! $head->notificationEnabledFor($trigger);
+        }
+
+        return $event ? ! $event->notificationEnabledFor($trigger) : false;
+    }
+
     public function competitionLabel(FestEvent $event): string
     {
         try {
@@ -112,7 +129,7 @@ class FestEventNotifier
     {
         $registration->load(['event', 'item']);
         $head = $this->resolveHeadForEvent($registration->event);
-        if ($head && ! $head->notificationEnabledFor('registration_approved')) {
+        if ($this->suppressed($head, $registration->event, 'registration_approved')) {
             return;
         }
 
@@ -130,7 +147,7 @@ class FestEventNotifier
     {
         $registration->load('event');
         $head = $this->resolveHeadForEvent($registration->event);
-        if ($head && ! $head->notificationEnabledFor('registration_rejected')) {
+        if ($this->suppressed($head, $registration->event, 'registration_rejected')) {
             return;
         }
 
@@ -148,7 +165,7 @@ class FestEventNotifier
     {
         $registration->load(['event', 'item']);
         $head = $this->resolveHeadForEvent($registration->event);
-        if ($head && ! $head->notificationEnabledFor('registration_withdrawn')) {
+        if ($this->suppressed($head, $registration->event, 'registration_withdrawn')) {
             return;
         }
 
@@ -204,7 +221,7 @@ class FestEventNotifier
     {
         $registration->load(['event', 'item']);
         $head = $this->resolveHeadForEvent($registration->event);
-        if ($head && ! $head->notificationEnabledFor('registration_withdrawn')) {
+        if ($this->suppressed($head, $registration->event, 'registration_withdrawn')) {
             return;
         }
 
@@ -307,7 +324,7 @@ class FestEventNotifier
     public function paymentPending(FestEvent $event, string $schoolId, float $amount): void
     {
         $head = $this->resolveHeadForEvent($event);
-        if ($head && ! $head->notificationEnabledFor('payment_pending')) {
+        if ($this->suppressed($head, $event, 'payment_pending')) {
             return;
         }
 
@@ -325,7 +342,7 @@ class FestEventNotifier
     public function competitionReminder(FestEvent $event): void
     {
         $head = $this->resolveHeadForEvent($event);
-        if ($head && ! $head->notificationEnabledFor('competition_reminder')) {
+        if ($this->suppressed($head, $event, 'competition_reminder')) {
             return;
         }
 
@@ -363,7 +380,7 @@ class FestEventNotifier
         }
 
         $head = $this->resolveHeadForEvent($event);
-        if ($head && ! $head->notificationEnabledFor('certificates_available')) {
+        if ($this->suppressed($head, $event, 'certificates_available')) {
             return;
         }
 
@@ -405,7 +422,7 @@ class FestEventNotifier
     public function resultsPublished(FestEvent $event): void
     {
         $head = $this->resolveHeadForEvent($event);
-        if ($head && ! $head->notificationEnabledFor('results_published')) {
+        if ($this->suppressed($head, $event, 'results_published')) {
             return;
         }
 
@@ -429,7 +446,7 @@ class FestEventNotifier
     public function schedulePublished(FestEvent $event): void
     {
         $head = $this->resolveHeadForEvent($event);
-        if ($head && ! $head->notificationEnabledFor('schedule_published')) {
+        if ($this->suppressed($head, $event, 'schedule_published')) {
             return;
         }
 
@@ -455,7 +472,7 @@ class FestEventNotifier
     public function sportsWinnersReceived(FestEvent $event, Tenant $school, int $count): void
     {
         $head = $this->resolveHeadForEvent($event);
-        if ($head && ! $head->notificationEnabledFor('sports_winners_received')) {
+        if ($this->suppressed($head, $event, 'sports_winners_received')) {
             return;
         }
 
@@ -479,7 +496,7 @@ class FestEventNotifier
     public function notifySchoolForChestReveal(FestEvent $event, string $schoolId, string $participantName): void
     {
         $head = $this->resolveHeadForEvent($event);
-        if ($head && ! $head->notificationEnabledFor('chest_reveal')) {
+        if ($this->suppressed($head, $event, 'chest_reveal')) {
             return;
         }
 
@@ -498,7 +515,7 @@ class FestEventNotifier
     public function appealReceived(FestEvent $event, string $participantName): void
     {
         $head = $this->resolveHeadForEvent($event);
-        if ($head && ! $head->notificationEnabledFor('appeal_received')) {
+        if ($this->suppressed($head, $event, 'appeal_received')) {
             return;
         }
 
@@ -550,7 +567,7 @@ class FestEventNotifier
     public function promotionCompleted(FestEvent $toEvent, int $count, ?FestEvent $fromEvent = null): void
     {
         $head = $this->resolveHeadForEvent($toEvent);
-        if ($head && ! $head->notificationEnabledFor('promotion_completed')) {
+        if ($this->suppressed($head, $toEvent, 'promotion_completed')) {
             return;
         }
 
@@ -581,7 +598,7 @@ class FestEventNotifier
     public function registrationDeadlineReminder(FestEvent $event, int $daysLeft): void
     {
         $head = $this->resolveHeadForEvent($event);
-        if ($head && ! $head->notificationEnabledFor('registration_deadline')) {
+        if ($this->suppressed($head, $event, 'registration_deadline')) {
             return;
         }
 

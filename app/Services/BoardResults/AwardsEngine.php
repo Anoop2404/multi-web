@@ -91,7 +91,10 @@ class AwardsEngine
                 'Best Class XII School'
             );
 
-            $created += $this->awardBestStreamSchool($sahodayaId, $academicYear, $schoolIds, AcademicAward::TYPE_BEST_SCIENCE, ['bio_science', 'computer_science'], 'Best Science School');
+            // Science was consolidated from two sub-streams (bio_science/computer_science)
+            // into one canonical `science` code — see
+            // 2026_08_06_000002_board_results_cbse_stream_consolidation.php.
+            $created += $this->awardBestStreamSchool($sahodayaId, $academicYear, $schoolIds, AcademicAward::TYPE_BEST_SCIENCE, ['science'], 'Best Science School');
             $created += $this->awardBestStreamSchool($sahodayaId, $academicYear, $schoolIds, AcademicAward::TYPE_BEST_COMMERCE, ['commerce'], 'Best Commerce School');
             $created += $this->awardBestStreamSchool($sahodayaId, $academicYear, $schoolIds, AcademicAward::TYPE_BEST_HUMANITIES, ['humanities'], 'Best Humanities School');
 

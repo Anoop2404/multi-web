@@ -29,6 +29,18 @@
                         Cluster default is set under Membership → Settings.
                     </p>
                 </FormField>
+                <FormField label="Approval policy" hint="Auto-approve submitted registrations, or hold every registration for manual Sahodaya review. Falls back to this event-level setting for any item with no Event Head.">
+                    <select v-model="settingsForm.approval_policy" class="field">
+                        <option value="auto">Auto (on submission / full payment)</option>
+                        <option value="manual">Manual review</option>
+                    </select>
+                </FormField>
+                <FormField label="Capacity caps" hint="Maximum total participants / team entries per school for this event (leave blank for no limit).">
+                    <div class="grid grid-cols-2 gap-3">
+                        <input v-model.number="settingsForm.max_participants" type="number" min="0" class="field" placeholder="Max participants">
+                        <input v-model.number="settingsForm.max_teams" type="number" min="0" class="field" placeholder="Max teams">
+                    </div>
+                </FormField>
                 <FormField label="Certificate collection">
                     <label class="flex items-center gap-2 text-sm text-slate-700">
                         <input type="checkbox" v-model="settingsForm.certificate_collection_open"> Allow certificate pickup
@@ -74,11 +86,52 @@
                 <button type="button" @click="backfillRegs" class="btn-secondary">Backfill level registration numbers</button>
             </div>
     </div>
+
+    <div v-if="notificationTriggers.length" class="card max-w-2xl space-y-4 mt-6">
+        <div>
+            <h3 class="section-title">Notifications</h3>
+            <p class="section-desc text-xs mt-1">
+                Untick anything this event shouldn't send. Everything is on by default.
+                Only applies to items with no Event Head — a head's own notification
+                settings (Competition hub) still take priority when one exists.
+            </p>
+        </div>
+
+        <div class="grid gap-2 sm:grid-cols-2">
+            <label v-for="trigger in notificationTriggers" :key="trigger"
+                   class="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" class="rounded border-slate-300" v-model="eventNotifForm.enabled[trigger]">
+                {{ triggerLabel(trigger) }}
+            </label>
+        </div>
+
+        <div v-if="eligibleNotificationUsers.length">
+            <p class="text-xs font-semibold text-slate-700 mb-1">Also notify these platform users</p>
+            <select v-model="eventNotifForm.extra_recipient_user_ids" multiple class="field text-sm h-28">
+                <option v-for="user in eligibleNotificationUsers" :key="user.id" :value="user.id">
+                    {{ user.name }}{{ user.email ? ` — ${user.email}` : '' }}
+                </option>
+            </select>
+            <p class="text-[11px] text-slate-500 mt-1">Ctrl/Cmd-click to select more than one.</p>
+        </div>
+
+        <button type="button" class="btn-secondary text-sm" :disabled="savingEventNotifications" @click="saveEventNotifications">
+            {{ savingEventNotifications ? 'Saving…' : 'Save notification settings' }}
+        </button>
+    </div>
 </template>
 
 <script setup>
 import { computed, inject } from 'vue';
 
-const { settingsForm, judgeGate, saveSettings, backfillRegs, event, clusterRequireStudentVerification } = inject('eventSettings');
+const {
+    settingsForm, judgeGate, saveSettings, backfillRegs, event, clusterRequireStudentVerification,
+    eventNotifForm, savingEventNotifications, saveEventNotifications,
+    notificationTriggers, eligibleNotificationUsers,
+} = inject('eventSettings');
 const isSports = computed(() => event?.event_type === 'sports');
+
+function triggerLabel(trigger) {
+    return trigger.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+}
 </script>

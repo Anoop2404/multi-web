@@ -885,8 +885,14 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/spawn-cluster', [FestEventController::class, 'spawnCluster'])->name('spawn-cluster');
             Route::post('/{event}/spawn-partition', [FestEventController::class, 'spawnPartition'])->name('spawn-partition');
             Route::post('/{event}/apply-conduct-preset', [FestEventController::class, 'applyConductPreset'])->name('apply-conduct-preset');
+            Route::post('/{event}/conduct-topology', [FestEventController::class, 'updateConductTopology'])->name('conduct-topology.update');
             Route::post('/{event}/assign-school-partitions', [FestEventController::class, 'assignSchoolPartitions'])->name('assign-school-partitions');
             Route::post('/{event}/sync-region-partitions', [FestEventController::class, 'syncRegionPartitions'])->name('sync-region-partitions');
+            Route::get('/{event}/phases', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'index'])->name('phases.index');
+            Route::post('/{event}/phases', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'store'])->name('phases.store');
+            Route::put('/{event}/phases/{phase}', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'update'])->name('phases.update');
+            Route::delete('/{event}/phases/{phase}', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'destroy'])->name('phases.destroy');
+            Route::post('/{event}/phases/assign-items', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'assignItems'])->name('phases.assign-items');
             Route::post('/{event}/submit-state-qualifiers', [\App\Http\Controllers\SahodayaAdmin\StateQualifierSubmissionController::class, 'store'])->name('submit-state-qualifiers');
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');
@@ -1008,6 +1014,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 ->where('tab', 'lifecycle|locks|venues|combo|grades|points|participation|eligibility|fees|registration|numbering|volunteers|records|clone')
                 ->name('settings');
             Route::put('/{event}/settings', [FestEventSettingsController::class, 'updateSettings'])->name('settings.update');
+            Route::put('/{event}/notification-settings', [FestEventSettingsController::class, 'updateNotifications'])->name('notification-settings.update');
             Route::put('/{event}/registration-settings', [FestEventSettingsController::class, 'updateRegistrationSettings'])->name('registration-settings.update');
             Route::put('/{event}/numbering-settings', [FestEventSettingsController::class, 'updateNumberingSettings'])->name('numbering-settings.update');
             Route::put('/{event}/item-numbering', [FestEventSettingsController::class, 'updateItemNumbering'])->name('item-numbering.update');

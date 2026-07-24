@@ -227,9 +227,38 @@
                         </div>
                         <InputError :message="form.errors.conduct_levels" class="mt-2" />
                     </div>
+                    <div v-if="!isSports" class="border-t border-slate-200 pt-3">
+                        <p class="form-label mb-1">Participation limits (per student)</p>
+                        <p class="section-desc mb-2">Same config for Kalotsav, English Fest, and every other fest program. Set the total first, then break it down — the breakdown can't exceed the total. Leave blank for no limit.</p>
+                        <div class="grid gap-4 sm:grid-cols-4">
+                            <FormField label="Total items" :error="form.errors.max_total_per_student">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="form.max_total_per_student" type="number" min="0" class="field" placeholder="e.g. 5">
+                                </template>
+                            </FormField>
+                            <FormField label="On-stage" :error="form.errors.max_onstage_per_student">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="form.max_onstage_per_student" type="number" min="0" class="field" placeholder="e.g. 3">
+                                </template>
+                            </FormField>
+                            <FormField label="Off-stage" :error="form.errors.max_offstage_per_student">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="form.max_offstage_per_student" type="number" min="0" class="field" placeholder="e.g. 3">
+                                </template>
+                            </FormField>
+                            <FormField label="Team/group" :error="form.errors.max_group_per_student">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model.number="form.max_group_per_student" type="number" min="0" class="field" placeholder="e.g. 2">
+                                </template>
+                            </FormField>
+                        </div>
+                        <p v-if="breakdownExceedsTotal" class="text-xs text-rose-600 mt-1.5">
+                            On-stage + off-stage + team ({{ breakdownSum }}) exceeds the total ({{ form.max_total_per_student }}).
+                        </p>
+                    </div>
                     <div class="flex justify-end gap-2 pt-2">
                         <button type="button" class="btn-secondary text-xs" @click="showCreateForm = false">Cancel</button>
-                        <button type="submit" class="btn-primary text-xs" :disabled="form.processing">
+                        <button type="submit" class="btn-primary text-xs" :disabled="form.processing || breakdownExceedsTotal">
                             {{ form.processing ? 'Creating...' : `Create ${program.label} Event` }}
                         </button>
                     </div>
@@ -436,7 +465,23 @@ const form = useForm({
     event_type: props.program.eventType,
     level_round: 'sahodaya',
     conduct_levels: ['sahodaya'],
+    max_total_per_student: null,
+    max_onstage_per_student: null,
+    max_offstage_per_student: null,
+    max_group_per_student: null,
 });
+
+const breakdownSum = computed(() => (
+    (Number(form.max_onstage_per_student) || 0)
+    + (Number(form.max_offstage_per_student) || 0)
+    + (Number(form.max_group_per_student) || 0)
+));
+
+const breakdownExceedsTotal = computed(() => (
+    form.max_total_per_student !== null
+    && form.max_total_per_student !== ''
+    && breakdownSum.value > Number(form.max_total_per_student)
+));
 
 const selectableLevelLabels = computed(() => {
     const all = props.levelLabels ?? {};
@@ -458,11 +503,14 @@ function statusClass(status) {
 }
 
 function createEvent() {
+    if (breakdownExceedsTotal.value) {
+        return;
+    }
     form.event_type = props.program.eventType;
     form.post(`/sahodaya-admin/${props.sahodaya.id}/events`, {
         preserveScroll: true,
         onSuccess: () => {
-            form.reset('title');
+            form.reset('title', 'max_total_per_student', 'max_onstage_per_student', 'max_offstage_per_student', 'max_group_per_student');
             showCreateForm.value = false;
         },
     });

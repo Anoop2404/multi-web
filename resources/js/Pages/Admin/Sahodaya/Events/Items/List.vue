@@ -120,6 +120,7 @@
                             <th class="w-12 text-center">On</th>
                             <th class="w-14 text-center">Type</th>
                             <th class="min-w-[10rem]">Item</th>
+                            <th class="whitespace-nowrap">Category</th>
                             <th class="whitespace-nowrap">{{ event.event_type === 'kids_fest' ? 'Band' : 'Class' }}</th>
                             <th class="whitespace-nowrap">Gender</th>
                             <th class="whitespace-nowrap">Participant</th>
@@ -143,6 +144,7 @@
                                 <p v-if="item.item_code" class="text-xs text-slate-400 font-mono mt-0.5">{{ item.item_code }}</p>
                                 <p v-if="squadSummary(item)" class="text-xs text-slate-500 mt-0.5">{{ squadSummary(item) }}</p>
                             </td>
+                            <td class="text-slate-600">{{ artsCategoryLabel(item) }}</td>
                             <td class="text-slate-600">{{ categoryLabel(item) }}</td>
                             <td class="text-slate-600">{{ genderLabel(item.gender) }}</td>
                             <td class="text-slate-600">{{ participantLabel(item.participant_type) }}</td>
@@ -206,13 +208,20 @@
                         </FormField>
                     </template>
 
-                    <FormField v-else-if="event.event_type === 'kids_fest'" label="Kids Fest band">
+                    <FormField v-if="!isSports" label="Category">
+                        <select v-model="addForm.category" class="field">
+                            <option value="">No category</option>
+                            <option v-for="(label, key) in taxonomy?.arts_category ?? {}" :key="key" :value="key">{{ label }}</option>
+                        </select>
+                    </FormField>
+
+                    <FormField v-if="event.event_type === 'kids_fest'" label="Kids Fest band">
                         <select v-model="addForm.kids_band" class="field">
                             <option value="">Kids Fest band</option>
                             <option v-for="(label, key) in taxonomy?.kids_band ?? {}" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </FormField>
-                    <FormField v-else label="Class category">
+                    <FormField v-else-if="!isSports" label="Class category">
                         <select v-model="addForm.class_group" class="field">
                             <option value="">Class category</option>
                             <option v-for="(label, key) in taxonomy?.class_group ?? {}" :key="key" :value="key">{{ label }}</option>
@@ -295,13 +304,20 @@
                         </FormField>
                     </template>
 
-                    <FormField v-else-if="event.event_type === 'kids_fest'" label="Kids Fest band">
+                    <FormField v-if="!isSports" label="Category">
+                        <select v-model="editForm.category" class="field">
+                            <option value="">No category</option>
+                            <option v-for="(label, key) in taxonomy?.arts_category ?? {}" :key="key" :value="key">{{ label }}</option>
+                        </select>
+                    </FormField>
+
+                    <FormField v-if="event.event_type === 'kids_fest'" label="Kids Fest band">
                         <select v-model="editForm.kids_band" class="field">
                             <option value="">Kids Fest band</option>
                             <option v-for="(label, key) in taxonomy?.kids_band ?? {}" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </FormField>
-                    <FormField v-else label="Class category">
+                    <FormField v-else-if="!isSports" label="Class category">
                         <select v-model="editForm.class_group" class="field">
                             <option value="">Class category</option>
                             <option v-for="(label, key) in taxonomy?.class_group ?? {}" :key="key" :value="key">{{ label }}</option>
@@ -428,12 +444,12 @@ const filteredItems = computed(() => {
 });
 
 const editForm = useForm({
-    title: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
+    title: '', is_enabled: true, gender: 'open', category: '', class_group: '', age_group: '', kids_band: '',
     venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual',
     qualify_count: null, max_per_school: null, fee_amount: null,
 });
 const addForm = useForm({
-    title: '', gender: 'open', class_group: '', age_group: '', kids_band: '',
+    title: '', gender: 'open', category: '', class_group: '', age_group: '', kids_band: '',
     venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual',
     qualify_count: null, max_per_school: null, fee_amount: null,
 });
@@ -471,6 +487,13 @@ function categoryLabel(item) {
     return '—';
 }
 
+// The arts_category taxonomy dimension — replaces per-event "Event Head" as the
+// grouping tag for non-sports items. See docs/KALOTSAV_ITEM_CATEGORY_REPLACES_HEAD_PLAN.md.
+function artsCategoryLabel(item) {
+    if (!item.category) return '—';
+    return props.taxonomy?.arts_category?.[item.category] ?? item.category;
+}
+
 function genderLabel(gender) {
     return festItemGenderLabel(gender, props.taxonomy);
 }
@@ -489,6 +512,7 @@ function payloadFor(item, overrides = {}) {
         title: item.title,
         is_enabled: item.is_enabled !== false,
         gender: item.gender ?? 'open',
+        category: item.category ?? '',
         class_group: item.class_group ?? '',
         age_group: item.age_group ?? '',
         kids_band: item.kids_band ?? '',
@@ -514,6 +538,7 @@ function quickUpdate(item, overrides) {
 function resetAddForm() {
     addForm.title = '';
     addForm.gender = 'open';
+    addForm.category = '';
     addForm.class_group = '';
     addForm.age_group = '';
     addForm.kids_band = '';

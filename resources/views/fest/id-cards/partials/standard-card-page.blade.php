@@ -51,6 +51,9 @@
                         <div class="card__name">{{ $card['name'] }}</div>
                         <div class="card__sub">{{ $card['subtitle'] }}</div>
                         <div class="card__detail">{{ $card['detail'] }}</div>
+                        @if(!empty($card['dob']))
+                        <div class="card__detail">DOB: {{ $card['dob'] }}</div>
+                        @endif
                         @if(!empty($card['schedule']))
                         <div class="card__detail" style="margin-top:0.8mm;">{{ $card['schedule'] }}</div>
                         @endif

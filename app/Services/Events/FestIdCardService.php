@@ -669,6 +669,8 @@ class FestIdCardService
         $venue = $event->venue ?: ($event->venue_name ?: '—');
         $sahodayaName = $event->tenant?->name ?? 'Sahodaya';
         $category = $itemLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : '—'));
+        $rawDob = $p->student?->dob;
+        $dob = $rawDob ? date('d M Y', strtotime((string) $rawDob)) : null;
 
         return [
             'card_type'       => 'individual',
@@ -688,6 +690,7 @@ class FestIdCardService
             'event_name'      => $event->title,
             'event_date'      => $eventDate,
             'venue'           => $venue,
+            'dob'             => $dob,
             'sahodaya_name'   => $sahodayaName,
             'category'        => $category,
             'detail'          => $item !== '—' ? $item : null,

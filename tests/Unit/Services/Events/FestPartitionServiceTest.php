@@ -78,4 +78,23 @@ class FestPartitionServiceTest extends TestCase
         $this->assertCount(1, $service->partitions($hub));
         $this->assertSame('tirur', $service->partitionKey($service->partitions($hub)->first()));
     }
+
+    public function test_should_combine_at_finale_flag(): void
+    {
+        $sahodaya = $this->sahodaya();
+
+        $hub = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'MCS Kalotsav',
+            'event_type' => 'kalolsavam',
+            'conduct_mode' => 'partitioned',
+            'combine_regions_at_finale' => false,
+            'level_round' => 'sahodaya',
+            'status' => 'draft',
+        ]);
+
+        $service = app(FestPartitionService::class);
+
+        $this->assertFalse($service->shouldCombineAtFinale($hub));
+    }
 }

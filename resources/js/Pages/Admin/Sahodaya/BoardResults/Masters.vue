@@ -47,6 +47,15 @@
                             <input v-model="streamForm.label" class="form-input mt-1" required maxlength="120" />
                         </label>
                     </div>
+                    <div>
+                        <p class="text-xs text-slate-500 mb-1">Subjects (optional — can be added later too)</p>
+                        <SubjectPicker
+                            :subjects="streamForm.default_subjects"
+                            :subjects-by-category="subjectsByCategory"
+                            @add="label => streamForm.default_subjects.push(label)"
+                            @remove="label => streamForm.default_subjects = streamForm.default_subjects.filter(l => l !== label)"
+                        />
+                    </div>
                     <button type="submit" class="btn-primary text-sm">Create stream</button>
                 </form>
             </section>
@@ -55,23 +64,37 @@
         <section class="card mt-6">
             <h2 class="font-semibold text-[#0f3d7a] mb-3">Exam streams</h2>
             <div class="space-y-3">
-                <div v-for="s in streams" :key="s.id" class="border border-slate-200 rounded-lg p-3 flex flex-wrap gap-3 items-end justify-between">
-                    <div class="min-w-0 flex-1">
-                        <p class="font-semibold text-sm">
-                            {{ s.label }}
-                            <span class="font-mono text-xs text-slate-500 ml-2">{{ s.code }}</span>
-                            <span v-if="!s.sahodaya_id" class="ml-2 text-[10px] uppercase tracking-wide bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Global</span>
-                            <span v-else class="ml-2 text-[10px] uppercase tracking-wide bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">Override</span>
-                            <span v-if="!s.is_active" class="ml-2 text-[10px] uppercase text-red-600">Inactive</span>
-                        </p>
-                        <div class="grid grid-cols-2 gap-2 mt-2">
-                            <input v-model="editForms[s.id].label" class="form-input text-sm" />
-                            <input v-model.number="editForms[s.id].sort_order" type="number" class="form-input text-sm" />
+                <div v-for="s in streams" :key="s.id" class="border border-slate-200 rounded-lg p-3 space-y-3">
+                    <div class="flex flex-wrap gap-3 items-end justify-between">
+                        <div class="min-w-0 flex-1">
+                            <p class="font-semibold text-sm">
+                                {{ s.label }}
+                                <span class="font-mono text-xs text-slate-500 ml-2">{{ s.code }}</span>
+                                <span v-if="!s.sahodaya_id" class="ml-2 text-[10px] uppercase tracking-wide bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Global</span>
+                                <span v-else class="ml-2 text-[10px] uppercase tracking-wide bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">Override</span>
+                                <span v-if="!s.is_active" class="ml-2 text-[10px] uppercase text-red-600">Inactive</span>
+                            </p>
+                            <div class="grid grid-cols-2 gap-2 mt-2">
+                                <input v-model="editForms[s.id].label" class="form-input text-sm" />
+                                <input v-model.number="editForms[s.id].sort_order" type="number" class="form-input text-sm" />
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" class="btn-secondary text-xs" @click="saveStream(s)">Save</button>
+                            <button v-if="s.sahodaya_id" type="button" class="text-xs text-red-700 px-2" @click="removeStream(s)">Remove</button>
                         </div>
                     </div>
-                    <div class="flex gap-2">
-                        <button type="button" class="btn-secondary text-xs" @click="saveStream(s)">Save</button>
-                        <button v-if="s.sahodaya_id" type="button" class="text-xs text-red-700 px-2" @click="removeStream(s)">Remove</button>
+
+                    <div class="border-t border-slate-100 pt-2">
+                        <p class="text-xs text-slate-500 mb-1">
+                            Subjects — students in this stream choose 3 from this list (add/edit/remove, then Save above).
+                        </p>
+                        <SubjectPicker
+                            :subjects="editForms[s.id].default_subjects"
+                            :subjects-by-category="subjectsByCategory"
+                            @add="label => editForms[s.id].default_subjects.push(label)"
+                            @remove="label => editForms[s.id].default_subjects = editForms[s.id].default_subjects.filter(l => l !== label)"
+                        />
                     </div>
                 </div>
                 <p v-if="!streams?.length" class="text-slate-400 text-sm py-6 text-center">No streams seeded yet.</p>
@@ -85,12 +108,14 @@ import { computed, reactive } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import SubjectPicker from '@/Components/ui/SubjectPicker.vue';
 
 const props = defineProps({
     sahodaya: Object,
     publicUrl: String,
     pendingPaymentsCount: Number,
     streams: { type: Array, default: () => [] },
+    subjectsByCategory: { type: Object, default: () => ({}) },
     apiConfig: { type: Object, default: () => ({}) },
     topperConfigs: { type: Array, default: () => [] },
 });
@@ -112,7 +137,7 @@ const apiSum = computed(() =>
     ) * 10) / 10
 );
 
-const streamForm = reactive({ code: '', label: '' });
+const streamForm = reactive({ code: '', label: '', default_subjects: [] });
 
 const editForms = reactive({});
 for (const s of props.streams) {
@@ -120,6 +145,9 @@ for (const s of props.streams) {
         label: s.label,
         sort_order: s.sort_order ?? 0,
         is_active: s.is_active,
+        // Own array per stream (not a shared reference to s.default_subjects) so edits here
+        // don't mutate the prop directly before Save is clicked.
+        default_subjects: Array.isArray(s.default_subjects) ? [...s.default_subjects] : [],
     };
 }
 
@@ -130,7 +158,7 @@ function saveApi() {
 function createStream() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/board-results/masters/streams`, { ...streamForm }, {
         preserveScroll: true,
-        onSuccess: () => { streamForm.code = ''; streamForm.label = ''; },
+        onSuccess: () => { streamForm.code = ''; streamForm.label = ''; streamForm.default_subjects = []; },
     });
 }
 

@@ -31,9 +31,13 @@ class FestRegistrationApprovalService
             ->with(['item.head'])
             ->orderBy('id')
             ->get()
-            ->each(function (FestRegistration $registration) use (&$count) {
+            ->each(function (FestRegistration $registration) use (&$count, $event) {
                 // Event Head approval_policy=manual stays in the Sahodaya review queue.
-                if ($registration->item?->head?->requiresManualApproval()) {
+                // Falls back to the event-level policy when the item has no head (Kalotsav
+                // items assigned a plain category instead — see
+                // docs/KALOTSAV_ITEM_CATEGORY_REPLACES_HEAD_PLAN.md §5 #3), so approval
+                // policy keeps working once heads stop being created for non-sports events.
+                if ($registration->item?->head?->requiresManualApproval() || $event->requiresManualApproval()) {
                     if ($registration->status !== 'pending_approval') {
                         $registration->update(['status' => 'pending_approval']);
                     }

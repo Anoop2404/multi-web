@@ -112,9 +112,12 @@ class FestRegistrationCreateService
         $item->loadMissing('head');
         $limitService = new FestParticipationLimitService($event);
         $waitlisted = $event->event_type === 'sports' && $limitService->isHeadAtCapacity($item, $school->id);
+        // Falls back to the event-level approval policy when the item has no head
+        // (Kalotsav items assigned a plain category instead — see
+        // docs/KALOTSAV_ITEM_CATEGORY_REPLACES_HEAD_PLAN.md §5 #3).
         $initialStatus = match (true) {
             $waitlisted => 'waitlisted',
-            $item->head?->requiresManualApproval() => 'pending_approval',
+            $item->head?->requiresManualApproval() || $event->requiresManualApproval() => 'pending_approval',
             default => 'submitted',
         };
 

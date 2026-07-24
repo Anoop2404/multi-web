@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\ApiConfig;
 use App\Models\ExamStream;
+use App\Models\Subject;
 use App\Models\Topper;
 use App\Models\TopperCountConfig;
 use Illuminate\Http\Request;
@@ -22,8 +23,23 @@ class BoardResultMastersController extends SahodayaAdminController
 
         $apiConfig = ApiConfig::forSahodaya($this->sahodaya->id);
 
+        // Subject master (Category I/II/III) for the "add subject to stream" picker on this
+        // page — lets an admin assign existing subjects instead of retyping labels, while
+        // still allowing free-text entry for one-off school-specific subjects.
+        $subjects = Subject::query()
+            ->forSahodaya($this->sahodaya->id)
+            ->active()
+            ->orderByRaw('sahodaya_id is null desc')
+            ->orderBy('category')
+            ->orderBy('sort_order')
+            ->get(['id', 'code', 'label', 'category'])
+            ->groupBy(fn (Subject $s) => $s->category ?? 'other')
+            ->map(fn ($group) => $group->values())
+            ->all();
+
         return $this->inertia('Sahodaya/BoardResults/Masters', [
             'streams' => $streams,
+            'subjectsByCategory' => $subjects,
             'apiConfig' => $apiConfig->only([
                 'id', 'weight_pass_percent', 'weight_distinctions',
                 'weight_highest_mark', 'weight_toppers', 'is_active',

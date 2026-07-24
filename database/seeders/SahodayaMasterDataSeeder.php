@@ -74,24 +74,58 @@ class SahodayaMasterDataSeeder extends Seeder
             );
         }
 
+        // Full CBSE Class XII subject master, correctly categorized (see Subject::CATEGORY_*):
+        // Category I (language) — every student picks 2, e.g. English Core + Malayalam.
+        // Category II (science/commerce/humanities) — stream electives, student picks 3
+        //   from their stream's pool (which specific 3 is the student's choice, not fixed).
+        // Category III (skill) — a fully optional additional/6th subject, any stream.
+        // Existing codes (ENG/MAL/HIN/MAT/PHY/CHE/BIO/CS/AI/SS/ECO/ACC/BS/PE/MUS/DAN/ART) are
+        // kept exactly as-is so already-provisioned Sahodayas don't get duplicate rows —
+        // updateOrCreate() below only adds the category (and corrects the 'English'/'Hindi'
+        // labels to their precise CBSE names) without touching anything referencing the code.
         $subjects = [
-            ['code' => 'ENG', 'label' => 'English'],
-            ['code' => 'MAL', 'label' => 'Malayalam'],
-            ['code' => 'HIN', 'label' => 'Hindi'],
-            ['code' => 'MAT', 'label' => 'Mathematics'],
-            ['code' => 'PHY', 'label' => 'Physics'],
-            ['code' => 'CHE', 'label' => 'Chemistry'],
-            ['code' => 'BIO', 'label' => 'Biology'],
-            ['code' => 'CS', 'label' => 'Computer Science'],
-            ['code' => 'AI', 'label' => 'Artificial Intelligence'],
-            ['code' => 'SS', 'label' => 'Social Science'],
-            ['code' => 'ECO', 'label' => 'Economics'],
-            ['code' => 'ACC', 'label' => 'Accountancy'],
-            ['code' => 'BS', 'label' => 'Business Studies'],
-            ['code' => 'PE', 'label' => 'Physical Education'],
-            ['code' => 'MUS', 'label' => 'Music'],
-            ['code' => 'DAN', 'label' => 'Dance'],
-            ['code' => 'ART', 'label' => 'Art'],
+            // Category I — Languages
+            ['code' => 'ENG',  'label' => 'English Core',        'category' => Subject::CATEGORY_LANGUAGE],
+            ['code' => 'ENGE', 'label' => 'English Elective',    'category' => Subject::CATEGORY_LANGUAGE],
+            ['code' => 'HIN',  'label' => 'Hindi Core',          'category' => Subject::CATEGORY_LANGUAGE],
+            ['code' => 'HINE', 'label' => 'Hindi Elective',      'category' => Subject::CATEGORY_LANGUAGE],
+            ['code' => 'MAL',  'label' => 'Malayalam',           'category' => Subject::CATEGORY_LANGUAGE],
+            ['code' => 'SKT',  'label' => 'Sanskrit',            'category' => Subject::CATEGORY_LANGUAGE],
+            ['code' => 'ARB',  'label' => 'Arabic',              'category' => Subject::CATEGORY_LANGUAGE],
+
+            // Category II — Science electives
+            ['code' => 'PHY', 'label' => 'Physics',              'category' => Subject::CATEGORY_SCIENCE],
+            ['code' => 'CHE', 'label' => 'Chemistry',             'category' => Subject::CATEGORY_SCIENCE],
+            ['code' => 'BIO', 'label' => 'Biology',               'category' => Subject::CATEGORY_SCIENCE],
+            ['code' => 'MAT', 'label' => 'Mathematics',           'category' => Subject::CATEGORY_SCIENCE],
+            ['code' => 'CS',  'label' => 'Computer Science',      'category' => Subject::CATEGORY_SCIENCE],
+            ['code' => 'IP',  'label' => 'Informatics Practices', 'category' => Subject::CATEGORY_SCIENCE],
+
+            // Category II — Commerce electives
+            ['code' => 'ACC', 'label' => 'Accountancy',           'category' => Subject::CATEGORY_COMMERCE],
+            ['code' => 'BS',  'label' => 'Business Studies',      'category' => Subject::CATEGORY_COMMERCE],
+            ['code' => 'ECO', 'label' => 'Economics',             'category' => Subject::CATEGORY_COMMERCE],
+            ['code' => 'BA',  'label' => 'Business Administration', 'category' => Subject::CATEGORY_COMMERCE],
+
+            // Category II — Humanities electives
+            ['code' => 'HIS',  'label' => 'History',              'category' => Subject::CATEGORY_HUMANITIES],
+            ['code' => 'POL',  'label' => 'Political Science',    'category' => Subject::CATEGORY_HUMANITIES],
+            ['code' => 'GEO',  'label' => 'Geography',            'category' => Subject::CATEGORY_HUMANITIES],
+            ['code' => 'SOC',  'label' => 'Sociology',            'category' => Subject::CATEGORY_HUMANITIES],
+            ['code' => 'PSY',  'label' => 'Psychology',           'category' => Subject::CATEGORY_HUMANITIES],
+            ['code' => 'PHIL', 'label' => 'Philosophy',           'category' => Subject::CATEGORY_HUMANITIES],
+            // Social Science (below-10 combined subject, not a Class XII stream elective) —
+            // kept uncategorized so it doesn't misleadingly show up in a stream's Category II pool.
+            ['code' => 'SS', 'label' => 'Social Science', 'category' => null],
+
+            // Category III — Skill subjects (optional additional/6th subject, any stream)
+            ['code' => 'HSC', 'label' => 'Home Science',          'category' => Subject::CATEGORY_SKILL],
+            ['code' => 'FS',  'label' => 'Fashion Studies',       'category' => Subject::CATEGORY_SKILL],
+            ['code' => 'PE',  'label' => 'Physical Education',    'category' => Subject::CATEGORY_SKILL],
+            ['code' => 'AI',  'label' => 'Artificial Intelligence', 'category' => Subject::CATEGORY_SKILL],
+            ['code' => 'MUS', 'label' => 'Music',                 'category' => Subject::CATEGORY_SKILL],
+            ['code' => 'DAN', 'label' => 'Dance',                 'category' => Subject::CATEGORY_SKILL],
+            ['code' => 'ART', 'label' => 'Art',                   'category' => Subject::CATEGORY_SKILL],
         ];
 
         foreach ($subjects as $i => $s) {

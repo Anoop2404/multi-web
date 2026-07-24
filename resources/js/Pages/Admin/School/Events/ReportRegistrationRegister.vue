@@ -63,8 +63,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <template v-for="(row, idx) in displayRows" :key="row.participant_id">
-                        <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50">
+                    <template v-for="(row, idx) in rows.data" :key="row.participant_id">
+                        <tr v-if="shouldShowHeadDivider(row, rows.data[idx - 1])" class="bg-slate-50">
                             <td colspan="8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 {{ row.head_name ?? 'Other items' }}
                             </td>
@@ -86,11 +86,21 @@
                             <td class="p-3 text-xs">{{ row.item_fee != null ? `₹${row.item_fee}` : '—' }}</td>
                         </tr>
                     </template>
-                    <tr v-if="!displayRows.length">
+                    <tr v-if="!rows.data.length">
                         <td colspan="8" class="p-8 text-center text-gray-400">No registrations match the selected filters.</td>
                     </tr>
                 </tbody>
             </table>
+            <div v-if="rows.last_page > 1" class="px-4 py-3 border-t border-gray-100 flex flex-wrap justify-center gap-1">
+                <Link v-for="link in rows.links" :key="link.label"
+                      :href="link.url || '#'"
+                      class="px-3 py-1 rounded text-xs font-medium"
+                      :class="link.active ? 'bg-[#0f3d7a] text-white' : (link.url ? 'text-[#0f3d7a] hover:bg-gray-100' : 'text-gray-300 pointer-events-none')"
+                      v-html="link.label" />
+            </div>
+            <div v-else-if="rows.total" class="px-4 py-2 border-t border-gray-100 text-center text-xs text-slate-400">
+                Showing all {{ rows.total }} row{{ rows.total === 1 ? '' : 's' }}
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>
@@ -108,7 +118,7 @@ const props = defineProps({
     program: [String, Object],
     programMeta: { type: Object, default: null },
     event: Object,
-    rows: Array,
+    rows: Object,
     schoolSummary: Object,
     totals: Object,
     paymentsUrl: String,
@@ -119,14 +129,17 @@ const props = defineProps({
 const { programLabel, programBase } = useSchoolProgramContext(props);
 const base = `${programBase.value}/reports/${props.event.id}/registration-register`;
 
+// Filtering now happens server-side (see FestRegistrationRegisterService::build()) since
+// 'rows' is a paginated slice — client-side post-filtering would only ever see whatever
+// happened to land on the current page. applyFilter() still does a full page navigation
+// with head_id/item_id in the query string; the server does the actual filtering + paging.
 const {
     headFilter,
     itemFilter,
     headItemGroups,
     headsForFilter,
     hasItemHeads,
-    displayRows,
     applyFilter,
     shouldShowHeadDivider,
-} = useReportHeadFilters(base, () => props.rows);
+} = useReportHeadFilters(base, () => props.rows.data);
 </script>

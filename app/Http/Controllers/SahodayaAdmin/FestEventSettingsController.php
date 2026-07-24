@@ -123,6 +123,17 @@ class FestEventSettingsController extends SahodayaAdminController
             'clusterRequireStudentVerification' => (bool) (
                 SahodayaProfile::where('tenant_id', $this->sahodaya->id)->value('require_student_verification') ?? true
             ),
+            // Event-level policy/notification settings (approval policy, capacity caps,
+            // notification triggers) — see LocksTab.vue and
+            // docs/KALOTSAV_ITEM_CATEGORY_REPLACES_HEAD_PLAN.md §5 #3. Unlike the
+            // per-head notification editor in FestItemHeadOpsController (sports only),
+            // this is available for every event type since FestEvent::notificationEnabledFor()
+            // now backs the notification gate for events with no Event Head.
+            'notificationTriggers' => FestEvent::NOTIFICATION_TRIGGERS,
+            'eligibleNotificationUsers' => \App\Models\User::role(['sahodaya_admin', 'sahodaya_staff', 'event_coordinator'])
+                ->where('tenant_id', $this->sahodaya->id)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']),
         ]);
     }
 
@@ -271,6 +282,12 @@ class FestEventSettingsController extends SahodayaAdminController
             // Only has any effect for item_catalog/per_item billing; harmless to enable
             // on other fee models since itemPaymentAllocation() returns [] for those.
             'strict_item_payment_gating'          => 'nullable|boolean',
+            // Event-level approval policy / capacity caps — read by FestEvent::requiresManualApproval()
+            // as the fallback once an item has no Event Head (Kalotsav items assigned a plain
+            // category instead). See docs/KALOTSAV_ITEM_CATEGORY_REPLACES_HEAD_PLAN.md §5 #3.
+            'approval_policy'                     => 'nullable|in:auto,manual',
+            'max_participants'                    => 'nullable|integer|min:0',
+            'max_teams'                            => 'nullable|integer|min:0',
         ]);
 
         $data = FestEventSettingsPayload::applyDefaults($data);
@@ -288,6 +305,55 @@ class FestEventSettingsController extends SahodayaAdminController
         );
 
         return back()->with('success', 'Event settings saved.');
+    }
+
+    /**
+     * Event-level notification gating — the equivalent of
+     * FestItemHeadController::updateNotifications() but for the event itself, so it works
+     * for events with no Event Head (Kalotsav items assigned a plain category). See
+     * FestEventNotifier::suppressed() and docs/KALOTSAV_ITEM_CATEGORY_REPLACES_HEAD_PLAN.md §5 #3.
+     */
+    public function updateNotifications(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'disabled_triggers' => 'nullable|array',
+            'disabled_triggers.*' => 'string|in:'.implode(',', FestEvent::NOTIFICATION_TRIGGERS),
+            'extra_recipient_user_ids' => 'nullable|array',
+            'extra_recipient_user_ids.*' => 'integer',
+        ]);
+
+        $disabledTriggers = array_values(array_unique($data['disabled_triggers'] ?? []));
+
+        // Extra recipients must be existing platform users in this Sahodaya — never
+        // free-text emails. Silently drop anything that doesn't resolve to a real,
+        // appropriately-roled user rather than trusting the submitted id list as-is.
+        $requestedIds = array_map('intval', $data['extra_recipient_user_ids'] ?? []);
+        $validUserIds = $requestedIds === [] ? [] : \App\Models\User::role(['sahodaya_admin', 'sahodaya_staff', 'event_coordinator'])
+            ->where('tenant_id', $this->sahodaya->id)
+            ->whereIn('id', $requestedIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $event->update([
+            'notification_settings' => [
+                'disabled_triggers' => $disabledTriggers,
+                'extra_recipient_user_ids' => $validUserIds,
+            ],
+        ]);
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('locks'),
+            'fest.settings.notifications_updated',
+            'Event notification settings updated',
+            ['disabled_triggers' => $disabledTriggers, 'extra_recipient_count' => count($validUserIds)],
+        );
+
+        return back()->with('success', 'Notification settings saved.');
     }
 
     public function updateFeeSettings(Request $request, string $tenantId, FestEvent $event)

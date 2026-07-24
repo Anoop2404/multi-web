@@ -144,11 +144,25 @@ class FestSchoolReportAnalyticsService
             ->numberingRegisterRows($this->schoolId);
     }
 
+    /** On-screen paginated variant — see docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md §7 Phase 4. */
+    public function numberingRegisterPaginated(int $page = 1, int $perPage = 50): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        return app(FestEventReportAnalyticsService::class, ['event' => $this->event])
+            ->numberingRegisterPaginated($this->schoolId, $page, $perPage);
+    }
+
     /** @return list<array<string, mixed>> */
     public function pendingApprovalRows(): array
     {
         return app(FestEventReportAnalyticsService::class, ['event' => $this->event])
             ->pendingApprovalRows($this->schoolId);
+    }
+
+    /** On-screen paginated variant — see docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md §7 Phase 4. */
+    public function pendingApprovalPaginated(int $page = 1, int $perPage = 50): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        return app(FestEventReportAnalyticsService::class, ['event' => $this->event])
+            ->pendingApprovalPaginated($this->schoolId, $page, $perPage);
     }
 
     /** @return list<array<string, mixed>> */

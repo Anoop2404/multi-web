@@ -38,6 +38,11 @@ class FestPartitionService
         return $this->partitions($event)->isNotEmpty();
     }
 
+    public function shouldCombineAtFinale(FestEvent $event): bool
+    {
+        return (bool) ($event->combine_regions_at_finale ?? true);
+    }
+
     /** @deprecated Use isPartitionedHub() */
     public function isUmbrella(FestEvent $event): bool
     {

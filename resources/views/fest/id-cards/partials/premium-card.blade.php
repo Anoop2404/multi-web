@@ -64,6 +64,13 @@
                     <td class="pcard__meta-sep">:</td>
                     <td class="pcard__meta-val">{{ $card['venue'] ?? '—' }}</td>
                 </tr>
+                @if(!empty($card['dob']))
+                <tr>
+                    <td class="pcard__meta-label">DOB</td>
+                    <td class="pcard__meta-sep">:</td>
+                    <td class="pcard__meta-val">{{ $card['dob'] }}</td>
+                </tr>
+                @endif
                 <tr>
                     <td class="pcard__meta-label">Sahodaya</td>
                     <td class="pcard__meta-sep">:</td>

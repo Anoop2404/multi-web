@@ -172,7 +172,7 @@ class EventContext
     public function scoreboardBySchool(): array
     {
         $partitionService = app(FestPartitionService::class);
-        if ($partitionService->isPartitionedHub($this->event)) {
+        if ($partitionService->isPartitionedHub($this->event) && $partitionService->shouldCombineAtFinale($this->event)) {
             return $partitionService->combinedScoreboard($this->event);
         }
 

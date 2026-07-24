@@ -112,7 +112,7 @@ class TenantUserCatalog
     /** @return list<string> */
     public static function festEventDuties(): array
     {
-        return ['coordinator', 'stage', 'registration', 'attendance', 'food', 'appeals', 'certificates', 'marks', 'discipline', 'admit_cards'];
+        return ['coordinator', 'region_admin', 'stage', 'registration', 'attendance', 'food', 'appeals', 'certificates', 'marks', 'discipline', 'admit_cards'];
     }
 
     /** @return array<string, string> */
@@ -204,6 +204,7 @@ class TenantUserCatalog
     {
         return [
             'coordinator'  => 'Head of event (coordinator)',
+            'region_admin' => 'Region coordinator / admin',
             'stage'        => 'Stage manager',
             'registration' => 'Registration desk',
             'attendance'   => 'Attendance officer',

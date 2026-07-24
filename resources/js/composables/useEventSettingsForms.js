@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import { settingsDescriptionForEvent } from '@/support/sahodayaEventCapabilities.js';
 
@@ -93,7 +93,42 @@ export function useEventSettingsForms(props) {
         default_record_prize_label: props.event.default_record_prize_label ?? 'Record Break Prize',
         student_verification_mode: studentVerificationModeFromEvent(props.event),
         strict_item_payment_gating: props.event.strict_item_payment_gating ?? false,
+        approval_policy: props.event.approval_policy ?? 'auto',
+        max_participants: props.event.max_participants ?? '',
+        max_teams: props.event.max_teams ?? '',
     });
+
+    // Event-level notification gating — mirrors the per-head form in
+    // FestHeadManagePanel.vue, but always available (that one is sports-only). See
+    // docs/KALOTSAV_ITEM_CATEGORY_REPLACES_HEAD_PLAN.md §5 #3.
+    const notificationTriggers = props.notificationTriggers ?? [];
+    function buildEventNotif(source) {
+        const disabled = new Set(source?.notification_settings?.disabled_triggers ?? []);
+        const enabled = {};
+        for (const trigger of notificationTriggers) {
+            enabled[trigger] = !disabled.has(trigger);
+        }
+
+        return {
+            enabled,
+            extra_recipient_user_ids: [...(source?.notification_settings?.extra_recipient_user_ids ?? [])],
+        };
+    }
+    const eventNotifForm = reactive(buildEventNotif(props.event));
+    const savingEventNotifications = ref(false);
+
+    function saveEventNotifications() {
+        savingEventNotifications.value = true;
+        const disabledTriggers = notificationTriggers.filter((trigger) => eventNotifForm.enabled[trigger] === false);
+
+        router.put(`${base}/notification-settings`, {
+            disabled_triggers: disabledTriggers,
+            extra_recipient_user_ids: eventNotifForm.extra_recipient_user_ids,
+        }, {
+            preserveScroll: true,
+            onFinish: () => { savingEventNotifications.value = false; },
+        });
+    }
 
     const venueForm = useForm({ name: '', location: '', capacity: null });
     const stageForm = useForm({ name: '', venue_id: '' });
@@ -421,6 +456,8 @@ export function useEventSettingsForms(props) {
         policyForm,
         lifecycleLinks,
         settingsForm,
+        eventNotifForm,
+        savingEventNotifications,
         venueForm,
         stageForm,
         comboForm,
@@ -441,6 +478,7 @@ export function useEventSettingsForms(props) {
         ageGroupHelp: computed(() => props.ageGroupHelp ?? []),
         savePolicy,
         saveSettings,
+        saveEventNotifications,
         saveFeeSettings,
         saveEligibility,
         saveLifecycle,

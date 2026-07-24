@@ -54,6 +54,11 @@
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.venue || '—' }}</td>
                     </tr>
+                    <tr v-if="card.dob">
+                        <td class="id-card-tile__meta-label">DOB</td>
+                        <td class="id-card-tile__meta-sep">:</td>
+                        <td class="id-card-tile__meta-val">{{ card.dob }}</td>
+                    </tr>
                     <tr>
                         <td class="id-card-tile__meta-label">Shodaya</td>
                         <td class="id-card-tile__meta-sep">:</td>

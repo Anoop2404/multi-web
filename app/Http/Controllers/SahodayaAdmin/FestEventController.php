@@ -142,7 +142,33 @@ class FestEventController extends SahodayaAdminController
             'fee_type'           => 'nullable|in:none,flat_school,per_participant,per_item',
             'fee_amount'         => 'nullable|numeric|min:0',
             'description'        => 'nullable|string',
+            'max_total_per_student'    => 'nullable|integer|min:0',
+            'max_onstage_per_student'  => 'nullable|integer|min:0',
+            'max_offstage_per_student' => 'nullable|integer|min:0',
+            'max_group_per_student'    => 'nullable|integer|min:0',
         ]);
+
+        // Participation limits (on-stage/off-stage/team caps per student) aren't
+        // fest_events columns — they live on FestParticipationPolicy. Pull them out
+        // of $data before FestEvent::create() and apply after the event exists.
+        $participationLimits = array_filter([
+            'max_total_per_student'    => $data['max_total_per_student'] ?? null,
+            'max_onstage_per_student'  => $data['max_onstage_per_student'] ?? null,
+            'max_offstage_per_student' => $data['max_offstage_per_student'] ?? null,
+            'max_group_per_student'    => $data['max_group_per_student'] ?? null,
+        ], fn ($v) => $v !== null);
+        unset($data['max_total_per_student'], $data['max_onstage_per_student'], $data['max_offstage_per_student'], $data['max_group_per_student']);
+
+        if (isset($participationLimits['max_total_per_student'])) {
+            $breakdown = ($participationLimits['max_onstage_per_student'] ?? 0)
+                + ($participationLimits['max_offstage_per_student'] ?? 0)
+                + ($participationLimits['max_group_per_student'] ?? 0);
+            if ($breakdown > $participationLimits['max_total_per_student']) {
+                return back()->withErrors([
+                    'max_total_per_student' => "On-stage + off-stage + team breakdown ({$breakdown}) exceeds the total per-student limit ({$participationLimits['max_total_per_student']}).",
+                ])->withInput();
+            }
+        }
 
         $levelRound = $data['level_round'] ?? 'sahodaya';
         $eventType = $data['event_type'];
@@ -182,6 +208,18 @@ class FestEventController extends SahodayaAdminController
         $data = FestEventPayload::applyDefaults($data);
 
         $event = FestEvent::create($data);
+
+        if ($participationLimits !== []) {
+            \App\Models\FestParticipationPolicy::updateOrCreate(
+                ['event_id' => $event->id, 'class_group' => null],
+                array_merge($participationLimits, [
+                    'tenant_id'    => $this->sahodaya->id,
+                    'scope'        => 'event',
+                    'level_round'  => $levelRound,
+                    'is_active'    => true,
+                ])
+            );
+        }
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,
@@ -562,8 +600,14 @@ class FestEventController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'preset' => 'required|string|in:mcs_kalotsav',
+            'preset' => 'required|string|in:mcs_kalotsav,generic_region_sync,regional_cluster,standard',
         ]);
+
+        if ($data['preset'] === 'generic_region_sync' || $data['preset'] === 'regional_cluster') {
+            $event->update(['conduct_mode' => 'partitioned']);
+            $result = app(\App\Services\Events\FestRegionPartitionService::class)->syncPartitionsFromRegions($event);
+            return back()->with('success', "{$result['partitions_created']} region partition(s) created from membership regions.");
+        }
 
         $created = app(\App\Services\Events\FestPartitionService::class)
             ->spawnFromPreset($event, $data['preset']);
@@ -574,6 +618,30 @@ class FestEventController extends SahodayaAdminController
         ]);
 
         return back()->with('success', count($created).' partition(s) created from preset.');
+    }
+
+    public function updateConductTopology(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'conduct_mode'              => 'required|string|in:standard,partitioned',
+            'combine_regions_at_finale' => 'nullable|boolean',
+        ]);
+
+        $event->update([
+            'conduct_mode'              => $data['conduct_mode'],
+            'combine_regions_at_finale' => $data['combine_regions_at_finale'] ?? true,
+        ]);
+
+        if ($data['conduct_mode'] === 'partitioned') {
+            app(\App\Services\Events\FestRegionPartitionService::class)
+                ->syncPartitionsFromRegions($event);
+        }
+
+        $audit->festEvent($event, FestPageActivity::LEVELS, 'fest.levels.topology_updated', 'Conduct topology updated', $data);
+
+        return back()->with('success', 'Conduct topology updated.');
     }
 
     public function assignSchoolPartitions(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)

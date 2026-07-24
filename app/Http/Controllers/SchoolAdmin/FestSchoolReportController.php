@@ -560,7 +560,14 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $meta = SchoolFestProgram::meta($program);
-        $data = $register->build($event, $this->school->id);
+        $data = $register->build(
+            $event,
+            $this->school->id,
+            $request->integer('page', 1),
+            50,
+            $request->string('head_id')->toString() ?: null,
+            $request->string('item_id')->toString() ?: null,
+        );
 
         return $this->inertia('School/Events/ReportRegistrationRegister', array_merge(
             $this->schoolItemHeadReportContext($event, $program),
@@ -1088,7 +1095,7 @@ class FestSchoolReportController extends SchoolAdminController
             'programMeta' => $meta,
             'school'      => $this->school->only('id', 'name'),
             'event'       => $event->only('id', 'title'),
-            'rows'        => $analytics->numberingRegisterRows(),
+            'rows'        => $analytics->numberingRegisterPaginated($request->integer('page', 1)),
             'xlsUrl'      => "{$base}/numbering-register/export",
         ]);
     }
@@ -1113,7 +1120,7 @@ class FestSchoolReportController extends SchoolAdminController
             'programMeta' => $meta,
             'school'      => $this->school->only('id', 'name'),
             'event'       => $event->only('id', 'title'),
-            'rows'        => $analytics->pendingApprovalRows(),
+            'rows'        => $analytics->pendingApprovalPaginated($request->integer('page', 1)),
             'xlsUrl'      => "{$base}/pending-approvals/export",
         ]);
     }

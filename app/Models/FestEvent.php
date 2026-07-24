@@ -11,11 +11,24 @@ class FestEvent extends Model
 {
     use BelongsToCentralTenant;
 
+    /**
+     * Mirrors FestItemHead::NOTIFICATION_TRIGGERS — kept as its own copy (not a shared
+     * reference) for the same reason the "Sports unified event fields" block below is a
+     * copy rather than a join: this list needs to work for any event, head or no head.
+     */
+    public const NOTIFICATION_TRIGGERS = [
+        'registration_approved', 'registration_rejected', 'registration_withdrawn',
+        'registration_opened', 'registration_deadline', 'payment_pending',
+        'competition_reminder', 'certificates_available', 'results_published',
+        'schedule_published', 'chest_reveal', 'promotion_completed',
+        'sports_winners_received', 'appeal_received',
+    ];
+
     protected $fillable = [
         'tenant_id', 'academic_year_id', 'title', 'event_type', 'conductor_level',
         'conduct_levels', 'level_round', 'state_program_id', 'conducting_school_id',
         'is_cascaded', 'parent_event_id',         'cluster_key', 'cluster_label', 'cloned_from_event_id',
-        'conduct_mode', 'partition_role', 'partition_key', 'aggregation_config', 'scoring_preset',
+        'conduct_mode', 'combine_regions_at_finale', 'partition_role', 'partition_key', 'aggregation_config', 'scoring_preset',
         'registration_open', 'registration_close', 'event_start', 'event_end', 'sports_age_cutoff_date', 'venue',
         'fee_type', 'fee_amount', 'fee_settings', 'numbering_settings', 'status', 'nav_hidden', 'results_published', 'description',
         'scoring_locked', 'appeals_open', 'chest_reveal_mode', 'require_judge_scores_before_publish',
@@ -53,6 +66,7 @@ class FestEvent extends Model
         'record_tracking_enabled'             => 'boolean',
         'is_team_heading'                     => 'boolean',
         'strict_item_payment_gating'           => 'boolean',
+        'combine_regions_at_finale'           => 'boolean',
         'conduct_levels'                      => 'array',
         'aggregation_config'                  => 'array',
         'notification_settings'               => 'array',
@@ -378,5 +392,10 @@ class FestEvent extends Model
         }
 
         return true;
+    }
+
+    public function phases(): HasMany
+    {
+        return $this->hasMany(FestEventPhase::class, 'event_id')->orderBy('sort_order');
     }
 }

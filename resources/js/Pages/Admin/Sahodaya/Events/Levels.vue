@@ -30,6 +30,32 @@
             <div class="card space-y-4">
                 <h4 class="section-title">{{ showPartitionUi ? 'Regions & partitions' : (event.event_type === 'kids_fest' && !event.parent_event_id ? 'Geographic clusters' : 'Child events') }}</h4>
 
+                <!-- Conduct Topology Settings -->
+                <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                    <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700">Conduct Topology Settings</h5>
+                    <form @submit.prevent="updateTopology" class="space-y-3 text-xs">
+                        <div>
+                            <label class="font-semibold text-slate-700 block mb-1">Conduct Mode</label>
+                            <select v-model="topologyForm.conduct_mode" class="field text-xs">
+                                <option value="standard">Single Venue / Single Event (Standard)</option>
+                                <option value="partitioned">Region-Wise Partitions / Multi-Region</option>
+                            </select>
+                        </div>
+                        <div v-if="topologyForm.conduct_mode === 'partitioned'" class="space-y-1">
+                            <label class="flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
+                                <input type="checkbox" v-model="topologyForm.combine_regions_at_finale" class="rounded border-slate-300 text-indigo-600">
+                                <span>Combine region scores into overall finale leaderboard</span>
+                            </label>
+                            <p class="text-[11px] text-slate-500">
+                                When enabled, an overall tab aggregates region scores. Uncheck if region results are final and standalone.
+                            </p>
+                        </div>
+                        <button type="submit" class="btn-primary text-xs w-full" :disabled="topologyForm.processing">
+                            Save Conduct Topology
+                        </button>
+                    </form>
+                </div>
+
                 <form v-if="!event.parent_event_id && conductPresets?.length" @submit.prevent="applyPreset" class="flex gap-2">
                     <select v-model="presetForm.preset" class="field flex-1 text-sm">
                         <option value="">Apply conduct preset…</option>
@@ -137,7 +163,15 @@ const clusterForm = useForm({ title: '', cluster_key: '', cluster_label: '', ven
 const partitionForm = useForm({ title: '', partition_key: '', partition_role: 'region', cluster_label: '', venue: '' });
 const presetForm = useForm({ preset: '' });
 const regionSync = useForm({});
+const topologyForm = useForm({
+    conduct_mode: props.event.conduct_mode || 'standard',
+    combine_regions_at_finale: props.event.combine_regions_at_finale ?? true,
+});
 const assignmentMap = reactive({ ...props.schoolPartitions });
+
+function updateTopology() {
+    topologyForm.post(`${base}/conduct-topology`, { preserveScroll: true });
+}
 
 function spawnChild() {
     cascadeForm.post(`${base}/spawn`, { preserveScroll: true, onSuccess: () => cascadeForm.reset() });

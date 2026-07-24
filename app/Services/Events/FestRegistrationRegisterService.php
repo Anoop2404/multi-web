@@ -17,14 +17,31 @@ class FestRegistrationRegisterService
     ) {}
 
     /**
+     * @param  ?int  $page  When null (the default), 'rows' is the full unbounded list —
+     *                      what exportCsv() and the PDF export need. On-screen callers
+     *                      pass the current page to get a windowed
+     *                      \Illuminate\Pagination\LengthAwarePaginator instead, for a
+     *                      school with many participants. See
+     *                      docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md §3/§7 Phase 4.
+     * @param  ?string  $headId  Optional head/item filter from the on-screen dropdown,
+     *                           applied at query level (required once rows can be a
+     *                           paginated slice — filtering post-hoc client-side would
+     *                           only see the current page).
+     * @param  ?string  $itemId
      * @return array{
-     *     rows: list<array<string, mixed>>,
+     *     rows: list<array<string, mixed>>|\Illuminate\Pagination\LengthAwarePaginator,
      *     school_summaries: list<array<string, mixed>>,
      *     totals: array<string, mixed>
      * }
      */
-    public function build(FestEvent $event, ?string $schoolId = null): array
-    {
+    public function build(
+        FestEvent $event,
+        ?string $schoolId = null,
+        ?int $page = null,
+        int $perPage = 50,
+        ?string $headId = null,
+        ?string $itemId = null,
+    ): array {
         $schedule = $this->feeService->resolveSchedule($event);
         $feeRequired = $this->feeService->feeRequired($event);
         $eventIds = $event->reportableEventIds();
@@ -52,6 +69,18 @@ class FestRegistrationRegisterService
         $registrations = FestRegistration::whereIn('event_id', $eventIds)
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->whereNotIn('status', ['withdrawn', 'rejected'])
+            // head_id/item_id come from the on-screen head/item filter dropdown. Filtering
+            // here (not client-side) is required now that 'rows' can be a paginated slice —
+            // client-side filtering would only ever see whatever happened to land on the
+            // current page. See ReportRegistrationRegister.vue.
+            ->when($headId, function ($q) use ($headId) {
+                if ($headId === 'other') {
+                    $q->whereHas('item', fn ($iq) => $iq->whereNull('head_id'));
+                } else {
+                    $q->whereHas('item', fn ($iq) => $iq->where('head_id', $headId));
+                }
+            })
+            ->when($itemId, fn ($q) => $q->where('item_id', $itemId))
             ->with([
                 'school:id,name',
                 'item:id,title,participant_type,class_group,age_group,fee_amount,head_id',
@@ -93,18 +122,44 @@ class FestRegistrationRegisterService
 
         $schoolSummaries = $this->schoolSummaries($event, $schoolFees, $feeRequired, $schoolId);
 
-        return [
-            'rows'             => $rows,
-            'school_summaries' => $schoolSummaries,
-            'totals'           => [
-                'participants'   => count($rows),
-                'registrations'  => $registrations->count(),
-                'schools'        => $schoolSummaries->count(),
-                'total_due'      => round((float) $schoolSummaries->sum('total_due'), 2),
-                'total_collected'=> round((float) $schoolSummaries->where('fee_status', 'approved')->sum('total_due'), 2),
-                'fee_required'   => $feeRequired,
-            ],
+        $totals = [
+            'participants'   => count($rows),
+            'registrations'  => $registrations->count(),
+            'schools'        => $schoolSummaries->count(),
+            'total_due'      => round((float) $schoolSummaries->sum('total_due'), 2),
+            'total_collected'=> round((float) $schoolSummaries->where('fee_status', 'approved')->sum('total_due'), 2),
+            'fee_required'   => $feeRequired,
         ];
+
+        // school_summaries/totals stay full aggregate data either way — they're summary
+        // tiles, not a long list. Only the participant-level rows get windowed, and only
+        // when a page is requested (exportCsv()/PDF export call build() with $page left
+        // null so they keep getting every row unchanged).
+        $rowsOut = $page === null ? $rows : $this->paginateRows($rows, max(1, $page), $perPage);
+
+        return [
+            'rows'             => $rowsOut,
+            'school_summaries' => $schoolSummaries,
+            'totals'           => $totals,
+        ];
+    }
+
+    private function paginateRows(array $rows, int $page, int $perPage): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        $collection = collect($rows);
+
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $collection->slice(($page - 1) * $perPage, $perPage)->values(),
+            $collection->count(),
+            $perPage,
+            $page,
+            ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'pageName' => 'page'],
+        );
+
+        // Preserve head_id/item_id (and anything else) in the page links generated below —
+        // without this, clicking "next page" from a filtered view would silently drop the
+        // active head/item filter.
+        return $paginator->withQueryString();
     }
 
     /** @return list<array<string, mixed>> */

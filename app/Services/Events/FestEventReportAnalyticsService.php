@@ -22,6 +22,8 @@ use App\Services\Events\FestIdCardService;
 use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FestEventReportAnalyticsService
@@ -211,60 +213,107 @@ class FestEventReportAnalyticsService
             ->orderBy('sort_order')
             ->get();
 
+        if ($heads->isEmpty()) {
+            return [];
+        }
+
+        $headIds = $heads->pluck('id');
+
         // Per-head due/collected totals only mean something when this event actually
         // bills per-head; otherwise every real FestSchoolEventFee row has head_id = null
         // and filtering by a specific head's id always returns zero, silently showing
         // "₹0 due" per head for a school that in fact owes a real single-record total.
         $usesPerHeadBilling = app(FestSchoolEventFeeService::class)->usesPerHeadBilling($this->event);
 
-        return $heads->map(function (FestItemHead $head) use ($schoolId, $usesPerHeadBilling) {
-            $itemIds = FestEventItem::where('event_id', $this->event->id)
-                ->where('head_id', $head->id)
-                ->pluck('id');
+        // Batched aggregates instead of ~6-7 queries per head — see
+        // docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md §2/§7 Phase 3. Each map below costs
+        // exactly one query, regardless of head count.
+        $itemCountByHead = FestEventItem::where('event_id', $this->event->id)
+            ->whereIn('head_id', $headIds)
+            ->selectRaw('head_id, count(*) as cnt')
+            ->groupBy('head_id')
+            ->pluck('cnt', 'head_id');
 
-            $regBase = FestRegistration::query()
-                ->where('event_id', $this->event->id)
-                ->whereIn('item_id', $itemIds)
-                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+        $statusRows = FestRegistration::query()
+            ->join('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
+            ->where('fest_registrations.event_id', $this->event->id)
+            ->whereIn('fest_event_items.head_id', $headIds)
+            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+            ->selectRaw('fest_event_items.head_id as head_id, fest_registrations.status as status, count(*) as cnt')
+            ->groupBy('fest_event_items.head_id', 'fest_registrations.status')
+            ->get();
 
-            $approved = (clone $regBase)->where('status', 'approved')->count();
-            $pending = (clone $regBase)->whereIn('status', ['submitted', 'pending_approval'])->count();
-            $waitlisted = (clone $regBase)->where('status', 'waitlisted')->count();
+        $statusMap = [];
+        foreach ($statusRows as $row) {
+            $statusMap[$row->head_id][$row->status] = (int) $row->cnt;
+        }
 
-            $participantCount = FestParticipant::query()
-                ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $this->event->id)
-                    ->whereIn('item_id', $itemIds)
-                    ->active()
-                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
-                ->count();
+        $participantRows = FestParticipant::query()
+            ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
+            ->join('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
+            ->leftJoin('students', 'students.id', '=', 'fest_participants.student_id')
+            ->where('fest_registrations.event_id', $this->event->id)
+            ->whereIn('fest_event_items.head_id', $headIds)
+            ->whereIn('fest_registrations.status', FestRegistration::ACTIVE_STATUSES)
+            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+            ->selectRaw('
+                fest_event_items.head_id as head_id,
+                count(*) as participant_count,
+                sum(case when students.verified_at is not null then 1 else 0 end) as verified_count
+            ')
+            ->groupBy('fest_event_items.head_id')
+            ->get();
 
-            $verifiedParticipants = FestParticipant::query()
-                ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $this->event->id)
-                    ->whereIn('item_id', $itemIds)
-                    ->active()
-                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
-                ->whereHas('student', fn ($q) => $q->whereNotNull('verified_at'))
-                ->count();
+        $participantMap = [];
+        foreach ($participantRows as $row) {
+            $participantMap[$row->head_id] = [
+                'participant_count' => (int) $row->participant_count,
+                'verified_count'    => (int) $row->verified_count,
+            ];
+        }
 
-            $perItemCounts = FestRegistration::query()
-                ->where('event_id', $this->event->id)
-                ->whereIn('item_id', $itemIds)
-                ->active()
+        // max_item_reg_count needs per-item counts first, then the max within each
+        // head's items — one query for per-item counts, grouped by head in PHP.
+        $perItemRows = FestRegistration::query()
+            ->join('fest_event_items', 'fest_event_items.id', '=', 'fest_registrations.item_id')
+            ->where('fest_registrations.event_id', $this->event->id)
+            ->whereIn('fest_event_items.head_id', $headIds)
+            ->whereIn('fest_registrations.status', FestRegistration::ACTIVE_STATUSES)
+            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+            ->selectRaw('fest_event_items.head_id as head_id, fest_registrations.item_id as item_id, count(*) as cnt')
+            ->groupBy('fest_event_items.head_id', 'fest_registrations.item_id')
+            ->get();
+
+        $maxItemRegByHead = [];
+        foreach ($perItemRows as $row) {
+            $maxItemRegByHead[$row->head_id] = max($maxItemRegByHead[$row->head_id] ?? 0, (int) $row->cnt);
+        }
+
+        $headFeesByHead = [];
+        if ($usesPerHeadBilling) {
+            $allHeadFees = FestSchoolEventFee::where('event_id', $this->event->id)
+                ->whereIn('head_id', $headIds)
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-                ->selectRaw('item_id, count(*) as cnt')
-                ->groupBy('item_id')
-                ->pluck('cnt', 'item_id');
+                ->get();
+            $headFeesByHead = $allHeadFees->groupBy('head_id');
+        }
 
-            $maxItemReg = $perItemCounts->max() ?? 0;
+        return $heads->map(function (FestItemHead $head) use ($schoolId, $usesPerHeadBilling, $itemCountByHead, $statusMap, $participantMap, $maxItemRegByHead, $headFeesByHead) {
+            $approved = $statusMap[$head->id]['approved'] ?? 0;
+            $pending = ($statusMap[$head->id]['submitted'] ?? 0) + ($statusMap[$head->id]['pending_approval'] ?? 0);
+            $waitlisted = $statusMap[$head->id]['waitlisted'] ?? 0;
+
+            $participantCount = $participantMap[$head->id]['participant_count'] ?? 0;
+            $verifiedParticipants = $participantMap[$head->id]['verified_count'] ?? 0;
+
+            $maxItemReg = $maxItemRegByHead[$head->id] ?? 0;
 
             $quota = max(0, (int) ($head->included_items_per_student ?? 0));
 
             $row = [
                 'head_id'             => $head->id,
                 'head_name'           => $head->name,
-                'item_count'          => $itemIds->count(),
+                'item_count'          => (int) ($itemCountByHead[$head->id] ?? 0),
                 'registration_count' => $approved + $pending,
                 'approved_count'      => $approved,
                 'pending_count'       => $pending,
@@ -281,10 +330,7 @@ class FestEventReportAnalyticsService
             ];
 
             if ($usesPerHeadBilling) {
-                $headFees = FestSchoolEventFee::where('event_id', $this->event->id)
-                    ->where('head_id', $head->id)
-                    ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-                    ->get();
+                $headFees = $headFeesByHead->get($head->id, collect());
 
                 $row['due_total'] = round((float) $headFees->sum('total_due'), 2);
                 $row['collected_total'] = round((float) $headFees->where('status', 'approved')->sum('total_due'), 2);
@@ -311,48 +357,91 @@ class FestEventReportAnalyticsService
                 ->get()
             : collect([$this->event]);
 
-        return $sports->map(function (FestEvent $sport) use ($schoolId) {
-            $itemIds = FestEventItem::where('event_id', $sport->id)->pluck('id');
+        if ($sports->isEmpty()) {
+            return [];
+        }
 
-            $regBase = FestRegistration::query()
-                ->where('event_id', $sport->id)
-                ->whereIn('item_id', $itemIds)
-                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+        $sportIds = $sports->pluck('id');
 
-            $approved = (clone $regBase)->where('status', 'approved')->count();
-            $pending = (clone $regBase)->whereIn('status', ['submitted', 'pending_approval'])->count();
-            $waitlisted = (clone $regBase)->where('status', 'waitlisted')->count();
+        // Batched aggregates instead of ~6 queries per sport — see
+        // docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md §2/§7 Phase 3. Each map below costs
+        // exactly one query, regardless of sport count. Grouping is by event_id alone
+        // (dropping the old whereIn('item_id', $itemIds) filter) — a registration's
+        // event_id already fully determines which sport it belongs to, so the item_id
+        // constraint was always redundant with it, not an independent condition.
+        $itemCountBySport = FestEventItem::whereIn('event_id', $sportIds)
+            ->selectRaw('event_id, count(*) as cnt')
+            ->groupBy('event_id')
+            ->pluck('cnt', 'event_id');
 
-            $participantBase = FestParticipant::query()
-                ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $sport->id)
-                    ->whereIn('item_id', $itemIds)
-                    ->active()
-                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)));
+        $statusRows = FestRegistration::query()
+            ->whereIn('event_id', $sportIds)
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->selectRaw('event_id, status, count(*) as cnt')
+            ->groupBy('event_id', 'status')
+            ->get();
 
-            $participantCount = (clone $participantBase)->count();
-            $verifiedParticipants = (clone $participantBase)
-                ->whereHas('student', fn ($q) => $q->whereNotNull('verified_at'))
-                ->count();
+        $statusMap = [];
+        foreach ($statusRows as $row) {
+            $statusMap[$row->event_id][$row->status] = (int) $row->cnt;
+        }
 
-            $maxItemReg = FestRegistration::query()
-                ->where('event_id', $sport->id)
-                ->whereIn('item_id', $itemIds)
-                ->active()
-                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-                ->selectRaw('item_id, count(*) as cnt')
-                ->groupBy('item_id')
-                ->pluck('cnt', 'item_id')
-                ->max() ?? 0;
+        $participantRows = FestParticipant::query()
+            ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
+            ->leftJoin('students', 'students.id', '=', 'fest_participants.student_id')
+            ->whereIn('fest_registrations.event_id', $sportIds)
+            ->whereIn('fest_registrations.status', FestRegistration::ACTIVE_STATUSES)
+            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+            ->selectRaw('
+                fest_registrations.event_id as event_id,
+                count(*) as participant_count,
+                sum(case when students.verified_at is not null then 1 else 0 end) as verified_count
+            ')
+            ->groupBy('fest_registrations.event_id')
+            ->get();
 
-            $fees = FestSchoolEventFee::where('event_id', $sport->id)
-                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-                ->get();
+        $participantMap = [];
+        foreach ($participantRows as $row) {
+            $participantMap[$row->event_id] = [
+                'participant_count' => (int) $row->participant_count,
+                'verified_count'    => (int) $row->verified_count,
+            ];
+        }
+
+        $perItemRows = FestRegistration::query()
+            ->whereIn('event_id', $sportIds)
+            ->whereIn('status', FestRegistration::ACTIVE_STATUSES)
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->selectRaw('event_id, item_id, count(*) as cnt')
+            ->groupBy('event_id', 'item_id')
+            ->get();
+
+        $maxItemRegBySport = [];
+        foreach ($perItemRows as $row) {
+            $maxItemRegBySport[$row->event_id] = max($maxItemRegBySport[$row->event_id] ?? 0, (int) $row->cnt);
+        }
+
+        $feesBySport = FestSchoolEventFee::whereIn('event_id', $sportIds)
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->get()
+            ->groupBy('event_id');
+
+        return $sports->map(function (FestEvent $sport) use ($itemCountBySport, $statusMap, $participantMap, $maxItemRegBySport, $feesBySport) {
+            $approved = $statusMap[$sport->id]['approved'] ?? 0;
+            $pending = ($statusMap[$sport->id]['submitted'] ?? 0) + ($statusMap[$sport->id]['pending_approval'] ?? 0);
+            $waitlisted = $statusMap[$sport->id]['waitlisted'] ?? 0;
+
+            $participantCount = $participantMap[$sport->id]['participant_count'] ?? 0;
+            $verifiedParticipants = $participantMap[$sport->id]['verified_count'] ?? 0;
+
+            $maxItemReg = $maxItemRegBySport[$sport->id] ?? 0;
+
+            $fees = $feesBySport->get($sport->id, collect());
 
             return [
                 'head_id'             => $sport->id,
                 'head_name'           => $sport->title,
-                'item_count'          => $itemIds->count(),
+                'item_count'          => (int) ($itemCountBySport[$sport->id] ?? 0),
                 'registration_count'  => $approved + $pending,
                 'approved_count'      => $approved,
                 'pending_count'       => $pending,
@@ -390,37 +479,65 @@ class FestEventReportAnalyticsService
             ->orderBy('title')
             ->get();
 
+        if ($items->isEmpty()) {
+            return [];
+        }
+
+        $itemIds = $items->pluck('id');
+
+        // Batched aggregates instead of ~5 queries per item — at real scale (many
+        // items × thousands of registrations) that was a genuine N+1 cost, not just
+        // an academic one. See docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md §2/§7 Phase 1.
+        // Each map below costs exactly one query, regardless of item count.
+        $statusRows = FestRegistration::query()
+            ->whereIn('event_id', $eventIds)
+            ->whereIn('item_id', $itemIds)
+            ->whereIn('status', ['approved', 'submitted'])
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->selectRaw('item_id, status, count(*) as cnt')
+            ->groupBy('item_id', 'status')
+            ->get();
+
+        $statusMap = [];
+        foreach ($statusRows as $row) {
+            $statusMap[$row->item_id][$row->status] = (int) $row->cnt;
+        }
+
+        $participantRows = FestParticipant::query()
+            ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
+            ->whereIn('fest_registrations.event_id', $eventIds)
+            ->whereIn('fest_registrations.item_id', $itemIds)
+            ->whereIn('fest_registrations.status', FestRegistration::ACTIVE_STATUSES)
+            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+            ->selectRaw('fest_registrations.item_id as item_id, count(*) as participant_count, sum(case when fest_participants.item_registration_number is not null then 1 else 0 end) as assigned_count')
+            ->groupBy('fest_registrations.item_id')
+            ->get();
+
+        $participantMap = [];
+        foreach ($participantRows as $row) {
+            $participantMap[$row->item_id] = ['participants' => (int) $row->participant_count, 'assigned' => (int) $row->assigned_count];
+        }
+
+        $schoolCountMap = $schoolId ? collect() : FestRegistration::query()
+            ->whereIn('event_id', $eventIds)
+            ->whereIn('item_id', $itemIds)
+            ->active()
+            ->selectRaw('item_id, count(distinct school_id) as cnt')
+            ->groupBy('item_id')
+            ->pluck('cnt', 'item_id');
+
         $rows = [];
         foreach ($items as $item) {
-            $regBase = FestRegistration::query()
-                ->whereIn('event_id', $eventIds)
-                ->where('item_id', $item->id)
-                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
-
-            $approved = (clone $regBase)->where('status', 'approved')->count();
-            $pending = (clone $regBase)->where('status', 'submitted')->count();
+            $approved = $statusMap[$item->id]['approved'] ?? 0;
+            $pending = $statusMap[$item->id]['submitted'] ?? 0;
             $totalRegs = $approved + $pending;
 
-            $participantQuery = FestParticipant::query()
-                ->whereHas('registration', fn ($q) => $q
-                    ->whereIn('event_id', $eventIds)
-                    ->where('item_id', $item->id)
-                    ->active()
-                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)));
-
-            $participants = (clone $participantQuery)->count();
-            $itemRegAssigned = (clone $participantQuery)
-                ->whereNotNull('item_registration_number')
-                ->count();
+            $participants = $participantMap[$item->id]['participants'] ?? 0;
+            $itemRegAssigned = $participantMap[$item->id]['assigned'] ?? 0;
 
             $schoolCount = $schoolId
                 ? ($totalRegs > 0 ? 1 : 0)
-                : (int) FestRegistration::query()
-                    ->whereIn('event_id', $eventIds)
-                    ->where('item_id', $item->id)
-                    ->active()
-                    ->distinct()
-                    ->count('school_id');
+                : (int) ($schoolCountMap[$item->id] ?? 0);
 
             $feePerItem = $feeRequired ? $feeResolver->amountForItem($item, $schedule, $this->event) : null;
             $lineFee = $feePerItem !== null ? round($feePerItem * $totalRegs, 2) : null;
@@ -504,55 +621,106 @@ class FestEventReportAnalyticsService
             ->orderBy('title')
             ->get();
 
+        if ($items->isEmpty()) {
+            return [];
+        }
+
+        $itemIds = $items->pluck('id');
+
+        // Batched aggregates instead of ~8 queries per item — see
+        // docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md §2/§7 Phase 2. Each map below costs
+        // exactly one query, regardless of item count.
+        $statusRows = FestRegistration::query()
+            ->whereIn('event_id', $eventIds)
+            ->whereIn('item_id', $itemIds)
+            ->whereIn('status', ['approved', 'submitted'])
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->selectRaw('item_id, status, count(*) as cnt')
+            ->groupBy('item_id', 'status')
+            ->get();
+
+        $statusMap = [];
+        foreach ($statusRows as $row) {
+            $statusMap[$row->item_id][$row->status] = (int) $row->cnt;
+        }
+
+        // Performers = active (not disqualified, not standby) participants on an
+        // approved registration. Chest-assigned also counts a participant whose GROUP
+        // (not the participant row itself) has a chest number — team items assign
+        // chest numbers at the group level, hence the left join + OR below, matching
+        // the original per-item query this replaces exactly.
+        $performerRows = FestParticipant::query()
+            ->join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
+            ->leftJoin('fest_groups', 'fest_groups.id', '=', 'fest_participants.group_id')
+            ->whereNull('fest_participants.disqualified_at')
+            ->where(function ($q) {
+                $q->whereNull('fest_participants.participant_role')
+                    ->orWhere('fest_participants.participant_role', '!=', 'standby');
+            })
+            ->whereIn('fest_registrations.event_id', $eventIds)
+            ->whereIn('fest_registrations.item_id', $itemIds)
+            ->where('fest_registrations.status', 'approved')
+            ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId))
+            ->selectRaw('
+                fest_registrations.item_id as item_id,
+                count(*) as performers,
+                sum(case when fest_participants.chest_no is not null or fest_groups.chest_no is not null then 1 else 0 end) as chest_assigned,
+                sum(case when fest_participants.item_registration_number is not null then 1 else 0 end) as item_reg_assigned
+            ')
+            ->groupBy('fest_registrations.item_id')
+            ->get();
+
+        $performerMap = [];
+        foreach ($performerRows as $row) {
+            $performerMap[$row->item_id] = [
+                'performers'        => (int) $row->performers,
+                'chest_assigned'    => (int) $row->chest_assigned,
+                'item_reg_assigned' => (int) $row->item_reg_assigned,
+            ];
+        }
+
+        $scheduledQuery = FestSchedule::query()
+            ->whereIn('event_id', $eventIds)
+            ->whereIn('item_id', $itemIds)
+            ->whereNotNull('participant_id');
+        if ($schoolId) {
+            $scheduledQuery->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId));
+        }
+        $scheduledMap = $scheduledQuery
+            ->selectRaw('item_id, count(distinct participant_id) as cnt')
+            ->groupBy('item_id')
+            ->pluck('cnt', 'item_id');
+
+        $marksQuery = FestMark::query()
+            ->whereIn('event_id', $eventIds)
+            ->whereIn('item_id', $itemIds)
+            ->where(fn ($q) => $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position'));
+        if ($schoolId) {
+            $marksQuery->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId));
+        }
+        $marksMap = $marksQuery
+            ->selectRaw('item_id, count(distinct participant_id) as cnt')
+            ->groupBy('item_id')
+            ->pluck('cnt', 'item_id');
+
+        $judgesMap = FestJudgeAssignment::whereIn('event_id', $eventIds)
+            ->whereIn('item_id', $itemIds)
+            ->selectRaw('item_id, count(*) as cnt')
+            ->groupBy('item_id')
+            ->pluck('cnt', 'item_id');
+
         $rows = [];
         foreach ($items as $item) {
-            $regBase = FestRegistration::query()
-                ->whereIn('event_id', $eventIds)
-                ->where('item_id', $item->id)
-                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
+            $approved = $statusMap[$item->id]['approved'] ?? 0;
+            $pending = $statusMap[$item->id]['submitted'] ?? 0;
 
-            $approved = (clone $regBase)->where('status', 'approved')->count();
-            $pending = (clone $regBase)->where('status', 'submitted')->count();
+            $performers = $performerMap[$item->id]['performers'] ?? 0;
+            $chestAssigned = $performerMap[$item->id]['chest_assigned'] ?? 0;
+            $itemRegAssigned = $performerMap[$item->id]['item_reg_assigned'] ?? 0;
 
-            $performerQuery = FestParticipant::query()
-                ->whereNull('disqualified_at')
-                ->where(function ($q) {
-                    $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby');
-                })
-                ->whereHas('registration', fn ($q) => $q
-                    ->whereIn('event_id', $eventIds)
-                    ->where('item_id', $item->id)
-                    ->where('status', 'approved')
-                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)));
-
-            $performers = (clone $performerQuery)->count();
-            $chestAssigned = (clone $performerQuery)
-                ->where(function ($q) {
-                    $q->whereNotNull('chest_no')
-                      ->orWhereHas('group', fn ($g) => $g->whereNotNull('chest_no'));
-                })
-                ->count();
-            $itemRegAssigned = (clone $performerQuery)->whereNotNull('item_registration_number')->count();
-
-            $scheduledParticipants = FestSchedule::query()
-                ->whereIn('event_id', $eventIds)
-                ->where('item_id', $item->id)
-                ->whereNotNull('participant_id')
-                ->when($schoolId, fn ($q) => $q->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId)))
-                ->distinct('participant_id')
-                ->count('participant_id');
-
-            $marksEntered = FestMark::query()
-                ->whereIn('event_id', $eventIds)
-                ->where('item_id', $item->id)
-                ->where(fn ($q) => $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position'))
-                ->when($schoolId, fn ($q) => $q->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId)))
-                ->distinct('participant_id')
-                ->count('participant_id');
-
-            $judges = FestJudgeAssignment::whereIn('event_id', $eventIds)
-                ->where('item_id', $item->id)
-                ->count();
+            $scheduledParticipants = (int) ($scheduledMap[$item->id] ?? 0);
+            $marksEntered = (int) ($marksMap[$item->id] ?? 0);
+            $judges = (int) ($judgesMap[$item->id] ?? 0);
 
             $rows[] = [
                 'item_id'                => $item->id,
@@ -601,6 +769,39 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function numberingRegisterRows(?string $schoolId = null): array
     {
+        return $this->numberingRegisterRowsSorted($schoolId)->all();
+    }
+
+    /**
+     * Paginated variant of numberingRegisterRows() for the on-screen table — the
+     * underlying query is already a single, cheap query, but for a large school this
+     * could be 5,000+ rows rendered in one unvirtualized table. The sort is a 4-key
+     * composite closure (head name, item title, chest no, participant name) that
+     * doesn't map cleanly onto a single SQL ORDER BY without extra joins, so this
+     * slices the same fully-sorted collection rather than re-deriving the sort in
+     * SQL — the "Option B" manual-paginator technique already documented in
+     * docs/SCALE_AND_PAGINATION_PLAN.md §3 for an equivalent PHP-sorted merge.
+     * Exports (exportNumberingRegister()) keep calling the unbounded
+     * numberingRegisterRows() above — a printed/exported register inherently needs
+     * every row. See docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md §3/§7 Phase 4.
+     */
+    public function numberingRegisterPaginated(?string $schoolId, int $page = 1, int $perPage = 50): LengthAwarePaginator
+    {
+        $sorted = $this->numberingRegisterRowsSorted($schoolId);
+        $page = max(1, $page);
+
+        return new LengthAwarePaginator(
+            $sorted->slice(($page - 1) * $perPage, $perPage)->values(),
+            $sorted->count(),
+            $perPage,
+            $page,
+            ['path' => Paginator::resolveCurrentPath(), 'pageName' => 'page'],
+        );
+    }
+
+    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
+    private function numberingRegisterRowsSorted(?string $schoolId): \Illuminate\Support\Collection
+    {
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $this->event->reportableEventIds())
@@ -637,12 +838,32 @@ class FestEventReportAnalyticsService
                 'item_reg'       => $p->item_registration_number,
                 'chest_no'       => $p->chest_no,
                 'disqualified'   => $p->disqualified_at !== null,
-            ])
-            ->all();
+            ]);
     }
 
     /** @return list<array<string, mixed>> */
     public function pendingApprovalRows(?string $schoolId = null): array
+    {
+        return $this->pendingApprovalQuery($schoolId)->get()
+            ->map(fn (FestRegistration $reg) => $this->mapPendingApprovalRow($reg))
+            ->all();
+    }
+
+    /**
+     * Paginated variant for the on-screen table — see docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md
+     * §3/§7 Phase 4. Unlike numberingRegisterPaginated(), this one's sort is already a
+     * plain SQL ORDER BY, so it's a genuine query-level ->paginate(), not a slice of an
+     * in-memory collection. Exports (exportPendingApprovals()) keep calling the
+     * unbounded pendingApprovalRows() above.
+     */
+    public function pendingApprovalPaginated(?string $schoolId, int $page = 1, int $perPage = 50): LengthAwarePaginator
+    {
+        return $this->pendingApprovalQuery($schoolId)
+            ->paginate($perPage, ['*'], 'page', max(1, $page))
+            ->through(fn (FestRegistration $reg) => $this->mapPendingApprovalRow($reg));
+    }
+
+    private function pendingApprovalQuery(?string $schoolId)
     {
         return FestRegistration::query()
             ->whereIn('event_id', $this->event->reportableEventIds())
@@ -650,20 +871,22 @@ class FestEventReportAnalyticsService
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->with(['school:id,name', 'item:id,title,head_id', 'item.head:id,name', 'participants.student:id,name', 'participants.teacher:id,name'])
             ->orderBy('school_id')
-            ->orderBy('item_id')
-            ->get()
-            ->map(fn (FestRegistration $reg) => [
-                'registration_id' => $reg->id,
-                'school_id'       => $reg->school_id,
-                'school'          => $reg->school?->name,
-                'head_name'       => $reg->item?->head?->name,
-                'item_id'         => $reg->item_id,
-                'item'            => $reg->item?->title,
-                'participant_count' => $reg->participants->count(),
-                'participants'    => $reg->participants->map(fn ($p) => $p->student?->name ?? $p->teacher?->name)->filter()->values()->all(),
-                'submitted_at'    => $reg->updated_at?->toIso8601String(),
-            ])
-            ->all();
+            ->orderBy('item_id');
+    }
+
+    private function mapPendingApprovalRow(FestRegistration $reg): array
+    {
+        return [
+            'registration_id' => $reg->id,
+            'school_id'       => $reg->school_id,
+            'school'          => $reg->school?->name,
+            'head_name'       => $reg->item?->head?->name,
+            'item_id'         => $reg->item_id,
+            'item'            => $reg->item?->title,
+            'participant_count' => $reg->participants->count(),
+            'participants'    => $reg->participants->map(fn ($p) => $p->student?->name ?? $p->teacher?->name)->filter()->values()->all(),
+            'submitted_at'    => $reg->updated_at?->toIso8601String(),
+        ];
     }
 
     public function exportAssignmentCompleteness(?string $schoolId = null): StreamedResponse

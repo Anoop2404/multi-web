@@ -169,6 +169,8 @@ const props = defineProps({
     itemHeads: { type: Array, default: () => [] },
     ledgerAccount: { type: Object, default: () => ({}) },
     clusterRequireStudentVerification: { type: Boolean, default: true },
+    notificationTriggers: { type: Array, default: () => [] },
+    eligibleNotificationUsers: { type: Array, default: () => [] },
 });
 
 const ctx = useEventSettingsForms(props);
