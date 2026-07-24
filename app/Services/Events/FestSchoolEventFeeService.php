@@ -931,6 +931,14 @@ class FestSchoolEventFeeService
      * credit (i.e. FestSchoolEventFeeController::forceApprove(), the system's existing,
      * already-correct "mark paid without new receipt money" action) call this alongside their
      * own logic so the credit ledger and the real payment state stay in sync.
+     *
+     * Also posts the "credit consumed" ledger leg (FestFeeLedgerService::postCreditConsumed())
+     * once per row actually marked applied_at here — centralized in this one method rather
+     * than left to each caller, so BOTH consumption paths (forceApprove()'s manual waiver and
+     * applyAvailableCredit()'s automatic offset) post consistently instead of only whichever
+     * one remembered to call it. Posted per-row (not as one lump sum for the whole $amount)
+     * so each posting is referenced by, and idempotent per, that credit row's own id — see
+     * FestFeeCredit::CONSUMPTION_REFERENCE.
      * See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.
      */
     public function markCreditsApplied(FestSchoolEventFee $fee, float $amount): float
@@ -938,6 +946,9 @@ class FestSchoolEventFeeService
         if ($amount <= 0) {
             return 0.0;
         }
+
+        $fee->loadMissing('event');
+        $consumingEvent = $fee->event;
 
         $applied = 0.0;
         foreach ($fee->credits()->outstanding()->oldest()->get() as $credit) {
@@ -947,6 +958,10 @@ class FestSchoolEventFeeService
             }
             $credit->update(['applied_at' => now()]);
             $applied += $creditAmount;
+
+            if ($consumingEvent) {
+                app(FestFeeLedgerService::class)->postCreditConsumed($credit, $consumingEvent, $creditAmount);
+            }
         }
 
         return round($applied, 2);
@@ -993,8 +1008,22 @@ class FestSchoolEventFeeService
                 return null;
             }
 
-            $creditToApply = round(min($locked->outstandingBalance(), $locked->outstandingCredit()), 2);
-            if ($creditToApply <= 0) {
+            $creditCap = round(min($locked->outstandingBalance(), $locked->outstandingCredit()), 2);
+            if ($creditCap <= 0) {
+                return null;
+            }
+
+            // markCreditsApplied() only ever consumes WHOLE credit rows that individually
+            // fit under the requested cap (see its own docblock) — it can legitimately mark
+            // less than $creditCap as applied (e.g. a single outstanding row bigger than the
+            // cap is skipped entirely, left for a future, larger balance). Calling it FIRST
+            // and using its *return value* — not $creditCap — as the receipt/ledger amount is
+            // essential: creating the receipt for $creditCap while only $applied worth of
+            // FestFeeCredit rows actually got marked applied_at would let the unconsumed
+            // remainder be "spent" again on the very next recalculate(), fabricating money
+            // and double-applying the same credit.
+            $applied = $this->markCreditsApplied($locked, $creditCap);
+            if ($applied <= 0) {
                 return null;
             }
 
@@ -1005,7 +1034,7 @@ class FestSchoolEventFeeService
                 'transaction_ref' => 'CREDIT-OFFSET',
                 'bank_name' => 'Fee Credit Adjustment',
                 'payment_date' => now()->toDateString(),
-                'amount' => $creditToApply,
+                'amount' => $applied,
                 'status' => 'approved',
                 'is_system_credit' => true,
                 'reviewed_at' => now(),
@@ -1016,14 +1045,14 @@ class FestSchoolEventFeeService
             }
 
             $locked->refreshPaidState();
-            $this->markCreditsApplied($locked, $creditToApply);
 
             return $receipt;
         });
 
+        // Ledger posting for the consumed credit already happened inside
+        // markCreditsApplied() above, per-row — nothing further to post here.
         if ($receipt) {
             $record->refresh();
-            app(FestFeeLedgerService::class)->postCreditConsumed($receipt->fresh(), $event, (float) $receipt->amount);
         }
     }
 

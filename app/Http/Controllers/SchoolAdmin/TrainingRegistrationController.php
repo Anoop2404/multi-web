@@ -113,6 +113,60 @@ class TrainingRegistrationController extends SchoolAdminController
         return back()->with('success', 'Teacher registered for training.');
     }
 
+    /**
+     * School cancels one of their training registrations.
+     * Blocks if the fee has already been approved (must go through Sahodaya admin).
+     * Frees the seat and promotes the next waitlisted teacher.
+     */
+    public function cancel(Request $request, string $tenantId, TrainingRegistration $registration)
+    {
+        abort_if($registration->school_id !== $this->school->id, 403);
+
+        $registration->loadMissing('program');
+        $program = $registration->program;
+        abort_unless($program, 404, 'Training programme not found.');
+        abort_if($program->tenant_id !== $this->school->parent_id, 403);
+
+        if ($registration->status === 'cancelled') {
+            return back()->with('success', 'Registration is already cancelled.');
+        }
+
+        // Block if the school batch fee is approved — at that point the money has been
+        // accepted and only a Sahodaya admin cancel (with credit/refund) makes sense.
+        abort_if(
+            $program->usesSchoolBatchFee() && $registration->school_id,
+            fn () => \App\Models\TrainingSchoolFee::where('program_id', $program->id)
+                ->where('school_id', $registration->school_id)
+                ->where('status', 'approved')
+                ->exists(),
+            422,
+            'This registration\'s fee has been approved. Contact your Sahodaya office to cancel a paid registration.',
+        );
+
+        app(\App\Services\Training\TrainingWaitlistService::class)->cancelAndPromote($registration);
+
+        app(PlatformAuditLogger::class)->log(
+            'training.registration.cancelled_by_school',
+            "School cancelled training registration for teacher #{$registration->teacher_id} in program {$program->title}",
+            $registration,
+        );
+
+        try {
+            app(SahodayaAdminNotifier::class)->notifyAdmins(
+                $program->tenant_id,
+                'training.registration.cancelled_by_school',
+                [
+                    'program_title' => $program->title,
+                    'school_name'   => $this->school->name,
+                ],
+            );
+        } catch (\Throwable) {
+            // non-blocking
+        }
+
+        return back()->with('success', 'Registration cancelled.');
+    }
+
     public function bulkStore(Request $request, TeacherTrainingEligibilityService $eligibility)
     {
         $data = $request->validate([

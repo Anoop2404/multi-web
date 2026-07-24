@@ -21,6 +21,19 @@ class FeeReceiptObserver
             return;
         }
 
+        // System-generated "receipts" created when a FestFeeCredit is auto-applied
+        // (FestSchoolEventFeeService::applyAvailableCredit()) must NEVER flow through the
+        // normal approved-receipt ledger poster — that path debits CASH-BANK, and no real
+        // cash moved for a credit offset. These are posted separately, without touching
+        // CASH-BANK, via FestFeeLedgerService::postCreditConsumed(). This guard is
+        // defense-in-depth: today applyAvailableCredit() creates the receipt already
+        // 'approved' at insert time, so this observer's updated() hook never actually fires
+        // for it (no created() hook exists) — but that's incidental, not structural. If a
+        // created() hook is ever added here, this check is what keeps it safe.
+        if ($receipt->isSystemCredit()) {
+            return;
+        }
+
         $tenantId = $this->resolveTenantId($receipt);
         if (! $tenantId) {
             Log::warning('FeeReceipt approved but tenant could not be resolved; ledger not posted', [

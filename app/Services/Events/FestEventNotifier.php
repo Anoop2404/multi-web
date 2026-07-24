@@ -126,7 +126,7 @@ class FestEventNotifier
         $this->notifyHeadExtras($head, $slug, $replacements);
     }
 
-    public function registrationRejected(FestRegistration $registration): void
+    public function registrationRejected(FestRegistration $registration, string $reason = ''): void
     {
         $registration->load('event');
         $head = $this->resolveHeadForEvent($registration->event);
@@ -136,8 +136,9 @@ class FestEventNotifier
 
         $slug = $this->resolveTemplateSlug($registration->event, 'fest.registration.rejected');
         $replacements = [
-            'event_title' => $registration->event->title,
+            'event_title'       => $registration->event->title,
             'competition_label' => $this->competitionLabel($registration->event),
+            'rejection_reason'  => $reason ?: 'Contact your Sahodaya for details.',
         ];
         $this->notifySchool($registration->school_id, $slug, $replacements);
         $this->notifyHeadExtras($head, $slug, $replacements);
@@ -159,6 +160,35 @@ class FestEventNotifier
         ];
         $this->notifySchool($registration->school_id, $slug, $replacements);
         $this->notifyHeadExtras($head, $slug, $replacements);
+    }
+
+    /**
+     * Notify Sahodaya/event-coordinator users when a school withdraws one of its own
+     * registrations. Fires alongside registrationWithdrawn() (which notifies the school).
+     * Uses the existing withSahodayaUsers() helper.
+     */
+    public function registrationWithdrawnAdmin(FestRegistration $registration): void
+    {
+        $registration->loadMissing(['event', 'item']);
+        $event = $registration->event;
+        if (! $event) {
+            return;
+        }
+
+        $replacements = [
+            'event_title'   => $event->title,
+            'item_title'    => $registration->item?->title ?? 'General',
+            'school_name'   => '', // resolved later per-user context
+            'competition_label' => $this->competitionLabel($event),
+        ];
+
+        $this->withSahodayaUsers($event->tenant_id, ['sahodaya_admin', 'sahodaya_staff'], function ($users) use ($registration, $replacements, $event) {
+            $service = app(NotificationService::class);
+            $url = "/sahodaya-admin/{$event->tenant_id}/programs/kalotsav/registration";
+            foreach ($users as $user) {
+                $service->notifyFromTemplate($user, 'fest.registration.withdrawn_admin', $replacements, $url);
+            }
+        });
     }
 
     /**

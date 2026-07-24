@@ -174,9 +174,16 @@ class FestEventOpsController extends Controller
 
         EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
 
-        $registration->update(['status' => 'rejected']);
+        $reason = $request->string('rejection_reason', '')->toString();
+
+        $registration->update([
+            'status'              => 'rejected',
+            'rejection_reason'    => $reason ?: null,
+            'rejected_at'         => now(),
+            'rejected_by_user_id' => $request->user()->id,
+        ]);
         app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
-        app(FestEventNotifier::class)->registrationRejected($registration);
+        app(FestEventNotifier::class)->registrationRejected($registration, $reason);
         $audit->festRegistrationRejected($registration);
 
         return back()->with('success', 'Registration rejected.');

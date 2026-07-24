@@ -31,6 +31,13 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         abort_unless($receipt && $receipt->status === 'uploaded', 422, 'No uploaded proof to approve.');
 
         $fullyPaid = DB::transaction(function () use ($request, $receipt, $schoolEventFee, $event) {
+            // Lock this fee record for the duration of the approval + overpayment-
+            // reconciliation check below, consistent with the locking added to reject/
+            // cancel (see docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4) — otherwise a
+            // concurrent reject/cancel racing against this approval could change total_due
+            // between the read above and the overpayment check below.
+            FestSchoolEventFee::whereKey($schoolEventFee->id)->lockForUpdate()->first();
+
             $nextNo = app(SahodayaReceiptNumberAllocator::class)->next($this->sahodaya->id);
             $receiptNo = 'EF-'.str_pad((string) $nextNo, 4, '0', STR_PAD_LEFT);
 
@@ -152,6 +159,15 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         $audit->festEvent($event, FestPageActivity::FEES, 'fest.fee.rejected', 'School event fee rejected', [
             'school_id' => $schoolEventFee->school_id,
         ]);
+
+        $slug = ProgramRouteMap::slugFromEventType($event->event_type) ?? 'kalotsav';
+        app(OfflineProgramFeeOrchestrator::class)->notifyRejected(
+            $schoolEventFee->school,
+            ProgramRouteMap::labelForSlug($slug).' fee',
+            $event->title,
+            $data['rejection_reason'] ?? null,
+            adminPath: "programs/{$slug}/registration",
+        );
 
         return back()->with('success', 'Fee rejected. School can re-upload.');
     }

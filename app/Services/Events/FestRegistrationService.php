@@ -46,6 +46,11 @@ class FestRegistrationService
 
         if ($notify) {
             app(FestEventNotifier::class)->registrationWithdrawn($registration);
+            try {
+                app(FestEventNotifier::class)->registrationWithdrawnAdmin($registration);
+            } catch (\Throwable) {
+                // non-blocking — sahodaya notification failure must never roll back the cancel
+            }
         }
     }
 

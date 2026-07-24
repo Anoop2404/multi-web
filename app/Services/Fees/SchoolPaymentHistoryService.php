@@ -163,7 +163,7 @@ class SchoolPaymentHistoryService
             'receipt_email_resend_count' => $p->feeReceipt?->receipt_email_resend_count ?? 0,
             'fee_receipt_id'       => $p->feeReceipt?->id,
             'receipt_status'       => $p->feeReceipt?->status,
-            'rejection_reason'     => null,
+            'rejection_reason'     => $p->feeReceipt?->rejection_reason ?? $p->rejection_reason,
         ];
     }
 

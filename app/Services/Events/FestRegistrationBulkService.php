@@ -53,7 +53,7 @@ class FestRegistrationBulkService
     }
 
     /** @return array{approved: int, rejected: int, skipped: int, errors: list<string>} */
-    public function rejectMany(FestEvent $event, array $registrationIds, ?int $schoolId = null, bool $overrideLifecycle = false, ?int $itemId = null): array
+    public function rejectMany(FestEvent $event, array $registrationIds, ?int $schoolId = null, bool $overrideLifecycle = false, ?int $itemId = null, string $reason = ''): array
     {
         EventLifecycleGate::allowRegistrationReview($event, $overrideLifecycle);
 
@@ -76,7 +76,7 @@ class FestRegistrationBulkService
             // transactional — notifier/audit calls happen after commit, outside the lock, so a
             // slow mail/notification dispatch never holds the row lock open. See
             // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4.
-            DB::transaction(function () use ($event, $registration, $feeService) {
+            DB::transaction(function () use ($event, $registration, $feeService, $reason) {
                 // Lock the school's aggregate fee record (if one exists yet) for the duration
                 // of the before/after snapshot below, so two reject/cancel actions racing on
                 // the same school can't both read the same "before" state and either compute
@@ -95,7 +95,12 @@ class FestRegistrationBulkService
                 $dueBefore = (float) ($feeBefore?->total_due ?? 0);
                 $paidBefore = (float) ($feeBefore?->amount_paid ?? 0);
 
-                $registration->update(['status' => 'rejected']);
+                $registration->update([
+                    'status'               => 'rejected',
+                    'rejection_reason'     => $reason ?: null,
+                    'rejected_at'          => now(),
+                    'rejected_by_user_id'  => auth()->id(),
+                ]);
                 $feeAfter = $feeService->recalculate($event, $registration->school_id);
 
                 // If the school had already paid something and this rejection freed up part of
@@ -109,7 +114,7 @@ class FestRegistrationBulkService
                         'fest_school_event_fee_id' => $feeAfter->id,
                         'source_registration_id' => $registration->id,
                         'amount' => min($reduction, $paidBefore),
-                        'reason' => 'Registration rejected after payment',
+                        'reason' => 'Registration rejected after payment'.($reason ? ': '.$reason : ''),
                         'created_by_user_id' => auth()->id(),
                     ]);
 
@@ -122,7 +127,7 @@ class FestRegistrationBulkService
                 }
             });
 
-            $notifier->registrationRejected($registration);
+            $notifier->registrationRejected($registration, $reason);
             $audit->festRegistrationRejected($registration);
             $rejected++;
         }

@@ -102,39 +102,48 @@ class FestFeeLedgerService
     }
 
     /**
-     * Post the reverse leg when a previously issued credit is applied against a school's
-     * new outstanding balance (FestSchoolEventFeeService::applyAvailableCredit()). Debits
-     * FEE-CREDIT-PAYABLE (the liability has now been used) and credits the *consuming*
-     * event's income head (this fee is now considered earned — funded by cash already
-     * recorded in CASH-BANK back when the original, credit-generating receipt was posted,
-     * so CASH-BANK is untouched here too, exactly as in postCreditIssued()). Idempotent
-     * per synthetic receipt via postJournal()'s dedup (keyed on FeeReceipt::class +
-     * $syntheticReceipt->id) — safe even if called more than once for the same receipt.
+     * Post the reverse leg when a previously issued credit ROW is consumed against a
+     * school's new outstanding balance — called once per FestFeeCredit row actually marked
+     * applied_at (see FestSchoolEventFeeService::markCreditsApplied(), the single place this
+     * should be called from, so every consumption path — auto-apply via
+     * applyAvailableCredit() AND the pre-existing manual forceApprove() waiver — posts
+     * consistently). Debits FEE-CREDIT-PAYABLE (the liability has now been used) and
+     * credits the *consuming* event's income head (this fee is now considered earned —
+     * funded by cash already recorded in CASH-BANK back when the original, credit-
+     * generating receipt was posted, so CASH-BANK is untouched here too, exactly as in
+     * postCreditIssued()).
+     *
+     * Referenced by FestFeeCredit::CONSUMPTION_REFERENCE + $credit->id — deliberately NOT
+     * FestFeeCredit::class (that's postCreditIssued()'s reference for the SAME row) and NOT
+     * FeeReceipt::class (that's postApprovedReceipt()'s reference for a real receipt) —
+     * postJournal()'s reference_type/reference_id dedup would otherwise treat this as an
+     * exact duplicate of one of those and silently skip posting anything. Idempotent per
+     * credit row: calling this twice for the same $credit is a no-op the second time.
      */
-    public function postCreditConsumed(FeeReceipt $syntheticReceipt, FestEvent $event, float $amount): ?LedgerTransaction
+    public function postCreditConsumed(FestFeeCredit $credit, FestEvent $consumingEvent, float $amount): ?LedgerTransaction
     {
         if ($amount <= 0) {
             return null;
         }
 
-        $incomeCode = LedgerAccountCatalog::festIncomeCode($event);
+        $incomeCode = LedgerAccountCatalog::festIncomeCode($consumingEvent);
         $posting = app(LedgerPostingService::class);
 
         $posting->ensureHead(
-            $event->tenant_id,
+            $consumingEvent->tenant_id,
             $incomeCode,
-            LedgerAccountCatalog::festIncomeHeadName($event),
-            LedgerAccountCatalog::festIncomeCategory($event),
-            $event->id,
+            LedgerAccountCatalog::festIncomeHeadName($consumingEvent),
+            LedgerAccountCatalog::festIncomeCategory($consumingEvent),
+            $consumingEvent->id,
         );
-        $posting->ensureHead($event->tenant_id, 'FEE-CREDIT-PAYABLE');
+        $posting->ensureHead($consumingEvent->tenant_id, 'FEE-CREDIT-PAYABLE');
 
-        $description = "Fee credit applied — {$event->title}";
+        $description = "Fee credit applied — {$consumingEvent->title}";
 
-        $rows = $posting->postJournal($event->tenant_id, [
+        $rows = $posting->postJournal($consumingEvent->tenant_id, [
             ['code' => 'FEE-CREDIT-PAYABLE', 'entry_type' => 'debit', 'amount' => $amount, 'description' => $description],
             ['code' => $incomeCode, 'entry_type' => 'credit', 'amount' => $amount, 'description' => $description],
-        ], FeeReceipt::class, $syntheticReceipt->id, now()->toDateString(), null);
+        ], FestFeeCredit::CONSUMPTION_REFERENCE, $credit->id, now()->toDateString(), null);
 
         return $rows[1] ?? $rows[0] ?? null;
     }

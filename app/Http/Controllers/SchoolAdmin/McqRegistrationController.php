@@ -11,6 +11,7 @@ use App\Models\McqSchoolFee;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Services\Mcq\McqEligibilityService;
+use App\Services\Mcq\McqExamNotifier;
 use App\Services\Mcq\McqRegistrationApprovalService;
 use App\Services\Mcq\McqRegistrationGateService;
 use App\Services\Mcq\McqRegistrationPortalService;
@@ -498,6 +499,12 @@ class McqRegistrationController extends SchoolAdminController
             'mcq.registration.cancelled',
             "School cancelled registration for {$name} in {$exam->title}",
         );
+
+        try {
+            app(McqExamNotifier::class)->registrationCancelledBySchool($registration->fresh(['exam', 'student', 'teacher']));
+        } catch (\Throwable) {
+            // non-blocking — sahodaya notification must not prevent school cancel response
+        }
 
         return back()->with('success', 'Registration cancelled. You can re-register later if needed.');
     }

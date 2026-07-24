@@ -17,9 +17,13 @@ class FestRegistration extends Model
     protected $fillable = [
         'event_id', 'item_id', 'school_id', 'mode', 'status',
         'fee_receipt_id', 'submitted_at',
+        'rejection_reason', 'rejected_at', 'rejected_by_user_id',
     ];
 
-    protected $casts = ['submitted_at' => 'datetime'];
+    protected $casts = [
+        'submitted_at' => 'datetime',
+        'rejected_at'  => 'datetime',
+    ];
 
     public function event(): BelongsTo
     {

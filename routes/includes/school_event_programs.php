@@ -309,6 +309,7 @@ Route::prefix('training')->name('training.')->group(function () {
     Route::get('/{program}/export', [TrainingRegistrationController::class, 'export'])->name('export');
     Route::get('/{program}/school-fee/invoice', [TrainingRegistrationController::class, 'downloadSchoolInvoice'])->name('school-fee.invoice');
     Route::post('/{registration}/payment', [TrainingRegistrationController::class, 'uploadPayment'])->name('payment');
+    Route::post('/{registration}/cancel', [TrainingRegistrationController::class, 'cancel'])->name('cancel');
     Route::get('/{registration}/invoice', [TrainingRegistrationController::class, 'downloadInvoice'])->name('invoice');
     Route::get('/{registration}/id-card', [TrainingRegistrationController::class, 'downloadIdCard'])->name('id-card');
     Route::post('/{program}/school-payment', [TrainingRegistrationController::class, 'uploadSchoolPayment'])->name('school-payment');

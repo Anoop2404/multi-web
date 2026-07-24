@@ -12,6 +12,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class FestFeeCredit extends Model
 {
+    /**
+     * Ledger reference_type for the "credit consumed" journal leg (FestFeeLedgerService::
+     * postCreditConsumed()), kept distinct from FestFeeCredit::class (used for the "credit
+     * issued" leg, postCreditIssued()) so both legs can be posted against the SAME credit
+     * row's id without postJournal()'s reference_type/reference_id dedup treating the second
+     * call as a duplicate of the first and silently skipping it.
+     */
+    public const CONSUMPTION_REFERENCE = 'fest_fee_credit_consumption';
+
     protected $fillable = [
         'fest_school_event_fee_id', 'source_registration_id', 'amount', 'reason',
         'created_by_user_id', 'applied_at',

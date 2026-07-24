@@ -258,4 +258,34 @@ class McqExamNotifier
                 "/school-admin/{$schoolId}/mcq/{$registration->exam_id}/fee");
         }
     }
+
+    /**
+     * Notify Sahodaya admin users when a school cancels one of their MCQ registrations.
+     * Fires alongside the school-side audit to close the "Sahodaya never knows" gap.
+     */
+    public function registrationCancelledBySchool(McqRegistration $registration): void
+    {
+        $registration->loadMissing(['exam', 'student', 'teacher']);
+        $exam = $registration->exam;
+        if (! $exam) {
+            return;
+        }
+
+        $sahodayaId = $exam->tenant_id;
+        $service = app(NotificationService::class);
+        $replacements = [
+            'exam_title'   => $exam->title,
+            'student_name' => $registration->participantName() ?: 'Participant',
+            'school_name'  => '', // resolved per user context
+        ];
+        $url = "/sahodaya-admin/{$sahodayaId}/mcq-exams/{$exam->id}/registrations";
+
+        foreach (User::role(['sahodaya_admin', 'sahodaya_staff'])->where('tenant_id', $sahodayaId)->get() as $user) {
+            try {
+                $service->notifyFromTemplate($user, 'mcq.registration.cancelled_by_school', $replacements, $url);
+            } catch (\Throwable) {
+                // non-blocking
+            }
+        }
+    }
 }

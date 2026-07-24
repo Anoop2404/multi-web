@@ -287,17 +287,25 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'This registration already has an approved payment — use "Cancel & refund" instead, which requires a reason and credits the school.'
         );
 
+        $data = $request->validate(['rejection_reason' => 'nullable|string|max:500']);
+        $reason = $data['rejection_reason'] ?? '';
+
         $registration->loadMissing('item');
         $headId = $registration->item?->head_id;
 
-        $registration->update(['status' => 'rejected']);
+        $registration->update([
+            'status'              => 'rejected',
+            'rejection_reason'    => $reason ?: null,
+            'rejected_at'         => now(),
+            'rejected_by_user_id' => $request->user()->id,
+        ]);
         app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
 
         if ($headId) {
             app(FestRegistrationApprovalService::class)->promoteNextWaitlisted($event, (int) $headId);
         }
 
-        app(FestEventNotifier::class)->registrationRejected($registration);
+        app(FestEventNotifier::class)->registrationRejected($registration, $reason);
         $audit->festRegistrationRejected($registration);
 
         return back()->with('success', 'Registration rejected.');
