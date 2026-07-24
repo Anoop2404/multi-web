@@ -124,6 +124,27 @@ One shared behavior, implemented per program (per D3):
 
 ---
 
+## Phase 3b — Document lifecycle (invoices, receipts, credit notes)  `[M–L]`
+
+**Problem (found 24 Jul):** documents never follow the money backwards. Receipts are issued at approval (numbered, snapshot stored, emailed) but a reversal never voids the document or notifies the school — they keep a valid-looking emailed receipt for reversed money. Fest invoices recompute on next view but already-sent PDFs are stale with no version marker and no `void` status. Training invoices are never touched by cancellation — `markPaidForRegistration()` only moves forward, so a cancelled registration's issued invoice stays an open receivable forever. No credit-note document exists for any credit.
+
+### 3b.1 Void treatment for reversed receipts  `[S]`
+- Render-time "REVERSED" watermark + reversal reason/date on the stored receipt HTML (`ProgramFeeReceiptService::readOrGenerate()` overlays when `status === 'reversed'` — no mutation of the stored snapshot).
+- Void-notice email on reversal (extend `FeeReceiptReversalService::reverse()` — same try/catch-never-block convention), tracked via the existing `receipt_email_status` fields.
+- Keep the receipt link visible school-side with reversed styling (replaces the current null-out in `programReceiptUrl()` — pairs with Phase 3 item 5).
+
+### 3b.2 Credit-note documents  `[M]`
+- When any `FestFeeCredit`/`ProgramFeeCredit` is issued: generate a numbered credit note (`CN-` prefix via the `SahodayaReceiptNumberAllocator` pattern), store HTML snapshot, email to school, link from the Phase 3 history timeline.
+- When a credit is applied/paid out/forfeited (4.3): note the terminal state on the credit-note render.
+
+### 3b.3 Invoice lifecycle states  `[M]`
+- Add `superseded` and `void` statuses to `FestEventInvoice`, `TrainingInvoice` (and the MCQ invoice equivalent).
+- Re-issue marks the prior row `superseded` and stamps a version number on the PDF ("Invoice #N v2 — supersedes v1") so stale downloaded copies are detectable.
+- Auto-void when the underlying obligation disappears: registration cancel (fest cancel-with-refund, 1.2 MCQ cancel, training cancel) and container cancel (1.3) void any unpaid invoice for that school/registration; paid invoices are left intact (the credit note is the compensating document).
+- Training specifically: `TrainingWaitlistService::cancelAndPromote()` → void unpaid `TrainingInvoice` rows for that registration (kills the phantom-receivable).
+
+**Acceptance:** reverse a receipt → school gets a void notice and the document renders watermarked; cancel a training registration → its unpaid invoice reads `void`, receivables reports drop it; every credit has a numbered credit note in the history timeline.
+
 ## Phase 4 — Structural hardening & remaining features
 
 ### 4.1 Shared status-transition guard  `[M]`
@@ -184,7 +205,7 @@ Seed via the existing `NotificationTemplate` seeder path; all sends wrapped in t
 
 1. **Phase 2 first** (a few days, near-zero risk, immediately visible) — 2.1, 2.2, 2.5, then 2.3/2.4.
 2. **Phase 1** next: 1.1 → 1.2 → 1.3 (1.3 depends on 1.1's credit mechanics) → 1.4.
-3. **Phase 3** after 1.1 (credit rows must exist to appear in the timeline).
+3. **Phase 3** after 1.1 (credit rows must exist to appear in the timeline); **3b** alongside it — 3b.1 is independent and can ship any time, 3b.2 needs 1.1, 3b.3's auto-void hooks need 1.2/1.3.
 4. **Phase 4** continuous; 4.3 last (ledger risk).
 
 **Migration hazard (same class as fest doc §10.1):** any code that writes `ProgramFeeCredit` unconditionally must ship together with (or after) the `program_fee_credits` tenant migration — `php artisan migrate --force` + `sahodaya:provision-databases --no-create` before deploy, or guard writes with `Schema::hasTable()` for one release.

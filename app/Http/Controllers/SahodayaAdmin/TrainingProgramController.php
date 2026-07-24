@@ -326,6 +326,21 @@ class TrainingProgramController extends SahodayaAdminController
             $data['eligibility_config'] = TrainingProgramEligibilityConfig::normalize($data['eligibility_config']);
         }
 
+        $previousStatus = $program->status;
+        $newStatus = $data['status'] ?? $previousStatus;
+
+        \App\Support\StatusTransitionGuard::assert(
+            $program,
+            $newStatus,
+            \App\Support\StatusTransitionGuard::TRAINING_PROGRAM_TRANSITIONS,
+        );
+
+        if ($newStatus === 'cancelled' && $previousStatus !== 'cancelled') {
+            app(\App\Services\Training\TrainingProgramStatusService::class)
+                ->transitionToCancelled($program, $request->boolean('confirm_credit_all'));
+            unset($data['status']);
+        }
+
         $program->update($data);
 
         app(LedgerAccountSetupService::class)->ensureTrainingProgramHead($program->fresh());
@@ -893,7 +908,7 @@ class TrainingProgramController extends SahodayaAdminController
         return back()->with('success', 'Registration confirmed.');
     }
 
-    public function cancelRegistration(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
+    public function cancelRegistration(Request $request, string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
         abort_if($registration->program_id !== $program->id, 403);
@@ -903,7 +918,18 @@ class TrainingProgramController extends SahodayaAdminController
             'This registration cannot be cancelled.'
         );
 
-        app(\App\Services\Training\TrainingWaitlistService::class)->cancelAndPromote($registration);
+        // Reason is optional at the HTTP layer (existing callers that never had money
+        // involved keep working unchanged) but required for cancelAndPromote() to
+        // actually issue a fee credit — see TrainingSchoolFeeService::syncForSchool().
+        // The UI (Registrations.vue) only prompts for one when the registration's
+        // fee_status shows money was actually paid.
+        $data = $request->validate(['reason' => 'nullable|string|max:500']);
+
+        app(\App\Services\Training\TrainingWaitlistService::class)->cancelAndPromote(
+            $registration,
+            $data['reason'] ?? null,
+            $request->user()?->id,
+        );
 
         app(PlatformAuditLogger::class)->training(
             $program,

@@ -288,4 +288,48 @@ class McqExamNotifier
             }
         }
     }
+    public function registrationCancelledByAdmin(McqRegistration $registration, string $reason): void
+    {
+        $registration->loadMissing(['exam', 'student', 'teacher']);
+        $exam = $registration->exam;
+        if (! $exam) {
+            return;
+        }
+
+        $replacements = [
+            'exam_title'       => $exam->title,
+            'student_name'     => $registration->participantName() ?: 'Participant',
+            'rejection_reason' => $reason,
+        ];
+
+        $this->notifySchoolAdmins($registration, 'mcq.registration.cancelled_admin', $replacements);
+    }
+    public function examCancelled(McqExam $exam, \Illuminate\Support\Collection $credits): void
+    {
+        $schoolIds = McqRegistration::where('exam_id', $exam->id)
+            ->distinct()
+            ->pluck('school_id');
+
+        $service = app(NotificationService::class);
+        $creditsBySchool = $credits->keyBy(function($c) {
+            return $c->creditable?->school_id;
+        });
+
+        foreach ($schoolIds as $schoolId) {
+            $creditForSchool = $creditsBySchool->get($schoolId);
+            $replacements = [
+                'exam_title' => $exam->title,
+                'credit_line' => $creditForSchool && $creditForSchool->amount > 0
+                    ? " A fee credit of ₹{$creditForSchool->amount} has been recorded to your school account."
+                    : '',
+            ];
+
+            foreach (User::role(['school_admin', 'school_staff'])->where('tenant_id', $schoolId)->get() as $user) {
+                try {
+                    $service->notifyFromTemplate($user, 'mcq.exam.cancelled', $replacements);
+                } catch (\Throwable) {
+                }
+            }
+        }
+    }
 }

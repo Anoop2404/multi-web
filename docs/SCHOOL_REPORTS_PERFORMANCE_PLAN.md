@@ -93,3 +93,46 @@ These are single-query, not N+1 — the backend response itself is reasonably fa
 - Confirm query count actually drops (e.g. via Laravel Debugbar or `DB::listen()` logging query count before/after) once there's a real environment to test in — this plan's whole premise can't be verified in this sandbox.
 - For the pagination fixes, confirm existing filters (`schoolId`, status, head/item filters) still work correctly against a paginated query, not just an in-memory `->get()->filter()`.
 - Brace-balance / syntax sanity check on every touched file, same discipline as prior fixes in this session.
+
+## 7. Implementation TODO
+
+Ordered, checkable, one PR-sized chunk per phase. Each phase is independently shippable — none blocks the others, so phases can be reordered or dropped if priorities change, but within a phase the steps are sequential.
+
+### Phase 1 — `itemRegistrationRows()` (lowest risk, do first)
+- [ ] Write the 3 grouped-aggregate replacement queries (status counts, participant+itemRegAssigned via join, distinct school count) per the §2 sketch.
+- [ ] Rewire the `foreach ($items as $item)` loop to read from the resulting in-memory maps instead of running `count()` per item.
+- [ ] Confirm the `$schoolCount` query is skipped entirely when `$schoolId` is set (already short-circuited today — keep that behavior, don't run the grouped version needlessly).
+- [ ] Spot-check: run both the old and new code against one real multi-item event, diff the row arrays field-by-field.
+- [ ] Brace-balance/syntax check on the touched file.
+
+### Phase 2 — `assignmentCompletenessRows()` (highest payoff, highest risk — most nested conditions)
+- [ ] Grouped aggregate for `approved`/`pending` counts per item.
+- [ ] Grouped aggregate (join `fest_participants` → `fest_registrations`, conditional `SUM(CASE WHEN ...)`) for `performers`/`chestAssigned`/`itemRegAssigned` — carefully preserve the existing `disqualified_at IS NULL`, `participant_role != 'standby'`, and the `chest_no` OR `group.chest_no` conditions; these are the parts most likely to be silently wrong if rewritten carelessly.
+- [ ] Grouped aggregate for `scheduledParticipants` (distinct participant count per item from `fest_schedules`).
+- [ ] Grouped aggregate for `marksEntered` (distinct participant count per item from `fest_marks`, `grade`/`score`/`position` OR condition preserved).
+- [ ] Grouped aggregate for `judges` count per item.
+- [ ] Rewire the loop to use the maps; keep `item_scheduled`/`ready_for_event` derived exactly as today (pure PHP, no query).
+- [ ] Spot-check against an event that actually has disqualified participants, group/team items, and mixed registration statuses — the happy-path case won't exercise the risky conditions.
+- [ ] Brace-balance/syntax check.
+
+### Phase 3 — `headWiseSummary()` / `sportsWiseSummary()`
+- [ ] Grouped aggregate for `approved`/`pending`/`waitlisted` per head (or per sport, in `sportsWiseSummary()`).
+- [ ] Grouped aggregate for `participantCount`/`verifiedParticipants` (join to `students.verified_at`).
+- [ ] Grouped aggregate for `perItemCounts`/`max_item_reg_count`.
+- [ ] Leave the conditional `headFees` query as-is (already one query per head, not the bottleneck) unless it's trivial to fold in while touching this method anyway.
+- [ ] Apply the same treatment to `sportsWiseSummary()`'s per-child-event loop (same shape, different table of `FestEvent` rows to iterate).
+- [ ] Spot-check against a season-hub event with several child sports and a per-head-billed non-sports event (two different code paths through this method).
+- [ ] Brace-balance/syntax check.
+
+### Phase 4 — Pagination for the three unbounded tables
+- [ ] `numberingRegisterRows()`: switch to `paginate(50)->withQueryString()` (or the app's established page size if different from 50 — check the existing convention files first); update `FestSchoolReportController::numberingRegister()` to pass the paginator through; update `ReportNumberingRegister.vue` to render `rows.data` and add pager controls (reuse whatever paginator UI component the app already has, don't build a new one).
+- [ ] `pendingApprovalRows()`: same treatment — controller, `ReportPendingApprovals.vue`.
+- [ ] `FestRegistrationRegisterService::build()`: same treatment for the on-screen table; per the precedent in `SCALE_AND_PAGINATION_PLAN.md` §3 ("export is out of scope for pagination"), the CSV/PDF export paths (`exportRegistrationRegister()`/`exportRegistrationRegisterPdf()`) should keep pulling the full unbounded set — printed/exported registers inherently need every row, only the on-screen table needs paging.
+- [ ] Confirm existing filters on all three (`schoolId`, status, head/item where applicable) are applied at the query level before `paginate()`, not filtered afterward on an in-memory collection.
+- [ ] Brace-balance/syntax check on all touched PHP/Vue files.
+
+### Phase 5 — Wrap-up
+- [ ] Full brace-balance sweep across every file touched in phases 1-4.
+- [ ] Update this doc's Status line to "Implemented" with a short summary per phase, matching the pattern `SCALE_AND_PAGINATION_PLAN.md`'s own Status line uses.
+- [ ] Update `SCALE_AND_PAGINATION_PLAN.md` §12 to point at the implemented state instead of "not yet implemented."
+- [ ] Flag to the user: real query-count and timing verification still requires a live database and realistic (3,000-student) seed data — nothing in phases 1-4 can be load-tested in this environment, same caveat as every other plan in this doc set.

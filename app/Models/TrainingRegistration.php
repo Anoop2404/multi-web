@@ -17,7 +17,7 @@ class TrainingRegistration extends Model
     use TracksPartialPayments;
 
     protected $fillable = [
-        'program_id', 'teacher_id', 'school_id', 'status', 'waitlist_position', 'fee_status', 'amount_paid', 'fee_receipt_id',
+        'program_id', 'teacher_id', 'school_id', 'status', 'rejection_reason', 'waitlist_position', 'fee_status', 'amount_paid', 'fee_receipt_id',
         'registration_source', 'consent_at', 'department', 'teacher_created', 'pending_school_id',
     ];
 

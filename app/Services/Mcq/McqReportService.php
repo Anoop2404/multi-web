@@ -31,6 +31,7 @@ class McqReportService
                 'class_name'       => $reg->student?->schoolClass?->name,
                 'school_name'      => $reg->school?->name,
                 'approval_status'  => $reg->approval_status,
+                'rejection_reason' => $reg->rejection_reason,
                 'attendance_status'=> $reg->attendance_status,
                 'attendance_note'  => $reg->attendance_note,
                 'score'            => $reg->mark?->score,

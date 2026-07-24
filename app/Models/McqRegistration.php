@@ -17,7 +17,7 @@ class McqRegistration extends Model
     protected $fillable = [
         'exam_id', 'student_id', 'teacher_id', 'school_id',
         'hall_ticket_no', 'hall_room', 'seat_no',
-        'status', 'approval_status', 'approved_at', 'approved_by_user_id',
+        'status', 'approval_status', 'rejection_reason', 'approved_at', 'approved_by_user_id',
         'attendance_status', 'attendance_marked_at', 'attendance_marked_by', 'attendance_note',
         'fee_receipt_id',
         'started_at', 'submitted_at', 'draft_answers',
@@ -132,5 +132,10 @@ class McqRegistration extends Model
     public function feeReceipt(): BelongsTo
     {
         return $this->belongsTo(FeeReceipt::class, 'fee_receipt_id');
+    }
+
+    public function receipts(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(FeeReceipt::class, 'feeable');
     }
 }

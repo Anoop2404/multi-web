@@ -639,9 +639,13 @@ function approve(id) {
 }
 
 function reject(id) {
+    const reason = prompt('Rejection reason (required):');
+    if (!reason?.trim()) return;
+
     if (confirm('Reject this registration?')) {
         router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${id}/reject`, {
             override_lifecycle: overrideLifecycle.value,
+            rejection_reason: reason.trim(),
         }, { preserveScroll: true });
     }
 }
@@ -712,12 +716,16 @@ function runBulkApprove() {
 }
 
 function runBulkReject() {
+    const reason = prompt('Rejection reason for these registrations (optional):');
+    if (reason === null) return; // User cancelled prompt
+
     if (filterWideMode.value) {
         if (!confirm(`Reject all ${props.pendingMatchingCount} pending registration(s) matching the current school/item filter?`)) return;
         router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-reject`, {
             school_id: form.school_id || undefined,
             item_id: form.item_id || undefined,
             override_lifecycle: overrideLifecycle.value,
+            rejection_reason: reason.trim(),
         }, { preserveScroll: true, onSuccess: clearSelection });
         return;
     }
@@ -726,6 +734,7 @@ function runBulkReject() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-reject`, {
         registration_ids: selectedIds.value,
         override_lifecycle: overrideLifecycle.value,
+        rejection_reason: reason.trim(),
     }, { preserveScroll: true, onSuccess: clearSelection });
 }
 

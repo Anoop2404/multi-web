@@ -287,8 +287,8 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'This registration already has an approved payment — use "Cancel & refund" instead, which requires a reason and credits the school.'
         );
 
-        $data = $request->validate(['rejection_reason' => 'nullable|string|max:500']);
-        $reason = $data['rejection_reason'] ?? '';
+        $data = $request->validate(['rejection_reason' => 'required|string|max:500']);
+        $reason = $data['rejection_reason'];
 
         $registration->loadMissing('item');
         $headId = $registration->item?->head_id;
@@ -410,6 +410,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'school_id'          => 'nullable|exists:tenants,id',
             'item_id'            => 'nullable|integer|exists:fest_event_items,id',
             'override_lifecycle' => 'nullable|boolean',
+            'rejection_reason'   => 'nullable|string|max:500',
         ]);
 
         $result = $bulk->rejectMany(
@@ -418,10 +419,12 @@ class FestRegistrationReviewController extends SahodayaAdminController
             $data['school_id'] ?? null,
             (bool) ($data['override_lifecycle'] ?? false),
             $data['item_id'] ?? null,
+            $data['rejection_reason'] ?? '',
         );
 
         $audit->festEvent($event, FestPageActivity::REGISTRATIONS, 'fest.registrations.bulk_rejected', "Rejected {$result['rejected']} registration(s)", [
             'rejected' => $result['rejected'],
+            'reason'   => $data['rejection_reason'] ?? null,
         ]);
 
         return back()->with('success', "Rejected {$result['rejected']} registration(s).");

@@ -27,6 +27,7 @@ class MembershipPayment extends Model
     public function registration() { return $this->belongsTo(Registration::class); }
     public function feeReceipt()   { return $this->belongsTo(FeeReceipt::class); }
     public function feeReceipts()  { return $this->morphMany(FeeReceipt::class, 'feeable'); }
+    public function receipts()     { return $this->morphMany(FeeReceipt::class, 'feeable'); }
     public function supersededBy() { return $this->belongsTo(self::class, 'superseded_by_payment_id'); }
 
     public function getProofUrlAttribute(): ?string

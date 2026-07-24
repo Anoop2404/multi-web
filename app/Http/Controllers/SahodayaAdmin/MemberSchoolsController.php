@@ -177,6 +177,7 @@ class MemberSchoolsController extends SahodayaAdminController
                 'has_login'      => User::where('tenant_id', $school->id)->exists(),
                 'login_email'    => User::where('tenant_id', $school->id)->value('email'),
                 'can_cancel_membership' => $cancellation->canCancel($school),
+                'can_cancel_with_settlement' => $school->membership_status === 'approved' && !$cancellation->canCancel($school),
                 'has_payment'    => $payment !== null,
                 'payment_proof_url' => $payment?->proof_url,
                 'payment_amount' => $payment?->amount,
@@ -219,7 +220,13 @@ class MemberSchoolsController extends SahodayaAdminController
 
         $data = $request->validate([
             'reason' => 'required|string|max:1000',
+            'settlement' => 'nullable|in:credit_next_year,forfeit',
         ]);
+
+        if (isset($data['settlement'])) {
+            $cancellation->cancelWithSettlement($school, $data['reason'], $data['settlement'], $notifier, $audit, $request->user()?->id);
+            return back()->with('success', "Membership cancelled for {$school->name} with settlement: {$data['settlement']}.");
+        }
 
         $cancellation->cancel($school, $data['reason'], $notifier, $audit, $request->user()?->id);
 

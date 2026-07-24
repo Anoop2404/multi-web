@@ -72,6 +72,12 @@ class FestSchoolEventFeeController extends SahodayaAdminController
                         'created_by_user_id' => $request->user()->id,
                     ]);
                     app(FestFeeLedgerService::class)->postCreditIssued($credit);
+
+                    try {
+                        app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
+                    } catch (\Throwable) {
+                        // credit is already recorded + posted; the note can be regenerated later
+                    }
                 }
             }
 

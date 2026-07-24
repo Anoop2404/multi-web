@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\FeeReceipt;
+use App\Models\FestFeeCredit;
 use App\Models\FestSchoolEventFee;
 use App\Models\MembershipPayment;
 use App\Models\McqSchoolFee;
+use App\Models\ProgramFeeCredit;
 use App\Models\Tenant;
 use App\Models\TrainingRegistration;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Fees\CreditNoteService;
 use App\Services\Fees\FeeReceiptEmailTracker;
 use App\Services\Fees\OfflineProgramFeeOrchestrator;
 use App\Services\Exports\CsvExportDispatcher;
@@ -159,6 +162,27 @@ class UnifiedPaymentsController extends SahodayaAdminController
 
         $html = $receiptService->readOrGenerate($feeReceipt);
         abort_if(! $html, 404, 'Receipt not yet generated.');
+
+        return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
+
+    /**
+     * Serves a credit note (see docs/FLOW_GAP_FIX_PLAN.md Phase 3b.2) — $type is 'fest' or
+     * 'program', matching SchoolPaymentHistoryService::creditNoteUrl()'s two link shapes.
+     */
+    public function creditNote(string $tenantId, string $type, int $creditId, CreditNoteService $notes)
+    {
+        abort_unless(in_array($type, ['fest', 'program'], true), 404);
+
+        $credit = $type === 'fest'
+            ? FestFeeCredit::findOrFail($creditId)
+            : ProgramFeeCredit::findOrFail($creditId);
+
+        $schoolId = $notes->schoolIdForCredit($credit);
+        abort_unless($schoolId && Tenant::find($schoolId)?->parent_id === $this->sahodaya->id, 403);
+
+        $html = $notes->readOrGenerate($credit);
+        abort_if(! $html, 404, 'Credit note not available.');
 
         return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
     }
@@ -324,5 +348,116 @@ class UnifiedPaymentsController extends SahodayaAdminController
         abort_unless($disk->exists($feeReceipt->file_path), 404, 'Payment proof file not found.');
 
         return response()->file($disk->path($feeReceipt->file_path));
+    }
+
+    public function recordCreditPayout(Request $request, \App\Services\Fees\CreditPayoutService $payoutService)
+    {
+        $data = $request->validate([
+            'credit_type' => 'required|in:fest,program',
+            'credit_id'   => 'required|integer',
+            'bank_ref'    => 'nullable|string|max:255',
+            'notes'       => 'nullable|string|max:1000',
+        ]);
+
+        $credit = $data['credit_type'] === 'fest'
+            ? \App\Models\FestFeeCredit::findOrFail($data['credit_id'])
+            : \App\Models\ProgramFeeCredit::findOrFail($data['credit_id']);
+
+        $payoutService->recordPayout($credit, $request->user(), $data['bank_ref'] ?? null, $data['notes'] ?? null);
+
+        return back()->with('success', 'Out-of-platform bank payout recorded. Credit closed out.');
+    }
+
+    public function creditsReport(Request $request)
+    {
+        $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->pluck('id');
+
+        $schoolNames = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
+
+        $festCredits = \App\Models\FestFeeCredit::whereHas('schoolEventFee', fn ($q) => $q->whereIn('school_id', $schoolIds))
+            ->with(['schoolEventFee.event', 'sourceRegistration', 'createdBy:id,name'])
+            ->latest('id')
+            ->get()
+            ->map(fn (\App\Models\FestFeeCredit $c) => [
+                'id'            => $c->id,
+                'credit_type'   => 'fest',
+                'school_id'     => $c->schoolEventFee?->school_id,
+                'school_name'   => $schoolNames->get($c->schoolEventFee?->school_id),
+                'amount'        => (float) $c->amount,
+                'reason'        => $c->reason,
+                'source_label'  => ($c->schoolEventFee?->event?->title ?? 'Fest').' — Event Fee',
+                'created_at'    => $c->created_at?->toIso8601String(),
+                'applied_at'    => $c->applied_at?->toIso8601String(),
+                'status'        => $c->applied_at ? 'closed' : 'outstanding',
+                'created_by'    => $c->createdBy?->name,
+            ]);
+
+        // creditable_type is McqSchoolFee/TrainingSchoolFee for program (MCQ/Training) fee
+        // credits, but Tenant::class directly for a membership cancel-with-settlement credit
+        // (SchoolMembershipCancellationService::cancelWithSettlement() — see
+        // docs/FLOW_GAP_FIX_PLAN.md Phase 1.4/D4) since a membership credit isn't tied to any
+        // per-program fee row, the school itself is the creditable. Resolve both shapes here
+        // so membership credits don't silently disappear from this report.
+        $programCreditSchoolId = fn (\App\Models\ProgramFeeCredit $c) => $c->creditable instanceof Tenant
+            ? $c->creditable->id
+            : $c->creditable?->school_id;
+
+        $programCredits = \App\Models\ProgramFeeCredit::with(['creditable', 'source', 'createdBy:id,name'])
+            ->latest('id')
+            ->get()
+            ->filter(fn (\App\Models\ProgramFeeCredit $c) => in_array($programCreditSchoolId($c), $schoolIds->all(), true))
+            ->map(function (\App\Models\ProgramFeeCredit $c) use ($programCreditSchoolId, $schoolNames) {
+                $schoolId = $programCreditSchoolId($c);
+
+                return [
+                    'id'            => $c->id,
+                    'credit_type'   => 'program',
+                    'school_id'     => $schoolId,
+                    'school_name'   => $schoolNames->get($schoolId),
+                    'amount'        => (float) $c->amount,
+                    'reason'        => $c->reason,
+                    'source_label'  => match ($c->creditable_type) {
+                        \App\Models\McqSchoolFee::class => 'Talent Search Batch Fee',
+                        \App\Models\TrainingSchoolFee::class => 'Training Program Fee',
+                        Tenant::class => 'Membership',
+                        default => 'Programme Fee',
+                    },
+                    'created_at'    => $c->created_at?->toIso8601String(),
+                    'applied_at'    => $c->applied_at?->toIso8601String(),
+                    'status'        => $c->applied_at ? 'closed' : 'outstanding',
+                    'created_by'    => $c->createdBy?->name,
+                ];
+            });
+
+        $payouts = \App\Models\CreditPayout::whereIn('school_id', $schoolIds)
+            ->with(['recordedBy:id,name'])
+            ->latest('id')
+            ->get()
+            ->map(fn (\App\Models\CreditPayout $p) => [
+                'id'          => $p->id,
+                'school_name' => $schoolNames->get($p->school_id),
+                'amount'      => (float) $p->amount,
+                'bank_ref'    => $p->bank_ref,
+                'notes'       => $p->notes,
+                'created_at'  => $p->created_at?->toIso8601String(),
+                'recorded_by' => $p->recordedBy?->name,
+            ]);
+
+        $credits = $festCredits->concat($programCredits)->sortByDesc('created_at')->values();
+
+        $stats = [
+            'total_issued' => (float) $credits->sum('amount'),
+            'outstanding'  => (float) $credits->where('status', 'outstanding')->sum('amount'),
+            'closed'       => (float) $credits->where('status', 'closed')->sum('amount'),
+            'paid_out'     => (float) $payouts->sum('amount'),
+        ];
+
+        return $this->inertia('Sahodaya/Finance/CreditsReport', [
+            'credits' => $credits,
+            'payouts' => $payouts->values(),
+            'stats'   => $stats,
+        ]);
     }
 }

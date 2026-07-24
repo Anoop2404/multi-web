@@ -121,10 +121,16 @@ class TrainingWaitlistService
 
     /**
      * Cancel/withdraw a registration and promote the next waitlisted seat-holder when a seat frees.
+     *
+     * @param  ?string  $reason  Required to actually issue a fee credit (see
+     *     TrainingSchoolFeeService::syncForSchool()/creditForCancelledIndividualRegistration()).
+     *     Left null for callers that haven't been updated to collect one yet — the
+     *     cancellation itself still proceeds, it just won't credit any paid amount, same
+     *     as this method's behavior before Phase 1.1.
      */
-    public function cancelAndPromote(TrainingRegistration $registration): TrainingRegistration
+    public function cancelAndPromote(TrainingRegistration $registration, ?string $reason = null, ?int $cancelledByUserId = null): TrainingRegistration
     {
-        return DB::transaction(function () use ($registration) {
+        return DB::transaction(function () use ($registration, $reason, $cancelledByUserId) {
             $registration->loadMissing('program');
             $program = $registration->program;
             $wasSeated = in_array($registration->status, self::SEATED_STATUSES, true);
@@ -134,6 +140,10 @@ class TrainingWaitlistService
                 'status' => 'cancelled',
                 'waitlist_position' => null,
             ]);
+
+            \App\Models\TrainingInvoice::where('registration_id', $registration->id)
+                ->where('status', '!=', \App\Models\TrainingInvoice::STATUS_PAID)
+                ->update(['status' => \App\Models\TrainingInvoice::STATUS_VOID]);
 
             if ($wasWaitlisted && $program) {
                 $this->reindexPositions($program);
@@ -145,8 +155,20 @@ class TrainingWaitlistService
                 if ($program->usesSchoolBatchFee() && $registration->school_id) {
                     $school = $registration->school;
                     if ($school) {
-                        app(TrainingSchoolFeeService::class)->syncForSchool($program, $school);
+                        app(TrainingSchoolFeeService::class)->syncForSchool(
+                            $program,
+                            $school,
+                            $reason,
+                            $cancelledByUserId,
+                            $registration->id,
+                        );
                     }
+                } elseif ($program && ! $program->usesSchoolBatchFee() && $reason !== null) {
+                    app(TrainingSchoolFeeService::class)->creditForCancelledIndividualRegistration(
+                        $registration,
+                        $reason,
+                        $cancelledByUserId ?? auth()->id(),
+                    );
                 }
             }
 

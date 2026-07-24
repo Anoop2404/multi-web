@@ -16,6 +16,10 @@ class TrainingInvoice extends Model
 
     public const STATUS_PAID = 'paid';
 
+    public const STATUS_SUPERSEDED = 'superseded';
+
+    public const STATUS_VOID = 'void';
+
     protected $fillable = [
         'program_id',
         'school_id',

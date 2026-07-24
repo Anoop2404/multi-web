@@ -143,7 +143,19 @@ class TrainingRegistrationController extends SchoolAdminController
             'This registration\'s fee has been approved. Contact your Sahodaya office to cancel a paid registration.',
         );
 
-        app(\App\Services\Training\TrainingWaitlistService::class)->cancelAndPromote($registration);
+        // School cancel never reaches an admin-typed reason — the batch-fee-approved case
+        // is already blocked above, so the only money this can free is a partial payment.
+        // Auto-generate a reason so that (rare) case still gets credited instead of
+        // silently requiring the guard above to be the only thing standing between a
+        // school and stranded money. Mirrors McqRegistrationController::cancel()'s
+        // auto-generated $cancelReason for the same situation.
+        $cancelReason = "Training registration cancelled by school for {$registration->teacher?->name} in {$program->title}";
+
+        app(\App\Services\Training\TrainingWaitlistService::class)->cancelAndPromote(
+            $registration,
+            $cancelReason,
+            $request->user()?->id,
+        );
 
         app(PlatformAuditLogger::class)->log(
             'training.registration.cancelled_by_school',

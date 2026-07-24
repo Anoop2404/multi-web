@@ -408,6 +408,14 @@ class FestEventController extends SahodayaAdminController
         }
 
         $previousStatus = $event->status;
+
+        if ($newStatus === 'cancelled' && $previousStatus !== 'cancelled') {
+            app(\App\Services\Events\FestEventStatusService::class)
+                ->transitionToCancelled($event, $request->boolean('confirm_credit_all'));
+            // Remove status from data so it's not updated again below.
+            unset($data['status']);
+        }
+
         $event->update($data);
 
         // Season hub: keep child sport events in sync (open status + item placement).
@@ -1027,6 +1035,12 @@ class FestEventController extends SahodayaAdminController
 
         $newStatus = $data['status'];
 
+        \App\Support\StatusTransitionGuard::assert(
+            $event,
+            $newStatus,
+            \App\Support\StatusTransitionGuard::FEST_EVENT_TRANSITIONS,
+        );
+
         if (in_array($newStatus, ['published', 'registration_open'], true)
             && ! in_array($event->status, ['published', 'registration_open', 'ongoing', 'completed'], true)) {
             try {
@@ -1041,7 +1055,13 @@ class FestEventController extends SahodayaAdminController
         }
 
         $previousStatus = $event->status;
-        $event->update(['status' => $newStatus]);
+
+        if ($newStatus === 'cancelled' && $previousStatus !== 'cancelled') {
+            app(\App\Services\Events\FestEventStatusService::class)
+                ->transitionToCancelled($event, $request->boolean('confirm_credit_all'));
+        } else {
+            $event->update(['status' => $newStatus]);
+        }
 
         if ($event->event_type === 'sports' && $event->isSportsSeasonEvent()) {
             app(\App\Services\Events\FestSportsEventSyncService::class)->syncSeason($event->fresh());

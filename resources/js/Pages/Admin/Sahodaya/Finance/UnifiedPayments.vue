@@ -145,6 +145,40 @@
                             Email: {{ p.receipt_email_status }}
                         </span>
                     </div>
+
+                    <button v-if="p.receipts_history && p.receipts_history.length > 1"
+                            type="button"
+                            class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold mt-2 flex items-center gap-1"
+                            @click="toggleExpand(rowKey(p))">
+                        <span>{{ expanded[rowKey(p)] ? 'Hide' : 'Show' }} payment history ({{ p.receipts_history.length }} attempts)</span>
+                        <span class="text-[10px]">{{ expanded[rowKey(p)] ? '▲' : '▼' }}</span>
+                    </button>
+
+                    <div v-if="expanded[rowKey(p)] && p.receipts_history" class="mt-3 pl-3 border-l-2 border-slate-200 space-y-2 w-full">
+                        <div v-for="r in p.receipts_history" :key="r.id" class="text-xs text-slate-600 flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-2 rounded">
+                            <div>
+                                <span class="font-mono text-indigo-700 mr-2" v-if="r.receipt_number">#{{ r.receipt_number }}</span>
+                                <span class="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded mr-2" :class="statusClass(r.status)">{{ r.status === 'credit' ? 'credit issued' : r.status }}</span>
+                                <span class="font-semibold">₹{{ fmt(r.amount) }}</span>
+                                <span v-if="r.payment_date" class="text-slate-400 ml-2">({{ formatCalendarDate(r.payment_date) }})</span>
+                                <div v-if="r.rejection_reason" class="text-red-600 mt-0.5 font-medium">Rejected: {{ r.rejection_reason }}</div>
+                                <div v-if="r.reversal_reason" class="text-red-600 mt-0.5 font-medium">Reversed: {{ r.reversal_reason }}</div>
+                                <!-- Money owed BACK after a rejected/cancelled paid item — not a
+                                     receipt. See docs/FLOW_GAP_FIX_PLAN.md Phase 3b.2. -->
+                                <template v-if="r.status === 'credit'">
+                                    <div class="text-amber-700 mt-0.5 font-medium">{{ r.credit_reason || 'Fee credit issued' }}</div>
+                                    <div class="text-slate-400 mt-0.5">
+                                        {{ r.applied_at ? 'Applied ' + formatCalendarDate(r.applied_at) : 'Outstanding — applies to a future fee' }}
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <a v-if="r.receipt_url" :href="r.receipt_url" target="_blank" rel="noopener" class="text-indigo-600 font-semibold hover:underline">Receipt ↗</a>
+                                <a v-if="r.proof_url" :href="r.proof_url" target="_blank" rel="noopener" class="text-slate-600 font-semibold hover:underline">Proof ↗</a>
+                                <a v-if="r.credit_note_url" :href="r.credit_note_url" target="_blank" rel="noopener" class="text-amber-700 font-semibold hover:underline">Credit note ↗</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="flex items-center gap-3">
@@ -156,6 +190,10 @@
                     </div>
 
                     <div class="flex items-center gap-1.5 flex-wrap">
+                        <a v-if="p.proof_url" :href="p.proof_url" target="_blank" rel="noopener"
+                           class="btn-secondary text-xs !py-1.5 !px-3 font-semibold text-slate-700 border-slate-200 hover:bg-slate-50 shadow-2xs">
+                            Proof
+                        </a>
                         <a v-if="p.receipt_url" :href="p.receipt_url" target="_blank" rel="noopener"
                            class="btn-secondary text-xs !py-1.5 !px-3 font-semibold text-slate-700 border-slate-200 hover:bg-slate-50 shadow-2xs">
                             Receipt
@@ -196,8 +234,13 @@ const props = defineProps({
 });
 
 const page = usePage();
+const expanded = ref({});
 const resending = ref(null);
 const reversing = ref(null);
+
+function toggleExpand(key) {
+    expanded.value = { ...expanded.value, [key]: !expanded.value[key] };
+}
 
 const form = reactive({
     type: props.filters?.type ?? 'all',
@@ -255,9 +298,20 @@ function typeClass(type) {
 }
 
 function statusClass(status) {
-    if (['verified', 'approved'].includes(status)) return 'bg-green-100 text-green-800';
-    if (['rejected', 'reversed'].includes(status)) return 'bg-red-100 text-red-800';
-    return 'bg-amber-100 text-amber-800';
+    return {
+        verified:   'bg-green-100 text-green-800 font-semibold',
+        approved:   'bg-green-100 text-green-800 font-semibold',
+        submitted:  'bg-amber-100 text-amber-800 font-semibold',
+        uploaded:   'bg-amber-100 text-amber-800 font-semibold',
+        rejected:   'bg-rose-100 text-rose-800 font-semibold',
+        reversed:   'bg-red-100 text-red-800 line-through font-semibold',
+        superseded: 'bg-slate-100 text-slate-500 line-through',
+        partial:    'bg-amber-100 text-amber-800 font-semibold',
+        waived:     'bg-sky-100 text-sky-800 font-semibold',
+        credit:     'bg-emerald-100 text-emerald-800 font-semibold',
+        cancelled:  'bg-slate-100 text-slate-600 font-semibold',
+        pending:    'bg-slate-100 text-slate-600',
+    }[status] ?? 'bg-slate-100 text-slate-600';
 }
 
 function emailStatusClass(status) {

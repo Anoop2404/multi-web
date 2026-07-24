@@ -16,7 +16,7 @@ class StudentVerificationController extends SahodayaAdminController
     {
         $filters = $request->validate([
             'school_id'         => 'nullable|string',
-            'verification'      => 'nullable|in:all,verified,unverified',
+            'verification'      => 'nullable|in:all,verified,unverified,resubmitted',
             'class_category_id' => 'nullable|integer',
             'search'            => 'nullable|string|max:100',
         ]);
@@ -30,9 +30,10 @@ class StudentVerificationController extends SahodayaAdminController
             ->where('status', 'active');
 
         $counts = [
-            'total'      => (clone $base)->count(),
-            'verified'   => (clone $base)->whereNotNull('verified_at')->count(),
-            'unverified' => (clone $base)->whereNull('verified_at')->count(),
+            'total'       => (clone $base)->count(),
+            'verified'    => (clone $base)->whereNotNull('verified_at')->count(),
+            'unverified'  => (clone $base)->whereNull('verified_at')->count(),
+            'resubmitted' => (clone $base)->whereNull('verified_at')->whereNotNull('resubmitted_at')->count(),
         ];
 
         $schools = Tenant::whereIn('id', $schoolIds)->orderBy('name')->get(['id', 'name']);
@@ -100,6 +101,7 @@ class StudentVerificationController extends SahodayaAdminController
                 ->where('tenant_id', $filters['school_id'])
                 ->when($verification === 'verified', fn ($q) => $q->whereNotNull('verified_at'))
                 ->when($verification === 'unverified', fn ($q) => $q->whereNull('verified_at'))
+                ->when($verification === 'resubmitted', fn ($q) => $q->whereNull('verified_at')->whereNotNull('resubmitted_at'))
                 ->when(! empty($filters['class_category_id']), fn ($q) => $q->whereHas(
                     'schoolClass',
                     fn ($c) => $c->where('class_category_id', $filters['class_category_id'])
@@ -245,30 +247,40 @@ class StudentVerificationController extends SahodayaAdminController
         $data = $request->validate([
             'student_ids'   => 'required|array|min:1',
             'student_ids.*' => 'integer',
-            'reason'        => 'required|string|max:500',
+            'reason'        => 'nullable|string|max:500',
+            'reasons'       => 'nullable|array',
+            'reasons.*'     => 'nullable|string|max:500',
         ]);
+
+        $defaultReason = $data['reason'] ?? 'Verification rejected by Sahodaya.';
+        $reasonsMap = $data['reasons'] ?? [];
 
         $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id');
 
-        $query = Student::whereIn('tenant_id', $schoolIds)
+        $students = Student::whereIn('tenant_id', $schoolIds)
             ->where('status', 'active')
             ->whereNull('verified_at')
-            ->whereIn('id', $data['student_ids']);
+            ->whereIn('id', $data['student_ids'])
+            ->get();
 
-        $affected = (clone $query)->get(['id', 'tenant_id', 'name']);
+        $count = 0;
+        foreach ($students as $student) {
+            $reason = $reasonsMap[$student->id] ?? $defaultReason;
+            $student->update([
+                'verified_at'         => null,
+                'verified_by_user_id' => null,
+                'rejection_reason'    => $reason,
+                'resubmitted_at'      => null,
+            ]);
+            $count++;
+        }
 
-        $count = $query->update([
-            'verified_at'         => null,
-            'verified_by_user_id' => null,
-            'rejection_reason'    => $data['reason'],
-        ]);
-
-        foreach ($affected->groupBy('tenant_id') as $schoolId => $students) {
+        foreach ($students->groupBy('tenant_id') as $schoolId => $schoolStudents) {
             $this->notifySchool((string) $schoolId, 'student.verification.rejected', [
-                'student_name' => $students->count() === 1
-                    ? $students->first()->name
-                    : "{$students->count()} students",
-                'reason' => $data['reason'],
+                'student_name' => $schoolStudents->count() === 1
+                    ? $schoolStudents->first()->name
+                    : "{$schoolStudents->count()} students",
+                'reason' => $defaultReason,
             ]);
         }
 

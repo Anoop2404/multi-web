@@ -482,7 +482,7 @@ class McqRegistrationController extends SchoolAdminController
         abort_unless(
             $registration->canBeCancelledBySchool(),
             422,
-            'This registration can no longer be cancelled. Approved registrations, issued hall tickets, or started exams must be handled by Sahodaya.',
+            'This registration can no longer be cancelled. Contact your Sahodaya to cancel it from the Exam Registrations page.',
         );
 
         $registration->update([
@@ -491,9 +491,10 @@ class McqRegistrationController extends SchoolAdminController
             'cancelled_by_user_id' => $request->user()->id,
         ]);
 
-        app(McqSchoolFeeService::class)->syncForSchool($exam, $this->school);
-
         $name = $registration->participantName();
+        $cancelReason = "MCQ registration cancelled by school for {$name} in {$exam->title}";
+
+        app(McqSchoolFeeService::class)->syncForSchool($exam, $this->school, $cancelReason, $request->user()->id, $registration->id);
         app(PlatformAuditLogger::class)->mcqRegistration(
             $registration->fresh(['exam', 'student', 'teacher']),
             'mcq.registration.cancelled',

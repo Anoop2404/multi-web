@@ -62,6 +62,22 @@ class FeeReceiptReversalService
                 category: 'finance',
             );
 
+            try {
+                $schoolId = app(\App\Services\Fees\ProgramFeeReceiptService::class)->schoolIdForReceipt($locked);
+                if ($schoolId) {
+                    $notifier = app(\App\Services\Notifications\NotificationService::class);
+                    foreach (User::role(['school_admin', 'school_staff'])->where('tenant_id', $schoolId)->get() as $user) {
+                        $notifier->notifyFromTemplate($user, 'fee.receipt.reversed', [
+                            'receipt_number' => $locked->receipt_number ?? "#{$locked->id}",
+                            'amount'         => number_format((float) $locked->amount, 2),
+                            'reason'         => $reason ?? 'Contact Sahodaya office for details.',
+                        ], "/school-admin/{$schoolId}/payments");
+                    }
+                }
+            } catch (\Throwable) {
+                // non-blocking
+            }
+
             return $locked->fresh();
         });
     }

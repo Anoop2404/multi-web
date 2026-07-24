@@ -217,9 +217,25 @@ class ProgramFeeReceiptService
 
         $disk = TenantStorage::uploadDisk();
 
-        return Storage::disk($disk)->exists($path)
-            ? Storage::disk($disk)->get($path)
-            : null;
+        if (! Storage::disk($disk)->exists($path)) {
+            return null;
+        }
+
+        $html = Storage::disk($disk)->get($path);
+
+        if ($receipt->status === 'reversed') {
+            $reason = htmlspecialchars($receipt->reversal_reason ?? 'Payment reversed');
+            $date = $receipt->reversed_at ? $receipt->reversed_at->format('d M Y, h:i A') : '';
+            $banner = '<div style="position: fixed; top: 25px; right: -30px; transform: rotate(15deg); background-color: rgba(220, 38, 38, 0.95); color: white; padding: 8px 40px; font-weight: bold; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; z-index: 9999; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 2px dashed #ffffff; text-align: center;">REVERSED'.($date ? '<div style="font-size: 10px; font-weight: normal; text-transform: none; margin-top: 2px;">'.$date.'</div>' : '').'<div style="font-size: 11px; font-weight: normal; text-transform: none; margin-top: 2px;">Reason: '.$reason.'</div></div>';
+
+            if (str_contains($html, '</body>')) {
+                $html = str_replace('</body>', $banner.'</body>', $html);
+            } else {
+                $html .= $banner;
+            }
+        }
+
+        return $html;
     }
 
     public function schoolIdForReceipt(FeeReceipt $receipt): ?string

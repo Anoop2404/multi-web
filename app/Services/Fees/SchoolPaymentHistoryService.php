@@ -3,10 +3,12 @@
 namespace App\Services\Fees;
 
 use App\Models\FestEvent;
+use App\Models\FestFeeCredit;
 use App\Models\FestSchoolEventFee;
 use App\Models\MembershipPayment;
 use App\Models\McqRegistration;
 use App\Models\McqSchoolFee;
+use App\Models\ProgramFeeCredit;
 use App\Models\Tenant;
 use App\Models\TrainingRegistration;
 use App\Models\TrainingSchoolFee;
@@ -164,6 +166,7 @@ class SchoolPaymentHistoryService
             'fee_receipt_id'       => $p->feeReceipt?->id,
             'receipt_status'       => $p->feeReceipt?->status,
             'rejection_reason'     => $p->feeReceipt?->rejection_reason ?? $p->rejection_reason,
+            'receipts_history'     => $this->mapReceiptsHistory($p, $urlSchoolId, $sahodayaId),
         ];
     }
 
@@ -186,9 +189,6 @@ class SchoolPaymentHistoryService
             'amount'               => $f->total_due,
             'amount_paid'          => (float) $f->amount_paid,
             'balance'              => $f->outstandingBalance(),
-            // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14 — money owed BACK to this
-            // school (rejected/cancelled paid items); 0 for every other program (only fest
-            // has the FestFeeCredit concept).
             'available_credit'     => $f->outstandingCredit(),
             'status'               => $f->status === 'approved' ? 'approved' : ($f->status === 'proof_uploaded' ? 'uploaded' : $f->status),
             'payment_date'         => $f->feeReceipt?->payment_date?->toDateString(),
@@ -205,6 +205,7 @@ class SchoolPaymentHistoryService
             'fee_receipt_id'       => $f->feeReceipt?->id,
             'receipt_status'       => $f->feeReceipt?->status,
             'rejection_reason'     => $f->feeReceipt?->status === 'rejected' ? $f->feeReceipt->rejection_reason : null,
+            'receipts_history'     => $this->mapReceiptsHistory($f, $urlSchoolId, $sahodayaId, $f->event),
         ];
     }
 
@@ -216,18 +217,24 @@ class SchoolPaymentHistoryService
         ?string $sahodayaId,
     ): array {
         $schoolId = $r->school_id;
+        $isCancelled = in_array($r->status, ['cancelled', 'withdrawn'], true);
+        $label = ($r->program?->title ?? 'Training').' — '.$r->teacher?->name;
+        if ($isCancelled) {
+            $label = 'CANCELLED — '.$label;
+        }
 
         return [
             'id'                   => $r->id,
             'type'                 => 'training',
             'school_id'            => $schoolId,
             'school_name'          => $schoolNames->get($schoolId),
-            'label'                => ($r->program?->title ?? 'Training').' — '.$r->teacher?->name,
+            'label'                => $label,
             'level_label'          => null,
             'amount'               => $r->feeTotalDue() ?: ($r->feeReceipt?->amount ?? $r->program?->fee_amount),
             'amount_paid'          => (float) $r->amount_paid,
             'balance'              => $r->outstandingBalance(),
-            'status'               => $r->fee_status ?: ($r->feeReceipt?->status === 'approved' ? 'approved' : ($r->feeReceipt?->status ?? 'pending')),
+            'status'               => $isCancelled ? 'cancelled' : ($r->fee_status ?: ($r->feeReceipt?->status === 'approved' ? 'approved' : ($r->feeReceipt?->status ?? 'pending'))),
+            'is_cancelled'         => $isCancelled,
             'payment_date'         => $r->feeReceipt?->payment_date?->toDateString(),
             'reviewed_at'          => $r->feeReceipt?->reviewed_at?->toDateTimeString(),
             'reviewed_by'          => $r->feeReceipt?->reviewedBy?->name,
@@ -242,6 +249,7 @@ class SchoolPaymentHistoryService
             'fee_receipt_id'       => $r->feeReceipt?->id,
             'receipt_status'       => $r->feeReceipt?->status,
             'rejection_reason'     => $r->feeReceipt?->status === 'rejected' ? $r->feeReceipt->rejection_reason : null,
+            'receipts_history'     => $this->mapReceiptsHistory($r, $urlSchoolId, $sahodayaId),
         ];
     }
 
@@ -279,6 +287,7 @@ class SchoolPaymentHistoryService
             'fee_receipt_id'       => $f->feeReceipt?->id,
             'receipt_status'       => $f->feeReceipt?->status,
             'rejection_reason'     => $f->feeReceipt?->status === 'rejected' ? $f->feeReceipt->rejection_reason : null,
+            'receipts_history'     => $this->mapReceiptsHistory($f, $urlSchoolId, $sahodayaId),
         ];
     }
 
@@ -316,6 +325,7 @@ class SchoolPaymentHistoryService
             'fee_receipt_id'       => $f->feeReceipt?->id,
             'receipt_status'       => $f->feeReceipt?->status,
             'rejection_reason'     => $f->feeReceipt?->status === 'rejected' ? $f->feeReceipt->rejection_reason : null,
+            'receipts_history'     => $this->mapReceiptsHistory($f, $urlSchoolId, $sahodayaId),
         ];
     }
 
@@ -327,16 +337,22 @@ class SchoolPaymentHistoryService
         ?string $sahodayaId,
     ): array {
         $schoolId = $r->school_id;
+        $isCancelled = in_array($r->status, ['cancelled', 'withdrawn'], true);
+        $label = ($r->exam?->title ?? 'Talent Search').' — '.$r->student?->name;
+        if ($isCancelled) {
+            $label = 'CANCELLED — '.$label;
+        }
 
         return [
             'id'                   => $r->id,
             'type'                 => 'mcq',
             'school_id'            => $schoolId,
             'school_name'          => $schoolNames->get($schoolId),
-            'label'                => ($r->exam?->title ?? 'Talent Search').' — '.$r->student?->name,
+            'label'                => $label,
             'level_label'          => null,
             'amount'               => $r->feeReceipt?->amount ?? $r->exam?->fee_amount,
-            'status'               => $r->feeReceipt?->status === 'approved' ? 'approved' : ($r->feeReceipt?->status ?? 'pending'),
+            'status'               => $isCancelled ? 'cancelled' : ($r->feeReceipt?->status === 'approved' ? 'approved' : ($r->feeReceipt?->status ?? 'pending')),
+            'is_cancelled'         => $isCancelled,
             'payment_date'         => $r->feeReceipt?->payment_date?->toDateString(),
             'reviewed_at'          => $r->feeReceipt?->reviewed_at?->toDateTimeString(),
             'reviewed_by'          => $r->feeReceipt?->reviewedBy?->name,
@@ -351,7 +367,110 @@ class SchoolPaymentHistoryService
             'fee_receipt_id'       => $r->feeReceipt?->id,
             'receipt_status'       => $r->feeReceipt?->status,
             'rejection_reason'     => $r->feeReceipt?->status === 'rejected' ? $r->feeReceipt->rejection_reason : null,
+            'receipts_history'     => $this->mapReceiptsHistory($r, $urlSchoolId, $sahodayaId),
         ];
+    }
+
+    private function mapReceiptsHistory(
+        $feeable,
+        ?string $urlSchoolId,
+        ?string $sahodayaId,
+        ?FestEvent $event = null,
+    ): array {
+        $receipts = method_exists($feeable, 'receipts')
+            ? $feeable->receipts
+            : ($feeable->feeReceipt ? collect([$feeable->feeReceipt]) : collect());
+
+        if ($receipts->isEmpty() && $feeable->feeReceipt) {
+            $receipts = collect([$feeable->feeReceipt]);
+        }
+
+        $schoolId = $feeable->school_id ?? null;
+
+        $receiptRows = $receipts
+            ->map(function (FeeReceipt $r) use ($feeable, $schoolId, $urlSchoolId, $sahodayaId, $event) {
+                return [
+                    'id'               => 'receipt-'.$r->id,
+                    'sort_at'          => $r->created_at,
+                    'status'           => $r->status,
+                    'amount'           => (float) $r->amount,
+                    'transaction_ref'  => $r->transaction_ref,
+                    'payment_date'     => $r->payment_date?->toDateString(),
+                    'uploaded_at'      => $r->created_at?->toDateTimeString(),
+                    'reviewed_at'      => $r->reviewed_at?->toDateTimeString(),
+                    'reviewed_by'      => $r->reviewedBy?->name,
+                    'rejection_reason' => $r->rejection_reason,
+                    'reversal_reason'  => $r->reversal_reason,
+                    'reversed_at'      => $r->reversed_at?->toDateTimeString(),
+                    'receipt_number'   => $r->receipt_number,
+                    'proof_url'        => $this->programProofUrl($r, (string) $schoolId, $urlSchoolId, $sahodayaId, $event, $feeable->id ?? null),
+                    'receipt_url'      => $this->programReceiptUrl($r, (string) $schoolId, $urlSchoolId, $sahodayaId, $event),
+                ];
+            });
+
+        $creditRows = $this->creditsFor($feeable)
+            ->map(function ($c) use ($schoolId, $urlSchoolId, $sahodayaId) {
+                return [
+                    'id'                 => 'credit-'.$c->id,
+                    'sort_at'            => $c->created_at,
+                    'status'             => 'credit',
+                    'amount'             => (float) $c->amount,
+                    'uploaded_at'        => $c->created_at?->toDateTimeString(),
+                    'credit_reason'      => $c->reason,
+                    'applied_at'         => $c->applied_at?->toDateTimeString(),
+                    'credit_note_number' => $c->credit_note_number,
+                    'credit_note_url'    => $this->creditNoteUrl($c, (string) $schoolId, $urlSchoolId, $sahodayaId),
+                ];
+            });
+
+        return $receiptRows->concat($creditRows)
+            ->sortByDesc('sort_at')
+            ->map(fn (array $row) => collect($row)->except('sort_at')->all())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * FestFeeCredit/ProgramFeeCredit rows tied to this fee carrier — additive to the
+     * receipt list above, not a replacement. Only Fest/MCQ-batch/Training-batch fee
+     * records carry credits today (the three aggregate carriers credits are actually
+     * created against — see docs/FLOW_GAP_FIX_PLAN.md Phase 1.1/3b.2); individually-billed
+     * MCQ/Training registrations and membership payments intentionally return empty here.
+     *
+     * @return Collection<int, FestFeeCredit|ProgramFeeCredit>
+     */
+    private function creditsFor($feeable): Collection
+    {
+        if ($feeable instanceof FestSchoolEventFee) {
+            return FestFeeCredit::where('fest_school_event_fee_id', $feeable->id)->get();
+        }
+
+        if ($feeable instanceof McqSchoolFee || $feeable instanceof TrainingSchoolFee) {
+            return ProgramFeeCredit::where('creditable_type', get_class($feeable))
+                ->where('creditable_id', $feeable->id)
+                ->get();
+        }
+
+        return collect();
+    }
+
+    private function creditNoteUrl($credit, string $schoolId, ?string $urlSchoolId, ?string $sahodayaId): ?string
+    {
+        if (! $credit->credit_note_number) {
+            return null;
+        }
+
+        $type = $credit instanceof FestFeeCredit ? 'fest' : 'program';
+
+        if ($urlSchoolId) {
+            return "/school-admin/{$urlSchoolId}/payments/credit-notes/{$type}/{$credit->id}";
+        }
+
+        if ($sahodayaId) {
+            return "/sahodaya-admin/{$sahodayaId}/finance/payments/credit-notes/{$type}/{$credit->id}";
+        }
+
+        return null;
     }
 
     private function membershipReceiptUrl(
@@ -425,7 +544,7 @@ class SchoolPaymentHistoryService
         ?string $sahodayaId,
         ?FestEvent $event = null,
     ): ?string {
-        if (! $receipt || $receipt->status !== 'approved') {
+        if (! $receipt || ! in_array($receipt->status, ['approved', 'reversed'], true)) {
             return null;
         }
 

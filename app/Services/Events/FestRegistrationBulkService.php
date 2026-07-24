@@ -124,6 +124,14 @@ class FestRegistrationBulkService
                     // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13 for why this does NOT touch
                     // CASH-BANK (no cash has moved).
                     app(FestFeeLedgerService::class)->postCreditIssued($credit);
+
+                    // Document-only; never blocks the rejection itself. See
+                    // docs/FLOW_GAP_FIX_PLAN.md Phase 3b.2.
+                    try {
+                        app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
+                    } catch (\Throwable) {
+                        // credit is already recorded + posted; the note can be regenerated later
+                    }
                 }
             });
 

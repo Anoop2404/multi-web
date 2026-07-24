@@ -51,6 +51,19 @@
                 </button>
             </div>
 
+            <div v-else-if="school.can_cancel_with_settlement"
+                 class="text-sm text-red-900 bg-red-50 border border-red-100 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div class="space-y-1">
+                    <p>
+                        This school is <strong>approved</strong> and has a verified payment. 
+                    </p>
+                    <p class="text-xs text-red-700 font-medium">Cancelling will reject their membership and requires resolving their payment.</p>
+                </div>
+                <button type="button" class="btn-secondary text-sm text-red-700 border-red-200 shrink-0" @click="cancelMembershipWithSettlement">
+                    Cancel membership (with settlement)
+                </button>
+            </div>
+
             <!-- Header -->
             <div class="card">
                 <div class="flex flex-wrap items-start justify-between gap-4">
@@ -269,6 +282,35 @@ function cancelMembership() {
     if (!confirm(`Cancel membership for "${props.school.name}"? They will be removed from approved member schools.`)) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/cancel-membership`, {
         reason: reason.trim(),
+    }, { preserveScroll: true });
+}
+
+function cancelMembershipWithSettlement() {
+    const settlementInput = prompt(
+        `Cancel membership for "${props.school.name}"?\n\n` +
+        `This school has a verified payment. How should this be settled?\n` +
+        `Type "1" for Credit (toward next year)\n` +
+        `Type "2" for Forfeit (no credit)`
+    );
+
+    if (!settlementInput) return;
+
+    let settlement = null;
+    if (settlementInput.trim() === '1') {
+        settlement = 'credit_next_year';
+    } else if (settlementInput.trim() === '2') {
+        settlement = 'forfeit';
+    } else {
+        alert('Invalid option selected.');
+        return;
+    }
+
+    const reason = prompt(`Reason for cancelling membership — ${props.school.name}?`);
+    if (!reason?.trim()) return;
+
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/cancel-membership`, {
+        reason: reason.trim(),
+        settlement: settlement,
     }, { preserveScroll: true });
 }
 

@@ -128,6 +128,7 @@
                                 <a v-if="exam.results_published && r.mark && r.attendance_status !== 'absent'"
                                    :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/registrations/${r.id}/certificate`"
                                    target="_blank" class="link-brand ml-2">Cert</a>
+                                <button v-if="canCancelRegistration(r)" type="button" @click="cancelRegistration(r.id)" class="text-red-600 font-semibold text-xs ml-3">Cancel</button>
                             </td>
                         </tr>
                         <tr v-if="!filteredRegistrations.length">
@@ -219,7 +220,18 @@ function approveFee(registrationId) {
 
 function rejectFee(registrationId) {
     const reason = prompt('Rejection reason (optional):');
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registrationId}/fee/reject`, { rejection_reason: reason ?? '' }, { preserveScroll: true });
+    if (reason === null) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registrationId}/fee/reject`, { rejection_reason: reason }, { preserveScroll: true });
+}
+
+function canCancelRegistration(r) {
+    return !['started', 'submitted', 'cancelled'].includes(r.status);
+}
+
+function cancelRegistration(registrationId) {
+    const reason = prompt('Reason for cancelling this registration (required):');
+    if (!reason) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registrationId}/cancel`, { reason }, { preserveScroll: true });
 }
 
 function approvalLabel(status) {

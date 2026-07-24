@@ -23,7 +23,7 @@ class FestFeeCredit extends Model
 
     protected $fillable = [
         'fest_school_event_fee_id', 'source_registration_id', 'amount', 'reason',
-        'created_by_user_id', 'applied_at',
+        'created_by_user_id', 'applied_at', 'credit_note_number', 'generated_note_path',
     ];
 
     protected $casts = [

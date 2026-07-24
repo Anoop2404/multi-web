@@ -25,9 +25,26 @@
                 <div v-if="row.status === 'rejected' && row.rejection_reason" class="text-red-600 mt-0.5">
                     Reason: {{ row.rejection_reason }}
                 </div>
+                <div v-if="row.status === 'reversed' && row.reversal_reason" class="text-red-600 mt-0.5">
+                    Reversal reason: {{ row.reversal_reason }}
+                </div>
                 <div v-if="row.status === 'approved' && row.receipt_number" class="text-emerald-700 mt-0.5">
                     Receipt #{{ row.receipt_number }}
+                    <a v-if="row.receipt_url" :href="row.receipt_url" target="_blank" class="underline ml-1">view</a>
                 </div>
+                <!-- A credit row is not a receipt — it's money owed BACK to the school after a
+                     rejected/cancelled paid item. Kept in the same timeline (not a separate
+                     list) so the full "what happened to this money" story reads in one place.
+                     See docs/FLOW_GAP_FIX_PLAN.md Phase 3b.2. -->
+                <template v-if="row.status === 'credit'">
+                    <div class="text-amber-700 mt-0.5">{{ row.credit_reason || 'Fee credit issued' }}</div>
+                    <div v-if="row.applied_at" class="text-slate-500 mt-0.5">Applied {{ formatDateTime(row.applied_at) }}</div>
+                    <div v-else class="text-slate-500 mt-0.5">Outstanding — can be applied to a future fee</div>
+                    <div v-if="row.credit_note_number" class="text-amber-700 mt-0.5">
+                        Credit note #{{ row.credit_note_number }}
+                        <a v-if="row.credit_note_url" :href="row.credit_note_url" target="_blank" class="underline ml-1">view</a>
+                    </div>
+                </template>
             </li>
         </ul>
     </div>
@@ -62,6 +79,7 @@ function statusLabel(status) {
         rejected: 'Rejected',
         superseded: 'Superseded (re-uploaded)',
         reversed: 'Reversed',
+        credit: 'Fee credit',
     };
     return labels[status] ?? status;
 }
@@ -73,6 +91,7 @@ function statusClass(status) {
         reversed: 'text-red-600',
         superseded: 'text-slate-500',
         uploaded: 'text-amber-700',
+        credit: 'text-amber-700',
     };
     return classes[status] ?? 'text-slate-700';
 }

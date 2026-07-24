@@ -661,7 +661,10 @@
                             <td>{{ row.hall_ticket_no || '—' }}</td>
                             <td>{{ row.student_name }}</td>
                             <td class="text-xs">{{ row.class_name || '—' }}</td>
-                            <td class="text-xs">{{ row.approval_status }}</td>
+                            <td class="text-xs">
+                                {{ row.approval_status }}
+                                <div v-if="row.approval_status === 'rejected' && row.rejection_reason" class="text-[10px] text-red-600 mt-0.5 truncate max-w-[150px]" :title="row.rejection_reason">{{ row.rejection_reason }}</div>
+                            </td>
                             <td class="text-xs">{{ row.attendance_status || '—' }}</td>
                         </tr>
                     </tbody>

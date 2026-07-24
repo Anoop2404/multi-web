@@ -14,8 +14,18 @@ use Illuminate\Validation\ValidationException;
 
 class McqSchoolFeeService
 {
-    public function syncForSchool(McqExam $exam, Tenant $school): McqSchoolFee
-    {
+    public function syncForSchool(
+        McqExam $exam,
+        Tenant $school,
+        ?string $cancellationReason = null,
+        ?int $cancelledByUserId = null,
+        ?int $sourceRegistrationId = null,
+    ): McqSchoolFee {
+        // Snapshot before recalculating so we can measure the delta caused by a cancellation.
+        $existingFee = McqSchoolFee::where('exam_id', $exam->id)->where('school_id', $school->id)->first();
+        $dueBefore   = (float) ($existingFee?->total_due ?? 0);
+        $paidBefore  = (float) ($existingFee?->amount_paid ?? 0);
+
         $count = McqRegistration::where('exam_id', $exam->id)
             ->where('school_id', $school->id)
             ->where('status', '!=', 'cancelled')
@@ -43,6 +53,35 @@ class McqSchoolFeeService
             $fee->update(['status' => 'waived']);
         } else {
             $fee->refreshPaidState();
+        }
+
+        // If a cancellation shrank total_due below what was already paid, record the freed
+        // amount as an outstanding credit — same delta-snapshot technique as
+        // FestRegistrationBulkService::rejectMany(). Never double-issues: credit is only
+        // created when there was an actual reduction and the school had already paid something.
+        $reduction = round($dueBefore - $totalDue, 2);
+        if ($reduction > 0 && $paidBefore > 0 && $cancellationReason !== null) {
+            $credit = \App\Models\ProgramFeeCredit::create([
+                'creditable_type'     => McqSchoolFee::class,
+                'creditable_id'       => $fee->id,
+                'source_type'         => McqRegistration::class,
+                // Both current callers (school-cancel, Sahodaya-cancel) always pass the
+                // real registration id that triggered this credit. 0 remains only as a
+                // last-resort fallback for a hypothetical future bulk-cancel caller that
+                // cancels many registrations in one syncForSchool() call and can't name a
+                // single one — source_id is a non-nullable column, so this must resolve to
+                // an int either way.
+                'source_id'           => $sourceRegistrationId ?? 0,
+                'amount'              => min($reduction, $paidBefore),
+                'reason'              => $cancellationReason,
+                'created_by_user_id'  => $cancelledByUserId ?? auth()->id(),
+            ]);
+
+            try {
+                app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
+            } catch (\Throwable) {
+                // credit is already recorded; the note can be regenerated later
+            }
         }
 
         return $fee->fresh();

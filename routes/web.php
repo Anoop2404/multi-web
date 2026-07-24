@@ -442,6 +442,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/payments/membership/{payment}/receipt', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'membershipReceipt'])->name('payments.membership.receipt');
     Route::get('/payments/receipts/{feeReceipt}', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'programReceipt'])->name('payments.program.receipt');
     Route::get('/payments/receipts/{feeReceipt}/proof', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'programProof'])->name('payments.program.proof');
+    Route::get('/payments/credit-notes/{type}/{creditId}', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'creditNote'])->name('payments.credit-note');
 
     // Website & CMS (disabled until WEBSITE_ENABLED=true)
     Route::middleware('website.enabled')->group(function () {
@@ -750,10 +751,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\FinanceHubController::class, 'index'])->name('hub');
             Route::get('/payments', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'index'])->name('payments.index');
             Route::get('/payments/export', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'export'])->name('payments.export');
+            Route::get('/payments/credits', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'creditsReport'])->name('payments.credits');
             Route::get('/payments/receipts/{feeReceipt}', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'programReceipt'])->name('payments.receipt');
             Route::get('/payments/receipts/{feeReceipt}/proof', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'proof'])->name('payments.proof');
             Route::post('/payments/resend-receipt', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'resendReceipt'])->name('payments.resend-receipt');
             Route::post('/payments/receipts/{feeReceipt}/reverse', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'reverseReceipt'])->name('payments.reverse');
+            Route::post('/payments/credits/payout', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'recordCreditPayout'])->name('payments.credit-payout');
+            Route::get('/payments/credit-notes/{type}/{creditId}', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'creditNote'])->name('payments.credit-note');
             Route::get('/receipt-emails', [\App\Http\Controllers\SahodayaAdmin\ReceiptEmailReportController::class, 'index'])->name('receipt-emails');
             Route::get('/email-delivery', [\App\Http\Controllers\SahodayaAdmin\EmailDeliveryReportController::class, 'index'])->name('email-delivery');
             Route::post('/email-delivery/{notificationLog}/retry', [\App\Http\Controllers\SahodayaAdmin\EmailDeliveryReportController::class, 'retry'])->name('email-delivery.retry');
@@ -1130,6 +1134,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{exam}/registrations/{registration}/fee/reject', [McqExamController::class, 'rejectFee'])->name('registrations.fee.reject');
             Route::post('/{exam}/registrations/{registration}/approve', [McqExamController::class, 'approveRegistration'])->name('registrations.approve');
             Route::post('/{exam}/registrations/{registration}/reject', [McqExamController::class, 'rejectRegistration'])->name('registrations.reject');
+            Route::post('/{exam}/registrations/{registration}/cancel', [McqExamController::class, 'cancelRegistration'])->name('registrations.cancel');
             Route::get('/{exam}/registrations/{registration}/fee/proof', [McqExamController::class, 'feeProof'])->name('registrations.fee.proof');
             Route::post('/{exam}/publish-results', [McqExamController::class, 'publishResults'])->name('results.publish');
             Route::post('/{exam}/unpublish-results', [McqExamController::class, 'unpublishResults'])->name('results.unpublish');

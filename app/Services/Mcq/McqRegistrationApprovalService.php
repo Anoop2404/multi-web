@@ -81,6 +81,7 @@ class McqRegistrationApprovalService
 
         $registration->update([
             'approval_status'     => 'rejected',
+            'rejection_reason'    => $reason,
             'approved_at'         => now(),
             'approved_by_user_id' => $rejectedByUserId,
         ]);

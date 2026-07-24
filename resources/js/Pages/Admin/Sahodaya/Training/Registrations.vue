@@ -163,6 +163,7 @@
                 </td>
                 <td class="px-4 py-3 capitalize text-gray-600">
                     {{ r.status }}
+                    <div v-if="r.status === 'rejected' && r.rejection_reason" class="text-[10px] text-red-600 mt-0.5 truncate max-w-[150px] normal-case" :title="r.rejection_reason">{{ r.rejection_reason }}</div>
                     <span v-if="r.status === 'waitlisted' && r.waitlist_position"
                           class="block text-[10px] text-slate-500 normal-case">
                         Position #{{ r.waitlist_position }}
@@ -377,12 +378,26 @@ function canCancel(r) {
 }
 
 function cancelRegistration(registration) {
-    if (!confirm(`Cancel registration for ${registration.teacher?.name || 'this teacher'}? A waitlisted participant may be promoted.`)) {
+    // A reason is only needed when this registration actually has money against it
+    // (approved or partial) — see TrainingSchoolFeeService::syncForSchool() /
+    // creditForCancelledIndividualRegistration(), which only issue a fee credit when a
+    // reason is present. Plain confirm() otherwise, matching the pre-credit behavior.
+    const hasMoney = ['approved', 'partial'].includes(registration.fee_status);
+
+    let reason = null;
+    if (hasMoney) {
+        reason = prompt(
+            `Cancel registration for ${registration.teacher?.name || 'this teacher'}? This registration has a paid/partial fee — `
+            + `cancelling will record a fee credit for the school. Reason (required):`
+        );
+        if (!reason) return;
+    } else if (!confirm(`Cancel registration for ${registration.teacher?.name || 'this teacher'}? A waitlisted participant may be promoted.`)) {
         return;
     }
+
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/training/${props.program.id}/registrations/${registration.id}/cancel`,
-        {},
+        reason ? { reason } : {},
         { preserveScroll: true },
     );
 }

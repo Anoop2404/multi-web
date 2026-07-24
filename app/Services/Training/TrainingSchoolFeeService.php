@@ -13,8 +13,29 @@ use Illuminate\Support\Facades\DB;
 
 class TrainingSchoolFeeService
 {
-    public function syncForSchool(TrainingProgram $program, Tenant $school): TrainingSchoolFee
-    {
+    /**
+     * @param  ?string  $cancellationReason  When set (i.e. this sync was triggered by a
+     *     cancellation, not a routine resync), and the recount causes total_due to drop
+     *     below what the school already had approved-paid, the freed amount is recorded
+     *     as a ProgramFeeCredit instead of silently vanishing. Same delta-snapshot
+     *     technique as McqSchoolFeeService::syncForSchool() / FestRegistrationBulkService::
+     *     rejectMany(). Leave null for ordinary (non-cancellation) resyncs so nothing here
+     *     changes behavior for ordinary registration/attendance/import flows.
+     *     See docs/FLOW_GAP_FIX_PLAN.md Phase 1.1.
+     */
+    public function syncForSchool(
+        TrainingProgram $program,
+        Tenant $school,
+        ?string $cancellationReason = null,
+        ?int $cancelledByUserId = null,
+        ?int $sourceRegistrationId = null,
+    ): TrainingSchoolFee {
+        // Snapshot before recalculating so a cancellation-triggered drop in total_due can
+        // be measured against what was already paid.
+        $existingFee = TrainingSchoolFee::where('program_id', $program->id)->where('school_id', $school->id)->first();
+        $dueBefore   = (float) ($existingFee?->total_due ?? 0);
+        $paidBefore  = (float) ($existingFee?->amount_paid ?? 0);
+
         $count = TrainingRegistration::where('program_id', $program->id)
             ->where('school_id', $school->id)
             ->whereNotIn('status', ['cancelled', 'rejected', 'waitlisted'])
@@ -49,12 +70,104 @@ class TrainingSchoolFeeService
             $fee->refreshPaidState();
         }
 
+        // Batch-fee credit on cancellation — mirrors McqSchoolFeeService::syncForSchool().
+        // Never fires on an ordinary resync (no $cancellationReason) and never double-issues
+        // (only when the recount actually reduced total_due below what was already paid).
+        if ($program->usesSchoolBatchFee()) {
+            $reduction = round($dueBefore - $totalDue, 2);
+            if ($reduction > 0 && $paidBefore > 0 && $cancellationReason !== null) {
+                $credit = \App\Models\ProgramFeeCredit::create([
+                    'creditable_type'    => TrainingSchoolFee::class,
+                    'creditable_id'      => $fee->id,
+                    'source_type'        => TrainingRegistration::class,
+                    'source_id'          => $sourceRegistrationId ?? 0,
+                    'amount'             => min($reduction, $paidBefore),
+                    'reason'             => $cancellationReason,
+                    'created_by_user_id' => $cancelledByUserId ?? auth()->id(),
+                ]);
+
+                try {
+                    app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
+                } catch (\Throwable) {
+                    // credit is already recorded; the note can be regenerated later
+                }
+            }
+        }
+
         $this->markRegistrationsDeferred($program, $school);
 
         $fee = $fee->fresh();
         app(TrainingInvoiceService::class)->ensureForSchoolFee($fee);
 
         return $fee;
+    }
+
+    /**
+     * Credit path for the *individually*-billed side (usesSchoolBatchFee() === false),
+     * where TrainingRegistration itself — not a TrainingSchoolFee row — is the fee
+     * carrier (via TracksPartialPayments). syncForSchool()'s batch-delta logic can't see
+     * this money at all (individually-billed programs always price the school aggregate
+     * at 0 — see TrainingSchoolFeeService::syncForSchool()'s $unit calc), so a cancelled,
+     * already-paid individual registration needs its own credit path.
+     *
+     * NOTE: as of this writing, `training_registrations.total_due` is never populated
+     * anywhere in the codebase (confirmed via migration search — only `amount_paid` and
+     * `fee_status` were added by 2026_07_23_000001_partial_fee_payments.php), so
+     * TrainingRegistration::outstandingBalance() always reads a $0 due and both
+     * SahodayaAdmin\TrainingProgramController::recordPayment() and
+     * SchoolAdmin\TrainingRegistrationController::uploadPayment() abort with "already
+     * fully paid" before a receipt can ever be created. That means amount_paid > 0 on an
+     * individually-billed registration should not currently be reachable in production.
+     * This method still guards on amount_paid > 0 (not total_due) so it behaves correctly
+     * the moment that separate, pre-existing bug is fixed — it is intentionally not fixed
+     * here, since populating total_due touches registration-creation call sites this
+     * pass never audited. Flagged in docs/FLOW_GAP_FIX_PLAN.md Phase 1.1.
+     */
+    public function creditForCancelledIndividualRegistration(
+        TrainingRegistration $registration,
+        string $reason,
+        int $userId,
+    ): void {
+        $paid = (float) $registration->amount_paid;
+        if ($paid <= 0) {
+            return;
+        }
+
+        $fee = TrainingSchoolFee::firstOrCreate(
+            ['program_id' => $registration->program_id, 'school_id' => $registration->school_id],
+            ['teacher_count' => 0, 'total_due' => 0],
+        );
+
+        $credit = \App\Models\ProgramFeeCredit::create([
+            'creditable_type'    => TrainingSchoolFee::class,
+            'creditable_id'      => $fee->id,
+            'source_type'        => TrainingRegistration::class,
+            'source_id'          => $registration->id,
+            'amount'             => $paid,
+            'reason'             => $reason,
+            'created_by_user_id' => $userId,
+        ]);
+
+        try {
+            app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
+        } catch (\Throwable) {
+            // credit is already recorded; the note can be regenerated later
+        }
+
+        // Nothing is owed on a cancelled registration anymore. forceFill+saveQuietly (not
+        // refreshPaidState()) deliberately, because refreshPaidState() would flip
+        // fee_status back to 'approved' once due<=0 — misleading for a cancelled
+        // registration. The row's own status='cancelled' is what payment-history keys off
+        // for the "CANCELLED" label regardless of fee_status (see Phase 3).
+        //
+        // Guarded with hasColumn() because `training_registrations.total_due` does not
+        // exist today (see this method's docblock) — forceFill+save on a non-existent
+        // column would throw a SQL error. This makes the guard self-updating: once that
+        // column is added, this starts zeroing it automatically with no further change here.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('training_registrations', 'total_due')
+            && (float) ($registration->total_due ?? 0) !== 0.0) {
+            $registration->forceFill(['total_due' => 0])->saveQuietly();
+        }
     }
 
     /**

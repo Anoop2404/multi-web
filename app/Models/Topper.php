@@ -64,7 +64,7 @@ class Topper extends Model
     public function getSubjectMarksAttribute(): array
     {
         $rows = $this->relationLoaded('subjectMarks')
-            ? $this->subjectMarks
+            ? $this->getRelation('subjectMarks')
             : $this->subjectMarks()->get(['subject_label', 'marks']);
 
         return $rows

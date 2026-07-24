@@ -144,6 +144,12 @@ class FestRegistrationService
                 // school, without touching CASH-BANK. FestFeeLedgerService::postCreditIssued().
                 app(FestFeeLedgerService::class)->postCreditIssued($credit);
 
+                try {
+                    app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
+                } catch (\Throwable) {
+                    // credit is already recorded + posted; the note can be regenerated later
+                }
+
                 app(PlatformAuditLogger::class)->log(
                     action: 'fest_fee_credit.issued',
                     description: "Fee credit of ₹{$credit->amount} issued — registration #{$registration->id} cancelled after payment ({$reason})",

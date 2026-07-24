@@ -333,6 +333,20 @@ class McqExamController extends SahodayaAdminController
             }
             $data['settings_json'] = $settings;
         }
+        $previousStatus = $exam->status;
+        $newStatus = $data['status'] ?? $previousStatus;
+
+        \App\Support\StatusTransitionGuard::assert(
+            $exam,
+            $newStatus,
+            \App\Support\StatusTransitionGuard::MCQ_EXAM_TRANSITIONS,
+        );
+
+        if ($newStatus === 'cancelled' && $previousStatus !== 'cancelled') {
+            app(\App\Services\Mcq\McqExamStatusService::class)
+                ->transitionToCancelled($exam, $request->boolean('confirm_credit_all'));
+            unset($data['status']);
+        }
 
         $exam->update($data);
 
@@ -512,6 +526,52 @@ class McqExamController extends SahodayaAdminController
         );
 
         return back()->with('success', 'Registration rejected.');
+    }
+
+    public function cancelRegistration(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->exam_id !== $exam->id, 403);
+
+        $data = $request->validate(['reason' => 'required|string|max:500']);
+
+        abort_if(in_array($registration->status, ['started', 'submitted'], true), 422, 'Cannot cancel — exam already started or submitted.');
+        if ($registration->status === 'cancelled') {
+            return back()->with('success', 'Registration is already cancelled.');
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($registration, $exam, $data, $request) {
+            $registration->update([
+                'status'               => 'cancelled',
+                'cancelled_at'         => now(),
+                'cancelled_by_user_id' => $request->user()->id,
+                'hall_ticket_no'       => null,
+                'hall_room'            => null,
+                'seat_no'              => null,
+            ]);
+
+            \App\Models\McqMark::where('registration_id', $registration->id)->delete();
+            \App\Models\McqCertificate::where('registration_id', $registration->id)->delete();
+
+            app(\App\Services\Mcq\McqSeatingService::class)->recalculate($exam);
+            
+            $cancelReason = "MCQ registration cancelled by Sahodaya for {$registration->participantName()} in {$exam->title}. Reason: {$data['reason']}";
+            app(\App\Services\Mcq\McqSchoolFeeService::class)->syncForSchool($exam, $registration->school, $cancelReason, $request->user()->id, $registration->id);
+
+            app(\App\Services\Audit\PlatformAuditLogger::class)->mcqRegistration(
+                $registration->fresh(['exam', 'student', 'teacher']),
+                'mcq.registration.cancelled_by_sahodaya',
+                "Sahodaya cancelled registration for {$registration->participantName()} in {$exam->title}. Reason: {$data['reason']}",
+            );
+        });
+
+        try {
+            app(\App\Services\Mcq\McqExamNotifier::class)->registrationCancelledByAdmin($registration->fresh(['exam', 'student', 'teacher']), $data['reason']);
+        } catch (\Throwable) {
+            // non-blocking
+        }
+
+        return back()->with('success', 'Registration cancelled.');
     }
 
     public function feeProof(string $tenantId, McqExam $exam, McqRegistration $registration)

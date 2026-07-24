@@ -16,14 +16,26 @@ class Student extends Model
         'admission_number', 'reg_no', 'roll_number', 'name', 'email', 'dob', 'gender', 'blood_group',
         'parent_name', 'parent_phone', 'parent_email', 'address',
         'admission_date', 'status', 'photo', 'notes',
-        'verified_at', 'verified_by_user_id', 'rejection_reason',
+        'verified_at', 'verified_by_user_id', 'rejection_reason', 'resubmitted_at',
     ];
 
     protected $casts = [
         'dob'            => 'date',
         'admission_date' => 'date',
-        'verified_at'      => 'datetime',
+        'verified_at'    => 'datetime',
+        'resubmitted_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $student) {
+            // When an unverified student with a rejection reason is modified by a school,
+            // stamp resubmitted_at so Sahodaya admins see it in the "Fixed after rejection" queue.
+            if ($student->verified_at === null && filled($student->rejection_reason) && ! $student->isDirty('verified_at')) {
+                $student->resubmitted_at = now();
+            }
+        });
+    }
 
     public function tenant()       { return $this->belongsToCentralTenant(); }
     public function user()         { return $this->belongsTo(User::class); }

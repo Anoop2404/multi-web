@@ -262,6 +262,48 @@ class FestEventNotifier
         }
     }
 
+    /** Notify schools when an event is cancelled by the admin. */
+    public function eventCancelled(FestEvent $event, \Illuminate\Support\Collection $credits): void
+    {
+        $schoolIds = FestRegistration::where('event_id', $event->id)
+            ->distinct()
+            ->pluck('school_id');
+
+        if ($schoolIds->isEmpty()) {
+            $schoolIds = Tenant::query()
+                ->where('parent_id', $event->tenant_id)
+                ->where('type', 'school')
+                ->where('membership_status', 'approved')
+                ->pluck('id');
+        }
+
+        $slug = $this->resolveTemplateSlug($event, 'fest.event.cancelled');
+        
+        $creditsBySchool = $credits->keyBy(function($c) {
+            return $c->fee?->school_id;
+        });
+
+        foreach ($schoolIds as $schoolId) {
+            $creditForSchool = $creditsBySchool->get($schoolId);
+            $replacements = [
+                'event_title' => $event->title,
+                'competition_label' => $this->competitionLabel($event),
+                'credit_line' => $creditForSchool && $creditForSchool->amount > 0
+                    ? " A fee credit of ₹{$creditForSchool->amount} has been recorded to your school account."
+                    : '',
+            ];
+
+            $this->notifySchool($schoolId, $slug, $replacements);
+        }
+        
+        $head = $this->resolveHeadForEvent($event);
+        $this->notifyHeadExtras($head, $slug, [
+            'event_title' => $event->title,
+            'competition_label' => $this->competitionLabel($event),
+            'credit_line' => '',
+        ]);
+    }
+
     public function paymentPending(FestEvent $event, string $schoolId, float $amount): void
     {
         $head = $this->resolveHeadForEvent($event);
