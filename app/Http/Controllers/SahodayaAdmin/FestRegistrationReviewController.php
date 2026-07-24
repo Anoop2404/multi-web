@@ -42,26 +42,35 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $headId = $this->resolveHeadQueryParam($request->query('head_id') ?? $request->query('head'));
         $itemId = $request->integer('item_id') ?: null;
         $itemIds = $this->itemIdsForHeadFilter($event, $headId, $itemId);
+        $filterSchoolId = $request->input('school_id') ?: null;
+        $filterStatus = $request->input('status') ?: null;
 
         $feeService = app(FestSchoolEventFeeService::class);
 
-        $registrations = FestRegistration::where('event_id', $event->id)
-            ->when($itemIds !== null, fn ($q) => $q->whereIn('item_id', $itemIds))
+        // Previously ->get() with no limit — an event with a large Sahodaya (many
+        // schools, thousands of students) could return thousands of rows on a single
+        // page load. school_id/item_id/status/search now all run as real query
+        // constraints (school_id and status were client-side-only filters before, doing
+        // nothing to reduce what got fetched) and the result set is paginated.
+        // See docs/SCALE_AND_PAGINATION_PLAN.md §2.
+        $scopedQuery = fn () => $this->scopedRegistrationsQuery($event, $itemIds, $filterSchoolId, $request->input('search'));
+
+        $registrations = $scopedQuery()
+            ->when($filterStatus, fn ($q) => $q->where('status', $filterStatus))
             ->with(['item', 'participants.student', 'participants.teacher', 'participants.group'])
-            ->when($request->filled('search'), function ($q) use ($request) {
-                $term = '%'.$request->input('search').'%';
-                $q->where(function ($inner) use ($term) {
-                    $inner->whereHas('participants.student', fn ($s) => $s
-                        ->where('name', 'like', $term)
-                        ->orWhere('reg_no', 'like', $term)
-                        ->orWhere('admission_number', 'like', $term))
-                        ->orWhereHas('participants.teacher', fn ($t) => $t
-                            ->where('name', 'like', $term)
-                            ->orWhere('reg_no', 'like', $term));
-                });
-            })
             ->latest()
-            ->get();
+            ->paginate(50)
+            ->withQueryString();
+
+        // Count of registrations matching the school/item/search filters (deliberately
+        // ignoring the on-screen status filter — the number that matters for bulk
+        // approve/reject is always "how many submitted ones match", regardless of what
+        // status the admin happens to be viewing right now) so the "select all N
+        // matching this filter" action can show an accurate count without ever loading
+        // every row. Backs the redesigned select-all below instead of the old client-side
+        // "select everything currently in memory", which silently becomes page-scoped
+        // once this list is paginated.
+        $pendingMatchingCount = $scopedQuery()->where('status', 'submitted')->count();
 
         $schools = Tenant::where('parent_id', $this->sahodaya->id)
             ->where('type', 'school')
@@ -100,19 +109,51 @@ class FestRegistrationReviewController extends SahodayaAdminController
         }
 
         return $this->inertia('Sahodaya/Events/Registrations', $this->withEventActivity($event, FestPageActivity::REGISTRATIONS, [
-            'event'              => $event,
-            'registrations'      => $registrations,
+            'event'                => $event,
+            'registrations'        => $registrations,
+            'pendingMatchingCount' => $pendingMatchingCount,
             'schools'            => $schools,
             'schoolRegions'      => $schoolRegions,
             'feeRequired'        => $feeService->feeRequired($event),
             'registerStudents'   => $registerStudents,
             'registerSchoolId'   => $registerSchoolId,
             'eventItems'         => $event->items->values(),
-            'filters'            => ['search' => $request->input('search', '')],
+            'filters'            => [
+                'search'    => $request->input('search', ''),
+                'school_id' => $filterSchoolId ?? '',
+                'status'    => $filterStatus ?? '',
+            ],
             'selectedHeadId'     => $selectedHeadId,
             'selectedItemId'     => $itemId,
             'competitionUrl'     => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/competition",
         ]));
+    }
+
+    /**
+     * Shared school_id/item_id(s)/search scoping used by both index() and
+     * printApproved() — kept in one place so the two don't drift (see
+     * docs/SCALE_AND_PAGINATION_PLAN.md §4). Callers add their own ->where('status', ...)
+     * and eager-loads on top since those differ between the two.
+     *
+     * @param  ?list<int>  $itemIds
+     */
+    private function scopedRegistrationsQuery(FestEvent $event, ?array $itemIds, ?string $schoolId, ?string $search)
+    {
+        return FestRegistration::where('event_id', $event->id)
+            ->when($itemIds !== null, fn ($q) => $q->whereIn('item_id', $itemIds))
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->when(filled($search), function ($q) use ($search) {
+                $term = '%'.$search.'%';
+                $q->where(function ($inner) use ($term) {
+                    $inner->whereHas('participants.student', fn ($s) => $s
+                        ->where('name', 'like', $term)
+                        ->orWhere('reg_no', 'like', $term)
+                        ->orWhere('admission_number', 'like', $term))
+                        ->orWhereHas('participants.teacher', fn ($t) => $t
+                            ->where('name', 'like', $term)
+                            ->orWhere('reg_no', 'like', $term));
+                });
+            });
     }
 
     public function storeOnBehalf(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
@@ -424,24 +465,11 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $itemId = $request->integer('item_id') ?: null;
         $search = $request->input('search');
 
-        $query = FestRegistration::where('event_id', $event->id)
+        $registrations = $this->scopedRegistrationsQuery($event, $itemId ? [$itemId] : null, $schoolId, $search)
             ->where('status', 'approved')
-            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-            ->when($itemId, fn ($q) => $q->where('item_id', $itemId))
-            ->with(['item', 'participants.student', 'participants.teacher', 'participants.group', 'school']);
-
-        if ($search) {
-            $term = '%'.$search.'%';
-            $query->where(function ($inner) use ($term) {
-                $inner->whereHas('participants.student', fn ($s) => $s
-                    ->where('name', 'like', $term)
-                    ->orWhere('reg_no', 'like', $term))
-                    ->orWhereHas('participants.teacher', fn ($t) => $t
-                        ->where('name', 'like', $term));
-            });
-        }
-
-        $registrations = $query->latest()->get();
+            ->with(['item', 'participants.student', 'participants.teacher', 'participants.group', 'school'])
+            ->latest()
+            ->get();
         $numbering = app(\App\Services\Events\FestNumberingService::class);
         $schools = Tenant::where('parent_id', $this->sahodaya->id)->pluck('name', 'id');
 

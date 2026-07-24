@@ -28,6 +28,9 @@ class UnifiedPaymentsController extends SahodayaAdminController
             'status'    => 'nullable|string|max:40',
             'school_id' => 'nullable|string',
             'search'    => 'nullable|string|max:100',
+            'from_date' => 'nullable|date',
+            'to_date'   => 'nullable|date',
+            'show_all'  => 'nullable|boolean',
         ]);
 
         $schools = Tenant::query()
@@ -36,15 +39,23 @@ class UnifiedPaymentsController extends SahodayaAdminController
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $rows = $history->rowsForSahodaya($this->sahodaya);
+        // A Sahodaya with 100 schools can accumulate years of receipts across all four
+        // programs — loading all of it on every page view of this screen doesn't scale
+        // (see docs/SCALE_AND_PAGINATION_PLAN.md §3). Default to the current academic
+        // year unless the admin explicitly asks for `from_date`/`to_date` or ticks
+        // "show all history"; type/school_id are pushed into the query too instead of
+        // filtering the fully-fetched collection afterward.
+        $defaultFrom = $this->defaultHistoryFromDate();
+        $fromDate = $filters['show_all'] ?? false
+            ? ($filters['from_date'] ?? null)
+            : ($filters['from_date'] ?? $defaultFrom?->toDateString());
 
-        if (($filters['type'] ?? 'all') !== 'all') {
-            $rows = $rows->where('type', $filters['type']);
-        }
-
-        if (! empty($filters['school_id'])) {
-            $rows = $rows->where('school_id', $filters['school_id']);
-        }
+        $rows = $history->rowsForSahodaya($this->sahodaya, [
+            'type'      => $filters['type'] ?? 'all',
+            'school_id' => $filters['school_id'] ?? null,
+            'from'      => $fromDate,
+            'to'        => $filters['to_date'] ?? null,
+        ]);
 
         if (! empty($filters['status'])) {
             $rows = $rows->where('status', $filters['status']);
@@ -78,8 +89,34 @@ class UnifiedPaymentsController extends SahodayaAdminController
                 'status'    => '',
                 'school_id' => '',
                 'search'    => '',
-            ], $filters),
+                'from_date' => '',
+                'to_date'   => '',
+                'show_all'  => false,
+            ], $filters, [
+                // Echo back what was actually applied (including the computed default)
+                // so the frontend can show it in the date field rather than a blank box
+                // that silently isn't "all time".
+                'from_date' => $fromDate ?? '',
+            ]),
         ]);
+    }
+
+    /**
+     * Default lower bound for the unified payments screen: the active academic year's
+     * start date if one is configured, else the Apr–Mar calendar academic year. Only
+     * used when the admin hasn't explicitly set from_date or ticked "show all history".
+     */
+    private function defaultHistoryFromDate(): ?\Illuminate\Support\Carbon
+    {
+        $active = \App\Support\AcademicYear::activeRecord();
+        if ($active?->start_date) {
+            return \Illuminate\Support\Carbon::parse($active->start_date);
+        }
+
+        $now = now();
+        $year = $now->month >= 4 ? $now->year : $now->year - 1;
+
+        return \Illuminate\Support\Carbon::create($year, 4, 1)->startOfDay();
     }
 
     public function export(Request $request, SchoolPaymentHistoryService $history, CsvExportDispatcher $exports)

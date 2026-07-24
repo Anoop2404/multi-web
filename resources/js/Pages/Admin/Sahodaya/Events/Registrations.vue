@@ -27,23 +27,23 @@
             <div class="flex flex-wrap gap-2 items-end">
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by school</label>
-                    <select v-model="filterSchoolId" class="field text-sm mt-1">
+                    <select v-model="form.school_id" class="field text-sm mt-1" @change="applyFilters">
                         <option value="">All schools</option>
                         <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
                     </select>
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by item</label>
-                    <select v-model="filterItemId" class="field text-sm mt-1 w-56">
+                    <select v-model="form.item_id" class="field text-sm mt-1 w-56" @change="applyFilters">
                         <option value="">All items</option>
-                        <option v-for="item in eventItems" :key="item.id" :value="item.id">
+                        <option v-for="item in eventItems" :key="item.id" :value="String(item.id)">
                             {{ item.title }}
                         </option>
                     </select>
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by status</label>
-                    <select v-model="filterStatus" class="field text-sm mt-1 w-32">
+                    <select v-model="form.status" class="field text-sm mt-1 w-32" @change="applyFilters">
                         <option value="">All statuses</option>
                         <option value="submitted">Submitted</option>
                         <option value="approved">Approved</option>
@@ -53,18 +53,42 @@
                 </div>
                 <div class="flex-1 min-w-[180px]">
                     <label class="text-xs font-semibold text-gray-600">Search participant</label>
-                    <input v-model="searchQuery" type="search" placeholder="Name or reg no…"
-                           class="field text-sm mt-1" @keyup.enter="applySearch">
+                    <input v-model="form.search" type="search" placeholder="Name or reg no…"
+                           class="field text-sm mt-1" @keyup.enter="applyFilters">
                 </div>
-                <button type="button" class="btn-secondary text-xs" @click="applySearch">Search</button>
-                <button type="button" class="btn-secondary text-xs" @click="toggleSelectAll">Toggle submitted</button>
-                <button type="button" class="btn-primary text-xs" :disabled="!selectedIds.length" @click="bulkApprove">Approve selected ({{ selectedIds.length }})</button>
-                <button type="button" class="btn-secondary text-xs text-red-600" :disabled="!selectedIds.length" @click="bulkReject">Reject selected</button>
-                <button v-if="filterSchoolId" type="button" class="btn-primary text-xs" @click="approveSchool">Approve all for school</button>
-                <button v-if="filterItemId" type="button" class="btn-primary text-xs" @click="approveItem">Approve all for item</button>
+                <button type="button" class="btn-secondary text-xs" @click="applyFilters">Search</button>
                 <label class="flex items-center gap-1 text-xs text-gray-600 ml-auto font-medium">
                     <input type="checkbox" v-model="overrideLifecycle"> Override locked registration
                 </label>
+            </div>
+
+            <!-- Select-all is filter-based, not "everything currently in memory": the list
+                 below is paginated, so selecting checkboxes only ever covers this page. To
+                 act on every pending registration matching the school/item filters above
+                 (which is what admins actually want during bulk review), use the explicit
+                 "select all N matching" action, which calls the bulk endpoint with those
+                 filters instead of an id list. See docs/SCALE_AND_PAGINATION_PLAN.md §2. -->
+            <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+                <button type="button" class="btn-secondary text-xs" @click="toggleSelectAllPage">
+                    {{ allPageSelected ? 'Clear page selection' : 'Select submitted on this page' }}
+                </button>
+                <button type="button" class="btn-primary text-xs" :disabled="!selectedIds.length && !filterWideMode" @click="runBulkApprove">
+                    {{ filterWideMode ? `Approve all ${pendingMatchingCount} matching` : `Approve selected (${selectedIds.length})` }}
+                </button>
+                <button type="button" class="btn-secondary text-xs text-red-600" :disabled="!selectedIds.length && !filterWideMode" @click="runBulkReject">
+                    {{ filterWideMode ? `Reject all ${pendingMatchingCount} matching` : 'Reject selected' }}
+                </button>
+                <button v-if="selectedIds.length || filterWideMode" type="button" class="btn-ghost text-xs text-gray-500" @click="clearSelection">
+                    Clear selection
+                </button>
+                <button v-if="!form.search && pendingMatchingCount > 0 && !filterWideMode"
+                        type="button" class="text-xs font-semibold text-indigo-700 underline underline-offset-2 ml-2"
+                        @click="selectAllMatchingFilter">
+                    Select all {{ pendingMatchingCount }} pending matching current school/item filter
+                </button>
+                <span v-else-if="form.search && pendingMatchingCount > 0" class="text-xs text-gray-400 ml-2">
+                    Clear the search box to select all matching a filter.
+                </span>
             </div>
         </div>
 
@@ -72,7 +96,7 @@
         <SportsRegistrationsTable
             v-if="event.event_type === 'sports'"
             :grouped-registrations="sportsGroupedRegistrations"
-            :has-registrations="filteredRegistrations.length > 0"
+            :has-registrations="registrationsList.length > 0"
             :selected-ids="selectedIds"
             :schools="schools"
             :gender-label="genderLabel"
@@ -101,9 +125,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="(reg, idx) in filteredRegistrations" :key="reg.id" class="border-t align-top">
+                    <tr v-for="(reg, idx) in registrationsList" :key="reg.id" class="border-t align-top">
                         <td class="p-3">
-                            <input v-if="reg.status === 'submitted'" type="checkbox" :value="reg.id" v-model="selectedIds">
+                            <input v-if="reg.status === 'submitted'" type="checkbox"
+                                   :checked="selectedIds.includes(reg.id)" @change="toggleId(reg.id)">
                         </td>
                         <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
                         <td class="p-3">{{ (schools[reg.school_id] ?? reg.school_id ?? '').toString().toUpperCase() }}</td>
@@ -150,11 +175,19 @@
                             </button>
                         </td>
                     </tr>
-                    <tr v-if="!filteredRegistrations.length">
-                        <td colspan="6" class="p-8 text-center text-gray-400">No registrations yet.</td>
+                    <tr v-if="!registrationsList.length">
+                        <td colspan="6" class="p-8 text-center text-gray-400">No registrations match your filters.</td>
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <div v-if="registrations?.links?.length > 3" class="flex justify-center gap-1 mt-4">
+            <Link v-for="link in registrations.links" :key="link.label"
+                  :href="link.url || '#'"
+                  class="px-3 py-1 rounded text-xs font-medium"
+                  :class="link.active ? 'bg-[#0f3d7a] text-white' : (link.url ? 'text-[#0f3d7a] hover:bg-gray-100' : 'text-gray-300 pointer-events-none')"
+                  v-html="link.label" />
         </div>
 
         <div v-if="substituteReg" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="substituteReg = null">
@@ -315,13 +348,14 @@ import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
-    event: Object, registrations: Array, schools: Object,
+    event: Object, registrations: Object, schools: Object,
+    pendingMatchingCount: { type: Number, default: 0 },
     feeRequired: Boolean, activityLogs: { type: Array, default: () => [] },
     registerStudents: { type: Array, default: () => [] },
     registerSchoolId: { type: [String, Number], default: '' },
     eventItems: { type: Array, default: () => [] },
     schoolRegions: { type: Object, default: () => ({}) },
-    filters: { type: Object, default: () => ({ search: '' }) },
+    filters: { type: Object, default: () => ({ search: '', school_id: '', status: '' }) },
     selectedHeadId: { type: [String, Number], default: null },
     selectedItemId: { type: [Number, String], default: null },
     competitionUrl: { type: String, default: null },
@@ -340,21 +374,47 @@ const filterDescription = computed(() => {
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
-const filterSchoolId = ref('');
-const filterItemId = ref('');
-const filterStatus = ref('');
+
+// Server-driven filters — school_id/item_id/status now run as real query constraints
+// (see FestRegistrationReviewController::index()), not just an in-memory slice of an
+// eagerly-loaded list. item_id defaults from selectedItemId so a link from the
+// competition hub (which sets that prop) shows up correctly in the dropdown too.
+const form = reactive({
+    school_id: props.filters?.school_id ?? '',
+    item_id: props.selectedItemId ? String(props.selectedItemId) : '',
+    status: props.filters?.status ?? '',
+    search: props.filters?.search ?? '',
+});
 
 const approvedPdfUrl = computed(() => {
     const p = new URLSearchParams();
-    if (filterSchoolId.value) p.set('school_id', filterSchoolId.value);
-    if (filterItemId.value) p.set('item_id', filterItemId.value);
-    if (props.selectedItemId) p.set('item_id', String(props.selectedItemId));
-    if (searchQuery.value) p.set('search', searchQuery.value);
+    if (form.school_id) p.set('school_id', form.school_id);
+    if (form.item_id) p.set('item_id', form.item_id);
+    if (form.search) p.set('search', form.search);
     const query = p.toString();
     return `${base}/registrations/approved-pdf${query ? '?' + query : ''}`;
 });
-const searchQuery = ref(props.filters?.search ?? '');
+
+function applyFilters() {
+    router.get(`${base}/registrations`, {
+        search: form.search || undefined,
+        school_id: form.school_id || undefined,
+        item_id: form.item_id || undefined,
+        status: form.status || undefined,
+    }, { preserveScroll: true, preserveState: true, replace: true });
+}
+
+const registrationsList = computed(() => props.registrations?.data ?? []);
+
+// ── Selection / bulk approve-reject ─────────────────────────────────────────────
+// selectedIds is an explicit id list, now necessarily page-scoped since the list
+// itself is paginated. filterWideMode is the separate, explicit "act on every
+// submitted registration matching the school/item filter" action the plan called
+// for — it does NOT enumerate ids at all, it just re-sends the current school_id/
+// item_id filters to the bulk endpoint, which already scopes to status='submitted'
+// server-side. See docs/SCALE_AND_PAGINATION_PLAN.md §2.
 const selectedIds = ref([]);
+const filterWideMode = ref(false);
 const overrideLifecycle = ref(false);
 const substituteReg = ref(null);
 const substituteForm = ref({ performer_id: '', standby_id: '' });
@@ -473,7 +533,7 @@ function studentLabel(id) {
 }
 
 function openOnBehalf() {
-    onBehalfForm.school_id = filterSchoolId.value || onBehalfForm.school_id || '';
+    onBehalfForm.school_id = form.school_id || onBehalfForm.school_id || '';
     onBehalfForm.item_id = '';
     onBehalfForm.team_name = '';
     onBehalfForm.coach_name = '';
@@ -521,27 +581,6 @@ function submitOnBehalf() {
         onFinish: () => { onBehalfSubmitting.value = false; },
     });
 }
-
-function applySearch() {
-    router.get(`${base}/registrations`, {
-        search: searchQuery.value || undefined,
-        school_id: filterSchoolId.value || undefined,
-    }, { preserveScroll: true, preserveState: true });
-}
-
-const filteredRegistrations = computed(() => {
-    let list = props.registrations;
-    if (filterSchoolId.value) {
-        list = list.filter(r => String(r.school_id) === String(filterSchoolId.value));
-    }
-    if (filterItemId.value) {
-        list = list.filter(r => String(r.item_id) === String(filterItemId.value));
-    }
-    if (filterStatus.value) {
-        list = list.filter(r => r.status === filterStatus.value);
-    }
-    return list;
-});
 
 function statusClass(status) {
     return {
@@ -625,40 +664,69 @@ function cancelWithRefund(id) {
     }, { preserveScroll: true });
 }
 
-function bulkApprove() {
+function toggleId(id) {
+    // A manual per-row pick always means "just this explicit set" — drop out of
+    // filter-wide mode so the two selection concepts never mix silently.
+    if (filterWideMode.value) filterWideMode.value = false;
+    const idx = selectedIds.value.indexOf(id);
+    if (idx === -1) selectedIds.value.push(id);
+    else selectedIds.value.splice(idx, 1);
+}
+
+const pageSubmittedIds = computed(() => registrationsList.value.filter(r => r.status === 'submitted').map(r => r.id));
+
+const allPageSelected = computed(() =>
+    pageSubmittedIds.value.length > 0 && pageSubmittedIds.value.every(id => selectedIds.value.includes(id)),
+);
+
+function toggleSelectAllPage() {
+    filterWideMode.value = false;
+    selectedIds.value = allPageSelected.value ? [] : [...pageSubmittedIds.value];
+}
+
+function selectAllMatchingFilter() {
+    selectedIds.value = [];
+    filterWideMode.value = true;
+}
+
+function clearSelection() {
+    selectedIds.value = [];
+    filterWideMode.value = false;
+}
+
+function runBulkApprove() {
+    if (filterWideMode.value) {
+        if (!confirm(`Approve all ${props.pendingMatchingCount} pending registration(s) matching the current school/item filter?`)) return;
+        router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-approve`, {
+            school_id: form.school_id || undefined,
+            item_id: form.item_id || undefined,
+            override_lifecycle: overrideLifecycle.value,
+        }, { preserveScroll: true, onSuccess: clearSelection });
+        return;
+    }
+
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-approve`, {
         registration_ids: selectedIds.value,
         override_lifecycle: overrideLifecycle.value,
-    }, { preserveScroll: true, onSuccess: () => { selectedIds.value = []; } });
+    }, { preserveScroll: true, onSuccess: clearSelection });
 }
 
-function bulkReject() {
+function runBulkReject() {
+    if (filterWideMode.value) {
+        if (!confirm(`Reject all ${props.pendingMatchingCount} pending registration(s) matching the current school/item filter?`)) return;
+        router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-reject`, {
+            school_id: form.school_id || undefined,
+            item_id: form.item_id || undefined,
+            override_lifecycle: overrideLifecycle.value,
+        }, { preserveScroll: true, onSuccess: clearSelection });
+        return;
+    }
+
     if (!confirm(`Reject ${selectedIds.value.length} registration(s)?`)) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-reject`, {
         registration_ids: selectedIds.value,
         override_lifecycle: overrideLifecycle.value,
-    }, { preserveScroll: true, onSuccess: () => { selectedIds.value = []; } });
-}
-
-function approveSchool() {
-    if (!filterSchoolId.value || !confirm('Approve all submitted registrations for this school?')) return;
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-approve`, {
-        school_id: filterSchoolId.value,
-        override_lifecycle: overrideLifecycle.value,
-    }, { preserveScroll: true });
-}
-
-function approveItem() {
-    if (!filterItemId.value || !confirm('Approve all submitted registrations for this item?')) return;
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/bulk-approve`, {
-        item_id: filterItemId.value,
-        override_lifecycle: overrideLifecycle.value,
-    }, { preserveScroll: true });
-}
-
-function toggleSelectAll() {
-    const ids = filteredRegistrations.value.filter(r => r.status === 'submitted').map(r => r.id);
-    selectedIds.value = selectedIds.value.length === ids.length ? [] : ids;
+    }, { preserveScroll: true, onSuccess: clearSelection });
 }
 
 // ── Sports helpers ────────────────────────────────────────────────────────────
@@ -686,7 +754,7 @@ function genderLabel(gender) {
 
 const sportsGroupedRegistrations = computed(() => {
     const grouped = {};
-    for (const reg of filteredRegistrations.value) {
+    for (const reg of registrationsList.value) {
         const key = ageGroupKey(reg);
         const label = ageGroupLabel(key);
         if (!grouped[label]) grouped[label] = [];

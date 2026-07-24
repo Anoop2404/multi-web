@@ -85,13 +85,28 @@
                 <label class="form-label text-xs text-slate-600 font-semibold mb-1">Search Payment</label>
                 <input v-model="form.search" type="text" class="form-input text-sm w-full bg-slate-50 border-slate-200 rounded-lg" placeholder="Search school name, label, receipt #..." />
             </div>
+            <div class="min-w-[140px]">
+                <label class="form-label text-xs text-slate-600 font-semibold mb-1">From</label>
+                <input v-model="form.from_date" type="date" :disabled="form.show_all" class="form-input text-sm w-full bg-slate-50 border-slate-200 rounded-lg disabled:opacity-50" />
+            </div>
+            <div class="min-w-[140px]">
+                <label class="form-label text-xs text-slate-600 font-semibold mb-1">To</label>
+                <input v-model="form.to_date" type="date" :disabled="form.show_all" class="form-input text-sm w-full bg-slate-50 border-slate-200 rounded-lg disabled:opacity-50" />
+            </div>
+            <label class="flex items-center gap-1.5 text-xs text-slate-600 font-medium whitespace-nowrap pb-2 cursor-pointer select-none">
+                <input v-model="form.show_all" type="checkbox" class="rounded">
+                Show all history
+            </label>
             <div class="flex items-center gap-2">
                 <button type="submit" class="btn-primary text-sm px-5 !py-2 rounded-lg shadow-sm">Filter</button>
-                <button v-if="form.type !== 'all' || form.school_id || form.search" type="button" class="btn-ghost text-xs text-slate-500 hover:text-slate-700" @click="resetFilters">
+                <button v-if="form.type !== 'all' || form.school_id || form.search || form.show_all" type="button" class="btn-ghost text-xs text-slate-500 hover:text-slate-700" @click="resetFilters">
                     Clear
                 </button>
             </div>
         </form>
+        <p v-if="!form.show_all && filters?.from_date" class="text-xs text-slate-500 -mt-3 mb-4">
+            Showing payments from {{ formatCalendarDate(filters.from_date) }} onward. Tick "Show all history" for the full record.
+        </p>
 
         <!-- Payment Records Register -->
         <div v-if="!payments?.length" class="card text-center py-16 text-slate-400 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl">
@@ -184,7 +199,12 @@ const form = reactive({
     type: props.filters?.type ?? 'all',
     school_id: props.filters?.school_id ?? '',
     search: props.filters?.search ?? '',
+    from_date: props.filters?.from_date ?? '',
+    to_date: props.filters?.to_date ?? '',
+    show_all: props.filters?.show_all ?? false,
 });
+
+const filters = computed(() => props.filters ?? {});
 
 const exportUrl = computed(() => {
     const base = `/sahodaya-admin/${props.sahodaya.id}/finance/payments/export`;
@@ -202,6 +222,9 @@ function resetFilters() {
     form.type = 'all';
     form.school_id = '';
     form.search = '';
+    form.from_date = '';
+    form.to_date = '';
+    form.show_all = false;
     applyFilters();
 }
 

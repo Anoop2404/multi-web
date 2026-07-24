@@ -16,13 +16,19 @@ use Illuminate\Support\Collection;
 
 class SchoolPaymentHistoryService
 {
-    public function rowsForSchool(Tenant $school): Collection
+    /**
+     * @param  array{from?: ?string, to?: ?string, school_id?: ?string, type?: ?string}  $filters
+     */
+    public function rowsForSchool(Tenant $school, array $filters = []): Collection
     {
-        return $this->buildRows(collect([$school]), $school->id);
+        return $this->buildRows(collect([$school]), $school->id, null, $filters);
     }
 
-    /** @return Collection<int, array<string, mixed>> */
-    public function rowsForSahodaya(Tenant $sahodaya): Collection
+    /**
+     * @param  array{from?: ?string, to?: ?string, school_id?: ?string, type?: ?string}  $filters
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function rowsForSahodaya(Tenant $sahodaya, array $filters = []): Collection
     {
         $schools = Tenant::query()
             ->where('parent_id', $sahodaya->id)
@@ -30,52 +36,69 @@ class SchoolPaymentHistoryService
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return $this->buildRows($schools, null, $sahodaya->id);
+        return $this->buildRows($schools, null, $sahodaya->id, $filters);
     }
 
     /**
+     * Every sub-query below is scoped by an optional date range and skipped entirely
+     * when a `type` filter narrows the request to a different program — previously
+     * all six ran unconditionally and unbounded for every Sahodaya-wide page view or
+     * report, regardless of what the caller actually asked to see.
+     * See docs/SCALE_AND_PAGINATION_PLAN.md §3 (Option A).
+     *
      * @param  Collection<int, Tenant>  $schools
+     * @param  array{from?: ?string, to?: ?string, school_id?: ?string, type?: ?string}  $filters
      * @return Collection<int, array<string, mixed>>
      */
-    private function buildRows(Collection $schools, ?string $urlSchoolId, ?string $sahodayaId = null): Collection
+    private function buildRows(Collection $schools, ?string $urlSchoolId, ?string $sahodayaId = null, array $filters = []): Collection
     {
         $schoolIds = $schools->pluck('id');
         $schoolNames = $schools->pluck('name', 'id');
 
-        $membership = MembershipPayment::whereIn('school_id', $schoolIds)
-            ->with('feeReceipt.reviewedBy')
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (MembershipPayment $p) => $this->mapMembershipRow($p, $schoolNames, $urlSchoolId, $sahodayaId));
+        if (! empty($filters['school_id'])) {
+            $schoolIds = $schoolIds->filter(fn ($id) => (string) $id === (string) $filters['school_id'])->values();
+        }
 
-        $fest = FestSchoolEventFee::whereIn('school_id', $schoolIds)
-            ->with(['feeReceipt.reviewedBy', 'event'])
-            ->get()
-            ->map(fn (FestSchoolEventFee $f) => $this->mapFestRow($f, $schoolNames, $urlSchoolId, $sahodayaId));
+        $from = $filters['from'] ?? null;
+        $to = $filters['to'] ?? null;
+        $type = $filters['type'] ?? 'all';
 
-        $training = TrainingRegistration::whereIn('school_id', $schoolIds)
-            ->whereNotNull('fee_receipt_id')
-            ->with(['feeReceipt.reviewedBy', 'program', 'teacher'])
-            ->get()
-            ->map(fn (TrainingRegistration $r) => $this->mapTrainingRow($r, $schoolNames, $urlSchoolId, $sahodayaId));
+        $membership = ($type === 'all' || $type === 'membership')
+            ? $this->dateScope(MembershipPayment::whereIn('school_id', $schoolIds)->with('feeReceipt.reviewedBy'), $from, $to)
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(fn (MembershipPayment $p) => $this->mapMembershipRow($p, $schoolNames, $urlSchoolId, $sahodayaId))
+            : collect();
 
-        $trainingBatch = TrainingSchoolFee::whereIn('school_id', $schoolIds)
-            ->whereNotNull('fee_receipt_id')
-            ->with(['feeReceipt.reviewedBy', 'program'])
-            ->get()
-            ->map(fn (TrainingSchoolFee $f) => $this->mapTrainingBatchRow($f, $schoolNames, $urlSchoolId, $sahodayaId));
+        $fest = ($type === 'all' || $type === 'fest')
+            ? $this->dateScope(FestSchoolEventFee::whereIn('school_id', $schoolIds)->with(['feeReceipt.reviewedBy', 'event']), $from, $to)
+                ->get()
+                ->map(fn (FestSchoolEventFee $f) => $this->mapFestRow($f, $schoolNames, $urlSchoolId, $sahodayaId))
+            : collect();
 
-        $mcqBatch = McqSchoolFee::whereIn('school_id', $schoolIds)
-            ->whereNotNull('fee_receipt_id')
-            ->with(['feeReceipt.reviewedBy', 'exam'])
-            ->get()
-            ->map(fn (McqSchoolFee $f) => $this->mapMcqBatchRow($f, $schoolNames, $urlSchoolId, $sahodayaId));
+        $training = ($type === 'all' || $type === 'training')
+            ? $this->dateScope(TrainingRegistration::whereIn('school_id', $schoolIds)->whereNotNull('fee_receipt_id')->with(['feeReceipt.reviewedBy', 'program', 'teacher']), $from, $to)
+                ->get()
+                ->map(fn (TrainingRegistration $r) => $this->mapTrainingRow($r, $schoolNames, $urlSchoolId, $sahodayaId))
+            : collect();
 
-        $mcq = McqRegistration::whereIn('school_id', $schoolIds)
-            ->whereNotNull('fee_receipt_id')
-            ->with(['feeReceipt.reviewedBy', 'exam', 'student'])
-            ->get()
-            ->map(fn (McqRegistration $r) => $this->mapMcqRow($r, $schoolNames, $urlSchoolId, $sahodayaId));
+        $trainingBatch = ($type === 'all' || $type === 'training')
+            ? $this->dateScope(TrainingSchoolFee::whereIn('school_id', $schoolIds)->whereNotNull('fee_receipt_id')->with(['feeReceipt.reviewedBy', 'program']), $from, $to)
+                ->get()
+                ->map(fn (TrainingSchoolFee $f) => $this->mapTrainingBatchRow($f, $schoolNames, $urlSchoolId, $sahodayaId))
+            : collect();
+
+        $mcqBatch = ($type === 'all' || $type === 'mcq')
+            ? $this->dateScope(McqSchoolFee::whereIn('school_id', $schoolIds)->whereNotNull('fee_receipt_id')->with(['feeReceipt.reviewedBy', 'exam']), $from, $to)
+                ->get()
+                ->map(fn (McqSchoolFee $f) => $this->mapMcqBatchRow($f, $schoolNames, $urlSchoolId, $sahodayaId))
+            : collect();
+
+        $mcq = ($type === 'all' || $type === 'mcq')
+            ? $this->dateScope(McqRegistration::whereIn('school_id', $schoolIds)->whereNotNull('fee_receipt_id')->with(['feeReceipt.reviewedBy', 'exam', 'student']), $from, $to)
+                ->get()
+                ->map(fn (McqRegistration $r) => $this->mapMcqRow($r, $schoolNames, $urlSchoolId, $sahodayaId))
+            : collect();
 
         // Sort by the actual review/approval timestamp, not payment_date — payment_date is
         // date-only (no time component) and, for fest/training/mcq rows, is the bank
@@ -95,6 +118,18 @@ class SchoolPaymentHistoryService
             ->concat($mcq)
             ->sortByDesc(fn (array $row) => $row['reviewed_at'] ?? $row['payment_date'])
             ->values();
+    }
+
+    /**
+     * Bounds a sub-query to `created_at` between $from/$to when given. Applied before
+     * any of the six queries run, not to the merged collection afterward — see the
+     * class-level note on buildRows().
+     */
+    private function dateScope($query, ?string $from, ?string $to)
+    {
+        return $query
+            ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
+            ->when($to, fn ($q) => $q->where('created_at', '<=', $to));
     }
 
     /** @param  Collection<string, string>  $schoolNames */

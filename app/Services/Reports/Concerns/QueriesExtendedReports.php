@@ -93,7 +93,7 @@ trait QueriesExtendedReports
             'RPT-PAY-003' => $this->rptExpiredMembership($sahodayaId),
             'RPT-PAY-004' => $this->rptRenewedMembership($sahodayaId),
             'RPT-PAY-005' => $this->rptMembershipPaymentHistory($sahodayaId, $filters),
-            'RPT-PAY-009' => $this->rptReceiptEmailStatus($sahodayaId),
+            'RPT-PAY-009' => $this->rptReceiptEmailStatus($sahodayaId, $filters),
             'RPT-PAY-010' => $this->rptUnifiedPaymentHub($sahodayaId, $filters),
             'RPT-PAY-011' => $this->rptProofPending($sahodayaId),
             'RPT-PAY-012' => $this->rptSchoolCollectionComparison($sahodayaId),
@@ -109,7 +109,7 @@ trait QueriesExtendedReports
             'RPT-FIN-005' => $this->rptTrialBalance($sahodayaId),
             'RPT-FIN-006' => $this->rptIncomeExpenditure($sahodayaId, $filters),
             'RPT-FIN-007' => $this->rptBalanceSheet($sahodayaId),
-            'RPT-FIN-008' => $this->rptReceiptRegister($sahodayaId),
+            'RPT-FIN-008' => $this->rptReceiptRegister($sahodayaId, $filters),
             'RPT-FIN-009' => $this->rptPaymentRegister($sahodayaId),
             'RPT-FIN-010' => $this->rptOutstandingReceivables($sahodayaId),
             'RPT-FIN-012' => $this->rptCollectionSummary($sahodayaId),
@@ -159,7 +159,7 @@ trait QueriesExtendedReports
 
             'RPT-EML-001' => $this->rptEmailDeliveryLog($filters),
             'RPT-EML-002' => $this->rptFailedEmails($filters),
-            'RPT-EML-003' => $this->rptReceiptEmailStatus($sahodayaId),
+            'RPT-EML-003' => $this->rptReceiptEmailStatus($sahodayaId, $filters),
 
             'RPT-AUD-001' => $this->rptAuditTrail($filters),
             'RPT-AUD-002' => $this->rptAuthEventsSummary($filters),
@@ -706,12 +706,12 @@ trait QueriesExtendedReports
      * the same way — source from SchoolPaymentHistoryService::rowsForSahodaya(), which scopes
      * to this Sahodaya's schools before ever touching FeeReceipt in bulk.
      */
-    protected function rptReceiptEmailStatus(string $sahodayaId): Collection
+    protected function rptReceiptEmailStatus(string $sahodayaId, array $filters = []): Collection
     {
         $sahodaya = Tenant::findOrFail($sahodayaId);
 
         return app(\App\Services\Fees\SchoolPaymentHistoryService::class)
-            ->rowsForSahodaya($sahodaya)
+            ->rowsForSahodaya($sahodaya, ['from' => $filters['from'] ?? null, 'to' => $filters['to'] ?? null])
             ->filter(fn (array $row) => filled($row['receipt_number']))
             ->map(fn (array $row) => [
                 'receipt_number' => $row['receipt_number'],
@@ -900,12 +900,12 @@ trait QueriesExtendedReports
      * SchoolPaymentHistoryService::buildRows()), so receipt order here matches the actual
      * approval sequence the receipt numbers were assigned in, not an arbitrary insertion order.
      */
-    protected function rptReceiptRegister(string $sahodayaId): Collection
+    protected function rptReceiptRegister(string $sahodayaId, array $filters = []): Collection
     {
         $sahodaya = Tenant::findOrFail($sahodayaId);
 
         return app(\App\Services\Fees\SchoolPaymentHistoryService::class)
-            ->rowsForSahodaya($sahodaya)
+            ->rowsForSahodaya($sahodaya, ['from' => $filters['from'] ?? null, 'to' => $filters['to'] ?? null])
             ->filter(fn (array $row) => filled($row['receipt_number']))
             ->map(fn (array $row) => [
                 'receipt_number' => $row['receipt_number'],

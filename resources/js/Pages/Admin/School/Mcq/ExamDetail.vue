@@ -94,14 +94,17 @@
                                     <select v-model="classFilter" class="field text-sm min-w-[160px]" @change="registerPage = 1">
                                         <option value="">All classes</option>
                                         <option v-for="c in classOptions" :key="c.id" :value="String(c.id)">
-                                            {{ c.name }} ({{ c.eligible_count }} to add)
+                                            {{ c.name }}<template v-if="c.eligible_count !== null"> ({{ c.eligible_count }} to add)</template>
                                         </option>
                                     </select>
                                     <input v-model="studentSearch" type="search" class="field text-sm min-w-[200px]"
                                            placeholder="Search name or reg. no…" @input="registerPage = 1">
                                 </div>
                             </div>
-                            <div class="flex flex-wrap gap-1.5">
+                            <p v-if="lazyLoadStudents && !studentSearch && !classFilter" class="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-3 py-2">
+                                This school has {{ studentCount }} students — search by name or admission number, or pick a class, to find and add them.
+                            </p>
+                            <div v-else class="flex flex-wrap gap-1.5">
                                 <button v-for="f in studentFilters" :key="f.key" type="button"
                                         class="text-xs font-medium px-2.5 py-1 rounded-full transition"
                                         :class="studentFilter === f.key ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
@@ -669,7 +672,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SchoolMcqSubNav from '@/Components/school/SchoolMcqSubNav.vue';
@@ -699,6 +702,8 @@ const props = defineProps({
     attendanceRows: { type: Array, default: () => [] },
     attendanceGate: { type: Object, default: () => ({ can_mark: false }) },
     reportExports: { type: Object, default: () => ({}) },
+    lazyLoadStudents: { type: Boolean, default: false },
+    studentCount: { type: Number, default: 0 },
 });
 
 const page = usePage();
@@ -718,7 +723,17 @@ const base = computed(() => `/school-admin/${props.school.id}/mcq/${props.exam.i
 const pdfUrl = computed(() => `${base.value}/hall-tickets/pdf`);
 const canDownloadDocuments = computed(() => !props.downloadGate?.blocked);
 
-const availableStudents = computed(() => props.students.filter(s => s.eligible && !s.registered));
+// For large schools (see lazyLoadStudents/studentCount below), the server sends an
+// empty `students` list and this page fetches bounded, searched batches on demand,
+// merging them in here by id. For small schools, `localStudents` is simply the full
+// eagerly-loaded `students` prop — behavior is unchanged.
+// See docs/SCALE_AND_PAGINATION_PLAN.md §6/§9-new.
+const localStudents = ref([...props.students]);
+watch(() => props.students, (value) => {
+    localStudents.value = [...value];
+});
+
+const availableStudents = computed(() => localStudents.value.filter(s => s.eligible && !s.registered));
 
 function matchesClass(s) {
     if (!classFilter.value) return true;
@@ -742,15 +757,45 @@ function matchesFilter(s, key) {
 }
 
 const studentFilters = computed(() => [
-    { key: 'available', label: 'To add', count: props.students.filter(s => matchesFilter(s, 'available') && matchesClass(s)).length },
-    { key: 'registered', label: 'Registered', count: props.students.filter(s => matchesFilter(s, 'registered') && matchesClass(s)).length },
-    { key: 'not_eligible', label: 'Not eligible', count: props.students.filter(s => matchesFilter(s, 'not_eligible') && matchesClass(s)).length },
-    { key: 'all', label: 'All', count: props.students.filter(s => matchesClass(s)).length },
+    { key: 'available', label: 'To add', count: localStudents.value.filter(s => matchesFilter(s, 'available') && matchesClass(s)).length },
+    { key: 'registered', label: 'Registered', count: localStudents.value.filter(s => matchesFilter(s, 'registered') && matchesClass(s)).length },
+    { key: 'not_eligible', label: 'Not eligible', count: localStudents.value.filter(s => matchesFilter(s, 'not_eligible') && matchesClass(s)).length },
+    { key: 'all', label: 'All', count: localStudents.value.filter(s => matchesClass(s)).length },
 ]);
 
 const filteredStudents = computed(() =>
-    props.students.filter(s => matchesFilter(s, studentFilter.value) && matchesSearch(s) && matchesClass(s)),
+    localStudents.value.filter(s => matchesFilter(s, studentFilter.value) && matchesSearch(s) && matchesClass(s)),
 );
+
+// Debounced server-side lookup when the roster is too large to ship eagerly. Merges
+// into localStudents by id so already-fetched/selected rows aren't lost.
+let studentSearchDebounce = null;
+async function fetchEligibleStudents() {
+    if (!props.lazyLoadStudents) return;
+    try {
+        const params = new URLSearchParams();
+        if (studentSearch.value.trim()) params.set('search', studentSearch.value.trim());
+        if (classFilter.value) params.set('class_id', classFilter.value);
+        if (!params.toString()) return;
+        const res = await fetch(`${base.value}/eligible-students?${params.toString()}`, {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const byId = new Map(localStudents.value.map(s => [s.id, s]));
+        for (const s of (data.students ?? [])) byId.set(s.id, s);
+        localStudents.value = Array.from(byId.values());
+    } catch {
+        // keep whatever's already loaded
+    }
+}
+
+watch([studentSearch, classFilter], () => {
+    if (!props.lazyLoadStudents) return;
+    if (studentSearchDebounce) clearTimeout(studentSearchDebounce);
+    studentSearchDebounce = setTimeout(fetchEligibleStudents, 300);
+});
 
 const selectableInView = computed(() =>
     filteredStudents.value.filter(s => isSelectable(s)),

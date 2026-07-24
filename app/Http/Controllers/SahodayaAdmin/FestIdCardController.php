@@ -129,6 +129,13 @@ class FestIdCardController extends SahodayaAdminController
 
     public function pdfAllItems(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
     {
+        // Renders every item's cards in one PDF — for a large event (thousands of
+        // students across many items) this is a multiple of what the single-item pdf()
+        // above generates, yet it was the only id-card export with no override at all
+        // (still bound by php.ini defaults). See docs/SCALE_AND_PAGINATION_PLAN.md §9-new.
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(600);
+
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $this->validated($request);
@@ -171,6 +178,11 @@ class FestIdCardController extends SahodayaAdminController
 
     public function pdfAllHeads(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
     {
+        // Same reasoning as pdfAllItems() above — bulk across every item head, same
+        // under-provisioning gap. See docs/SCALE_AND_PAGINATION_PLAN.md §9-new.
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(600);
+
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $this->validated($request);

@@ -170,38 +170,23 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get();
+        $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no']);
 
-        $rows = $students->map(function ($student) use ($event) {
-            $partIds = FestParticipant::where('student_id', $student->id)
-                ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $event->id)
-                    ->where('school_id', $this->school->id)
-                    ->active())
-                ->pluck('id');
+        [$itemsByStudent, $marksByStudent] = $this->studentWiseLookups($event);
 
-            $regs = FestRegistration::where('event_id', $event->id)
-                ->where('school_id', $this->school->id)
-                ->active()
-                ->whereHas('participants', fn ($q) => $q->where('student_id', $student->id))
-                ->with('item')
-                ->get();
-
-            $marks = FestMark::where('event_id', $event->id)
-                ->whereIn('participant_id', $partIds)
-                ->with('item')
-                ->get();
+        $rows = $students->map(function ($student) use ($itemsByStudent, $marksByStudent) {
+            $marks = $marksByStudent->get($student->id) ?? collect();
 
             return [
                 'student'       => $student->only(['id', 'name', 'reg_no']),
-                'registrations' => $regs->map(fn ($r) => $r->item?->title),
+                'registrations' => ($itemsByStudent->get($student->id) ?? collect())->values(),
                 'total_score'   => $marks->sum('score'),
                 'results'       => $marks->map(fn ($m) => [
                     'item' => $m->item?->title,
                     'position' => $m->position,
                     'grade' => $m->grade,
                     'score' => $m->score,
-                ]),
+                ])->values(),
             ];
         });
 
@@ -215,6 +200,57 @@ class FestSchoolReportController extends SchoolAdminController
             'pdfUrl'   => "{$base}/export/school-wise",
             'csvUrl'   => "{$base}/student-wise/export",
         ]);
+    }
+
+    /**
+     * Batch-fetch every registration + mark for the event/school once, instead of the
+     * previous per-student pattern of 3 queries each (partIds, registrations, marks) —
+     * a 3000-student school triggered 9000+ queries rendering a single report. Reused
+     * by both studentWise() (screen) and exportStudentWise() (CSV).
+     * See docs/SCALE_AND_PAGINATION_PLAN.md §7.
+     *
+     * @return array{0: \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, string|null>>, 1: \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, FestMark>>}
+     */
+    private function studentWiseLookups(FestEvent $event): array
+    {
+        $registrations = FestRegistration::where('event_id', $event->id)
+            ->where('school_id', $this->school->id)
+            ->active()
+            ->with(['item:id,title', 'participants:id,registration_id,student_id'])
+            ->get();
+
+        $itemsByStudent = collect();
+        $participantIdsByStudent = collect();
+
+        foreach ($registrations as $reg) {
+            foreach ($reg->participants as $participant) {
+                if (! $participant->student_id) {
+                    continue;
+                }
+                $itemsByStudent->put(
+                    $participant->student_id,
+                    ($itemsByStudent->get($participant->student_id) ?? collect())->push($reg->item?->title),
+                );
+                $participantIdsByStudent->put(
+                    $participant->student_id,
+                    ($participantIdsByStudent->get($participant->student_id) ?? collect())->push($participant->id),
+                );
+            }
+        }
+
+        $allParticipantIds = $participantIdsByStudent->flatten()->unique()->values();
+
+        $marksByParticipant = FestMark::where('event_id', $event->id)
+            ->whereIn('participant_id', $allParticipantIds)
+            ->with('item:id,title')
+            ->get()
+            ->groupBy('participant_id');
+
+        $marksByStudent = $participantIdsByStudent->map(
+            fn ($participantIds) => $participantIds->flatMap(fn ($pid) => $marksByParticipant->get($pid) ?? collect()),
+        );
+
+        return [$itemsByStudent, $marksByStudent];
     }
 
     public function itemWise(Request $request, string $tenantId, FestEvent $event, string $program)
@@ -273,38 +309,23 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
         abort_if($event->event_type !== 'teacher_fest', 404);
 
-        $teachers = \App\Models\Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get();
+        $teachers = \App\Models\Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no', 'designation']);
 
-        $rows = $teachers->map(function ($teacher) use ($event) {
-            $partIds = FestParticipant::where('teacher_id', $teacher->id)
-                ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $event->id)
-                    ->where('school_id', $this->school->id)
-                    ->active())
-                ->pluck('id');
+        [$itemsByTeacher, $marksByTeacher] = $this->teacherWiseLookups($event);
 
-            $regs = FestRegistration::where('event_id', $event->id)
-                ->where('school_id', $this->school->id)
-                ->active()
-                ->whereHas('participants', fn ($q) => $q->where('teacher_id', $teacher->id))
-                ->with('item')
-                ->get();
-
-            $marks = FestMark::where('event_id', $event->id)
-                ->whereIn('participant_id', $partIds)
-                ->with('item')
-                ->get();
+        $rows = $teachers->map(function ($teacher) use ($itemsByTeacher, $marksByTeacher) {
+            $marks = $marksByTeacher->get($teacher->id) ?? collect();
 
             return [
                 'teacher'       => $teacher->only(['id', 'name', 'reg_no', 'designation']),
-                'registrations' => $regs->map(fn ($r) => $r->item?->title),
+                'registrations' => ($itemsByTeacher->get($teacher->id) ?? collect())->values(),
                 'total_score'   => $marks->sum('score'),
                 'results'       => $marks->map(fn ($m) => [
                     'item'     => $m->item?->title,
                     'position' => $m->position,
                     'grade'    => $m->grade,
                     'score'    => $m->score,
-                ]),
+                ])->values(),
             ];
         });
 
@@ -316,23 +337,65 @@ class FestSchoolReportController extends SchoolAdminController
         ]);
     }
 
+    /**
+     * Teacher-side twin of studentWiseLookups() — same batch-fetch fix, same reasoning.
+     * Reused by both teacherWise() (screen) and exportTeacherWise() (CSV).
+     */
+    private function teacherWiseLookups(FestEvent $event): array
+    {
+        $registrations = FestRegistration::where('event_id', $event->id)
+            ->where('school_id', $this->school->id)
+            ->active()
+            ->with(['item:id,title', 'participants:id,registration_id,teacher_id'])
+            ->get();
+
+        $itemsByTeacher = collect();
+        $participantIdsByTeacher = collect();
+
+        foreach ($registrations as $reg) {
+            foreach ($reg->participants as $participant) {
+                if (! $participant->teacher_id) {
+                    continue;
+                }
+                $itemsByTeacher->put(
+                    $participant->teacher_id,
+                    ($itemsByTeacher->get($participant->teacher_id) ?? collect())->push($reg->item?->title),
+                );
+                $participantIdsByTeacher->put(
+                    $participant->teacher_id,
+                    ($participantIdsByTeacher->get($participant->teacher_id) ?? collect())->push($participant->id),
+                );
+            }
+        }
+
+        $allParticipantIds = $participantIdsByTeacher->flatten()->unique()->values();
+
+        $marksByParticipant = FestMark::where('event_id', $event->id)
+            ->whereIn('participant_id', $allParticipantIds)
+            ->with('item:id,title')
+            ->get()
+            ->groupBy('participant_id');
+
+        $marksByTeacher = $participantIdsByTeacher->map(
+            fn ($participantIds) => $participantIds->flatMap(fn ($pid) => $marksByParticipant->get($pid) ?? collect()),
+        );
+
+        return [$itemsByTeacher, $marksByTeacher];
+    }
+
     public function exportStudentWise(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        return response()->streamDownload(function () use ($event) {
+        [$itemsByStudent, $marksByStudent] = $this->studentWiseLookups($event);
+
+        return response()->streamDownload(function () use ($event, $itemsByStudent, $marksByStudent) {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['Reg No', 'Name', 'Items', 'Total Score', 'Results']);
-            $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get();
+            $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no']);
             foreach ($students as $student) {
-                $partIds = FestParticipant::where('student_id', $student->id)
-                    ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('school_id', $this->school->id)->active())
-                    ->pluck('id');
-                $items = FestRegistration::where('event_id', $event->id)->where('school_id', $this->school->id)
-                    ->active()
-                    ->whereHas('participants', fn ($q) => $q->where('student_id', $student->id))
-                    ->with('item')->get()->pluck('item.title')->filter()->implode('; ');
-                $marks = FestMark::where('event_id', $event->id)->whereIn('participant_id', $partIds)->with('item')->get();
+                $items = ($itemsByStudent->get($student->id) ?? collect())->filter()->implode('; ');
+                $marks = $marksByStudent->get($student->id) ?? collect();
                 $results = $marks->map(fn ($m) => ($m->item?->title ?? '').':'.($m->grade ?? $m->position ?? $m->score))->implode('; ');
                 fputcsv($out, [$student->reg_no, $student->name, $items, $marks->sum('score'), $results]);
             }
@@ -345,19 +408,15 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
         abort_if($event->event_type !== 'teacher_fest', 404);
 
-        return response()->streamDownload(function () use ($event) {
+        [$itemsByTeacher, $marksByTeacher] = $this->teacherWiseLookups($event);
+
+        return response()->streamDownload(function () use ($event, $itemsByTeacher, $marksByTeacher) {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['Reg No', 'Name', 'Designation', 'Items', 'Total Score', 'Results']);
-            $teachers = \App\Models\Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get();
+            $teachers = \App\Models\Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no', 'designation']);
             foreach ($teachers as $teacher) {
-                $partIds = FestParticipant::where('teacher_id', $teacher->id)
-                    ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('school_id', $this->school->id)->active())
-                    ->pluck('id');
-                $items = FestRegistration::where('event_id', $event->id)->where('school_id', $this->school->id)
-                    ->active()
-                    ->whereHas('participants', fn ($q) => $q->where('teacher_id', $teacher->id))
-                    ->with('item')->get()->pluck('item.title')->filter()->implode('; ');
-                $marks = FestMark::where('event_id', $event->id)->whereIn('participant_id', $partIds)->with('item')->get();
+                $items = ($itemsByTeacher->get($teacher->id) ?? collect())->filter()->implode('; ');
+                $marks = $marksByTeacher->get($teacher->id) ?? collect();
                 $results = $marks->map(fn ($m) => ($m->item?->title ?? '').':'.($m->grade ?? $m->position ?? $m->score))->implode('; ');
                 fputcsv($out, [$teacher->reg_no, $teacher->name, $teacher->designation, $items, $marks->sum('score'), $results]);
             }

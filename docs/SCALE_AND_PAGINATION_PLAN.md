@@ -2,11 +2,11 @@
 
 **Prepared:** 23 Jul 2026
 **Trigger:** Sahodaya scale check — 30-100 member schools per Sahodaya, **up to ~3000 students PER SCHOOL** (not 3000 combined — corrected 23 Jul 2026; a 100-school Sahodaya can mean up to ~300,000 students total), multi-year accumulated fee/receipt history.
-**Status:** Plan only — nothing in this doc has been implemented yet.
+**Status:** Implemented (24 Jul 2026) — every item in §9/§10 below has been built: the Fest and MCQ registration-page eager-load fixes and student-picker rewires, the `studentWise`/`teacherWise` N+1 rewrite, the bulk ID card PDF memory/timeout fix, `SchoolPaymentHistoryService` date/type-scoped filtering (Option A) wired into `UnifiedPaymentsController` and both reports, and `Registrations.vue` pagination with the redesigned filter-wide select-all (plus `printApproved()` reusing the same query helper). See git history on the files listed throughout this doc for the actual diffs. §11's "is this perfect" caveats still apply — this plan closed out every finding identified in it, not every conceivable scale issue in the codebase.
 
 **Revision note (23 Jul 2026):** the original version of this doc assumed ~3000 students combined across a whole Sahodaya, and on that assumption marked the school-side registration pages "confirmed bounded/fine" since they're scoped to one school. That assumption was wrong. At 3000 students in a SINGLE school, those same school-side pages are not fine — §6-§8 below are new findings from re-checking under the corrected number, and one of them (§7) is worse than anything found on the Sahodaya-admin side. Priority ordering in §9 has been revised accordingly — the school-side fixes now come first, because they hit every school on every page load, not just Sahodaya admins occasionally opening a report.
 
-No code has been changed for this plan. Everything below is analysis + spec, written the same way as `FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md` so it can be picked up and implemented piece by piece.
+No code had been changed for this plan as of 23 Jul 2026; everything below was analysis + spec at that point, written the same way as `FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md` so it could be picked up and implemented piece by piece. That implementation is now done — see the Status line above.
 
 ---
 
