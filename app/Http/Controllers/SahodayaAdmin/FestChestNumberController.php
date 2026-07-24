@@ -253,7 +253,7 @@ class FestChestNumberController extends SahodayaAdminController
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->where('item_id', $itemId)
-            ->when($includePending, fn ($q2) => $q2->active(), fn ($q2) => $q2->where('status', 'approved')))
+            ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->with(['registration.school', 'registration', 'student', 'teacher', 'group'])
             ->get();
 
@@ -322,7 +322,7 @@ class FestChestNumberController extends SahodayaAdminController
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->where('item_id', $itemId)
-            ->where('status', 'approved')
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->whereHas('item', fn ($i) => $i->where('stage_type', 'on_stage')))
             ->with(['registration.school', 'student', 'teacher', 'group'])
             ->get();
@@ -367,7 +367,7 @@ class FestChestNumberController extends SahodayaAdminController
     {
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
-            ->where('status', 'approved')
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId)))
             ->with(['registration.item', 'registration.school', 'student', 'teacher', 'group'])
             ->get();
