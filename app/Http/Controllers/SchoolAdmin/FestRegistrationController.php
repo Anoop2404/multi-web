@@ -793,9 +793,9 @@ class FestRegistrationController extends SchoolAdminController
 
         $data = $request->validate([
             'payment_proof'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'transaction_ref' => 'nullable|string|max:100',
-            'bank_name'       => 'nullable|string|max:100',
-            'amount'          => 'nullable|numeric|min:0.01',
+            'transaction_ref' => 'required|string|max:100',
+            'bank_name'       => 'required|string|max:100',
+            'amount'          => 'required|numeric|min:0.01',
             'head_id'         => ($usesPerHead ? 'required' : 'nullable').'|integer|exists:fest_item_heads,id',
         ]);
 
@@ -806,9 +806,9 @@ class FestRegistrationController extends SchoolAdminController
                 (int) $data['head_id'],
                 $request->file('payment_proof'),
                 $request->user()->id,
-                $data['transaction_ref'] ?? null,
-                $data['bank_name'] ?? null,
-                isset($data['amount']) ? (float) $data['amount'] : null,
+                $data['transaction_ref'],
+                $data['bank_name'],
+                (float) $data['amount'],
             );
             $contextLabel = $event->title.' — '.((FestItemHead::find($data['head_id'])?->name) ?? 'head').' fee';
         } else {
@@ -817,8 +817,9 @@ class FestRegistrationController extends SchoolAdminController
                 $this->school->id,
                 $request->file('payment_proof'),
                 $request->user()->id,
-                $data['transaction_ref'] ?? null,
-                $data['bank_name'] ?? null,
+                $data['transaction_ref'],
+                $data['bank_name'],
+                (float) $data['amount'],
             );
             $contextLabel = $event->title.' event fee';
         }
