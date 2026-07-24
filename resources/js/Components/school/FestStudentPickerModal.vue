@@ -175,6 +175,7 @@ const emit = defineEmits([
     'update:managerPhone',
     'confirm',
     'add-student',
+    'search',
 ]);
 
 const search = ref('');
@@ -221,6 +222,18 @@ const canConfirm = computed(() => {
     if (!localSelected.value.length) return false;
     if (props.requireTeamName && !String(localTeamName.value ?? '').trim()) return false;
     return true;
+});
+
+// For large schools, `entries` is only ever the first ~150 students by name (see
+// FestRegistrationController::eligibleStudents() / docs/SCALE_AND_PAGINATION_PLAN.md §6/§8)
+// — searching client-side alone can't find someone outside that window. Debounce and emit
+// the search text so the parent can fetch a matching batch from the server and merge it
+// into `entries`; harmless no-op for small schools where the parent has nothing extra to
+// fetch (the full roster is already in `entries`).
+let searchDebounce = null;
+watch(search, (value) => {
+    if (searchDebounce) clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => emit('search', value), 300);
 });
 
 watch(() => props.modelValue, (open) => {

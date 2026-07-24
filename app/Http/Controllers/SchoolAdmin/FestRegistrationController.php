@@ -110,13 +110,7 @@ class FestRegistrationController extends SchoolAdminController
             ->with(['event', 'item', 'participants.student', 'participants.group'])
             ->get();
 
-        $studentRows = Student::where('tenant_id', $this->school->id)
-            ->active()
-            ->with('schoolClass')
-            ->orderBy('name')
-            ->get();
-
-        $studentCount = $studentRows->count();
+        $studentCount = Student::where('tenant_id', $this->school->id)->active()->count();
         $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 300);
         $lazyStudents = $studentCount > $lazyThreshold;
         $focusEventId = $request->query('event') ? (int) $request->query('event') : null;
@@ -129,31 +123,49 @@ class FestRegistrationController extends SchoolAdminController
             $focusEventId = $events->first()->id;
         }
 
-        $eligibilityService = app(FestRegistrationEligibilityService::class);
-        $primaryEvent = $events->first();
-        $baseStudents = $primaryEvent
-            ? $eligibilityService->annotateStudents($studentRows, $primaryEvent, $this->school->id)->values()
-            : collect();
+        // At/below the threshold, behavior is unchanged from before: eagerly load and
+        // annotate the whole roster once, then reuse it per event. ABOVE the threshold
+        // (this is the fix — lazyLoadStudents used to be computed but never actually
+        // acted on, so a 3000-student school still got the full roster here, duplicated
+        // once per open event below), skip the eager load entirely: ship an empty list
+        // per event and let the frontend fetch a bounded, searched list on demand via
+        // eligibleStudents() (now itself capped — see that method).
+        // See docs/SCALE_AND_PAGINATION_PLAN.md §6.
+        if ($lazyStudents) {
+            $studentsByEvent = $events->mapWithKeys(fn (FestEvent $event) => [$event->id => collect()]);
+        } else {
+            $studentRows = Student::where('tenant_id', $this->school->id)
+                ->active()
+                ->with('schoolClass')
+                ->orderBy('name')
+                ->get();
 
-        $eventRegMap = \App\Models\FestLevelRegistration::query()
-            ->whereIn('event_id', $events->pluck('id'))
-            ->where('status', 'active')
-            ->whereIn('student_id', $studentRows->pluck('id'))
-            ->get()
-            ->groupBy('event_id')
-            ->map(fn ($regs) => $regs->pluck('registration_number', 'student_id')->all());
+            $eligibilityService = app(FestRegistrationEligibilityService::class);
+            $primaryEvent = $events->first();
+            $baseStudents = $primaryEvent
+                ? $eligibilityService->annotateStudents($studentRows, $primaryEvent, $this->school->id)->values()
+                : collect();
 
-        $studentsByEvent = $events->mapWithKeys(function (FestEvent $event) use ($baseStudents, $eventRegMap) {
-            $regMap = $eventRegMap->get($event->id) ?? [];
-            $eventStudents = $baseStudents->map(function ($s) use ($regMap) {
-                $regNo = $regMap[$s['id']] ?? null;
-                return array_merge($s, [
-                    'event_registered' => $regNo !== null,
-                    'event_registration_number' => $regNo,
-                ]);
+            $eventRegMap = \App\Models\FestLevelRegistration::query()
+                ->whereIn('event_id', $events->pluck('id'))
+                ->where('status', 'active')
+                ->whereIn('student_id', $studentRows->pluck('id'))
+                ->get()
+                ->groupBy('event_id')
+                ->map(fn ($regs) => $regs->pluck('registration_number', 'student_id')->all());
+
+            $studentsByEvent = $events->mapWithKeys(function (FestEvent $event) use ($baseStudents, $eventRegMap) {
+                $regMap = $eventRegMap->get($event->id) ?? [];
+                $eventStudents = $baseStudents->map(function ($s) use ($regMap) {
+                    $regNo = $regMap[$s['id']] ?? null;
+                    return array_merge($s, [
+                        'event_registered' => $regNo !== null,
+                        'event_registration_number' => $regNo,
+                    ]);
+                });
+                return [$event->id => $eventStudents];
             });
-            return [$event->id => $eventStudents];
-        });
+        }
 
         return $this->inertia('School/Events/Registration', [
             'program'       => $program,
@@ -248,7 +260,14 @@ class FestRegistrationController extends SchoolAdminController
             });
         }
 
-        $studentRows = $studentQuery->get();
+        // Was previously unbounded — fine for the small-roster case (where this endpoint
+        // was rarely even reached, since index()/eventRegistration() always eagerly sent
+        // the full list anyway), but a real problem now that those two methods actually
+        // defer to this endpoint for large rosters. 150 is generous for "in the process of
+        // typing a name/admission number" while still bounding the worst case (a large
+        // school opening the picker with no search text yet).
+        // See docs/SCALE_AND_PAGINATION_PLAN.md §6.
+        $studentRows = $studentQuery->limit(150)->get();
 
         $annotated = app(FestRegistrationEligibilityService::class)
             ->annotateStudents($studentRows, $event, $this->school->id)
@@ -279,18 +298,25 @@ class FestRegistrationController extends SchoolAdminController
         $feeService = app(FestSchoolEventFeeService::class);
         $hydrated = $this->hydrateEventForSchoolRegistration($event, $feeService);
 
-        $studentQuery = Student::where('tenant_id', $this->school->id)
-            ->active()
-            ->with('schoolClass')
-            ->orderBy('name');
-
-        $studentRows = $studentQuery->get();
-        $studentCount = $studentRows->count();
+        $studentCount = Student::where('tenant_id', $this->school->id)->active()->count();
         $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 300);
         $lazyStudents = $studentCount > $lazyThreshold;
 
-        $eligibilityService = app(FestRegistrationEligibilityService::class);
-        $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
+        // Same fix as index() above — see docs/SCALE_AND_PAGINATION_PLAN.md §6. Below
+        // threshold: unchanged eager load. Above it: skip the full-roster fetch entirely,
+        // frontend fetches on demand via the now-bounded eligibleStudents().
+        if ($lazyStudents) {
+            $students = collect();
+        } else {
+            $studentRows = Student::where('tenant_id', $this->school->id)
+                ->active()
+                ->with('schoolClass')
+                ->orderBy('name')
+                ->get();
+
+            $eligibilityService = app(FestRegistrationEligibilityService::class);
+            $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
+        }
 
         $registrations = FestRegistration::where('school_id', $this->school->id)
             ->whereIn('event_id', $this->registrationEventIdsForSchoolView(collect([$event])))

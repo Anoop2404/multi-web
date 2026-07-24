@@ -350,6 +350,7 @@
                                         @edit="startEdit($event, event, item)"
                                         @cancel-edit="cancelEdit(event, item)"
                                         @add-student="showAddStudent = true"
+                                        @search-students="query => searchStudentsForEvent(event.id, query)"
                                     />
                                 </tbody>
                             </table>
@@ -411,6 +412,7 @@
                                         @edit="startEdit($event, event, item)"
                                         @cancel-edit="cancelEdit(event, item)"
                                         @add-student="showAddStudent = true"
+                                        @search-students="query => searchStudentsForEvent(event.id, query)"
                                     />
                                 </tbody>
                             </table>
@@ -588,6 +590,39 @@ async function loadStudentsForEvent(eventId) {
         fetchedStudentsByEvent[eventId] = data.students ?? [];
     } catch {
         // keep empty pool — user can refresh
+    }
+}
+
+// A large school's initial pool (loadStudentsForEvent above) is capped at the first ~150
+// students by name (see FestRegistrationController::eligibleStudents()) — this is what lets
+// the picker modal actually find someone outside that window, by asking the server instead
+// of only filtering what's already downloaded. Merges by ID rather than replacing, so
+// students shown/selected from the initial batch don't disappear when a search narrows the
+// result. No-op for small (non-lazy) schools — their full roster is already loaded, and the
+// modal's existing client-side filter already covers them.
+async function searchStudentsForEvent(eventId, query) {
+    if (!props.lazyLoadStudents) return;
+    const term = String(query ?? '').trim();
+    if (!term) return;
+
+    try {
+        const res = await fetch(
+            `${programBase.value}/events/${eventId}/eligible-students?json=1&search=${encodeURIComponent(term)}`,
+            {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            },
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const existing = fetchedStudentsByEvent[eventId] ?? [];
+        const byId = new Map(existing.map(s => [s.id, s]));
+        for (const s of (data.students ?? [])) {
+            byId.set(s.id, s);
+        }
+        fetchedStudentsByEvent[eventId] = Array.from(byId.values());
+    } catch {
+        // keep whatever's already loaded — user can retry the search
     }
 }
 

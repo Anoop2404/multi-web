@@ -61,10 +61,6 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $registrations = FestRegistration::where('event_id', $event->id)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
-            ->where(function ($query) {
-                $query->whereHas('participants', fn ($qp) => $qp->whereNotNull('chest_no'))
-                    ->orWhereHas('groups', fn ($qg) => $qg->whereNotNull('chest_no'));
-            })
             ->when($itemIds !== [], fn ($q) => $q->whereIn('item_id', $itemIds))
             ->when($itemIds === [], fn ($q) => $q->whereRaw('1 = 0'))
             ->with(['item', 'school', 'participants.student', 'participants.teacher', 'participants.group'])
@@ -284,10 +280,6 @@ class FestMarkEntryController extends SahodayaAdminController
                 $chest = $numbering->effectiveChestNumber($p);
             }
 
-            if ($chest === null) {
-                continue;
-            }
-
             $regNo = $p->student?->reg_no ?? $p->teacher?->reg_no ?? null;
             $rowScores = $scores[$p->id] ?? [];
 
@@ -365,10 +357,6 @@ class FestMarkEntryController extends SahodayaAdminController
                     $chest = $p->group?->chest_no;
                 } else {
                     $chest = $numbering->effectiveChestNumber($p);
-                }
-
-                if ($chest === null) {
-                    continue;
                 }
 
                 $rows[] = ['chest_no' => $chest];

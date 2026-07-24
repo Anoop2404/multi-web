@@ -63,7 +63,7 @@ class FestReportService
     public function approvedRegistrations(?string $classGroup = null, ?string $schoolId = null)
     {
         return FestRegistration::where('event_id', $this->event->id)
-            ->where('status', 'approved')
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->when($classGroup, fn ($q) => $q->whereHas('item', fn ($i) => $i->where('class_group', $classGroup)))
             ->with(['item', 'participants.student', 'participants.teacher', 'school'])
@@ -125,7 +125,7 @@ class FestReportService
             $partCount = FestParticipant::whereHas('registration', fn ($q) => $q
                 ->where('event_id', $this->event->id)
                 ->where('item_id', $item->id)
-                ->where('status', 'approved')
+                ->whereNotIn('status', ['rejected', 'withdrawn'])
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId)))->count();
 
             $scoredQuery = FestMark::where('event_id', $this->event->id)
@@ -771,7 +771,7 @@ class FestReportService
 
         $query = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $this->event->id)
-            ->where('status', 'approved')
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId)))
             ->with(['registration.item', 'registration.school', 'student', 'teacher'])
             ->orderBy('chest_no');

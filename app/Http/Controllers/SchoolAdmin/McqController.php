@@ -125,7 +125,17 @@ class McqController extends SchoolAdminController
         $classOptions = collect();
         $registeredIds = $registrations->pluck('student_id')->filter()->all();
 
-        if ($allowsStudents) {
+        // A school may have anywhere from a few dozen to ~3000 active students. Loading
+        // and per-student-annotating the whole roster on every page view of every exam
+        // does not scale — mirrors the fix already applied to FestRegistrationController
+        // (see docs/SCALE_AND_PAGINATION_PLAN.md §6/§9-new). Above the threshold, skip the
+        // eager load: ship an empty list and let the frontend fetch a bounded, searched
+        // batch on demand via eligibleStudents() below.
+        $studentTotalCount = Student::where('tenant_id', $this->school->id)->active()->count();
+        $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 300);
+        $lazyStudents = $allowsStudents && $studentTotalCount > $lazyThreshold;
+
+        if ($allowsStudents && ! $lazyStudents) {
             $studentQuery = Student::where('tenant_id', $this->school->id)
                 ->active()
                 ->with('schoolClass:id,name,class_category_id')
@@ -181,6 +191,15 @@ class McqController extends SchoolAdminController
                     'eligible_count' => $eligibleInClass->count(),
                 ];
             })->values();
+        } elseif ($allowsStudents) {
+            // Lazy mode: class list without per-class eligible counts (would require the
+            // same full-roster scan we're avoiding). Frontend shows counts as "—" until a
+            // search has been run.
+            $classOptions = $this->schoolClasses()->map(fn ($class) => [
+                'id'             => $class->id,
+                'name'           => $class->name,
+                'eligible_count' => null,
+            ])->values();
         }
 
         $teachers = collect();
@@ -282,10 +301,19 @@ class McqController extends SchoolAdminController
             'registeredStudentIds'   => $registeredIds,
             'registeredTeacherIds'   => $registeredTeacherIds,
             'ticketsIssuedCount'     => $ticketsIssuedCount,
+            'lazyLoadStudents'       => $lazyStudents,
+            'studentCount'           => $studentTotalCount,
             'registerStats'          => [
-                'eligible'    => $students->where('eligible', true)->count() + $teachers->where('eligible', true)->count(),
-                'available'   => $students->where('eligible', true)->where('registered', false)->count()
-                    + $teachers->where('eligible', true)->where('registered', false)->count(),
+                // When lazy, the eligible/available counts can't be computed without the
+                // full-roster scan we're specifically avoiding — send null and let the
+                // frontend show "—" instead of a misleading 0.
+                'eligible'    => $lazyStudents
+                    ? null
+                    : $students->where('eligible', true)->count() + $teachers->where('eligible', true)->count(),
+                'available'   => $lazyStudents
+                    ? null
+                    : $students->where('eligible', true)->where('registered', false)->count()
+                        + $teachers->where('eligible', true)->where('registered', false)->count(),
                 'registered'  => $registrations->count(),
                 'batch_due'   => (float) ($schoolFee?->total_due ?? 0),
                 'can_register'=> $canRegister,
@@ -310,6 +338,104 @@ class McqController extends SchoolAdminController
                 'toppers'      => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/toppers/export",
             ],
         ]);
+    }
+
+    /**
+     * Bounded, searchable student lookup for the exam's register tab — the counterpart
+     * to FestRegistrationController::eligibleStudents() for large rosters. Only reached
+     * when exam() reports lazyLoadStudents = true; capped at 150 regardless of search
+     * term so a large school opening the picker with no search text yet can't trigger
+     * an unbounded scan. See docs/SCALE_AND_PAGINATION_PLAN.md §6/§9-new.
+     */
+    public function eligibleStudents(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+
+        $search = $request->query('search');
+        $classId = $request->query('class_id');
+
+        $eligibilityService = app(McqEligibilityService::class);
+
+        $studentQuery = Student::where('tenant_id', $this->school->id)
+            ->active()
+            ->with('schoolClass:id,name,class_category_id')
+            ->orderBy('name');
+
+        $eligibleClassIds = $eligibilityService->eligibleSchoolClassIds($exam, $this->school->id);
+        if ($eligibleClassIds !== null) {
+            if ($eligibleClassIds === []) {
+                $studentQuery->whereRaw('1 = 0');
+            } else {
+                $studentQuery->whereIn('school_class_id', $eligibleClassIds);
+            }
+        }
+
+        if ((int) ($exam->exam_level ?? 1) > 1
+            && $exam->promotion_locked
+            && ! empty($exam->promoted_student_ids)) {
+            $studentQuery->whereIn('id', $exam->promoted_student_ids);
+        }
+
+        if ($classId) {
+            $studentQuery->where('school_class_id', $classId);
+        }
+
+        if (filled($search)) {
+            $term = strtolower(trim((string) $search));
+            $studentQuery->where(function ($q) use ($term) {
+                $q->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
+                  ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"]);
+            });
+        }
+
+        $matches = $studentQuery->limit(150)->get(['id', 'name', 'reg_no', 'school_class_id', 'gender', 'user_id', 'verified_at']);
+
+        $registeredIdSet = McqRegistration::where('exam_id', $exam->id)
+            ->where('school_id', $this->school->id)
+            ->active()
+            ->whereIn('student_id', $matches->pluck('id'))
+            ->pluck('student_id')
+            ->filter()
+            ->flip();
+
+        $cancelledStudentIds = McqRegistration::where('exam_id', $exam->id)
+            ->where('school_id', $this->school->id)
+            ->where('status', 'cancelled')
+            ->whereIn('student_id', $matches->pluck('id'))
+            ->pluck('student_id')
+            ->filter()
+            ->flip();
+
+        $cancellableStudentIds = McqRegistration::where('exam_id', $exam->id)
+            ->where('school_id', $this->school->id)
+            ->whereIn('student_id', $matches->pluck('id'))
+            ->get()
+            ->filter(fn (McqRegistration $r) => $r->canBeCancelledBySchool())
+            ->pluck('student_id')
+            ->filter()
+            ->flip();
+
+        $students = $matches->map(function (Student $s) use ($exam, $registeredIdSet, $eligibilityService, $cancelledStudentIds, $cancellableStudentIds) {
+            $eligible = $eligibilityService->isEligible($exam, $s);
+            $registered = $registeredIdSet->has($s->id);
+
+            return [
+                'id'                   => $s->id,
+                'name'                 => $s->name,
+                'reg_no'               => $s->reg_no,
+                'gender'               => $s->gender,
+                'class_name'           => $s->schoolClass?->name,
+                'school_class_id'      => $s->school_class_id,
+                'has_portal_login'     => (bool) $s->user_id,
+                'registered'           => $registered,
+                'previously_cancelled' => ! $registered && $cancelledStudentIds->has($s->id),
+                'can_cancel'           => $registered && $cancellableStudentIds->has($s->id),
+                'eligible'             => $eligible,
+                'ineligible_reason'    => $eligible ? null : $eligibilityService->ineligibilityReason($exam, $s),
+            ];
+        })->values();
+
+        return response()->json(['students' => $students]);
     }
 
     public function register(Request $request, string $tenantId, McqExam $exam)

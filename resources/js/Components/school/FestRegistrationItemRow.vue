@@ -194,6 +194,7 @@
         @update:manager-phone="form.manager_phone = $event"
         @confirm="handleMainPickerConfirm"
         @add-student="$emit('add-student')"
+        @search="$emit('search-students', $event)"
     />
 
     <FestStudentPickerModal
@@ -205,6 +206,7 @@
         v-model:selected-ids="standbyModel"
         confirm-label="Use standbys"
         @add-student="$emit('add-student')"
+        @search="$emit('search-students', $event)"
     />
 
     <FestStudentPickerModal
@@ -251,7 +253,7 @@ const props = defineProps({
     layout: { type: String, default: 'default' },
 });
 
-const emit = defineEmits(['register', 'update', 'withdraw', 'edit', 'cancel-edit', 'add-student']);
+const emit = defineEmits(['register', 'update', 'withdraw', 'edit', 'cancel-edit', 'add-student', 'search-students']);
 
 const isEditing = computed(() => props.editingRegistrationId != null);
 
