@@ -54,8 +54,8 @@ trait TracksPartialPayments
     {
         $paid = round($this->approvedPaidTotal(), 2);
         $due = $this->feeTotalDue();
-        $hasUploaded = $this->receipts()->whereIn('status', ['uploaded', 'proof_uploaded', 'submitted'])->exists()
-            || ($this->feeReceipt && in_array($this->feeReceipt->status, ['uploaded', 'proof_uploaded', 'submitted'], true));
+        $hasUploaded = $this->receipts()->whereNotIn('status', ['approved', 'rejected', 'superseded', 'reversed'])->whereNotNull('file_path')->exists()
+            || ($this->feeReceipt && !empty($this->feeReceipt->file_path) && !in_array($this->feeReceipt->status, ['approved', 'rejected', 'superseded', 'reversed'], true));
 
         $status = match (true) {
             $due <= 0 => ($this->{$statusColumn} === 'waived' ? 'waived' : 'approved'),

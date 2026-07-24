@@ -55,14 +55,16 @@ class FestEventFeesController extends SahodayaAdminController
                     'indiv_count' => $indivCount,
                 ] : null;
 
-                $pendingReceipt = $fee->receipts->firstWhere('status', 'uploaded');
+                $pendingReceipt = $fee->receipts->first(function ($r) {
+                    return !empty($r->file_path) && !in_array($r->status, ['approved', 'rejected', 'superseded', 'reversed'], true);
+                });
                 $primaryReceipt = $pendingReceipt ?? $fee->feeReceipt ?? $fee->receipts->sortByDesc('id')->first();
 
                 $hasPendingProof = $pendingReceipt !== null
-                    || ($primaryReceipt && in_array($primaryReceipt->status, ['uploaded', 'submitted', 'proof_uploaded'], true));
+                    || ($primaryReceipt && !empty($primaryReceipt->file_path) && !in_array($primaryReceipt->status, ['approved', 'rejected', 'superseded', 'reversed'], true));
 
                 $effectiveStatus = $fee->status;
-                if (($effectiveStatus === 'pending' || $effectiveStatus === 'submitted') && $hasPendingProof) {
+                if ($effectiveStatus !== 'approved' && $hasPendingProof) {
                     $effectiveStatus = 'proof_uploaded';
                 }
 
