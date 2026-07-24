@@ -152,9 +152,6 @@
                                 <div v-if="row.head" class="text-[11px] font-semibold text-indigo-700 mt-0.5">
                                     Head: {{ row.head }}
                                 </div>
-                                <div class="text-[10px] text-slate-400 font-mono mt-0.5">
-                                    ID: {{ row.school_id }}
-                                </div>
                             </td>
                             <td class="p-3.5 text-xs">
                                 <template v-if="event.event_type === 'sports' && row.sports_participation">
@@ -244,76 +241,77 @@
                             </td>
 
                             <!-- Action Column: Multi-Proof Management -->
-                            <td class="p-3.5 text-right space-y-1.5">
-                                <div class="flex items-center justify-end gap-1.5">
-                                    <button v-if="!isNoFeeDue(row)" type="button" @click="recalculateFee(row.id)"
-                                            title="Recalculate fee from current registrations"
-                                            class="btn-secondary !py-1 !px-2 text-[11px] inline-flex items-center gap-1 shadow-xs">
-                                        <span>🔄 Refresh</span>
-                                    </button>
-
-                                    <!-- Proofs Drawer Trigger Button -->
+                            <td class="p-3.5 text-right space-y-1">
+                                <div class="flex items-center justify-end gap-1.5 flex-wrap">
+                                    <!-- Proofs Modal Trigger -->
                                     <button v-if="row.all_receipts?.length" type="button"
                                             @click="activeProofModalRow = row"
-                                            :class="row.status === 'proof_uploaded' ? 'btn-primary !bg-amber-600 hover:!bg-amber-500 font-bold' : 'btn-secondary text-indigo-700 font-bold'"
-                                            class="!py-1 !px-2.5 text-[11px] inline-flex items-center gap-1.5 shadow-xs">
+                                            :class="row.status === 'proof_uploaded'
+                                                ? 'bg-amber-500 hover:bg-amber-600 text-white font-bold animate-pulse shadow-xs'
+                                                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 shadow-2xs'"
+                                            class="px-2.5 py-1 rounded-lg text-xs inline-flex items-center gap-1.5 transition">
                                         <span>📷 Proofs</span>
-                                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-current font-black">
+                                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 font-black">
                                             {{ row.all_receipts.length }}
                                         </span>
                                     </button>
-
                                     <a v-else-if="row.fee_receipt?.file_path"
                                        :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/school-fees/${row.id}/proof`"
                                        target="_blank" rel="noopener"
-                                       class="btn-secondary !py-1 !px-2.5 text-[11px] text-indigo-700 font-bold shadow-xs">
+                                       class="px-2.5 py-1 rounded-lg text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 transition">
                                         View proof ↗
                                     </a>
+
+                                    <!-- Recalculate Icon Button -->
+                                    <button v-if="!isNoFeeDue(row)" type="button" @click="recalculateFee(row.id, row.school)"
+                                            title="Recalculate fee from current registrations"
+                                            class="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition text-xs">
+                                        🔄
+                                    </button>
                                 </div>
 
-                                <div v-if="row.status === 'proof_uploaded'" class="flex items-center justify-end gap-1.5 pt-1">
-                                    <button type="button" @click="approve(row.id, row.school)" class="btn-primary !bg-emerald-600 hover:!bg-emerald-500 text-[11px] !py-1 !px-2.5 shadow-xs">
+                                <!-- Action Buttons Based on Status -->
+                                <div v-if="row.status === 'proof_uploaded'" class="flex items-center justify-end gap-1 pt-1">
+                                    <button type="button" @click="approve(row.id, row.school)"
+                                            class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition">
                                         Approve ✓
                                     </button>
-                                    <button type="button" @click="reject(row.id, row.school)" class="btn-secondary text-[11px] !py-1 !px-2.5 !text-rose-700 hover:!bg-rose-50 shadow-xs">
+                                    <button type="button" @click="reject(row.id, row.school)"
+                                            class="px-2 py-1 rounded-md text-[11px] font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition">
                                         Reject
                                     </button>
                                 </div>
 
-                                <div v-if="row.status === 'approved' || row.status === 'partial'" class="flex items-center justify-end gap-1.5 pt-1">
-                                    <button type="button" @click="reject(row.id, row.school)"
-                                            title="Reject or reverse this payment proof to allow school to re-upload"
-                                            class="text-[11px] font-semibold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded border border-rose-200 shadow-2xs transition">
-                                        Reject / Reverse ✕
-                                    </button>
-                                </div>
-
-                                <div v-if="row.status === 'rejected'" class="flex items-center justify-end gap-1.5 pt-1">
+                                <div v-else-if="row.status === 'rejected'" class="flex items-center justify-end pt-1">
                                     <button type="button" @click="approve(row.id, row.school)"
-                                            title="Re-approve or verify this previously rejected payment proof"
-                                            class="btn-primary !bg-emerald-600 hover:!bg-emerald-500 text-[11px] !py-1 !px-2.5 shadow-xs">
+                                            class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition">
                                         Re-approve / Verify ✓
                                     </button>
                                 </div>
 
-                                <div v-if="row.status === 'partial'" class="flex items-center justify-end pt-1">
+                                <div v-else-if="row.status === 'partial'" class="flex items-center justify-end pt-1">
                                     <button type="button" @click="forceApprove(row)"
                                             title="Waives the gap between total due and amount paid, then approves."
-                                            class="btn-secondary text-[11px] !py-1 !px-2.5 !text-sky-700 hover:!bg-sky-50 shadow-xs">
+                                            class="px-2 py-0.5 rounded-md text-[10px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition">
                                         Force approve (waive ₹{{ partialShortfall(row) }})
                                     </button>
                                 </div>
 
-                                <a v-if="row.fee_receipt?.receipt_number && row.fee_receipt?.id && row.fee_receipt?.status === 'approved'"
-                                   :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/receipts/${row.fee_receipt.id}`"
-                                   target="_blank" rel="noopener"
-                                   title="View & print official fee receipt"
-                                   class="text-[11px] font-mono font-bold text-emerald-700 hover:text-emerald-900 underline decoration-emerald-300 hover:decoration-emerald-600 inline-flex items-center gap-0.5 mt-0.5 transition">
-                                    #{{ row.fee_receipt.receipt_number }} ↗
-                                </a>
-                                <span v-else-if="row.fee_receipt?.receipt_number" class="text-[11px] font-mono font-bold text-emerald-700 block">
-                                    #{{ row.fee_receipt.receipt_number }}
-                                </span>
+                                <!-- Approved Receipt Badge & Reversal Link -->
+                                <div v-if="row.fee_receipt?.receipt_number && row.fee_receipt?.status === 'approved'"
+                                     class="flex items-center justify-end gap-2 pt-0.5">
+                                    <a :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/receipts/${row.fee_receipt.id}`"
+                                       target="_blank" rel="noopener"
+                                       title="View & print official fee receipt"
+                                       class="text-[11px] font-mono font-bold text-emerald-700 hover:text-emerald-900 underline decoration-emerald-300 hover:decoration-emerald-600 transition">
+                                        #{{ row.fee_receipt.receipt_number }} ↗
+                                    </a>
+                                    <button type="button" @click="reject(row.id, row.school)"
+                                            title="Reverse or reject this approved receipt if needed"
+                                            class="text-[10px] font-semibold text-slate-400 hover:text-rose-600 transition">
+                                        Reverse
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         <tr v-if="!filteredRows.length">
