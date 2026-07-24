@@ -203,9 +203,9 @@
                                 <FormField label="Display name" :error="accountForm.errors.name" class-extra="sm:col-span-2">
                                     <input v-model="accountForm.name" type="text" class="field">
                                 </FormField>
-                                <FormField label="Gmail login email" required :error="accountForm.errors.email" class-extra="sm:col-span-2"
-                                           hint="Must be a @gmail.com address. Changing email requires verification again.">
-                                    <input v-model="accountForm.email" type="email" required placeholder="your.school@gmail.com" class="field">
+                                <FormField label="Login email" required :error="accountForm.errors.email" class-extra="sm:col-span-2"
+                                           hint="Must be a valid email address. Changing email requires verification again.">
+                                    <input v-model="accountForm.email" type="email" required placeholder="your.school@example.com" class="field">
                                 </FormField>
                             </FormGrid>
 

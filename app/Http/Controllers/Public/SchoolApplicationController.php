@@ -61,7 +61,7 @@ class SchoolApplicationController extends Controller
 
         if (User::where('email', $email)->exists()) {
             throw ValidationException::withMessages([
-                'school_email' => 'An account with this Gmail address already exists.',
+                'school_email' => 'An account with this email address already exists.',
             ]);
         }
 

@@ -20,10 +20,10 @@ class SchoolApplicationForm
                 'locked'      => true,
             ],
             'school_email' => [
-                'label'       => 'Gmail Address (Login)',
+                'label'       => 'Email Address (Login)',
                 'group'       => 'school',
-                'placeholder' => 'your.school@gmail.com',
-                'hint'        => 'Use a Gmail address — this will be your login username. You must verify it after registration.',
+                'placeholder' => 'your.school@example.com',
+                'hint'        => 'Use a valid email address — this will be your login username. You must verify it after registration.',
                 'default'     => ['enabled' => true, 'required' => true],
                 'locked'      => true,
             ],
@@ -321,11 +321,6 @@ class SchoolApplicationForm
                 ($fields['school_email']['required'] ?? true) ? 'required' : 'nullable',
                 'email',
                 'max:255',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! is_string($value) || ! self::isGmailAddress($value)) {
-                        $fail('Login email must be a valid Gmail address (@gmail.com).');
-                    }
-                },
             ];
         }
 
@@ -424,7 +419,7 @@ class SchoolApplicationForm
 
     public static function isGmailAddress(string $email): bool
     {
-        return (bool) preg_match('/^[^@\s]+@gmail\.com$/i', trim($email));
+        return filter_var(trim($email), FILTER_VALIDATE_EMAIL) !== false;
     }
 
     public static function prefixIsTaken(Tenant $sahodaya, string $prefix, ?string $exceptSchoolId = null): bool
@@ -651,17 +646,12 @@ class SchoolApplicationForm
                 'required',
                 'email',
                 'max:255',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! is_string($value) || ! self::isGmailAddress($value)) {
-                        $fail('Login email must be a valid Gmail address (@gmail.com).');
-                    }
-                },
                 function (string $attribute, mixed $value, \Closure $fail) use ($user): void {
                     if (! is_string($value) || ! $user) {
                         return;
                     }
                     if (User::where('email', strtolower(trim($value)))->where('id', '!=', $user->id)->exists()) {
-                        $fail('An account with this Gmail address already exists.');
+                        $fail('An account with this email address already exists.');
                     }
                 },
             ],

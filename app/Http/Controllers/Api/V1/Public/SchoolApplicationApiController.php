@@ -161,9 +161,9 @@ class SchoolApplicationApiController extends ApiController
     {
         return match ($field) {
             'school_email' => ! SchoolApplicationForm::isGmailAddress($value)
-                ? 'Login email must be a valid Gmail address (@gmail.com).'
+                ? 'Login email must be a valid email address.'
                 : (User::where('email', strtolower(trim($value)))->exists()
-                    ? 'An account with this Gmail address already exists.'
+                    ? 'An account with this email address already exists.'
                     : null),
             'school_prefix' => SchoolApplicationForm::prefixIsTaken($sahodaya, $value)
                 ? 'This school code is already in use within this Sahodaya.'

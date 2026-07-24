@@ -59,10 +59,11 @@ class SchoolApplicationSubmitTest extends TestCase
         Notification::assertSentTo($user, PortalVerifyEmail::class);
     }
 
-    public function test_non_gmail_rejected(): void
+    public function test_valid_email_accepted(): void
     {
-        $this->assertFalse(SchoolApplicationForm::isGmailAddress('admin@school.edu'));
+        $this->assertTrue(SchoolApplicationForm::isGmailAddress('admin@school.edu'));
         $this->assertTrue(SchoolApplicationForm::isGmailAddress('admin@gmail.com'));
+        $this->assertFalse(SchoolApplicationForm::isGmailAddress('not-an-email'));
     }
 
     public function test_duplicate_school_prefix_rejected_on_setup(): void

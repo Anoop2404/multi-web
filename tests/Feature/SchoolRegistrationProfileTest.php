@@ -161,13 +161,13 @@ class SchoolRegistrationProfileTest extends TestCase
         Notification::assertSentTo($admin->fresh(), PortalVerifyEmail::class);
     }
 
-    public function test_non_gmail_login_email_rejected(): void
+    public function test_invalid_login_email_format_rejected(): void
     {
         ['school' => $school, 'admin' => $admin] = $this->schoolAdmin();
 
         $response = $this->actingAs($admin)->put("/school-admin/{$school->id}/registration/account", [
             'name'  => 'Demo School',
-            'email' => 'admin@school.edu',
+            'email' => 'invalid-email-format',
         ]);
 
         $response->assertSessionHasErrors('email');

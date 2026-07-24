@@ -1,15 +1,15 @@
 @extends('emails.layouts.sahodaya')
 
 @section('content')
-    <h2 style="margin:0 0 12px;font-size:18px;color:#041525;font-weight:700;">{{ $title ?? 'Verify your Gmail address' }}</h2>
+    <h2 style="margin:0 0 12px;font-size:18px;color:#041525;font-weight:700;">{{ $title ?? 'Verify your email address' }}</h2>
 
     <p>Hello {{ $userName ?? 'there' }},</p>
 
-    <p>{{ $body ?? ((!empty($schoolName) ? 'Your school '.$schoolName.' is registered with '.$sahodayaName.'.' : 'Welcome to '.$sahodayaName.'.').' Please confirm your Gmail address to activate your school portal account.') }}</p>
+    <p>{{ $body ?? ((!empty($schoolName) ? 'Your school '.$schoolName.' is registered with '.$sahodayaName.'.' : 'Welcome to '.$sahodayaName.'.').' Please confirm your email address to activate your school portal account.') }}</p>
 
     @include('emails.partials.button', [
         'url' => $verificationUrl,
-        'label' => 'Verify Gmail & open portal',
+        'label' => 'Verify Email & open portal',
         'variant' => 'primary',
     ])
 
