@@ -625,7 +625,7 @@ class FestReportService
             $request->input('school_id'),
             null,
             null,
-            true,
+            false,
         )
             // Unfilled standby slots and rows with no student/teacher attached aren't
             // real attendees — exclude them so the printed sheet has no blank rows.
@@ -658,7 +658,7 @@ class FestReportService
         $request->validate(['school_id' => 'required|string']);
         $school = Tenant::findOrFail($request->input('school_id'));
 
-        $participants = $this->participantsFlat(null, null, $school->id, null, null, true);
+        $participants = $this->participantsFlat(null, null, $school->id, null, null, false);
         $studentRows = [];
 
         foreach ($participants as $p) {
@@ -696,7 +696,7 @@ class FestReportService
             ->orderBy('scheduled_at')
             ->first();
 
-        $participants = $this->participantsFlat($itemId, null, null, null, null, true);
+        $participants = $this->participantsFlat($itemId, null, null, null, null, false);
 
         return Pdf::loadView('fest.reports.judge-sheet', [
             'event'    => $this->event,
@@ -714,7 +714,7 @@ class FestReportService
         $itemId = $request->integer('item_id') ?: $this->items()->first()?->id;
         $item = FestEventItem::find($itemId);
         $audience = $this->reportAudience($request);
-        $participants = $this->participantsFlat($itemId, null, null, null, null, true);
+        $participants = $this->participantsFlat($itemId, null, null, null, null, false);
 
         $sahodaya = Tenant::find($this->event->tenant_id);
 

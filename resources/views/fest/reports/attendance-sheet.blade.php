@@ -5,7 +5,10 @@
     <title>Attendance Sheet — {{ $event->title }}</title>
     <style>
         @page {
-            margin: 26mm 10mm 16mm 10mm;
+            margin-top: 36mm;
+            margin-bottom: 16mm;
+            margin-left: 10mm;
+            margin-right: 10mm;
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
@@ -16,28 +19,28 @@
         }
         .header-container {
             position: fixed;
-            top: -22mm;
+            top: -30mm;
             left: 0;
             right: 0;
+            height: 24mm;
             border-bottom: 2px solid #0f172a;
-            padding-bottom: 6px;
             text-align: center;
         }
         .logo-img {
-            max-height: 40px;
-            margin-bottom: 4px;
+            max-height: 36px;
+            margin-bottom: 2px;
         }
         .sahodaya-title {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             color: #0f172a;
             text-transform: uppercase;
             letter-spacing: 0.04em;
             margin: 0;
-            line-height: 1.2;
+            line-height: 1.1;
         }
         .event-subtitle {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
             color: #475569;
             text-transform: uppercase;
