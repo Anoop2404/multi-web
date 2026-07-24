@@ -1,6 +1,6 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Event Fees`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
-                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false" max-width="w-full max-w-[98rem]">
         
         <!-- Executive Header with Actions -->
         <PageHeader :title="`${event.title} — Event Fees`" eyebrow="Event Fee Ledger &amp; Submissions"
@@ -111,9 +111,11 @@
                 </div>
 
                 <!-- Search Input & Quick Actions -->
-                <div class="flex items-center gap-2 flex-1 min-w-[14rem] max-w-sm ml-auto">
-                    <input v-model="search" type="search" placeholder="Search school name…"
-                           class="field text-xs !py-2 flex-1 shadow-xs" autocomplete="off">
+                <div class="relative flex items-center gap-2 flex-1 min-w-[16rem] max-w-md ml-auto">
+                    <input v-model="search" type="search" placeholder="Search school, item, receipt #, UTR..."
+                           class="field text-xs !py-2 pl-7 pr-7 flex-1 shadow-xs" autocomplete="off">
+                    <button v-if="search" type="button" @click="search = ''"
+                            class="absolute right-24 text-xs text-slate-400 hover:text-slate-700 font-bold p-0.5" title="Clear search">✕</button>
                     <span class="text-xs text-slate-500 whitespace-nowrap tabular-nums shrink-0 font-semibold">
                         {{ filteredRows.length }} of {{ rows.length }} schools
                     </span>
@@ -489,7 +491,25 @@ const filteredRows = computed(() => {
 
     const q = search.value.trim().toLowerCase();
     if (q) {
-        rows = rows.filter(row => (row.school ?? '').toLowerCase().includes(q));
+        rows = rows.filter(row => {
+            const schoolName = (row.school ?? '').toLowerCase();
+            const headName = (row.head ?? '').toLowerCase();
+            const itemsList = (row.items ?? []).join(' ').toLowerCase();
+            const breakdownList = (row.breakdown?.items ?? []).map(b => b.label ?? '').join(' ').toLowerCase();
+            const receiptNo = (row.fee_receipt?.receipt_number ?? '').toLowerCase();
+            const txRef = (row.fee_receipt?.transaction_ref ?? '').toLowerCase();
+            const statusStr = (row.status ?? '').toLowerCase();
+            const allReceiptsSearch = (row.all_receipts ?? []).map(r => `${r.receipt_number ?? ''} ${r.transaction_ref ?? ''}`).join(' ').toLowerCase();
+
+            return schoolName.includes(q)
+                || headName.includes(q)
+                || itemsList.includes(q)
+                || breakdownList.includes(q)
+                || receiptNo.includes(q)
+                || txRef.includes(q)
+                || statusStr.includes(q)
+                || allReceiptsSearch.includes(q);
+        });
     }
 
     return rows;

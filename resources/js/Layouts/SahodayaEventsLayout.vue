@@ -132,7 +132,7 @@
             </header>
 
             <main class="sa-main flex-1 p-4 sm:p-6 lg:p-8 overflow-auto" :class="{ 'staff-readonly': isStaffUser }">
-                <div class="sa-page mx-auto w-full max-w-6xl">
+                <div class="sa-page mx-auto w-full" :class="maxWidth">
                     <StaffReadOnlyBanner v-if="isStaffUser" />
                     <FlashBanner />
                     <slot />
@@ -168,6 +168,7 @@ const props = defineProps({
     programEvents: { type: Array, default: null },
     /** When false, the top bar shows only menu + badges — use PageHeader in page body for the title. */
     showHeaderTitle: { type: Boolean, default: true },
+    maxWidth: { type: String, default: 'max-w-[96rem]' },
 });
 
 const page = usePage();
