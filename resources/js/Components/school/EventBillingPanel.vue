@@ -46,9 +46,13 @@
             :school-fee="event.school_fee"
             :program-base="programBase"
             :head-payment-ref-map="headPaymentRefMap"
+            :head-payment-bank-map="headPaymentBankMap"
+            :head-payment-amount-map="headPaymentAmountMap"
             @upload-head-payment="$emit('upload-head-payment', $event)"
             @set-head-file="(headId, file) => $emit('set-head-file', headId, file)"
             @update-head-ref="(headId, refVal) => $emit('update-head-ref', headId, refVal)"
+            @update-head-bank="(headId, bankVal) => $emit('update-head-bank', headId, bankVal)"
+            @update-head-amount="(headId, amountVal) => $emit('update-head-amount', headId, amountVal)"
         />
 
         <!-- Single-invoice path (non sports_composite) -->
@@ -113,12 +117,21 @@
                 <form v-if="outstanding > 0 && ['pending', 'partial', 'rejected'].includes(event.school_fee?.status)"
                       @submit.prevent="$emit('upload-event-payment')" class="flex flex-wrap gap-2 items-center">
                     <!-- multiple: up to 5 images for the SAME payment (e.g. a UTR screenshot +
-                         a bank statement page) — still one receipt, reviewed as one payment. -->
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple
+                         a bank statement page) — still one receipt, reviewed as one payment.
+                         Txn ref / bank name / amount are all required — the backend uses them
+                         to reconcile against the Sahodaya's bank statement. -->
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple required
                            @change="e => $emit('set-event-file', Array.from(e.target.files ?? []))" class="text-xs" />
-                    <input :value="eventPaymentRef"
+                    <input :value="eventPaymentRef" required
                            @input="e => $emit('update-event-ref', e.target.value)"
-                           class="field text-xs w-36" placeholder="Txn ref (opt)">
+                           class="field text-xs w-28" placeholder="Txn ref *">
+                    <input :value="eventPaymentBank" required
+                           @input="e => $emit('update-event-bank', e.target.value)"
+                           class="field text-xs w-28" placeholder="Bank name *">
+                    <input type="number" step="0.01" min="0.01" :max="outstanding" required
+                           :value="eventPaymentAmount"
+                           @input="e => $emit('update-event-amount', e.target.value)"
+                           class="field text-xs w-24" :placeholder="`Amount * (₹${formatMoney(outstanding)} due)`">
                     <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">Upload payment proof</button>
                 </form>
                 <p v-if="outstanding > 0 && ['pending', 'partial', 'rejected'].includes(event.school_fee?.status)"
@@ -162,16 +175,24 @@ const props = defineProps({
     itemFeesDue: { type: Number, default: 0 },
     isMinFeeApplied: { type: Boolean, default: false },
     eventPaymentRef: { type: String, default: '' },
+    eventPaymentBank: { type: String, default: '' },
+    eventPaymentAmount: { type: [String, Number], default: '' },
     headPaymentRefMap: { type: Object, default: () => ({}) },
+    headPaymentBankMap: { type: Object, default: () => ({}) },
+    headPaymentAmountMap: { type: Object, default: () => ({}) },
 });
 
 defineEmits([
     'upload-event-payment',
     'set-event-file',
     'update-event-ref',
+    'update-event-bank',
+    'update-event-amount',
     'upload-head-payment',
     'set-head-file',
     'update-head-ref',
+    'update-head-bank',
+    'update-head-amount',
 ]);
 
 // Real, authoritative figures from the school_fee record itself — not the item-only

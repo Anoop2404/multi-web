@@ -32,13 +32,22 @@
                 <form v-if="canUploadHeadFee(headFee)"
                       @submit.prevent="$emit('upload-head-payment', headFee)"
                       class="flex flex-wrap gap-2 items-center">
-                    <!-- multiple: up to 5 images for the SAME payment — still one receipt. -->
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple
+                    <!-- multiple: up to 5 images for the SAME payment — still one receipt.
+                         Txn ref / bank name / amount are all required — used to reconcile
+                         against the Sahodaya's bank statement. -->
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple required
                            @change="e => $emit('set-head-file', headFee.head_id, Array.from(e.target.files ?? []))"
                            class="text-xs" />
-                    <input :value="headPaymentRef(headFee.head_id)"
+                    <input :value="headPaymentRef(headFee.head_id)" required
                            @input="e => $emit('update-head-ref', headFee.head_id, e.target.value)"
-                           class="field text-xs w-36" placeholder="Txn ref (opt)">
+                           class="field text-xs w-28" placeholder="Txn ref *">
+                    <input :value="headPaymentBank(headFee.head_id)" required
+                           @input="e => $emit('update-head-bank', headFee.head_id, e.target.value)"
+                           class="field text-xs w-28" placeholder="Bank name *">
+                    <input type="number" step="0.01" min="0.01" :max="headFee.outstanding" required
+                           :value="headPaymentAmount(headFee.head_id)"
+                           @input="e => $emit('update-head-amount', headFee.head_id, e.target.value)"
+                           class="field text-xs w-24" :placeholder="`Amount * (₹${formatMoney(headFee.outstanding)} due)`">
                     <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">
                         Upload proof
                     </button>
@@ -75,15 +84,23 @@
 <script setup>
 import PaymentHistoryList from '@/Components/school/PaymentHistoryList.vue';
 
-defineProps({
+const props = defineProps({
     eventId: [String, Number],
     headFees: { type: Array, default: () => [] },
     schoolFee: Object,
     programBase: String,
     headPaymentRefMap: { type: Object, default: () => ({}) },
+    headPaymentBankMap: { type: Object, default: () => ({}) },
+    headPaymentAmountMap: { type: Object, default: () => ({}) },
 });
 
-defineEmits(['upload-head-payment', 'set-head-file', 'update-head-ref']);
+defineEmits([
+    'upload-head-payment',
+    'set-head-file',
+    'update-head-ref',
+    'update-head-bank',
+    'update-head-amount',
+]);
 
 function formatMoney(val) {
     const n = Number(val ?? 0);
@@ -114,5 +131,13 @@ function canUploadHeadFee(hf) {
 
 function headPaymentRef(headId) {
     return props.headPaymentRefMap?.[headId] ?? '';
+}
+
+function headPaymentBank(headId) {
+    return props.headPaymentBankMap?.[headId] ?? '';
+}
+
+function headPaymentAmount(headId) {
+    return props.headPaymentAmountMap?.[headId] ?? '';
 }
 </script>

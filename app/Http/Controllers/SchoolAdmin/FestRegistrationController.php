@@ -796,19 +796,19 @@ class FestRegistrationController extends SchoolAdminController
         // exactly as before, the rest are stored as FeeReceiptAttachment rows on the same
         // receipt. Still one receipt, one review decision. See
         // docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature.
-        // transaction_ref/bank_name/amount are optional here — the school-side upload form
-        // (EventBillingPanel.vue / HeadBillingInvoices.vue) only collects the file + an
-        // optional txn ref, matching Training/MCQ. attachPayment()/attachPaymentForHead()
-        // already default amount to the outstanding balance when not supplied, and store a
-        // null bank_name — this was previously `required` here with no matching frontend
-        // fields, which made the upload form permanently unusable (every submission failed
-        // validation on the missing bank_name/amount). See FLOW_GAP_FIX_PLAN.md.
+        // transaction_ref/bank_name/amount are required here by design — the school types
+        // in the actual transaction reference, the bank it was paid from, and the amount
+        // paid, all of which Sahodaya reviewers use to reconcile against their bank
+        // statement. EventBillingPanel.vue / HeadBillingInvoices.vue now collect all three
+        // alongside the file(s). (An earlier version of this fix relaxed these to nullable
+        // when the frontend fields didn't exist yet — reverted now that the fields exist.
+        // See FLOW_GAP_FIX_PLAN.md.)
         $data = $request->validate([
             'payment_proof'    => 'required|array|min:1|max:'.\App\Services\Fees\FeeReceiptAttachmentService::MAX_FILES,
             'payment_proof.*'  => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'transaction_ref'  => 'nullable|string|max:100',
-            'bank_name'        => 'nullable|string|max:100',
-            'amount'           => 'nullable|numeric|min:0.01',
+            'transaction_ref'  => 'required|string|max:100',
+            'bank_name'        => 'required|string|max:100',
+            'amount'           => 'required|numeric|min:0.01',
             'head_id'          => ($usesPerHead ? 'required' : 'nullable').'|integer|exists:fest_item_heads,id',
         ]);
 

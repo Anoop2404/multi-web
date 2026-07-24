@@ -431,13 +431,21 @@
                     :item-fees-due="itemFeesDue(event)"
                     :is-min-fee-applied="isMinFeeApplied(event)"
                     :event-payment-ref="eventPaymentRefs[event.id] ?? ''"
+                    :event-payment-bank="eventPaymentBanks[event.id] ?? ''"
+                    :event-payment-amount="eventPaymentAmounts[event.id] ?? ''"
                     :head-payment-ref-map="headPaymentRefs"
+                    :head-payment-bank-map="headPaymentBanks"
+                    :head-payment-amount-map="headPaymentAmounts"
                     @upload-event-payment="uploadEventPayment(event)"
                     @set-event-file="file => eventPaymentFiles[event.id] = file"
                     @update-event-ref="refVal => eventPaymentRefs[event.id] = refVal"
+                    @update-event-bank="bankVal => eventPaymentBanks[event.id] = bankVal"
+                    @update-event-amount="amountVal => eventPaymentAmounts[event.id] = amountVal"
                     @upload-head-payment="headFee => uploadHeadPayment(event, headFee)"
                     @set-head-file="(headId, file) => setHeadPaymentFile(event.id, headId, file)"
                     @update-head-ref="(headId, refVal) => headPaymentRefs[headPaymentKey(event.id, headId)] = refVal"
+                    @update-head-bank="(headId, bankVal) => headPaymentBanks[headPaymentKey(event.id, headId)] = bankVal"
+                    @update-head-amount="(headId, amountVal) => headPaymentAmounts[headPaymentKey(event.id, headId)] = amountVal"
                 />
                 <p v-else-if="canRegister(event) && !event.fee_required" class="text-xs text-gray-400 mt-4 border-t border-gray-100 pt-4">No fee for this round</p>
                 </div>
@@ -852,8 +860,12 @@ const itemForms = reactive({});
 const itemErrors = reactive({});
 const eventPaymentFiles = reactive({});
 const eventPaymentRefs = reactive({});
+const eventPaymentBanks = reactive({});
+const eventPaymentAmounts = reactive({});
 const headPaymentFiles = reactive({});
 const headPaymentRefs = reactive({});
+const headPaymentBanks = reactive({});
+const headPaymentAmounts = reactive({});
 const editingRegistrationId = reactive({});
 
 function allItemsStatic(event) {
@@ -870,6 +882,8 @@ function headPaymentKey(eventId, headId) {
 
 for (const e of props.events) {
     eventPaymentRefs[e.id] = '';
+    eventPaymentBanks[e.id] = '';
+    eventPaymentAmounts[e.id] = '';
     sportsSearch[e.id] = '';
     sportsAgeFilter[e.id] = '';
     sportsItemFilter[e.id] = '';
@@ -1574,9 +1588,18 @@ function uploadEventPayment(event) {
         alert('Choose a payment proof file first, or skip — registration does not require it.');
         return;
     }
+    // Txn ref / bank name / amount are all required by the backend — see
+    // FestRegistrationController::uploadEventPayment(). The <input required> attributes
+    // stop most bad submits, but router.post bypasses native form validation, so re-check here.
+    if (!eventPaymentRefs[event.id] || !eventPaymentBanks[event.id] || !eventPaymentAmounts[event.id]) {
+        alert('Enter the transaction reference, bank name, and amount paid before uploading.');
+        return;
+    }
     router.post(`${programBase.value}/events/${event.id}/payment`, {
         payment_proof: files,
-        transaction_ref: eventPaymentRefs[event.id] || null,
+        transaction_ref: eventPaymentRefs[event.id],
+        bank_name: eventPaymentBanks[event.id],
+        amount: eventPaymentAmounts[event.id],
     }, { forceFormData: true, preserveScroll: true });
 }
 
@@ -1619,9 +1642,18 @@ function uploadHeadPayment(event, headFee) {
         alert('Choose a payment proof file for this Sport Event first.');
         return;
     }
+    // Txn ref / bank name / amount are all required by the backend — see
+    // FestRegistrationController::uploadEventPayment(). Re-check here since router.post
+    // bypasses native <input required> form validation.
+    if (!headPaymentRefs[key] || !headPaymentBanks[key] || !headPaymentAmounts[key]) {
+        alert('Enter the transaction reference, bank name, and amount paid before uploading.');
+        return;
+    }
     router.post(`${programBase.value}/events/${event.id}/payment`, {
         payment_proof: files,
-        transaction_ref: headPaymentRefs[key] || null,
+        transaction_ref: headPaymentRefs[key],
+        bank_name: headPaymentBanks[key],
+        amount: headPaymentAmounts[key],
         head_id: headFee.head_id,
     }, { forceFormData: true, preserveScroll: true });
 }
