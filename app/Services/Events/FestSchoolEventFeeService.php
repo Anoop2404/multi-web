@@ -474,6 +474,7 @@ class FestSchoolEventFeeService
         ?string $transactionRef = null,
         ?string $bankName = null,
         ?float $amount = null,
+        array $extraProofs = [],
     ): FestSchoolEventFee {
         $head = FestItemHead::findOrFail($headId);
         abort_if($head->event_id !== $event->id, 403);
@@ -502,6 +503,14 @@ class FestSchoolEventFeeService
             'status' => 'uploaded',
             'uploaded_by_user_id' => $userId,
         ]);
+
+        // Extra evidence images for this same payment (e.g. a bank statement page alongside
+        // a UTR screenshot) — see docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature.
+        // Never creates additional receipts; $proof above remains the one reviewed record.
+        if (! empty($extraProofs)) {
+            app(\App\Services\Fees\FeeReceiptAttachmentService::class)
+                ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
+        }
 
         $fee->update([
             'fee_receipt_id' => $receipt->id,
@@ -781,6 +790,7 @@ class FestSchoolEventFeeService
         ?string $transactionRef = null,
         ?string $bankName = null,
         ?float $amount = null,
+        array $extraProofs = [],
     ): FestSchoolEventFee {
         abort_if(
             $this->usesPerHeadBilling($event),
@@ -812,6 +822,13 @@ class FestSchoolEventFeeService
             'status' => 'uploaded',
             'uploaded_by_user_id' => $userId,
         ]);
+
+        // See attachPaymentForHead() above for why this exists — same additive, no-new-
+        // receipt behavior.
+        if (! empty($extraProofs)) {
+            app(\App\Services\Fees\FeeReceiptAttachmentService::class)
+                ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
+        }
 
         $fee->update([
             'fee_receipt_id' => $receipt->id,

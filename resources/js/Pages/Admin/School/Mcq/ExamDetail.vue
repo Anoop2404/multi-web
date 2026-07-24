@@ -483,7 +483,8 @@
                       @submit.prevent="uploadBatchFee" class="flex flex-wrap gap-2 items-end border-t border-slate-100 pt-4">
                     <div>
                         <label class="text-xs font-semibold text-slate-600 block mb-1">Payment proof</label>
-                        <input ref="proofInput" type="file" accept=".pdf,.jpg,.jpeg,.png" class="text-sm" required>
+                        <input ref="proofInput" type="file" accept=".pdf,.jpg,.jpeg,.png" multiple class="text-sm" required>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Up to 5 images for this one payment.</p>
                     </div>
                     <div>
                         <label class="text-xs font-semibold text-slate-600 block mb-1">Amount (₹)</label>
@@ -1030,10 +1031,12 @@ function cancelStudent(id, name) {
 }
 
 function uploadBatchFee() {
-    const file = proofInput.value?.files?.[0];
-    if (!file) return;
+    // Up to 5 images for one payment — see docs/FLOW_GAP_FIX_PLAN.md multi-image
+    // upload feature.
+    const files = Array.from(proofInput.value?.files ?? []);
+    if (!files.length) return;
     router.post(`${base.value}/school-payment`, {
-        payment_proof: file,
+        payment_proof: files,
         transaction_ref: transactionRef.value || null,
         amount: feeAmount.value ? Number(feeAmount.value) : null,
     }, {

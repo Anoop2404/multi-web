@@ -32,8 +32,9 @@
                 <form v-if="canUploadHeadFee(headFee)"
                       @submit.prevent="$emit('upload-head-payment', headFee)"
                       class="flex flex-wrap gap-2 items-center">
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-                           @change="e => $emit('set-head-file', headFee.head_id, e.target.files[0])"
+                    <!-- multiple: up to 5 images for the SAME payment — still one receipt. -->
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple
+                           @change="e => $emit('set-head-file', headFee.head_id, Array.from(e.target.files ?? []))"
                            class="text-xs" />
                     <input :value="headPaymentRef(headFee.head_id)"
                            @input="e => $emit('update-head-ref', headFee.head_id, e.target.value)"

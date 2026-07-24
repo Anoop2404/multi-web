@@ -112,13 +112,17 @@
                      purely from the school registration fee with zero item fees registered. -->
                 <form v-if="outstanding > 0 && ['pending', 'partial', 'rejected'].includes(event.school_fee?.status)"
                       @submit.prevent="$emit('upload-event-payment')" class="flex flex-wrap gap-2 items-center">
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-                           @change="e => $emit('set-event-file', e.target.files[0])" class="text-xs" />
+                    <!-- multiple: up to 5 images for the SAME payment (e.g. a UTR screenshot +
+                         a bank statement page) — still one receipt, reviewed as one payment. -->
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple
+                           @change="e => $emit('set-event-file', Array.from(e.target.files ?? []))" class="text-xs" />
                     <input :value="eventPaymentRef"
                            @input="e => $emit('update-event-ref', e.target.value)"
                            class="field text-xs w-36" placeholder="Txn ref (opt)">
                     <button type="submit" class="btn-secondary text-xs !min-h-0 !px-2 !py-1">Upload payment proof</button>
                 </form>
+                <p v-if="outstanding > 0 && ['pending', 'partial', 'rejected'].includes(event.school_fee?.status)"
+                   class="text-[10px] text-slate-400 -mt-1">Up to 5 images for this one payment.</p>
                 <a v-if="event.school_fee?.status === 'approved'"
                    :href="`${programBase}/events/${event.id}/receipt`"
                    target="_blank" rel="noopener"

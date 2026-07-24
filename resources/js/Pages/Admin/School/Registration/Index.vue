@@ -179,8 +179,8 @@
 
                     <form @submit.prevent="uploadPayment" class="card space-y-4 !shadow-none">
                         <p class="section-title">Upload payment proof for Sahodaya approval</p>
-                        <FormField label="Payment proof" required hint="PDF, JPG or PNG — max 5 MB">
-                            <input type="file" required accept=".pdf,.jpg,.jpeg,.png" @change="paymentForm.payment_proof = $event.target.files[0]" class="field">
+                        <FormField label="Payment proof" required hint="PDF, JPG or PNG — up to 5 images for this one payment, max 5 MB each">
+                            <input type="file" required multiple accept=".pdf,.jpg,.jpeg,.png" @change="paymentForm.payment_proof = Array.from($event.target.files ?? [])" class="field">
                         </FormField>
                         <FormGrid>
                             <FormField label="Payment method">
@@ -279,7 +279,7 @@ const hasDataTracks = computed(() =>
 );
 
 const paymentForm = useForm({
-    payment_proof: null,
+    payment_proof: [],
     payment_method: '',
     transaction_ref: '',
 });

@@ -571,16 +571,20 @@ class McqRegistrationController extends SchoolAdminController
         $outstanding = $schoolFee->outstandingBalance();
         abort_if($outstanding <= 0, 422, 'This batch fee is already fully paid.');
 
+        // payment_proof accepts up to 5 images for ONE payment — see
+        // docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature.
         $data = $request->validate([
-            'payment_proof'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'transaction_ref' => 'nullable|string|max:100',
-            'amount'          => 'nullable|numeric|min:1|max:'.$outstanding,
+            'payment_proof'    => 'required|array|min:1|max:'.\App\Services\Fees\FeeReceiptAttachmentService::MAX_FILES,
+            'payment_proof.*'  => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'transaction_ref'  => 'nullable|string|max:100',
+            'amount'           => 'nullable|numeric|min:1|max:'.$outstanding,
         ]);
 
         $amount = round((float) ($data['amount'] ?? $outstanding), 2);
 
+        $proofFiles = $request->file('payment_proof');
         $path = TenantStorage::storeUploadedFile(
-            $request->file('payment_proof'),
+            $proofFiles[0],
             "mcq-payments/{$this->school->id}"
         );
 
@@ -596,6 +600,11 @@ class McqRegistrationController extends SchoolAdminController
             'status'              => 'uploaded',
             'uploaded_by_user_id' => $request->user()->id,
         ]);
+
+        if (count($proofFiles) > 1) {
+            app(\App\Services\Fees\FeeReceiptAttachmentService::class)
+                ->attachExtra($receipt, array_slice($proofFiles, 1), "mcq-payments/{$this->school->id}");
+        }
 
         $schoolFee->update(['fee_receipt_id' => $receipt->id, 'status' => 'proof_uploaded']);
 
@@ -640,12 +649,14 @@ class McqRegistrationController extends SchoolAdminController
         abort_unless($exam->hasFee(), 422, 'This exam requires a per-student fee.');
 
         $data = $request->validate([
-            'payment_proof'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'transaction_ref' => 'nullable|string|max:100',
+            'payment_proof'    => 'required|array|min:1|max:'.\App\Services\Fees\FeeReceiptAttachmentService::MAX_FILES,
+            'payment_proof.*'  => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'transaction_ref'  => 'nullable|string|max:100',
         ]);
 
+        $proofFiles = $request->file('payment_proof');
         $path = TenantStorage::storeUploadedFile(
-            $request->file('payment_proof'),
+            $proofFiles[0],
             "mcq-payments/{$this->school->id}"
         );
 
@@ -661,6 +672,11 @@ class McqRegistrationController extends SchoolAdminController
             'status'              => 'uploaded',
             'uploaded_by_user_id' => $request->user()->id,
         ]);
+
+        if (count($proofFiles) > 1) {
+            app(\App\Services\Fees\FeeReceiptAttachmentService::class)
+                ->attachExtra($receipt, array_slice($proofFiles, 1), "mcq-payments/{$this->school->id}");
+        }
 
         $registration->update(['fee_receipt_id' => $receipt->id]);
 

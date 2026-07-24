@@ -245,8 +245,13 @@
                             <!-- Action Column: Multi-Proof Management -->
                             <td class="p-3.5 text-right space-y-1">
                                 <div class="flex items-center justify-end gap-1.5 flex-wrap">
-                                    <!-- Proofs Modal Trigger -->
-                                    <button v-if="row.all_receipts?.length" type="button"
+                                    <!-- Proofs Modal Trigger — counts only real school-uploaded
+                                         proofs, not system credit-offset placeholder records
+                                         (is_system_credit), so a school that never uploaded
+                                         anything but had a fee credit auto-applied doesn't
+                                         show a misleading "Proofs N" badge while its status is
+                                         still (correctly) "Not uploaded yet". -->
+                                    <button v-if="realProofsCount(row) > 0" type="button"
                                             @click="activeProofModalRow = row"
                                             :class="row.status === 'proof_uploaded'
                                                 ? 'bg-amber-500 hover:bg-amber-600 text-white font-bold animate-pulse shadow-xs'
@@ -254,15 +259,24 @@
                                             class="px-2.5 py-1 rounded-lg text-xs inline-flex items-center gap-1.5 transition">
                                         <span>📷 Proofs</span>
                                         <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 font-black">
-                                            {{ row.all_receipts.length }}
+                                            {{ realProofsCount(row) }}
                                         </span>
                                     </button>
-                                    <a v-else-if="row.fee_receipt?.file_path"
+                                    <a v-else-if="row.fee_receipt?.file_path && !row.fee_receipt?.is_system_credit"
                                        :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/school-fees/${row.id}/proof`"
                                        target="_blank" rel="noopener"
                                        class="px-2.5 py-1 rounded-lg text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 transition">
                                         View proof ↗
                                     </a>
+                                    <!-- No real proof on file, but a credit was auto-applied — a
+                                         distinct, non-misleading indicator instead of "Proofs".
+                                         Still opens the same modal so the credit is auditable. -->
+                                    <button v-else-if="row.all_receipts?.length" type="button"
+                                            @click="activeProofModalRow = row"
+                                            title="No uploaded payment proof — an existing fee credit was applied toward this balance"
+                                            class="px-2.5 py-1 rounded-lg text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold border border-amber-200 transition inline-flex items-center gap-1.5">
+                                        <span>💳 Credit applied</span>
+                                    </button>
 
                                     <!-- Recalculate Icon Button -->
                                     <button v-if="!isNoFeeDue(row)" type="button" @click="recalculateFee(row.id, row.school)"
@@ -361,27 +375,35 @@
                 <!-- Proofs List -->
                 <div class="p-6 max-h-[60vh] overflow-y-auto space-y-3">
                     <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">
-                        Uploaded Payment Proofs ({{ activeProofModalRow.all_receipts?.length || 0 }})
+                        Uploaded Payment Proofs ({{ realProofsCount(activeProofModalRow) }})
                     </h4>
 
                     <div v-for="(rc, idx) in (activeProofModalRow.all_receipts || [])" :key="rc.id"
                          class="p-4 rounded-xl border transition shadow-xs"
-                         :class="rc.status === 'uploaded' ? 'border-amber-300 bg-amber-50/50 ring-2 ring-amber-200' : (rc.status === 'approved' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white')">
+                         :class="rc.is_system_credit ? 'border-amber-200 bg-amber-50/40' : (rc.status === 'uploaded' ? 'border-amber-300 bg-amber-50/50 ring-2 ring-amber-200' : (rc.status === 'approved' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'))">
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <div class="flex items-center gap-2">
-                                    <span class="text-xs font-bold text-slate-900">Proof Upload #{{ activeProofModalRow.all_receipts.length - idx }}</span>
+                                    <span class="text-xs font-bold text-slate-900">
+                                        {{ rc.is_system_credit ? '💳 Fee credit applied' : `Proof Upload #${activeProofModalRow.all_receipts.length - idx}` }}
+                                    </span>
                                     <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded"
-                                          :class="rc.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : (rc.status === 'uploaded' ? 'bg-amber-100 text-amber-900 font-bold' : 'bg-slate-100 text-slate-600')">
-                                        {{ rc.status === 'uploaded' ? 'Awaiting Review' : rc.status }}
+                                          :class="rc.is_system_credit ? 'bg-amber-100 text-amber-800' : (rc.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : (rc.status === 'uploaded' ? 'bg-amber-100 text-amber-900 font-bold' : 'bg-slate-100 text-slate-600'))">
+                                        {{ rc.is_system_credit ? 'Not an uploaded proof' : (rc.status === 'uploaded' ? 'Awaiting Review' : rc.status) }}
                                     </span>
                                     <span v-if="rc.receipt_number" class="text-xs font-mono font-bold text-emerald-700">
                                         #{{ rc.receipt_number }}
                                     </span>
                                 </div>
                                 <p class="text-xs text-slate-500 mt-1">
-                                    Uploaded on {{ formatCalendarDate(rc.created_at) }}
-                                    <span v-if="rc.transaction_ref" class="ml-2 font-mono">Ref: {{ rc.transaction_ref }}</span>
+                                    <template v-if="rc.is_system_credit">
+                                        Automatically offset from an existing fee credit on {{ formatCalendarDate(rc.created_at) }} — does not
+                                        cover the school's full balance if any amount is still shown as due.
+                                    </template>
+                                    <template v-else>
+                                        Uploaded on {{ formatCalendarDate(rc.created_at) }}
+                                        <span v-if="rc.transaction_ref" class="ml-2 font-mono">Ref: {{ rc.transaction_ref }}</span>
+                                    </template>
                                 </p>
                                 <p v-if="rc.rejection_reason" class="text-xs text-rose-600 font-medium mt-1">
                                     Rejection Reason: {{ rc.rejection_reason }}
@@ -390,10 +412,16 @@
 
                             <div class="text-right">
                                 <span class="text-base font-black text-slate-900 tabular-nums">₹{{ fmt(rc.amount) }}</span>
-                                <div class="mt-2 flex items-center justify-end gap-2">
+                                <div class="mt-2 flex items-center justify-end gap-2 flex-wrap">
                                     <a v-if="rc.proof_url" :href="rc.proof_url" target="_blank" rel="noopener"
                                        class="btn-secondary !py-1 !px-2.5 text-xs text-indigo-700 font-bold shadow-xs">
                                         View Image ↗
+                                    </a>
+                                    <!-- Extra images for this same payment (multi-image upload). -->
+                                    <a v-for="(att, ai) in (rc.attachments || [])" :key="att.id"
+                                       :href="att.url" target="_blank" rel="noopener"
+                                       class="btn-secondary !py-1 !px-2.5 text-xs text-indigo-600 font-semibold shadow-xs">
+                                        +{{ ai + 1 }} ↗
                                     </a>
                                 </div>
                             </div>
@@ -459,6 +487,17 @@ function hasRegisteredItems(row) {
 
 function isUnpaidPending(row) {
     return row.status === 'pending' && !isNoFeeDue(row);
+}
+
+/**
+ * Real, school-uploaded proofs only — excludes system credit-offset placeholder receipts
+ * (is_system_credit) created by FestSchoolEventFeeService::applyAvailableCredit(). Those
+ * carry a fake file_path and inflate all_receipts.length without representing anything a
+ * school actually submitted, which previously made "Not uploaded yet" rows show a
+ * "Proofs N" badge that looked contradictory.
+ */
+function realProofsCount(row) {
+    return (row.all_receipts ?? []).filter(r => !r.is_system_credit).length;
 }
 
 const statusFilter = ref('all');

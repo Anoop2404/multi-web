@@ -27,7 +27,7 @@ class FestEventFeesController extends SahodayaAdminController
 
         $schoolFees = FestSchoolEventFee::where('event_id', $event->id)
             ->forAmountAggregation()
-            ->with(['school', 'feeReceipt', 'receipts', 'head'])
+            ->with(['school', 'feeReceipt', 'receipts.attachments', 'head'])
             ->orderBy('school_id')
             ->get()
             ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event) {
@@ -68,17 +68,35 @@ class FestEventFeesController extends SahodayaAdminController
                     $effectiveStatus = 'proof_uploaded';
                 }
 
-                $allReceipts = $fee->receipts->sortByDesc('id')->values()->map(fn ($r) => [
-                    'id'               => $r->id,
-                    'status'           => $r->status,
-                    'amount'           => (float) $r->amount,
-                    'receipt_number'   => $r->receipt_number,
-                    'transaction_ref'  => $r->transaction_ref,
-                    'payment_date'     => $r->payment_date?->toDateString(),
-                    'created_at'       => $r->created_at?->toIso8601String(),
-                    'rejection_reason' => $r->rejection_reason,
-                    'proof_url'        => $r->file_path ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/school-fees/{$fee->id}/proofs/{$r->id}" : null,
-                ]);
+                // is_system_credit rows are the placeholder FeeReceipt created by
+                // FestSchoolEventFeeService::applyAvailableCredit() when an existing fee
+                // credit auto-offsets part of this balance — file_path is a fake
+                // 'system://...' marker, not something the school uploaded. Flagged here
+                // (and proof_url nulled) so the UI can tell "school submitted a proof" apart
+                // from "a credit was applied" instead of counting/linking both the same way.
+                // See docs/CROSS_SYSTEM_FLOW_GAP_AUDIT.md — "Proofs N" badge investigation.
+                $allReceipts = $fee->receipts->sortByDesc('id')->values()->map(function ($r) use ($event, $fee) {
+                    return [
+                        'id'                => $r->id,
+                        'status'            => $r->status,
+                        'amount'            => (float) $r->amount,
+                        'receipt_number'    => $r->receipt_number,
+                        'transaction_ref'   => $r->transaction_ref,
+                        'payment_date'      => $r->payment_date?->toDateString(),
+                        'created_at'        => $r->created_at?->toIso8601String(),
+                        'rejection_reason'  => $r->rejection_reason,
+                        'is_system_credit'  => (bool) $r->is_system_credit,
+                        'proof_url'         => ($r->file_path && ! $r->is_system_credit)
+                            ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/school-fees/{$fee->id}/proofs/{$r->id}"
+                            : null,
+                        // Extra evidence images for this SAME payment (multi-image upload
+                        // feature) — not additional receipts, just more views of one payment.
+                        'attachments'       => $r->attachments->map(fn ($a) => [
+                            'id'  => $a->id,
+                            'url' => "/sahodaya-admin/{$this->sahodaya->id}/finance/payments/attachments/{$a->id}",
+                        ])->values(),
+                    ];
+                });
 
                 return [
                     'id' => $fee->id,

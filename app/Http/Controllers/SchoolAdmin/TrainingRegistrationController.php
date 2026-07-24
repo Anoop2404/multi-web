@@ -502,14 +502,19 @@ class TrainingRegistrationController extends SchoolAdminController
         $outstanding = $registration->outstandingBalance();
         abort_if($outstanding <= 0, 422, 'This training fee is already fully paid.');
 
+        // payment_proof accepts up to 5 images for ONE payment — see
+        // docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature. First file is the
+        // receipt's primary file_path (unchanged behavior); rest become attachments.
         $data = $request->validate([
-            'payment_proof'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'transaction_ref' => 'nullable|string|max:100',
-            'amount'          => 'nullable|numeric|min:1|max:'.$outstanding,
+            'payment_proof'    => 'required|array|min:1|max:'.\App\Services\Fees\FeeReceiptAttachmentService::MAX_FILES,
+            'payment_proof.*'  => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'transaction_ref'  => 'nullable|string|max:100',
+            'amount'           => 'nullable|numeric|min:1|max:'.$outstanding,
         ]);
 
+        $proofFiles = $request->file('payment_proof');
         $path = TenantStorage::storeUploadedFile(
-            $request->file('payment_proof'),
+            $proofFiles[0],
             "training-payments/{$this->school->id}"
         );
 
@@ -529,6 +534,11 @@ class TrainingRegistrationController extends SchoolAdminController
             'status'              => 'uploaded',
             'uploaded_by_user_id' => $request->user()->id,
         ]);
+
+        if (count($proofFiles) > 1) {
+            app(\App\Services\Fees\FeeReceiptAttachmentService::class)
+                ->attachExtra($receipt, array_slice($proofFiles, 1), "training-payments/{$this->school->id}");
+        }
 
         $registration->update(['fee_receipt_id' => $receipt->id, 'fee_status' => 'proof_uploaded']);
 
@@ -597,25 +607,32 @@ class TrainingRegistrationController extends SchoolAdminController
         abort_if($outstanding <= 0, 422, 'This school batch fee is already fully paid.');
 
         $data = $request->validate([
-            'payment_proof'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'transaction_ref' => 'nullable|string|max:100',
-            'amount'          => 'nullable|numeric|min:1|max:'.$outstanding,
+            'payment_proof'    => 'required|array|min:1|max:'.\App\Services\Fees\FeeReceiptAttachmentService::MAX_FILES,
+            'payment_proof.*'  => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'transaction_ref'  => 'nullable|string|max:100',
+            'amount'           => 'nullable|numeric|min:1|max:'.$outstanding,
         ]);
 
+        $proofFiles = $request->file('payment_proof');
         $path = TenantStorage::storeUploadedFile(
-            $request->file('payment_proof'),
+            $proofFiles[0],
             "training-payments/{$this->school->id}"
         );
 
         $amount = round((float) ($data['amount'] ?? $outstanding), 2);
 
-        $feeService->attachPaymentProof(
+        $receipt = $feeService->attachPaymentProof(
             $schoolFee,
             $path,
             $data['transaction_ref'] ?? null,
             $amount,
             $request->user()->id,
         );
+
+        if (count($proofFiles) > 1) {
+            app(\App\Services\Fees\FeeReceiptAttachmentService::class)
+                ->attachExtra($receipt, array_slice($proofFiles, 1), "training-payments/{$this->school->id}");
+        }
 
         app(SahodayaAdminNotifier::class)->notifyAdmins(
             $this->school->parent_id,

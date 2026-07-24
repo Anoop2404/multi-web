@@ -513,13 +513,19 @@ class AnnualRegistrationController extends SchoolAdminController
             return back()->with('info', 'No payment is currently due.');
         }
 
+        // payment_proof accepts up to 5 images for ONE payment — see
+        // docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature. The first file remains
+        // the primary payment_proof_path/backup exactly as before; extras are attached to
+        // the FeeReceipt created below.
         $data = $request->validate([
-            'payment_method'  => 'nullable|string|max:50',
-            'transaction_ref' => 'nullable|string|max:100',
-            'payment_proof'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'payment_method'   => 'nullable|string|max:50',
+            'transaction_ref'  => 'nullable|string|max:100',
+            'payment_proof'    => 'required|array|min:1|max:'.\App\Services\Fees\FeeReceiptAttachmentService::MAX_FILES,
+            'payment_proof.*'  => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
-        $file = $request->file('payment_proof');
+        $proofFiles = $request->file('payment_proof');
+        $file = $proofFiles[0];
         $backup = app(UploadBackupService::class)->store(
             $file,
             'payment_proof',
@@ -555,7 +561,15 @@ class AnnualRegistrationController extends SchoolAdminController
             ]);
         }
 
-        app(FeeReceiptService::class)->createForMembershipPayment($payment);
+        $receipt = app(FeeReceiptService::class)->createForMembershipPayment($payment);
+
+        if (count($proofFiles) > 1) {
+            app(\App\Services\Fees\FeeReceiptAttachmentService::class)->attachExtra(
+                $receipt,
+                array_slice($proofFiles, 1),
+                "payments/{$this->school->id}",
+            );
+        }
 
         $backup->update([
             'related_type' => $payment->getMorphClass(),

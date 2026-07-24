@@ -1567,13 +1567,15 @@ function submitBulkAssign() {
 }
 
 function uploadEventPayment(event) {
-    const file = eventPaymentFiles[event.id];
-    if (!file) {
+    // eventPaymentFiles[event.id] is now an array (see set-event-file / multiple file
+    // input) — up to 5 images for one payment, submitted together as one receipt.
+    const files = eventPaymentFiles[event.id];
+    if (!files || !files.length) {
         alert('Choose a payment proof file first, or skip — registration does not require it.');
         return;
     }
     router.post(`${programBase.value}/events/${event.id}/payment`, {
-        payment_proof: file,
+        payment_proof: files,
         transaction_ref: eventPaymentRefs[event.id] || null,
     }, { forceFormData: true, preserveScroll: true });
 }
@@ -1610,14 +1612,15 @@ function headFeeStatusClass(status) {
 }
 
 function uploadHeadPayment(event, headFee) {
+    // headPaymentFiles[key] is now an array (see set-head-file / multiple file input).
     const key = headPaymentKey(event.id, headFee.head_id);
-    const file = headPaymentFiles[key];
-    if (!file) {
+    const files = headPaymentFiles[key];
+    if (!files || !files.length) {
         alert('Choose a payment proof file for this Sport Event first.');
         return;
     }
     router.post(`${programBase.value}/events/${event.id}/payment`, {
-        payment_proof: file,
+        payment_proof: files,
         transaction_ref: headPaymentRefs[key] || null,
         head_id: headFee.head_id,
     }, { forceFormData: true, preserveScroll: true });

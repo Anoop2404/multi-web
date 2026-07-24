@@ -71,8 +71,8 @@
                     </div>
                     <form v-if="needsSchoolFeeUpload(program)"
                           @submit.prevent="uploadSchoolFee(program)" class="flex flex-wrap gap-2 items-center">
-                        <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-                               @change="e => schoolFeeFiles[program.id] = e.target.files[0]"
+                        <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple
+                               @change="e => schoolFeeFiles[program.id] = Array.from(e.target.files ?? [])"
                                class="text-xs" required>
                         <input v-model="schoolFeeRefs[program.id]" class="field text-xs max-w-xs" placeholder="Transaction ref (optional)">
                         <button class="btn-primary text-xs !min-h-0 !px-2 !py-1">Upload batch proof</button>
@@ -116,8 +116,8 @@
                         </div>
                         <form v-if="program.fee_type === 'flat' && program.fee_amount && needsFeeUpload(r)"
                               @submit.prevent="uploadFee(r)" class="flex flex-wrap gap-2 items-center mt-2">
-                            <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-                                   @change="e => feeFiles[r.id] = e.target.files[0]"
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple
+                                   @change="e => feeFiles[r.id] = Array.from(e.target.files ?? [])"
                                    class="text-xs" required>
                             <input v-model="feeRefs[r.id]" class="field text-xs max-w-xs" placeholder="Transaction ref (optional)">
                             <button class="btn-primary text-xs !min-h-0 !px-2 !py-1">Upload proof</button>
@@ -308,25 +308,30 @@ function submitImport(program) {
 }
 
 function uploadFee(registration) {
-    const file = feeFiles[registration.id];
-    if (!file) return;
+    // feeFiles[registration.id] is now an array — up to 5 images for one payment,
+    // submitted together as one receipt. See docs/FLOW_GAP_FIX_PLAN.md multi-image
+    // upload feature.
+    const files = feeFiles[registration.id];
+    if (!files || !files.length) return;
 
     const fd = new FormData();
-    fd.append('payment_proof', file);
+    files.forEach(f => fd.append('payment_proof[]', f));
     if (feeRefs[registration.id]) fd.append('transaction_ref', feeRefs[registration.id]);
 
     router.post(`/school-admin/${props.school.id}/training/${registration.id}/payment`, fd, {
         preserveScroll: true,
+        forceFormData: true,
         onSuccess: () => { feeFiles[registration.id] = null; feeRefs[registration.id] = ''; },
     });
 }
 
 function uploadSchoolFee(program) {
-    const file = schoolFeeFiles[program.id];
-    if (!file) return;
+    // schoolFeeFiles[program.id] is now an array — see uploadFee() above.
+    const files = schoolFeeFiles[program.id];
+    if (!files || !files.length) return;
 
     const fd = new FormData();
-    fd.append('payment_proof', file);
+    files.forEach(f => fd.append('payment_proof[]', f));
     if (schoolFeeRefs[program.id]) fd.append('transaction_ref', schoolFeeRefs[program.id]);
 
     router.post(`/school-admin/${props.school.id}/training/${program.id}/school-payment`, fd, {

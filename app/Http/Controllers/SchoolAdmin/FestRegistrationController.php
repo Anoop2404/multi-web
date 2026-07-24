@@ -791,35 +791,47 @@ class FestRegistrationController extends SchoolAdminController
 
         $usesPerHead = $feeService->usesPerHeadBilling($event);
 
+        // payment_proof now accepts up to 5 images for ONE payment (e.g. a UTR screenshot
+        // + a bank statement page) — the first becomes the receipt's primary file_path
+        // exactly as before, the rest are stored as FeeReceiptAttachment rows on the same
+        // receipt. Still one receipt, one review decision. See
+        // docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature.
         $data = $request->validate([
-            'payment_proof'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'transaction_ref' => 'required|string|max:100',
-            'bank_name'       => 'required|string|max:100',
-            'amount'          => 'required|numeric|min:0.01',
-            'head_id'         => ($usesPerHead ? 'required' : 'nullable').'|integer|exists:fest_item_heads,id',
+            'payment_proof'    => 'required|array|min:1|max:'.\App\Services\Fees\FeeReceiptAttachmentService::MAX_FILES,
+            'payment_proof.*'  => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'transaction_ref'  => 'required|string|max:100',
+            'bank_name'        => 'required|string|max:100',
+            'amount'           => 'required|numeric|min:0.01',
+            'head_id'          => ($usesPerHead ? 'required' : 'nullable').'|integer|exists:fest_item_heads,id',
         ]);
+
+        $proofFiles = $request->file('payment_proof');
+        $primaryProof = $proofFiles[0];
+        $extraProofs = array_slice($proofFiles, 1);
 
         if ($usesPerHead) {
             $feeService->attachPaymentForHead(
                 $event,
                 $this->school->id,
                 (int) $data['head_id'],
-                $request->file('payment_proof'),
+                $primaryProof,
                 $request->user()->id,
                 $data['transaction_ref'],
                 $data['bank_name'],
                 (float) $data['amount'],
+                $extraProofs,
             );
             $contextLabel = $event->title.' — '.((FestItemHead::find($data['head_id'])?->name) ?? 'head').' fee';
         } else {
             $feeService->attachPayment(
                 $event,
                 $this->school->id,
-                $request->file('payment_proof'),
+                $primaryProof,
                 $request->user()->id,
                 $data['transaction_ref'],
                 $data['bank_name'],
                 (float) $data['amount'],
+                $extraProofs,
             );
             $contextLabel = $event->title.' event fee';
         }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class FeeReceipt extends Model
@@ -50,6 +51,12 @@ class FeeReceipt extends Model
     public function uploadedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by_user_id');
+    }
+
+    /** Additional proof images beyond the primary `file_path` — see FeeReceiptAttachment. */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(FeeReceiptAttachment::class)->orderBy('sort_order');
     }
 
     public function reviewedBy(): BelongsTo

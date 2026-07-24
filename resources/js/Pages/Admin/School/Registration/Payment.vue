@@ -30,9 +30,9 @@
 
             <form v-if="canUpload" @submit.prevent="upload" class="card space-y-4">
                 <h3 class="section-title text-base">Upload payment proof</h3>
-                <FormField label="Payment proof" required hint="PDF, JPG, or PNG" :error="form.errors.payment_proof">
-                    <input type="file" required accept=".pdf,.jpg,.jpeg,.png" class="field"
-                           @change="form.payment_proof = $event.target.files[0]">
+                <FormField label="Payment proof" required hint="PDF, JPG, or PNG — up to 5 images for this one payment" :error="form.errors.payment_proof">
+                    <input type="file" required multiple accept=".pdf,.jpg,.jpeg,.png" class="field"
+                           @change="form.payment_proof = Array.from($event.target.files ?? [])">
                 </FormField>
                 <FormField label="Payment method" :error="form.errors.payment_method">
                     <input v-model="form.payment_method" class="field" placeholder="e.g. NEFT, UPI, Cheque">
@@ -79,7 +79,7 @@ const props = defineProps({
 
 const { scrollToFirstError } = useScrollToFirstError();
 
-const form = useForm({ payment_proof: null, payment_method: '', transaction_ref: '' });
+const form = useForm({ payment_proof: [], payment_method: '', transaction_ref: '' });
 
 const paymentDetails = computed(() => props.profile?.payment_details_text || '');
 

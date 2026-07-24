@@ -443,6 +443,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/payments/receipts/{feeReceipt}', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'programReceipt'])->name('payments.program.receipt');
     Route::get('/payments/receipts/{feeReceipt}/proof', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'programProof'])->name('payments.program.proof');
     Route::get('/payments/credit-notes/{type}/{creditId}', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'creditNote'])->name('payments.credit-note');
+    Route::get('/payments/attachments/{attachment}', [\App\Http\Controllers\SchoolAdmin\FeeReceiptAttachmentController::class, 'show'])->name('payments.attachment');
 
     // Website & CMS (disabled until WEBSITE_ENABLED=true)
     Route::middleware('website.enabled')->group(function () {
@@ -758,6 +759,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/payments/receipts/{feeReceipt}/reverse', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'reverseReceipt'])->name('payments.reverse');
             Route::post('/payments/credits/payout', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'recordCreditPayout'])->name('payments.credit-payout');
             Route::get('/payments/credit-notes/{type}/{creditId}', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'creditNote'])->name('payments.credit-note');
+            Route::get('/payments/attachments/{attachment}', [\App\Http\Controllers\SahodayaAdmin\FeeReceiptAttachmentController::class, 'show'])->name('payments.attachment');
             Route::get('/receipt-emails', [\App\Http\Controllers\SahodayaAdmin\ReceiptEmailReportController::class, 'index'])->name('receipt-emails');
             Route::get('/email-delivery', [\App\Http\Controllers\SahodayaAdmin\EmailDeliveryReportController::class, 'index'])->name('email-delivery');
             Route::post('/email-delivery/{notificationLog}/retry', [\App\Http\Controllers\SahodayaAdmin\EmailDeliveryReportController::class, 'retry'])->name('email-delivery.retry');
