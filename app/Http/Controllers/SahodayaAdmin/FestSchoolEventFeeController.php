@@ -183,10 +183,31 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($schoolEventFee->event_id !== $event->id, 403);
 
-        $receipt = $schoolEventFee->feeReceipt;
-        abort_if($receipt?->isSystemCredit(), 404, 'This balance was settled from fee credit — there is no uploaded payment proof to view.');
+        $receipt = $schoolEventFee->receipts()->where('status', 'uploaded')->latest('id')->first()
+            ?? $schoolEventFee->feeReceipt
+            ?? $schoolEventFee->receipts()->latest('id')->first();
 
-        $path = $receipt?->file_path;
+        abort_if(!$receipt || $receipt->isSystemCredit(), 404, 'This balance was settled from fee credit — there is no uploaded payment proof to view.');
+
+        $path = $receipt->file_path;
+        abort_unless($path, 404);
+
+        $disk = config('filesystems.upload_disk', 'shared');
+        if (in_array($disk, ['s3', 'private'], true)) {
+            return redirect(\Illuminate\Support\Facades\Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(15)));
+        }
+
+        return TenantStorage::downloadResponse($this->sahodaya, $path);
+    }
+
+    public function receiptProof(string $tenantId, FestEvent $event, FestSchoolEventFee $schoolEventFee, \App\Models\FeeReceipt $feeReceipt)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($schoolEventFee->event_id !== $event->id, 403);
+        abort_if($feeReceipt->feeable_type !== FestSchoolEventFee::class || (int) $feeReceipt->feeable_id !== (int) $schoolEventFee->id, 403);
+        abort_if($feeReceipt->isSystemCredit(), 404, 'This balance was settled from fee credit — there is no uploaded payment proof to view.');
+
+        $path = $feeReceipt->file_path;
         abort_unless($path, 404);
 
         $disk = config('filesystems.upload_disk', 'shared');

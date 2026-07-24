@@ -238,12 +238,27 @@
                                             class="btn-secondary !py-1 !px-2 text-[11px] inline-flex items-center gap-1 shadow-sm">
                                         <span>🔄 Refresh</span>
                                     </button>
-                                    <a v-if="row.fee_receipt?.file_path"
+                                    <a v-if="!row.all_receipts || row.all_receipts.length <= 1"
+                                       v-show="row.fee_receipt?.file_path"
                                        :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/school-fees/${row.id}/proof`"
                                        target="_blank" rel="noopener"
                                        class="btn-secondary !py-1 !px-2.5 text-[11px] text-indigo-700 font-bold shadow-sm">
                                         View proof ↗
                                     </a>
+                                </div>
+
+                                <div v-if="row.all_receipts?.length > 1" class="mt-1.5 pt-1.5 border-t border-slate-100 space-y-1 text-[11px] text-right">
+                                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Uploaded Payment Proofs ({{ row.all_receipts.length }})</p>
+                                    <div v-for="rc in row.all_receipts" :key="rc.id" class="flex items-center justify-end gap-1.5">
+                                        <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
+                                              :class="rc.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : (rc.status === 'uploaded' ? 'bg-amber-100 text-amber-800 font-black ring-1 ring-amber-300' : 'bg-slate-100 text-slate-600')">
+                                            {{ rc.status === 'uploaded' ? 'Pending proof' : rc.status }}
+                                        </span>
+                                        <span class="font-mono text-slate-700 font-medium">₹{{ Number(rc.amount || 0).toLocaleString('en-IN') }}</span>
+                                        <a v-if="rc.proof_url" :href="rc.proof_url" target="_blank" rel="noopener" class="text-indigo-700 font-bold hover:underline">
+                                            Proof #{{ rc.id }} ↗
+                                        </a>
+                                    </div>
                                 </div>
 
                                 <div v-if="row.status === 'proof_uploaded'" class="flex items-center justify-end gap-1.5 pt-1">

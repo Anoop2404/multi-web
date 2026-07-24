@@ -27,7 +27,7 @@ class FestEventFeesController extends SahodayaAdminController
 
         $schoolFees = FestSchoolEventFee::where('event_id', $event->id)
             ->forAmountAggregation()
-            ->with(['school', 'feeReceipt', 'head'])
+            ->with(['school', 'feeReceipt', 'receipts', 'head'])
             ->orderBy('school_id')
             ->get()
             ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event) {
@@ -55,6 +55,21 @@ class FestEventFeesController extends SahodayaAdminController
                     'indiv_count' => $indivCount,
                 ] : null;
 
+                $pendingReceipt = $fee->receipts->firstWhere('status', 'uploaded');
+                $primaryReceipt = $pendingReceipt ?? $fee->feeReceipt ?? $fee->receipts->sortByDesc('id')->first();
+
+                $allReceipts = $fee->receipts->sortByDesc('id')->values()->map(fn ($r) => [
+                    'id'               => $r->id,
+                    'status'           => $r->status,
+                    'amount'           => (float) $r->amount,
+                    'receipt_number'   => $r->receipt_number,
+                    'transaction_ref'  => $r->transaction_ref,
+                    'payment_date'     => $r->payment_date?->toDateString(),
+                    'created_at'       => $r->created_at?->toIso8601String(),
+                    'rejection_reason' => $r->rejection_reason,
+                    'proof_url'        => $r->file_path ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/school-fees/{$fee->id}/proofs/{$r->id}" : null,
+                ]);
+
                 return [
                     'id' => $fee->id,
                     'school' => $fee->school?->name ?? $fee->school_id,
@@ -68,7 +83,8 @@ class FestEventFeesController extends SahodayaAdminController
                     'school_registration_fee' => $fee->school_registration_fee,
                     'participation_fee' => $fee->participation_fee,
                     'breakdown' => $feeService->breakdown($event, $fee, $schedule),
-                    'fee_receipt' => $fee->feeReceipt,
+                    'fee_receipt' => $primaryReceipt,
+                    'all_receipts' => $allReceipts,
                     'items' => $regs->map(fn ($r) => $r->item?->title)->filter()->values(),
                     'sports_participation' => $sportsParticipation,
                     'available_credit' => $fee->outstandingCredit(),
