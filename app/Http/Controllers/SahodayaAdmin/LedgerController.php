@@ -360,8 +360,10 @@ class LedgerController extends SahodayaAdminController
 
     private function scopedTransactions(?int $financialYearId)
     {
-        return LedgerTransaction::where('tenant_id', $this->sahodaya->id)
-            ->when($financialYearId, fn ($q) => $q->where('financial_year_id', $financialYearId));
+        // Columns qualified with the table name: reports() joins account_heads, which also has
+        // tenant_id and financial_year_id columns — unqualified names are ambiguous once joined.
+        return LedgerTransaction::where('ledger_transactions.tenant_id', $this->sahodaya->id)
+            ->when($financialYearId, fn ($q) => $q->where('ledger_transactions.financial_year_id', $financialYearId));
     }
 
     /** @return list<array{month: string, income: float, expense: float}> */
