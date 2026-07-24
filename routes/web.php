@@ -441,6 +441,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/payments/export', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'export'])->name('payments.export');
     Route::get('/payments/membership/{payment}/receipt', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'membershipReceipt'])->name('payments.membership.receipt');
     Route::get('/payments/receipts/{feeReceipt}', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'programReceipt'])->name('payments.program.receipt');
+    Route::get('/payments/receipts/{feeReceipt}/proof', [\App\Http\Controllers\SchoolAdmin\PaymentHistoryController::class, 'programProof'])->name('payments.program.proof');
 
     // Website & CMS (disabled until WEBSITE_ENABLED=true)
     Route::middleware('website.enabled')->group(function () {
@@ -750,6 +751,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/payments', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'index'])->name('payments.index');
             Route::get('/payments/export', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'export'])->name('payments.export');
             Route::get('/payments/receipts/{feeReceipt}', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'programReceipt'])->name('payments.receipt');
+            Route::get('/payments/receipts/{feeReceipt}/proof', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'proof'])->name('payments.proof');
             Route::post('/payments/resend-receipt', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'resendReceipt'])->name('payments.resend-receipt');
             Route::post('/payments/receipts/{feeReceipt}/reverse', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'reverseReceipt'])->name('payments.reverse');
             Route::get('/receipt-emails', [\App\Http\Controllers\SahodayaAdmin\ReceiptEmailReportController::class, 'index'])->name('receipt-emails');

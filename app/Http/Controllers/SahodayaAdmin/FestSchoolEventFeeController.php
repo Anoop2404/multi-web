@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\FestEvent;
+use App\Models\FestFeeCredit;
 use App\Models\FestSchoolEventFee;
 use App\Models\Tenant;
 use App\Models\FestEventInvoice;
@@ -43,7 +44,29 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             // Accumulate into amount_paid; status becomes partial or approved.
             $schoolEventFee->refresh();
             $schoolEventFee->refreshPaidState();
-            $fullyPaid = $schoolEventFee->fresh()->isFullyPaid();
+            $fresh = $schoolEventFee->fresh();
+            $fullyPaid = $fresh->isFullyPaid();
+
+            // Reconcile an overpayment caused by total_due shrinking *after* this receipt
+            // was uploaded but *before* it got reviewed — e.g. a registration this receipt
+            // was meant to help cover got cancelled/rejected in between. Without this, the
+            // excess just sits as an untracked, invisible overpayment: amount_paid can
+            // legitimately exceed total_due here (refreshPaidState() doesn't clamp it), but
+            // nothing before this surfaced or recorded that as money owed back to the
+            // school. Scoped to head_id = null records, matching every other FestFeeCredit
+            // site. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §4.
+            if ($fresh->head_id === null) {
+                $overpaid = round((float) $fresh->amount_paid - (float) $fresh->total_due, 2);
+                if ($overpaid > 0) {
+                    $credit = FestFeeCredit::create([
+                        'fest_school_event_fee_id' => $fresh->id,
+                        'amount' => $overpaid,
+                        'reason' => 'Overpayment reconciled at approval — balance decreased after this proof was uploaded',
+                        'created_by_user_id' => $request->user()->id,
+                    ]);
+                    app(FestFeeLedgerService::class)->postCreditIssued($credit);
+                }
+            }
 
             if ($fullyPaid) {
                 // Fest no longer needs a separate registration approval — settling the fee
@@ -138,7 +161,10 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($schoolEventFee->event_id !== $event->id, 403);
 
-        $path = $schoolEventFee->feeReceipt?->file_path;
+        $receipt = $schoolEventFee->feeReceipt;
+        abort_if($receipt?->isSystemCredit(), 404, 'This balance was settled from fee credit — there is no uploaded payment proof to view.');
+
+        $path = $receipt?->file_path;
         abort_unless($path, 404);
 
         $disk = config('filesystems.upload_disk', 'shared');

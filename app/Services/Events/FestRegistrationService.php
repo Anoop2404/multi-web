@@ -7,7 +7,9 @@ use App\Models\FestFeeCredit;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\FestSchoolEventFee;
 use App\Services\Audit\PlatformAuditLogger;
+use Illuminate\Support\Facades\DB;
 
 class FestRegistrationService
 {
@@ -24,9 +26,19 @@ class FestRegistrationService
         $registration->loadMissing('item');
         $headId = $registration->item?->head_id;
 
-        $registration->update(['status' => 'withdrawn']);
+        DB::transaction(function () use ($event, $registration) {
+            // Lock the school's aggregate fee record for the duration of the status flip +
+            // recalculate, so a concurrent cancel/reject on the same school can't interleave.
+            // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4.
+            FestSchoolEventFee::where('event_id', $event->id)
+                ->where('school_id', $registration->school_id)
+                ->whereNull('head_id')
+                ->lockForUpdate()
+                ->first();
 
-        app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
+            $registration->update(['status' => 'withdrawn']);
+            app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
+        });
 
         if ($headId) {
             app(FestRegistrationApprovalService::class)->promoteNextWaitlisted($event, (int) $headId);
@@ -83,47 +95,66 @@ class FestRegistrationService
         $headId = $registration->item?->head_id;
         $participantIds = $registration->participants->pluck('id');
 
-        $feeBefore = $feeService->currentFeeRecordFor($event, $registration->school_id);
-        $dueBefore = (float) ($feeBefore?->total_due ?? 0);
-        $paidBefore = (float) ($feeBefore?->amount_paid ?? 0);
+        // Lock the school's aggregate fee record for the duration of the snapshot/update/
+        // credit critical section, so a concurrent cancel/reject on the same school can't
+        // interleave and produce a wrong delta or a duplicate credit. Notifier/audit calls
+        // stay outside, after commit. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4.
+        $creditAmount = DB::transaction(function () use ($event, $registration, $feeService, $reason, $participantIds) {
+            FestSchoolEventFee::where('event_id', $event->id)
+                ->where('school_id', $registration->school_id)
+                ->whereNull('head_id')
+                ->lockForUpdate()
+                ->first();
 
-        $registration->update(['status' => 'withdrawn']);
+            $feeBefore = $feeService->currentFeeRecordFor($event, $registration->school_id);
+            $dueBefore = (float) ($feeBefore?->total_due ?? 0);
+            $paidBefore = (float) ($feeBefore?->amount_paid ?? 0);
 
-        // Free the chest number and drop any marks — this registration is no longer a
-        // competing entry. Deleting (not orphaning) marks avoids a cancelled participant's
-        // score lingering in any not-yet-published scoreboard calculation.
-        if ($participantIds->isNotEmpty()) {
-            FestMark::whereIn('participant_id', $participantIds)->delete();
-            FestParticipant::whereIn('id', $participantIds)->update(['chest_no' => null]);
-        }
+            $registration->update(['status' => 'withdrawn']);
 
-        $feeAfter = $feeService->recalculate($event, $registration->school_id);
+            // Free the chest number and drop any marks — this registration is no longer a
+            // competing entry. Deleting (not orphaning) marks avoids a cancelled participant's
+            // score lingering in any not-yet-published scoreboard calculation.
+            if ($participantIds->isNotEmpty()) {
+                FestMark::whereIn('participant_id', $participantIds)->delete();
+                FestParticipant::whereIn('id', $participantIds)->update(['chest_no' => null]);
+            }
 
-        $reduction = round($dueBefore - (float) $feeAfter->total_due, 2);
-        $creditAmount = null;
-        if ($reduction > 0 && $paidBefore > 0) {
-            $creditAmount = min($reduction, $paidBefore);
-            $credit = FestFeeCredit::create([
-                'fest_school_event_fee_id' => $feeAfter->id,
-                'source_registration_id' => $registration->id,
-                'amount' => $creditAmount,
-                'reason' => 'Registration cancelled after payment: '.$reason,
-                'created_by_user_id' => auth()->id(),
-            ]);
+            $feeAfter = $feeService->recalculate($event, $registration->school_id);
 
-            app(PlatformAuditLogger::class)->log(
-                action: 'fest_fee_credit.issued',
-                description: "Fee credit of ₹{$credit->amount} issued — registration #{$registration->id} cancelled after payment ({$reason})",
-                subject: $credit,
-                properties: [
-                    'event_id' => $event->id,
-                    'school_id' => $registration->school_id,
-                    'registration_id' => $registration->id,
-                    'amount' => (float) $credit->amount,
-                ],
-                category: 'finance',
-            );
-        }
+            $reduction = round($dueBefore - (float) $feeAfter->total_due, 2);
+            $creditAmount = null;
+            if ($reduction > 0 && $paidBefore > 0) {
+                $creditAmount = min($reduction, $paidBefore);
+                $credit = FestFeeCredit::create([
+                    'fest_school_event_fee_id' => $feeAfter->id,
+                    'source_registration_id' => $registration->id,
+                    'amount' => $creditAmount,
+                    'reason' => 'Registration cancelled after payment: '.$reason,
+                    'created_by_user_id' => auth()->id(),
+                ]);
+
+                // See FestRegistrationBulkService::rejectMany() for the identical hook — reduces
+                // recognized income for this event and records the liability owed back to the
+                // school, without touching CASH-BANK. FestFeeLedgerService::postCreditIssued().
+                app(FestFeeLedgerService::class)->postCreditIssued($credit);
+
+                app(PlatformAuditLogger::class)->log(
+                    action: 'fest_fee_credit.issued',
+                    description: "Fee credit of ₹{$credit->amount} issued — registration #{$registration->id} cancelled after payment ({$reason})",
+                    subject: $credit,
+                    properties: [
+                        'event_id' => $event->id,
+                        'school_id' => $registration->school_id,
+                        'registration_id' => $registration->id,
+                        'amount' => (float) $credit->amount,
+                    ],
+                    category: 'finance',
+                );
+            }
+
+            return $creditAmount;
+        });
 
         if ($headId) {
             app(FestRegistrationApprovalService::class)->promoteNextWaitlisted($event, (int) $headId);

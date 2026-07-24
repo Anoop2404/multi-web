@@ -13,6 +13,7 @@ use App\Models\FestSchoolEventFeeLine;
 use App\Models\FestStateProgram;
 use App\Models\Tenant;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use App\Support\TenantStorage;
 
@@ -341,6 +342,9 @@ class FestSchoolEventFeeService
             }
         }
 
+        // Snapshot before overwriting total_due — see demoteSiblingApprovals() for why.
+        $wasFullyPaidAndApproved = $record->exists && $record->status === 'approved' && $record->isFullyPaid();
+
         $record->fill([
             'head_id' => null,
             'school_registration_fee' => $composite['school_reg'],
@@ -358,6 +362,11 @@ class FestSchoolEventFeeService
         // around forever afterward, even once the real amount was recalculated and
         // even if the school's uploaded proof was never actually approved by an admin.
         $record->refreshPaidState();
+        $this->applyAvailableCredit($record, $event);
+
+        if ($wasFullyPaidAndApproved && ! $record->isFullyPaid()) {
+            $this->demoteSiblingApprovals($event, $schoolId, $record);
+        }
 
         if ($this->supportsFeeLines()) {
             $this->syncFeeLines($record, $composite['lines']);
@@ -575,6 +584,9 @@ class FestSchoolEventFeeService
             'school_id' => $schoolId,
         ]);
 
+        // Snapshot before overwriting total_due — see demoteSiblingApprovals() for why.
+        $wasFullyPaidAndApproved = $record->exists && $record->status === 'approved' && $record->isFullyPaid();
+
         $record->fill(array_filter([
             'school_registration_fee' => $schoolRegFee,
             'student_registration_fee' => $this->supportsSportsCompositeSchema() ? $studentRegFee : null,
@@ -588,6 +600,11 @@ class FestSchoolEventFeeService
         // Derive status from the actual receipt state rather than preserving whatever
         // was stored — see recalculateForSportsEvent() for the incident this fixes.
         $record->refreshPaidState();
+        $this->applyAvailableCredit($record, $event);
+
+        if ($wasFullyPaidAndApproved && ! $record->isFullyPaid()) {
+            $this->demoteSiblingApprovals($event, $schoolId, $record);
+        }
 
         if ($useComposite && $this->supportsFeeLines()) {
             $this->syncFeeLines($record, $compositeLines);
@@ -636,6 +653,15 @@ class FestSchoolEventFeeService
         ]);
         $record->save();
 
+        // Deliberately NOT wired into applyAvailableCredit(): this rollup's amount_paid is a
+        // manual sum of child per-head records, not driven by this record's own receipts() —
+        // calling refreshPaidState() on it (which applyAvailableCredit() needs, to fold a new
+        // synthetic credit receipt into amount_paid) would reset amount_paid to just that one
+        // receipt and wipe out the real head-level totals summed above. Per-head billing is
+        // already legacy/transitional (see usesPerHeadBilling()'s docblock — reachable only for
+        // a sports season hub with no discipline children yet), so outstanding FestFeeCredit
+        // rows against this head_id=null record are tracked (visible on the credit badge) but
+        // not auto-consumed here. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.2.
         return $record;
     }
 
@@ -924,6 +950,127 @@ class FestSchoolEventFeeService
         }
 
         return round($applied, 2);
+    }
+
+    /**
+     * Auto-apply any outstanding, unapplied FestFeeCredit against this fee record's unpaid
+     * balance — additive, zero effect for the common case (no credit, or nothing outstanding).
+     * Scoped to head_id = null records only, matching where rejectMany()/cancelWithRefund()
+     * actually create FestFeeCredit rows (see currentFeeRecordFor()'s docblock) — a no-op for
+     * per-head-billed records.
+     *
+     * Deliberately does NOT fold the credit into total_due or write amount_paid directly —
+     * refreshPaidState() recomputes amount_paid from scratch as sum(approved FeeReceipt) every
+     * time it runs (see TracksPartialPayments), so anything bypassing that would be silently
+     * discarded on the very next recalculate(). Instead this creates a system-generated,
+     * already-approved FeeReceipt (is_system_credit = true, no real proof file — see
+     * FeeReceipt::isSystemCredit()) for the amount actually covered, so refreshPaidState()'s
+     * own math picks it up exactly like a real payment. This makes it idempotent: once created,
+     * the receipt persists and the underlying FestFeeCredit rows are marked applied_at in the
+     * same transaction, so repeated recalculate() calls never double-apply the same credit —
+     * unlike netting credit into total_due directly, which would have reset back to the gross
+     * amount on the very next call once the credit rows were marked consumed.
+     *
+     * Locks the fee row for the duration of the check-and-apply so two concurrent
+     * recalculate() calls for the same school can't both see the same outstanding credit and
+     * apply it twice (see markCreditsApplied()'s oldest-first, whole-row-only consumption).
+     *
+     * See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.2/§13.3.
+     */
+    private function applyAvailableCredit(FestSchoolEventFee $record, FestEvent $event): void
+    {
+        if ($record->head_id !== null || ! $record->exists) {
+            return;
+        }
+
+        if ($record->outstandingBalance() <= 0 || $record->outstandingCredit() <= 0) {
+            return;
+        }
+
+        $receipt = DB::transaction(function () use ($record) {
+            $locked = FestSchoolEventFee::whereKey($record->id)->lockForUpdate()->first();
+            if (! $locked) {
+                return null;
+            }
+
+            $creditToApply = round(min($locked->outstandingBalance(), $locked->outstandingCredit()), 2);
+            if ($creditToApply <= 0) {
+                return null;
+            }
+
+            $receipt = FeeReceipt::create([
+                'feeable_type' => FestSchoolEventFee::class,
+                'feeable_id' => $locked->id,
+                'file_path' => 'system://fee-credit-adjustment',
+                'transaction_ref' => 'CREDIT-OFFSET',
+                'bank_name' => 'Fee Credit Adjustment',
+                'payment_date' => now()->toDateString(),
+                'amount' => $creditToApply,
+                'status' => 'approved',
+                'is_system_credit' => true,
+                'reviewed_at' => now(),
+            ]);
+
+            if (! $locked->fee_receipt_id) {
+                $locked->update(['fee_receipt_id' => $receipt->id]);
+            }
+
+            $locked->refreshPaidState();
+            $this->markCreditsApplied($locked, $creditToApply);
+
+            return $receipt;
+        });
+
+        if ($receipt) {
+            $record->refresh();
+            app(FestFeeLedgerService::class)->postCreditConsumed($receipt->fresh(), $event, (float) $receipt->amount);
+        }
+    }
+
+    /**
+     * When a school adds a new item after the rest of their registrations for this
+     * event/head were already approved-and-fully-paid, and the resulting total_due now
+     * exceeds amount_paid again, demote every other 'approved' registration for that
+     * school+event back to 'submitted' — "approved" should always mean "currently backed
+     * by payment," not "was paid once, before something else got added." Deliberately
+     * does NOT touch chest numbers or marks (unlike cancelWithRefund()) — this is a
+     * payment-status reversal, not a withdrawal; the registration itself is untouched and
+     * simply needs the fee settled again before FestRegistrationApprovalService::
+     * approveSchoolEvent() re-approves it. Scoped to head_id = null callers only (the two
+     * non-per-head recalculate() paths) — per-head billing is legacy/rare (see
+     * usesPerHeadBilling()'s docblock) and out of scope here, same as
+     * recalculateAggregateForPerHeadEvent().
+     *
+     * Product decision confirmed 24 Jul 2026: always demote (no exception for results
+     * already published) — see docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §5.
+     */
+    private function demoteSiblingApprovals(FestEvent $event, string $schoolId, FestSchoolEventFee $fee): void
+    {
+        $registrations = FestRegistration::where('event_id', $event->id)
+            ->where('school_id', $schoolId)
+            ->where('status', 'approved')
+            ->get(['id']);
+
+        if ($registrations->isEmpty()) {
+            return;
+        }
+
+        FestRegistration::whereIn('id', $registrations->pluck('id'))
+            ->update(['status' => 'submitted']);
+
+        app(\App\Services\Audit\PlatformAuditLogger::class)->log(
+            action: 'fest.registration.demoted_unpaid',
+            description: "{$registrations->count()} approved registration(s) demoted back to submitted — school's balance for \"{$event->title}\" is unpaid again after new items were added",
+            subject: $fee,
+            properties: [
+                'event_id' => $event->id,
+                'school_id' => $schoolId,
+                'registration_ids' => $registrations->pluck('id')->all(),
+                'total_due' => (float) $fee->total_due,
+                'amount_paid' => (float) $fee->amount_paid,
+            ],
+            category: 'finance',
+        );
     }
 
     /**

@@ -315,4 +315,14 @@ class UnifiedPaymentsController extends SahodayaAdminController
             default => abort(422),
         };
     }
+
+    public function proof(string $tenantId, FeeReceipt $feeReceipt)
+    {
+        abort_if($feeReceipt->isSystemCredit() || ! $feeReceipt->file_path, 404, 'No payment proof uploaded.');
+
+        $disk = \Illuminate\Support\Facades\Storage::disk('local');
+        abort_unless($disk->exists($feeReceipt->file_path), 404, 'Payment proof file not found.');
+
+        return response()->file($disk->path($feeReceipt->file_path));
+    }
 }

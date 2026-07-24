@@ -81,4 +81,15 @@ class PaymentHistoryController extends SchoolAdminController
 
         return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
     }
+
+    public function programProof(string $tenantId, FeeReceipt $feeReceipt, ProgramFeeReceiptService $receiptService)
+    {
+        abort_if($receiptService->schoolIdForReceipt($feeReceipt) !== $this->school->id, 403);
+        abort_if($feeReceipt->isSystemCredit() || ! $feeReceipt->file_path, 404, 'No payment proof uploaded.');
+
+        $disk = \Illuminate\Support\Facades\Storage::disk('local');
+        abort_unless($disk->exists($feeReceipt->file_path), 404, 'Payment proof file not found.');
+
+        return response()->file($disk->path($feeReceipt->file_path));
+    }
 }

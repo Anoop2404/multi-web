@@ -5,8 +5,10 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\FestFeeCredit;
 use App\Models\FestRegistration;
+use App\Models\FestSchoolEventFee;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\EventLifecycleGate;
+use Illuminate\Support\Facades\DB;
 
 class FestRegistrationBulkService
 {
@@ -70,32 +72,55 @@ class FestRegistrationBulkService
             ->when($itemId, fn ($q) => $q->where('item_id', $itemId));
 
         foreach ($query->get() as $registration) {
-            // Snapshot the fee record before rejecting, so we can measure what this
-            // rejection actually reduced total_due by — fee-model-agnostic, so it works
-            // the same for flat/tiered/per-item/composite billing. See
-            // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §9.2 for the full rationale.
-            $feeBefore = $feeService->currentFeeRecordFor($event, $registration->school_id);
-            $dueBefore = (float) ($feeBefore?->total_due ?? 0);
-            $paidBefore = (float) ($feeBefore?->amount_paid ?? 0);
+            // Only the DB-mutating snapshot/update/credit critical section is locked and
+            // transactional — notifier/audit calls happen after commit, outside the lock, so a
+            // slow mail/notification dispatch never holds the row lock open. See
+            // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4.
+            DB::transaction(function () use ($event, $registration, $feeService) {
+                // Lock the school's aggregate fee record (if one exists yet) for the duration
+                // of the before/after snapshot below, so two reject/cancel actions racing on
+                // the same school can't both read the same "before" state and either compute
+                // a wrong delta or double-issue a credit.
+                FestSchoolEventFee::where('event_id', $event->id)
+                    ->where('school_id', $registration->school_id)
+                    ->whereNull('head_id')
+                    ->lockForUpdate()
+                    ->first();
 
-            $registration->update(['status' => 'rejected']);
-            $feeAfter = $feeService->recalculate($event, $registration->school_id);
+                // Snapshot the fee record before rejecting, so we can measure what this
+                // rejection actually reduced total_due by — fee-model-agnostic, so it works
+                // the same for flat/tiered/per-item/composite billing. See
+                // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §9.2 for the full rationale.
+                $feeBefore = $feeService->currentFeeRecordFor($event, $registration->school_id);
+                $dueBefore = (float) ($feeBefore?->total_due ?? 0);
+                $paidBefore = (float) ($feeBefore?->amount_paid ?? 0);
 
-            // If the school had already paid something and this rejection freed up part of
-            // what they owe, record the freed amount (capped at what was actually paid) as
-            // an outstanding credit rather than letting it silently disappear into an
-            // "overpaid" balance nobody tracks. Deliberately does NOT touch total_due,
-            // amount_paid, or receipt status — this is purely an additive record.
-            $reduction = round($dueBefore - (float) $feeAfter->total_due, 2);
-            if ($reduction > 0 && $paidBefore > 0) {
-                FestFeeCredit::create([
-                    'fest_school_event_fee_id' => $feeAfter->id,
-                    'source_registration_id' => $registration->id,
-                    'amount' => min($reduction, $paidBefore),
-                    'reason' => 'Registration rejected after payment',
-                    'created_by_user_id' => auth()->id(),
-                ]);
-            }
+                $registration->update(['status' => 'rejected']);
+                $feeAfter = $feeService->recalculate($event, $registration->school_id);
+
+                // If the school had already paid something and this rejection freed up part of
+                // what they owe, record the freed amount (capped at what was actually paid) as
+                // an outstanding credit rather than letting it silently disappear into an
+                // "overpaid" balance nobody tracks. Deliberately does NOT touch total_due,
+                // amount_paid, or receipt status — this is purely an additive record.
+                $reduction = round($dueBefore - (float) $feeAfter->total_due, 2);
+                if ($reduction > 0 && $paidBefore > 0) {
+                    $credit = FestFeeCredit::create([
+                        'fest_school_event_fee_id' => $feeAfter->id,
+                        'source_registration_id' => $registration->id,
+                        'amount' => min($reduction, $paidBefore),
+                        'reason' => 'Registration rejected after payment',
+                        'created_by_user_id' => auth()->id(),
+                    ]);
+
+                    // Reduce recognized income for this event by the credited amount and record
+                    // the liability now owed back to the school — see
+                    // FestFeeLedgerService::postCreditIssued() and
+                    // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13 for why this does NOT touch
+                    // CASH-BANK (no cash has moved).
+                    app(FestFeeLedgerService::class)->postCreditIssued($credit);
+                }
+            });
 
             $notifier->registrationRejected($registration);
             $audit->festRegistrationRejected($registration);

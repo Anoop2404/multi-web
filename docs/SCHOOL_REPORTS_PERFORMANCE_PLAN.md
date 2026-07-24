@@ -1,6 +1,12 @@
 # School Sports Reports — Performance & Scale Fix Plan
 
 Scope: the same report set fixed in `docs/SCHOOL_SPORTS_ITEM_HEAD_REPORTS_PLAN.md`, this time for query-count and unpaginated-result-set problems rather than correctness. Written for the specific question: will these hold up for a school with ~3,000 students?
+
+This is the detail doc for `docs/SCALE_AND_PAGINATION_PLAN.md` §12 ("third sweep") — that doc already found and fixed a near-identical N+1 storm in `FestSchoolReportController::studentWise()` (§7 there: ~9,000 queries for a 3,000-student school) and an unpaginated-list problem in the registration picker (§6/§8 there). This plan is the same bug class showing up again in a report set those two sweeps didn't cover. Read `SCALE_AND_PAGINATION_PLAN.md` first for the established conventions this plan reuses rather than reinvents:
+- Batch-fetch-then-group-in-PHP, exactly as `FestSchoolReportController::studentWiseLookups()` now does (its docblock explicitly cites the incident this fixed) — the reference implementation for §2 below.
+- `paginate(50)->withQueryString()` for list pages, the existing convention (`FestPaymentsController.php:40`, `MemberSchoolsController.php:36`) — the reference for §3 below.
+- Its §11 caveats apply here too: nothing below has been run against a live database, and a fourth sweep would likely find a fifth thing.
+
 Status: **plan only — no code changes yet.**
 
 ## 1. Two different problems, two different fixes

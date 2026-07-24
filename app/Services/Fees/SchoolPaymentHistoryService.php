@@ -196,6 +196,7 @@ class SchoolPaymentHistoryService
             'reviewed_by'          => $f->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $f->feeReceipt?->transaction_ref,
             'receipt_number'       => $f->feeReceipt?->receipt_number,
+            'proof_url'            => $this->programProofUrl($f->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId, $f->event, $f->id),
             'receipt_url'          => $this->programReceiptUrl($f->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId, $f->event),
             'receipt_email_status' => $f->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $f->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -232,6 +233,7 @@ class SchoolPaymentHistoryService
             'reviewed_by'          => $r->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $r->feeReceipt?->transaction_ref,
             'receipt_number'       => $r->feeReceipt?->receipt_number,
+            'proof_url'            => $this->programProofUrl($r->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_url'          => $this->programReceiptUrl($r->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $r->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $r->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -268,6 +270,7 @@ class SchoolPaymentHistoryService
             'reviewed_by'          => $f->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $f->feeReceipt?->transaction_ref,
             'receipt_number'       => $f->feeReceipt?->receipt_number,
+            'proof_url'            => $this->programProofUrl($f->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_url'          => $this->programReceiptUrl($f->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $f->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $f->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -304,6 +307,7 @@ class SchoolPaymentHistoryService
             'reviewed_by'          => $f->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $f->feeReceipt?->transaction_ref,
             'receipt_number'       => $f->feeReceipt?->receipt_number,
+            'proof_url'            => $this->programProofUrl($f->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_url'          => $this->programReceiptUrl($f->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $f->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $f->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -338,6 +342,7 @@ class SchoolPaymentHistoryService
             'reviewed_by'          => $r->feeReceipt?->reviewedBy?->name,
             'transaction_ref'      => $r->feeReceipt?->transaction_ref,
             'receipt_number'       => $r->feeReceipt?->receipt_number,
+            'proof_url'            => $this->programProofUrl($r->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_url'          => $this->programReceiptUrl($r->feeReceipt, $schoolId, $urlSchoolId, $sahodayaId),
             'receipt_email_status' => $r->feeReceipt?->receipt_email_status,
             'receipt_emailed_at'   => $r->feeReceipt?->receipt_emailed_at?->toDateTimeString(),
@@ -369,13 +374,48 @@ class SchoolPaymentHistoryService
         return null;
     }
 
-    private function membershipProofUrl(MembershipPayment $payment, ?string $urlSchoolId): ?string
+    private function membershipProofUrl(MembershipPayment $payment, ?string $urlSchoolId, ?string $sahodayaId = null): ?string
     {
-        if (! $urlSchoolId || ! $payment->payment_proof_path) {
+        if (! $payment->payment_proof_path) {
             return null;
         }
 
-        return "/school-admin/{$urlSchoolId}/registration/payments/{$payment->id}/proof";
+        if ($urlSchoolId) {
+            return "/school-admin/{$urlSchoolId}/registration/payments/{$payment->id}/proof";
+        }
+
+        if ($sahodayaId) {
+            return "/sahodaya-admin/{$sahodayaId}/membership/payments/{$payment->id}/proof";
+        }
+
+        return null;
+    }
+
+    private function programProofUrl(
+        ?FeeReceipt $receipt,
+        string $schoolId,
+        ?string $urlSchoolId,
+        ?string $sahodayaId,
+        ?FestEvent $event = null,
+        ?int $schoolFeeId = null,
+    ): ?string {
+        if (! $receipt || ! $receipt->file_path || $receipt->isSystemCredit()) {
+            return null;
+        }
+
+        if ($urlSchoolId) {
+            return "/school-admin/{$urlSchoolId}/payments/receipts/{$receipt->id}/proof";
+        }
+
+        if ($sahodayaId) {
+            if ($event && $schoolFeeId) {
+                return "/sahodaya-admin/{$sahodayaId}/events/{$event->id}/school-fees/{$schoolFeeId}/proof";
+            }
+
+            return "/sahodaya-admin/{$sahodayaId}/finance/payments/receipts/{$receipt->id}/proof";
+        }
+
+        return null;
     }
 
     private function programReceiptUrl(

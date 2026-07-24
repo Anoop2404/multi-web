@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FeeReceipt;
 use App\Models\FestEvent;
+use App\Models\FestFeeCredit;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Models\LedgerTransaction;
@@ -56,6 +57,86 @@ class FestFeeLedgerService
     public function postReversal(FeeReceipt $receipt, string $tenantId): void
     {
         app(LedgerPostingService::class)->postReceiptReversal($receipt, $tenantId);
+    }
+
+    /**
+     * Post the income-reducing / liability-creating leg for a newly issued FestFeeCredit
+     * (a paid item rejected, or a paid registration cancelled-with-refund). Debits this
+     * event's income head — undoing recognition of income for money now owed back to the
+     * school — and credits the dedicated FEE-CREDIT-PAYABLE liability head. Deliberately
+     * does NOT touch CASH-BANK: no cash has moved, the school's money is still sitting in
+     * the bank exactly as it was when the original receipt posted, only no longer earned
+     * against this item. Idempotent per credit row via postJournal()'s existing
+     * reference_type/reference_id dedup (keyed on FestFeeCredit::class + $credit->id), so
+     * calling this twice for the same credit is a no-op the second time.
+     * See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.
+     */
+    public function postCreditIssued(FestFeeCredit $credit): ?LedgerTransaction
+    {
+        $fee = $credit->schoolEventFee()->with('event', 'school')->first();
+        if (! $fee?->event) {
+            return null;
+        }
+
+        $event = $fee->event;
+        $incomeCode = LedgerAccountCatalog::festIncomeCode($event);
+        $posting = app(LedgerPostingService::class);
+
+        $posting->ensureHead(
+            $event->tenant_id,
+            $incomeCode,
+            LedgerAccountCatalog::festIncomeHeadName($event),
+            LedgerAccountCatalog::festIncomeCategory($event),
+            $event->id,
+        );
+        $posting->ensureHead($event->tenant_id, 'FEE-CREDIT-PAYABLE');
+
+        $description = "Fee credit issued — {$fee->school?->name} — {$event->title} ({$credit->reason})";
+
+        $rows = $posting->postJournal($event->tenant_id, [
+            ['code' => $incomeCode, 'entry_type' => 'debit', 'amount' => $credit->amount, 'description' => $description],
+            ['code' => 'FEE-CREDIT-PAYABLE', 'entry_type' => 'credit', 'amount' => $credit->amount, 'description' => $description],
+        ], FestFeeCredit::class, $credit->id, now()->toDateString(), $credit->created_by_user_id);
+
+        return $rows[1] ?? $rows[0] ?? null;
+    }
+
+    /**
+     * Post the reverse leg when a previously issued credit is applied against a school's
+     * new outstanding balance (FestSchoolEventFeeService::applyAvailableCredit()). Debits
+     * FEE-CREDIT-PAYABLE (the liability has now been used) and credits the *consuming*
+     * event's income head (this fee is now considered earned — funded by cash already
+     * recorded in CASH-BANK back when the original, credit-generating receipt was posted,
+     * so CASH-BANK is untouched here too, exactly as in postCreditIssued()). Idempotent
+     * per synthetic receipt via postJournal()'s dedup (keyed on FeeReceipt::class +
+     * $syntheticReceipt->id) — safe even if called more than once for the same receipt.
+     */
+    public function postCreditConsumed(FeeReceipt $syntheticReceipt, FestEvent $event, float $amount): ?LedgerTransaction
+    {
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $incomeCode = LedgerAccountCatalog::festIncomeCode($event);
+        $posting = app(LedgerPostingService::class);
+
+        $posting->ensureHead(
+            $event->tenant_id,
+            $incomeCode,
+            LedgerAccountCatalog::festIncomeHeadName($event),
+            LedgerAccountCatalog::festIncomeCategory($event),
+            $event->id,
+        );
+        $posting->ensureHead($event->tenant_id, 'FEE-CREDIT-PAYABLE');
+
+        $description = "Fee credit applied — {$event->title}";
+
+        $rows = $posting->postJournal($event->tenant_id, [
+            ['code' => 'FEE-CREDIT-PAYABLE', 'entry_type' => 'debit', 'amount' => $amount, 'description' => $description],
+            ['code' => $incomeCode, 'entry_type' => 'credit', 'amount' => $amount, 'description' => $description],
+        ], FeeReceipt::class, $syntheticReceipt->id, now()->toDateString(), null);
+
+        return $rows[1] ?? $rows[0] ?? null;
     }
 
     /** @return array{0: ?string, 1: ?string, 2: ?string} */

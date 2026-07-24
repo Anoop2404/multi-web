@@ -27,6 +27,13 @@ class LedgerAccountCatalog
             'ADMIN-EXP'        => ['name' => 'Administrative Expenses', 'type' => 'expense', 'category' => 'expense'],
             'OPENING-BAL'      => ['name' => 'Opening Balance Equity', 'type' => 'liability', 'category' => 'other'],
             'ACC-PAYABLE'      => ['name' => 'Accounts Payable', 'type' => 'liability', 'category' => 'expense'],
+            // Money owed back to a school after a paid registration was rejected or
+            // cancelled-with-refund (FestFeeCredit), until it's consumed against a later
+            // fee. NOT the same as ACC-PAYABLE (vendor/expense payables) — kept distinct so
+            // Financial Statements can show "owed to schools" separately from operating
+            // payables. See FestFeeLedgerService::postCreditIssued()/postCreditConsumed()
+            // and docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.
+            'FEE-CREDIT-PAYABLE' => ['name' => 'Fee Credits Payable to Schools', 'type' => 'liability', 'category' => 'other'],
             default            => [
                 'name'     => match (true) {
                     str_starts_with($code, 'SPT-') => 'Sports meet fees',
@@ -113,7 +120,7 @@ class LedgerAccountCatalog
     /** @return list<string> */
     public static function defaultCodes(): array
     {
-        return ['CASH-BANK', 'MEMBERSHIP', 'EVENT-FEE', 'TRAINING-FEE', 'MCQ-FEE', 'SPORTS-FEE', 'STATE-REMITTANCE', 'AWARDS-FUND', 'VENUE-COST', 'CATERING', 'PRINTING', 'TRAVEL-REIMB', 'PRIZES', 'HONORARIUM', 'ADMIN-EXP', 'OPENING-BAL', 'ACC-PAYABLE'];
+        return ['CASH-BANK', 'MEMBERSHIP', 'EVENT-FEE', 'TRAINING-FEE', 'MCQ-FEE', 'SPORTS-FEE', 'STATE-REMITTANCE', 'AWARDS-FUND', 'VENUE-COST', 'CATERING', 'PRINTING', 'TRAVEL-REIMB', 'PRIZES', 'HONORARIUM', 'ADMIN-EXP', 'OPENING-BAL', 'ACC-PAYABLE', 'FEE-CREDIT-PAYABLE'];
     }
 
     /** @return array<string, string> */

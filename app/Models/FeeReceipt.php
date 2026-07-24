@@ -28,6 +28,7 @@ class FeeReceipt extends Model
         'uploaded_by_user_id', 'reviewed_by', 'reviewed_at',
         'reversed_by', 'reversed_at', 'reversal_reason',
         'receipt_emailed_at', 'receipt_email_status', 'receipt_email_error', 'receipt_email_resend_count',
+        'is_system_credit',
     ];
 
     protected $casts = [
@@ -38,6 +39,7 @@ class FeeReceipt extends Model
         'reversed_at'  => 'datetime',
         'receipt_emailed_at' => 'datetime',
         'rejection_history' => 'array',
+        'is_system_credit' => 'boolean',
     ];
 
     public function feeable(): MorphTo
@@ -78,6 +80,17 @@ class FeeReceipt extends Model
     public function isReversed(): bool
     {
         return $this->status === self::STATUS_REVERSED;
+    }
+
+    /**
+     * True for a system-generated "receipt" created when an outstanding FestFeeCredit is
+     * auto-applied against a new balance (FestSchoolEventFeeService::applyAvailableCredit()) —
+     * carries a placeholder file_path, not a real uploaded proof. Callers that serve/download
+     * `file_path` (e.g. FestSchoolEventFeeController::proof()) must check this first.
+     */
+    public function isSystemCredit(): bool
+    {
+        return (bool) $this->is_system_credit;
     }
 
     /** Append a rejection event to the history array, mirroring BoardResult::correction_history. */
