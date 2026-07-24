@@ -280,7 +280,7 @@ class FestNumberingService
         // Team/group items: one chest number per squad (FestGroup), not per member.
         FestGroup::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
-            ->where('status', 'approved')
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($item, fn ($q2) => $q2->where('item_id', $item->id))
             ->whereHas('item', fn ($qi) => $qi->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)))
             ->with('registration.item')
@@ -298,7 +298,7 @@ class FestNumberingService
 
         FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
-            ->where('status', 'approved')
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($item, fn ($q2) => $q2->where('item_id', $item->id))
             ->whereDoesntHave('item', fn ($qi) => $qi->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)))
             ->with('registration.item')

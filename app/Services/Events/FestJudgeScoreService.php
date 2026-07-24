@@ -21,7 +21,7 @@ class FestJudgeScoreService
     {
         $participant = FestParticipant::with('registration')->findOrFail($data['participant_id']);
         abort_if($participant->registration->event_id !== $event->id, 403);
-        abort_if($participant->registration->status !== 'approved', 422, 'Scores can only be entered for approved registrations.');
+        abort_if(in_array($participant->registration->status, ['rejected', 'withdrawn'], true), 422, 'Scores cannot be entered for withdrawn or rejected registrations.');
         abort_if($participant->participant_role === 'standby', 422, 'Standby participants cannot receive scores.');
         abort_if($participant->disqualified_at !== null, 422, 'Disqualified participants cannot receive scores.');
 

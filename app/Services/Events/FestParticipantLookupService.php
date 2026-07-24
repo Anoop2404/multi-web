@@ -58,7 +58,7 @@ class FestParticipantLookupService
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
                 ->where('event_id', $event->id)
-                ->where('status', 'approved'))
+                ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->with(['student:id,reg_no,name', 'teacher:id,reg_no,name', 'registration.item:id,title', 'registration.school:id,name,school_prefix'])
             ->orderBy('chest_no')
             ->get()

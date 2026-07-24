@@ -60,7 +60,7 @@ class FestMarkEntryController extends SahodayaAdminController
         $itemIds = $itemId ? [$itemId] : [];
 
         $registrations = FestRegistration::where('event_id', $event->id)
-            ->where('status', 'approved')
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($itemIds !== [], fn ($q) => $q->whereIn('item_id', $itemIds))
             ->when($itemIds === [], fn ($q) => $q->whereRaw('1 = 0'))
             ->with(['item', 'school', 'participants.student', 'participants.teacher', 'participants.group'])
@@ -259,7 +259,7 @@ class FestMarkEntryController extends SahodayaAdminController
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
                 ->where('event_id', $event->id)
                 ->where('item_id', $item->id)
-                ->where('status', 'approved'))
+                ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->where('participant_role', '!=', 'standby')
             ->with(['student', 'teacher', 'registration.school', 'group'])
             ->get();
@@ -340,7 +340,7 @@ class FestMarkEntryController extends SahodayaAdminController
             $participants = FestParticipant::whereHas('registration', fn ($q) => $q
                     ->where('event_id', $event->id)
                     ->where('item_id', $item->id)
-                    ->where('status', 'approved'))
+                    ->whereNotIn('status', ['rejected', 'withdrawn']))
                 ->where('participant_role', '!=', 'standby')
                 ->with(['student', 'teacher', 'registration.school', 'group'])
                 ->get();
