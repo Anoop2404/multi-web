@@ -39,7 +39,7 @@ class FestMarkCoordinatorController extends Controller
             $participantCount = FestParticipant::query()
                 ->whereHas('registration', fn ($q) => $q
                     ->where('event_id', $event->id)
-                    ->where('status', 'approved'))
+                    ->whereNotIn('status', ['rejected', 'withdrawn']))
                 ->count();
 
             $marksEntered = FestMark::where('event_id', $event->id)

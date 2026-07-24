@@ -455,7 +455,7 @@ class FestEventOpsController extends Controller
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
-            ->where('status', 'approved'))
+            ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->with(['registration.item', 'student', 'teacher'])
             ->get();
 

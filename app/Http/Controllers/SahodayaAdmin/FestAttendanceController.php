@@ -22,7 +22,7 @@ class FestAttendanceController extends SahodayaAdminController
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
-            ->where('status', 'approved'))
+            ->whereNotIn('status', ['rejected', 'withdrawn']))
             // Exclude unfilled standby slots and any row with no actual person
             // attached (student_id/teacher_id both null) — these aren't real
             // attendees and were showing up as blank rows with no name.
