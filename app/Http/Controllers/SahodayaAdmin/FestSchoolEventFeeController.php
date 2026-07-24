@@ -27,8 +27,11 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         abort_if($schoolEventFee->event_id !== $event->id, 403);
 
         $receipt = $schoolEventFee->receipts()->where('status', 'uploaded')->latest('id')->first()
-            ?? $schoolEventFee->feeReceipt;
-        abort_unless($receipt && $receipt->status === 'uploaded', 422, 'No uploaded proof to approve.');
+            ?? $schoolEventFee->feeReceipt
+            ?? $schoolEventFee->receipts()->where('status', 'rejected')->latest('id')->first()
+            ?? $schoolEventFee->receipts()->latest('id')->first();
+
+        abort_unless($receipt && in_array($receipt->status, ['uploaded', 'rejected', 'superseded'], true), 422, 'No proof available to approve.');
 
         $fullyPaid = DB::transaction(function () use ($request, $receipt, $schoolEventFee, $event) {
             // Lock this fee record for the duration of the approval + overpayment-

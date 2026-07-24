@@ -272,19 +272,27 @@
                                 </div>
 
                                 <div v-if="row.status === 'proof_uploaded'" class="flex items-center justify-end gap-1.5 pt-1">
-                                    <button type="button" @click="approve(row.id)" class="btn-primary !bg-emerald-600 hover:!bg-emerald-500 text-[11px] !py-1 !px-2.5 shadow-xs">
+                                    <button type="button" @click="approve(row.id, row.school)" class="btn-primary !bg-emerald-600 hover:!bg-emerald-500 text-[11px] !py-1 !px-2.5 shadow-xs">
                                         Approve ✓
                                     </button>
-                                    <button type="button" @click="reject(row.id)" class="btn-secondary text-[11px] !py-1 !px-2.5 !text-rose-700 hover:!bg-rose-50 shadow-xs">
+                                    <button type="button" @click="reject(row.id, row.school)" class="btn-secondary text-[11px] !py-1 !px-2.5 !text-rose-700 hover:!bg-rose-50 shadow-xs">
                                         Reject
                                     </button>
                                 </div>
 
                                 <div v-if="row.status === 'approved' || row.status === 'partial'" class="flex items-center justify-end gap-1.5 pt-1">
-                                    <button type="button" @click="reject(row.id)"
+                                    <button type="button" @click="reject(row.id, row.school)"
                                             title="Reject or reverse this payment proof to allow school to re-upload"
                                             class="text-[11px] font-semibold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded border border-rose-200 shadow-2xs transition">
                                         Reject / Reverse ✕
+                                    </button>
+                                </div>
+
+                                <div v-if="row.status === 'rejected'" class="flex items-center justify-end gap-1.5 pt-1">
+                                    <button type="button" @click="approve(row.id, row.school)"
+                                            title="Re-approve or verify this previously rejected payment proof"
+                                            class="btn-primary !bg-emerald-600 hover:!bg-emerald-500 text-[11px] !py-1 !px-2.5 shadow-xs">
+                                        Re-approve / Verify ✓
                                     </button>
                                 </div>
 
@@ -398,12 +406,12 @@
                     <button type="button" @click="activeProofModalRow = null" class="btn-secondary text-xs">Close</button>
 
                     <div class="flex items-center gap-2">
-                        <button v-if="activeProofModalRow.status === 'proof_uploaded'" type="button"
-                                @click="approve(activeProofModalRow.id)" class="btn-primary !bg-emerald-600 hover:!bg-emerald-500 text-xs shadow-xs">
-                            Approve Pending Proof ✓
+                        <button v-if="activeProofModalRow.status === 'proof_uploaded' || activeProofModalRow.status === 'rejected'" type="button"
+                                @click="approve(activeProofModalRow.id, activeProofModalRow.school)" class="btn-primary !bg-emerald-600 hover:!bg-emerald-500 text-xs shadow-xs">
+                            {{ activeProofModalRow.status === 'rejected' ? 'Re-approve / Verify Payment ✓' : 'Approve Pending Proof ✓' }}
                         </button>
                         <button v-if="activeProofModalRow.status === 'proof_uploaded' || activeProofModalRow.status === 'approved' || activeProofModalRow.status === 'partial'" type="button"
-                                @click="reject(activeProofModalRow.id)" class="btn-secondary text-xs text-rose-700 hover:bg-rose-50 shadow-xs">
+                                @click="reject(activeProofModalRow.id, activeProofModalRow.school)" class="btn-secondary text-xs text-rose-700 hover:bg-rose-50 shadow-xs">
                             {{ activeProofModalRow.status === 'approved' || activeProofModalRow.status === 'partial' ? 'Reject / Reverse Payment ✕' : 'Reject Pending Proof' }}
                         </button>
                     </div>
@@ -489,24 +497,34 @@ const filteredRows = computed(() => {
     return rows;
 });
 
-function approve(id) {
+function approve(id, schoolName = '') {
+    const targetName = schoolName || activeProofModalRow.value?.school || 'this school';
+    if (!confirm(`Are you sure you want to approve/verify the fee payment for "${targetName}"?`)) {
+        return;
+    }
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${id}/approve`, {}, {
         preserveScroll: true,
         onSuccess: () => { activeProofModalRow.value = null; },
     });
 }
 
-function reject(id) {
-    const reason = prompt('Rejection reason (optional):');
+function reject(id, schoolName = '') {
+    const targetName = schoolName || activeProofModalRow.value?.school || 'this school';
+    const reason = prompt(`Rejection / Reversal confirmation for "${targetName}".\n\nPlease enter reason for rejecting or reversing this payment (optional):`);
+    if (reason === null) return;
+
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${id}/reject`, {
-        rejection_reason: reason ?? '',
+        rejection_reason: reason,
     }, {
         preserveScroll: true,
         onSuccess: () => { activeProofModalRow.value = null; },
     });
 }
 
-function recalculateFee(id) {
+function recalculateFee(id, schoolName = '') {
+    if (!confirm(`Recalculate event fee for "${schoolName || 'this school'}" from current registered items?`)) {
+        return;
+    }
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${id}/recalculate`, {}, { preserveScroll: true });
 }
 
@@ -516,7 +534,8 @@ function partialShortfall(row) {
 
 function forceApprove(row) {
     const reason = prompt(
-        `This waives ₹${partialShortfall(row)} (the gap between total due and amount paid) and approves the school's registrations.\n`
+        `CONFIRM FORCE APPROVAL for "${row.school}":\n\n`
+        + `This waives ₹${partialShortfall(row)} (the gap between total due and amount paid) and approves the school's registrations.\n`
         + `Only do this if the uploaded receipt genuinely covers their current items. Reason (required):`
     );
     if (!reason) return;

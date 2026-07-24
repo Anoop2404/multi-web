@@ -58,6 +58,14 @@ class FestEventFeesController extends SahodayaAdminController
                 $pendingReceipt = $fee->receipts->firstWhere('status', 'uploaded');
                 $primaryReceipt = $pendingReceipt ?? $fee->feeReceipt ?? $fee->receipts->sortByDesc('id')->first();
 
+                $hasPendingProof = $pendingReceipt !== null
+                    || ($primaryReceipt && in_array($primaryReceipt->status, ['uploaded', 'submitted', 'proof_uploaded'], true));
+
+                $effectiveStatus = $fee->status;
+                if (($effectiveStatus === 'pending' || $effectiveStatus === 'submitted') && $hasPendingProof) {
+                    $effectiveStatus = 'proof_uploaded';
+                }
+
                 $allReceipts = $fee->receipts->sortByDesc('id')->values()->map(fn ($r) => [
                     'id'               => $r->id,
                     'status'           => $r->status,
@@ -76,7 +84,7 @@ class FestEventFeesController extends SahodayaAdminController
                     'school_id' => $fee->school_id,
                     'head' => $fee->head?->name,
                     'head_id' => $fee->head_id,
-                    'status' => $fee->status,
+                    'status' => $effectiveStatus,
                     'total_due' => $fee->total_due,
                     'amount_paid' => $fee->amount_paid,
                     'participation_item_count' => $fee->participation_item_count,
@@ -104,6 +112,7 @@ class FestEventFeesController extends SahodayaAdminController
             'total_paid' => $schoolFees->sum('amount_paid'),
             'pending'    => $schoolFees->where('status', 'pending')->count(),
             'awaiting'   => $schoolFees->where('status', 'proof_uploaded')->count(),
+            'approved'   => $schoolFees->where('status', 'approved')->count(),
         ];
 
         return $this->inertia('Sahodaya/Events/Fees', $this->withEventActivity($event, FestPageActivity::FEES, [
