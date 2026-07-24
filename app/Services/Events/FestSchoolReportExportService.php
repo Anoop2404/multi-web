@@ -85,7 +85,7 @@ class FestSchoolReportExportService
     /** @param list<array<string, mixed>> $rows */
     public function itemParticipantsExcel(FestEvent $event, int $itemId, array $rows): StreamedResponse
     {
-        $item = $event->items()->find($itemId);
+        $item = \App\Models\FestEventItem::whereIn('event_id', $event->reportableEventIds())->find($itemId);
         $title = $item?->title ?? 'item';
 
         $data = collect($rows)->map(fn (array $r) => [

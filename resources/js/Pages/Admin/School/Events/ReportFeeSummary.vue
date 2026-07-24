@@ -14,6 +14,9 @@
             <div class="card text-center">
                 <p class="text-2xl font-bold">₹{{ fee.total_due }}</p>
                 <p class="text-xs text-gray-500 mt-1">Total due</p>
+                <p v-if="fee.available_credit > 0" class="text-xs text-emerald-700 font-semibold mt-1">
+                    ₹{{ fee.available_credit }} credit owed to you
+                </p>
             </div>
             <div class="card text-center">
                 <p class="text-2xl font-bold text-emerald-700">₹{{ fee.paid }}</p>

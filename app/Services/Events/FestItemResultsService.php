@@ -31,7 +31,7 @@ class FestItemResultsService
         );
 
         $items = FestEventItem::query()
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('is_enabled', true)
             ->with('head:id,name,reg_start,reg_end,competition_start,competition_end')
             ->orderBy('display_order')
@@ -88,7 +88,7 @@ class FestItemResultsService
     {
         $participants = FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $event->reportableEventIds())
                 ->where('item_id', $itemId)
                 ->where('status', 'approved'))
             ->with([

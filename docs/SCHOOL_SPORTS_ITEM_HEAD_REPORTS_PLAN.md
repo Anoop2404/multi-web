@@ -1,7 +1,7 @@
 # School Admin — Sports Item/Head Reports: Fix Plan
 
 Scope: `school-admin/{sahodaya}/sports/reports/{event}` and everything it links to.
-Status: **plan only — no code changes yet.**
+Status: **implemented (24 Jul 2026).** See §9 for what was actually built, including several bugs found only once the fix was underway (broader than this original plan).
 
 ## 1. The problem in one paragraph
 
@@ -82,3 +82,36 @@ For each fixed report, confirm by reading the resulting query that:
 - Brace-balance / syntax sanity check (`grep -o "{" | wc -l` vs `}`) on every touched file, same discipline as the rest of this session's edits.
 
 Once this plan is approved, each numbered step above becomes its own implementation task, same as the payment/registration fixes earlier in this doc's sibling document.
+
+## 9. What was actually built (24 Jul 2026)
+
+The core fix landed as planned, plus a wider sweep once implementation started turning up the same bug in files this plan hadn't enumerated yet.
+
+**New shared helper.** `FestEvent::reportableEventIds(): array` (model method, not a service method as originally sketched — centralizing it on the model made it reusable from controllers and every service without DI). Returns `[$this->id]` normally; for a sports season hub, `[$this->id, ...child sport event ids]`. `studentWiseBrowserRows()` (already correct, pre-existing) was refactored to call this instead of duplicating the same inline logic — now there's exactly one implementation of the branch.
+
+**`FestEventReportAnalyticsService` — fixed to use `reportableEventIds()`:**
+`disciplineRegistrationRows()`, `itemRegistrationRows()`, `assignmentCompletenessRows()`, `numberingRegisterRows()`, `pendingApprovalRows()`, `itemWiseBrowserRows()`, `teamSquadRows()` (found during the sweep — team/group item squad sheets, same bug). `headWiseParticipantRows()` got the planned sports branch, split into a new private `sportsWiseParticipantRows()` mirroring `sportsWiseSummary()`'s shape (one bucket per child sport event, `head_id` = child event id — matches the convention `sportsNavigation()` and `sportsWiseSummary()` already use, verified against `ReportHeadWise.vue`'s `?head_id=` link).
+
+`headWiseSummary()`'s non-sports per-head `due_total`/`collected_total`/`pending_fee_total` are now only computed when `FestSchoolEventFeeService::usesPerHeadBilling($event)` is true — otherwise the keys are simply omitted from the row (the Sahodaya-admin `HeadWiseParticipants.vue` already defensively does `row.due_total ?? 0`, so this is a safe, non-breaking change there).
+
+**`FestSchoolReportAnalyticsService` — fixed:**
+`feeSummary()` now calls `FestSchoolEventFeeService::currentFeeRecordFor()` (always the `head_id IS NULL` rollup — the same record every `recalculate()` dispatch branch produces) instead of an unordered `->first()`, and returns a new `available_credit` field. `attendanceRows()`, `publishedResultsRows()`, `resultsPublishStatus()`, `resultsSummary()`, `itemParticipantDetails()` — found during the sweep, all had the identical direct-`event_id` bug (attendance sheets, published results, and results status were all silently empty for a season hub) — all now use `reportableEventIds()`.
+
+**`FestSchoolReportController` — fixed:**
+`studentWiseLookups()` (private, feeds both the screen and CSV export), `itemWise()`, `exportItemWise()`, `exportItemWisePdf()`. The latter two also had a second bug: they resolved the item via `$event->items()->findOrFail($itemId)` / `->first()`, which is always empty for a season hub (items live on `FestEventItem.event_id = child id`) — replaced with a direct `FestEventItem::whereIn('event_id', $event->reportableEventIds())` lookup.
+
+**`FestItemResultsService`** (found during the sweep — feeds both School Admin's `resultsPublishStatus()` and the Sahodaya-admin `FestResultsController`): `itemSummaries()` and `resultRowsForItem()` had the same direct-`event_id` bug; fixed the same way.
+
+**`FestSchoolReportExportService::itemParticipantsExcel()`** (found during the sweep): used `$event->items()->find($itemId)` only to look up a title for the export filename — cosmetic, not a data bug (the actual rows were already fixed upstream), but corrected for consistency.
+
+**`FestRegistrationRegisterService`** (found during the sweep, not in the original plan table — Registration Register report, `registrationRegister()`/`exportRegistrationRegister()`/`exportRegistrationRegisterPdf()`): had the same direct-`event_id` bug on both registrations and fee lookups. This one needed more care than a plain `whereIn` swap: under a season hub, a school's fee is spread across multiple per-sport `FestSchoolEventFee` rows (one per child event, matching `sportsWiseSummary()`'s billing model — there is no season-hub-level fee record). The original code did `->keyBy('school_id')`, which would have silently kept only one sport's fee row per school once the `event_id` filter started matching more than one row. Fixed by grouping and summing per school (`total_due` summed, `status` = approved only if every row is approved, else `partial` if any is, else the first row's status) before building rows/summaries. `rowFromParticipant()` and `schoolSummaries()` were updated to consume this aggregate array instead of a single `FestSchoolEventFee` model.
+
+**`ReportFeeSummary.vue`:** added a conditional "credit owed to you" line, same visual pattern as `EventBillingPanel.vue`/`Fees.vue`.
+
+### 9.1 Deliberately not touched — flagged, not fixed
+
+`FestSchoolEventFeeService::recalculate()` is dispatched with whatever `FestEvent` it's given, and `recalculateForSportsEvent()` (its sports branch) bills directly at `$event->id` — it has no season-hub awareness of its own; every other place that reads sports fees (`sportsWiseSummary()`, this fix's own aggregation) works with child sport events specifically, never the hub. `FestRegistrationRegisterService::schoolSummaries()` still calls `recalculate($event, $sid)` as a fallback when a school has registrations but no fee row yet — if `$event` is a season hub, this preserves whatever `recalculate()` already does today (which may itself be a latent bug: creating a `FestSchoolEventFee` row keyed to the hub, inconsistent with how every other sports fee row is keyed to a child event). This was **not** changed, because fixing it means changing `recalculate()`'s own dispatch/mutation behavior — a financial write path — not a report read. Rushing that fix without being able to run migrations or hit a real database in this environment was judged too risky. Flagging it here as a follow-up: audit whether `recalculate()` is ever actually invoked with a season-hub `$event` in production, and if so, give it the same child-event resolution treatment on the write side.
+
+### 9.2 Verification performed
+
+Brace-balance check (`grep -o "{" | wc -l` vs `}`) on every touched PHP/Vue file — all matched. No PHP runtime or database available in this environment, so nothing here was executed; verification beyond static review requires the user to smoke-test against a real sports season-hub event (e.g. event 21) after deploy — specifically: open Head-wise, Item counts, Item-wise, Discipline participation, Fee summary, Attendance, Published results, and Registration Register for that event and confirm the drill-down tables now show data consistent with the summary tiles above them.

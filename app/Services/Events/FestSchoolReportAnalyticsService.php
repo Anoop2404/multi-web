@@ -18,20 +18,26 @@ class FestSchoolReportAnalyticsService
     /** @return array<string, mixed>|null */
     public function feeSummary(): ?array
     {
-        $fee = FestSchoolEventFee::where('event_id', $this->event->id)
-            ->where('school_id', $this->schoolId)
-            ->with('feeReceipt')
-            ->first();
+        // Always the event-wide head_id = null rollup — the same record every
+        // recalculate() dispatch branch (plain / sports-event / per-head rollup)
+        // produces — not an arbitrary row that could be one specific Event Head's
+        // slice of the total. See FestSchoolEventFeeService::currentFeeRecordFor().
+        $fee = app(FestSchoolEventFeeService::class)
+            ->currentFeeRecordFor($this->event, $this->schoolId);
 
         if (! $fee) {
             return null;
         }
 
+        $fee->loadMissing('feeReceipt');
+
         return [
-            'total_due'  => (float) $fee->total_due,
-            'paid'       => (float) ($fee->feeReceipt?->amount ?? 0),
-            'status'     => $fee->status,
-            'receipt_no' => $fee->feeReceipt?->receipt_number,
+            'total_due'        => (float) $fee->total_due,
+            'paid'             => (float) ($fee->feeReceipt?->amount ?? 0),
+            'status'           => $fee->status,
+            'receipt_no'       => $fee->feeReceipt?->receipt_number,
+            // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.
+            'available_credit' => $fee->outstandingCredit(),
         ];
     }
 
@@ -71,7 +77,7 @@ class FestSchoolReportAnalyticsService
     /** @return array{gold: int, silver: int, bronze: int, total_score: float, items: list<array<string, mixed>>} */
     public function resultsSummary(): array
     {
-        $marks = FestMark::where('event_id', $this->event->id)
+        $marks = FestMark::whereIn('event_id', $this->event->reportableEventIds())
             ->whereNotNull('position')
             ->whereHas('participant.registration', fn ($q) => $q
                 ->where('school_id', $this->schoolId)
@@ -150,7 +156,7 @@ class FestSchoolReportAnalyticsService
     {
         $participants = FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $this->event->id)
+                ->whereIn('event_id', $this->event->reportableEventIds())
                 ->where('school_id', $this->schoolId)
                 ->active()
                 ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId))
@@ -205,13 +211,14 @@ class FestSchoolReportAnalyticsService
     /** @return array{published: bool, gold: int, silver: int, bronze: int, total_score: float, items: list<array<string, mixed>>} */
     public function publishedResultsRows(?int $headId = null, ?int $itemId = null): array
     {
+        $eventIds = $this->event->reportableEventIds();
         $eventPublished = (bool) $this->event->results_published;
         $anyItemPublished = \App\Models\FestEventItem::query()
-            ->where('event_id', $this->event->id)
+            ->whereIn('event_id', $eventIds)
             ->whereNotNull('results_published_at')
             ->exists();
 
-        $marks = FestMark::where('event_id', $this->event->id)
+        $marks = FestMark::whereIn('event_id', $eventIds)
             ->where(fn ($q) => $q->whereNotNull('position')->orWhereNotNull('score')->orWhereNotNull('grade'))
             ->whereHas('participant.registration', fn ($q) => $q
                 ->where('school_id', $this->schoolId)
@@ -268,7 +275,7 @@ class FestSchoolReportAnalyticsService
         $all = collect(app(FestItemResultsService::class)->itemSummaries($this->event));
 
         $schoolItemIds = FestRegistration::query()
-            ->where('event_id', $this->event->id)
+            ->whereIn('event_id', $this->event->reportableEventIds())
             ->where('school_id', $this->schoolId)
             ->where('status', 'approved')
             ->whereNotNull('item_id')
@@ -312,15 +319,17 @@ class FestSchoolReportAnalyticsService
     /** @return array{item: array<string, mixed>, participants: list<array<string, mixed>>} */
     public function itemParticipantDetails(int $itemId): array
     {
+        $eventIds = $this->event->reportableEventIds();
+
         $item = \App\Models\FestEventItem::query()
-            ->where('event_id', $this->event->id)
+            ->whereIn('event_id', $eventIds)
             ->where('id', $itemId)
             ->with('head:id,name')
             ->firstOrFail();
 
         $participants = FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $this->event->id)
+                ->whereIn('event_id', $eventIds)
                 ->where('school_id', $this->schoolId)
                 ->where('item_id', $itemId)
                 ->active())

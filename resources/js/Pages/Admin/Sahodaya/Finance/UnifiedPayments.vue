@@ -76,10 +76,13 @@
             </div>
             <div class="flex-1 min-w-[200px]">
                 <label class="form-label text-xs text-slate-600 font-semibold mb-1">School</label>
-                <select v-model="form.school_id" class="form-input text-sm w-full bg-slate-50 border-slate-200 rounded-lg">
-                    <option value="">All member schools</option>
-                    <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                </select>
+                <SearchableSelect
+                    v-model="form.school_id"
+                    :options="schools"
+                    placeholder="All member schools"
+                    search-placeholder="Type school name to search…"
+                    all-label="All member schools"
+                />
             </div>
             <div class="flex-[1.5] min-w-[220px]">
                 <label class="form-label text-xs text-slate-600 font-semibold mb-1">Search Payment</label>
@@ -179,6 +182,7 @@ import { computed, reactive, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 
 const props = defineProps({

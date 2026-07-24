@@ -213,7 +213,9 @@ class FestSchoolReportController extends SchoolAdminController
      */
     private function studentWiseLookups(FestEvent $event): array
     {
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $eventIds = $event->reportableEventIds();
+
+        $registrations = FestRegistration::whereIn('event_id', $eventIds)
             ->where('school_id', $this->school->id)
             ->active()
             ->with(['item:id,title', 'participants:id,registration_id,student_id'])
@@ -240,7 +242,7 @@ class FestSchoolReportController extends SchoolAdminController
 
         $allParticipantIds = $participantIdsByStudent->flatten()->unique()->values();
 
-        $marksByParticipant = FestMark::where('event_id', $event->id)
+        $marksByParticipant = FestMark::whereIn('event_id', $eventIds)
             ->whereIn('participant_id', $allParticipantIds)
             ->with('item:id,title')
             ->get()
@@ -263,7 +265,7 @@ class FestSchoolReportController extends SchoolAdminController
         $participants = collect();
         if ($itemId) {
             $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $this->school->id)
                 ->where('item_id', $itemId)
                 ->active())
@@ -428,14 +430,16 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $itemId = $request->integer('item_id') ?: $event->items()->first()?->id;
-        $item = $event->items()->findOrFail($itemId);
+        $eventIds = $event->reportableEventIds();
+        $itemsQuery = \App\Models\FestEventItem::whereIn('event_id', $eventIds);
+        $itemId = $request->integer('item_id') ?: (clone $itemsQuery)->value('id');
+        $item = (clone $itemsQuery)->findOrFail($itemId);
 
-        return response()->streamDownload(function () use ($event, $itemId, $item) {
+        return response()->streamDownload(function () use ($event, $eventIds, $itemId, $item) {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['Item', 'Participant', 'Reg No', 'Class', 'Fest ID', 'Item reg', 'Chest', 'Grade', 'Position', 'Score']);
             $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $eventIds)
                 ->where('school_id', $this->school->id)
                 ->where('item_id', $itemId)
                 ->active())
@@ -469,10 +473,11 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $itemId = $request->integer('item_id') ?: abort(422, 'Select an item.');
-        $item = $event->items()->findOrFail($itemId);
+        $eventIds = $event->reportableEventIds();
+        $item = \App\Models\FestEventItem::whereIn('event_id', $eventIds)->findOrFail($itemId);
 
         $rows = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $eventIds)
             ->where('school_id', $this->school->id)
             ->where('item_id', $itemId)
             ->active())

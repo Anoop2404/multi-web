@@ -254,6 +254,29 @@ class FestEvent extends Model
             : self::where('parent_event_id', $this->id)->exists();
     }
 
+    /**
+     * Event ids to query against for reports. For a sports season hub, real
+     * FestEventItem/FestRegistration/FestParticipant/FestMark/FestSchedule rows all
+     * attach to the auto-promoted child sport events, never the hub itself — so any
+     * report builder that filters by `event_id = $event->id` directly returns nothing
+     * for a season hub. This centralizes the fix: callers should filter with
+     * `whereIn('event_id', $event->reportableEventIds())` instead of a plain `where`.
+     * For every non-season-hub event this is just `[$this->id]` — a no-op.
+     * See docs/SCHOOL_SPORTS_ITEM_HEAD_REPORTS_PLAN.md.
+     *
+     * @return list<int>
+     */
+    public function reportableEventIds(): array
+    {
+        $ids = [$this->id];
+
+        if ($this->isSportsSeasonEvent()) {
+            $ids = array_merge($ids, self::where('parent_event_id', $this->id)->pluck('id')->all());
+        }
+
+        return $ids;
+    }
+
     /** Fest program types that are unique (one per Sahodaya per academic year). */
     public static function singletonEventTypes(?string $tenantId = null): array
     {

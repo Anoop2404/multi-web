@@ -23,6 +23,10 @@ class UnifiedPaymentsController extends SahodayaAdminController
 {
     public function index(Request $request, SchoolPaymentHistoryService $history)
     {
+        $request->merge([
+            'show_all' => filter_var($request->input('show_all'), FILTER_VALIDATE_BOOLEAN),
+        ]);
+
         $filters = $request->validate([
             'type'      => 'nullable|in:all,membership,fest,training,mcq',
             'status'    => 'nullable|string|max:40',
@@ -30,7 +34,7 @@ class UnifiedPaymentsController extends SahodayaAdminController
             'search'    => 'nullable|string|max:100',
             'from_date' => 'nullable|date',
             'to_date'   => 'nullable|date',
-            'show_all'  => 'nullable|boolean',
+            'show_all'  => 'nullable',
         ]);
 
         $schools = Tenant::query()

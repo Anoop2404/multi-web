@@ -49,13 +49,14 @@ class FestEventReportAnalyticsService
         $taxonomy = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id);
         $labels = $taxonomy->labels('sport_discipline');
 
-        $items = FestEventItem::where('event_id', $this->event->id)->get(['id', 'sport_discipline']);
+        $eventIds = $this->event->reportableEventIds();
+        $items = FestEventItem::whereIn('event_id', $eventIds)->get(['id', 'sport_discipline']);
         $byDiscipline = $items->groupBy(fn ($i) => $i->sport_discipline ?: 'unspecified');
 
         $rows = [];
         foreach ($byDiscipline as $discipline => $group) {
             $itemIds = $group->pluck('id');
-            $regQuery = fn (string $status) => FestRegistration::where('event_id', $this->event->id)
+            $regQuery = fn (string $status) => FestRegistration::whereIn('event_id', $eventIds)
                 ->whereIn('item_id', $itemIds)
                 ->where('status', $status)
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
@@ -210,7 +211,13 @@ class FestEventReportAnalyticsService
             ->orderBy('sort_order')
             ->get();
 
-        return $heads->map(function (FestItemHead $head) use ($schoolId) {
+        // Per-head due/collected totals only mean something when this event actually
+        // bills per-head; otherwise every real FestSchoolEventFee row has head_id = null
+        // and filtering by a specific head's id always returns zero, silently showing
+        // "₹0 due" per head for a school that in fact owes a real single-record total.
+        $usesPerHeadBilling = app(FestSchoolEventFeeService::class)->usesPerHeadBilling($this->event);
+
+        return $heads->map(function (FestItemHead $head) use ($schoolId, $usesPerHeadBilling) {
             $itemIds = FestEventItem::where('event_id', $this->event->id)
                 ->where('head_id', $head->id)
                 ->pluck('id');
@@ -253,12 +260,8 @@ class FestEventReportAnalyticsService
             $maxItemReg = $perItemCounts->max() ?? 0;
 
             $quota = max(0, (int) ($head->included_items_per_student ?? 0));
-            $headFees = FestSchoolEventFee::where('event_id', $this->event->id)
-                ->where('head_id', $head->id)
-                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-                ->get();
 
-            return [
+            $row = [
                 'head_id'             => $head->id,
                 'head_name'           => $head->name,
                 'item_count'          => $itemIds->count(),
@@ -273,12 +276,22 @@ class FestEventReportAnalyticsService
                 'included_quota'      => $quota,
                 'verification_policy' => $head->verification_policy ?? 'all_students',
                 'approval_policy'     => $head->approval_policy ?? 'auto',
-                'due_total'           => round((float) $headFees->sum('total_due'), 2),
-                'collected_total'     => round((float) $headFees->where('status', 'approved')->sum('total_due'), 2),
-                'pending_fee_total'   => round((float) $headFees->whereNotIn('status', ['approved', 'waived'])->sum('total_due'), 2),
                 'default_item_fee'    => $head->default_item_fee !== null ? (float) $head->default_item_fee : null,
                 'extra_item_fee'      => $head->extra_item_fee !== null ? (float) $head->extra_item_fee : null,
             ];
+
+            if ($usesPerHeadBilling) {
+                $headFees = FestSchoolEventFee::where('event_id', $this->event->id)
+                    ->where('head_id', $head->id)
+                    ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+                    ->get();
+
+                $row['due_total'] = round((float) $headFees->sum('total_due'), 2);
+                $row['collected_total'] = round((float) $headFees->where('status', 'approved')->sum('total_due'), 2);
+                $row['pending_fee_total'] = round((float) $headFees->whereNotIn('status', ['approved', 'waived'])->sum('total_due'), 2);
+            }
+
+            return $row;
         })->all();
     }
 
@@ -367,9 +380,10 @@ class FestEventReportAnalyticsService
         $schedule = $feeService->resolveSchedule($this->event);
         $feeRequired = $feeService->feeRequired($this->event);
         $feeResolver = app(FestItemFeeResolver::class);
+        $eventIds = $this->event->reportableEventIds();
 
         $items = FestEventItem::query()
-            ->where('event_id', $this->event->id)
+            ->whereIn('event_id', $eventIds)
             ->where('is_enabled', true)
             ->with('head:id,name,default_item_fee,extra_item_fee')
             ->orderBy('display_order')
@@ -379,7 +393,7 @@ class FestEventReportAnalyticsService
         $rows = [];
         foreach ($items as $item) {
             $regBase = FestRegistration::query()
-                ->where('event_id', $this->event->id)
+                ->whereIn('event_id', $eventIds)
                 ->where('item_id', $item->id)
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
 
@@ -389,7 +403,7 @@ class FestEventReportAnalyticsService
 
             $participantQuery = FestParticipant::query()
                 ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $this->event->id)
+                    ->whereIn('event_id', $eventIds)
                     ->where('item_id', $item->id)
                     ->active()
                     ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)));
@@ -402,7 +416,7 @@ class FestEventReportAnalyticsService
             $schoolCount = $schoolId
                 ? ($totalRegs > 0 ? 1 : 0)
                 : (int) FestRegistration::query()
-                    ->where('event_id', $this->event->id)
+                    ->whereIn('event_id', $eventIds)
                     ->where('item_id', $item->id)
                     ->active()
                     ->distinct()
@@ -475,13 +489,15 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function assignmentCompletenessRows(?string $schoolId = null): array
     {
+        $eventIds = $this->event->reportableEventIds();
+
         $itemScheduleIds = FestSchedule::query()
-            ->where('event_id', $this->event->id)
+            ->whereIn('event_id', $eventIds)
             ->whereNull('participant_id')
             ->pluck('id', 'item_id');
 
         $items = FestEventItem::query()
-            ->where('event_id', $this->event->id)
+            ->whereIn('event_id', $eventIds)
             ->where('is_enabled', true)
             ->with('head:id,name')
             ->orderBy('display_order')
@@ -491,7 +507,7 @@ class FestEventReportAnalyticsService
         $rows = [];
         foreach ($items as $item) {
             $regBase = FestRegistration::query()
-                ->where('event_id', $this->event->id)
+                ->whereIn('event_id', $eventIds)
                 ->where('item_id', $item->id)
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
 
@@ -504,7 +520,7 @@ class FestEventReportAnalyticsService
                     $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby');
                 })
                 ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $this->event->id)
+                    ->whereIn('event_id', $eventIds)
                     ->where('item_id', $item->id)
                     ->where('status', 'approved')
                     ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)));
@@ -519,7 +535,7 @@ class FestEventReportAnalyticsService
             $itemRegAssigned = (clone $performerQuery)->whereNotNull('item_registration_number')->count();
 
             $scheduledParticipants = FestSchedule::query()
-                ->where('event_id', $this->event->id)
+                ->whereIn('event_id', $eventIds)
                 ->where('item_id', $item->id)
                 ->whereNotNull('participant_id')
                 ->when($schoolId, fn ($q) => $q->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId)))
@@ -527,14 +543,14 @@ class FestEventReportAnalyticsService
                 ->count('participant_id');
 
             $marksEntered = FestMark::query()
-                ->where('event_id', $this->event->id)
+                ->whereIn('event_id', $eventIds)
                 ->where('item_id', $item->id)
                 ->where(fn ($q) => $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position'))
                 ->when($schoolId, fn ($q) => $q->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId)))
                 ->distinct('participant_id')
                 ->count('participant_id');
 
-            $judges = FestJudgeAssignment::where('event_id', $this->event->id)
+            $judges = FestJudgeAssignment::whereIn('event_id', $eventIds)
                 ->where('item_id', $item->id)
                 ->count();
 
@@ -587,7 +603,7 @@ class FestEventReportAnalyticsService
     {
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $this->event->id)
+                ->whereIn('event_id', $this->event->reportableEventIds())
                 ->active()
                 ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
             ->with([
@@ -629,7 +645,7 @@ class FestEventReportAnalyticsService
     public function pendingApprovalRows(?string $schoolId = null): array
     {
         return FestRegistration::query()
-            ->where('event_id', $this->event->id)
+            ->whereIn('event_id', $this->event->reportableEventIds())
             ->where('status', 'submitted')
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->with(['school:id,name', 'item:id,title,head_id', 'item.head:id,name', 'participants.student:id,name', 'participants.teacher:id,name'])
@@ -718,6 +734,12 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function headWiseParticipantRows(?int $headId = null, ?string $schoolId = null): array
     {
+        // Sports (Head = Event): FestItemHead rows are never created for sports events —
+        // "head" means a sport/discipline, i.e. a child FestEvent. See sportsWiseSummary().
+        if ($this->event->event_type === 'sports') {
+            return $this->sportsWiseParticipantRows($headId, $schoolId);
+        }
+
         $heads = FestItemHead::forTenant($this->event->tenant_id)
             ->forEvent($this->event->id)
             ->when($headId, fn ($q) => $q->where('id', $headId))
@@ -773,17 +795,80 @@ class FestEventReportAnalyticsService
         return $rows;
     }
 
+    /**
+     * Sports twin of the FestItemHead loop above: one "head" bucket per sport/discipline
+     * event (children when run on the season hub, itself when run on a single sport
+     * event) — mirrors sportsWiseSummary()'s row shape, where head_id carries the sport
+     * event id. $headId here is therefore a child-event id, not a FestItemHead id.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function sportsWiseParticipantRows(?int $headId = null, ?string $schoolId = null): array
+    {
+        $sports = $this->event->isSportsSeasonEvent()
+            ? FestEvent::where('parent_event_id', $this->event->id)
+                ->ofType('sports')
+                ->when($headId, fn ($q) => $q->where('id', $headId))
+                ->orderBy('sort_order')
+                ->orderBy('title')
+                ->get()
+            : collect([$this->event])->when($headId, fn ($c) => $c->where('id', $headId));
+
+        $rows = [];
+        foreach ($sports as $sport) {
+            $participants = FestParticipant::query()
+                ->whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $sport->id)
+                    ->active()
+                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
+                ->with([
+                    'student:id,name,reg_no,photo,tenant_id',
+                    'student.schoolClass:id,name',
+                    'teacher:id,name,reg_no',
+                    'registration.school:id,name',
+                    'registration.item:id,title,head_id,competition_start,competition_end,competition_time',
+                ])
+                ->get();
+
+            foreach ($participants as $p) {
+                $rows[] = [
+                    'head_id'    => $sport->id,
+                    'head_name'  => $sport->title,
+                    'item_id'    => $p->registration?->item_id,
+                    'school'     => $p->registration?->school?->name,
+                    'student_id' => $p->student_id,
+                    'student'    => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no'     => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    'class'      => $p->student?->schoolClass?->name,
+                    'photo_url'  => $p->student?->photoUrl(),
+                    'item'       => $p->registration?->item?->title,
+                    'item_reg'   => $p->item_registration_number,
+                    'chest_no'   => $p->chest_no,
+                    'fest_id'    => $p->level_registration_number,
+                    'status'     => $p->registration?->status,
+                    'role'       => $p->participant_role,
+                    'team_name'  => $p->registration?->team_name,
+                    'competition_start' => $p->registration?->item?->competition_start,
+                    'competition_end'   => $p->registration?->item?->competition_end,
+                    'competition_time'  => $p->registration?->item?->competition_time,
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
     /** @return list<array<string, mixed>> */
     public function teamSquadRows(?string $schoolId = null): array
     {
-        $teamItems = FestEventItem::where('event_id', $this->event->id)
+        $teamItems = FestEventItem::whereIn('event_id', $this->event->reportableEventIds())
             ->whereIn('participant_type', ['team', 'group'])
             ->orderBy('title')
             ->get();
 
         $rows = [];
         foreach ($teamItems as $item) {
-            $regs = FestRegistration::where('event_id', $this->event->id)
+            $regs = FestRegistration::where('event_id', $item->event_id)
                 ->where('item_id', $item->id)
                 ->active()
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
@@ -1264,10 +1349,7 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function studentWiseBrowserRows(?string $schoolId = null, ?string $search = null): array
     {
-        $eventIds = [$this->event->id];
-        if ($this->event->isSportsSeasonEvent()) {
-            $eventIds = array_merge($eventIds, FestEvent::where('parent_event_id', $this->event->id)->pluck('id')->all());
-        }
+        $eventIds = $this->event->reportableEventIds();
 
         $participants = FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
@@ -1352,7 +1434,7 @@ class FestEventReportAnalyticsService
     {
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $this->event->id)
+                ->whereIn('event_id', $this->event->reportableEventIds())
                 ->where('item_id', $itemId)
                 ->active())
             ->with(['student', 'teacher', 'registration.school', 'mark'])

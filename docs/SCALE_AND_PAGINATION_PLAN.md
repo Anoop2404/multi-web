@@ -237,6 +237,18 @@ Following the same discipline as `FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §10`:
 8. **§4 — `printApproved` reuse.**
 9. **§3 Option B** — only if §3 Option A isn't enough.
 
+## 12. Third sweep (24 Jul 2026) — the sports item/head report set, found while fixing a correctness bug
+
+Confirms §11's prediction: a third pass found a fourth thing. While fixing a season-hub correctness bug across the School Admin sports report pages (`docs/SCHOOL_SPORTS_ITEM_HEAD_REPORTS_PLAN.md` — head-wise, item counts, item-wise, discipline participation, assignment completeness, numbering register, pending approvals, attendance, published results, registration register), the same "built and tested at small scale" pattern showed up again, in a report set this doc's first two sweeps didn't cover.
+
+**Two distinct problems, not one:**
+- **N+1 loops** in `FestEventReportAnalyticsService::assignmentCompletenessRows()` (8 queries per item), `headWiseSummary()`/`sportsWiseSummary()` (6-7 per head/sport), and `itemRegistrationRows()` (5 per item) — same shape as §7's `studentWise` finding, but bounded by item/head count (tens, not thousands) rather than student count directly. Real, but secondary — extra latency, not a likely timeout.
+- **Unpaginated result sets** in `numberingRegisterRows()`, `pendingApprovalRows()`, and `FestRegistrationRegisterService::build()` — one efficient query each, but every matching row is sent to the browser and rendered in a plain unvirtualized `v-for` (confirmed in `ReportNumberingRegister.vue`). This one scales directly with student count: a 3,000-student school could put 5,000-15,000+ `<tr>` rows on one page. This is the more serious of the two for a single large school, same category as §8's picker finding but on the report side instead of the registration side.
+
+Full detail, exact fix pattern (grouped aggregate queries replacing the per-item loops, reusing this doc's own `paginate(50)->withQueryString()` convention — see `FestPaymentsController.php:40`, `MemberSchoolsController.php:36` — for the three unpaginated reports), and a suggested build order are in `docs/SCHOOL_REPORTS_PERFORMANCE_PLAN.md`. Not yet implemented — analysis only, same status as this doc was before its first implementation pass.
+
+---
+
 ## 11. Is this "perfect" once done? — no, and here's what "done" actually requires
 
 Implementing everything above fixes every *specific bug* found across two research passes. That is not the same as a guarantee the system handles 100 schools × 3000 students "perfectly" — a few honest caveats:
