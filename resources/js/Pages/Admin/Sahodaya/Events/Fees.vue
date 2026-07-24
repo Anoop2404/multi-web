@@ -280,6 +280,14 @@
                                     </button>
                                 </div>
 
+                                <div v-if="row.status === 'approved' || row.status === 'partial'" class="flex items-center justify-end gap-1.5 pt-1">
+                                    <button type="button" @click="reject(row.id)"
+                                            title="Reject or reverse this payment proof to allow school to re-upload"
+                                            class="text-[11px] font-semibold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded border border-rose-200 shadow-2xs transition">
+                                        Reject / Reverse ✕
+                                    </button>
+                                </div>
+
                                 <div v-if="row.status === 'partial'" class="flex items-center justify-end pt-1">
                                     <button type="button" @click="forceApprove(row)"
                                             title="Waives the gap between total due and amount paid, then approves."
@@ -394,9 +402,9 @@
                                 @click="approve(activeProofModalRow.id)" class="btn-primary !bg-emerald-600 hover:!bg-emerald-500 text-xs shadow-xs">
                             Approve Pending Proof ✓
                         </button>
-                        <button v-if="activeProofModalRow.status === 'proof_uploaded'" type="button"
+                        <button v-if="activeProofModalRow.status === 'proof_uploaded' || activeProofModalRow.status === 'approved' || activeProofModalRow.status === 'partial'" type="button"
                                 @click="reject(activeProofModalRow.id)" class="btn-secondary text-xs text-rose-700 hover:bg-rose-50 shadow-xs">
-                            Reject Pending Proof
+                            {{ activeProofModalRow.status === 'approved' || activeProofModalRow.status === 'partial' ? 'Reject / Reverse Payment ✕' : 'Reject Pending Proof' }}
                         </button>
                     </div>
                 </div>

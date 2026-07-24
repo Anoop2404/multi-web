@@ -135,14 +135,27 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         $data = $request->validate(['rejection_reason' => 'nullable|string|max:500']);
 
         $receipt = $schoolEventFee->receipts()->where('status', 'uploaded')->latest('id')->first()
-            ?? $schoolEventFee->feeReceipt;
-        if ($receipt && $receipt->status === 'uploaded') {
-            $receipt->update([
-                'status' => 'rejected',
-                'rejection_reason' => $data['rejection_reason'] ?? null,
-                'reviewed_by' => $request->user()->id,
-                'reviewed_at' => now(),
-            ]);
+            ?? $schoolEventFee->feeReceipt
+            ?? $schoolEventFee->receipts()->latest('id')->first();
+
+        if ($receipt) {
+            if ($receipt->status === 'approved') {
+                app(\App\Services\Ledger\FeeReceiptReversalService::class)->reverse($receipt, $request->user(), $data['rejection_reason'] ?? 'Payment proof rejected by admin');
+            } elseif ($receipt->status === 'uploaded') {
+                $receipt->update([
+                    'status' => 'rejected',
+                    'rejection_reason' => $data['rejection_reason'] ?? null,
+                    'reviewed_by' => $request->user()->id,
+                    'reviewed_at' => now(),
+                ]);
+            }
+        }
+
+        // If fee_receipt_id pointed to this receipt, point to next approved/uploaded receipt or null
+        if ($schoolEventFee->fee_receipt_id === $receipt?->id) {
+            $nextReceipt = $schoolEventFee->receipts()->where('status', 'approved')->latest('id')->first()
+                ?? $schoolEventFee->receipts()->where('status', 'uploaded')->latest('id')->first();
+            $schoolEventFee->update(['fee_receipt_id' => $nextReceipt?->id]);
         }
 
         // Preserve any already-approved partial payments; fall back to partial/pending.
@@ -175,7 +188,7 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             adminPath: "programs/{$slug}/registration",
         );
 
-        return back()->with('success', 'Fee rejected. School can re-upload.');
+        return back()->with('success', 'Fee payment proof rejected/reversed. School can re-upload.');
     }
 
     public function proof(string $tenantId, FestEvent $event, FestSchoolEventFee $schoolEventFee)
