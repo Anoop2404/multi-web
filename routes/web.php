@@ -844,6 +844,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/masters/streams', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'storeStream'])->name('masters.streams.store');
             Route::put('/masters/streams/{stream}', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'updateStream'])->name('masters.streams.update');
             Route::delete('/masters/streams/{stream}', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'destroyStream'])->name('masters.streams.destroy');
+            Route::post('/masters/subjects', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'storeSubject'])->name('masters.subjects.store');
+            Route::put('/masters/subjects/{subject}', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'updateSubject'])->name('masters.subjects.update');
+            Route::delete('/masters/subjects/{subject}', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'destroySubject'])->name('masters.subjects.destroy');
+            Route::post('/masters/subjects/seed-standard', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'seedStandardSubjects'])->name('masters.subjects.seed-standard');
             Route::put('/masters/api-config', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'updateApiConfig'])->name('masters.api-config');
             Route::get('/reports', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'index'])->name('reports');
             Route::get('/reports/subject-merit', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'subjectMerit'])->name('reports.subject-merit');

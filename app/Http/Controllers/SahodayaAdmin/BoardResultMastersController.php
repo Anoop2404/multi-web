@@ -37,9 +37,16 @@ class BoardResultMastersController extends SahodayaAdminController
             ->map(fn ($group) => $group->values())
             ->all();
 
+        $allBoardSubjects = Subject::query()
+            ->forSahodaya($this->sahodaya->id)
+            ->orderBy('label')
+            ->get();
+
         return $this->inertia('Sahodaya/BoardResults/Masters', [
             'streams' => $streams,
             'subjectsByCategory' => $subjects,
+            'allBoardSubjects' => $allBoardSubjects,
+            'standardCbses' => \App\Support\BoardExamSubjects::standardBoardSubjects(),
             'apiConfig' => $apiConfig->only([
                 'id', 'weight_pass_percent', 'weight_distinctions',
                 'weight_highest_mark', 'weight_toppers', 'is_active',
@@ -50,6 +57,82 @@ class BoardResultMastersController extends SahodayaAdminController
                 ->get(),
         ]);
     }
+
+    public function storeSubject(Request $request)
+    {
+        $data = $request->validate([
+            'label' => 'required|string|max:120',
+            'code' => 'nullable|string|max:40',
+            'category' => 'nullable|string|max:40',
+        ]);
+
+        $code = strtoupper(trim($data['code'] ?? preg_replace('/[^A-Za-z0-9]/', '', $data['label'])));
+
+        Subject::create([
+            'sahodaya_id' => $this->sahodaya->id,
+            'label' => trim($data['label']),
+            'code' => $code,
+            'category' => $data['category'] ?? 'language',
+            'is_active' => true,
+        ]);
+
+        return back()->with('success', 'Subject created successfully.');
+    }
+
+    public function updateSubject(Request $request, Subject $subject)
+    {
+        abort_if($subject->sahodaya_id !== $this->sahodaya->id && $subject->sahodaya_id !== null, 403);
+
+        $data = $request->validate([
+            'label' => 'required|string|max:120',
+            'code' => 'nullable|string|max:40',
+            'category' => 'nullable|string|max:40',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $subject->update([
+            'label' => trim($data['label']),
+            'code' => strtoupper(trim($data['code'] ?? $subject->code)),
+            'category' => $data['category'] ?? $subject->category,
+            'is_active' => $data['is_active'] ?? true,
+        ]);
+
+        return back()->with('success', 'Subject updated successfully.');
+    }
+
+    public function destroySubject(Subject $subject)
+    {
+        abort_if($subject->sahodaya_id !== $this->sahodaya->id && $subject->sahodaya_id !== null, 403);
+        $subject->delete();
+
+        return back()->with('success', 'Subject removed.');
+    }
+
+    public function seedStandardSubjects()
+    {
+        $standards = \App\Support\BoardExamSubjects::standardBoardSubjects();
+        $count = 0;
+
+        foreach ($standards as $index => $label) {
+            $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $label), 0, 10));
+            $created = Subject::firstOrCreate([
+                'sahodaya_id' => $this->sahodaya->id,
+                'label' => $label,
+            ], [
+                'code' => $code,
+                'category' => 'language',
+                'is_active' => true,
+                'sort_order' => $index + 1,
+            ]);
+
+            if ($created->wasRecentlyCreated) {
+                $count++;
+            }
+        }
+
+        return back()->with('success', "Seeded {$count} standard CBSE subjects for this Sahodaya.");
+    }
+}
 
     public function storeStream(Request $request)
     {

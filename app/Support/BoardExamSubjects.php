@@ -14,9 +14,9 @@ use RuntimeException;
 class BoardExamSubjects
 {
     /** @return list<string> */
-    public static function standardBoardSubjects(): array
+    public static function standardBoardSubjects(?string $sahodayaId = null): array
     {
-        return [
+        $defaults = [
             'English core',
             'Hindi core',
             'Hindi elective',
@@ -41,6 +41,20 @@ class BoardExamSubjects
             'Business administration',
             'KTPI',
         ];
+
+        if ($sahodayaId && Schema::hasTable('subjects')) {
+            $custom = \App\Models\Subject::query()
+                ->forSahodaya($sahodayaId)
+                ->active()
+                ->pluck('label')
+                ->all();
+
+            if (! empty($custom)) {
+                return array_values(array_unique(array_merge($defaults, $custom)));
+            }
+        }
+
+        return $defaults;
     }
 
     /** @return array<string, string> */
