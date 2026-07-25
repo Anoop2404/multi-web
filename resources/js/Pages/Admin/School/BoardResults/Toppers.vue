@@ -23,15 +23,15 @@
             </div>
         </div>
 
-        <!-- 3 CATEGORY NAVIGATION TABS (CLASS 12 EXCLUSIVE) -->
-        <div v-if="isClass12" class="flex items-center bg-white p-1.5 rounded-2xl shadow-xs border border-gray-200 mb-6 space-x-1 max-w-2xl">
+        <!-- CATEGORY NAVIGATION TABS -->
+        <div class="flex items-center bg-white p-1.5 rounded-2xl shadow-xs border border-gray-200 mb-6 space-x-1 max-w-2xl">
             <button
                 type="button"
                 @click="activeTab = 'overall'"
                 class="flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                 :class="activeTab === 'overall' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
             >
-                <span>🏆</span> Overall Stream Toppers
+                <span>🏆</span> Overall Toppers
             </button>
 
             <button
@@ -40,10 +40,11 @@
                 class="flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                 :class="activeTab === 'subject' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
             >
-                <span>🎯</span> Subject-Wise Toppers
+                <span>🎯</span> Subject-Wise Mark Entry
             </button>
 
             <button
+                v-if="isClass12"
                 type="button"
                 @click="activeTab = 'achievers'"
                 class="flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
@@ -80,7 +81,6 @@
                                 <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-gray-50 border-b border-gray-200">
                                     <tr>
                                         <th class="p-3">Student Name *</th>
-                                        <th v-if="isClass12" class="p-3">Stream *</th>
                                         <th class="p-3">CBSE Roll No</th>
                                         <th class="p-3">Marks Scored *</th>
                                         <th class="p-3">%</th>
@@ -91,12 +91,6 @@
                                 <tbody class="divide-y divide-gray-100 bg-white">
                                     <tr v-for="(row, i) in batchForm.toppers" :key="i" class="hover:bg-slate-50/50">
                                         <td class="p-3"><input v-model="row.name" type="text" required class="field text-sm" placeholder="Student name" :disabled="!canEdit"></td>
-                                        <td v-if="isClass12" class="p-3">
-                                            <select v-model="row.stream_key" required class="field text-sm w-36 bg-white" :disabled="!canEdit">
-                                                <option value="" disabled>Select Stream</option>
-                                                <option v-for="(label, key) in streamOptions" :key="key" :value="key">{{ label }}</option>
-                                            </select>
-                                        </td>
                                         <td class="p-3"><input v-model="row.roll_no" type="text" class="field text-sm w-36" placeholder="CBSE Roll No" :disabled="!canEdit"></td>
                                         <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="batchForm.total_marks || undefined" required class="field text-sm w-28" placeholder="Marks" :disabled="!canEdit"></td>
                                         <td class="p-3 text-indigo-600 font-bold whitespace-nowrap">{{ rowPercentage(row) }}</td>
@@ -256,8 +250,8 @@
                 </div>
             </div>
 
-            <!-- TAB 2: SUBJECT-WISE TOPPERS (CLASS 12 EXCLUSIVE, SUBJECT-BASED ENTRY) -->
-            <div v-if="isClass12 && activeTab === 'subject'" class="space-y-6">
+            <!-- TAB 2: SUBJECT-WISE MARK ENTRY (STREAM-INDEPENDENT) -->
+            <div v-if="activeTab === 'subject'" class="space-y-6">
                 <!-- Add Subject Topper Form -->
                 <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                     <div class="border-b border-gray-100 pb-3">

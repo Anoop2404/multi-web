@@ -449,9 +449,7 @@ class BoardResultController extends SchoolAdminController
             'subjectsByStream' => $isClass12 ? collect($streamOptions)
                 ->mapWithKeys(fn ($label, $key) => [$key => BoardExamSubjects::subjectsForStream($key, $sahodayaId)])
                 ->all() : [],
-            'subjectWiseLeaders' => $isClass12
-                ? BoardExamSubjects::subjectWiseLeaders($boardResult->toppers)
-                : [],
+            'subjectWiseLeaders' => BoardExamSubjects::subjectWiseLeaders($boardResult->toppers),
             'canEdit' => $boardResult->isEditable(),
             'topperCap' => app(TopperCountService::class)->resolveCap($sahodayaId, (int) $boardResult->class),
             'topperCount' => $boardResult->toppers->count(),
