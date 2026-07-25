@@ -105,7 +105,7 @@
 </template>
 
 <script setup>
-import { provide, computed, onMounted, watch, nextTick } from 'vue';
+import { provide, computed, onMounted, watch, nextTick, toRefs } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
@@ -134,6 +134,7 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     event: Object,
     venues: Array,
+    regions: { type: Array, default: () => [] },
     stages: Array,
     comboRules: Array,
     gradeConfigs: Array,
@@ -242,8 +243,17 @@ watch(activeTab, () => {
     scrollToCurrentSection();
 });
 
+// `props` is Inertia's reactive page-props object. Spreading it directly (`{...props}`)
+// copies out plain snapshots of each key at this exact moment — arrays like `venues`,
+// `stages`, `regions` get frozen to whatever they were on first render. Every subsequent
+// Inertia visit (add/remove venue, etc.) replaces `props.venues` with a brand-new array,
+// but the already-provided plain object never sees it, so every tab injecting
+// `eventSettings` and destructuring `venues`/`stages`/etc. shows stale data until a full
+// page reload. `toRefs()` turns each prop into a ref that stays linked to the live
+// reactive source, so destructuring in a child (`const { venues } = inject(...)`) keeps
+// working without every Tab component needing to switch to `.value` access.
 provide('eventSettings', {
-    ...props,
+    ...toRefs(props),
     ...ctx,
 });
 </script>

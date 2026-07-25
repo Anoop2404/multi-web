@@ -26,7 +26,11 @@ class SchoolRegionAssignment extends Model
 
     public function scopeForTenant($query, string $tenantId)
     {
-        return $query->where('tenant_id', $tenantId);
+        // Qualified with the table name deliberately: FestRegistrationController::schoolRegionContext()
+        // joins this to `regions`, which also has its own tenant_id column — an unqualified
+        // where('tenant_id', ...) is ambiguous to Postgres as soon as that join is present
+        // (SQLSTATE 42702). Qualifying here is safe for every other (non-joined) caller too.
+        return $query->where('school_region_assignments.tenant_id', $tenantId);
     }
 
     public function scopeForYear($query, string $academicYear)

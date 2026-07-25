@@ -46,25 +46,62 @@
             <!-- Venues List -->
             <div v-if="venues.length" class="rounded-xl border border-slate-200 overflow-hidden bg-white">
                 <ul class="divide-y divide-slate-100 text-xs">
-                    <li v-for="v in venues" :key="v.id" class="p-3.5 flex items-center justify-between hover:bg-slate-50/70 transition">
-                        <div class="space-y-1">
-                            <div class="flex items-center gap-2">
-                                <p class="font-bold text-slate-900 text-sm">{{ v.name }}</p>
-                                <span v-if="v.region" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                    📍 {{ v.region.name }}
-                                </span>
-                                <span v-else class="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600">
-                                    Central / All Regions
-                                </span>
+                    <li v-for="v in venues" :key="v.id" class="p-3.5">
+                        <!-- Edit mode -->
+                        <form v-if="editingVenueId === v.id" @submit.prevent="saveVenueEdit" class="space-y-3">
+                            <div class="grid gap-3 sm:grid-cols-4">
+                                <div class="sm:col-span-2">
+                                    <label class="form-label text-xs">Venue Name *</label>
+                                    <input v-model="venueEditForm.name" class="field text-xs" required>
+                                </div>
+                                <div>
+                                    <label class="form-label text-xs">Location / Campus</label>
+                                    <input v-model="venueEditForm.location" class="field text-xs">
+                                </div>
+                                <div>
+                                    <label class="form-label text-xs">Capacity (approx.)</label>
+                                    <input v-model.number="venueEditForm.capacity" type="number" min="1" class="field text-xs">
+                                </div>
+                                <div v-if="regions?.length" class="sm:col-span-4">
+                                    <label class="form-label text-xs">Assigned Region</label>
+                                    <select v-model="venueEditForm.region_id" class="field text-xs font-medium">
+                                        <option value="">— All Regions / Central Venue —</option>
+                                        <option v-for="r in regions" :key="r.id" :value="r.id">📍 {{ r.name }}</option>
+                                    </select>
+                                </div>
                             </div>
-                            <p class="text-slate-500 text-[11px] flex items-center gap-3">
-                                <span>📍 {{ v.location || 'No location specified' }}</span>
-                                <span v-if="v.capacity">👥 Capacity: {{ v.capacity }}</span>
-                            </p>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" @click="cancelEditVenue" class="btn-secondary text-xs !py-1.5 !px-4">Cancel</button>
+                                <button type="submit" :disabled="venueEditForm.processing" class="btn-primary text-xs !py-1.5 !px-4">Save</button>
+                            </div>
+                        </form>
+
+                        <!-- Display mode -->
+                        <div v-else class="flex items-center justify-between hover:bg-slate-50/70 transition -m-3.5 p-3.5">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <p class="font-bold text-slate-900 text-sm">{{ v.name }}</p>
+                                    <span v-if="v.region" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                        📍 {{ v.region.name }}
+                                    </span>
+                                    <span v-else class="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600">
+                                        Central / All Regions
+                                    </span>
+                                </div>
+                                <p class="text-slate-500 text-[11px] flex items-center gap-3">
+                                    <span>📍 {{ v.location || 'No location specified' }}</span>
+                                    <span v-if="v.capacity">👥 Capacity: {{ v.capacity }}</span>
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button type="button" @click="startEditVenue(v)" class="btn-secondary text-xs !py-1 !px-2.5">
+                                    Edit
+                                </button>
+                                <button type="button" @click="removeVenue(v.id)" class="btn-secondary text-xs !text-rose-700 hover:!bg-rose-50 !py-1 !px-2.5">
+                                    Remove
+                                </button>
+                            </div>
                         </div>
-                        <button type="button" @click="removeVenue(v.id)" class="btn-secondary text-xs !text-rose-700 hover:!bg-rose-50 !py-1 !px-2.5">
-                            Remove
-                        </button>
                     </li>
                 </ul>
             </div>
@@ -136,5 +173,8 @@
 <script setup>
 import { inject } from 'vue';
 
-const { venueForm, stageForm, venues, stages, regions, addVenue, removeVenue, addStage, removeStage } = inject('eventSettings');
+const {
+    venueForm, stageForm, venues, stages, regions, addVenue, removeVenue, addStage, removeStage,
+    editingVenueId, venueEditForm, startEditVenue, cancelEditVenue, saveVenueEdit,
+} = inject('eventSettings');
 </script>

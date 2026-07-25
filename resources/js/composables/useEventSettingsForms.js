@@ -66,6 +66,13 @@ export function useEventSettingsForms(props) {
         max_onstage_per_student: props.participationPolicy?.max_onstage_per_student ?? '',
         max_offstage_per_student: props.participationPolicy?.max_offstage_per_student ?? '',
         max_group_per_student: props.participationPolicy?.max_group_per_student ?? '',
+        // Per-school caps: the controller/service already validate and enforce these
+        // (FestParticipationPolicyController, FestParticipationLimitService) — they just
+        // had no form fields to reach them from this tab.
+        max_onstage_per_school: props.participationPolicy?.max_onstage_per_school ?? '',
+        max_offstage_per_school: props.participationPolicy?.max_offstage_per_school ?? '',
+        max_group_per_school: props.participationPolicy?.max_group_per_school ?? '',
+        one_entry_per_item_per_school: props.participationPolicy?.one_entry_per_item_per_school ?? true,
         require_fee_before_approval: props.participationPolicy?.require_fee_before_approval ?? true,
     });
 
@@ -131,7 +138,7 @@ export function useEventSettingsForms(props) {
         });
     }
 
-    const venueForm = useForm({ name: '', location: '', capacity: null });
+    const venueForm = useForm({ name: '', location: '', capacity: null, region_id: '' });
     const stageForm = useForm({ name: '', venue_id: '' });
     const comboForm = useForm({ school_id: '', class_group: '', max_arts_events: null, max_sports_events: null, max_on_stage: null, max_off_stage: null });
     const gradeForm = useForm({ item_id: '', grade: 'A', min_score: null, max_score: null });
@@ -366,6 +373,30 @@ export function useEventSettingsForms(props) {
         router.delete(`${base}/venues/${id}`, { preserveScroll: true });
     }
 
+    const editingVenueId = ref(null);
+    const venueEditForm = useForm({ name: '', location: '', capacity: null, region_id: '' });
+
+    function startEditVenue(venue) {
+        editingVenueId.value = venue.id;
+        venueEditForm.clearErrors();
+        venueEditForm.name = venue.name ?? '';
+        venueEditForm.location = venue.location ?? '';
+        venueEditForm.capacity = venue.capacity ?? null;
+        venueEditForm.region_id = venue.region_id ?? '';
+    }
+
+    function cancelEditVenue() {
+        editingVenueId.value = null;
+        venueEditForm.clearErrors();
+    }
+
+    function saveVenueEdit() {
+        venueEditForm.put(`${base}/venues/${editingVenueId.value}`, {
+            preserveScroll: true,
+            onSuccess: () => { editingVenueId.value = null; },
+        });
+    }
+
     function addStage() {
         stageForm.post(`${base}/stages`, { preserveScroll: true, onSuccess: () => stageForm.reset() });
     }
@@ -493,6 +524,11 @@ export function useEventSettingsForms(props) {
         backfillRegs,
         addVenue,
         removeVenue,
+        editingVenueId,
+        venueEditForm,
+        startEditVenue,
+        cancelEditVenue,
+        saveVenueEdit,
         addStage,
         removeStage,
         addComboRule,

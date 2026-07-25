@@ -148,6 +148,12 @@
                     </FormField>
                 </div>
 
+                <!-- This branch only ever renders for a NON-sports event whose billing model was manually set to
+                     "Sports composite" from the dropdown above — a real sports event (event_type === 'sports')
+                     never reaches this far down the chain; it resolves at the very first v-if on line 43.
+                     For that non-sports case, these fields (not "Sport event billing" below, which is sports-only —
+                     see the gate added there) are what updateFeeSettings() actually persists via
+                     normalizeEventFeeSettings(), so this block must stay intact. -->
                 <div v-else-if="feeSettingsForm.fee_model === 'sports_composite'" class="space-y-4 border-t border-slate-100 pt-4">
                     <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700 space-y-2">
                         <p class="font-semibold text-slate-900">How billing works</p>
@@ -259,7 +265,12 @@
                 </div>
             </section>
 
-            <section v-if="feeSettingsForm.fee_model === 'sports_composite'" class="card space-y-4">
+            <!-- Sports-only: updateFeeSettings() only writes sport_event_fees.* to the event's composite fee
+                 columns when event.event_type === 'sports'. Without this gate, a non-sports event with
+                 fee_model = sports_composite (e.g. an arts/language fest that picked this billing model) showed
+                 this whole section, but anything entered here was silently discarded on save — the fields above
+                 in the sports_composite block are what actually persist for that case. -->
+            <section v-if="feeSettingsForm.fee_model === 'sports_composite' && event.event_type === 'sports'" class="card space-y-4">
                 <div>
                     <h3 class="section-title">Sport event billing</h3>
                     <p class="section-desc">

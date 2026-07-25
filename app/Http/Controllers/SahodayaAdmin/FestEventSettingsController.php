@@ -601,6 +601,31 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', 'Venue added.');
     }
 
+    public function updateVenue(Request $request, string $tenantId, FestEvent $event, FestVenue $venue)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($venue->event_id !== $event->id, 404);
+
+        $data = $request->validate([
+            'name'      => 'required|string|max:255',
+            'location'  => 'nullable|string|max:255',
+            'capacity'  => 'nullable|integer|min:1',
+            'region_id' => 'nullable|exists:regions,id',
+        ]);
+
+        $venue->update($data);
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('venues'),
+            'fest.settings.venue_updated',
+            "Venue updated: {$data['name']}",
+            ['venue_id' => $venue->id],
+        );
+
+        return back()->with('success', 'Venue updated.');
+    }
+
     public function destroyVenue(string $tenantId, FestEvent $event, FestVenue $venue)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
