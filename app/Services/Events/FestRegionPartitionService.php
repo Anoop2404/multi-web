@@ -80,7 +80,7 @@ class FestRegionPartitionService
      */
     public function assertRegionSelected(FestEvent $event, Tenant $school): void
     {
-        if (($event->conduct_mode ?? 'standard') !== 'partitioned' && ! in_array($event->event_type, ['kalolsavam', 'sports'], true)) {
+        if (($event->conduct_mode ?? 'standard') !== 'partitioned' && ! in_array($event->event_type, ['kalolsavam', 'sports', 'english_fest', 'science_fest', 'kids_fest', 'teacher_fest'], true)) {
             return;
         }
 

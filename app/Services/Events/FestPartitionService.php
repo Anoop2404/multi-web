@@ -176,7 +176,7 @@ class FestPartitionService
     {
         abort_if($hub->parent_event_id, 422, 'Create partitions on the hub event, not a child partition.');
 
-        $allowedTypes = ['kids_fest', 'kalolsavam', 'kalotsav', 'custom'];
+        $allowedTypes = ['kids_fest', 'kalolsavam', 'kalotsav', 'english_fest', 'science_fest', 'teacher_fest', 'sports', 'custom'];
         abort_unless(
             in_array($hub->event_type, $allowedTypes, true) || $this->conductMode($hub) === 'partitioned',
             422,

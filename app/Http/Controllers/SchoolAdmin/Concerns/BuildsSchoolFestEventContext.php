@@ -54,7 +54,7 @@ trait BuildsSchoolFestEventContext
      */
     protected function schoolKalotsavRegion(FestEvent $event): ?array
     {
-        if (! in_array($event->event_type, ['kalolsavam', 'sports'], true)) {
+        if (! in_array($event->event_type, ['kalolsavam', 'sports', 'english_fest', 'science_fest', 'kids_fest', 'teacher_fest'], true)) {
             return null;
         }
 
