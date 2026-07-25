@@ -225,6 +225,74 @@
                         </div>
                     </div>
 
+                    <!-- 4. Regional Structure & Regional Venues Section -->
+                    <div class="border-t border-slate-100 pt-5 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">4. Regional Structure &amp; Regional Venues</h4>
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold uppercase tracking-wider"
+                                  :class="conductMode === 'partitioned' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-700 border border-slate-200'">
+                                {{ conductMode === 'partitioned' ? '⚡ Region-Wise / Multi-Region' : 'Single Event / Centralized' }}
+                            </span>
+                        </div>
+
+                        <div class="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 via-blue-50/30 to-white p-4 space-y-4">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <p class="font-bold text-slate-900 text-xs">Competition Topology Mode</p>
+                                    <p class="text-xs text-slate-500 mt-0.5">Select if this fest is conducted centrally or split into regional preliminary grounds.</p>
+                                </div>
+                                <button type="button" @click="syncRegionPartitions" class="btn-primary text-xs !bg-indigo-600 hover:!bg-indigo-700 shadow-sm" :disabled="regionSync.processing">
+                                    <span>{{ regionSync.processing ? 'Syncing...' : '⚡ Sync Partitions from Sahodaya Regions' }}</span>
+                                </button>
+                            </div>
+
+                            <div class="grid sm:grid-cols-2 gap-3">
+                                <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-3"
+                                       :class="topologyForm.conduct_mode === 'standard' ? 'border-indigo-600 bg-white ring-1 ring-indigo-500 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'">
+                                    <input type="radio" value="standard" v-model="topologyForm.conduct_mode" class="mt-0.5 text-indigo-600" @change="updateTopology">
+                                    <div>
+                                        <p class="font-bold text-slate-900 text-xs">🏢 Single Venue / Standard</p>
+                                        <p class="text-[11px] text-slate-500 mt-0.5">All schools participate together at one central venue.</p>
+                                    </div>
+                                </label>
+
+                                <label class="p-3 rounded-xl border cursor-pointer transition flex items-start gap-3"
+                                       :class="topologyForm.conduct_mode === 'partitioned' ? 'border-indigo-600 bg-white ring-1 ring-indigo-500 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'">
+                                    <input type="radio" value="partitioned" v-model="topologyForm.conduct_mode" class="mt-0.5 text-indigo-600" @change="updateTopology">
+                                    <div>
+                                        <p class="font-bold text-slate-900 text-xs">🗺️ Region-Wise Partitions / Multi-Region</p>
+                                        <p class="text-[11px] text-slate-500 mt-0.5">Preliminary rounds conducted per region (Tirur, Karuvarakundu, etc.).</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Assigned Regional Venues List -->
+                        <div v-if="regions?.length" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                                <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                    <span>📍</span> Assigned Regional Venues
+                                </h5>
+                                <Link :href="`${base}/settings/venues`" class="link-brand text-xs font-semibold">
+                                    Manage &amp; Assign Venues →
+                                </Link>
+                            </div>
+
+                            <div class="divide-y divide-slate-100 text-xs">
+                                <div v-for="r in regions" :key="r.id" class="py-2.5 flex items-center justify-between gap-4">
+                                    <span class="font-medium text-slate-900 flex items-center gap-1.5">
+                                        <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
+                                        {{ r.name }}
+                                    </span>
+                                    <span v-if="venueForRegion(r.id)" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1">
+                                        📍 {{ venueForRegion(r.id).name }}
+                                    </span>
+                                    <span v-else class="text-slate-400 italic">No venue assigned yet</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <p v-if="form.hasErrors" class="text-sm text-red-600 font-medium">
                         {{ Object.values(form.errors).flat().join(' ') }}
                     </p>
@@ -270,9 +338,32 @@ const props = defineProps({
     sportsAgeGroupsUrl: { type: String, default: '' },
     eventHeadNav: { type: Object, default: () => ({ headItemGroups: [] }) },
     mistakenSeasonIssue: { type: Object, default: null },
+    conductMode: { type: String, default: 'standard' },
+    partitions: { type: Array, default: () => [] },
+    regions: { type: Array, default: () => [] },
+    venues: { type: Array, default: () => [] },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+
+const topologyForm = useForm({
+    conduct_mode: props.event.conduct_mode || props.conductMode || 'standard',
+    combine_regions_at_finale: props.event.combine_regions_at_finale ?? true,
+});
+const regionSync = useForm({});
+
+function updateTopology() {
+    topologyForm.post(`${base}/conduct-topology`, { preserveScroll: true });
+}
+
+function syncRegionPartitions() {
+    if (!confirm('Create a partition per membership region and assign schools by their region? Existing region partitions are kept.')) return;
+    regionSync.post(`${base}/sync-region-partitions`, { preserveScroll: true });
+}
+
+function venueForRegion(regionId) {
+    return props.venues?.find(v => v.region_id === regionId);
+}
 
 const fixingSeason = ref(false);
 function fixMistakenSeason() {
@@ -285,9 +376,6 @@ function fixMistakenSeason() {
     });
 }
 const isSports = computed(() => props.event.event_type === 'sports');
-const statusHint = computed(() => (isSports.value
-    ? 'Setup → Registration open (schools see event) → Ongoing → Complete. Publish results separately.'
-    : 'Draft → Published → Registration open → Ongoing → Completed.'));
 
 const eventTypesLabel = computed(() => props.event.event_type?.replace(/_/g, ' ') ?? 'Event');
 const publicFestUrl = computed(() => {

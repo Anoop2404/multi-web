@@ -1012,6 +1012,10 @@ class FestEventController extends SahodayaAdminController
             'feeTypes'      => config('fest_fees.fee_models'),
             'levelFeeLabels'=> config('fest_fees.payer_labels'),
             'feeSchedule'   => $feeSchedule,
+            'conductMode'   => $event->conduct_mode ?? 'standard',
+            'partitions'    => FestEvent::where('parent_event_id', $event->id)->get(),
+            'regions'       => \App\Models\Region::forTenant($this->sahodaya->id)->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+            'venues'        => FestVenue::where('event_id', $event->id)->with('region:id,name')->orderBy('name')->get(),
             'ageRuleSummary' => $event->event_type === 'sports' ? FestSportsAgeGroup::ageRuleSummary($event) : null,
             'suggestedAgeCutoff' => $event->event_type === 'sports'
                 ? FestSportsAgeGroup::cutoffDate($event)->format('Y-m-d')
