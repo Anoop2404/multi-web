@@ -18,7 +18,7 @@
             </div>
         </div>
 
-        <div class="max-w-5xl space-y-6">
+        <div class="max-w-6xl space-y-6">
             <!-- TOP CONTROLS: ACADEMIC YEAR, SUBJECT SELECTOR & SEARCH -->
             <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
                 <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4">
@@ -28,9 +28,7 @@
                         </div>
                         <div>
                             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Class XII Examination</p>
-                            <p class="text-base font-bold text-gray-900">
-                                Subject-Wise Entry Portal
-                            </p>
+                            <p class="text-base font-bold text-gray-900">Subject-Wise Entry Portal</p>
                         </div>
                     </div>
 
@@ -59,13 +57,11 @@
 
                     <div>
                         <label class="form-label mb-1 font-semibold text-xs text-gray-700">2. Select Subject *</label>
-                        <div class="flex gap-2">
-                            <select v-model="selectedSubjectOption" class="field text-sm bg-white font-medium" :disabled="!canEdit">
-                                <option value="" disabled>-- Select Subject --</option>
-                                <option v-for="subj in filteredSubjectOptions" :key="subj" :value="subj">{{ subj }}</option>
-                                <option value="__custom__">+ Add Custom Subject...</option>
-                            </select>
-                        </div>
+                        <select v-model="selectedSubjectOption" class="field text-sm bg-white font-medium" :disabled="!canEdit">
+                            <option value="" disabled>-- Select Subject --</option>
+                            <option v-for="subj in filteredSubjectOptions" :key="subj" :value="subj">{{ subj }}</option>
+                            <option value="__custom__">+ Add Custom Subject...</option>
+                        </select>
 
                         <input
                             v-if="selectedSubjectOption === '__custom__'"
@@ -84,12 +80,16 @@
                 <div class="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <div class="flex items-center gap-2">
-                            <h3 class="font-bold text-gray-900 text-base">Enter Top Rankers for {{ activeSubjectName || 'Selected Subject' }}</h3>
+                            <h3 class="font-bold text-gray-900 text-base">
+                                Enter Top Rankers for {{ activeSubjectName || 'Selected Subject' }}
+                            </h3>
                             <span v-if="activeSubjectName" class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-0.5 rounded-full">
                                 {{ activeSubjectName }}
                             </span>
                         </div>
-                        <p class="text-xs text-gray-500 mt-0.5">Add one or multiple students scoring top marks in {{ activeSubjectName || 'this subject' }}.</p>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            <strong>Student Name</strong>, <strong>Gender</strong> and <strong>Mark Scored</strong> are required. Roll No is optional.
+                        </p>
                     </div>
 
                     <button
@@ -107,42 +107,78 @@
                 </div>
 
                 <form v-else @submit.prevent="saveAllRows" class="space-y-4">
+                    <!-- Validation error display -->
+                    <div v-if="rowError" class="rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-xs text-red-700 font-semibold">
+                        ⚠️ {{ rowError }}
+                    </div>
+
                     <div class="overflow-x-auto border border-gray-200 rounded-xl">
                         <table class="w-full text-left text-xs">
                             <thead class="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200">
                                 <tr>
-                                    <th class="py-2.5 px-3 w-12 text-center">#</th>
-                                    <th class="py-2.5 px-3">Student Full Name *</th>
-                                    <th class="py-2.5 px-3 w-48">CBSE Roll No *</th>
-                                    <th class="py-2.5 px-3 w-40">Mark Scored (out of 100) *</th>
-                                    <th class="py-2.5 px-3 w-16 text-center" v-if="canEdit">Action</th>
+                                    <th class="py-2.5 px-3 w-10 text-center">#</th>
+                                    <th class="py-2.5 px-3">Student Full Name <span class="text-red-500">*</span></th>
+                                    <th class="py-2.5 px-3 w-36">Gender <span class="text-red-500">*</span></th>
+                                    <th class="py-2.5 px-3 w-40">CBSE Roll No</th>
+                                    <th class="py-2.5 px-3 w-40">Mark Scored (/100) <span class="text-red-500">*</span></th>
+                                    <th class="py-2.5 px-3 w-14 text-center" v-if="canEdit">Del</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100 bg-white">
-                                <tr v-for="(row, index) in rows" :key="index" class="hover:bg-gray-50/50">
+                                <tr
+                                    v-for="(row, index) in rows"
+                                    :key="index"
+                                    class="hover:bg-gray-50/50 transition-colors"
+                                    :class="{ 'bg-red-50/40 ring-1 ring-inset ring-red-200': rowHasError(row) }"
+                                >
                                     <td class="py-2 px-3 text-center font-bold text-gray-400">
                                         {{ index + 1 }}
                                     </td>
+
+                                    <!-- STUDENT NAME (required) -->
                                     <td class="py-2 px-3">
                                         <input
                                             v-model="row.name"
                                             type="text"
                                             required
                                             class="field text-xs py-1.5"
-                                            placeholder="Student full name"
+                                            :class="{ 'border-red-400': row._touched && !row.name.trim() }"
+                                            placeholder="Student full name *"
                                             :disabled="!canEdit"
+                                            @blur="row._touched = true"
                                         >
+                                        <p v-if="row._touched && !row.name.trim()" class="text-[10px] text-red-500 mt-0.5">Name is required</p>
                                     </td>
+
+                                    <!-- GENDER (required) -->
+                                    <td class="py-2 px-3">
+                                        <select
+                                            v-model="row.gender"
+                                            class="field text-xs py-1.5 bg-white"
+                                            :class="{ 'border-red-400': row._touched && !row.gender }"
+                                            :disabled="!canEdit"
+                                            @blur="row._touched = true"
+                                        >
+                                            <option value="">— Select Gender —</option>
+                                            <option value="male">♂ Male</option>
+                                            <option value="female">♀ Female</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                        <p v-if="row._touched && !row.gender" class="text-[10px] text-red-500 mt-0.5">Gender is required</p>
+                                    </td>
+
+                                    <!-- ROLL NO (optional) -->
                                     <td class="py-2 px-3">
                                         <input
                                             v-model="row.roll_no"
                                             type="text"
-                                            required
                                             class="field text-xs py-1.5"
-                                            placeholder="e.g. 11182743"
+                                            placeholder="e.g. 11182743 (optional)"
                                             :disabled="!canEdit"
                                         >
                                     </td>
+
+                                    <!-- MARKS (required) -->
                                     <td class="py-2 px-3">
                                         <input
                                             v-model.number="row.marks"
@@ -151,10 +187,15 @@
                                             max="100"
                                             required
                                             class="field text-xs py-1.5 font-bold text-emerald-700"
-                                            placeholder="e.g. 99"
+                                            :class="{ 'border-red-400': row._touched && (row.marks === '' || row.marks === null) }"
+                                            placeholder="e.g. 99 *"
                                             :disabled="!canEdit"
+                                            @blur="row._touched = true"
                                         >
+                                        <p v-if="row._touched && (row.marks === '' || row.marks === null)" class="text-[10px] text-red-500 mt-0.5">Mark is required</p>
                                     </td>
+
+                                    <!-- DELETE ROW -->
                                     <td class="py-2 px-3 text-center" v-if="canEdit">
                                         <button
                                             type="button"
@@ -227,19 +268,38 @@
                 </div>
 
                 <div v-if="filteredSubjectWiseLeaders.length" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div v-for="row in filteredSubjectWiseLeaders" :key="row.subject + '-' + row.name"
-                         class="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/40 to-white p-4 shadow-xs">
+                    <div
+                        v-for="row in filteredSubjectWiseLeaders"
+                        :key="row.subject + '-' + row.name"
+                        class="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/40 to-white p-4 shadow-xs"
+                    >
                         <div class="flex items-center justify-between mb-1">
                             <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded">
                                 {{ row.subject }}
                             </span>
                             <span class="text-sm font-bold text-emerald-600">{{ row.marks }} / 100</span>
                         </div>
+
                         <p class="font-bold text-gray-900 text-sm mt-2">{{ row.name }}</p>
-                        <p v-if="row.roll_no" class="text-xs text-gray-500 mt-0.5">CBSE Roll No: {{ row.roll_no }}</p>
+
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                            <!-- GENDER BADGE -->
+                            <span
+                                v-if="row.gender"
+                                class="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                                :class="{
+                                    'bg-blue-100 text-blue-700': row.gender === 'male',
+                                    'bg-pink-100 text-pink-700': row.gender === 'female',
+                                    'bg-gray-100 text-gray-700': row.gender === 'other',
+                                }"
+                            >
+                                {{ row.gender === 'male' ? '♂ Male' : row.gender === 'female' ? '♀ Female' : 'Other' }}
+                            </span>
+                            <span v-if="row.roll_no" class="text-xs text-gray-500">Roll: {{ row.roll_no }}</span>
+                        </div>
 
                         <button v-if="canEdit" type="button" @click="removeSubjectTopper(row)" class="text-xs text-red-500 hover:text-red-700 font-semibold mt-3 flex items-center gap-1">
-                            <span>🗑</span> Remove Subject Topper
+                            <span>🗑</span> Remove
                         </button>
                     </div>
                 </div>
@@ -267,9 +327,9 @@ const props = defineProps({
     canEdit:            { type: Boolean, default: true },
 });
 
-const pageTitle = computed(() => `Subject-Wise Toppers — ${props.academicYear}`);
 const selectedYear = ref(props.academicYear);
 const searchQuery = ref('');
+const rowError = ref('');
 
 const default23Subjects = [
     'English core', 'Hindi core', 'Hindi elective', 'Malayalam', 'Sanskrit',
@@ -293,7 +353,10 @@ const filteredSubjectWiseLeaders = computed(() => {
     if (!searchQuery.value.trim()) return props.subjectWiseLeaders;
     const q = searchQuery.value.toLowerCase();
     return props.subjectWiseLeaders.filter(
-        row => row.subject?.toLowerCase().includes(q) || row.name?.toLowerCase().includes(q) || row.roll_no?.toLowerCase().includes(q)
+        row => row.subject?.toLowerCase().includes(q)
+            || row.name?.toLowerCase().includes(q)
+            || row.roll_no?.toLowerCase().includes(q)
+            || row.gender?.toLowerCase().includes(q)
     );
 });
 
@@ -315,12 +378,14 @@ const activeSubjectName = computed(() => {
     return selectedSubjectOption.value;
 });
 
-const rows = ref([
-    { name: '', roll_no: '', marks: '' },
-]);
+function blankRow() {
+    return { name: '', gender: '', roll_no: '', marks: '', _touched: false };
+}
+
+const rows = ref([blankRow()]);
 
 function addRow() {
-    rows.value.push({ name: '', roll_no: '', marks: '' });
+    rows.value.push(blankRow());
 }
 
 function removeRow(index) {
@@ -329,9 +394,18 @@ function removeRow(index) {
     }
 }
 
-// Pre-fill existing entries for selected subject if available
+function rowHasError(row) {
+    return row._touched && (
+        !row.name.trim() ||
+        !row.gender ||
+        row.marks === '' || row.marks === null
+    );
+}
+
+// Pre-fill existing entries for selected subject
 watch([selectedSubjectOption, customSubjectInput], () => {
     const subj = activeSubjectName.value;
+    rowError.value = '';
     if (!subj) return;
 
     const existingForSubject = props.subjectWiseLeaders.filter(
@@ -341,11 +415,13 @@ watch([selectedSubjectOption, customSubjectInput], () => {
     if (existingForSubject.length) {
         rows.value = existingForSubject.map(item => ({
             name: item.name || '',
+            gender: item.gender || '',
             roll_no: item.roll_no || '',
             marks: item.marks ?? '',
+            _touched: false,
         }));
     } else {
-        rows.value = [{ name: '', roll_no: '', marks: '' }];
+        rows.value = [blankRow()];
     }
 });
 
@@ -353,8 +429,27 @@ async function saveAllRows() {
     const subj = activeSubjectName.value;
     if (!subj) return;
 
-    const validRows = rows.value.filter(r => r.name.trim() && r.roll_no.trim() && r.marks !== '');
-    if (!validRows.length) return;
+    rowError.value = '';
+
+    // Mark all rows as touched to show validation UI
+    rows.value.forEach(r => { r._touched = true; });
+
+    // Validate: name + gender + marks required, roll_no optional
+    const incompleteRows = rows.value.filter(
+        r => !r.name.trim() || !r.gender || r.marks === '' || r.marks === null
+    );
+    if (incompleteRows.length) {
+        rowError.value = `${incompleteRows.length} row(s) are incomplete. Student Name, Gender and Mark Scored are required.`;
+        return;
+    }
+
+    const validRows = rows.value.filter(
+        r => r.name.trim() && r.gender && (r.marks !== '' && r.marks !== null)
+    );
+    if (!validRows.length) {
+        rowError.value = 'Add at least one student with a name, gender and mark scored.';
+        return;
+    }
 
     isSubmitting.value = true;
 
@@ -370,6 +465,8 @@ async function saveAllRows() {
             await new Promise((resolve) => {
                 router.put(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
                     ...existing,
+                    gender: r.gender || null,
+                    roll_no: r.roll_no || null,
                     subject_marks: currentSubjectMarks,
                 }, {
                     preserveScroll: true,
@@ -383,7 +480,8 @@ async function saveAllRows() {
             await new Promise((resolve) => {
                 router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/single`, {
                     name: r.name.trim(),
-                    roll_no: r.roll_no.trim(),
+                    gender: r.gender || null,
+                    roll_no: r.roll_no?.trim() || null,
                     percentage: r.marks,
                     marks_obtained: r.marks,
                     total_marks: 100,

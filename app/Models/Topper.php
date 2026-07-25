@@ -17,6 +17,7 @@ class Topper extends Model
         'name',
         'admission_no',
         'roll_no',
+        'gender',
         'photo',
         'percentage',
         'total_marks',
