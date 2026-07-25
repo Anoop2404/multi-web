@@ -182,6 +182,7 @@
                                 <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-gray-50 border-b border-gray-200">
                                     <tr>
                                         <th class="p-3">Student Name</th>
+                                        <th v-if="(selectedClass ?? searchClass) == 12" class="p-3">Stream *</th>
                                         <th class="p-3">CBSE Roll No</th>
                                         <th class="p-3">Marks Scored</th>
                                         <th class="p-3">%</th>
@@ -192,6 +193,14 @@
                                 <tbody class="divide-y divide-gray-100 bg-white">
                                     <tr v-for="(row, i) in form.toppers" :key="i" class="hover:bg-slate-50/50">
                                         <td class="p-3"><input v-model="row.name" type="text" placeholder="Student name" class="field text-sm" :disabled="!canEditActive"></td>
+                                        <td v-if="(selectedClass ?? searchClass) == 12" class="p-3">
+                                            <select v-model="row.stream_key" required class="field text-sm w-36" :disabled="!canEditActive">
+                                                <option value="" disabled>Select Stream</option>
+                                                <option value="science">Science</option>
+                                                <option value="commerce">Commerce</option>
+                                                <option value="humanities">Humanities</option>
+                                            </select>
+                                        </td>
                                         <td class="p-3"><input v-model="row.roll_no" type="text" placeholder="CBSE Roll No" class="field text-sm w-36" :disabled="!canEditActive"></td>
                                         <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="form.total_marks || undefined" placeholder="Marks" class="field text-sm w-28" :disabled="!canEditActive"></td>
                                         <td class="p-3 text-indigo-600 font-bold whitespace-nowrap">{{ rowPercentage(row) }}</td>
@@ -362,7 +371,7 @@ function loadResult(r) {
 const canEditActive = computed(() => !props.activeResult || ['draft', 'rejected'].includes(props.activeResult.status));
 
 function blankRow() {
-    return { name: '', roll_no: '', marks_obtained: '', photo: null };
+    return { name: '', stream_key: '', roll_no: '', marks_obtained: '', photo: null };
 }
 
 function resultToFormData(r) {

@@ -223,6 +223,8 @@ class BoardResultController extends SchoolAdminController
         $data = $request->validate([
             'toppers' => 'nullable|array',
             'toppers.*.name' => 'nullable|string|max:255',
+            'toppers.*.stream' => 'nullable|string|max:100',
+            'toppers.*.stream_key' => 'nullable|string|max:50',
             'toppers.*.roll_no' => 'nullable|string|max:64',
             'toppers.*.admission_no' => 'nullable|string|max:64',
             'toppers.*.marks_obtained' => 'nullable|numeric|min:0',
@@ -287,12 +289,26 @@ class BoardResultController extends SchoolAdminController
                 );
             }
 
+            $streamKey = $row['stream_key'] ?? $row['stream'] ?? null;
+            $streamLabel = null;
+            $streamId = null;
+            if ($streamKey && (int) $boardResult->class === 12) {
+                $normalizedKey = BoardExamSubjects::normalizeStream($streamKey, $sahodayaId);
+                if ($normalizedKey) {
+                    $labels = BoardExamSubjects::class12StreamLabels($sahodayaId);
+                    $streamLabel = $labels[$normalizedKey] ?? $streamKey;
+                    $streamId = BoardExamSubjects::resolveStreamId($normalizedKey, $sahodayaId);
+                }
+            }
+
             Topper::create([
                 'board_result_id' => $boardResult->id,
                 'tenant_id' => $this->school->id,
                 'name' => $row['name'],
                 'roll_no' => $row['roll_no'] ?? null,
                 'admission_no' => $row['admission_no'] ?? null,
+                'stream' => $streamLabel ?? $row['stream'] ?? null,
+                'stream_id' => $streamId,
                 'total_marks' => $totalMarks,
                 'marks_obtained' => $marksObtained,
                 'percentage' => $percentage,
