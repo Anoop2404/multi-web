@@ -26,14 +26,20 @@ class BoardResultMastersController extends SahodayaAdminController
         // Subject master (Category I/II/III) for the "add subject to stream" picker on this
         // page — lets an admin assign existing subjects instead of retyping labels, while
         // still allowing free-text entry for one-off school-specific subjects.
-        $subjects = Subject::query()
+        $hasCategory = \Illuminate\Support\Facades\Schema::hasColumn('subjects', 'category');
+
+        $subjectsQuery = Subject::query()
             ->forSahodaya($this->sahodaya->id)
             ->active()
-            ->orderByRaw('sahodaya_id is null desc')
-            ->orderBy('category')
-            ->orderBy('sort_order')
-            ->get(['id', 'code', 'label', 'category'])
-            ->groupBy(fn (Subject $s) => $s->category ?? 'other')
+            ->orderByRaw('sahodaya_id is null desc');
+
+        if ($hasCategory) {
+            $subjectsQuery->orderBy('category');
+        }
+
+        $subjects = $subjectsQuery->orderBy('sort_order')
+            ->get($hasCategory ? ['id', 'code', 'label', 'category'] : ['id', 'code', 'label'])
+            ->groupBy(fn (Subject $s) => ($hasCategory ? $s->category : null) ?? 'other')
             ->map(fn ($group) => $group->values())
             ->all();
 
@@ -68,13 +74,20 @@ class BoardResultMastersController extends SahodayaAdminController
 
         $code = strtoupper(trim($data['code'] ?? preg_replace('/[^A-Za-z0-9]/', '', $data['label'])));
 
-        Subject::create([
+        $hasCategory = \Illuminate\Support\Facades\Schema::hasColumn('subjects', 'category');
+
+        $attributes = [
             'sahodaya_id' => $this->sahodaya->id,
             'label' => trim($data['label']),
             'code' => $code,
-            'category' => $data['category'] ?? 'language',
             'is_active' => true,
-        ]);
+        ];
+
+        if ($hasCategory) {
+            $attributes['category'] = $data['category'] ?? 'language';
+        }
+
+        Subject::create($attributes);
 
         return back()->with('success', 'Subject created successfully.');
     }
@@ -90,12 +103,19 @@ class BoardResultMastersController extends SahodayaAdminController
             'is_active' => 'nullable|boolean',
         ]);
 
-        $subject->update([
+        $hasCategory = \Illuminate\Support\Facades\Schema::hasColumn('subjects', 'category');
+
+        $updateData = [
             'label' => trim($data['label']),
             'code' => strtoupper(trim($data['code'] ?? $subject->code)),
-            'category' => $data['category'] ?? $subject->category,
             'is_active' => $data['is_active'] ?? true,
-        ]);
+        ];
+
+        if ($hasCategory) {
+            $updateData['category'] = $data['category'] ?? $subject->category;
+        }
+
+        $subject->update($updateData);
 
         return back()->with('success', 'Subject updated successfully.');
     }
@@ -112,18 +132,23 @@ class BoardResultMastersController extends SahodayaAdminController
     {
         $standards = \App\Support\BoardExamSubjects::standardBoardSubjects();
         $count = 0;
+        $hasCategory = \Illuminate\Support\Facades\Schema::hasColumn('subjects', 'category');
 
         foreach ($standards as $index => $label) {
             $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $label), 0, 10));
+            $defaults = [
+                'code' => $code,
+                'is_active' => true,
+                'sort_order' => $index + 1,
+            ];
+            if ($hasCategory) {
+                $defaults['category'] = 'language';
+            }
+
             $created = Subject::firstOrCreate([
                 'sahodaya_id' => $this->sahodaya->id,
                 'label' => $label,
-            ], [
-                'code' => $code,
-                'category' => 'language',
-                'is_active' => true,
-                'sort_order' => $index + 1,
-            ]);
+            ], $defaults);
 
             if ($created->wasRecentlyCreated) {
                 $count++;
