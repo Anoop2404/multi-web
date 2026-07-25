@@ -43,15 +43,6 @@
                 </div>
 
                 <form @submit.prevent="search" class="flex items-center gap-3 flex-wrap">
-                    <div v-if="(selectedClass ?? searchClass) == 12" class="flex items-center gap-2">
-                        <label class="text-xs font-semibold text-gray-600 whitespace-nowrap">Stream:</label>
-                        <select v-model="searchStream" class="field text-xs py-1.5 w-40 font-medium">
-                            <option value="">All Streams</option>
-                            <option v-for="(label, key) in streamOptions" :key="key" :value="key">
-                                {{ label }}
-                            </option>
-                        </select>
-                    </div>
                     <div class="flex items-center gap-2">
                         <label class="text-xs font-semibold text-gray-600 whitespace-nowrap">Academic Year:</label>
                         <select v-model="searchYear" required class="field text-xs py-1.5 w-48 font-medium">

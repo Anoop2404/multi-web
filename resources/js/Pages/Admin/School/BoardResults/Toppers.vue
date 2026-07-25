@@ -23,15 +23,15 @@
             </div>
         </div>
 
-        <!-- CATEGORY NAVIGATION TABS -->
-        <div class="flex items-center bg-white p-1.5 rounded-2xl shadow-xs border border-gray-200 mb-6 space-x-1 max-w-2xl">
+        <!-- CATEGORY NAVIGATION TABS (CLASS 12 EXCLUSIVE) -->
+        <div v-if="isClass12" class="flex items-center bg-white p-1.5 rounded-2xl shadow-xs border border-gray-200 mb-6 space-x-1 max-w-2xl">
             <button
                 type="button"
                 @click="activeTab = 'overall'"
                 class="flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                 :class="activeTab === 'overall' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
             >
-                <span>🏆</span> Overall Toppers
+                <span>🏆</span> Overall Stream Toppers
             </button>
 
             <button
@@ -44,7 +44,6 @@
             </button>
 
             <button
-                v-if="isClass12"
                 type="button"
                 @click="activeTab = 'achievers'"
                 class="flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
@@ -250,8 +249,8 @@
                 </div>
             </div>
 
-            <!-- TAB 2: SUBJECT-WISE MARK ENTRY (STREAM-INDEPENDENT) -->
-            <div v-if="activeTab === 'subject'" class="space-y-6">
+            <!-- TAB 2: SUBJECT-WISE MARK ENTRY (CLASS 12 EXCLUSIVE) -->
+            <div v-if="isClass12 && activeTab === 'subject'" class="space-y-6">
                 <!-- Add Subject Topper Form -->
                 <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                     <div class="border-b border-gray-100 pb-3">
