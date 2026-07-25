@@ -212,7 +212,7 @@ class FestRegistrationController extends SchoolAdminController
      */
     private function schoolRegionContext(string $eventType): ?array
     {
-        if ($eventType !== 'kalolsavam') {
+        if (! in_array($eventType, ['kalolsavam', 'sports'], true)) {
             return null;
         }
 

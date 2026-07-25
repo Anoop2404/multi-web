@@ -99,7 +99,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         };
 
         $schoolRegions = [];
-        if ($event->event_type === 'kalolsavam') {
+        if (in_array($event->event_type, ['kalolsavam', 'sports'], true)) {
             $schoolRegions = SchoolRegionAssignment::query()
                 ->where('school_region_assignments.tenant_id', $this->sahodaya->id)
                 ->where('school_region_assignments.academic_year', AcademicYear::forSahodaya($this->sahodaya->id))

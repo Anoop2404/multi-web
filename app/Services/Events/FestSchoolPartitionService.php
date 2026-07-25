@@ -30,7 +30,7 @@ class FestSchoolPartitionService
 
         // Fall back to the school's membership region so Kalotsav routing works without
         // assigning partitions twice — as long as a matching partition child exists.
-        if ($hub->event_type === 'kalolsavam') {
+        if (in_array($hub->event_type, ['kalolsavam', 'sports'], true)) {
             $key = app(FestRegionPartitionService::class)->partitionKeyForSchool($hub, $schoolId);
             if ($key !== null && $this->partitions->partitionByKey($hub, $key)) {
                 return $key;
