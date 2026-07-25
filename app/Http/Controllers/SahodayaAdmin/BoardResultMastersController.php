@@ -132,7 +132,6 @@ class BoardResultMastersController extends SahodayaAdminController
 
         return back()->with('success', "Seeded {$count} standard CBSE subjects for this Sahodaya.");
     }
-}
 
     public function storeStream(Request $request)
     {
