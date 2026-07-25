@@ -11,22 +11,32 @@
                 </p>
             </div>
 
-            <!-- Class segmented switch -->
-            <div class="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200/80 self-start md:self-auto">
-                <Link
-                    :href="`/school-admin/${school.id}/board-results?class=10`"
-                    class="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all"
-                    :class="selectedClass === 10 ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+            <div class="flex items-center gap-3 self-start md:self-auto print:hidden">
+                <button
+                    type="button"
+                    @click="printReport"
+                    class="btn-secondary text-xs py-1.5 font-bold flex items-center gap-1.5"
                 >
-                    Class X (AISSE)
-                </Link>
-                <Link
-                    :href="`/school-admin/${school.id}/board-results?class=12`"
-                    class="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all"
-                    :class="selectedClass === 12 ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
-                >
-                    Class XII (AISSCE)
-                </Link>
+                    <span>🖨</span> Print Rank Report
+                </button>
+
+                <!-- Class segmented switch -->
+                <div class="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200/80">
+                    <Link
+                        :href="`/school-admin/${school.id}/board-results?class=10`"
+                        class="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all"
+                        :class="selectedClass === 10 ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                    >
+                        Class X (AISSE)
+                    </Link>
+                    <Link
+                        :href="`/school-admin/${school.id}/board-results?class=12`"
+                        class="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all"
+                        :class="selectedClass === 12 ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                    >
+                        Class XII (AISSCE)
+                    </Link>
+                </div>
             </div>
         </div>
 
@@ -559,5 +569,9 @@ function removeSubjectTopper(row) {
     }, {
         preserveScroll: true,
     });
+}
+
+function printReport() {
+    window.print();
 }
 </script>
