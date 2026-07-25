@@ -107,11 +107,11 @@
 
                         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
-                                <label class="form-label mb-1 font-semibold">Total Appeared *</label>
+                                <label class="form-label mb-1">Total Appeared (Optional)</label>
                                 <input v-model.number="form.total_appeared" type="number" min="0" class="field text-sm" placeholder="e.g. 120" :disabled="!canEditActive">
                             </div>
                             <div>
-                                <label class="form-label mb-1 font-semibold">Total Passed *</label>
+                                <label class="form-label mb-1">Total Passed (Optional)</label>
                                 <input v-model.number="form.pass_count" type="number" min="0" class="field text-sm" placeholder="e.g. 115" :disabled="!canEditActive">
                             </div>
                             <div>
@@ -124,7 +124,7 @@
                             <div>
                                 <label class="form-label mb-1 font-semibold text-gray-800">Total Marks (Common Out of) *</label>
                                 <input v-model.number="form.total_marks" type="number" min="1" class="field text-sm font-bold text-indigo-700 bg-indigo-50/20" placeholder="e.g. 500" :disabled="!canEditActive">
-                                <p class="text-[11px] text-gray-400 mt-1">Used for topper percentages.</p>
+                                <p class="text-[11px] text-gray-400 mt-1">Used for topper percentages (Default: 500).</p>
                             </div>
 
                             <div>
@@ -160,7 +160,7 @@
 
                         <div class="grid sm:grid-cols-2 gap-4">
                             <div>
-                                <label class="form-label mb-1 font-semibold">CBSE Tabulation Sheet / Proof Document *</label>
+                                <label class="form-label mb-1">CBSE Tabulation Sheet / Proof Document (Required for verification)</label>
                                 <div v-if="activeResult?.result_pdf_path" class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 mb-2 flex items-center justify-between shadow-xs">
                                     <div class="flex items-center gap-2 text-xs font-semibold text-emerald-800">
                                         <span>✓ Proof Attached</span>

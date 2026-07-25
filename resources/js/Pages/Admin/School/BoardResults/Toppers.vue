@@ -252,21 +252,12 @@
 
             <!-- TAB 2: SUBJECT-WISE MARK ENTRY (CLASS 12 EXCLUSIVE) -->
             <div v-if="isClass12 && activeTab === 'subject'" class="space-y-6">
-                <!-- TOP SELECTION BAR: STREAM | SUBJECT | YEAR -->
+                <!-- TOP SELECTION BAR: SUBJECT & YEAR -->
                 <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center gap-3 flex-wrap">
                         <div class="flex items-center gap-2">
-                            <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">Stream:</label>
-                            <select v-model="selectedSubjectStream" class="field text-xs py-1.5 w-36 font-semibold bg-white">
-                                <option value="science">Science</option>
-                                <option value="commerce">Commerce</option>
-                                <option value="humanities">Humanities</option>
-                            </select>
-                        </div>
-
-                        <div class="flex items-center gap-2">
                             <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">Subject:</label>
-                            <select v-model="selectedSubjectOption" class="field text-xs py-1.5 w-48 font-semibold bg-white">
+                            <select v-model="selectedSubjectOption" class="field text-xs py-1.5 w-56 font-semibold bg-white">
                                 <option value="" disabled>Select Subject</option>
                                 <option v-for="subj in masterSubjectList" :key="subj" :value="subj">{{ subj }}</option>
                                 <option value="__custom__">+ Add Custom Subject...</option>
