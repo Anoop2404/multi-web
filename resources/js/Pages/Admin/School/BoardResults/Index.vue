@@ -152,21 +152,19 @@
                                     <tr>
                                         <th class="p-2">Student Name</th>
                                         <th class="p-2">CBSE Roll No</th>
-                                        <th class="p-2">Admission No</th>
                                         <th class="p-2">Marks Scored</th>
                                         <th class="p-2">%</th>
-                                        <th class="p-2">Photo</th>
+                                        <th class="p-2">Photo (Optional)</th>
                                         <th class="p-2"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="(row, i) in form.toppers" :key="i" class="border-t border-gray-100">
                                         <td class="p-2"><input v-model="row.name" type="text" placeholder="Student name" class="field text-sm" :disabled="!canEditActive"></td>
-                                        <td class="p-2"><input v-model="row.roll_no" type="text" placeholder="CBSE Roll No" class="field text-sm w-32" :disabled="!canEditActive"></td>
-                                        <td class="p-2"><input v-model="row.admission_no" type="text" placeholder="Adm No" class="field text-sm w-28" :disabled="!canEditActive"></td>
-                                        <td class="p-2"><input v-model.number="row.marks_obtained" type="number" min="0" :max="form.total_marks || undefined" placeholder="Marks" class="field text-sm w-24" :disabled="!canEditActive"></td>
+                                        <td class="p-2"><input v-model="row.roll_no" type="text" placeholder="CBSE Roll No" class="field text-sm w-36" :disabled="!canEditActive"></td>
+                                        <td class="p-2"><input v-model.number="row.marks_obtained" type="number" min="0" :max="form.total_marks || undefined" placeholder="Marks" class="field text-sm w-28" :disabled="!canEditActive"></td>
                                         <td class="p-2 text-gray-600 font-semibold whitespace-nowrap">{{ rowPercentage(row) }}</td>
-                                        <td class="p-2"><input type="file" accept="image/*" class="text-xs w-32" :disabled="!canEditActive" @change="row.photo = $event.target.files[0]"></td>
+                                        <td class="p-2"><input type="file" accept="image/*" class="text-xs w-36" :disabled="!canEditActive" @change="row.photo = $event.target.files[0]"></td>
                                         <td class="p-2">
                                             <button v-if="canEditActive && form.toppers.length > 1" type="button" class="text-red-500 hover:underline text-xs" @click="removeRow(i)">Remove</button>
                                         </td>
@@ -380,7 +378,7 @@ function loadResult(r) {
 const canEditActive = computed(() => !props.activeResult || ['draft', 'rejected'].includes(props.activeResult.status));
 
 function blankRow() {
-    return { name: '', roll_no: '', admission_no: '', marks_obtained: '', photo: null };
+    return { name: '', roll_no: '', marks_obtained: '', photo: null };
 }
 
 function resultToFormData(r) {

@@ -53,21 +53,19 @@
                                 <tr>
                                     <th class="p-2">Student name *</th>
                                     <th class="p-2">CBSE Roll No</th>
-                                    <th class="p-2">Admission No</th>
                                     <th class="p-2">Marks scored *</th>
                                     <th class="p-2">%</th>
-                                    <th class="p-2">Photo</th>
+                                    <th class="p-2">Photo (Optional)</th>
                                     <th class="p-2"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="(row, i) in batchForm.toppers" :key="i" class="border-t border-gray-50">
                                     <td class="p-2"><input v-model="row.name" type="text" required class="field text-sm" placeholder="Student name" :disabled="!canEdit"></td>
-                                    <td class="p-2"><input v-model="row.roll_no" type="text" class="field text-sm w-32" placeholder="CBSE Roll No" :disabled="!canEdit"></td>
-                                    <td class="p-2"><input v-model="row.admission_no" type="text" class="field text-sm w-28" :disabled="!canEdit"></td>
-                                    <td class="p-2"><input v-model.number="row.marks_obtained" type="number" min="0" :max="batchForm.total_marks || undefined" required class="field text-sm w-24" :disabled="!canEdit"></td>
+                                    <td class="p-2"><input v-model="row.roll_no" type="text" class="field text-sm w-36" placeholder="CBSE Roll No" :disabled="!canEdit"></td>
+                                    <td class="p-2"><input v-model.number="row.marks_obtained" type="number" min="0" :max="batchForm.total_marks || undefined" required class="field text-sm w-28" :disabled="!canEdit"></td>
                                     <td class="p-2 text-gray-500 whitespace-nowrap">{{ rowPercentage(row) }}</td>
-                                    <td class="p-2"><input type="file" accept="image/*" class="text-xs w-32" :disabled="!canEdit" @change="row.photo = $event.target.files[0]"></td>
+                                    <td class="p-2"><input type="file" accept="image/*" class="text-xs w-36" :disabled="!canEdit" @change="row.photo = $event.target.files[0]"></td>
                                     <td class="p-2">
                                         <button v-if="canEdit && batchForm.toppers.length > 1" type="button" class="text-red-400 hover:underline text-xs" @click="removeRow(i)">Remove</button>
                                     </td>
@@ -104,12 +102,8 @@
                             <input v-model="form.name" type="text" required class="field" :disabled="!canEdit">
                         </div>
                         <div>
-                            <label class="form-label mb-1.5">Admission No</label>
-                            <input v-model="form.admission_no" type="text" class="field" :disabled="!canEdit" placeholder="School admission number">
-                        </div>
-                        <div>
-                            <label class="form-label mb-1.5">Roll No</label>
-                            <input v-model="form.roll_no" type="text" class="field" :disabled="!canEdit" placeholder="Board roll number">
+                            <label class="form-label mb-1.5">CBSE Roll No</label>
+                            <input v-model="form.roll_no" type="text" class="field" :disabled="!canEdit" placeholder="CBSE examination roll number">
                         </div>
                         <div>
                             <label class="form-label mb-1.5">Overall percentage *</label>
