@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\ApiConfig;
+use App\Models\BoardResultMarksConfig;
 use App\Models\ExamStream;
 use App\Models\Subject;
 use App\Models\Topper;
 use App\Models\TopperCountConfig;
+use App\Services\BoardResults\BoardResultMarksConfigService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -48,6 +50,10 @@ class BoardResultMastersController extends SahodayaAdminController
             ->orderBy('label')
             ->get();
 
+        $marksConfigs = BoardResultMarksConfig::query()
+            ->where('sahodaya_id', $this->sahodaya->id)
+            ->get();
+
         return $this->inertia('Sahodaya/BoardResults/Masters', [
             'streams' => $streams,
             'subjectsByCategory' => $subjects,
@@ -61,7 +67,30 @@ class BoardResultMastersController extends SahodayaAdminController
                 ->where('sahodaya_id', $this->sahodaya->id)
                 ->orderBy('class')
                 ->get(),
+            'classXTotalMarks' => $marksConfigs->firstWhere('class', 10)?->total_marks
+                ?? BoardResultMarksConfig::DEFAULT_TOTAL_MARKS,
+            'streamTotalMarks' => $marksConfigs->where('class', 12)
+                ->whereNotNull('stream_id')
+                ->pluck('total_marks', 'stream_id'),
         ]);
+    }
+
+    public function updateMarksConfig(Request $request, BoardResultMarksConfigService $marksConfig)
+    {
+        $data = $request->validate([
+            'class_x_total_marks' => 'required|integer|min:1|max:5000',
+            'streams' => 'nullable|array',
+            'streams.*.stream_id' => 'required|integer',
+            'streams.*.total_marks' => 'required|integer|min:1|max:5000',
+        ]);
+
+        $marksConfig->upsert($this->sahodaya->id, 10, null, $data['class_x_total_marks']);
+
+        foreach ($data['streams'] ?? [] as $row) {
+            $marksConfig->upsert($this->sahodaya->id, 12, (int) $row['stream_id'], (int) $row['total_marks']);
+        }
+
+        return back()->with('success', 'Marks settings saved — schools will use these locked totals for new entries.');
     }
 
     public function storeSubject(Request $request)

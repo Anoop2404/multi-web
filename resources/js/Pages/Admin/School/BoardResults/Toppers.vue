@@ -71,8 +71,14 @@
 
                     <form @submit.prevent="submitBatch" class="space-y-5">
                         <div class="max-w-xs">
-                            <label class="form-label mb-1 font-semibold">Total Marks (Common Out of) *</label>
-                            <input v-model.number="batchForm.total_marks" type="number" min="1" required class="field text-sm" placeholder="e.g. 500" :disabled="!canEdit">
+                            <label class="form-label mb-1 font-semibold">Total Marks (Out of)</label>
+                            <div v-if="!isClass12" class="field text-sm font-bold text-indigo-700 bg-indigo-50/40 flex items-center border-indigo-100">
+                                {{ classXTotal }}
+                                <span class="ml-1.5 text-[10px] font-normal text-gray-400">(admin-locked)</span>
+                            </div>
+                            <p v-else class="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 leading-snug">
+                                Locked per stream — pick each topper's stream in the table below.
+                            </p>
                         </div>
 
                         <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
@@ -81,6 +87,7 @@
                                     <tr>
                                         <th class="p-3">Student Name *</th>
                                         <th class="p-3">Gender *</th>
+                                        <th v-if="isClass12" class="p-3">Stream *</th>
                                         <th class="p-3">CBSE Roll No</th>
                                         <th class="p-3">Marks Scored *</th>
                                         <th class="p-3">%</th>
@@ -99,8 +106,15 @@
                                                 <option value="other">Other</option>
                                             </select>
                                         </td>
+                                        <td v-if="isClass12" class="p-3">
+                                            <select v-model="row.stream_key" required class="field text-sm w-32" :disabled="!canEdit">
+                                                <option value="">— Select —</option>
+                                                <option v-for="(label, key) in streamOptions" :key="key" :value="key">{{ label }}</option>
+                                            </select>
+                                            <p class="text-[10px] text-gray-400 mt-0.5" v-if="row.stream_key">Out of {{ rowTotalMarks(row) ?? '—' }}</p>
+                                        </td>
                                         <td class="p-3"><input v-model="row.roll_no" type="text" class="field text-sm w-36" placeholder="CBSE Roll No" :disabled="!canEdit"></td>
-                                        <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="batchForm.total_marks || undefined" required class="field text-sm w-28" placeholder="Marks" :disabled="!canEdit"></td>
+                                        <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="rowTotalMarks(row) || undefined" required class="field text-sm w-28" placeholder="Marks" :disabled="!canEdit"></td>
                                         <td class="p-3 text-indigo-600 font-bold whitespace-nowrap">{{ rowPercentage(row) }}</td>
                                         <td class="p-3"><input type="file" accept="image/*" class="text-xs w-40" :disabled="!canEdit" @change="row.photo = $event.target.files[0]"></td>
                                         <td class="p-3 text-right">
@@ -453,6 +467,7 @@ const props = defineProps({
     canEdit:            { type: Boolean, default: true },
     topperCap:          { type: Number, default: null },
     topperCount:        { type: Number, default: 0 },
+    marksConfig:        { type: Object, default: () => ({ classX: 500, byStream: {} }) },
 });
 
 const default23Subjects = [
@@ -497,12 +512,22 @@ const achievers90ByStream = computed(() => {
 });
 
 // ── Bulk add ─────────────────────────────────────────────────────────────
+// Total marks is admin-locked (BoardResultMarksConfigService) — Class X shares one value,
+// Class XII resolves per-row from the selected stream. Schools no longer type this in.
+const classXTotal = computed(() => props.marksConfig?.classX ?? 500);
+
+function rowTotalMarks(row) {
+    if (props.isClass12) {
+        return row.stream_key ? (props.marksConfig?.byStream?.[row.stream_key] ?? null) : null;
+    }
+    return classXTotal.value;
+}
+
 function blankRow() {
     return { name: '', gender: '', stream_key: '', roll_no: '', marks_obtained: '', photo: null };
 }
 
 const batchForm = useForm({
-    total_marks: props.boardResult.total_marks || 500,
     toppers: [blankRow()],
 });
 
@@ -519,8 +544,9 @@ function removeRow(i) {
 }
 
 function rowPercentage(row) {
-    if (!batchForm.total_marks || row.marks_obtained === '' || row.marks_obtained == null) return '—';
-    const val = Math.round(((row.marks_obtained / batchForm.total_marks) * 100) * 100) / 100;
+    const total = rowTotalMarks(row);
+    if (!total || row.marks_obtained === '' || row.marks_obtained == null) return '—';
+    const val = Math.round(((row.marks_obtained / total) * 100) * 100) / 100;
     return `${val}%`;
 }
 

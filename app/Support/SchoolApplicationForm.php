@@ -219,6 +219,7 @@ class SchoolApplicationForm
         $fields = self::resolve($profile);
 
         $profileFields = [
+            'school_name' => true,
             'principal_name' => true,
             'principal_email' => true,
             'principal_phone' => true,
@@ -237,9 +238,11 @@ class SchoolApplicationForm
 
             $fields[$key]['enabled'] = true;
             $fields[$key]['required'] = $required;
-            $fields[$key]['hint'] = $required
-                ? 'Required before fest event registrations can proceed.'
-                : 'Optional — add if your school has a vice principal.';
+            if ($key !== 'school_name') {
+                $fields[$key]['hint'] = $required
+                    ? 'Required before fest event registrations can proceed.'
+                    : 'Optional — add if your school has a vice principal.';
+            }
         }
 
         return $fields;
@@ -252,6 +255,31 @@ class SchoolApplicationForm
             ['Pre-Primary' => 'Pre-Primary', 'LKG' => 'LKG', 'UKG' => 'UKG'],
             collect(range(1, 12))->mapWithKeys(fn (int $n) => ["Class {$n}" => "Class {$n}"])->all()
         );
+    }
+
+    /** @return list<string> Fields schools may update from their admin panel. */
+    public static function editableFieldKeys(): array
+    {
+        return [
+            'school_name', 'school_prefix', 'cbse_affiliation',
+            'phone', 'website', 'address', 'district', 'highest_class',
+            'principal_name', 'principal_email', 'principal_phone',
+            'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
+            'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
+        ];
+    }
+
+    /** @return array<string, list<string>> */
+    public static function profileSectionFieldKeys(): array
+    {
+        return [
+            'school' => ['school_name', 'school_prefix', 'cbse_affiliation', 'phone', 'website', 'address', 'district', 'highest_class'],
+            'principal' => ['principal_name', 'principal_email', 'principal_phone'],
+            'leadership' => [
+                'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
+                'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
+            ],
+        ];
     }
 
     /** @return array<string, mixed> */

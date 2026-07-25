@@ -74,7 +74,7 @@
                         </select>
                     </div>
                     <button type="submit" class="btn-primary text-xs px-4 py-1.5 font-semibold">
-                        Load Result
+                        Search
                     </button>
                 </form>
             </div>
@@ -132,9 +132,14 @@
                                 </div>
                             </div>
                             <div>
-                                <label class="form-label mb-1 font-semibold text-gray-800">Total Marks (Common Out of) *</label>
-                                <input v-model.number="form.total_marks" type="number" min="1" class="field text-sm font-bold text-indigo-700 bg-indigo-50/20" placeholder="e.g. 500" :disabled="!canEditActive">
-                                <p class="text-[11px] text-gray-400 mt-1">Used for topper percentages (Default: 500).</p>
+                                <label class="form-label mb-1 font-semibold text-gray-800">Total Marks (Out of)</label>
+                                <div v-if="!isXii" class="field text-sm font-bold text-indigo-700 bg-indigo-50/40 flex items-center border-indigo-100">
+                                    {{ classXTotal }}
+                                    <span class="ml-1.5 text-[10px] font-normal text-gray-400">(admin-locked)</span>
+                                </div>
+                                <p v-else class="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 leading-snug">
+                                    Locked per stream — pick each topper's stream in the table below.
+                                </p>
                             </div>
 
                             <div>
@@ -202,9 +207,13 @@
                                       class="btn-primary text-xs px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-sm border-none">
                                     <span>🎯</span> Open Subject-Wise Toppers Page →
                                 </Link>
-                                <span class="text-xs text-gray-500">Out of {{ form.total_marks || 500 }} marks</span>
+                                <span class="text-xs text-gray-500">{{ isXii ? 'Out of marks — set by stream' : `Out of ${classXTotal} marks` }}</span>
                             </div>
                         </div>
+
+                        <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                            📌 Enter at least your top 5 students here. Also add <strong>every</strong> student scoring 90% or above, even beyond the top 5 — they won't be left out, but they only show up in the 90%+ Achievers list, not the ranked Top-N.
+                        </p>
 
                         <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
                             <table class="w-full text-sm">
@@ -212,6 +221,7 @@
                                     <tr>
                                         <th class="p-3">Student Name</th>
                                         <th class="p-3">Gender</th>
+                                        <th v-if="isXii" class="p-3">Stream</th>
                                         <th class="p-3">CBSE Roll No</th>
                                         <th class="p-3">Marks Scored</th>
                                         <th class="p-3">%</th>
@@ -230,8 +240,15 @@
                                                 <option value="other">Other</option>
                                             </select>
                                         </td>
+                                        <td v-if="isXii" class="p-3">
+                                            <select v-model="row.stream_key" class="field text-sm w-32" :disabled="!canEditActive">
+                                                <option value="">— Select —</option>
+                                                <option v-for="(label, key) in streamOptions" :key="key" :value="key">{{ label }}</option>
+                                            </select>
+                                            <p class="text-[10px] text-gray-400 mt-0.5" v-if="row.stream_key">Out of {{ rowTotalMarks(row) ?? '—' }}</p>
+                                        </td>
                                         <td class="p-3"><input v-model="row.roll_no" type="text" placeholder="CBSE Roll No" class="field text-sm w-36" :disabled="!canEditActive"></td>
-                                        <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="form.total_marks || undefined" placeholder="Marks" class="field text-sm w-28" :disabled="!canEditActive"></td>
+                                        <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="rowTotalMarks(row) || undefined" placeholder="Marks" class="field text-sm w-28" :disabled="!canEditActive"></td>
                                         <td class="p-3 text-indigo-600 font-bold whitespace-nowrap">{{ rowPercentage(row) }}</td>
                                         <td class="p-3"><input type="file" accept="image/*" class="text-xs w-40" :disabled="!canEditActive" @change="row.photo = $event.target.files[0]"></td>
                                         <td class="p-3 text-right">
@@ -270,7 +287,7 @@
             </div>
 
             <div v-else class="p-12 text-center text-gray-400 text-sm card bg-white">
-                Select an academic year above and click "Load Result" to begin.
+                Select an academic year above and click "Search" to begin.
             </div>
 
             <!-- SAVED RESULTS HISTORY TABLE -->
@@ -344,6 +361,7 @@ const props = defineProps({
     streamOptions: { type: Object, default: () => ({}) },
     activeResult: { type: Object, default: null },
     activeResultContext: { type: Object, default: null },
+    marksConfig: { type: Object, default: () => ({ classX: 500, byStream: {} }) },
 });
 
 const pageTitle = computed(() => {
@@ -374,6 +392,19 @@ function loadResult(r) {
 // ── Step 2: combined summary + toppers form ──────────────────────────────
 const canEditActive = computed(() => !props.activeResult || ['draft', 'rejected'].includes(props.activeResult.status));
 
+// Admin-locked "out of" marks — schools no longer type this in. Class X is one shared
+// value; Class XII varies per stream, so each topper row resolves its own total once a
+// stream is picked (see marksConfig.byStream, keyed by the same keys as streamOptions).
+const isXii = computed(() => Number(props.selectedClass ?? searchClass.value) === 12);
+const classXTotal = computed(() => props.marksConfig?.classX ?? 500);
+
+function rowTotalMarks(row) {
+    if (isXii.value) {
+        return row.stream_key ? (props.marksConfig?.byStream?.[row.stream_key] ?? null) : null;
+    }
+    return classXTotal.value;
+}
+
 function blankRow() {
     return { name: '', gender: '', stream_key: '', roll_no: '', marks_obtained: '', photo: null };
 }
@@ -389,7 +420,7 @@ function resultToFormData(r) {
         first_class: r?.first_class ?? '',
         highest_mark: r?.highest_mark ?? '',
         average_mark: r?.average_mark ?? '',
-        total_marks: r?.total_marks || 500,
+        total_marks: r?.total_marks || props.marksConfig?.classX || 500,
         remarks: r?.remarks ?? '',
         result_pdf: null,
         attachments: [],
@@ -418,8 +449,8 @@ watch(() => [form.total_appeared, form.pass_count], ([appeared, passed]) => {
 watch(() => form.toppers, (rows) => {
     if (form.highest_mark === '' || form.highest_mark == null) {
         const percentages = rows
-            .filter((r) => r.marks_obtained !== '' && r.marks_obtained != null && form.total_marks)
-            .map((r) => Math.round((r.marks_obtained / form.total_marks) * 10000) / 100);
+            .filter((r) => r.marks_obtained !== '' && r.marks_obtained != null && rowTotalMarks(r))
+            .map((r) => Math.round((r.marks_obtained / rowTotalMarks(r)) * 10000) / 100);
         if (percentages.length > 0) {
             const maxPerc = Math.max(...percentages);
             if (maxPerc > 0) {
@@ -445,8 +476,9 @@ function removeRow(i) {
 }
 
 function rowPercentage(row) {
-    if (!form.total_marks || row.marks_obtained === '' || row.marks_obtained == null) return '—';
-    const val = Math.round(((row.marks_obtained / form.total_marks) * 100) * 100) / 100;
+    const total = rowTotalMarks(row);
+    if (!total || row.marks_obtained === '' || row.marks_obtained == null) return '—';
+    const val = Math.round(((row.marks_obtained / total) * 100) * 100) / 100;
     return `${val}%`;
 }
 

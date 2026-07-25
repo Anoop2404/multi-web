@@ -9,6 +9,7 @@ use App\Models\DataChangeLog;
 use App\Models\Topper;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\BoardResults\BoardResultAcademicYearService;
+use App\Services\BoardResults\BoardResultMarksConfigService;
 use App\Services\BoardResults\BoardResultNotifier;
 use App\Services\BoardResults\SubjectStatsNormalizer;
 use App\Services\BoardResults\TopperCountService;
@@ -68,6 +69,11 @@ class BoardResultController extends SchoolAdminController
             'selectedClass' => $class,
             'selectedAcademicYear' => $academicYear,
             'streamOptions' => BoardExamSubjects::class12StreamLabels((string) $this->school->parent_id),
+            'marksConfig' => $this->marksConfigFor(
+                $class ?? 10,
+                BoardExamSubjects::class12StreamLabels((string) $this->school->parent_id),
+                (string) $this->school->parent_id
+            ),
             'activeResult' => $activeResult,
         ], $activeResult ? ['activeResultContext' => $this->topperContext($activeResult)] : []));
     }
@@ -106,11 +112,13 @@ class BoardResultController extends SchoolAdminController
         $yearService = app(BoardResultAcademicYearService::class);
         $data = $yearService->attachToPayload($this->validateBoardResult($request));
         $topperRows = $this->validateTopperRows($request);
-        if ($topperRows !== [] && empty($data['total_marks'])) {
-            throw ValidationException::withMessages([
-                'total_marks' => 'Enter total marks before adding toppers.',
-            ]);
-        }
+
+        // Total marks is admin-locked now (BoardResultMarksConfigService), not typed by the
+        // school. Class X has one Sahodaya-wide value; Class XII varies per-topper by stream,
+        // so the aggregate-level column is left null and each Topper carries its own total.
+        $data['total_marks'] = (int) $data['class'] === 10
+            ? app(BoardResultMarksConfigService::class)->resolve((string) $this->school->parent_id, 10, null)
+            : null;
 
         $data['tenant_id'] = $this->school->id;
         $data['examination_type'] = $data['examination_type']
@@ -150,7 +158,7 @@ class BoardResultController extends SchoolAdminController
         $result = BoardResult::updateOrCreate($keys, $payload);
         $this->storeUploads($request, $result);
 
-        $addedCount = $this->createToppersFromRows($request, $result, $topperRows, (int) ($data['total_marks'] ?? 0));
+        $addedCount = $this->createToppersFromRows($request, $result, $topperRows);
 
         app(DataChangeLogger::class)->event(
             $existing ? 'updated' : 'created',
@@ -193,11 +201,11 @@ class BoardResultController extends SchoolAdminController
             $this->validateBoardResult($request, $boardResult)
         );
         $topperRows = $this->validateTopperRows($request);
-        if ($topperRows !== [] && empty($data['total_marks']) && empty($boardResult->total_marks)) {
-            throw ValidationException::withMessages([
-                'total_marks' => 'Enter total marks before adding toppers.',
-            ]);
-        }
+
+        // See store() — total marks is admin-locked, not school-editable.
+        $data['total_marks'] = (int) $data['class'] === 10
+            ? app(BoardResultMarksConfigService::class)->resolve((string) $this->school->parent_id, 10, null)
+            : null;
 
         $data['examination_type'] = $data['examination_type']
             ?? BoardResult::examinationTypeForClass((int) $data['class']);
@@ -215,8 +223,7 @@ class BoardResultController extends SchoolAdminController
         $boardResult->update(collect($data)->except(['result_pdf', 'attachments', 'toppers'])->all());
         $this->storeUploads($request, $boardResult->fresh());
 
-        $totalMarks = (int) ($data['total_marks'] ?? $boardResult->total_marks ?? 0);
-        $addedCount = $this->createToppersFromRows($request, $boardResult->fresh(), $topperRows, $totalMarks);
+        $addedCount = $this->createToppersFromRows($request, $boardResult->fresh(), $topperRows);
 
         app(DataChangeLogger::class)->updated(
             $boardResult,
@@ -288,13 +295,16 @@ class BoardResultController extends SchoolAdminController
      * @param  list<array<string, mixed>>  $rows  keyed by original request index
      * @return int number of toppers created
      */
-    private function createToppersFromRows(Request $request, BoardResult $boardResult, array $rows, int $totalMarks): int
+    private function createToppersFromRows(Request $request, BoardResult $boardResult, array $rows): int
     {
         if ($rows === []) {
             return 0;
         }
 
         $sahodayaId = (string) $this->school->parent_id;
+        $isClass12 = (int) $boardResult->class === 12;
+        $marksConfig = app(BoardResultMarksConfigService::class);
+
         $cap = app(TopperCountService::class)->resolveCap($sahodayaId, (int) $boardResult->class);
         $existingCount = Topper::where('board_result_id', $boardResult->id)->count();
         $incoming = count($rows);
@@ -305,12 +315,38 @@ class BoardResultController extends SchoolAdminController
             ]);
         }
 
+        // Resolve each row's stream (Class XII) and admin-locked "out of" total up front,
+        // so marks_obtained can be validated against the correct per-stream total before
+        // anything is created. Class X has no stream — one Sahodaya-wide total applies.
+        $resolved = [];
         foreach ($rows as $i => $row) {
+            $streamKey = $row['stream_key'] ?? $row['stream'] ?? null;
+            $streamLabel = null;
+            $streamId = null;
+
+            if ($isClass12) {
+                if (blank($streamKey)) {
+                    throw ValidationException::withMessages([
+                        "toppers.{$i}.stream_key" => 'Select a stream for each Class XII topper — it determines the locked total marks.',
+                    ]);
+                }
+                $normalizedKey = BoardExamSubjects::normalizeStream($streamKey, $sahodayaId);
+                if ($normalizedKey) {
+                    $labels = BoardExamSubjects::class12StreamLabels($sahodayaId);
+                    $streamLabel = $labels[$normalizedKey] ?? $streamKey;
+                    $streamId = BoardExamSubjects::resolveStreamId($normalizedKey, $sahodayaId);
+                }
+            }
+
+            $totalMarks = $marksConfig->resolve($sahodayaId, (int) $boardResult->class, $streamId);
+
             if ((float) $row['marks_obtained'] > $totalMarks) {
                 throw ValidationException::withMessages([
-                    "toppers.{$i}.marks_obtained" => 'Marks scored cannot exceed the total (max) marks.',
+                    "toppers.{$i}.marks_obtained" => "Marks scored cannot exceed the total marks ({$totalMarks}).",
                 ]);
             }
+
+            $resolved[$i] = ['stream_label' => $streamLabel, 'stream_id' => $streamId, 'total_marks' => $totalMarks];
         }
 
         $nextRank = (int) (Topper::where('board_result_id', $boardResult->id)->max('rank') ?? 0) + 1;
@@ -318,6 +354,7 @@ class BoardResultController extends SchoolAdminController
 
         foreach ($rows as $i => $row) {
             $marksObtained = (float) $row['marks_obtained'];
+            $totalMarks = $resolved[$i]['total_marks'];
             $percentage = $totalMarks > 0 ? round(($marksObtained / $totalMarks) * 100, 2) : 0;
 
             $photoPath = null;
@@ -328,18 +365,6 @@ class BoardResultController extends SchoolAdminController
                 );
             }
 
-            $streamKey = $row['stream_key'] ?? $row['stream'] ?? null;
-            $streamLabel = null;
-            $streamId = null;
-            if ($streamKey && (int) $boardResult->class === 12) {
-                $normalizedKey = BoardExamSubjects::normalizeStream($streamKey, $sahodayaId);
-                if ($normalizedKey) {
-                    $labels = BoardExamSubjects::class12StreamLabels($sahodayaId);
-                    $streamLabel = $labels[$normalizedKey] ?? $streamKey;
-                    $streamId = BoardExamSubjects::resolveStreamId($normalizedKey, $sahodayaId);
-                }
-            }
-
             Topper::create([
                 'board_result_id' => $boardResult->id,
                 'tenant_id' => $this->school->id,
@@ -347,8 +372,8 @@ class BoardResultController extends SchoolAdminController
                 'roll_no' => $row['roll_no'] ?? null,
                 'admission_no' => $row['admission_no'] ?? null,
                 'gender' => $row['gender'] ?? null,
-                'stream' => $streamLabel ?? $row['stream'] ?? null,
-                'stream_id' => $streamId,
+                'stream' => $resolved[$i]['stream_label'] ?? $row['stream'] ?? null,
+                'stream_id' => $resolved[$i]['stream_id'],
                 'total_marks' => $totalMarks,
                 'marks_obtained' => $marksObtained,
                 'percentage' => $percentage,
@@ -520,6 +545,29 @@ class BoardResultController extends SchoolAdminController
             'canEdit' => $boardResult->isEditable(),
             'topperCap' => app(TopperCountService::class)->resolveCap($sahodayaId, (int) $boardResult->class),
             'topperCount' => $boardResult->toppers->count(),
+            'marksConfig' => $this->marksConfigFor((int) $boardResult->class, $streamOptions, $sahodayaId),
+        ];
+    }
+
+    /**
+     * Admin-locked "out of" marks for the frontend: a flat Class X value, and (for Class XII)
+     * a per-stream-key map so the entry table can show/lock each row's total once a stream is
+     * picked. Schools can no longer type this value — see BoardResultMarksConfigService.
+     *
+     * @param  array<string, string>  $streamOptions  stream_key => label
+     * @return array{classX: int, byStream: array<string, int>}
+     */
+    private function marksConfigFor(int $class, array $streamOptions, string $sahodayaId): array
+    {
+        $marksConfig = app(BoardResultMarksConfigService::class);
+
+        return [
+            'classX' => $marksConfig->resolve($sahodayaId, 10, null),
+            'byStream' => collect($streamOptions)->mapWithKeys(function ($label, $key) use ($marksConfig, $sahodayaId) {
+                $streamId = BoardExamSubjects::resolveStreamId($key, $sahodayaId);
+
+                return [$key => $marksConfig->resolve($sahodayaId, 12, $streamId)];
+            })->all(),
         ];
     }
 
@@ -560,22 +608,17 @@ class BoardResultController extends SchoolAdminController
     }
 
     /**
-     * Add several toppers at once: a single "max marks" shared by every row, plus per-row
-     * name / roll no / admission no / marks scored (+ optional photo proof). Percentage is
-     * derived automatically. Rank, stream, and subject-wise marks aren't set here — use the
-     * single Edit form afterward for those (mainly relevant to Class XII).
+     * Add several toppers at once: name / roll no / admission no / marks scored (+ optional
+     * photo proof) per row. Total ("out of") marks is admin-locked — resolved server-side per
+     * row via BoardResultMarksConfigService, not submitted by the school. Percentage is derived
+     * automatically. Rank and subject-wise marks aren't set here — use the single Edit form
+     * afterward for those (mainly relevant to Class XII).
      */
     public function storeToppersBatch(Request $request, string $tenantId, BoardResult $boardResult)
     {
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
         abort_unless($boardResult->isEditable(), 422, 'Toppers are locked for this result.');
         app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
-
-        $request->validate(['total_marks' => 'required|integer|min:1']);
-        $totalMarks = (int) $request->input('total_marks');
-        if ((int) $boardResult->total_marks !== $totalMarks) {
-            $boardResult->update(['total_marks' => $totalMarks]);
-        }
 
         $rows = $this->validateTopperRows($request);
         if ($rows === []) {
@@ -584,7 +627,7 @@ class BoardResultController extends SchoolAdminController
             ]);
         }
 
-        $created = $this->createToppersFromRows($request, $boardResult, $rows, $totalMarks);
+        $created = $this->createToppersFromRows($request, $boardResult, $rows);
 
         app(DataChangeLogger::class)->event(
             'created',

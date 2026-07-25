@@ -852,6 +852,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/masters/subjects/{subject}', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'destroySubject'])->name('masters.subjects.destroy');
             Route::post('/masters/subjects/seed-standard', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'seedStandardSubjects'])->name('masters.subjects.seed-standard');
             Route::put('/masters/api-config', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'updateApiConfig'])->name('masters.api-config');
+            Route::put('/masters/marks-config', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'updateMarksConfig'])->name('masters.marks-config');
             Route::get('/reports', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'index'])->name('reports');
             Route::get('/reports/subject-merit', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'subjectMerit'])->name('reports.subject-merit');
             Route::get('/reports/excellence', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'excellence'])->name('reports.excellence');

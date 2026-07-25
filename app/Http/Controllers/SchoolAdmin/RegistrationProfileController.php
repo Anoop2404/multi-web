@@ -74,6 +74,7 @@ class RegistrationProfileController extends SchoolAdminController
         foreach (SchoolApplicationForm::editableFieldKeys() as $key) {
             if ($fields[$key]['enabled'] ?? false) {
                 $profileData[$key] = match ($key) {
+                    'school_name'      => $this->school->name ?? '',
                     'school_prefix'    => $this->school->school_prefix ?? '',
                     'cbse_affiliation' => SchoolApplicationForm::schoolAffiliation($this->school) ?? '',
                     default            => $payload[$key] ?? '',
@@ -123,6 +124,9 @@ class RegistrationProfileController extends SchoolAdminController
         $payload = SchoolApplicationForm::mergeProfileUpdate($before, $data, $fields);
 
         $updates = ['application_payload' => $payload];
+        if (array_key_exists('school_name', $data) && filled($data['school_name'])) {
+            $updates['name'] = trim((string) $data['school_name']);
+        }
         if (
             array_key_exists('school_prefix', $data)
             && filled($data['school_prefix'])
