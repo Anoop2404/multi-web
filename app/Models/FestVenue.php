@@ -8,13 +8,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FestVenue extends Model
 {
-    protected $fillable = ['tenant_id', 'event_id', 'name', 'location', 'capacity', 'is_active'];
+    protected $fillable = ['tenant_id', 'event_id', 'region_id', 'name', 'location', 'capacity', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];
 
     public function event(): BelongsTo
     {
         return $this->belongsTo(FestEvent::class, 'event_id');
+    }
+
+    public function region(): BelongsTo
+    {
+        return $this->belongsTo(Region::class, 'region_id');
     }
 
     public function stages(): HasMany
