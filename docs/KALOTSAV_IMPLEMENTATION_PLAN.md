@@ -134,13 +134,19 @@ Independent of region work — ship whenever convenient, useful even for single-
 
 ---
 
-### Phase 5.5 — Participation limits exposed at event creation (done 25 Jul 2026)
+### Phase 5.5 — Participation limits exposed at event creation (done 25 Jul 2026, corrected same day)
 
 Discovered while scoping Phase 6: per-student on-stage/off-stage/team-item caps already existed as a full generic system (`FestParticipationPolicy`, keyed by `event_id` + `class_group`, enforced by `FestParticipationLimitService`/`FestComboRuleService`) — but only configurable after the fact via the Settings → Participation tab, not at event creation.
 
-Shipped: `FestEventController::store()` now accepts `max_total_per_student` + `max_onstage_per_student`/`max_offstage_per_student`/`max_group_per_student`, rejects a breakdown that exceeds the total, and creates the `FestParticipationPolicy` row (`class_group = null`, applies to all class categories uniformly) in the same request as event creation. The form lives in `ProgramIndex.vue`'s shared create panel — since that component is used by every fest program (Kalotsav, English Fest, Science Fest, Kids Fest, Teacher Fest), **English Fest gets the identical config surface with no extra work**, exactly as required.
+**First pass (wrong):** added `max_total_per_student`/`max_onstage_per_student`/`max_offstage_per_student`/`max_group_per_student` fields to `FestEventController::store()` and the `ProgramIndex.vue` create-event panel. This is dead code for Kalotsav and English Fest specifically — both are `is_singleton = true`, and `FestEventController::programIndex()` auto-creates their one hub event via `FestPrimaryEventResolver::resolveOrCreate()` and redirects a regular (non-staff) admin straight to it, **before the create form ever renders**. There is no "creation moment" UI for singleton programs — the program IS the event, created silently on first visit.
 
-Not yet done (future, only if needed): per-class-category (LP/UP/HS/HSS) variation — current requirement was confirmed as one uniform set of numbers for all categories, so `class_group` is left `null`. If a Sahodaya later needs different limits per category, the existing Settings → Participation tab already supports per-`class_group` rows; only the creation-form UI would need a second per-category input mode.
+**Fix:** `programIndex()` now checks `$event->wasRecentlyCreated` after `resolveOrCreate()`. On a brand-new hub event, it redirects to `/events/{id}/settings/participation` (with a flash message) instead of the plain Overview page — landing the admin exactly where the limits can be set, immediately after the event exists. That Settings → Participation tab (`ParticipationTab.vue` / `useEventSettingsForms.js` / `FestParticipationPolicyController`) already had `max_onstage_per_student`/`max_offstage_per_student`/`max_group_per_student` wired end to end but was **missing the `max_total_per_student` field entirely** — added it, plus the same "breakdown can't exceed total" client-side check used in the create-form version.
+
+The `ProgramIndex.vue` create-form fields from the first pass are kept — they're not wasted, since two competition types (`sports`, `custom`) are `is_singleton = false` and do use that literal create form.
+
+Net result: for Kalotsav and English Fest, the reachable path is Settings → Participation (now with all four fields), reached automatically right after first creation. Confirmed both programs share the exact same component and controller, so "English Fest same configs" holds.
+
+Not yet done (future, only if needed): per-class-category (LP/UP/HS/HSS) variation — current requirement was confirmed as one uniform set of numbers for all categories, so `class_group` is left `null`. The Settings → Participation tab's backend already supports per-`class_group` rows; only its UI would need a second per-category input mode if that's ever needed.
 
 ---
 

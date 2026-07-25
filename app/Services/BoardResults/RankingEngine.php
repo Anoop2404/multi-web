@@ -25,6 +25,12 @@ class RankingEngine
 
     public const SCOPE_SUBJECT = 'subject';
 
+    /** Sahodaya-wide student ranking, Class X overall (also computed for Class XII, unused by default). */
+    public const SCOPE_STUDENT_OVERALL = 'student_overall';
+
+    /** Sahodaya-wide student ranking per stream, Class XII. */
+    public const SCOPE_STUDENT_STREAM = 'student_stream';
+
     /**
      * Recompute rankings for a Sahodaya + academic year.
      *
@@ -92,6 +98,201 @@ class RankingEngine
         });
 
         return ['scopes' => $scopes, 'rows' => $written];
+    }
+
+    /**
+     * Recompute the auto-computed Sahodaya-wide STUDENT topper rankings — Class X overall
+     * and Class XII per-stream — from every school's submitted toppers.
+     *
+     * Unlike recompute() (school-level scopes, which require approved/published data), this
+     * pulls from any result that has at least been submitted, since the Sahodaya topper list
+     * is meant to auto-compute as schools submit rather than waiting for final approval.
+     *
+     * @return array{scopes: list<string>, rows: int}
+     */
+    public function recomputeStudentToppers(string $sahodayaId, string $academicYear): array
+    {
+        $scopes = [self::SCOPE_STUDENT_OVERALL, self::SCOPE_STUDENT_STREAM];
+
+        $schoolIds = Tenant::query()
+            ->where('parent_id', $sahodayaId)
+            ->where('type', 'school')
+            ->pluck('id')
+            ->all();
+
+        $results = BoardResult::query()
+            ->whereIn('tenant_id', $schoolIds)
+            ->where('academic_year', $academicYear)
+            ->whereIn('status', [
+                BoardResult::STATUS_SUBMITTED,
+                BoardResult::STATUS_VERIFIED,
+                BoardResult::STATUS_APPROVED,
+                BoardResult::STATUS_PUBLISHED,
+            ])
+            ->with(['toppers.examStream'])
+            ->get();
+
+        $written = 0;
+
+        DB::transaction(function () use ($sahodayaId, $academicYear, $scopes, $results, &$written) {
+            BoardResultRanking::query()
+                ->where('sahodaya_id', $sahodayaId)
+                ->where('academic_year', $academicYear)
+                ->whereIn('scope', $scopes)
+                ->delete();
+
+            foreach ($scopes as $scope) {
+                $rows = match ($scope) {
+                    self::SCOPE_STUDENT_OVERALL => $this->rankStudentsOverall($results),
+                    self::SCOPE_STUDENT_STREAM => $this->rankStudentsByStream($results),
+                    default => collect(),
+                };
+
+                foreach ($rows as $row) {
+                    BoardResultRanking::create([
+                        'sahodaya_id' => $sahodayaId,
+                        'academic_year' => $academicYear,
+                        'examination_type' => $row['examination_type'] ?? null,
+                        'class' => $row['class'] ?? null,
+                        'scope' => $scope,
+                        'entity_type' => 'student',
+                        'entity_id' => $row['entity_id'],
+                        'board_result_id' => $row['board_result_id'] ?? null,
+                        'rank' => $row['rank'],
+                        'score' => $row['score'] ?? null,
+                        'tie_rule_applied' => $row['tie_rule_applied'] ?? null,
+                        'meta' => $row['meta'] ?? null,
+                    ]);
+                    $written++;
+                }
+            }
+        });
+
+        return ['scopes' => $scopes, 'rows' => $written];
+    }
+
+    /**
+     * Sahodaya-wide student ranking by percentage, computed separately per class
+     * (Class X's list is the one actually surfaced as "overall Sahodaya toppers").
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function rankStudentsOverall(Collection $results): Collection
+    {
+        $rows = collect();
+
+        foreach ([10, 12] as $class) {
+            $toppers = $results->where('class', $class)
+                ->flatMap->toppers
+                ->filter(fn (Topper $t) => $t->percentage !== null)
+                ->values();
+
+            if ($toppers->isEmpty()) {
+                continue;
+            }
+
+            $sorted = $this->sortToppersByPercentage($toppers);
+            $rows = $rows->merge($this->assignStudentCompetitionRanks($sorted, $class, null));
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Sahodaya-wide student ranking per stream (Class XII).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function rankStudentsByStream(Collection $results): Collection
+    {
+        $toppers = $results->where('class', 12)
+            ->flatMap->toppers
+            ->filter(fn (Topper $t) => $t->percentage !== null)
+            ->values();
+
+        $grouped = $toppers->groupBy(fn (Topper $t) => $t->stream_id ?: ($t->stream ?: 'unknown'));
+
+        $rows = collect();
+        foreach ($grouped as $streamKey => $group) {
+            $sorted = $this->sortToppersByPercentage($group);
+            $streamLabel = $sorted->first()?->examStream?->label ?? $sorted->first()?->stream ?? (string) $streamKey;
+
+            $rows = $rows->merge($this->assignStudentCompetitionRanks($sorted, 12, [
+                'stream' => $streamLabel,
+                'stream_key' => $streamKey,
+            ]));
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  Collection<int, Topper>  $toppers
+     * @return Collection<int, Topper>
+     */
+    private function sortToppersByPercentage(Collection $toppers): Collection
+    {
+        return $toppers->sort(function (Topper $a, Topper $b) {
+            $cmp = (float) $b->percentage <=> (float) $a->percentage;
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            $cmp = ((float) ($b->marks_obtained ?? 0)) <=> ((float) ($a->marks_obtained ?? 0));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strcmp((string) $a->id, (string) $b->id);
+        })->values();
+    }
+
+    /**
+     * @param  Collection<int, Topper>  $sorted
+     * @param  array<string, mixed>|null  $extraMeta
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function assignStudentCompetitionRanks(Collection $sorted, int $class, ?array $extraMeta): Collection
+    {
+        $rows = collect();
+        $lastScore = null;
+        $lastRank = 0;
+
+        foreach ($sorted as $index => $topper) {
+            /** @var Topper $topper */
+            $score = (float) $topper->percentage;
+            $position = $index + 1;
+
+            if ($lastScore === null || abs($score - $lastScore) > 0.0001) {
+                $rank = $position;
+                $applied = null;
+            } else {
+                $rank = $lastRank;
+                $applied = 'percentage';
+            }
+
+            $rows->push([
+                'entity_id' => (string) $topper->id,
+                'board_result_id' => $topper->board_result_id,
+                'examination_type' => null,
+                'class' => $class,
+                'rank' => $rank,
+                'score' => $score,
+                'tie_rule_applied' => $applied,
+                'meta' => array_merge([
+                    'student_name' => $topper->name,
+                    'school_id' => $topper->tenant_id,
+                    'admission_no' => $topper->admission_no,
+                    'roll_no' => $topper->roll_no,
+                    'marks_obtained' => $topper->marks_obtained,
+                    'total_marks' => $topper->total_marks,
+                ], $extraMeta ?? []),
+            ]);
+
+            $lastScore = $score;
+            $lastRank = $rank;
+        }
+
+        return $rows;
     }
 
     /**

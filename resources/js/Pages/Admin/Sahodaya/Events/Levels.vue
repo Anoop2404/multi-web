@@ -56,6 +56,14 @@
                     </form>
                 </div>
 
+                <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700">Phases</h5>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Optional — split items into named phases (Digi Fest day, Off-stage, On-stage…).</p>
+                    </div>
+                    <Link :href="`${base}/phases`" class="btn-secondary text-xs shrink-0">Manage phases</Link>
+                </div>
+
                 <form v-if="!event.parent_event_id && conductPresets?.length" @submit.prevent="applyPreset" class="flex gap-2">
                     <select v-model="presetForm.preset" class="field flex-1 text-sm">
                         <option value="">Apply conduct preset…</option>

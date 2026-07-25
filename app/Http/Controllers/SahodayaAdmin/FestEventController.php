@@ -80,6 +80,16 @@ class FestEventController extends SahodayaAdminController
             $event = app(\App\Services\Events\FestPrimaryEventResolver::class)
                 ->resolveOrCreate($this->sahodaya, $eventType, $programMeta['label']);
 
+            // First-ever visit auto-creates this singleton's hub event with no form step
+            // (there's no "create" screen for Kalotsav/English Fest/etc. — the program IS
+            // the event). Land the admin on Settings > Participation so the on-stage/
+            // off-stage/team/total per-student limits get set right away instead of
+            // silently defaulting to "no limit."
+            if ($event->wasRecentlyCreated) {
+                return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/settings/participation")
+                    ->with('success', "{$programMeta['label']} created — set participation limits (on-stage / off-stage / team items per student) below to get started.");
+            }
+
             return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}");
         }
 

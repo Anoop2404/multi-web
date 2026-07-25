@@ -20,10 +20,84 @@
                 </div>
             </div>
 
-            <!-- Add / edit topper -->
-            <div class="card">
-                <h3 class="font-bold text-gray-800 mb-4">{{ editingId ? 'Edit topper' : 'Add topper' }}</h3>
-                <form @submit.prevent="submit" class="space-y-4">
+            <!-- 90%+ achievers (overall) -->
+            <div v-if="isClass12 && achievers90.length" class="card">
+                <h3 class="section-title">90%+ achievers</h3>
+                <p class="section-desc mb-4">Every student you've added scoring 90% or above overall — not limited to the ranked toppers list.</p>
+                <div v-for="(rows, stream) in achievers90ByStream" :key="stream" class="mb-4 last:mb-0">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600 mb-2">{{ stream }}</p>
+                    <div class="flex flex-wrap gap-2">
+                        <span v-for="t in rows" :key="t.id" class="text-xs px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            {{ t.name }} · <strong>{{ t.percentage }}%</strong>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bulk add toppers -->
+            <div v-if="!editingId" class="card">
+                <h3 class="font-bold text-gray-800 mb-1">Add toppers</h3>
+                <p class="text-xs text-gray-500 mb-4">
+                    Enter the total (max) marks once — it applies to every row below. Percentage is calculated automatically.
+                    <span v-if="isClass12">For Class XII, add stream &amp; subject-wise marks afterward using Edit on each student.</span>
+                </p>
+                <form @submit.prevent="submitBatch" class="space-y-4">
+                    <div class="max-w-xs">
+                        <label class="form-label mb-1.5">Total marks (common, out of) *</label>
+                        <input v-model.number="batchForm.total_marks" type="number" min="1" required class="field" placeholder="e.g. 500" :disabled="!canEdit">
+                    </div>
+
+                    <div class="overflow-x-auto -mx-2">
+                        <table class="w-full text-sm">
+                            <thead class="text-left text-xs uppercase text-gray-500">
+                                <tr>
+                                    <th class="p-2">Student name *</th>
+                                    <th class="p-2">CBSE Roll No</th>
+                                    <th class="p-2">Admission No</th>
+                                    <th class="p-2">Marks scored *</th>
+                                    <th class="p-2">%</th>
+                                    <th class="p-2">Photo</th>
+                                    <th class="p-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(row, i) in batchForm.toppers" :key="i" class="border-t border-gray-50">
+                                    <td class="p-2"><input v-model="row.name" type="text" required class="field text-sm" placeholder="Student name" :disabled="!canEdit"></td>
+                                    <td class="p-2"><input v-model="row.roll_no" type="text" class="field text-sm w-32" placeholder="CBSE Roll No" :disabled="!canEdit"></td>
+                                    <td class="p-2"><input v-model="row.admission_no" type="text" class="field text-sm w-28" :disabled="!canEdit"></td>
+                                    <td class="p-2"><input v-model.number="row.marks_obtained" type="number" min="0" :max="batchForm.total_marks || undefined" required class="field text-sm w-24" :disabled="!canEdit"></td>
+                                    <td class="p-2 text-gray-500 whitespace-nowrap">{{ rowPercentage(row) }}</td>
+                                    <td class="p-2"><input type="file" accept="image/*" class="text-xs w-32" :disabled="!canEdit" @change="row.photo = $event.target.files[0]"></td>
+                                    <td class="p-2">
+                                        <button v-if="canEdit && batchForm.toppers.length > 1" type="button" class="text-red-400 hover:underline text-xs" @click="removeRow(i)">Remove</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div v-if="Object.keys(batchForm.errors).length" class="text-xs text-red-600 space-y-0.5">
+                        <p v-for="(msg, key) in batchForm.errors" :key="key">{{ msg }}</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button v-if="canEdit" type="button" class="btn-secondary text-sm" @click="addRow">+ Add row</button>
+                        <button v-if="canEdit" type="submit" class="btn-primary" :disabled="batchForm.processing || wouldExceedCap">
+                            Add {{ batchForm.toppers.length }} topper{{ batchForm.toppers.length > 1 ? 's' : '' }}
+                        </button>
+                        <p v-if="wouldExceedCap" class="text-xs text-amber-600">
+                            {{ topperCount }} already added — adding {{ batchForm.toppers.length }} more would exceed the Top-N limit ({{ topperCap }}).
+                        </p>
+                        <p v-if="!canEdit" class="text-xs text-amber-600">Result is {{ boardResult.status }} — toppers are locked.</p>
+                        <Link :href="`/school-admin/${school.id}/board-results`" class="text-sm text-gray-500 hover:text-gray-700">← Back to results</Link>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Edit topper (single) -->
+            <div v-else class="card">
+                <h3 class="font-bold text-gray-800 mb-4">Edit topper</h3>
+                <form @submit.prevent="submitEdit" class="space-y-4">
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
                             <label class="form-label mb-1.5">Student name *</label>
@@ -89,13 +163,11 @@
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">
-                        <button v-if="canEdit" type="submit" class="btn-primary" :disabled="form.processing || atCap">
-                            {{ editingId ? 'Save changes' : 'Add topper' }}
+                        <button v-if="canEdit" type="submit" class="btn-primary" :disabled="form.processing">
+                            Save changes
                         </button>
-                        <p v-if="atCap && !editingId" class="text-xs text-amber-600">Top-N limit reached ({{ topperCap }}).</p>
-                        <button v-if="editingId && canEdit" type="button" class="btn-secondary text-sm" @click="cancelEdit">Cancel edit</button>
+                        <button v-if="canEdit" type="button" class="btn-secondary text-sm" @click="cancelEdit">Cancel edit</button>
                         <p v-if="!canEdit" class="text-xs text-amber-600">Result is {{ boardResult.status }} — toppers are locked.</p>
-                        <Link :href="`/school-admin/${school.id}/board-results`" class="text-sm text-gray-500 hover:text-gray-700">← Back to results</Link>
                     </div>
                 </form>
             </div>
@@ -156,7 +228,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -175,12 +247,65 @@ const pageTitle = computed(() => `Toppers — Class ${props.boardResult.class} (
 
 const editingId = ref(null);
 
-const atCap = computed(() => props.topperCap != null && props.topperCount >= props.topperCap && !editingId.value);
-
 const sortedToppers = computed(() =>
     [...(props.boardResult.toppers ?? [])].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)),
 );
 
+// 90%+ achievers — every added student at/above 90% overall, not limited to ranked toppers.
+const achievers90 = computed(() =>
+    (props.boardResult.toppers ?? [])
+        .filter((t) => t.percentage != null && Number(t.percentage) >= 90)
+        .sort((a, b) => Number(b.percentage) - Number(a.percentage)),
+);
+
+const achievers90ByStream = computed(() => {
+    const groups = {};
+    for (const t of achievers90.value) {
+        const key = t.stream ?? 'Overall';
+        (groups[key] ??= []).push(t);
+    }
+    return groups;
+});
+
+// ── Bulk add ─────────────────────────────────────────────────────────────
+function blankRow() {
+    return { name: '', roll_no: '', admission_no: '', marks_obtained: '', photo: null };
+}
+
+const batchForm = useForm({
+    total_marks: props.boardResult.total_marks ?? '',
+    toppers: [blankRow()],
+});
+
+const wouldExceedCap = computed(() =>
+    props.topperCap != null && (props.topperCount + batchForm.toppers.length) > props.topperCap,
+);
+
+function addRow() {
+    batchForm.toppers.push(blankRow());
+}
+
+function removeRow(i) {
+    batchForm.toppers.splice(i, 1);
+}
+
+function rowPercentage(row) {
+    if (!batchForm.total_marks || row.marks_obtained === '' || row.marks_obtained == null) return '—';
+    return `${((row.marks_obtained / batchForm.total_marks) * 100).toFixed(2)}%`;
+}
+
+function submitBatch() {
+    batchForm.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/batch`, {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            batchForm.reset();
+            batchForm.toppers = [blankRow()];
+        },
+    });
+}
+
+// ── Edit (single) ────────────────────────────────────────────────────────
 const form = useForm({
     name: '',
     admission_no: '',
@@ -246,33 +371,18 @@ function cancelEdit() {
     form.subject_marks = {};
 }
 
-function submit() {
+function submitEdit() {
     const base = `/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers`;
-    const options = {
-        forceFormData: true,
-        preserveScroll: true,
-        onSuccess: () => {
-            cancelEdit();
-        },
-    };
-
-    if (editingId.value) {
-        form.transform((data) => ({ ...data, _method: 'put' }))
-            .post(`${base}/${editingId.value}`, options);
-    } else {
-        form.post(base, options);
-    }
+    form.transform((data) => ({ ...data, _method: 'put' }))
+        .post(`${base}/${editingId.value}`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => cancelEdit(),
+        });
 }
 
 function remove(t) {
     if (!confirm(`Remove topper "${t.name}"?`)) return;
     router.delete(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${t.id}`);
 }
-
-watch(() => form.stream_key, (key) => {
-    if (!key || editingId.value) return;
-    if (Object.keys(form.subject_marks).length === 0) {
-        form.subject_marks = blankSubjectMarks(key);
-    }
-});
 </script>

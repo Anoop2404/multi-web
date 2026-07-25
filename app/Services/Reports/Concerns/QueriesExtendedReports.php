@@ -1813,6 +1813,7 @@ trait QueriesExtendedReports
         return BoardResult::query()
             ->whereIn('tenant_id', $schoolIds)
             ->where('academic_year', $year)
+            ->when($filters['class'] ?? null, fn ($q, $class) => $q->where('class', (int) $class))
             ->orderBy('tenant_id')
             ->orderBy('class')
             ->get()
@@ -1840,6 +1841,7 @@ trait QueriesExtendedReports
             ->where('sahodaya_id', $sahodayaId)
             ->where('academic_year', $year)
             ->whereIn('scope', [RankingEngine::SCOPE_OVERALL, RankingEngine::SCOPE_OVERALL_PASS_PERCENT])
+            ->when($filters['class'] ?? null, fn ($q, $class) => $q->where('class', (int) $class))
             ->orderBy('scope')
             ->orderBy('rank')
             ->get()
@@ -1865,6 +1867,7 @@ trait QueriesExtendedReports
             ->whereIn('tenant_id', $schoolIds)
             ->where('academic_year', $year)
             ->whereIn('status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED])
+            ->when($filters['class'] ?? null, fn ($q, $class) => $q->where('class', (int) $class))
             ->orderByDesc('pass_percent')
             ->get()
             ->map(fn (BoardResult $r) => [

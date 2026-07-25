@@ -110,6 +110,30 @@
                         Save assignments
                     </button>
                 </div>
+
+                <div v-if="schools.length" class="card mb-3 space-y-2">
+                    <p class="text-xs font-semibold text-slate-700">Bulk assign</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input v-model="schoolFilter" class="field !py-1 !text-xs max-w-xs" placeholder="Search schools...">
+                        <select v-model="bulkRegionId" class="field !py-1 !text-xs max-w-xs">
+                            <option :value="null">Choose a region…</option>
+                            <option v-for="region in activeRegions" :key="region.id" :value="region.id">
+                                {{ region.name }}
+                            </option>
+                        </select>
+                        <button type="button" class="btn-secondary text-xs" :disabled="selectedSchoolIds.length === 0 || bulkRegionId === null" @click="applyBulkAssign">
+                            Assign {{ selectedSchoolIds.length }} selected school(s)
+                        </button>
+                        <button type="button" class="btn-ghost text-xs" :disabled="selectedSchoolIds.length === 0" @click="applyBulkUnassign">
+                            Unassign selected
+                        </button>
+                        <span v-if="selectedSchoolIds.length" class="text-xs text-slate-500">
+                            {{ selectedSchoolIds.length }} selected ·
+                            <button type="button" class="link-brand" @click="selectedSchoolIds = []">clear</button>
+                        </span>
+                    </div>
+                </div>
+
                 <div v-if="schools.length === 0" class="card text-sm text-slate-500">
                     No approved schools yet.
                 </div>
@@ -117,6 +141,7 @@
                     <table class="w-full text-sm">
                         <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                             <tr>
+                                <th class="p-3 w-8"><input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAllFiltered"></th>
                                 <th class="p-3">Sl No</th>
                                 <th class="p-3">School</th>
                                 <th class="p-3">Code</th>
@@ -124,7 +149,8 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            <tr v-for="(school, idx) in schools" :key="school.id" class="bg-white">
+                            <tr v-for="(school, idx) in filteredSchools" :key="school.id" class="bg-white">
+                                <td class="p-3"><input type="checkbox" :value="school.id" v-model="selectedSchoolIds"></td>
                                 <td class="p-3">{{ idx + 1 }}</td>
                                 <td class="p-3 font-medium text-slate-700">{{ (school.name || '').toUpperCase() }}</td>
                                 <td class="p-3 font-mono text-xs text-slate-500">{{ school.school_prefix || '—' }}</td>
@@ -176,6 +202,46 @@ const assignMap = reactive(
 );
 
 const activeRegions = computed(() => props.regions.filter((r) => r.is_active));
+
+const schoolFilter = ref('');
+const selectedSchoolIds = ref([]);
+const bulkRegionId = ref(null);
+
+const filteredSchools = computed(() => {
+    const q = schoolFilter.value.trim().toLowerCase();
+    if (!q) return props.schools;
+    return props.schools.filter((s) => (s.name || '').toLowerCase().includes(q) || (s.school_prefix || '').toLowerCase().includes(q));
+});
+
+const allFilteredSelected = computed(() => (
+    filteredSchools.value.length > 0
+    && filteredSchools.value.every((s) => selectedSchoolIds.value.includes(s.id))
+));
+
+function toggleSelectAllFiltered() {
+    if (allFilteredSelected.value) {
+        const filteredIds = new Set(filteredSchools.value.map((s) => s.id));
+        selectedSchoolIds.value = selectedSchoolIds.value.filter((id) => !filteredIds.has(id));
+    } else {
+        const merged = new Set(selectedSchoolIds.value);
+        filteredSchools.value.forEach((s) => merged.add(s.id));
+        selectedSchoolIds.value = Array.from(merged);
+    }
+}
+
+function applyBulkAssign() {
+    selectedSchoolIds.value.forEach((id) => {
+        assignMap[id] = bulkRegionId.value;
+    });
+    dirty.value = true;
+}
+
+function applyBulkUnassign() {
+    selectedSchoolIds.value.forEach((id) => {
+        assignMap[id] = null;
+    });
+    dirty.value = true;
+}
 
 function countForRegion(regionId) {
     return Object.values(assignMap).filter((v) => v === regionId).length;

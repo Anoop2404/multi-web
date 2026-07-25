@@ -63,8 +63,38 @@ class TopperCountService
             'subject_id' => $data['subject_id'] ?? null,
         ];
 
+        $tieMode = $data['tie_mode'] ?? TopperCountConfig::TIE_INCLUDE_GROUP;
+        if (! in_array($tieMode, [TopperCountConfig::TIE_INCLUDE_GROUP, TopperCountConfig::TIE_HARD_CAP], true)) {
+            $tieMode = TopperCountConfig::TIE_INCLUDE_GROUP;
+        }
+
         return TopperCountConfig::updateOrCreate($keys, [
             'top_n' => max(1, min(50, (int) ($data['top_n'] ?? self::DEFAULT_TOP_N))),
+            'tie_mode' => $tieMode,
         ]);
+    }
+
+    /** Resolve the tie-break mode for a given scope (include_group|hard_cap). */
+    public function resolveTieMode(string $sahodayaId, int $class, string $scope = TopperCountConfig::SCOPE_OVERALL, ?int $streamId = null): string
+    {
+        $query = TopperCountConfig::query()
+            ->where('sahodaya_id', $sahodayaId)
+            ->where('scope', $scope)
+            ->where(function ($q) use ($class) {
+                $q->where('class', $class)->orWhereNull('class');
+            });
+
+        if ($scope === TopperCountConfig::SCOPE_STREAM && $streamId) {
+            $query->where(function ($q) use ($streamId) {
+                $q->where('stream_id', $streamId)->orWhereNull('stream_id');
+            });
+        }
+
+        $config = $query
+            ->orderByRaw('class is null')
+            ->orderByRaw('stream_id is null')
+            ->first();
+
+        return $config?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP;
     }
 }

@@ -1,7 +1,7 @@
 <template>
-    <SahodayaAdminLayout title="Board result verification" :sahodaya="sahodaya" :publicUrl="publicUrl"
+    <SahodayaAdminLayout :title="pageTitle" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader title="Board result verification" eyebrow="Academic Results"
+        <PageHeader :title="pageTitle" eyebrow="Academic Results"
                     description="Review CBSE board results submitted by member schools — verify, approve, reject, or publish.">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/masters`" class="btn-secondary text-sm">Masters</Link>
@@ -9,40 +9,32 @@
             </template>
         </PageHeader>
 
+        <p v-if="selectedClass" class="text-sm -mt-2 mb-4">
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification?class=${selectedClass === 12 ? 10 : 12}&status=${filters.status}`" class="text-indigo-600 hover:underline font-medium">
+                Switch to {{ selectedClass === 12 ? 'Class X' : 'Class XII' }} →
+            </Link>
+        </p>
+
         <div class="flex flex-wrap gap-2 mb-4">
             <Link v-for="(label, value) in statusOptions" :key="value"
-                  :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification?status=${value}`"
+                  :href="statusHref(value)"
                   class="px-3 py-1.5 rounded-lg text-sm font-semibold border"
                   :class="filters.status === value ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]' : 'border-slate-200 text-slate-600'">
                 {{ label }}
             </Link>
         </div>
 
-        <div class="card !p-4 mb-4">
-            <h3 class="text-sm font-semibold text-slate-800 mb-2">Top-N toppers (Sahodaya-wide)</h3>
-            <p class="text-xs text-slate-500 mb-3">
-                Default cap: {{ defaultTopN }}. Schools cannot add more overall toppers than this limit.
-            </p>
-            <form class="flex flex-wrap gap-3 items-end" @submit.prevent="saveTopN">
-                <div>
-                    <label class="form-label mb-1 text-xs">Class</label>
-                    <select v-model="topNForm.class" class="field text-sm">
-                        <option :value="null">All</option>
-                        <option :value="10">Class X</option>
-                        <option :value="12">Class XII</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="form-label mb-1 text-xs">Top N</label>
-                    <input v-model.number="topNForm.top_n" type="number" min="1" max="50" class="field text-sm w-24" required>
-                </div>
-                <button type="submit" class="btn-secondary text-xs">Save Top-N</button>
-            </form>
-            <ul v-if="topperConfigs?.length" class="mt-3 text-xs text-slate-600 space-y-1">
-                <li v-for="c in topperConfigs" :key="c.id">
-                    Class {{ c.class ?? 'all' }} · {{ c.scope }} → <strong>{{ c.top_n }}</strong>
-                </li>
-            </ul>
+        <div class="card !p-4 mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h3 class="text-sm font-semibold text-slate-800">Sahodaya-wide toppers</h3>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Default cap: {{ defaultTopN }} per school submission. The auto-computed Sahodaya-wide list
+                    (Top-N + tie handling) now lives on its own page.
+                </p>
+            </div>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers`" class="btn-secondary text-sm shrink-0">
+                Sahodaya Toppers →
+            </Link>
         </div>
 
         <div class="space-y-3">
@@ -101,7 +93,7 @@
 
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
-import { reactive } from 'vue';
+import { computed } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 
@@ -115,20 +107,19 @@ const props = defineProps({
     statusOptions: Object,
     topperConfigs: { type: Array, default: () => [] },
     defaultTopN: { type: Number, default: 5 },
+    selectedClass: { type: Number, default: null },
 });
 
-const topNForm = reactive({
-    class: null,
-    scope: 'overall',
-    top_n: props.defaultTopN,
+const pageTitle = computed(() => {
+    if (props.selectedClass === 12) return 'Class XII Board Result Verification';
+    if (props.selectedClass === 10) return 'Class X Board Result Verification';
+    return 'Board Result Verification';
 });
 
-function saveTopN() {
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/board-results/topper-cap`, {
-        class: topNForm.class,
-        scope: topNForm.scope,
-        top_n: topNForm.top_n,
-    }, { preserveScroll: true });
+function statusHref(status) {
+    const params = new URLSearchParams({ status });
+    if (props.selectedClass) params.set('class', props.selectedClass);
+    return `/sahodaya-admin/${props.sahodaya.id}/board-results/verification?${params.toString()}`;
 }
 
 function act(r, action) {

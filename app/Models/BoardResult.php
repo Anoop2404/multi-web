@@ -41,6 +41,7 @@ class BoardResult extends Model
         'first_class',
         'highest_mark',
         'average_mark',
+        'total_marks',
         'remarks',
         'subject_stats',
         'result_pdf_path',

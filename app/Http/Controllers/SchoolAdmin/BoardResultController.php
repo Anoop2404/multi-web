@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Models\AcademicYearRecord;
 use App\Models\BoardResult;
 use App\Models\BoardResultUpload;
 use App\Models\DataChangeLog;
@@ -22,10 +23,14 @@ use Illuminate\Validation\ValidationException;
 
 class BoardResultController extends SchoolAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
+        $class = $request->filled('class') ? $request->integer('class') : null;
+        abort_if($class !== null && ! in_array($class, [10, 12], true), 404);
+
         $results = BoardResult::where('tenant_id', $this->school->id)
-            ->with(['toppers.subjectMarks', 'uploads' => fn ($q) => $q->orderByDesc('version')->limit(5)])
+            ->when($class, fn ($q) => $q->where('class', $class))
+            ->with(['toppers.subjectMarks', 'toppers.examStream', 'uploads' => fn ($q) => $q->orderByDesc('version')->limit(5)])
             ->orderByDesc('academic_year')
             ->orderByDesc('class')
             ->get();
@@ -37,9 +42,16 @@ class BoardResultController extends SchoolAdminController
             ->limit(75)
             ->get(['id', 'action', 'description', 'log_name', 'subject_type', 'subject_id', 'changes', 'created_at', 'causer_user_id']);
 
-        return $this->inertia('School/BoardResults/Index', [
+        // Class + Academic Year "search" — looks up the matching result from what's already
+        // loaded above (no extra query) so the aggregate form + topper entry can live inline.
+        $academicYear = $request->string('academic_year')->toString() ?: null;
+        $activeResult = ($class && $academicYear)
+            ? $results->first(fn (BoardResult $r) => $r->academic_year === $academicYear)
+            : null;
+
+        return $this->inertia('School/BoardResults/Index', array_merge([
             'results' => $results,
-            'examinationTypes' => BoardResult::examinationTypes(),
+            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
             'statuses' => [
                 BoardResult::STATUS_DRAFT,
                 BoardResult::STATUS_SUBMITTED,
@@ -53,18 +65,30 @@ class BoardResultController extends SchoolAdminController
                 (string) $this->school->parent_id,
                 10
             ),
-        ]);
+            'selectedClass' => $class,
+            'selectedAcademicYear' => $academicYear,
+            'activeResult' => $activeResult,
+        ], $activeResult ? ['activeResultContext' => $this->topperContext($activeResult)] : []));
     }
 
     public function store(Request $request)
     {
         $yearService = app(BoardResultAcademicYearService::class);
         $data = $yearService->attachToPayload($this->validateBoardResult($request));
+        $topperRows = $this->validateTopperRows($request);
+        if ($topperRows !== [] && empty($data['total_marks'])) {
+            throw ValidationException::withMessages([
+                'total_marks' => 'Enter total marks before adding toppers.',
+            ]);
+        }
 
         $data['tenant_id'] = $this->school->id;
         $data['examination_type'] = $data['examination_type']
             ?? BoardResult::examinationTypeForClass((int) $data['class']);
         $data = PersistDefaults::coalesce($data, [
+            'total_appeared' => 0,
+            'pass_count' => 0,
+            'pass_percent' => 0,
             'distinctions' => 0,
             'first_class' => 0,
             'status' => BoardResult::STATUS_DRAFT,
@@ -87,7 +111,7 @@ class BoardResultController extends SchoolAdminController
             $yearService->assertResultEditable($existing);
         }
 
-        $payload = collect($data)->except(['result_pdf', 'attachments'])->all();
+        $payload = collect($data)->except(['result_pdf', 'attachments', 'toppers'])->all();
         if ($existing?->status === BoardResult::STATUS_REJECTED) {
             $payload['status'] = BoardResult::STATUS_DRAFT;
             $payload['rejection_reason'] = null;
@@ -95,6 +119,8 @@ class BoardResultController extends SchoolAdminController
 
         $result = BoardResult::updateOrCreate($keys, $payload);
         $this->storeUploads($request, $result);
+
+        $addedCount = $this->createToppersFromRows($request, $result, $topperRows, (int) ($data['total_marks'] ?? 0));
 
         app(DataChangeLogger::class)->event(
             $existing ? 'updated' : 'created',
@@ -105,8 +131,21 @@ class BoardResultController extends SchoolAdminController
             ['class' => $result->class, 'academic_year' => $result->academic_year],
         );
 
-        return redirect("/school-admin/{$this->school->id}/board-results/{$result->id}/toppers")
-            ->with('success', 'Board result saved. Now add toppers.');
+        $fresh = $result->fresh();
+        if ($request->boolean('submit_for_review')) {
+            if (! $fresh->hasResultPdf()) {
+                throw ValidationException::withMessages([
+                    'result_pdf' => 'Upload the CBSE result PDF before submitting for verification.',
+                ]);
+            }
+            $this->performSubmit($request, $fresh);
+            $msg = 'Board result saved and submitted for Sahodaya verification.';
+        } else {
+            $msg = 'Board result saved.'.($addedCount ? " {$addedCount} topper(s) added." : '');
+        }
+
+        return redirect("/school-admin/{$this->school->id}/board-results?class={$result->class}&academic_year=".urlencode($result->academic_year))
+            ->with('success', $msg);
     }
 
     public function update(Request $request, string $tenantId, BoardResult $boardResult)
@@ -123,16 +162,31 @@ class BoardResultController extends SchoolAdminController
         $data = app(BoardResultAcademicYearService::class)->attachToPayload(
             $this->validateBoardResult($request, $boardResult)
         );
+        $topperRows = $this->validateTopperRows($request);
+        if ($topperRows !== [] && empty($data['total_marks']) && empty($boardResult->total_marks)) {
+            throw ValidationException::withMessages([
+                'total_marks' => 'Enter total marks before adding toppers.',
+            ]);
+        }
+
         $data['examination_type'] = $data['examination_type']
             ?? BoardResult::examinationTypeForClass((int) $data['class']);
+        $data = PersistDefaults::coalesce($data, [
+            'total_appeared' => 0,
+            'pass_count' => 0,
+            'pass_percent' => 0,
+        ]);
 
         if ($boardResult->status === BoardResult::STATUS_REJECTED) {
             $data['status'] = BoardResult::STATUS_DRAFT;
             $data['rejection_reason'] = null;
         }
 
-        $boardResult->update(collect($data)->except(['result_pdf', 'attachments'])->all());
+        $boardResult->update(collect($data)->except(['result_pdf', 'attachments', 'toppers'])->all());
         $this->storeUploads($request, $boardResult->fresh());
+
+        $totalMarks = (int) ($data['total_marks'] ?? $boardResult->total_marks ?? 0);
+        $addedCount = $this->createToppersFromRows($request, $boardResult->fresh(), $topperRows, $totalMarks);
 
         app(DataChangeLogger::class)->updated(
             $boardResult,
@@ -142,7 +196,115 @@ class BoardResultController extends SchoolAdminController
             'board_result',
         );
 
-        return back()->with('success', 'Board result updated.');
+        $fresh = $boardResult->fresh();
+        if ($request->boolean('submit_for_review')) {
+            if (! $fresh->hasResultPdf()) {
+                throw ValidationException::withMessages([
+                    'result_pdf' => 'Upload the CBSE result PDF before submitting for verification.',
+                ]);
+            }
+            $this->performSubmit($request, $fresh);
+            $msg = 'Board result updated and submitted for Sahodaya verification.';
+        } else {
+            $msg = 'Board result updated.'.($addedCount ? " {$addedCount} topper(s) added." : '');
+        }
+
+        return back()->with('success', $msg);
+    }
+
+    /**
+     * Optional topper rows submitted alongside the aggregate form. Fully blank rows are
+     * skipped; a row must have both a name and marks to count.
+     *
+     * @return list<array<string, mixed>> keyed by original request index (needed to match file uploads)
+     */
+    private function validateTopperRows(Request $request): array
+    {
+        $data = $request->validate([
+            'toppers' => 'nullable|array',
+            'toppers.*.name' => 'nullable|string|max:255',
+            'toppers.*.roll_no' => 'nullable|string|max:64',
+            'toppers.*.admission_no' => 'nullable|string|max:64',
+            'toppers.*.marks_obtained' => 'nullable|numeric|min:0',
+            'toppers.*.photo' => 'nullable|image|max:4096',
+        ]);
+
+        $rows = collect($data['toppers'] ?? [])
+            ->filter(fn ($row) => filled($row['name'] ?? null) || filled($row['marks_obtained'] ?? null));
+
+        foreach ($rows as $i => $row) {
+            if (blank($row['name'] ?? null) || blank($row['marks_obtained'] ?? null)) {
+                throw ValidationException::withMessages([
+                    "toppers.{$i}" => 'Each topper row needs both a name and marks scored (or leave the row fully blank to skip it).',
+                ]);
+            }
+        }
+
+        return $rows->all();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows  keyed by original request index
+     * @return int number of toppers created
+     */
+    private function createToppersFromRows(Request $request, BoardResult $boardResult, array $rows, int $totalMarks): int
+    {
+        if ($rows === []) {
+            return 0;
+        }
+
+        $sahodayaId = (string) $this->school->parent_id;
+        $cap = app(TopperCountService::class)->resolveCap($sahodayaId, (int) $boardResult->class);
+        $existingCount = Topper::where('board_result_id', $boardResult->id)->count();
+        $incoming = count($rows);
+
+        if ($existingCount + $incoming > $cap) {
+            throw ValidationException::withMessages([
+                'toppers' => "Adding {$incoming} would exceed the Top-N limit ({$cap}). {$existingCount} already added — remove some rows or lower the batch size.",
+            ]);
+        }
+
+        foreach ($rows as $i => $row) {
+            if ((float) $row['marks_obtained'] > $totalMarks) {
+                throw ValidationException::withMessages([
+                    "toppers.{$i}.marks_obtained" => 'Marks scored cannot exceed the total (max) marks.',
+                ]);
+            }
+        }
+
+        $nextRank = (int) (Topper::where('board_result_id', $boardResult->id)->max('rank') ?? 0) + 1;
+        $created = 0;
+
+        foreach ($rows as $i => $row) {
+            $marksObtained = (float) $row['marks_obtained'];
+            $percentage = $totalMarks > 0 ? round(($marksObtained / $totalMarks) * 100, 2) : 0;
+
+            $photoPath = null;
+            if ($request->hasFile("toppers.{$i}.photo")) {
+                $photoPath = $request->file("toppers.{$i}.photo")->store(
+                    'board-results/'.$this->school->id.'/'.$boardResult->id,
+                    TenantStorage::uploadDisk()
+                );
+            }
+
+            Topper::create([
+                'board_result_id' => $boardResult->id,
+                'tenant_id' => $this->school->id,
+                'name' => $row['name'],
+                'roll_no' => $row['roll_no'] ?? null,
+                'admission_no' => $row['admission_no'] ?? null,
+                'total_marks' => $totalMarks,
+                'marks_obtained' => $marksObtained,
+                'percentage' => $percentage,
+                'rank' => $nextRank++,
+                'photo' => $photoPath,
+            ]);
+            $created++;
+        }
+
+        app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
+
+        return $created;
     }
 
     public function submit(Request $request, string $tenantId, BoardResult $boardResult)
@@ -157,6 +319,13 @@ class BoardResultController extends SchoolAdminController
             ]);
         }
 
+        $this->performSubmit($request, $boardResult);
+
+        return back()->with('success', 'Board result submitted for Sahodaya verification.');
+    }
+
+    private function performSubmit(Request $request, BoardResult $boardResult): void
+    {
         $history = $boardResult->correction_history ?? [];
         $history[] = [
             'at' => now()->toIso8601String(),
@@ -188,11 +357,10 @@ class BoardResultController extends SchoolAdminController
             $this->school->id,
             'board_result',
             $boardResult,
+            ['class' => $boardResult->class, 'academic_year' => $boardResult->academic_year],
         );
 
-        app(BoardResultNotifier::class)->submissionConfirmation($boardResult);
-
-        return back()->with('success', 'Board result submitted for Sahodaya verification.');
+        app(BoardResultNotifier::class)->notifySubmitted($boardResult->fresh(), $request->user());
     }
 
     public function uploadPdf(Request $request, string $tenantId, BoardResult $boardResult)
@@ -244,12 +412,20 @@ class BoardResultController extends SchoolAdminController
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
         $boardResult->load(['toppers.subjectMarks', 'toppers.examStream', 'uploads']);
 
+        return $this->inertia('School/BoardResults/Toppers', array_merge(
+            ['boardResult' => $boardResult],
+            $this->topperContext($boardResult),
+        ));
+    }
+
+    /** Shared topper-entry context used by both the standalone Toppers page and the inline Index search/entry flow. */
+    private function topperContext(BoardResult $boardResult): array
+    {
         $isClass12 = (int) $boardResult->class === 12;
         $sahodayaId = (string) $this->school->parent_id;
         $streamOptions = $isClass12 ? BoardExamSubjects::class12StreamLabels($sahodayaId) : [];
 
-        return $this->inertia('School/BoardResults/Toppers', [
-            'boardResult' => $boardResult,
+        return [
             'isClass12' => $isClass12,
             'streamOptions' => $streamOptions,
             'subjectsByStream' => $isClass12 ? collect($streamOptions)
@@ -261,7 +437,7 @@ class BoardResultController extends SchoolAdminController
             'canEdit' => $boardResult->isEditable(),
             'topperCap' => app(TopperCountService::class)->resolveCap($sahodayaId, (int) $boardResult->class),
             'topperCount' => $boardResult->toppers->count(),
-        ]);
+        ];
     }
 
     public function updateTopper(Request $request, string $tenantId, BoardResult $boardResult, Topper $topper)
@@ -298,6 +474,45 @@ class BoardResultController extends SchoolAdminController
         );
 
         return back()->with('success', 'Topper updated.');
+    }
+
+    /**
+     * Add several toppers at once: a single "max marks" shared by every row, plus per-row
+     * name / roll no / admission no / marks scored (+ optional photo proof). Percentage is
+     * derived automatically. Rank, stream, and subject-wise marks aren't set here — use the
+     * single Edit form afterward for those (mainly relevant to Class XII).
+     */
+    public function storeToppersBatch(Request $request, string $tenantId, BoardResult $boardResult)
+    {
+        abort_if($boardResult->tenant_id !== $this->school->id, 403);
+        abort_unless($boardResult->isEditable(), 422, 'Toppers are locked for this result.');
+        app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
+
+        $request->validate(['total_marks' => 'required|integer|min:1']);
+        $totalMarks = (int) $request->input('total_marks');
+        if ((int) $boardResult->total_marks !== $totalMarks) {
+            $boardResult->update(['total_marks' => $totalMarks]);
+        }
+
+        $rows = $this->validateTopperRows($request);
+        if ($rows === []) {
+            throw ValidationException::withMessages([
+                'toppers' => 'Add at least one topper (name + marks scored).',
+            ]);
+        }
+
+        $created = $this->createToppersFromRows($request, $boardResult, $rows, $totalMarks);
+
+        app(DataChangeLogger::class)->event(
+            'created',
+            $created.' topper(s) added (bulk)',
+            $this->school->id,
+            'topper',
+            $boardResult,
+            ['count' => $created],
+        );
+
+        return back()->with('success', $created.' topper(s) added.');
     }
 
     public function storeTopper(Request $request, string $tenantId, BoardResult $boardResult)
@@ -430,20 +645,21 @@ class BoardResultController extends SchoolAdminController
             'class' => 'required|integer|in:10,12',
             'examination_type' => ['nullable', 'string', Rule::in(BoardResult::examinationTypes())],
             'academic_year' => 'required|string|max:20',
-            'total_appeared' => 'required|integer|min:0',
-            'pass_count' => 'required|integer|min:0',
-            'pass_percent' => 'required|numeric|min:0|max:100',
+            'total_appeared' => 'nullable|integer|min:0',
+            'pass_count' => 'nullable|integer|min:0',
+            'pass_percent' => 'nullable|numeric|min:0|max:100',
             'distinctions' => 'nullable|integer|min:0',
             'first_class' => 'nullable|integer|min:0',
             'highest_mark' => 'nullable|numeric|min:0|max:100',
             'average_mark' => 'nullable|numeric|min:0|max:100',
+            'total_marks' => 'nullable|integer|min:1',
             'remarks' => 'nullable|string|max:5000',
             'result_pdf' => ($existing?->hasResultPdf() ? 'nullable' : 'nullable').'|file|mimes:pdf|max:20480',
             'attachments' => 'nullable|array|max:5',
             'attachments.*' => 'file|mimes:pdf,doc,docx,xls,xlsx|max:20480',
         ]);
 
-        if ((int) $data['pass_count'] > (int) $data['total_appeared']) {
+        if ((int) ($data['pass_count'] ?? 0) > (int) ($data['total_appeared'] ?? 0)) {
             throw ValidationException::withMessages([
                 'pass_count' => 'Pass count cannot exceed total appeared.',
             ]);

@@ -110,6 +110,7 @@ function selectPlaceholder(key) {
         school_id: 'All schools',
         head_id: 'All heads',
         exam_id: 'All exams',
+        class: 'All classes',
     }[key] ?? 'All';
 }
 

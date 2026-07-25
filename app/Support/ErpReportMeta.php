@@ -112,7 +112,7 @@ class ErpReportMeta
     {
         return match ($key) {
             'from', 'to', 'date_from', 'date_to' => 'date',
-            'event_id', 'school_id', 'head_id', 'exam_id' => 'select',
+            'event_id', 'school_id', 'head_id', 'exam_id', 'class' => 'select',
             default => 'text',
         };
     }
@@ -351,9 +351,9 @@ class ErpReportMeta
             'RPT-TRN-016' => ['columns' => ['program', 'session', 'date', 'present', 'late', 'absent', 'with_permission']],
 
             // Board results (FRD-21)
-            'RPT-BRD-001' => ['columns' => ['school', 'class', 'examination_type', 'academic_year', 'appeared', 'passed', 'pass_percent', 'distinctions', 'highest_mark', 'status'], 'filters' => ['academic_year']],
-            'RPT-BRD-002' => ['columns' => ['rank', 'school', 'class', 'examination_type', 'score', 'pass_percent', 'scope'], 'filters' => ['academic_year']],
-            'RPT-BRD-003' => ['columns' => ['school', 'class', 'examination_type', 'academic_year', 'pass_percent', 'appeared', 'passed'], 'filters' => ['academic_year']],
+            'RPT-BRD-001' => ['columns' => ['school', 'class', 'examination_type', 'academic_year', 'appeared', 'passed', 'pass_percent', 'distinctions', 'highest_mark', 'status'], 'filters' => ['academic_year', 'class']],
+            'RPT-BRD-002' => ['columns' => ['rank', 'school', 'class', 'examination_type', 'score', 'pass_percent', 'scope'], 'filters' => ['academic_year', 'class']],
+            'RPT-BRD-003' => ['columns' => ['school', 'class', 'examination_type', 'academic_year', 'pass_percent', 'appeared', 'passed'], 'filters' => ['academic_year', 'class']],
             'RPT-BRD-004' => ['columns' => ['rank', 'student', 'school', 'admission_no', 'roll_no', 'percentage', 'marks_obtained', 'total_marks'], 'filters' => ['academic_year']],
             'RPT-BRD-005' => ['columns' => ['stream', 'rank', 'student', 'school', 'percentage', 'admission_no', 'roll_no'], 'filters' => ['academic_year']],
 

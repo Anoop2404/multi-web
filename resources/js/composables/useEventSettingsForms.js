@@ -62,6 +62,7 @@ export function useEventSettingsForms(props) {
 
     const policyForm = useForm({
         preset_key: props.participationPolicy?.preset_key ?? '',
+        max_total_per_student: props.participationPolicy?.max_total_per_student ?? '',
         max_onstage_per_student: props.participationPolicy?.max_onstage_per_student ?? '',
         max_offstage_per_student: props.participationPolicy?.max_offstage_per_student ?? '',
         max_group_per_student: props.participationPolicy?.max_group_per_student ?? '',

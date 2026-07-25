@@ -19,6 +19,9 @@ class BoardResultVerificationController extends SahodayaAdminController
     public function index(Request $request)
     {
         $status = $request->string('status')->toString() ?: 'submitted';
+        $class = $request->filled('class') ? $request->integer('class') : null;
+        abort_if($class !== null && ! in_array($class, [10, 12], true), 404);
+
         $schoolIds = Tenant::query()
             ->where('parent_id', $this->sahodaya->id)
             ->where('type', 'school')
@@ -27,6 +30,7 @@ class BoardResultVerificationController extends SahodayaAdminController
         $results = BoardResult::query()
             ->whereIn('tenant_id', $schoolIds)
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
+            ->when($class, fn ($q) => $q->where('class', $class))
             ->with(['toppers', 'uploads' => fn ($q) => $q->where('file_type', 'pdf')->orderByDesc('version')->limit(3)])
             ->orderByDesc('submitted_at')
             ->orderByDesc('updated_at')
@@ -44,7 +48,7 @@ class BoardResultVerificationController extends SahodayaAdminController
         return $this->inertia('Sahodaya/BoardResults/Verification', [
             'results' => $results,
             'schoolNames' => $schoolNames,
-            'filters' => ['status' => $status],
+            'filters' => ['status' => $status, 'class' => $class],
             'statusOptions' => [
                 'submitted' => 'Submitted',
                 'verified' => 'Verified',
@@ -56,6 +60,7 @@ class BoardResultVerificationController extends SahodayaAdminController
             ],
             'topperConfigs' => $topperConfigs,
             'defaultTopN' => TopperCountService::DEFAULT_TOP_N,
+            'selectedClass' => $class,
         ]);
     }
 
@@ -65,6 +70,7 @@ class BoardResultVerificationController extends SahodayaAdminController
             'class' => 'nullable|integer|in:10,12',
             'scope' => 'nullable|string|in:overall,stream,subject',
             'top_n' => 'required|integer|min:1|max:50',
+            'tie_mode' => 'nullable|string|in:include_group,hard_cap',
             'stream_id' => 'nullable|integer',
             'subject_id' => 'nullable|integer',
         ]);

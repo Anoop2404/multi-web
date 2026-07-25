@@ -15,6 +15,10 @@ class TopperCountConfig extends Model
 
     public const SCOPE_SUBJECT = 'subject';
 
+    public const TIE_INCLUDE_GROUP = 'include_group';
+
+    public const TIE_HARD_CAP = 'hard_cap';
+
     protected $fillable = [
         'sahodaya_id',
         'class',
@@ -22,6 +26,7 @@ class TopperCountConfig extends Model
         'stream_id',
         'subject_id',
         'top_n',
+        'tie_mode',
     ];
 
     protected $casts = [

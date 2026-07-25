@@ -25,6 +25,7 @@ class ReportFilterOptionsService
                 'event_id'  => $this->eventOptions($sahodayaId),
                 'head_id'   => $this->headOptions($currentFilters['event_id'] ?? null),
                 'exam_id'   => $this->examOptions($sahodayaId),
+                'class'     => [['id' => 10, 'label' => 'Class X'], ['id' => 12, 'label' => 'Class XII']],
                 default     => [],
             };
         }
