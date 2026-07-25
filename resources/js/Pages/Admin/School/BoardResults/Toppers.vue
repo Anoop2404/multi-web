@@ -291,7 +291,8 @@ function removeRow(i) {
 
 function rowPercentage(row) {
     if (!batchForm.total_marks || row.marks_obtained === '' || row.marks_obtained == null) return '—';
-    return `${((row.marks_obtained / batchForm.total_marks) * 100).toFixed(2)}%`;
+    const val = Math.round(((row.marks_obtained / batchForm.total_marks) * 100) * 100) / 100;
+    return `${val}%`;
 }
 
 function submitBatch() {

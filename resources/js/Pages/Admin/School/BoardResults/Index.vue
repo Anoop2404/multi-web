@@ -412,7 +412,7 @@ watch(() => [props.activeResult, props.selectedAcademicYear], () => {
 // Auto-calculate Pass % when total_appeared & pass_count are entered
 watch(() => [form.total_appeared, form.pass_count], ([appeared, passed]) => {
     if (appeared && Number(appeared) > 0 && passed !== '' && passed != null) {
-        const calculated = Number(((Number(passed) / Number(appeared)) * 100).toFixed(2));
+        const calculated = Math.round((Number(passed) / Number(appeared)) * 10000) / 100;
         if (calculated >= 0 && calculated <= 100) {
             form.pass_percent = calculated;
         }
@@ -424,7 +424,7 @@ watch(() => form.toppers, (rows) => {
     if (form.highest_mark === '' || form.highest_mark == null) {
         const percentages = rows
             .filter((r) => r.marks_obtained !== '' && r.marks_obtained != null && form.total_marks)
-            .map((r) => Number(((r.marks_obtained / form.total_marks) * 100).toFixed(2)));
+            .map((r) => Math.round((r.marks_obtained / form.total_marks) * 10000) / 100);
         if (percentages.length > 0) {
             const maxPerc = Math.max(...percentages);
             if (maxPerc > 0) {
@@ -455,7 +455,8 @@ function removeRow(i) {
 
 function rowPercentage(row) {
     if (!form.total_marks || row.marks_obtained === '' || row.marks_obtained == null) return '—';
-    return `${((row.marks_obtained / form.total_marks) * 100).toFixed(2)}%`;
+    const val = Math.round(((row.marks_obtained / form.total_marks) * 100) * 100) / 100;
+    return `${val}%`;
 }
 
 function submit(submitForReview = false) {
