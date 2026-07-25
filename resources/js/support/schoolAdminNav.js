@@ -370,6 +370,16 @@ export function schoolAdminNav(schoolId, options = {}) {
         groups.push({ section: 'Exams & training', items: examItems });
     }
 
+    // ── Board Results (Academic Results) ──────────────────────────────
+    groups.push({
+        section: 'Academic Results',
+        items: [
+            { label: 'Class X Results', href: `${base}/board-results?class=10`, icon: 'bar-chart', matchQuery: { class: '10' } },
+            { label: 'Class XII Results', href: `${base}/board-results?class=12`, icon: 'bar-chart', matchQuery: { class: '12' } },
+            { label: 'Subject-Wise Toppers', href: `${base}/board-results/subject-toppers`, icon: 'award' },
+        ],
+    });
+
     // ── Website (collapses to single hub entry) ────────────────────────
     if (websiteEnabled && publicWebsiteEnabled && canNav('website')) {
         groups.push({
@@ -384,9 +394,6 @@ export function schoolAdminNav(schoolId, options = {}) {
                 { label: 'Achievements', href: `${base}/achievements`, icon: 'star', hidden: true },
                 { label: 'Downloads', href: `${base}/downloads`, icon: 'folder', hidden: true },
                 { label: 'Job Vacancies', href: `${base}/job-vacancies`, icon: 'briefcase', hidden: true },
-                { label: 'Class X Results', href: `${base}/board-results?class=10`, icon: 'bar-chart', matchQuery: { class: '10' } },
-                { label: 'Class XII Results', href: `${base}/board-results?class=12`, icon: 'bar-chart', matchQuery: { class: '12' } },
-                { label: 'Subject-Wise Toppers', href: `${base}/board-results/subject-toppers`, icon: 'award' },
                 { label: 'Alumni', href: `${base}/alumni`, icon: 'award', hidden: true },
                 { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star', hidden: true },
                 { label: 'Contact Page', href: `${base}/contact`, icon: 'file-text', hidden: true },
