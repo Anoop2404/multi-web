@@ -22,6 +22,7 @@ class ReportFilterOptionsService
         foreach ($filterKeys as $key) {
             $options[$key] = match ($key) {
                 'school_id' => $this->schoolOptions($sahodayaId),
+                'region_id' => $this->regionOptions($sahodayaId),
                 'event_id'  => $this->eventOptions($sahodayaId),
                 'head_id'   => $this->headOptions($currentFilters['event_id'] ?? null),
                 'exam_id'   => $this->examOptions($sahodayaId),
@@ -104,6 +105,19 @@ class ReportFilterOptionsService
                     'label' => "{$e->title}{$level} · {$date}",
                 ];
             })
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array{id: int, label: string}> */
+    private function regionOptions(string $sahodayaId): array
+    {
+        return \App\Models\Region::forTenant($sahodayaId)
+            ->active()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (\App\Models\Region $r) => ['id' => $r->id, 'label' => $r->name])
             ->values()
             ->all();
     }
