@@ -536,6 +536,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::delete('/board-results/{boardResult}',                  [BoardResultController::class, 'destroy'])->name('board-results.destroy');
     Route::get('/board-results/{boardResult}/toppers',             [BoardResultController::class, 'toppers'])->name('board-results.toppers');
     Route::post('/board-results/{boardResult}/toppers',            [BoardResultController::class, 'storeTopper'])->name('board-results.toppers.store');
+    Route::post('/board-results/{boardResult}/toppers/single',     [BoardResultController::class, 'storeTopper'])->name('board-results.toppers.single');
     Route::post('/board-results/{boardResult}/toppers/batch',      [BoardResultController::class, 'storeToppersBatch'])->name('board-results.toppers.batch');
     Route::put('/board-results/{boardResult}/toppers/{topper}',    [BoardResultController::class, 'updateTopper'])->name('board-results.toppers.update');
     Route::delete('/board-results/{boardResult}/toppers/{topper}', [BoardResultController::class, 'destroyTopper'])->name('board-results.toppers.destroy');

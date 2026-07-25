@@ -208,9 +208,8 @@ function submitSubjectTopper() {
         const currentSubjectMarks = { ...(existing.subject_marks ?? {}) };
         currentSubjectMarks[finalSubject] = subjectForm.marks;
 
-        router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
+        router.put(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
             ...existing,
-            _method: 'put',
             subject_marks: currentSubjectMarks,
         }, {
             preserveScroll: true,
@@ -254,9 +253,8 @@ function removeSubjectTopper(row) {
     const updatedSubjectMarks = { ...(existing.subject_marks ?? {}) };
     delete updatedSubjectMarks[row.subject];
 
-    router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
+    router.put(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
         ...existing,
-        _method: 'put',
         subject_marks: updatedSubjectMarks,
     }, {
         preserveScroll: true,
