@@ -82,8 +82,8 @@
                         <p class="text-xs text-gray-500 mt-0.5">Fill in aggregate performance data and toppers below.</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <Link v-if="activeResult" :href="`/school-admin/${school.id}/board-results/${activeResult.id}/toppers`" class="btn-secondary text-xs">
-                            Manage Toppers &amp; Subjects →
+                        <Link v-if="activeResult" :href="`/school-admin/${school.id}/board-results/${activeResult.id}/toppers`" class="btn-primary text-xs px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-sm border-none">
+                            <span>🎯</span> Manage Stream &amp; Subject-Wise Toppers →
                         </Link>
                     </div>
                 </div>
@@ -95,6 +95,27 @@
                 </div>
 
                 <form @submit.prevent="submit(false)" class="p-6 space-y-8" enctype="multipart/form-data">
+                    <!-- PROMINENT SUBJECT-WISE TOPPERS BANNER CARD -->
+                    <div v-if="(selectedClass ?? searchClass) == 12" class="p-4 rounded-xl bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                                🎯
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-gray-900 text-sm">Subject-Wise &amp; Stream Toppers Entry Workspace</h4>
+                                <p class="text-xs text-gray-600">Directly enter marks for English, Physics, Chemistry, Biology, Mathematics, Accountancy &amp; 23 CBSE subjects.</p>
+                            </div>
+                        </div>
+                        <div>
+                            <Link v-if="activeResult" :href="`/school-admin/${school.id}/board-results/${activeResult.id}/toppers`"
+                                  class="btn-primary text-xs px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-sm border-none">
+                                🎯 Go to Subject-Wise Toppers Page →
+                            </Link>
+                            <span v-else class="text-xs text-indigo-700 font-semibold bg-white px-3 py-2 rounded-lg border border-indigo-200 shadow-xs">
+                                💡 Save draft summary below to open Subject-Wise Mark Entry
+                            </span>
+                        </div>
+                    </div>
                     <!-- SECTION 1: Aggregate Summary Stats -->
                     <div>
                         <div class="flex items-center gap-2 mb-3">
