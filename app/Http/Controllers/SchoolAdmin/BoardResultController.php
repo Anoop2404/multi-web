@@ -370,9 +370,9 @@ class BoardResultController extends SchoolAdminController
         app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
 
         $request->validate([
-            'result_pdf' => 'required|file|mimes:pdf|max:20480',
+            'result_pdf' => 'required|file|mimes:pdf,jpg,jpeg,png,webp|max:20480',
             'attachments' => 'nullable|array|max:5',
-            'attachments.*' => 'file|mimes:pdf,doc,docx,xls,xlsx|max:20480',
+            'attachments.*' => 'file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,webp|max:20480',
         ]);
 
         $this->storeUploads($request, $boardResult);
@@ -654,9 +654,9 @@ class BoardResultController extends SchoolAdminController
             'average_mark' => 'nullable|numeric|min:0|max:100',
             'total_marks' => 'nullable|integer|min:1',
             'remarks' => 'nullable|string|max:5000',
-            'result_pdf' => ($existing?->hasResultPdf() ? 'nullable' : 'nullable').'|file|mimes:pdf|max:20480',
+            'result_pdf' => ($existing?->hasResultPdf() ? 'nullable' : 'nullable').'|file|mimes:pdf,jpg,jpeg,png,webp|max:20480',
             'attachments' => 'nullable|array|max:5',
-            'attachments.*' => 'file|mimes:pdf,doc,docx,xls,xlsx|max:20480',
+            'attachments.*' => 'file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,webp|max:20480',
         ]);
 
         if ((int) ($data['pass_count'] ?? 0) > (int) ($data['total_appeared'] ?? 0)) {
@@ -685,15 +685,16 @@ class BoardResultController extends SchoolAdminController
         if ($request->hasFile('result_pdf')) {
             $file = $request->file('result_pdf');
             $path = TenantStorage::storeUploadedFile($file, $dir, $disk);
+            $ext = strtolower($file->getClientOriginalExtension());
+            $fileType = in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) ? 'image' : 'pdf';
 
-            DB::transaction(function () use ($result, $path, $disk, $file, $request) {
+            DB::transaction(function () use ($result, $path, $disk, $file, $fileType, $request) {
                 // Lock the parent BoardResult to serialize concurrent uploads for the same result,
                 // so two simultaneous uploads can't compute and insert the same version number.
                 BoardResult::query()->whereKey($result->id)->lockForUpdate()->first();
 
                 $nextVersion = (int) BoardResultUpload::query()
                     ->where('board_result_id', $result->id)
-                    ->where('file_type', 'pdf')
                     ->max('version') + 1;
 
                 BoardResultUpload::create([
@@ -703,7 +704,7 @@ class BoardResultController extends SchoolAdminController
                     'file_path' => $path,
                     'storage_disk' => $disk,
                     'file_name' => $file->getClientOriginalName(),
-                    'file_type' => 'pdf',
+                    'file_type' => $fileType,
                     'uploaded_by' => $request->user()?->id,
                 ]);
 

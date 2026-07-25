@@ -1,54 +1,79 @@
 <template>
     <SchoolAdminLayout :title="pageTitle" :school="school" :show-header-title="false">
-        <PageHeader :title="pageTitle" eyebrow="Academic Results" :description="pageDescription" />
-
-        <p v-if="selectedClass" class="text-sm -mt-2 mb-4">
-            <Link :href="`/school-admin/${school.id}/board-results?class=${selectedClass === 12 ? 10 : 12}`" class="text-indigo-600 hover:underline font-medium">
-                Switch to {{ selectedClass === 12 ? 'Class X' : 'Class XII' }} results →
-            </Link>
-        </p>
-
-        <div class="space-y-6">
-            <!-- Step 1: pick the academic year to work on -->
-            <div class="card">
-                <h3 class="font-bold text-gray-800 mb-1">Find or start a result</h3>
-                <p class="text-xs text-gray-500 mb-4">Pick the academic year and search — it'll load the existing result to edit, or let you start a new one.</p>
-                <form class="flex flex-wrap items-end gap-3" @submit.prevent="search">
-                    <div v-if="!selectedClass" class="w-40">
-                        <label class="form-label mb-1.5">Class *</label>
-                        <select v-model="searchClass" required class="field">
-                            <option value="10">Class X (AISSE)</option>
-                            <option value="12">Class XII (AISSCE)</option>
-                        </select>
-                    </div>
-                    <div class="w-56">
-                        <label class="form-label mb-1.5">Academic Year *</label>
-                        <select v-model="searchYear" required class="field">
-                            <option value="" disabled>Select academic year</option>
-                            <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                                {{ ay.label }}{{ ay.status === 'active' ? ' (active)' : '' }}
-                            </option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn-primary text-sm">Search</button>
-                </form>
+        <!-- TOP TOOLBAR & HEADER -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+                <span class="text-xs font-semibold uppercase tracking-wider text-indigo-600">Academic Management</span>
+                <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Board Examination Results</h1>
+                <p class="text-xs text-gray-500 mt-1">Manage Class X (AISSE) &amp; Class XII (AISSCE) board results, upload proof documents, and submit for Sahodaya verification.</p>
             </div>
 
-            <!-- Step 2: summary + toppers, one form -->
-            <div v-if="selectedAcademicYear" class="card space-y-6">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+            <!-- Class Switcher Tabs -->
+            <div class="flex items-center bg-gray-100 p-1 rounded-xl shadow-inner border border-gray-200 self-start md:self-auto">
+                <Link
+                    :href="`/school-admin/${school.id}/board-results?class=10`"
+                    class="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all"
+                    :class="(selectedClass === 10 || (!selectedClass && searchClass === '10')) ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                >
+                    Class X (AISSE)
+                </Link>
+                <Link
+                    :href="`/school-admin/${school.id}/board-results?class=12`"
+                    class="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all"
+                    :class="selectedClass === 12 ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                >
+                    Class XII (AISSCE)
+                </Link>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <!-- WORKING YEAR SELECTOR BAR -->
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                        {{ selectedClass === 12 ? '12' : '10' }}
+                    </div>
                     <div>
-                        <h3 class="font-bold text-gray-800 text-lg flex items-center gap-2">
-                            {{ activeResult ? 'Edit' : 'Create' }} Board Result — {{ selectedAcademicYear }}
-                            <span v-if="activeResult" class="text-xs px-2.5 py-0.5 rounded-full font-medium capitalize" :class="statusClass(activeResult.status)">
-                                {{ activeResult.status }}
-                            </span>
-                        </h3>
-                        <p class="text-xs text-gray-500 mt-0.5">
+                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Selected Examination</p>
+                        <p class="text-sm font-bold text-gray-800">
                             Class {{ selectedClass ?? searchClass }} ({{ (selectedClass ?? searchClass) == 12 ? 'AISSCE' : 'AISSE' }})
                         </p>
                     </div>
-                    <div class="flex items-center gap-3">
+                </div>
+
+                <form @submit.prevent="search" class="flex items-center gap-3 flex-wrap">
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs font-semibold text-gray-600 whitespace-nowrap">Academic Year:</label>
+                        <select v-model="searchYear" required class="field text-xs py-1.5 w-48 font-medium">
+                            <option value="" disabled>Select Academic Year</option>
+                            <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
+                                {{ ay.label }}{{ ay.status === 'active' ? ' (Active)' : '' }}
+                            </option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary text-xs px-4 py-1.5 font-semibold">
+                        Load Result
+                    </button>
+                </form>
+            </div>
+
+            <!-- MAIN WORKSPACE CARD -->
+            <div v-if="selectedAcademicYear" class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden divide-y divide-gray-100">
+                <!-- Workspace Title Bar -->
+                <div class="p-5 bg-gradient-to-r from-slate-50 to-white flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-bold text-gray-900">
+                                {{ activeResult ? 'Edit' : 'Create' }} Result — {{ selectedAcademicYear }}
+                            </h2>
+                            <span v-if="activeResult" class="text-xs px-2.5 py-0.5 rounded-full font-semibold capitalize border" :class="statusClass(activeResult.status)">
+                                {{ activeResult.status }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-0.5">Fill in aggregate performance data and toppers below.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
                         <Link v-if="activeResult" :href="`/school-admin/${school.id}/board-results/${activeResult.id}/toppers`" class="btn-secondary text-xs">
                             Manage Toppers &amp; Subjects →
                         </Link>
@@ -56,266 +81,231 @@
                 </div>
 
                 <!-- Rejection Banner if rejected -->
-                <div v-if="activeResult?.status === 'rejected'" class="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
-                    <p class="font-semibold text-red-800">Result Submission Rejected</p>
-                    <p class="mt-1">{{ activeResult.rejection_reason || 'Please correct the details or re-upload the result PDF, then resubmit.' }}</p>
+                <div v-if="activeResult?.status === 'rejected'" class="p-4 bg-red-50 border-l-4 border-red-500 text-xs text-red-700">
+                    <p class="font-bold text-red-800">Result Submission Rejected by Sahodaya</p>
+                    <p class="mt-1">{{ activeResult.rejection_reason || 'Please review and update the summary or proof document, then resubmit for verification.' }}</p>
                 </div>
 
-                <form @submit.prevent="submit(false)" class="space-y-6" enctype="multipart/form-data">
+                <form @submit.prevent="submit(false)" class="p-6 space-y-8" enctype="multipart/form-data">
                     <!-- SECTION 1: Aggregate Summary Stats -->
                     <div>
-                        <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider mb-2 text-indigo-700">1. Summary Statistics</h4>
-                        <p class="text-xs text-gray-500 mb-3">Overall performance statistics for Class {{ selectedClass ?? searchClass }}. Pass % calculates automatically.</p>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">1</span>
+                            <h3 class="font-bold text-gray-800 text-sm">Summary Performance Statistics</h3>
+                        </div>
 
-                        <div class="grid sm:grid-cols-3 gap-4">
+                        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
-                                <label class="form-label mb-1.5">Total Appeared</label>
-                                <input v-model.number="form.total_appeared" type="number" min="0" class="field" placeholder="e.g. 120" :disabled="!canEditActive">
+                                <label class="form-label mb-1">Total Appeared *</label>
+                                <input v-model.number="form.total_appeared" type="number" min="0" class="field text-sm" placeholder="e.g. 120" :disabled="!canEditActive">
                             </div>
                             <div>
-                                <label class="form-label mb-1.5">Passed</label>
-                                <input v-model.number="form.pass_count" type="number" min="0" class="field" placeholder="e.g. 115" :disabled="!canEditActive">
+                                <label class="form-label mb-1">Total Passed *</label>
+                                <input v-model.number="form.pass_count" type="number" min="0" class="field text-sm" placeholder="e.g. 115" :disabled="!canEditActive">
                             </div>
                             <div>
-                                <label class="form-label mb-1.5">Pass % (Calculated)</label>
+                                <label class="form-label mb-1">Pass % (Calculated)</label>
                                 <div class="relative">
-                                    <input v-model.number="form.pass_percent" type="number" min="0" max="100" step="0.01" class="field pr-8" placeholder="e.g. 95.83" :disabled="!canEditActive">
-                                    <span class="absolute right-3 top-2.5 text-xs text-gray-400 font-bold">%</span>
+                                    <input v-model.number="form.pass_percent" type="number" min="0" max="100" step="0.01" class="field text-sm pr-8 font-semibold text-emerald-700 bg-emerald-50/30" placeholder="e.g. 95.83" :disabled="!canEditActive">
+                                    <span class="absolute right-3 top-2.5 text-xs text-emerald-600 font-bold">%</span>
                                 </div>
                             </div>
                             <div>
-                                <label class="form-label mb-1.5">Distinctions</label>
-                                <input v-model.number="form.distinctions" type="number" min="0" class="field" placeholder="0" :disabled="!canEditActive">
+                                <label class="form-label mb-1">Total Marks (Common Out of)</label>
+                                <input v-model.number="form.total_marks" type="number" min="1" class="field text-sm" placeholder="e.g. 500" :disabled="!canEditActive">
+                                <p class="text-[11px] text-gray-400 mt-1">Used for topper percentages.</p>
                             </div>
                             <div>
-                                <label class="form-label mb-1.5">First class</label>
-                                <input v-model.number="form.first_class" type="number" min="0" class="field" placeholder="0" :disabled="!canEditActive">
+                                <label class="form-label mb-1">Distinctions Count</label>
+                                <input v-model.number="form.distinctions" type="number" min="0" class="field text-sm" placeholder="0" :disabled="!canEditActive">
                             </div>
                             <div>
-                                <label class="form-label mb-1.5">Total marks (out of)</label>
-                                <input v-model.number="form.total_marks" type="number" min="1" class="field" placeholder="e.g. 500" :disabled="!canEditActive">
-                                <p class="text-[11px] text-gray-400 mt-1">Common total for calculating percentage below.</p>
+                                <label class="form-label mb-1">First Class Count</label>
+                                <input v-model.number="form.first_class" type="number" min="0" class="field text-sm" placeholder="0" :disabled="!canEditActive">
                             </div>
                             <div>
-                                <label class="form-label mb-1.5">Highest mark (%)</label>
-                                <input v-model.number="form.highest_mark" type="number" min="0" max="100" step="0.01" class="field" placeholder="e.g. 98.4" :disabled="!canEditActive">
+                                <label class="form-label mb-1">Highest Mark (%)</label>
+                                <input v-model.number="form.highest_mark" type="number" min="0" max="100" step="0.01" class="field text-sm" placeholder="e.g. 98.4" :disabled="!canEditActive">
                             </div>
                             <div>
-                                <label class="form-label mb-1.5">Average mark (%)</label>
-                                <input v-model.number="form.average_mark" type="number" min="0" max="100" step="0.01" class="field" placeholder="e.g. 78.2" :disabled="!canEditActive">
+                                <label class="form-label mb-1">Average Mark (%)</label>
+                                <input v-model.number="form.average_mark" type="number" min="0" max="100" step="0.01" class="field text-sm" placeholder="e.g. 78.2" :disabled="!canEditActive">
                             </div>
-                            <div class="sm:col-span-3">
-                                <label class="form-label mb-1.5">Remarks</label>
-                                <textarea v-model="form.remarks" rows="2" class="field" placeholder="Optional notes for Sahodaya reviewers" :disabled="!canEditActive"></textarea>
+                            <div class="sm:col-span-2 lg:col-span-4">
+                                <label class="form-label mb-1">School Remarks / Notes</label>
+                                <textarea v-model="form.remarks" rows="2" class="field text-sm" placeholder="Optional notes for Sahodaya reviewers" :disabled="!canEditActive"></textarea>
                             </div>
                         </div>
                     </div>
 
-                    <!-- SECTION 2: PDF Upload & Attachments -->
-                    <div class="border-t border-gray-100 pt-5">
-                        <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider mb-2 text-indigo-700">2. CBSE Result PDF &amp; Attachments</h4>
-                        <p class="text-xs text-gray-500 mb-3">Upload official CBSE result tabulation sheet/PDF (required before submitting for verification).</p>
+                    <!-- SECTION 2: Proof Document (PDF or Image) -->
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">2</span>
+                            <h3 class="font-bold text-gray-800 text-sm">CBSE Result Document (PDF / Image Proof)</h3>
+                        </div>
 
-                        <div class="grid sm:grid-cols-2 gap-4">
+                        <div class="grid sm:grid-cols-2 gap-4 bg-slate-50/70 p-4 rounded-xl border border-slate-200/80">
                             <div>
-                                <label class="form-label mb-1.5">CBSE Result PDF *</label>
-                                <div v-if="activeResult?.result_pdf_path" class="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 mb-2 flex items-center justify-between">
+                                <label class="form-label mb-1 font-semibold">CBSE Tabulation Sheet / Proof Document *</label>
+                                <div v-if="activeResult?.result_pdf_path" class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 mb-2 flex items-center justify-between shadow-xs">
                                     <div class="flex items-center gap-2 text-xs font-semibold text-emerald-800">
-                                        <span>✓ PDF Attached</span>
-                                        <a :href="`/school-admin/${school.id}/board-results/${activeResult.id}/pdf`" target="_blank" class="underline text-indigo-600 font-normal">View PDF ↗</a>
+                                        <span>✓ Proof Attached</span>
+                                        <a :href="`/school-admin/${school.id}/board-results/${activeResult.id}/pdf`" target="_blank" class="underline text-indigo-600 hover:text-indigo-800 font-normal">View Attached File ↗</a>
                                     </div>
                                     <span class="text-[11px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-medium">Ready</span>
                                 </div>
-                                <input type="file" accept="application/pdf" class="field text-sm" :disabled="!canEditActive" @change="form.result_pdf = $event.target.files[0]">
-                                <p class="text-[11px] text-gray-400 mt-1">Upload PDF file (max 20MB).</p>
+                                <input type="file" accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp" class="field text-sm bg-white" :disabled="!canEditActive" @change="form.result_pdf = $event.target.files[0]">
+                                <p class="text-[11px] text-gray-400 mt-1">Accepts PDF, JPG, PNG, WEBP files up to 20MB.</p>
                             </div>
                             <div>
-                                <label class="form-label mb-1.5">Attachments (Word/Excel)</label>
-                                <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx" class="field text-sm" :disabled="!canEditActive"
+                                <label class="form-label mb-1">Additional Attachments (Word/Excel/Images)</label>
+                                <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,image/png,image/jpeg,image/jpg,image/webp" class="field text-sm bg-white" :disabled="!canEditActive"
                                        @change="form.attachments = Array.from($event.target.files || [])">
                                 <p class="text-[11px] text-gray-400 mt-1">Optional additional sheets or summary docs.</p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- SECTION 3: Toppers List -->
-                    <div class="border-t border-gray-100 pt-5">
-                        <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider mb-2 text-indigo-700">3. Add Toppers</h4>
-                        <p class="text-xs text-gray-500 mb-3">
-                            Add toppers scored out of {{ form.total_marks || 500 }}. Percentage calculates automatically as you type.
-                            <span v-if="activeResultContext?.isClass12">For Class XII, add stream &amp; subject-wise marks afterward via "Manage toppers &amp; subjects".</span>
-                        </p>
+                    <!-- SECTION 3: School Toppers -->
+                    <div>
+                        <div class="flex items-center justify-between gap-3 mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">3</span>
+                                <h3 class="font-bold text-gray-800 text-sm">School Toppers</h3>
+                            </div>
+                            <span class="text-xs text-gray-500">Out of {{ form.total_marks || 500 }} marks</span>
+                        </div>
 
-                        <div class="overflow-x-auto -mx-2">
+                        <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
                             <table class="w-full text-sm">
-                                <thead class="text-left text-xs uppercase text-gray-500 bg-slate-50/80">
+                                <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-gray-50 border-b border-gray-200">
                                     <tr>
-                                        <th class="p-2">Student Name</th>
-                                        <th class="p-2">CBSE Roll No</th>
-                                        <th class="p-2">Marks Scored</th>
-                                        <th class="p-2">%</th>
-                                        <th class="p-2">Photo (Optional)</th>
-                                        <th class="p-2"></th>
+                                        <th class="p-3">Student Name</th>
+                                        <th class="p-3">CBSE Roll No</th>
+                                        <th class="p-3">Marks Scored</th>
+                                        <th class="p-3">%</th>
+                                        <th class="p-3">Photo (Optional)</th>
+                                        <th class="p-3 text-right"></th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <tr v-for="(row, i) in form.toppers" :key="i" class="border-t border-gray-100">
-                                        <td class="p-2"><input v-model="row.name" type="text" placeholder="Student name" class="field text-sm" :disabled="!canEditActive"></td>
-                                        <td class="p-2"><input v-model="row.roll_no" type="text" placeholder="CBSE Roll No" class="field text-sm w-36" :disabled="!canEditActive"></td>
-                                        <td class="p-2"><input v-model.number="row.marks_obtained" type="number" min="0" :max="form.total_marks || undefined" placeholder="Marks" class="field text-sm w-28" :disabled="!canEditActive"></td>
-                                        <td class="p-2 text-gray-600 font-semibold whitespace-nowrap">{{ rowPercentage(row) }}</td>
-                                        <td class="p-2"><input type="file" accept="image/*" class="text-xs w-36" :disabled="!canEditActive" @change="row.photo = $event.target.files[0]"></td>
-                                        <td class="p-2">
-                                            <button v-if="canEditActive && form.toppers.length > 1" type="button" class="text-red-500 hover:underline text-xs" @click="removeRow(i)">Remove</button>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    <tr v-for="(row, i) in form.toppers" :key="i" class="hover:bg-slate-50/50">
+                                        <td class="p-3"><input v-model="row.name" type="text" placeholder="Student name" class="field text-sm" :disabled="!canEditActive"></td>
+                                        <td class="p-3"><input v-model="row.roll_no" type="text" placeholder="CBSE Roll No" class="field text-sm w-36" :disabled="!canEditActive"></td>
+                                        <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="form.total_marks || undefined" placeholder="Marks" class="field text-sm w-28" :disabled="!canEditActive"></td>
+                                        <td class="p-3 text-indigo-600 font-bold whitespace-nowrap">{{ rowPercentage(row) }}</td>
+                                        <td class="p-3"><input type="file" accept="image/*" class="text-xs w-40" :disabled="!canEditActive" @change="row.photo = $event.target.files[0]"></td>
+                                        <td class="p-3 text-right">
+                                            <button v-if="canEditActive && form.toppers.length > 1" type="button" class="text-red-500 hover:text-red-700 text-xs font-semibold" @click="removeRow(i)">Remove</button>
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
-                        <button v-if="canEditActive" type="button" class="btn-secondary text-xs mt-3" @click="addRow">+ Add Topper Row</button>
+                        <button v-if="canEditActive" type="button" class="btn-secondary text-xs mt-3 px-3 py-1.5" @click="addRow">+ Add Topper Row</button>
                     </div>
 
-                    <div v-if="Object.keys(form.errors).length" class="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-600 space-y-0.5">
-                        <p v-for="(msg, key) in form.errors" :key="key">{{ msg }}</p>
+                    <!-- Errors alert -->
+                    <div v-if="Object.keys(form.errors).length" class="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-600 space-y-1">
+                        <p class="font-bold text-red-800">Please review the following errors:</p>
+                        <p v-for="(msg, key) in form.errors" :key="key">• {{ msg }}</p>
                     </div>
 
-                    <!-- FOOTER ACTIONS -->
-                    <div class="border-t border-gray-100 pt-4 flex flex-wrap items-center justify-between gap-3">
+                    <!-- FOOTER ACTION TOOLBAR -->
+                    <div class="border-t border-gray-100 pt-5 flex flex-wrap items-center justify-between gap-4">
                         <div v-if="canEditActive" class="flex flex-wrap items-center gap-3">
-                            <!-- Button 1: Save Draft -->
                             <button type="button" @click="submit(false)" :disabled="form.processing || wouldExceedCap"
-                                    class="btn-secondary text-sm px-4 py-2">
+                                    class="btn-secondary text-sm px-5 py-2.5 font-semibold">
                                 Save Draft
                             </button>
 
-                            <!-- Button 2: Save & Submit for Verification -->
                             <button type="button" @click="submit(true)" :disabled="form.processing || wouldExceedCap"
-                                    class="btn-primary text-white px-5 py-2 text-sm font-semibold shadow-sm">
+                                    class="btn-primary text-white px-6 py-2.5 text-sm font-bold shadow-md bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500 border-none transition-all">
                                 Save &amp; Submit for Verification
                             </button>
                         </div>
-                        <p v-else class="text-xs font-semibold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md">
-                            Result is {{ activeResult?.status }} — locked for editing.
+                        <p v-else class="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl">
+                            Result status is {{ activeResult?.status }} — locked for editing.
                         </p>
                     </div>
                 </form>
+            </div>
 
-                <!-- Toppers already added for this result -->
-                <div v-if="activeResult?.toppers?.length" class="mt-5 pt-4 border-t border-gray-100 divide-y divide-gray-50">
-                    <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider mb-2 text-indigo-700">Saved Toppers List ({{ activeResult.toppers.length }})</h4>
-                    <div v-for="t in sortedActiveToppers" :key="t.id" class="py-2 flex items-center justify-between gap-3 text-sm">
-                        <div>
-                            <span class="font-semibold text-indigo-600">#{{ t.rank ?? '—' }}</span>
-                            {{ t.name }}
-                            <span class="text-xs text-gray-400 ml-1">{{ [t.admission_no, t.roll_no].filter(Boolean).join(' · ') }}</span>
-                        </div>
-                        <div class="text-xs text-gray-500 flex items-center gap-3">
-                            <span class="font-semibold text-gray-700">{{ t.percentage }}%</span>
-                            <span v-if="t.marks_obtained != null && t.total_marks != null">{{ t.marks_obtained }}/{{ t.total_marks }}</span>
-                        </div>
+            <!-- ALL SAVED RESULTS HISTORY TABLE -->
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-gray-900 text-sm uppercase tracking-wide">Saved Results History</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Overview of all saved and submitted board examination results for your school.</p>
                     </div>
+                </div>
+
+                <div v-if="results.length" class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-slate-50 border-b border-gray-200">
+                            <tr>
+                                <th class="p-3">Academic Year</th>
+                                <th class="p-3">Class / Exam</th>
+                                <th class="p-3">Appeared / Passed</th>
+                                <th class="p-3">Pass %</th>
+                                <th class="p-3">Proof Document</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr v-for="r in results" :key="r.id" class="hover:bg-slate-50/50">
+                                <td class="p-3 font-bold text-gray-900">{{ r.academic_year }}</td>
+                                <td class="p-3 text-gray-700">Class {{ r.class }} ({{ r.examination_type }})</td>
+                                <td class="p-3 text-gray-600">{{ r.total_appeared }} appeared · {{ r.pass_count }} passed</td>
+                                <td class="p-3 font-bold text-emerald-600">{{ r.pass_percent }}%</td>
+                                <td class="p-3">
+                                    <a v-if="r.result_pdf_path" :href="`/school-admin/${school.id}/board-results/${r.id}/pdf`" target="_blank" class="text-xs font-semibold text-indigo-600 hover:underline flex items-center gap-1">
+                                        <span>View Document</span> ↗
+                                    </a>
+                                    <span v-else class="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Missing Proof</span>
+                                </td>
+                                <td class="p-3">
+                                    <span class="text-xs px-2.5 py-1 rounded-full font-semibold capitalize border" :class="statusClass(r.status)">
+                                        {{ r.status }}
+                                    </span>
+                                </td>
+                                <td class="p-3 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button type="button" @click="loadResult(r)" class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition">
+                                            Edit Workspace ↑
+                                        </button>
+                                        <Link :href="`/school-admin/${school.id}/board-results/${r.id}/toppers`" class="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-semibold hover:bg-slate-200 transition">
+                                            Toppers ({{ r.toppers?.length ?? 0 }})
+                                        </Link>
+                                        <button v-if="isEditable(r)" @click="remove(r)" class="text-xs text-red-500 hover:underline font-semibold ml-1">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div v-else class="p-10 text-center text-gray-400 text-xs">
+                    No board results recorded yet. Select an Academic Year above to begin.
                 </div>
             </div>
 
-            <!-- Previously saved results -->
-            <div class="space-y-4">
-                <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wide">All saved results</h3>
-                <div v-for="r in results" :key="r.id" class="card card--flush">
-                    <div class="flex items-center justify-between px-5 py-4 bg-gray-50 border-b border-gray-100 gap-3 flex-wrap">
-                        <div>
-                            <span class="font-bold text-gray-800">
-                                Class {{ r.class }} — {{ r.examination_type }} — {{ r.academic_year }}
-                            </span>
-                            <span class="ml-2 text-xs px-2 py-0.5 rounded-full capitalize"
-                                  :class="statusClass(r.status)">{{ r.status }}</span>
-                            <div class="flex flex-wrap items-center gap-4 mt-1 text-xs text-gray-500">
-                                <span>{{ r.total_appeared }} appeared</span>
-                                <span>{{ r.pass_count }} passed</span>
-                                <span class="font-semibold text-green-600">{{ r.pass_percent }}%</span>
-                                <span v-if="r.highest_mark">High {{ r.highest_mark }}</span>
-                                <span v-if="r.average_mark">Avg {{ r.average_mark }}</span>
-                                <span v-if="r.distinctions">{{ r.distinctions }} distinctions</span>
-                                <span v-if="r.result_pdf_path" class="text-indigo-600">PDF on file</span>
-                                <span v-else class="text-amber-600">PDF missing</span>
-                            </div>
-                            <p v-if="r.rejection_reason" class="text-xs text-red-600 mt-1">{{ r.rejection_reason }}</p>
-                            <p v-if="r.uploads?.length" class="text-xs text-gray-400 mt-1">
-                                Upload history:
-                                <span v-for="(u, i) in r.uploads" :key="u.id">
-                                    {{ u.file_type }} v{{ u.version }}{{ i < r.uploads.length - 1 ? ', ' : '' }}
-                                </span>
-                            </p>
-                        </div>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <button type="button" @click="loadResult(r)" class="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-100 transition">
-                                Edit here ↑
-                            </button>
-                            <Link :href="`/school-admin/${school.id}/board-results/${r.id}/toppers`"
-                                  class="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg font-semibold hover:bg-indigo-100 transition">
-                                {{ r.class == 12 ? 'Manage toppers & subjects' : 'Manage toppers' }} ({{ r.toppers?.length ?? 0 }})
-                            </Link>
-                            <button v-if="canSubmit(r)" type="button" @click="submitForReview(r)"
-                                    class="text-xs bg-green-50 text-green-700 px-3 py-1.5 rounded-lg font-semibold hover:bg-green-100">
-                                Submit
-                            </button>
-                            <label v-if="isEditable(r)" class="text-xs bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg font-semibold cursor-pointer hover:bg-slate-100">
-                                Upload PDF
-                                <input type="file" accept="application/pdf" class="hidden" @change="uploadPdf(r, $event)">
-                            </label>
-                            <button v-if="isEditable(r)" @click="remove(r)" class="text-xs text-red-400 hover:underline">Delete</button>
-                        </div>
-                    </div>
-
-                    <div v-if="r.toppers?.length" class="px-5 py-3 flex flex-wrap gap-3">
-                        <div v-for="t in r.toppers.slice(0, 6)" :key="t.id"
-                             class="flex items-center gap-2 text-xs text-gray-600">
-                            <img v-if="t.photo" :src="t.photo" class="w-7 h-7 rounded-full object-cover border border-gray-100">
-                            <span class="text-gray-400 w-7 h-7 rounded-full bg-indigo-50 flex items-center justify-center font-bold text-indigo-600" v-else>
-                                {{ t.name[0] }}
-                            </span>
-                            <span>{{ t.name }} <span class="text-indigo-600 font-semibold">{{ t.percentage }}%</span></span>
-                        </div>
-                        <span v-if="r.toppers.length > 6" class="text-xs text-gray-400 self-center">
-                            +{{ r.toppers.length - 6 }} more
-                        </span>
-                    </div>
-
-                    <div v-if="r.subject_stats && Object.keys(r.subject_stats).length"
-                         class="px-5 pb-4 border-t border-slate-50 pt-3">
-                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Subject stats</p>
-                        <div class="flex flex-wrap gap-2">
-                            <span v-for="(stat, subject) in r.subject_stats" :key="subject"
-                                  class="text-xs px-2.5 py-1 rounded-lg bg-slate-50 text-slate-700 border border-slate-100">
-                                {{ subject }}:
-                                <span class="font-semibold text-indigo-700">{{ stat.top_score }}</span>
-                                <span class="text-slate-400">({{ stat.topper_name }})</span>
-                            </span>
-                        </div>
-                    </div>
+            <!-- AUDIT HISTORY -->
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div class="mb-3 border-b border-gray-100 pb-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500">Audit &amp; Change Log</h3>
                 </div>
-
-                <div v-if="!results.length"
-                     class="card card--dashed p-10 text-center text-slate-400">
-                    No board results added yet.
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="mb-4 border-b border-slate-100 pb-3">
-                    <h3 class="text-sm font-semibold text-slate-800">Audit history</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Board result, topper, and achievement changes for this school.</p>
-                </div>
-                <div v-if="auditHistory?.length" class="divide-y divide-slate-50 max-h-80 overflow-y-auto">
-                    <div v-for="entry in auditHistory" :key="entry.id" class="py-3 text-sm">
-                        <p class="font-medium text-slate-800">{{ entry.description }}</p>
-                        <p class="text-xs text-slate-500 mt-0.5">
-                            <span class="capitalize">{{ entry.action }}</span>
-                            · {{ entry.log_name }}
-                            · {{ formatAuditTime(entry.created_at) }}
+                <div v-if="auditHistory?.length" class="divide-y divide-gray-100 max-h-60 overflow-y-auto">
+                    <div v-for="entry in auditHistory" :key="entry.id" class="py-2.5 text-xs">
+                        <p class="font-semibold text-gray-800">{{ entry.description }}</p>
+                        <p class="text-gray-400 mt-0.5">
+                            <span class="capitalize font-medium text-gray-600">{{ entry.action }}</span> · {{ formatAuditTime(entry.created_at) }}
                         </p>
                     </div>
                 </div>
-                <p v-else class="text-sm text-slate-400 py-6 text-center">No audit entries for board results yet.</p>
+                <p v-else class="text-xs text-gray-400 py-4 text-center">No recent audit log entries.</p>
             </div>
         </div>
     </SchoolAdminLayout>
@@ -343,12 +333,6 @@ const pageTitle = computed(() => {
     if (props.selectedClass === 12) return 'Class XII Board Results';
     if (props.selectedClass === 10) return 'Class X Board Results';
     return 'Board Results';
-});
-
-const pageDescription = computed(() => {
-    if (props.selectedClass === 12) return 'Search or start a year, enter the summary, then add toppers — all on this page.';
-    if (props.selectedClass === 10) return 'Search or start a year, enter the summary, then add toppers — all on this page.';
-    return 'Enter CBSE AISSE/AISSCE summaries, upload the official PDF, add toppers, then submit for Sahodaya verification.';
 });
 
 function formatAuditTime(iso) {
@@ -459,7 +443,7 @@ function rowPercentage(row) {
 
 function submit(submitForReview = false) {
     if (submitForReview && !props.activeResult?.result_pdf_path && !form.result_pdf) {
-        alert('Please select/upload the CBSE Result PDF before submitting for verification.');
+        alert('Please select/upload the CBSE Result PDF or Image before submitting for verification.');
         return;
     }
 
@@ -491,27 +475,6 @@ function isEditable(r) {
     return r.status === 'draft' || r.status === 'rejected';
 }
 
-function canSubmit(r) {
-    return isEditable(r) && !!r.result_pdf_path;
-}
-
-function submitForReview(r) {
-    if (!confirm(`Submit Class ${r.class} (${r.academic_year}) for Sahodaya verification?`)) return;
-    router.post(`/school-admin/${props.school.id}/board-results/${r.id}/submit`);
-}
-
-function uploadPdf(r, event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const data = new FormData();
-    data.append('result_pdf', file);
-    router.post(`/school-admin/${props.school.id}/board-results/${r.id}/upload-pdf`, data, {
-        forceFormData: true,
-        preserveScroll: true,
-        onFinish: () => { event.target.value = ''; },
-    });
-}
-
 function remove(r) {
     if (!confirm(`Delete Class ${r.class} results for ${r.academic_year}?`)) return;
     router.delete(`/school-admin/${props.school.id}/board-results/${r.id}`);
@@ -519,13 +482,13 @@ function remove(r) {
 
 function statusClass(status) {
     const map = {
-        draft: 'bg-slate-100 text-slate-700',
-        submitted: 'bg-amber-50 text-amber-700',
-        verified: 'bg-blue-50 text-blue-700',
-        approved: 'bg-indigo-50 text-indigo-700',
-        published: 'bg-green-50 text-green-700',
-        rejected: 'bg-red-50 text-red-700',
+        draft: 'bg-slate-100 text-slate-700 border-slate-200',
+        submitted: 'bg-blue-50 text-blue-700 border-blue-200',
+        verified: 'bg-amber-50 text-amber-700 border-amber-200',
+        approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        published: 'bg-green-50 text-green-700 border-green-200',
+        rejected: 'bg-red-50 text-red-700 border-red-200',
     };
-    return map[status] || 'bg-slate-100 text-slate-600';
+    return map[status] || 'bg-slate-100 text-slate-600 border-slate-200';
 }
 </script>
