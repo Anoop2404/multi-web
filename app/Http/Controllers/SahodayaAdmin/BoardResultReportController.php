@@ -100,6 +100,17 @@ class BoardResultReportController extends SahodayaAdminController
 
         $rows = $service->register($this->sahodaya->id, $year, $class);
 
+        $schoolOptions = \App\Models\Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])
+            ->values()
+            ->all();
+
+        $academicYearOptions = AcademicYear::optionsForSahodaya($this->sahodaya->id);
+
         return $this->inertia('Sahodaya/BoardResults/SubjectMeritRegister', [
             'rows' => $rows,
             'filters' => [
@@ -107,6 +118,8 @@ class BoardResultReportController extends SahodayaAdminController
                 'class' => $class,
             ],
             'classOptions' => [10, 12],
+            'schoolOptions' => $schoolOptions,
+            'academicYearOptions' => $academicYearOptions,
         ]);
     }
 

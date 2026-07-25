@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Subject-wise Merit Register (#147).
- * Reads exclusively from topper_subject_marks.
+ * Reads from topper_subject_marks and computes ranks per subject.
  */
 class SubjectMeritRegisterService
 {
@@ -26,7 +26,8 @@ class SubjectMeritRegisterService
      *   class: int|null,
      *   academic_year: string,
      *   admission_no: string|null,
-     *   roll_no: string|null
+     *   roll_no: string|null,
+     *   rank: int
      * }>
      */
     public function register(string $sahodayaId, string $academicYear, ?int $class = null): array
@@ -48,10 +49,10 @@ class SubjectMeritRegisterService
 
     /**
      * @param  list<string>  $schoolIds
-     * @param  \Illuminate\Support\Collection<string, string>  $names
-     * @return list<array<string, mixed>>|null
+     * @param  Collection<string, string>  $names
+     * @return list<array<string, mixed>>
      */
-    private function fromNormalizedTable(array $schoolIds, string $academicYear, ?int $class, Collection $names): ?array
+    private function fromNormalizedTable(array $schoolIds, string $academicYear, ?int $class, Collection $names): array
     {
         if (! Schema::hasTable('topper_subject_marks')) {
             return [];
@@ -62,7 +63,7 @@ class SubjectMeritRegisterService
             ->join('board_results as br', 'br.id', '=', 't.board_result_id')
             ->whereIn('br.tenant_id', $schoolIds)
             ->where('br.academic_year', $academicYear)
-            ->whereIn('br.status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED])
+            ->whereNotIn('br.status', [BoardResult::STATUS_REJECTED])
             ->select([
                 'tsm.marks',
                 'tsm.subject_label as subject',
@@ -80,7 +81,7 @@ class SubjectMeritRegisterService
             $query->where('br.class', $class);
         }
 
-        return $query->orderBy('subject')->orderByDesc('tsm.marks')->get()
+        $items = $query->orderBy('subject')->orderByDesc('tsm.marks')->get()
             ->map(fn ($row) => [
                 'subject' => (string) $row->subject,
                 'student_name' => (string) $row->student_name,
@@ -93,8 +94,27 @@ class SubjectMeritRegisterService
                 'academic_year' => (string) $row->academic_year,
                 'admission_no' => $row->admission_no,
                 'roll_no' => $row->roll_no,
-            ])
-            ->values()
-            ->all();
+            ]);
+
+        $grouped = $items->groupBy('subject');
+        $rankedList = [];
+
+        foreach ($grouped as $subject => $subjectItems) {
+            $sorted = $subjectItems->sortByDesc('marks')->values();
+            $currentRank = 1;
+            $prevMarks = null;
+
+            foreach ($sorted as $idx => $row) {
+                $marks = $row['marks'];
+                if ($prevMarks !== null && $marks < $prevMarks) {
+                    $currentRank = $idx + 1;
+                }
+                $row['rank'] = $currentRank;
+                $prevMarks = $marks;
+                $rankedList[] = $row;
+            }
+        }
+
+        return $rankedList;
     }
 }
