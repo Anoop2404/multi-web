@@ -429,8 +429,8 @@ class BoardResultController extends SchoolAdminController
         $class = 12;
         $academicYear = $request->string('academic_year')->trim()->toString();
         if ($academicYear === '') {
-            $active = AcademicYearRecord::active();
-            $academicYear = $active ? $active->label : (date('Y') - 1).'-'.substr((string) date('Y'), 2);
+            $active = AcademicYearRecord::query()->where('status', 'active')->first();
+            $academicYear = $active?->label ?? ((date('Y') - 1).'-'.substr((string) date('Y'), 2));
         }
 
         $boardResult = BoardResult::firstOrCreate([
