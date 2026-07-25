@@ -528,6 +528,7 @@ Route::prefix('school-admin/{tenantId}')
 
     // Board Results
     Route::get('/board-results',                                   [BoardResultController::class, 'index'])->name('board-results.index');
+    Route::get('/board-results/rank-report',                       [BoardResultController::class, 'rankReport'])->name('board-results.rank-report');
     Route::get('/board-results/subject-toppers',                   [BoardResultController::class, 'subjectToppers'])->name('board-results.subject-toppers');
     Route::post('/board-results',                                  [BoardResultController::class, 'store'])->name('board-results.store');
     Route::put('/board-results/{boardResult}',                     [BoardResultController::class, 'update'])->name('board-results.update');
@@ -538,6 +539,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/board-results/{boardResult}/toppers',            [BoardResultController::class, 'storeTopper'])->name('board-results.toppers.store');
     Route::post('/board-results/{boardResult}/toppers/single',     [BoardResultController::class, 'storeTopper'])->name('board-results.toppers.single');
     Route::post('/board-results/{boardResult}/toppers/batch',      [BoardResultController::class, 'storeToppersBatch'])->name('board-results.toppers.batch');
+    Route::post('/board-results/{boardResult}/subject-toppers/batch', [BoardResultController::class, 'storeSubjectToppersBatch'])->name('board-results.subject-toppers.batch');
     Route::put('/board-results/{boardResult}/toppers/{topper}',    [BoardResultController::class, 'updateTopper'])->name('board-results.toppers.update');
     Route::delete('/board-results/{boardResult}/toppers/{topper}', [BoardResultController::class, 'destroyTopper'])->name('board-results.toppers.destroy');
 
@@ -855,6 +857,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/reports/excellence', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'excellence'])->name('reports.excellence');
             Route::post('/topper-cap', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'updateTopperCap'])->name('topper-cap');
             Route::get('/toppers', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'index'])->name('toppers');
+            Route::get('/toppers/overall', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'overall'])->name('toppers.overall');
+            Route::get('/toppers/subject-wise', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'subjectWise'])->name('toppers.subject-wise');
+            Route::get('/toppers/achievers', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'achievers'])->name('toppers.achievers');
             Route::post('/toppers/recompute', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'recompute'])->name('toppers.recompute');
             Route::post('/{boardResult}/verify', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verify'])->name('verify');
             Route::post('/{boardResult}/approve', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'approve'])->name('approve');

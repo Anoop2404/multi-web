@@ -15,23 +15,87 @@ use Illuminate\Http\Request;
  */
 class SahodayaTopperController extends SahodayaAdminController
 {
-    public function index(Request $request, SahodayaTopperSelectionService $selection)
+    /**
+     * Settings hub: Top-N / tie-mode config + recompute, plus links out to the three
+     * standalone report pages below. Deliberately doesn't compute any topper lists itself
+     * so it stays fast regardless of how many schools/toppers exist.
+     */
+    public function index(Request $request)
     {
         $year = $request->string('academic_year')->toString()
             ?: AcademicYear::forSahodaya($this->sahodaya->id);
         $class = $request->integer('class') ?: 10;
         abort_unless(in_array($class, [10, 12], true), 404);
 
+        [$overallConfig, $streamConfig] = $this->loadConfigs();
+
+        return $this->inertia('Sahodaya/BoardResults/Toppers', [
+            'selectedClass' => $class,
+            'filters' => ['academic_year' => $year],
+            'settings' => [
+                'overall' => [
+                    'top_n' => $overallConfig?->top_n ?? TopperCountService::DEFAULT_TOP_N,
+                    'tie_mode' => $overallConfig?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP,
+                ],
+                'stream' => [
+                    'top_n' => $streamConfig?->top_n ?? TopperCountService::DEFAULT_TOP_N,
+                    'tie_mode' => $streamConfig?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP,
+                ],
+            ],
+        ]);
+    }
+
+    /** Overall Result — Sahodaya-wide toppers (Class X flat, Class XII per stream). */
+    public function overall(Request $request, SahodayaTopperSelectionService $selection)
+    {
+        $year = $request->string('academic_year')->toString()
+            ?: AcademicYear::forSahodaya($this->sahodaya->id);
+        $class = $request->integer('class') ?: 10;
+        abort_unless(in_array($class, [10, 12], true), 404);
+
+        return $this->inertia('Sahodaya/BoardResults/TopperResultsOverall', [
+            'selectedClass' => $class,
+            'filters' => ['academic_year' => $year],
+            'overall' => $class === 10 ? $selection->overallForClassX($this->sahodaya->id, $year) : [],
+            'byStream' => $class === 12 ? $selection->byStreamForClassXII($this->sahodaya->id, $year) : [],
+        ]);
+    }
+
+    /** Subject-Wise Top Scorers — Class XII only. */
+    public function subjectWise(Request $request)
+    {
+        $year = $request->string('academic_year')->toString()
+            ?: AcademicYear::forSahodaya($this->sahodaya->id);
+
+        $subjectLeaders = app(\App\Services\BoardResults\SubjectMeritRegisterService::class)
+            ->register($this->sahodaya->id, $year, 12);
+
+        return $this->inertia('Sahodaya/BoardResults/TopperResultsSubjectWise', [
+            'filters' => ['academic_year' => $year],
+            'subjectLeaders' => $subjectLeaders,
+        ]);
+    }
+
+    /** 90%+ (or custom threshold) achievers — not capped to Top-N. */
+    public function achievers(Request $request, SahodayaTopperSelectionService $selection)
+    {
+        $year = $request->string('academic_year')->toString()
+            ?: AcademicYear::forSahodaya($this->sahodaya->id);
+        $class = $request->integer('class') ?: 10;
+        abort_unless(in_array($class, [10, 12], true), 404);
         $threshold = $request->filled('threshold') ? (float) $request->input('threshold') : 90.0;
 
-        $overall = $class === 10 ? $selection->overallForClassX($this->sahodaya->id, $year) : [];
-        $byStream = $class === 12 ? $selection->byStreamForClassXII($this->sahodaya->id, $year) : [];
-        $achieversOverall = $class === 10 ? $selection->achieversForClassX($this->sahodaya->id, $year, $threshold) : [];
-        $achieversByStream = $class === 12 ? $selection->achieversByStreamForClassXII($this->sahodaya->id, $year, $threshold) : [];
-        $subjectLeaders = $class === 12
-            ? app(\App\Services\BoardResults\SubjectMeritRegisterService::class)->register($this->sahodaya->id, $year, 12)
-            : [];
+        return $this->inertia('Sahodaya/BoardResults/TopperResultsAchievers', [
+            'selectedClass' => $class,
+            'filters' => ['academic_year' => $year, 'threshold' => rtrim(rtrim(number_format($threshold, 2), '0'), '.')],
+            'achieversOverall' => $class === 10 ? $selection->achieversForClassX($this->sahodaya->id, $year, $threshold) : [],
+            'achieversByStream' => $class === 12 ? $selection->achieversByStreamForClassXII($this->sahodaya->id, $year, $threshold) : [],
+        ]);
+    }
 
+    /** @return array{0: ?TopperCountConfig, 1: ?TopperCountConfig} */
+    private function loadConfigs(): array
+    {
         $overallConfig = TopperCountConfig::query()
             ->where('sahodaya_id', $this->sahodaya->id)
             ->where('scope', TopperCountConfig::SCOPE_OVERALL)
@@ -45,25 +109,7 @@ class SahodayaTopperController extends SahodayaAdminController
             ->whereNull('stream_id')
             ->first();
 
-        return $this->inertia('Sahodaya/BoardResults/Toppers', [
-            'selectedClass' => $class,
-            'filters' => ['academic_year' => $year, 'threshold' => rtrim(rtrim(number_format($threshold, 2), '0'), '.')],
-            'overall' => $overall,
-            'byStream' => $byStream,
-            'subjectLeaders' => $subjectLeaders,
-            'achieversOverall' => $achieversOverall,
-            'achieversByStream' => $achieversByStream,
-            'settings' => [
-                'overall' => [
-                    'top_n' => $overallConfig?->top_n ?? TopperCountService::DEFAULT_TOP_N,
-                    'tie_mode' => $overallConfig?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP,
-                ],
-                'stream' => [
-                    'top_n' => $streamConfig?->top_n ?? TopperCountService::DEFAULT_TOP_N,
-                    'tie_mode' => $streamConfig?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP,
-                ],
-            ],
-        ]);
+        return [$overallConfig, $streamConfig];
     }
 
     public function recompute(Request $request, SahodayaTopperSelectionService $selection)

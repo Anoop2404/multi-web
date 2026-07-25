@@ -80,6 +80,7 @@
                                 <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-gray-50 border-b border-gray-200">
                                     <tr>
                                         <th class="p-3">Student Name *</th>
+                                        <th class="p-3">Gender *</th>
                                         <th class="p-3">CBSE Roll No</th>
                                         <th class="p-3">Marks Scored *</th>
                                         <th class="p-3">%</th>
@@ -90,6 +91,14 @@
                                 <tbody class="divide-y divide-gray-100 bg-white">
                                     <tr v-for="(row, i) in batchForm.toppers" :key="i" class="hover:bg-slate-50/50">
                                         <td class="p-3"><input v-model="row.name" type="text" required class="field text-sm" placeholder="Student name" :disabled="!canEdit"></td>
+                                        <td class="p-3">
+                                            <select v-model="row.gender" required class="field text-sm w-28" :disabled="!canEdit">
+                                                <option value="">— Select —</option>
+                                                <option value="male">Male</option>
+                                                <option value="female">Female</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </td>
                                         <td class="p-3"><input v-model="row.roll_no" type="text" class="field text-sm w-36" placeholder="CBSE Roll No" :disabled="!canEdit"></td>
                                         <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="batchForm.total_marks || undefined" required class="field text-sm w-28" placeholder="Marks" :disabled="!canEdit"></td>
                                         <td class="p-3 text-indigo-600 font-bold whitespace-nowrap">{{ rowPercentage(row) }}</td>
@@ -132,6 +141,15 @@
                             <div>
                                 <label class="form-label mb-1">Student Name *</label>
                                 <input v-model="form.name" type="text" required class="field text-sm" :disabled="!canEdit">
+                            </div>
+                            <div>
+                                <label class="form-label mb-1">Gender *</label>
+                                <select v-model="form.gender" required class="field text-sm" :disabled="!canEdit">
+                                    <option value="">— Select —</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
                             </div>
                             <div v-if="isClass12">
                                 <label class="form-label mb-1">Stream *</label>
@@ -288,10 +306,19 @@
                         </div>
                     </div>
 
-                    <form @submit.prevent="submitSubjectTopper" class="grid sm:grid-cols-3 gap-4">
+                    <form @submit.prevent="submitSubjectTopper" class="grid sm:grid-cols-4 gap-4">
                         <div>
                             <label class="form-label mb-1 font-semibold">Student Name *</label>
                             <input v-model="subjectForm.name" type="text" required class="field text-sm" placeholder="Student full name" :disabled="!canEdit">
+                        </div>
+                        <div>
+                            <label class="form-label mb-1 font-semibold">Gender *</label>
+                            <select v-model="subjectForm.gender" required class="field text-sm" :disabled="!canEdit">
+                                <option value="">— Select —</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
                         </div>
                         <div>
                             <label class="form-label mb-1 font-semibold">CBSE Roll No *</label>
@@ -302,9 +329,14 @@
                             <input v-model.number="subjectForm.marks" type="number" min="0" max="100" required class="field text-sm font-bold text-emerald-700" placeholder="e.g. 99" :disabled="!canEdit">
                         </div>
 
-                        <div class="sm:col-span-3 flex justify-end pt-2">
+                        <div class="sm:col-span-4 flex items-center justify-between pt-2">
+                            <p v-if="editingSubjectRow" class="text-xs font-semibold text-indigo-600">
+                                Editing {{ editingSubjectRow.name }}'s {{ editingSubjectRow.subject }} mark — save to update, or
+                                <button type="button" class="underline" @click="cancelSubjectEdit">cancel</button>.
+                            </p>
+                            <span v-else></span>
                             <button v-if="canEdit" type="submit" class="btn-primary text-xs px-6 py-2.5 font-bold shadow-sm" :disabled="subjectForm.processing">
-                                + Save Subject Topper
+                                {{ editingSubjectRow ? '💾 Update Subject Mark' : '+ Save Subject Topper' }}
                             </button>
                         </div>
                     </form>
@@ -323,27 +355,39 @@
                     <p class="text-xs text-gray-500">Upload the common CBSE Tabulation Sheet or result proof PDF for verification.</p>
                 </div>
 
-                <!-- DISPLAY SUBJECT TOP PERFORMERS GRID -->
+                <!-- DISPLAY ALL SUBJECT-WISE ENTRIES (every student, every subject — not just the top scorer) -->
                 <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                    <h3 class="font-bold text-gray-900 text-sm mb-1 uppercase tracking-wide">Saved Subject Top Performers</h3>
-                    <p class="text-xs text-gray-500 mb-4">Highest scorers identified across Class XII subjects.</p>
+                    <h3 class="font-bold text-gray-900 text-sm mb-1 uppercase tracking-wide">Saved Subject-Wise Entries</h3>
+                    <p class="text-xs text-gray-500 mb-4">Every student's marks, by subject. Click Edit to update a mark.</p>
 
-                    <div v-if="subjectWiseLeaders.length" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div v-for="row in subjectWiseLeaders" :key="row.subject"
-                             class="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/40 to-white p-4 shadow-xs">
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded">
-                                    {{ row.subject }}
-                                </span>
-                                <span class="text-sm font-bold text-emerald-600">{{ row.marks }} / 100</span>
-                            </div>
-                            <p class="font-bold text-gray-900 text-sm mt-2">{{ row.name }}</p>
-                            <p v-if="row.roll_no" class="text-xs text-gray-500 mt-0.5">CBSE Roll No: {{ row.roll_no }}</p>
-
-                            <button v-if="canEdit" type="button" @click="removeSubjectTopper(row)" class="text-xs text-red-500 hover:text-red-700 font-semibold mt-3 flex items-center gap-1">
-                                <span>🗑</span> Remove Subject Topper
-                            </button>
-                        </div>
+                    <div v-if="sortedAllSubjectRows.length" class="overflow-x-auto border border-gray-200 rounded-xl">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-gray-50 text-xs uppercase text-gray-500 border-b border-gray-200">
+                                <tr>
+                                    <th class="p-3 cursor-pointer select-none" @click="toggleSubjectSort('subject')">Subject{{ subjectSortArrow('subject') }}</th>
+                                    <th class="p-3 cursor-pointer select-none" @click="toggleSubjectSort('name')">Student{{ subjectSortArrow('name') }}</th>
+                                    <th class="p-3">Gender</th>
+                                    <th class="p-3">Roll No</th>
+                                    <th class="p-3 cursor-pointer select-none" @click="toggleSubjectSort('marks')">Marks{{ subjectSortArrow('marks') }}</th>
+                                    <th v-if="canEdit" class="p-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 bg-white">
+                                <tr v-for="row in sortedAllSubjectRows" :key="row.subject + '-' + row.topper_id" class="hover:bg-slate-50/50">
+                                    <td class="p-3">
+                                        <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded">{{ row.subject }}</span>
+                                    </td>
+                                    <td class="p-3 font-semibold text-gray-900">{{ row.name }}</td>
+                                    <td class="p-3 text-xs text-gray-500">{{ row.gender || '—' }}</td>
+                                    <td class="p-3 text-xs text-gray-500">{{ row.roll_no || '—' }}</td>
+                                    <td class="p-3 font-bold text-emerald-600">{{ row.marks }} / 100</td>
+                                    <td v-if="canEdit" class="p-3 text-right whitespace-nowrap">
+                                        <button type="button" @click="editSubjectRow(row)" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold mr-3">✎ Edit</button>
+                                        <button type="button" @click="removeSubjectTopper(row)" class="text-xs text-red-500 hover:text-red-700 font-semibold">🗑 Remove</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
                     <div v-else class="p-8 text-center text-gray-400 text-xs">
@@ -454,7 +498,7 @@ const achievers90ByStream = computed(() => {
 
 // ── Bulk add ─────────────────────────────────────────────────────────────
 function blankRow() {
-    return { name: '', stream_key: '', roll_no: '', marks_obtained: '', photo: null };
+    return { name: '', gender: '', stream_key: '', roll_no: '', marks_obtained: '', photo: null };
 }
 
 const batchForm = useForm({
@@ -494,24 +538,95 @@ function submitBatch() {
 // ── Subject Topper Form ──────────────────────────────────────────────────
 const selectedSubjectOption = ref('');
 const customSubjectInput = ref('');
+const editingSubjectRow = ref(null);
 
 const subjectForm = useForm({
     subject: '',
     name: '',
+    gender: '',
     roll_no: '',
     marks: '',
 });
+
+// Every student's marks for every subject — not just the top scorer per subject —
+// so previously-added entries stay visible and editable instead of appearing "lost".
+const allSubjectRows = computed(() => {
+    const out = [];
+    for (const t of props.boardResult.toppers ?? []) {
+        const marks = t.subject_marks || {};
+        for (const [subject, mark] of Object.entries(marks)) {
+            out.push({
+                topper_id: t.id,
+                subject,
+                name: t.name,
+                gender: t.gender || '',
+                roll_no: t.roll_no || '',
+                marks: mark,
+            });
+        }
+    }
+    return out.sort((a, b) => a.subject.localeCompare(b.subject) || b.marks - a.marks);
+});
+
+// Saved Subject-Wise Entries — sortable datatable (click a header to sort by it)
+const subjectSortKey = ref('subject');
+const subjectSortDir = ref('asc');
+
+function toggleSubjectSort(key) {
+    if (subjectSortKey.value === key) {
+        subjectSortDir.value = subjectSortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        subjectSortKey.value = key;
+        subjectSortDir.value = 'asc';
+    }
+}
+
+function subjectSortArrow(key) {
+    if (subjectSortKey.value !== key) return '';
+    return subjectSortDir.value === 'asc' ? ' ▲' : ' ▼';
+}
+
+const sortedAllSubjectRows = computed(() => {
+    const dir = subjectSortDir.value === 'asc' ? 1 : -1;
+    return [...allSubjectRows.value].sort((a, b) => {
+        const av = a[subjectSortKey.value];
+        const bv = b[subjectSortKey.value];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (typeof av === 'string') return av.localeCompare(bv) * dir;
+        return (av - bv) * dir;
+    });
+});
+
+function editSubjectRow(row) {
+    editingSubjectRow.value = row;
+    selectedSubjectOption.value = masterSubjectList.value.includes(row.subject) ? row.subject : '__custom__';
+    if (selectedSubjectOption.value === '__custom__') customSubjectInput.value = row.subject;
+    subjectForm.name = row.name;
+    subjectForm.gender = row.gender || '';
+    subjectForm.roll_no = row.roll_no || '';
+    subjectForm.marks = row.marks;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelSubjectEdit() {
+    editingSubjectRow.value = null;
+    subjectForm.reset();
+    selectedSubjectOption.value = '';
+    customSubjectInput.value = '';
+}
 
 function submitSubjectTopper() {
     const finalSubject = selectedSubjectOption.value === '__custom__'
         ? customSubjectInput.value.trim()
         : selectedSubjectOption.value;
 
-    if (!finalSubject || !subjectForm.name || subjectForm.marks === '') return;
+    if (!finalSubject || !subjectForm.name || !subjectForm.gender || subjectForm.marks === '') return;
 
-    const existing = (props.boardResult.toppers ?? []).find(
-        (t) => t.name.toLowerCase() === subjectForm.name.toLowerCase()
-    );
+    const existing = editingSubjectRow.value
+        ? (props.boardResult.toppers ?? []).find((t) => t.id === editingSubjectRow.value.topper_id)
+        : (props.boardResult.toppers ?? []).find((t) => t.name.toLowerCase() === subjectForm.name.toLowerCase());
 
     if (existing) {
         const currentSubjectMarks = { ...(existing.subject_marks ?? {}) };
@@ -520,14 +635,12 @@ function submitSubjectTopper() {
         router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
             ...existing,
             _method: 'put',
+            gender: subjectForm.gender || existing.gender,
+            roll_no: subjectForm.roll_no || existing.roll_no,
             subject_marks: currentSubjectMarks,
         }, {
             preserveScroll: true,
-            onSuccess: () => {
-                subjectForm.reset();
-                selectedSubjectOption.value = '';
-                customSubjectInput.value = '';
-            },
+            onSuccess: () => cancelSubjectEdit(),
         });
     } else {
         const subjectMarks = {};
@@ -535,6 +648,7 @@ function submitSubjectTopper() {
 
         router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/single`, {
             name: subjectForm.name,
+            gender: subjectForm.gender,
             roll_no: subjectForm.roll_no,
             percentage: subjectForm.marks,
             marks_obtained: subjectForm.marks,
@@ -542,11 +656,7 @@ function submitSubjectTopper() {
             subject_marks: subjectMarks,
         }, {
             preserveScroll: true,
-            onSuccess: () => {
-                subjectForm.reset();
-                selectedSubjectOption.value = '';
-                customSubjectInput.value = '';
-            },
+            onSuccess: () => cancelSubjectEdit(),
         });
     }
 }
@@ -554,10 +664,7 @@ function submitSubjectTopper() {
 function removeSubjectTopper(row) {
     if (!confirm(`Remove subject topper "${row.name}" for ${row.subject}?`)) return;
 
-    const existing = (props.boardResult.toppers ?? []).find(
-        (t) => t.name.toLowerCase() === row.name.toLowerCase()
-    );
-
+    const existing = (props.boardResult.toppers ?? []).find((t) => t.id === row.topper_id);
     if (!existing) return;
 
     const updatedSubjectMarks = { ...(existing.subject_marks ?? {}) };
@@ -575,6 +682,7 @@ function removeSubjectTopper(row) {
 // ── Edit (single) ────────────────────────────────────────────────────────
 const form = useForm({
     name: '',
+    gender: '',
     roll_no: '',
     percentage: '',
     rank: '',
@@ -615,6 +723,7 @@ function streamKeyFromTopper(t) {
 function startEdit(t) {
     editingId.value = t.id;
     form.name = t.name;
+    form.gender = t.gender ?? '';
     form.roll_no = t.roll_no ?? '';
     form.percentage = t.percentage;
     form.rank = t.rank ?? '';

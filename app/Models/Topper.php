@@ -74,4 +74,23 @@ class Topper extends Model
             ])
             ->all();
     }
+
+    /**
+     * The eager-loaded `subjectMarks` relation serializes to the same `subject_marks`
+     * JSON key as the getSubjectMarksAttribute() accessor above (Eloquent snake-cases
+     * the relation method name). Array::merge in Model::toArray() lets whichever comes
+     * from relationsToArray() win, which was silently replacing the clean
+     * {subject: marks} map with the raw list of TopperSubjectMark rows on every
+     * page that eager-loads toppers.subjectMarks. Drop it here so only the accessor's
+     * map is ever serialized; the relation stays loaded/usable internally either way.
+     *
+     * @return array<string, mixed>
+     */
+    public function relationsToArray()
+    {
+        $relations = parent::relationsToArray();
+        unset($relations['subject_marks']);
+
+        return $relations;
+    }
 }

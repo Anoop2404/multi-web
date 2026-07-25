@@ -72,6 +72,35 @@ class BoardResultController extends SchoolAdminController
         ], $activeResult ? ['activeResultContext' => $this->topperContext($activeResult)] : []));
     }
 
+    public function rankReport(Request $request)
+    {
+        $class = $request->filled('class') ? $request->integer('class') : 12;
+        abort_if(! in_array($class, [10, 12], true), 404);
+
+        $academicYear = $request->string('academic_year')->trim()->toString();
+        abort_if($academicYear === '', 422, 'academic_year is required.');
+
+        $result = BoardResult::with(['toppers' => function ($q) {
+            $q->with(['subjectMarks', 'examStream'])->orderBy('rank');
+        }])
+            ->where('tenant_id', $this->school->id)
+            ->where('class', $class)
+            ->where('academic_year', $academicYear)
+            ->first();
+
+        abort_if($result === null, 404, 'No board result found for the given class and academic year.');
+
+        return view('school.board-results.rank-report', [
+            'school'       => $this->school,
+            'result'       => $result,
+            'toppers'      => $result->toppers,
+            'academicYear' => $academicYear,
+            'class'        => $class,
+            'isClass12'    => $class === 12,
+            'subjectWiseLeaders' => BoardExamSubjects::subjectWiseLeaders($result->toppers),
+        ]);
+    }
+
     public function store(Request $request)
     {
         $yearService = app(BoardResultAcademicYearService::class);
@@ -227,7 +256,10 @@ class BoardResultController extends SchoolAdminController
             'toppers.*.stream' => 'nullable|string|max:100',
             'toppers.*.stream_key' => 'nullable|string|max:50',
             'toppers.*.roll_no' => 'nullable|string|max:64',
-            'toppers.*.gender' => 'required|string|in:male,female,other',
+            // Nullable here so a blank placeholder row (the default empty row every form
+            // starts with) doesn't fail validation on its own — gender is only required
+            // below, for rows the user actually filled in (name + marks present).
+            'toppers.*.gender' => 'nullable|string|in:male,female,other',
             'toppers.*.admission_no' => 'nullable|string|max:64',
             'toppers.*.marks_obtained' => 'nullable|numeric|min:0',
             'toppers.*.photo' => 'nullable|image|max:4096',
@@ -240,6 +272,11 @@ class BoardResultController extends SchoolAdminController
             if (blank($row['name'] ?? null) || blank($row['marks_obtained'] ?? null)) {
                 throw ValidationException::withMessages([
                     "toppers.{$i}" => 'Each topper row needs both a name and marks scored (or leave the row fully blank to skip it).',
+                ]);
+            }
+            if (blank($row['gender'] ?? null)) {
+                throw ValidationException::withMessages([
+                    "toppers.{$i}.gender" => 'Select a gender for each topper row.',
                 ]);
             }
         }
@@ -600,6 +637,89 @@ class BoardResultController extends SchoolAdminController
         );
 
         return back()->with('success', 'Topper added.');
+    }
+
+    /**
+     * Add/update several students' marks for a single subject in one request. Replaces
+     * looping one router.post/put per row on the Subject-Wise Toppers page, which was
+     * firing a separate "success" flash per row and never refreshing the on-screen rows.
+     */
+    public function storeSubjectToppersBatch(Request $request, string $tenantId, BoardResult $boardResult)
+    {
+        abort_if($boardResult->tenant_id !== $this->school->id, 403);
+        abort_unless($boardResult->isEditable(), 422, 'Toppers are locked for this result.');
+        app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
+
+        $data = $request->validate([
+            'subject' => 'required|string|max:100',
+            'rows' => 'required|array|min:1',
+            'rows.*.name' => 'required|string|max:255',
+            'rows.*.gender' => 'required|string|in:male,female,other',
+            'rows.*.roll_no' => 'nullable|string|max:64',
+            'rows.*.marks' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $subject = $data['subject'];
+        $sahodayaId = (string) $this->school->parent_id;
+        $boardResult->load(['toppers.subjectMarks']);
+
+        $nextRank = (int) (Topper::where('board_result_id', $boardResult->id)->max('rank') ?? 0) + 1;
+        $created = 0;
+        $updated = 0;
+
+        foreach ($data['rows'] as $row) {
+            $name = trim($row['name']);
+            $topper = $boardResult->toppers->first(
+                fn (Topper $t) => strtolower($t->name) === strtolower($name)
+            );
+
+            if ($topper) {
+                $subjectMarks = $topper->subject_marks;
+                $subjectMarks[$subject] = $row['marks'];
+
+                $topper->update([
+                    'gender' => $row['gender'],
+                    'roll_no' => filled($row['roll_no'] ?? null) ? $row['roll_no'] : $topper->roll_no,
+                ]);
+                app(TopperSubjectMarkService::class)->sync($topper, $subjectMarks);
+                $updated++;
+            } else {
+                app(TopperCountService::class)->assertCanAdd($boardResult, $sahodayaId);
+
+                $topper = Topper::create([
+                    'board_result_id' => $boardResult->id,
+                    'tenant_id' => $this->school->id,
+                    'name' => $name,
+                    'gender' => $row['gender'],
+                    'roll_no' => $row['roll_no'] ?? null,
+                    'percentage' => $row['marks'],
+                    'marks_obtained' => $row['marks'],
+                    'total_marks' => 100,
+                    'rank' => $nextRank++,
+                ]);
+                app(TopperSubjectMarkService::class)->sync($topper, [$subject => $row['marks']]);
+                $boardResult->toppers->push($topper);
+                $created++;
+            }
+        }
+
+        app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
+
+        app(DataChangeLogger::class)->event(
+            'created',
+            "{$subject}: {$created} added, {$updated} updated",
+            $this->school->id,
+            'topper',
+            $boardResult,
+            ['subject' => $subject, 'created' => $created, 'updated' => $updated],
+        );
+
+        $parts = array_filter([
+            $created ? "{$created} added" : null,
+            $updated ? "{$updated} updated" : null,
+        ]);
+
+        return back()->with('success', implode(', ', $parts)." for {$subject}.");
     }
 
     /** @return array<string, mixed> */

@@ -10,7 +10,7 @@
             class="sa-sidebar w-72 lg:w-60 h-screen text-white flex flex-col shrink-0 shadow-xl overflow-hidden
                    fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0
                    transition-transform duration-200 ease-out
-                   -translate-x-full lg:translate-x-0"
+                   -translate-x-full lg:translate-x-0 print:hidden"
             :class="mobileNavOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
         >
             <div class="sa-sidebar-head px-5 pt-5 pb-4 border-b border-white/10 shrink-0">
@@ -69,7 +69,7 @@
         </aside>
 
         <div class="flex-1 flex flex-col min-w-0 min-h-screen w-full lg:w-auto">
-            <header class="sa-header bg-white border-b border-[#dbeafe] px-4 lg:px-6 py-3 flex items-center justify-between gap-3 shrink-0 shadow-sm">
+            <header class="sa-header bg-white border-b border-[#dbeafe] px-4 lg:px-6 py-3 flex items-center justify-between gap-3 shrink-0 shadow-sm print:hidden">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <button type="button"
                             class="lg:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 shrink-0"

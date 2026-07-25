@@ -255,53 +255,62 @@
                 <p class="text-[11px] text-gray-400">Accepts PDF, JPG, PNG, WEBP files up to 20MB.</p>
             </div>
 
-            <!-- DISPLAY SAVED SUBJECT TOP PERFORMERS GRID -->
+            <!-- DISPLAY SAVED SUBJECT-WISE ENTRIES (every student, every subject) -->
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <div class="border-b border-gray-100 pb-3 mb-4 flex items-center justify-between">
                     <div>
-                        <h3 class="font-bold text-gray-900 text-sm uppercase tracking-wide">Saved Subject Top Performers</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">Highest scorers identified across Class XII subjects for {{ selectedYear }}.</p>
+                        <h3 class="font-bold text-gray-900 text-sm uppercase tracking-wide">Saved Subject-Wise Entries</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Every student's marks, by subject, for {{ selectedYear }}. Select a subject above to edit its rows.</p>
                     </div>
                     <span class="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
-                        {{ filteredSubjectWiseLeaders.length }} record(s)
+                        {{ filteredSubjectRows.length }} record(s)
                     </span>
                 </div>
 
-                <div v-if="filteredSubjectWiseLeaders.length" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div
-                        v-for="row in filteredSubjectWiseLeaders"
-                        :key="row.subject + '-' + row.name"
-                        class="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/40 to-white p-4 shadow-xs"
-                    >
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded">
-                                {{ row.subject }}
-                            </span>
-                            <span class="text-sm font-bold text-emerald-600">{{ row.marks }} / 100</span>
-                        </div>
-
-                        <p class="font-bold text-gray-900 text-sm mt-2">{{ row.name }}</p>
-
-                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                            <!-- GENDER BADGE -->
-                            <span
-                                v-if="row.gender"
-                                class="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                                :class="{
-                                    'bg-blue-100 text-blue-700': row.gender === 'male',
-                                    'bg-pink-100 text-pink-700': row.gender === 'female',
-                                    'bg-gray-100 text-gray-700': row.gender === 'other',
-                                }"
-                            >
-                                {{ row.gender === 'male' ? '♂ Male' : row.gender === 'female' ? '♀ Female' : 'Other' }}
-                            </span>
-                            <span v-if="row.roll_no" class="text-xs text-gray-500">Roll: {{ row.roll_no }}</span>
-                        </div>
-
-                        <button v-if="canEdit" type="button" @click="removeSubjectTopper(row)" class="text-xs text-red-500 hover:text-red-700 font-semibold mt-3 flex items-center gap-1">
-                            <span>🗑</span> Remove
-                        </button>
-                    </div>
+                <div v-if="filteredSubjectRows.length" class="overflow-x-auto border border-gray-200 rounded-xl">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-xs uppercase text-gray-500 border-b border-gray-200">
+                            <tr>
+                                <th class="p-3 cursor-pointer select-none" @click="toggleSubjectSort('subject')">Subject{{ subjectSortArrow('subject') }}</th>
+                                <th class="p-3 cursor-pointer select-none" @click="toggleSubjectSort('name')">Student{{ subjectSortArrow('name') }}</th>
+                                <th class="p-3">Gender</th>
+                                <th class="p-3">Roll No</th>
+                                <th class="p-3 cursor-pointer select-none" @click="toggleSubjectSort('marks')">Marks{{ subjectSortArrow('marks') }}</th>
+                                <th v-if="canEdit" class="p-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white">
+                            <tr v-for="row in sortedSubjectRows" :key="row.subject + '-' + row.topper_id" class="hover:bg-slate-50/50">
+                                <td class="p-3">
+                                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded">
+                                        {{ row.subject }}
+                                    </span>
+                                </td>
+                                <td class="p-3 font-semibold text-gray-900">{{ row.name }}</td>
+                                <td class="p-3">
+                                    <span
+                                        v-if="row.gender"
+                                        class="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                                        :class="{
+                                            'bg-blue-100 text-blue-700': row.gender === 'male',
+                                            'bg-pink-100 text-pink-700': row.gender === 'female',
+                                            'bg-gray-100 text-gray-700': row.gender === 'other',
+                                        }"
+                                    >
+                                        {{ row.gender === 'male' ? '♂ Male' : row.gender === 'female' ? '♀ Female' : 'Other' }}
+                                    </span>
+                                    <span v-else class="text-xs text-gray-300">—</span>
+                                </td>
+                                <td class="p-3 text-xs text-gray-500">{{ row.roll_no || '—' }}</td>
+                                <td class="p-3 font-bold text-emerald-600">{{ row.marks }} / 100</td>
+                                <td v-if="canEdit" class="p-3 text-right">
+                                    <button type="button" @click="removeSubjectTopper(row)" class="text-xs text-red-500 hover:text-red-700 font-semibold">
+                                        🗑 Remove
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 <div v-else class="p-10 text-center text-gray-400 text-xs">
@@ -349,15 +358,67 @@ const filteredSubjectOptions = computed(() => {
     return masterSubjectList.value.filter(s => s.toLowerCase().includes(q));
 });
 
-const filteredSubjectWiseLeaders = computed(() => {
-    if (!searchQuery.value.trim()) return props.subjectWiseLeaders;
+// Every student's marks for every subject — not just the top scorer per subject
+// (props.subjectWiseLeaders is a leaderboard, one row per subject, which was hiding
+// every other student's entries from this listing and from the edit prefill below).
+const allSubjectRows = computed(() => {
+    const out = [];
+    for (const t of props.boardResult.toppers ?? []) {
+        const marks = t.subject_marks || {};
+        for (const [subject, mark] of Object.entries(marks)) {
+            out.push({
+                topper_id: t.id,
+                subject,
+                name: t.name,
+                gender: t.gender || '',
+                roll_no: t.roll_no || '',
+                marks: mark,
+            });
+        }
+    }
+    return out.sort((a, b) => a.subject.localeCompare(b.subject) || b.marks - a.marks);
+});
+
+const filteredSubjectRows = computed(() => {
+    if (!searchQuery.value.trim()) return allSubjectRows.value;
     const q = searchQuery.value.toLowerCase();
-    return props.subjectWiseLeaders.filter(
+    return allSubjectRows.value.filter(
         row => row.subject?.toLowerCase().includes(q)
             || row.name?.toLowerCase().includes(q)
             || row.roll_no?.toLowerCase().includes(q)
             || row.gender?.toLowerCase().includes(q)
     );
+});
+
+// Saved Subject-Wise Entries — sortable datatable (click a header to sort by it)
+const subjectSortKey = ref('subject');
+const subjectSortDir = ref('asc');
+
+function toggleSubjectSort(key) {
+    if (subjectSortKey.value === key) {
+        subjectSortDir.value = subjectSortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        subjectSortKey.value = key;
+        subjectSortDir.value = 'asc';
+    }
+}
+
+function subjectSortArrow(key) {
+    if (subjectSortKey.value !== key) return '';
+    return subjectSortDir.value === 'asc' ? ' ▲' : ' ▼';
+}
+
+const sortedSubjectRows = computed(() => {
+    const dir = subjectSortDir.value === 'asc' ? 1 : -1;
+    return [...filteredSubjectRows.value].sort((a, b) => {
+        const av = a[subjectSortKey.value];
+        const bv = b[subjectSortKey.value];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (typeof av === 'string') return av.localeCompare(bv) * dir;
+        return (av - bv) * dir;
+    });
 });
 
 function onYearChange() {
@@ -408,8 +469,8 @@ watch([selectedSubjectOption, customSubjectInput], () => {
     rowError.value = '';
     if (!subj) return;
 
-    const existingForSubject = props.subjectWiseLeaders.filter(
-        leader => leader.subject?.toLowerCase() === subj.toLowerCase()
+    const existingForSubject = allSubjectRows.value.filter(
+        row => row.subject?.toLowerCase() === subj.toLowerCase()
     );
 
     if (existingForSubject.length) {
@@ -425,7 +486,7 @@ watch([selectedSubjectOption, customSubjectInput], () => {
     }
 });
 
-async function saveAllRows() {
+function saveAllRows() {
     const subj = activeSubjectName.value;
     if (!subj) return;
 
@@ -453,56 +514,27 @@ async function saveAllRows() {
 
     isSubmitting.value = true;
 
-    for (const r of validRows) {
-        const existing = (props.boardResult.toppers ?? []).find(
-            (t) => t.name.toLowerCase() === r.name.trim().toLowerCase()
-        );
-
-        if (existing) {
-            const currentSubjectMarks = { ...(existing.subject_marks ?? {}) };
-            currentSubjectMarks[subj] = r.marks;
-
-            await new Promise((resolve) => {
-                router.put(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
-                    ...existing,
-                    gender: r.gender || null,
-                    roll_no: r.roll_no || null,
-                    subject_marks: currentSubjectMarks,
-                }, {
-                    preserveScroll: true,
-                    onFinish: resolve,
-                });
-            });
-        } else {
-            const subjectMarks = {};
-            subjectMarks[subj] = r.marks;
-
-            await new Promise((resolve) => {
-                router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/single`, {
-                    name: r.name.trim(),
-                    gender: r.gender || null,
-                    roll_no: r.roll_no?.trim() || null,
-                    percentage: r.marks,
-                    marks_obtained: r.marks,
-                    total_marks: 100,
-                    subject_marks: subjectMarks,
-                }, {
-                    preserveScroll: true,
-                    onFinish: resolve,
-                });
-            });
-        }
-    }
-
-    isSubmitting.value = false;
+    // One request for every row in this subject — was previously N sequential
+    // requests (one per row), which fired N separate "success" toasts and never
+    // refreshed the rows on screen until the whole loop finished.
+    router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/subject-toppers/batch`, {
+        subject: subj,
+        rows: validRows.map(r => ({
+            name: r.name.trim(),
+            gender: r.gender,
+            roll_no: r.roll_no?.trim() || null,
+            marks: r.marks,
+        })),
+    }, {
+        preserveScroll: true,
+        onFinish: () => { isSubmitting.value = false; },
+    });
 }
 
 function removeSubjectTopper(row) {
     if (!confirm(`Remove subject topper "${row.name}" for ${row.subject}?`)) return;
 
-    const existing = (props.boardResult.toppers ?? []).find(
-        (t) => t.name.toLowerCase() === row.name.toLowerCase()
-    );
+    const existing = (props.boardResult.toppers ?? []).find((t) => t.id === row.topper_id);
 
     if (!existing) return;
 
