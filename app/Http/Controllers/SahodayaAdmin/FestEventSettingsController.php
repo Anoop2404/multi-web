@@ -88,7 +88,8 @@ class FestEventSettingsController extends SahodayaAdminController
             'defaultParticipantTypeFees' => config('fest_fees.default_participant_type_fees'),
             'ageGroupLabels' => FestSportsAgeGroup::labels($this->sahodaya->id),
             'defaultAgeGroupFees' => FestSportsAgeGroup::defaultFees($this->sahodaya->id),
-            'venues'       => FestVenue::where('event_id', $event->id)->orderBy('name')->get(),
+            'venues'       => FestVenue::where('event_id', $event->id)->with('region:id,name')->orderBy('name')->get(),
+            'regions'      => \App\Models\Region::forTenant($this->sahodaya->id)->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
             'stages'       => FestStage::where('event_id', $event->id)
                 ->with('venue:id,name')
                 ->orderBy('sort_order')
@@ -579,9 +580,10 @@ class FestEventSettingsController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'location' => 'nullable|string|max:255',
-            'capacity' => 'nullable|integer|min:1',
+            'name'      => 'required|string|max:255',
+            'location'  => 'nullable|string|max:255',
+            'capacity'  => 'nullable|integer|min:1',
+            'region_id' => 'nullable|exists:regions,id',
         ]);
 
         FestVenue::create(array_merge($data, [

@@ -1,151 +1,304 @@
 <template>
-    <SahodayaEventsLayout :title="`${event.title} — Levels`" :sahodaya="sahodaya" :event="event"
-                         :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Rounds & promotion`" eyebrow="Rounds & levels"
-                    :description="isPartitionedHub ? 'Regional partitions, school rounds, and overall championship aggregation.' : (event.event_type === 'kids_fest' ? 'Kids Fest clusters, school rounds, and promotions.' : 'School rounds, promotions, and child events.')" />
+    <SahodayaEventsLayout :title="`${event.title} — Levels & Regions`" :sahodaya="sahodaya" :event="event"
+                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        
+        <!-- Header -->
+        <PageHeader :title="`${event.title} — Rounds & Regions`" eyebrow="Topology & Partitioning"
+                    :description="isPartitionedHub ? 'Regional preliminary partitions, school rounds, and overall championship aggregation.' : (event.event_type === 'kids_fest' ? 'Kids Fest clusters, school rounds, and promotions.' : 'Configure region-based preliminaries, school rounds, and child event routing.')">
+            <template #actions>
+                <div class="flex items-center gap-2">
+                    <Link :href="`${base}/phases`" class="btn-secondary text-xs flex items-center gap-1">
+                        <span>⚡ Manage Phases</span>
+                    </Link>
+                </div>
+            </template>
+        </PageHeader>
 
         <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="levels" :event="event" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="levels" />
 
-        <div class="grid lg:grid-cols-2 gap-6 max-w-5xl">
-            <div class="card space-y-4">
-                <h4 class="section-title">Current round</h4>
-                <p class="section-desc">
-                    Round: <strong class="text-slate-700">{{ levelLabels[event.level_round] ?? event.level_round }}</strong>
-                    <span v-if="conductMode" class="ml-2 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{{ conductMode }}</span>
-                </p>
-                <form v-if="event.state_program_id && !event.parent_event_id" @submit.prevent="submitStateQualifiers" class="space-y-1">
-                    <button type="submit" class="btn-secondary w-full text-sm">Submit qualifiers to State</button>
-                    <p class="form-hint">Sends regional/district winners via API outbox.</p>
-                </form>
-                <form v-if="event.conduct_levels?.includes('school') && schoolRoundCount > 0" @submit.prevent="promoteAllSchoolRounds" class="space-y-1">
-                    <button type="submit" class="btn-primary w-full text-sm">Promote all school-round winners</button>
-                    <p class="form-hint">Only rounds with published results are included. Per-item tie-break (lot draw / include ties / manual) is set on Items.</p>
-                </form>
-                <form v-if="event.conduct_levels?.includes('school')" @submit.prevent="spawnSchoolRounds">
-                    <button type="submit" class="btn-secondary w-full text-sm">Create school rounds ({{ schoolRoundCount }} exist)</button>
-                </form>
-            </div>
-
-            <div class="card space-y-4">
-                <h4 class="section-title">{{ showPartitionUi ? 'Regions & partitions' : (event.event_type === 'kids_fest' && !event.parent_event_id ? 'Geographic clusters' : 'Child events') }}</h4>
-
-                <!-- Conduct Topology Settings -->
-                <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
-                    <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700">Conduct Topology Settings</h5>
-                    <form @submit.prevent="updateTopology" class="space-y-3 text-xs">
-                        <div>
-                            <label class="font-semibold text-slate-700 block mb-1">Conduct Mode</label>
-                            <select v-model="topologyForm.conduct_mode" class="field text-xs">
-                                <option value="standard">Single Venue / Single Event (Standard)</option>
-                                <option value="partitioned">Region-Wise Partitions / Multi-Region</option>
-                            </select>
+        <div class="space-y-6 max-w-6xl">
+            <!-- Hero Topology Overview Card -->
+            <div class="card bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white !p-6 shadow-xl rounded-2xl border border-indigo-900/50">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
+                    <div class="flex items-center gap-3.5">
+                        <div class="h-12 w-12 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center text-2xl shadow-inner border border-white/20">
+                            🗺️
                         </div>
-                        <div v-if="topologyForm.conduct_mode === 'partitioned'" class="space-y-1">
-                            <label class="flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
-                                <input type="checkbox" v-model="topologyForm.combine_regions_at_finale" class="rounded border-slate-300 text-indigo-600">
-                                <span>Combine region scores into overall finale leaderboard</span>
-                            </label>
-                            <p class="text-[11px] text-slate-500">
-                                When enabled, an overall tab aggregates region scores. Uncheck if region results are final and standalone.
+                        <div>
+                            <div class="flex items-center gap-2.5">
+                                <h3 class="text-lg font-bold text-white tracking-tight">Competition Structure</h3>
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold uppercase tracking-wider"
+                                      :class="conductMode === 'partitioned' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'">
+                                    {{ conductMode === 'partitioned' ? '⚡ Region-Wise / Multi-Region' : 'Single Event / Centralized' }}
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-300 mt-1 flex items-center gap-3">
+                                <span>Current Round: <strong class="text-white">{{ levelLabels[event.level_round] ?? event.level_round }}</strong></span>
+                                <span>·</span>
+                                <span>Partitions: <strong class="text-white">{{ activePartitions.length }}</strong></span>
+                                <span v-if="memberSchools?.length">· Assigned Schools: <strong class="text-white">{{ assignedSchoolsCount }} / {{ memberSchools.length }}</strong></span>
                             </p>
                         </div>
-                        <button type="submit" class="btn-primary text-xs w-full" :disabled="topologyForm.processing">
-                            Save Conduct Topology
-                        </button>
-                    </form>
-                </div>
-
-                <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 flex items-center justify-between gap-3">
-                    <div>
-                        <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700">Phases</h5>
-                        <p class="text-[11px] text-slate-500 mt-0.5">Optional — split items into named phases (Digi Fest day, Off-stage, On-stage…).</p>
                     </div>
-                    <Link :href="`${base}/phases`" class="btn-secondary text-xs shrink-0">Manage phases</Link>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="toggleQuickMode" class="btn-primary text-xs !bg-indigo-600 hover:!bg-indigo-500 text-white border-none shadow-md" :disabled="topologyForm.processing">
+                            Switch to {{ conductMode === 'partitioned' ? 'Standard Single-Event' : 'Region-Based Mode' }}
+                        </button>
+                    </div>
                 </div>
 
-                <form v-if="!event.parent_event_id && conductPresets?.length" @submit.prevent="applyPreset" class="flex gap-2">
-                    <select v-model="presetForm.preset" class="field flex-1 text-sm">
-                        <option value="">Apply conduct preset…</option>
-                        <option v-for="p in conductPresets" :key="p" :value="p">{{ p }}</option>
-                    </select>
-                    <button class="btn-secondary text-sm shrink-0" :disabled="!presetForm.preset">Apply</button>
-                </form>
-
-                <div v-if="showPartitionUi" class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 space-y-2">
-                    <p class="text-xs text-slate-600">
-                        Create a partition per membership region and assign every school by its
-                        <a :href="`/sahodaya-admin/${sahodaya.id}/regions`" class="link-brand font-semibold">region assignment</a> in one step.
-                    </p>
-                    <button type="button" class="btn-secondary text-sm w-full" :disabled="regionSync.processing" @click="syncRegionPartitions">
-                        {{ regionSync.processing ? 'Syncing…' : 'Sync partitions from membership regions' }}
-                    </button>
-                </div>
-
-                <form v-if="showPartitionUi" @submit.prevent="spawnPartition" class="space-y-3">
-                    <input v-model="partitionForm.title" class="field" placeholder="Partition title (e.g. Tirur Region)" required>
-                    <div class="grid sm:grid-cols-2 gap-2">
-                        <input v-model="partitionForm.partition_key" class="field text-sm" placeholder="Partition key (tirur)">
-                        <select v-model="partitionForm.partition_role" class="field text-sm">
-                            <option value="region">Region</option>
-                            <option value="finale">District finale</option>
-                            <option value="cluster">Cluster</option>
-                            <option value="digi_fest">Digi Fest</option>
+                <!-- Conduct Mode Settings Details -->
+                <form @submit.prevent="updateTopology" class="pt-4 grid sm:grid-cols-3 gap-4 items-end text-xs">
+                    <div>
+                        <label class="font-bold text-slate-300 block mb-1.5 uppercase text-[10px] tracking-wider">Conduct Topology Mode</label>
+                        <select v-model="topologyForm.conduct_mode" class="field text-xs bg-white/10 text-white border-white/20 focus:bg-slate-900 focus:text-white">
+                            <option value="standard" class="text-slate-900">Single Venue / Single Event (Standard)</option>
+                            <option value="partitioned" class="text-slate-900">Region-Wise Partitions / Multi-Region</option>
                         </select>
                     </div>
-                    <input v-model="partitionForm.cluster_label" class="field text-sm" placeholder="Display label">
-                    <input v-model="partitionForm.venue" class="field text-sm" placeholder="Venue">
-                    <button class="btn-primary text-sm w-full">Create partition</button>
-                </form>
 
-                <form v-else-if="event.event_type === 'kids_fest' && !event.parent_event_id" @submit.prevent="spawnCluster" class="space-y-3">
-                    <input v-model="clusterForm.title" class="field" placeholder="Cluster title (e.g. Nilambur Cluster)" required>
-                    <div class="grid sm:grid-cols-2 gap-2">
-                        <input v-model="clusterForm.cluster_key" class="field text-sm" placeholder="Cluster key (nilambur)">
-                        <input v-model="clusterForm.cluster_label" class="field text-sm" placeholder="Display label">
+                    <div class="flex items-center">
+                        <label v-if="topologyForm.conduct_mode === 'partitioned'" class="flex items-center gap-2 text-slate-300 cursor-pointer select-none">
+                            <input type="checkbox" v-model="topologyForm.combine_regions_at_finale" class="rounded border-white/30 text-indigo-500 focus:ring-indigo-400 bg-white/10">
+                            <span class="font-medium text-xs">Combine region scores into overall finale leaderboard</span>
+                        </label>
                     </div>
-                    <input v-model="clusterForm.venue" class="field text-sm" placeholder="Venue">
-                    <button class="btn-primary text-sm w-full">Create cluster event</button>
-                </form>
 
-                <form v-else @submit.prevent="spawnChild" class="flex gap-2">
-                    <input v-model="cascadeForm.title" class="field flex-1" placeholder="Child event title" required>
-                    <button class="btn-primary text-sm shrink-0">Spawn child</button>
+                    <div class="flex justify-end">
+                        <button type="submit" class="btn-secondary text-xs !bg-white/10 hover:!bg-white/20 !text-white !border-white/20 w-full sm:w-auto" :disabled="topologyForm.processing">
+                            {{ topologyForm.processing ? 'Saving...' : 'Save Topology Settings' }}
+                        </button>
+                    </div>
                 </form>
-
-                <ul v-if="partitions?.length || event.child_events?.length" class="text-sm space-y-2">
-                    <li v-for="c in (partitions?.length ? partitions : event.child_events)" :key="c.id" class="flex flex-wrap items-center gap-2">
-                        <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${c.id}`" class="link-brand">{{ c.title }}</Link>
-                        <span v-if="c.partition_role" class="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700">{{ c.partition_role }}</span>
-                        <span v-if="c.cluster_label" class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">{{ c.cluster_label }}</span>
-                    </li>
-                </ul>
-                <p v-else class="text-sm text-slate-400">No child events yet.</p>
             </div>
-        </div>
 
-        <div v-if="isPartitionedHub && memberSchools?.length" class="card mt-6 max-w-5xl space-y-4">
-            <h4 class="section-title">School region assignments</h4>
-            <p class="section-desc">Each member school must be assigned to exactly one region before registration.</p>
-            <form @submit.prevent="saveAssignments" class="space-y-2 max-h-96 overflow-y-auto">
-                <div v-for="school in memberSchools" :key="school.id" class="grid sm:grid-cols-2 gap-2 items-center text-sm">
-                    <span>{{ school.name }}</span>
-                    <select v-model="assignmentMap[school.id]" class="field text-sm">
-                        <option value="">— Select region —</option>
-                        <option v-for="p in partitions" :key="p.partition_key" :value="p.partition_key">{{ p.cluster_label || p.title }}</option>
-                    </select>
+            <!-- Two-Column Operations Layout -->
+            <div class="grid lg:grid-cols-12 gap-6">
+                
+                <!-- Left Column: Regional Partitions & Child Events (Span 7) -->
+                <div class="lg:col-span-7 space-y-6">
+                    
+                    <!-- Region Partitions & Sync Card -->
+                    <div class="card space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div>
+                                <h4 class="section-title !mb-0 flex items-center gap-2 text-base">
+                                    <span>📍</span> {{ showPartitionUi ? 'Region Partitions & Preliminary Events' : (event.event_type === 'kids_fest' && !event.parent_event_id ? 'Geographic Clusters' : 'Child Events') }}
+                                </h4>
+                                <p class="section-desc mt-0.5">Manage preliminary region rounds, venues, and school assignments.</p>
+                            </div>
+                            <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                                {{ activePartitions.length }} {{ activePartitions.length === 1 ? 'Partition' : 'Partitions' }}
+                            </span>
+                        </div>
+
+                        <!-- 1-Click Sync Partitions Banner -->
+                        <div v-if="showPartitionUi" class="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/90 via-blue-50/50 to-white p-4 space-y-3 shadow-sm">
+                            <div class="flex items-start gap-3">
+                                <div class="h-9 w-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-lg shrink-0 shadow">
+                                    🔄
+                                </div>
+                                <div>
+                                    <h5 class="text-xs font-bold uppercase tracking-wider text-indigo-950">Auto-Sync Membership Regions</h5>
+                                    <p class="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                                        Generate a partition for every active Sahodaya region and automatically assign member schools based on their annual region assignment in 1 click.
+                                    </p>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-primary text-xs w-full justify-center !py-2.5 bg-indigo-600 hover:bg-indigo-700 font-bold shadow" :disabled="regionSync.processing" @click="syncRegionPartitions">
+                                <span>{{ regionSync.processing ? 'Syncing Partitions…' : '⚡ Sync Partitions from Sahodaya Regions' }}</span>
+                            </button>
+                        </div>
+
+                        <!-- Active Partitions List Grid -->
+                        <div v-if="activePartitions.length" class="space-y-3">
+                            <h5 class="text-xs font-bold uppercase tracking-wider text-slate-400">Configured Partitions / Sub-Events</h5>
+                            <div class="grid sm:grid-cols-2 gap-3">
+                                <div v-for="c in activePartitions" :key="c.id" class="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2 hover:border-indigo-300 hover:shadow-md transition">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div>
+                                            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${c.id}`" class="font-bold text-slate-900 text-sm hover:text-indigo-600 transition flex items-center gap-1.5">
+                                                <span>{{ c.title }}</span>
+                                                <span class="text-xs text-indigo-600">↗</span>
+                                            </Link>
+                                            <p v-if="c.venue" class="text-[11px] text-slate-500 mt-0.5">📍 {{ c.venue }}</p>
+                                        </div>
+                                        <span v-if="c.partition_role" class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                                            {{ c.partition_role }}
+                                        </span>
+                                    </div>
+                                    <div v-if="c.cluster_label" class="text-[11px] text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-100 flex items-center justify-between">
+                                        <span>Display Label:</span>
+                                        <span class="font-medium text-slate-800">{{ c.cluster_label }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-slate-400 text-xs">
+                            No region partitions created yet. Use the sync button above to auto-create them.
+                        </div>
+
+                        <!-- Custom Manual Partition Form (Collapsible/Accordion style) -->
+                        <div class="pt-2 border-t border-slate-100">
+                            <button type="button" @click="showCustomForm = !showCustomForm" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                                <span>{{ showCustomForm ? '− Hide Manual Partition Form' : '+ Add Custom Region Partition Manually' }}</span>
+                            </button>
+
+                            <form v-if="showCustomForm" @submit.prevent="spawnPartition" class="mt-3 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 text-xs">
+                                <h5 class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Add Custom Partition</h5>
+                                <div>
+                                    <label class="form-label text-xs">Partition Title *</label>
+                                    <input v-model="partitionForm.title" class="field text-xs" placeholder="e.g. Tirur Region Fest" required>
+                                </div>
+                                <div class="grid sm:grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="form-label text-xs">Partition Key</label>
+                                        <input v-model="partitionForm.partition_key" class="field text-xs" placeholder="e.g. tirur">
+                                    </div>
+                                    <div>
+                                        <label class="form-label text-xs">Role</label>
+                                        <select v-model="partitionForm.partition_role" class="field text-xs">
+                                            <option value="region">Region</option>
+                                            <option value="finale">District Finale</option>
+                                            <option value="cluster">Cluster</option>
+                                            <option value="digi_fest">Digi Fest</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid sm:grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="form-label text-xs">Display Label</label>
+                                        <input v-model="partitionForm.cluster_label" class="field text-xs" placeholder="e.g. Tirur Zone">
+                                    </div>
+                                    <div>
+                                        <label class="form-label text-xs">Venue</label>
+                                        <input v-model="partitionForm.venue" class="field text-xs" placeholder="e.g. MES Central School">
+                                    </div>
+                                </div>
+                                <button class="btn-primary text-xs w-full justify-center !py-2">Create Partition</button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
-                <button class="btn-primary text-sm">Save assignments</button>
-            </form>
-        </div>
 
-        <EventPageActivityLog :logs="activityLogs" class="mt-8 max-w-5xl" />
+                <!-- Right Column: Competition Rounds & Promotions (Span 5) -->
+                <div class="lg:col-span-5 space-y-6">
+                    
+                    <!-- School Rounds & Promotions -->
+                    <div class="card space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h4 class="section-title !mb-0 flex items-center gap-2 text-base">
+                                <span>🏆</span> Round Promotion &amp; Qualifiers
+                            </h4>
+                            <span class="text-xs font-semibold text-slate-500">
+                                {{ schoolRoundCount }} school round{{ schoolRoundCount === 1 ? '' : 's' }}
+                            </span>
+                        </div>
+
+                        <!-- Promotion Actions -->
+                        <div class="space-y-3">
+                            <div v-if="event.conduct_levels?.includes('school')" class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/80 space-y-2">
+                                <h5 class="text-xs font-bold text-slate-800">School Level Competitions</h5>
+                                <p class="text-[11px] text-slate-500 leading-relaxed">
+                                    Spawn intra-school selection rounds or promote top winners directly to the Sahodaya/Region event.
+                                </p>
+                                <div class="grid gap-2 pt-1">
+                                    <button v-if="schoolRoundCount > 0" type="button" @click="promoteAllSchoolRounds" class="btn-primary text-xs justify-center !py-2 w-full">
+                                        Promote All School Round Winners
+                                    </button>
+                                    <button type="button" @click="spawnSchoolRounds" class="btn-secondary text-xs justify-center !py-2 w-full">
+                                        Create School Selection Rounds
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- State Qualifier Submission -->
+                            <div v-if="event.state_program_id && !event.parent_event_id" class="p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 space-y-2">
+                                <h5 class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                    <span>🏛️</span> State Qualification Outbox
+                                </h5>
+                                <p class="text-[11px] text-amber-800/90 leading-relaxed">
+                                    Submit regional/district winners to the Central State Competition portal.
+                                </p>
+                                <button type="button" @click="submitStateQualifiers" class="btn-secondary text-xs justify-center !py-2 w-full !bg-white hover:!bg-amber-100 !border-amber-300 !text-amber-900">
+                                    Submit Qualifiers to State
+                                </button>
+                            </div>
+
+                            <!-- Conduct Presets -->
+                            <div v-if="!event.parent_event_id && conductPresets?.length" class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/80 space-y-2">
+                                <h5 class="text-xs font-bold text-slate-800">Conduct Presets</h5>
+                                <form @submit.prevent="applyPreset" class="flex gap-2">
+                                    <select v-model="presetForm.preset" class="field text-xs flex-1">
+                                        <option value="">Apply conduct preset…</option>
+                                        <option v-for="p in conductPresets" :key="p" :value="p">{{ p }}</option>
+                                    </select>
+                                    <button class="btn-secondary text-xs shrink-0" :disabled="!presetForm.preset">Apply</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Event Phases Link Card -->
+                    <div class="card p-4 flex items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-indigo-50/30 border border-indigo-100">
+                        <div>
+                            <h5 class="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
+                                <span>⚡</span> Event Phases
+                            </h5>
+                            <p class="text-[11px] text-slate-500 mt-0.5">Split items into named phases (Off-stage, On-stage...)</p>
+                        </div>
+                        <Link :href="`${base}/phases`" class="btn-secondary text-xs shrink-0">
+                            Manage Phases →
+                        </Link>
+                    </div>
+                </div>
+            </div>
+
+            <!-- School Region Assignments Matrix Table -->
+            <div v-if="isPartitionedHub && memberSchools?.length" class="card space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                        <h4 class="section-title !mb-0 flex items-center gap-2 text-base">
+                            <span>🏫</span> Member School Region Mapping
+                        </h4>
+                        <p class="section-desc mt-0.5">Assign each participating school to its corresponding region partition.</p>
+                    </div>
+                    <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {{ assignedSchoolsCount }} / {{ memberSchools.length }} Schools Assigned
+                    </span>
+                </div>
+
+                <form @submit.prevent="saveAssignments" class="space-y-4">
+                    <div class="rounded-xl border border-slate-200 overflow-hidden bg-white max-h-96 overflow-y-auto divide-y divide-slate-100">
+                        <div v-for="school in memberSchools" :key="school.id" class="p-3 flex items-center justify-between gap-4 hover:bg-slate-50/70 transition">
+                            <span class="font-medium text-slate-900 text-xs">{{ school.name }}</span>
+                            <div class="w-64">
+                                <select v-model="assignmentMap[school.id]" class="field text-xs !py-1.5">
+                                    <option value="">— Select Region —</option>
+                                    <option v-for="p in partitions" :key="p.partition_key" :value="p.partition_key">
+                                        {{ p.cluster_label || p.title }}
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end pt-2">
+                        <button class="btn-primary text-xs font-bold px-5 py-2">Save School Assignments</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Activity Logs -->
+            <EventPageActivityLog :logs="activityLogs" class="pt-4" />
+        </div>
     </SahodayaEventsLayout>
 </template>
 
 <script setup>
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
@@ -165,6 +318,10 @@ const props = defineProps({
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const showPartitionUi = computed(() => props.conductMode === 'partitioned' || props.event.event_type === 'kalolsavam');
+const showCustomForm = ref(false);
+
+const activePartitions = computed(() => props.partitions?.length ? props.partitions : (props.event.child_events || []));
+const assignedSchoolsCount = computed(() => Object.values(assignmentMap).filter(Boolean).length);
 
 const cascadeForm = useForm({ title: '' });
 const clusterForm = useForm({ title: '', cluster_key: '', cluster_label: '', venue: '', event_start: '', event_end: '' });
@@ -177,6 +334,12 @@ const topologyForm = useForm({
 });
 const assignmentMap = reactive({ ...props.schoolPartitions });
 
+function toggleQuickMode() {
+    const nextMode = props.conductMode === 'partitioned' ? 'standard' : 'partitioned';
+    topologyForm.conduct_mode = nextMode;
+    updateTopology();
+}
+
 function updateTopology() {
     topologyForm.post(`${base}/conduct-topology`, { preserveScroll: true });
 }
@@ -188,7 +351,7 @@ function spawnCluster() {
     clusterForm.post(`${base}/spawn-cluster`, { preserveScroll: true, onSuccess: () => clusterForm.reset() });
 }
 function spawnPartition() {
-    partitionForm.post(`${base}/spawn-partition`, { preserveScroll: true, onSuccess: () => partitionForm.reset() });
+    partitionForm.post(`${base}/spawn-partition`, { preserveScroll: true, onSuccess: () => { partitionForm.reset(); showCustomForm.value = false; } });
 }
 function syncRegionPartitions() {
     if (!confirm('Create a partition per membership region and assign schools by their region? Existing region partitions are kept.')) return;
