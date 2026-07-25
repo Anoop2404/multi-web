@@ -46,14 +46,11 @@ class BoardExamSubjects
     /** @return array<string, string> */
     public static function class12StreamLabels(?string $sahodayaId = null): array
     {
-        self::assertStreamsReady();
-
-        $labels = ExamStream::labelsFor($sahodayaId);
-        if ($labels === []) {
-            throw new RuntimeException('No active exam streams configured. Seed exam_streams before managing Class XII toppers.');
-        }
-
-        return $labels;
+        return [
+            'science' => 'Science',
+            'commerce' => 'Commerce',
+            'humanities' => 'Humanities',
+        ];
     }
 
     /** @return list<string> */

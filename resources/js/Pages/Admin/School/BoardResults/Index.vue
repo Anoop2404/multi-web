@@ -43,6 +43,14 @@
                 </div>
 
                 <form @submit.prevent="search" class="flex items-center gap-3 flex-wrap">
+                    <div v-if="(selectedClass ?? searchClass) == 12" class="flex items-center gap-2">
+                        <label class="text-xs font-semibold text-gray-600 whitespace-nowrap">Stream:</label>
+                        <select v-model="searchStream" class="field text-xs py-1.5 w-36 font-semibold bg-white">
+                            <option value="science">Science</option>
+                            <option value="commerce">Commerce</option>
+                            <option value="humanities">Humanities</option>
+                        </select>
+                    </div>
                     <div class="flex items-center gap-2">
                         <label class="text-xs font-semibold text-gray-600 whitespace-nowrap">Academic Year:</label>
                         <select v-model="searchYear" required class="field text-xs py-1.5 w-48 font-medium">
@@ -350,7 +358,7 @@ function formatAuditTime(iso) {
 // ── Step 1: search ──────────────────────────────────────────────────────
 const searchYear = ref(props.selectedAcademicYear ?? '');
 const searchClass = ref(props.selectedClass ? String(props.selectedClass) : '10');
-const searchStream = ref('');
+const searchStream = ref('science');
 
 function search() {
     router.get(`/school-admin/${props.school.id}/board-results`, {
