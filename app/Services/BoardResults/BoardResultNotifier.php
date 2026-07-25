@@ -29,6 +29,11 @@ class BoardResultNotifier
         $this->notifySahodayaAdmins($boardResult, self::VERIFICATION_PENDING, $this->vars($boardResult));
     }
 
+    public function notifySubmitted(BoardResult $boardResult, ?User $actor = null): void
+    {
+        $this->submissionConfirmation($boardResult);
+    }
+
     public function approved(BoardResult $boardResult): void
     {
         $this->notifySchoolAdmin($boardResult, self::RESULT_APPROVED, $this->vars($boardResult));
