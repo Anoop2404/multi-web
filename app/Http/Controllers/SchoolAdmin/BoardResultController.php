@@ -67,6 +67,7 @@ class BoardResultController extends SchoolAdminController
             ),
             'selectedClass' => $class,
             'selectedAcademicYear' => $academicYear,
+            'streamOptions' => BoardExamSubjects::class12StreamLabels((string) $this->school->parent_id),
             'activeResult' => $activeResult,
         ], $activeResult ? ['activeResultContext' => $this->topperContext($activeResult)] : []));
     }

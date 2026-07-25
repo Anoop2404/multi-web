@@ -43,6 +43,15 @@
                 </div>
 
                 <form @submit.prevent="search" class="flex items-center gap-3 flex-wrap">
+                    <div v-if="(selectedClass ?? searchClass) == 12" class="flex items-center gap-2">
+                        <label class="text-xs font-semibold text-gray-600 whitespace-nowrap">Stream:</label>
+                        <select v-model="searchStream" class="field text-xs py-1.5 w-40 font-medium">
+                            <option value="">All Streams</option>
+                            <option v-for="(label, key) in streamOptions" :key="key" :value="key">
+                                {{ label }}
+                            </option>
+                        </select>
+                    </div>
                     <div class="flex items-center gap-2">
                         <label class="text-xs font-semibold text-gray-600 whitespace-nowrap">Academic Year:</label>
                         <select v-model="searchYear" required class="field text-xs py-1.5 w-48 font-medium">
@@ -334,6 +343,7 @@ const props = defineProps({
     selectedClass: { type: Number, default: null },
     academicYearOptions: { type: Array, default: () => [] },
     selectedAcademicYear: { type: String, default: null },
+    streamOptions: { type: Object, default: () => ({}) },
     activeResult: { type: Object, default: null },
     activeResultContext: { type: Object, default: null },
 });
@@ -352,6 +362,7 @@ function formatAuditTime(iso) {
 // ── Step 1: search ──────────────────────────────────────────────────────
 const searchYear = ref(props.selectedAcademicYear ?? '');
 const searchClass = ref(props.selectedClass ? String(props.selectedClass) : '10');
+const searchStream = ref('');
 
 function search() {
     router.get(`/school-admin/${props.school.id}/board-results`, {
