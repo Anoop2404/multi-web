@@ -178,12 +178,18 @@
 
                     <!-- SECTION 3: School Toppers -->
                     <div>
-                        <div class="flex items-center justify-between gap-3 mb-3">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
                             <div class="flex items-center gap-2">
                                 <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">3</span>
-                                <h3 class="font-bold text-gray-800 text-sm">School Toppers</h3>
+                                <h3 class="font-bold text-gray-800 text-sm">School Toppers {{ (selectedClass ?? searchClass) == 12 ? '(Science, Commerce, Humanities)' : '' }}</h3>
                             </div>
-                            <span class="text-xs text-gray-500">Out of {{ form.total_marks || 500 }} marks</span>
+                            <div class="flex items-center gap-2">
+                                <Link v-if="activeResult" :href="`/school-admin/${school.id}/board-results/${activeResult.id}/toppers`"
+                                      class="btn-primary text-xs px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-sm border-none">
+                                    <span>🎯</span> Manage Stream &amp; Subject-Wise Toppers →
+                                </Link>
+                                <span class="text-xs text-gray-500">Out of {{ form.total_marks || 500 }} marks</span>
+                            </div>
                         </div>
 
                         <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">

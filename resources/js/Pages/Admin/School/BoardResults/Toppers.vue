@@ -270,7 +270,34 @@
                     <form @submit.prevent="submitSubjectTopper" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
                             <label class="form-label mb-1 font-semibold">Subject Name *</label>
-                            <input v-model="subjectForm.subject" type="text" required class="field text-sm" placeholder="e.g. Mathematics, Physics..." :disabled="!canEdit">
+                            <select v-model="subjectForm.subject" required class="field text-sm bg-white" :disabled="!canEdit">
+                                <option value="" disabled>Select Subject</option>
+                                <optgroup label="Science Subjects">
+                                    <option value="Physics">Physics</option>
+                                    <option value="Chemistry">Chemistry</option>
+                                    <option value="Mathematics">Mathematics</option>
+                                    <option value="Biology">Biology</option>
+                                    <option value="Computer Science">Computer Science</option>
+                                </optgroup>
+                                <optgroup label="Commerce Subjects">
+                                    <option value="Accountancy">Accountancy</option>
+                                    <option value="Business Studies">Business Studies</option>
+                                    <option value="Economics">Economics</option>
+                                    <option value="Applied Mathematics">Applied Mathematics</option>
+                                </optgroup>
+                                <optgroup label="Humanities / Arts Subjects">
+                                    <option value="History">History</option>
+                                    <option value="Political Science">Political Science</option>
+                                    <option value="Sociology">Sociology</option>
+                                    <option value="Psychology">Psychology</option>
+                                    <option value="Geography">Geography</option>
+                                </optgroup>
+                                <optgroup label="Languages & General">
+                                    <option value="English Core">English Core</option>
+                                    <option value="Malayalam">Malayalam</option>
+                                    <option value="Hindi Course-A">Hindi Course-A</option>
+                                </optgroup>
+                            </select>
                         </div>
                         <div>
                             <label class="form-label mb-1 font-semibold">Student Name *</label>
