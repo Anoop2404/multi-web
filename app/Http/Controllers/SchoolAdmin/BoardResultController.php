@@ -424,6 +424,34 @@ class BoardResultController extends SchoolAdminController
         return back()->with('success', 'Board result removed.');
     }
 
+    public function subjectToppers(Request $request, string $tenantId)
+    {
+        $class = 12;
+        $academicYear = $request->string('academic_year')->trim()->toString();
+        if ($academicYear === '') {
+            $active = AcademicYearRecord::active();
+            $academicYear = $active ? $active->label : (date('Y') - 1).'-'.substr((string) date('Y'), 2);
+        }
+
+        $boardResult = BoardResult::firstOrCreate([
+            'tenant_id' => $this->school->id,
+            'class' => $class,
+            'academic_year' => $academicYear,
+        ], [
+            'examination_type' => 'AISSCE',
+            'status' => BoardResult::STATUS_DRAFT,
+            'total_marks' => 500,
+        ]);
+
+        $boardResult->load(['toppers.subjectMarks', 'toppers.examStream', 'uploads']);
+
+        return $this->inertia('School/BoardResults/SubjectToppers', array_merge([
+            'boardResult' => $boardResult,
+            'academicYear' => $academicYear,
+            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
+        ], $this->topperContext($boardResult)));
+    }
+
     public function toppers(string $tenantId, BoardResult $boardResult)
     {
         abort_if($boardResult->tenant_id !== $this->school->id, 403);

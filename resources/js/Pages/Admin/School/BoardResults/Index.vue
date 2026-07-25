@@ -180,132 +180,49 @@
                         </div>
                     </div>
 
-                    <!-- SECTION 3: School Toppers & Subject-Wise Entry -->
+                    <!-- SECTION 3: School Toppers -->
                     <div>
-                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
                             <div class="flex items-center gap-2">
                                 <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">3</span>
-                                <h3 class="font-bold text-gray-800 text-sm">School &amp; Subject-Wise Toppers</h3>
+                                <h3 class="font-bold text-gray-800 text-sm">School Toppers</h3>
                             </div>
-
-                            <!-- Class XII Sub-Tabs -->
-                            <div v-if="(selectedClass ?? searchClass) == 12" class="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 space-x-1">
-                                <button
-                                    type="button"
-                                    @click="section3Tab = 'overall'"
-                                    class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all"
-                                    :class="section3Tab === 'overall' ? 'bg-white text-indigo-600 shadow-xs' : 'text-gray-600 hover:text-gray-900'"
-                                >
-                                    🏆 Overall Stream Toppers
-                                </button>
-                                <button
-                                    type="button"
-                                    @click="section3Tab = 'subject'"
-                                    class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all"
-                                    :class="section3Tab === 'subject' ? 'bg-indigo-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'"
-                                >
-                                    🎯 Subject-Wise Toppers
-                                </button>
+                            <div class="flex items-center gap-2">
+                                <Link v-if="(selectedClass ?? searchClass) == 12" :href="`/school-admin/${school.id}/board-results/subject-toppers`"
+                                      class="btn-primary text-xs px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-sm border-none">
+                                    <span>🎯</span> Open Subject-Wise Toppers Page →
+                                </Link>
+                                <span class="text-xs text-gray-500">Out of {{ form.total_marks || 500 }} marks</span>
                             </div>
                         </div>
 
-                        <!-- TAB A: Overall Toppers Table -->
-                        <div v-if="section3Tab === 'overall' || (selectedClass ?? searchClass) != 12" class="space-y-3">
-                            <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
-                                <table class="w-full text-sm">
-                                    <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-gray-50 border-b border-gray-200">
-                                        <tr>
-                                            <th class="p-3">Student Name</th>
-                                            <th class="p-3">CBSE Roll No</th>
-                                            <th class="p-3">Marks Scored</th>
-                                            <th class="p-3">%</th>
-                                            <th class="p-3">Photo (Optional)</th>
-                                            <th class="p-3 text-right"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100 bg-white">
-                                        <tr v-for="(row, i) in form.toppers" :key="i" class="hover:bg-slate-50/50">
-                                            <td class="p-3"><input v-model="row.name" type="text" placeholder="Student name" class="field text-sm" :disabled="!canEditActive"></td>
-                                            <td class="p-3"><input v-model="row.roll_no" type="text" placeholder="CBSE Roll No" class="field text-sm w-36" :disabled="!canEditActive"></td>
-                                            <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="form.total_marks || undefined" placeholder="Marks" class="field text-sm w-28" :disabled="!canEditActive"></td>
-                                            <td class="p-3 text-indigo-600 font-bold whitespace-nowrap">{{ rowPercentage(row) }}</td>
-                                            <td class="p-3"><input type="file" accept="image/*" class="text-xs w-40" :disabled="!canEditActive" @change="row.photo = $event.target.files[0]"></td>
-                                            <td class="p-3 text-right">
-                                                <button v-if="canEditActive && form.toppers.length > 1" type="button" class="text-red-500 hover:text-red-700 text-xs font-semibold" @click="removeRow(i)">Remove</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <button v-if="canEditActive" type="button" class="btn-secondary text-xs px-3 py-1.5 font-semibold" @click="addRow">+ Add Topper Row</button>
+                        <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+                            <table class="w-full text-sm">
+                                <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th class="p-3">Student Name</th>
+                                        <th class="p-3">CBSE Roll No</th>
+                                        <th class="p-3">Marks Scored</th>
+                                        <th class="p-3">%</th>
+                                        <th class="p-3">Photo (Optional)</th>
+                                        <th class="p-3 text-right"></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 bg-white">
+                                    <tr v-for="(row, i) in form.toppers" :key="i" class="hover:bg-slate-50/50">
+                                        <td class="p-3"><input v-model="row.name" type="text" placeholder="Student name" class="field text-sm" :disabled="!canEditActive"></td>
+                                        <td class="p-3"><input v-model="row.roll_no" type="text" placeholder="CBSE Roll No" class="field text-sm w-36" :disabled="!canEditActive"></td>
+                                        <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="form.total_marks || undefined" placeholder="Marks" class="field text-sm w-28" :disabled="!canEditActive"></td>
+                                        <td class="p-3 text-indigo-600 font-bold whitespace-nowrap">{{ rowPercentage(row) }}</td>
+                                        <td class="p-3"><input type="file" accept="image/*" class="text-xs w-40" :disabled="!canEditActive" @change="row.photo = $event.target.files[0]"></td>
+                                        <td class="p-3 text-right">
+                                            <button v-if="canEditActive && form.toppers.length > 1" type="button" class="text-red-500 hover:text-red-700 text-xs font-semibold" @click="removeRow(i)">Remove</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
-
-                        <!-- TAB B: Class XII Direct Subject-Wise Entry -->
-                        <div v-if="(selectedClass ?? searchClass) == 12 && section3Tab === 'subject'" class="space-y-4">
-                            <!-- Add Subject Topper Form -->
-                            <div class="bg-indigo-50/40 rounded-2xl border border-indigo-100 p-5 space-y-4">
-                                <div class="border-b border-indigo-100/60 pb-2">
-                                    <h4 class="font-bold text-gray-900 text-sm">Add Subject Top Scorer (Out of 100)</h4>
-                                    <p class="text-xs text-gray-500">Select subject (English, Physics, Chemistry, Maths, Biology, Accounts, etc.) and enter top mark scored.</p>
-                                </div>
-
-                                <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div>
-                                        <label class="form-label mb-1 text-xs font-semibold">Subject Name *</label>
-                                        <select v-model="selectedSubjectOption" class="field text-xs bg-white" :disabled="!canEditActive">
-                                            <option value="" disabled>Select Subject</option>
-                                            <option v-for="subj in masterSubjects" :key="subj" :value="subj">{{ subj }}</option>
-                                            <option value="__custom__">+ Add Custom Subject...</option>
-                                        </select>
-                                        <input v-if="selectedSubjectOption === '__custom__'" v-model="customSubjectInput" type="text" class="field text-xs mt-1.5" placeholder="Enter custom subject name..." :disabled="!canEditActive">
-                                    </div>
-                                    <div>
-                                        <label class="form-label mb-1 text-xs font-semibold">Student Name *</label>
-                                        <input v-model="subjectForm.name" type="text" class="field text-xs" placeholder="Student name" :disabled="!canEditActive">
-                                    </div>
-                                    <div>
-                                        <label class="form-label mb-1 text-xs">CBSE Roll No</label>
-                                        <input v-model="subjectForm.roll_no" type="text" class="field text-xs" placeholder="CBSE Roll No" :disabled="!canEditActive">
-                                    </div>
-                                    <div>
-                                        <label class="form-label mb-1 text-xs font-semibold">Mark Scored (out of 100) *</label>
-                                        <input v-model.number="subjectForm.marks" type="number" min="0" max="100" class="field text-xs" placeholder="e.g. 99" :disabled="!canEditActive">
-                                    </div>
-                                </div>
-
-                                <div class="flex justify-end pt-1">
-                                    <button type="button" @click="saveSubjectTopper" class="btn-primary text-xs px-5 py-2 font-bold shadow-xs" :disabled="!canEditActive">
-                                        + Save Subject Topper
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Subject Top Performers Grid -->
-                            <div class="bg-white rounded-2xl border border-gray-200 p-5">
-                                <h4 class="font-bold text-gray-900 text-xs uppercase tracking-wide mb-1">Subject Top Performers Grid</h4>
-                                <p class="text-xs text-gray-500 mb-4">Highest scorers recorded for Class XII subjects.</p>
-
-                                <div v-if="subjectWiseLeaders.length" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    <div v-for="row in subjectWiseLeaders" :key="row.subject" class="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/40 to-white p-3.5 shadow-2xs">
-                                        <div class="flex items-center justify-between mb-1">
-                                            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded">
-                                                {{ row.subject }}
-                                            </span>
-                                            <span class="text-xs font-bold text-emerald-600">{{ row.marks }} / 100</span>
-                                        </div>
-                                        <p class="font-bold text-gray-900 text-xs mt-1.5">{{ row.name }}</p>
-                                        <p v-if="row.roll_no" class="text-[11px] text-gray-400">CBSE Roll No: {{ row.roll_no }}</p>
-                                        <button v-if="canEditActive" type="button" @click="removeSubjectTopper(row)" class="text-[11px] text-red-500 hover:text-red-700 font-semibold mt-2.5 flex items-center gap-1">
-                                            <span>🗑</span> Remove Subject Topper
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div v-else class="p-8 text-center text-gray-400 text-xs">
-                                    No subject-wise toppers recorded yet for Class XII. Use the form above to add subject leaders.
-                                </div>
-                            </div>
-                        </div>
+                        <button v-if="canEditActive" type="button" class="btn-secondary text-xs mt-3 px-3 py-1.5 font-semibold" @click="addRow">+ Add Topper Row</button>
                     </div>
 
                     <!-- Errors alert -->

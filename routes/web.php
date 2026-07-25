@@ -528,6 +528,7 @@ Route::prefix('school-admin/{tenantId}')
 
     // Board Results
     Route::get('/board-results',                                   [BoardResultController::class, 'index'])->name('board-results.index');
+    Route::get('/board-results/subject-toppers',                   [BoardResultController::class, 'subjectToppers'])->name('board-results.subject-toppers');
     Route::post('/board-results',                                  [BoardResultController::class, 'store'])->name('board-results.store');
     Route::put('/board-results/{boardResult}',                     [BoardResultController::class, 'update'])->name('board-results.update');
     Route::post('/board-results/{boardResult}/submit',             [BoardResultController::class, 'submit'])->name('board-results.submit');

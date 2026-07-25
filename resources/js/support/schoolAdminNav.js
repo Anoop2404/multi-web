@@ -386,6 +386,7 @@ export function schoolAdminNav(schoolId, options = {}) {
                 { label: 'Job Vacancies', href: `${base}/job-vacancies`, icon: 'briefcase', hidden: true },
                 { label: 'Class X Results', href: `${base}/board-results?class=10`, icon: 'bar-chart', matchQuery: { class: '10' } },
                 { label: 'Class XII Results', href: `${base}/board-results?class=12`, icon: 'bar-chart', matchQuery: { class: '12' } },
+                { label: 'Subject-Wise Toppers', href: `${base}/board-results/subject-toppers`, icon: 'award' },
                 { label: 'Alumni', href: `${base}/alumni`, icon: 'award', hidden: true },
                 { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star', hidden: true },
                 { label: 'Contact Page', href: `${base}/contact`, icon: 'file-text', hidden: true },
