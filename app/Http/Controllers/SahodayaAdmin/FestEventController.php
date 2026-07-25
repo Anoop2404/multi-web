@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Support\AcademicYear;
 use App\Models\FestEvent;
+use App\Models\FestVenue;
 use App\Models\FestCompetitionArea;
 use App\Models\FestSchoolEventFee;
 use App\Models\FestEventItem;
@@ -1015,7 +1016,7 @@ class FestEventController extends SahodayaAdminController
             'conductMode'   => $event->conduct_mode ?? 'standard',
             'partitions'    => FestEvent::where('parent_event_id', $event->id)->get(),
             'regions'       => \App\Models\Region::forTenant($this->sahodaya->id)->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
-            'venues'        => FestVenue::where('event_id', $event->id)->with('region:id,name')->orderBy('name')->get(),
+            'venues'        => \App\Models\FestVenue::where('event_id', $event->id)->with('region:id,name')->orderBy('name')->get(),
             'ageRuleSummary' => $event->event_type === 'sports' ? FestSportsAgeGroup::ageRuleSummary($event) : null,
             'suggestedAgeCutoff' => $event->event_type === 'sports'
                 ? FestSportsAgeGroup::cutoffDate($event)->format('Y-m-d')
