@@ -263,41 +263,30 @@
                     <div class="border-b border-gray-100 pb-3">
                         <h3 class="font-bold text-gray-900 text-base">Add / Assign Subject Topper</h3>
                         <p class="text-xs text-gray-500 mt-0.5">
-                            Subject-based entry: Select the subject name and enter top score out of 100.
+                            Select from the 23 master CBSE subjects or add a custom subject.
                         </p>
                     </div>
 
                     <form @submit.prevent="submitSubjectTopper" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
                             <label class="form-label mb-1 font-semibold">Subject Name *</label>
-                            <select v-model="subjectForm.subject" required class="field text-sm bg-white" :disabled="!canEdit">
+                            <select v-model="selectedSubjectOption" required class="field text-sm bg-white" :disabled="!canEdit">
                                 <option value="" disabled>Select Subject</option>
-                                <optgroup label="Science Subjects">
-                                    <option value="Physics">Physics</option>
-                                    <option value="Chemistry">Chemistry</option>
-                                    <option value="Mathematics">Mathematics</option>
-                                    <option value="Biology">Biology</option>
-                                    <option value="Computer Science">Computer Science</option>
-                                </optgroup>
-                                <optgroup label="Commerce Subjects">
-                                    <option value="Accountancy">Accountancy</option>
-                                    <option value="Business Studies">Business Studies</option>
-                                    <option value="Economics">Economics</option>
-                                    <option value="Applied Mathematics">Applied Mathematics</option>
-                                </optgroup>
-                                <optgroup label="Humanities / Arts Subjects">
-                                    <option value="History">History</option>
-                                    <option value="Political Science">Political Science</option>
-                                    <option value="Sociology">Sociology</option>
-                                    <option value="Psychology">Psychology</option>
-                                    <option value="Geography">Geography</option>
-                                </optgroup>
-                                <optgroup label="Languages & General">
-                                    <option value="English Core">English Core</option>
-                                    <option value="Malayalam">Malayalam</option>
-                                    <option value="Hindi Course-A">Hindi Course-A</option>
-                                </optgroup>
+                                <option v-for="subj in masterSubjectList" :key="subj" :value="subj">
+                                    {{ subj }}
+                                </option>
+                                <option value="__custom__">+ Add Custom Subject...</option>
                             </select>
+
+                            <input
+                                v-if="selectedSubjectOption === '__custom__'"
+                                v-model="customSubjectInput"
+                                type="text"
+                                required
+                                class="field text-sm mt-2"
+                                placeholder="Enter custom subject name..."
+                                :disabled="!canEdit"
+                            >
                         </div>
                         <div>
                             <label class="form-label mb-1 font-semibold">Student Name *</label>
@@ -336,6 +325,10 @@
                             </div>
                             <p class="font-bold text-gray-900 text-sm mt-2">{{ row.name }}</p>
                             <p v-if="row.stream" class="text-xs text-gray-500 mt-0.5">Stream: {{ row.stream }}</p>
+
+                            <button v-if="canEdit" type="button" @click="removeSubjectTopper(row)" class="text-xs text-red-500 hover:text-red-700 font-semibold mt-3 flex items-center gap-1">
+                                <span>🗑</span> Remove Subject Topper
+                            </button>
                         </div>
                     </div>
 
@@ -396,12 +389,43 @@ const props = defineProps({
     boardResult:        Object,
     isClass12:          { type: Boolean, default: false },
     streamOptions:      { type: Object, default: () => ({}) },
+    standardSubjects:   { type: Array, default: () => [] },
     subjectsByStream:   { type: Object, default: () => ({}) },
     subjectWiseLeaders: { type: Array, default: () => [] },
     canEdit:            { type: Boolean, default: true },
     topperCap:          { type: Number, default: null },
     topperCount:        { type: Number, default: 0 },
 });
+
+const default23Subjects = [
+    'English core',
+    'Hindi core',
+    'Hindi elective',
+    'Malayalam',
+    'Sanskrit',
+    'Physics',
+    'Chemistry',
+    'Biology',
+    'Mathematics',
+    'Computer science',
+    'Psychology',
+    'Informatics practices',
+    'History',
+    'Sociology',
+    'Political science',
+    'Economics',
+    'Accountancy',
+    'Business Studies',
+    'Home science',
+    'Fashion studies',
+    'Physical education',
+    'Business administration',
+    'KTPI',
+];
+
+const masterSubjectList = computed(() =>
+    props.standardSubjects?.length ? props.standardSubjects : default23Subjects
+);
 
 const pageTitle = computed(() => `Toppers — Class ${props.boardResult.class} (${props.boardResult.academic_year})`);
 
@@ -472,6 +496,9 @@ function submitBatch() {
 }
 
 // ── Subject Topper Form ──────────────────────────────────────────────────
+const selectedSubjectOption = ref('');
+const customSubjectInput = ref('');
+
 const subjectForm = useForm({
     subject: '',
     name: '',
@@ -480,7 +507,11 @@ const subjectForm = useForm({
 });
 
 function submitSubjectTopper() {
-    if (!subjectForm.subject || !subjectForm.name || subjectForm.marks === '') return;
+    const finalSubject = selectedSubjectOption.value === '__custom__'
+        ? customSubjectInput.value.trim()
+        : selectedSubjectOption.value;
+
+    if (!finalSubject || !subjectForm.name || subjectForm.marks === '') return;
 
     // Find existing topper or add new
     const existing = (props.boardResult.toppers ?? []).find(
@@ -490,7 +521,7 @@ function submitSubjectTopper() {
     if (existing) {
         // Update existing topper's subject_marks
         const currentSubjectMarks = { ...(existing.subject_marks ?? {}) };
-        currentSubjectMarks[subjectForm.subject] = subjectForm.marks;
+        currentSubjectMarks[finalSubject] = subjectForm.marks;
 
         router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
             ...existing,
@@ -498,12 +529,16 @@ function submitSubjectTopper() {
             subject_marks: currentSubjectMarks,
         }, {
             preserveScroll: true,
-            onSuccess: () => subjectForm.reset(),
+            onSuccess: () => {
+                subjectForm.reset();
+                selectedSubjectOption.value = '';
+                customSubjectInput.value = '';
+            },
         });
     } else {
         // Create new topper record with this subject mark
         const subjectMarks = {};
-        subjectMarks[subjectForm.subject] = subjectForm.marks;
+        subjectMarks[finalSubject] = subjectForm.marks;
 
         router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/single`, {
             name: subjectForm.name,
@@ -514,9 +549,34 @@ function submitSubjectTopper() {
             subject_marks: subjectMarks,
         }, {
             preserveScroll: true,
-            onSuccess: () => subjectForm.reset(),
+            onSuccess: () => {
+                subjectForm.reset();
+                selectedSubjectOption.value = '';
+                customSubjectInput.value = '';
+            },
         });
     }
+}
+
+function removeSubjectTopper(row) {
+    if (!confirm(`Remove subject topper "${row.name}" for ${row.subject}?`)) return;
+
+    const existing = (props.boardResult.toppers ?? []).find(
+        (t) => t.name.toLowerCase() === row.name.toLowerCase()
+    );
+
+    if (!existing) return;
+
+    const updatedSubjectMarks = { ...(existing.subject_marks ?? {}) };
+    delete updatedSubjectMarks[row.subject];
+
+    router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
+        ...existing,
+        _method: 'put',
+        subject_marks: updatedSubjectMarks,
+    }, {
+        preserveScroll: true,
+    });
 }
 
 // ── Edit (single) ────────────────────────────────────────────────────────

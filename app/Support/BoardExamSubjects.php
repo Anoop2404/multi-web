@@ -13,6 +13,36 @@ use RuntimeException;
  */
 class BoardExamSubjects
 {
+    /** @return list<string> */
+    public static function standardBoardSubjects(): array
+    {
+        return [
+            'English core',
+            'Hindi core',
+            'Hindi elective',
+            'Malayalam',
+            'Sanskrit',
+            'Physics',
+            'Chemistry',
+            'Biology',
+            'Mathematics',
+            'Computer science',
+            'Psychology',
+            'Informatics practices',
+            'History',
+            'Sociology',
+            'Political science',
+            'Economics',
+            'Accountancy',
+            'Business Studies',
+            'Home science',
+            'Fashion studies',
+            'Physical education',
+            'Business administration',
+            'KTPI',
+        ];
+    }
+
     /** @return array<string, string> */
     public static function class12StreamLabels(?string $sahodayaId = null): array
     {

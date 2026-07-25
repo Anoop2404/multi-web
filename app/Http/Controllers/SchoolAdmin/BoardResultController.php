@@ -445,6 +445,7 @@ class BoardResultController extends SchoolAdminController
         return [
             'isClass12' => $isClass12,
             'streamOptions' => $streamOptions,
+            'standardSubjects' => BoardExamSubjects::standardBoardSubjects(),
             'subjectsByStream' => $isClass12 ? collect($streamOptions)
                 ->mapWithKeys(fn ($label, $key) => [$key => BoardExamSubjects::subjectsForStream($key, $sahodayaId)])
                 ->all() : [],
