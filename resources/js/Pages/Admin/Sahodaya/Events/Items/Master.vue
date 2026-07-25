@@ -192,9 +192,9 @@
                         </select>
                     </FormField>
 
-                    <FormField v-if="!isSports" label="Category">
+                    <FormField v-if="!isSports" label="Item Genre / Type">
                         <select v-model="itemForm.category" class="field">
-                            <option value="">Category</option>
+                            <option value="">Select genre (Literary, Drama...)</option>
                             <option v-for="(label, key) in taxonomy.arts_category" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </FormField>
@@ -232,9 +232,9 @@
                             <option v-for="(label, key) in taxonomy.kids_band" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </FormField>
-                    <FormField v-else label="Class Category">
-                        <select v-model="itemForm.class_group" class="field">
-                            <option value="">Class category</option>
+                    <FormField v-else label="Competition Category (Grade Level)">
+                        <select v-model="itemForm.class_group" class="field font-medium">
+                            <option value="">Select Category (Category I, II, III, IV)...</option>
                             <option v-for="(label, key) in taxonomy.class_group" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </FormField>
