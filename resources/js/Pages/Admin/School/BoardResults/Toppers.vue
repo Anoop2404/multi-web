@@ -23,7 +23,7 @@
             </div>
         </div>
 
-        <!-- CATEGORY NAVIGATION TABS (CLASS 12 EXCLUSIVE) -->
+        <!-- 3 CATEGORY NAVIGATION TABS (CLASS 12 EXCLUSIVE) -->
         <div v-if="isClass12" class="flex items-center bg-white p-1.5 rounded-2xl shadow-xs border border-gray-200 mb-6 space-x-1 max-w-2xl">
             <button
                 type="button"
@@ -54,7 +54,7 @@
         </div>
 
         <div class="max-w-5xl space-y-6">
-            <!-- TAB 1: OVERALL TOPPERS (STREAM-BASED FOR CLASS 12, GENERAL FOR CLASS 10) -->
+            <!-- TAB 1: OVERALL STREAM TOPPERS -->
             <div v-if="activeTab === 'overall' || !isClass12" class="space-y-6">
                 <!-- Bulk add toppers -->
                 <div v-if="!editingId" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5">
@@ -64,7 +64,7 @@
                                 Add {{ isClass12 ? 'Class XII Overall Stream Toppers' : 'Class X School Toppers' }}
                             </h3>
                             <p class="text-xs text-gray-500 mt-0.5">
-                                {{ isClass12 ? 'Select Stream (Science, Commerce, Humanities) for each Class XII topper.' : 'Enter overall top rankers for Class X.' }}
+                                {{ isClass12 ? 'Enter overall top rankers for Class XII.' : 'Enter overall top rankers for Class X.' }}
                             </p>
                         </div>
                     </div>
@@ -136,8 +136,9 @@
                             <div v-if="isClass12">
                                 <label class="form-label mb-1">Stream *</label>
                                 <select v-model="form.stream_key" required class="field text-sm" @change="onStreamChange">
-                                    <option value="">Select stream</option>
-                                    <option v-for="(label, key) in streamOptions" :key="key" :value="key">{{ label }}</option>
+                                    <option value="science">Science</option>
+                                    <option value="commerce">Commerce</option>
+                                    <option value="humanities">Humanities</option>
                                 </select>
                             </div>
                             <div>
@@ -251,61 +252,90 @@
 
             <!-- TAB 2: SUBJECT-WISE MARK ENTRY (CLASS 12 EXCLUSIVE) -->
             <div v-if="isClass12 && activeTab === 'subject'" class="space-y-6">
-                <!-- Add Subject Topper Form -->
-                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
-                    <div class="border-b border-gray-100 pb-3">
-                        <h3 class="font-bold text-gray-900 text-base">Add / Assign Subject Topper</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">
-                            Select from the 23 master CBSE subjects or add a custom subject.
-                        </p>
-                    </div>
+                <!-- TOP SELECTION BAR: STREAM | SUBJECT | YEAR -->
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">Stream:</label>
+                            <select v-model="selectedSubjectStream" class="field text-xs py-1.5 w-36 font-semibold bg-white">
+                                <option value="science">Science</option>
+                                <option value="commerce">Commerce</option>
+                                <option value="humanities">Humanities</option>
+                            </select>
+                        </div>
 
-                    <form @submit.prevent="submitSubjectTopper" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                            <label class="form-label mb-1 font-semibold">Subject Name *</label>
-                            <select v-model="selectedSubjectOption" required class="field text-sm bg-white" :disabled="!canEdit">
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">Subject:</label>
+                            <select v-model="selectedSubjectOption" class="field text-xs py-1.5 w-48 font-semibold bg-white">
                                 <option value="" disabled>Select Subject</option>
-                                <option v-for="subj in masterSubjectList" :key="subj" :value="subj">
-                                    {{ subj }}
-                                </option>
+                                <option v-for="subj in masterSubjectList" :key="subj" :value="subj">{{ subj }}</option>
                                 <option value="__custom__">+ Add Custom Subject...</option>
                             </select>
-
-                            <input
-                                v-if="selectedSubjectOption === '__custom__'"
-                                v-model="customSubjectInput"
-                                type="text"
-                                required
-                                class="field text-sm mt-2"
-                                placeholder="Enter custom subject name..."
-                                :disabled="!canEdit"
-                            >
                         </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-gray-500 uppercase tracking-wide">Academic Year:</span>
+                        <span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100">
+                            {{ boardResult.academic_year }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Custom Subject Input if selected -->
+                <div v-if="selectedSubjectOption === '__custom__'" class="bg-white rounded-xl border border-indigo-200 p-4 shadow-2xs max-w-md">
+                    <label class="form-label mb-1 text-xs font-semibold text-indigo-900">Custom Subject Name *</label>
+                    <input v-model="customSubjectInput" type="text" required class="field text-sm" placeholder="Enter custom subject name..." :disabled="!canEdit">
+                </div>
+
+                <!-- ADD SUBJECT TOPPER FORM -->
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                    <div class="border-b border-gray-100 pb-3 flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-gray-900 text-base">Add Subject Top Scorer</h3>
+                            <p class="text-xs text-gray-500 mt-0.5">Enter student name, CBSE roll number, and mark scored out of 100.</p>
+                        </div>
+                    </div>
+
+                    <form @submit.prevent="submitSubjectTopper" class="grid sm:grid-cols-3 gap-4">
                         <div>
                             <label class="form-label mb-1 font-semibold">Student Name *</label>
-                            <input v-model="subjectForm.name" type="text" required class="field text-sm" placeholder="Student name" :disabled="!canEdit">
+                            <input v-model="subjectForm.name" type="text" required class="field text-sm" placeholder="Student full name" :disabled="!canEdit">
                         </div>
                         <div>
-                            <label class="form-label mb-1">CBSE Roll No</label>
-                            <input v-model="subjectForm.roll_no" type="text" class="field text-sm" placeholder="CBSE Roll No" :disabled="!canEdit">
+                            <label class="form-label mb-1 font-semibold">CBSE Roll No *</label>
+                            <input v-model="subjectForm.roll_no" type="text" required class="field text-sm" placeholder="e.g. 11182743" :disabled="!canEdit">
                         </div>
                         <div>
                             <label class="form-label mb-1 font-semibold">Mark Scored (out of 100) *</label>
-                            <input v-model.number="subjectForm.marks" type="number" min="0" max="100" required class="field text-sm" placeholder="e.g. 99" :disabled="!canEdit">
+                            <input v-model.number="subjectForm.marks" type="number" min="0" max="100" required class="field text-sm font-bold text-emerald-700" placeholder="e.g. 99" :disabled="!canEdit">
                         </div>
 
-                        <div class="sm:col-span-2 lg:col-span-4 flex justify-end pt-2">
-                            <button v-if="canEdit" type="submit" class="btn-primary text-xs px-5 py-2.5 font-bold shadow-sm" :disabled="subjectForm.processing">
+                        <div class="sm:col-span-3 flex justify-end pt-2">
+                            <button v-if="canEdit" type="submit" class="btn-primary text-xs px-6 py-2.5 font-bold shadow-sm" :disabled="subjectForm.processing">
                                 + Save Subject Topper
                             </button>
                         </div>
                     </form>
                 </div>
 
-                <!-- Display Subject-wise Leaders -->
+                <!-- COMMON PROOF DOCUMENT UPLOAD -->
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-3">
+                    <h3 class="font-bold text-gray-900 text-sm uppercase tracking-wide">Common Proof Document (CBSE Result PDF / Proof)</h3>
+                    <div v-if="boardResult.result_pdf_path" class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 flex items-center justify-between shadow-2xs">
+                        <div class="flex items-center gap-2 text-xs font-semibold text-emerald-800">
+                            <span>✓ Common Proof Attached</span>
+                            <a :href="`/school-admin/${school.id}/board-results/${boardResult.id}/pdf`" target="_blank" class="underline text-indigo-600 hover:text-indigo-800 font-normal">View File ↗</a>
+                        </div>
+                        <span class="text-[11px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-medium">Ready</span>
+                    </div>
+                    <p class="text-xs text-gray-500">Upload the common CBSE Tabulation Sheet or result proof PDF for verification.</p>
+                </div>
+
+                <!-- DISPLAY SUBJECT TOP PERFORMERS GRID -->
                 <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                    <h3 class="font-bold text-gray-900 text-sm mb-1 uppercase tracking-wide">Subject Top Performers Grid</h3>
-                    <p class="text-xs text-gray-500 mb-4">Highest scorers identified across all subjects.</p>
+                    <h3 class="font-bold text-gray-900 text-sm mb-1 uppercase tracking-wide">Saved Subject Top Performers</h3>
+                    <p class="text-xs text-gray-500 mb-4">Highest scorers identified across Class XII subjects.</p>
 
                     <div v-if="subjectWiseLeaders.length" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div v-for="row in subjectWiseLeaders" :key="row.subject"
@@ -317,7 +347,7 @@
                                 <span class="text-sm font-bold text-emerald-600">{{ row.marks }} / 100</span>
                             </div>
                             <p class="font-bold text-gray-900 text-sm mt-2">{{ row.name }}</p>
-                            <p v-if="row.stream" class="text-xs text-gray-500 mt-0.5">Stream: {{ row.stream }}</p>
+                            <p v-if="row.roll_no" class="text-xs text-gray-500 mt-0.5">CBSE Roll No: {{ row.roll_no }}</p>
 
                             <button v-if="canEdit" type="button" @click="removeSubjectTopper(row)" class="text-xs text-red-500 hover:text-red-700 font-semibold mt-3 flex items-center gap-1">
                                 <span>🗑</span> Remove Subject Topper
@@ -331,7 +361,7 @@
                 </div>
             </div>
 
-            <!-- TAB 3: 90%+ HIGH ACHIEVERS (CLASS 12 EXCLUSIVE, STREAM-BASED) -->
+            <!-- TAB 3: 90%+ HIGH ACHIEVERS -->
             <div v-if="isClass12 && activeTab === 'achievers'" class="space-y-6">
                 <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                     <div class="border-b border-gray-100 pb-3 flex items-center justify-between">
@@ -391,29 +421,11 @@ const props = defineProps({
 });
 
 const default23Subjects = [
-    'English core',
-    'Hindi core',
-    'Hindi elective',
-    'Malayalam',
-    'Sanskrit',
-    'Physics',
-    'Chemistry',
-    'Biology',
-    'Mathematics',
-    'Computer science',
-    'Psychology',
-    'Informatics practices',
-    'History',
-    'Sociology',
-    'Political science',
-    'Economics',
-    'Accountancy',
-    'Business Studies',
-    'Home science',
-    'Fashion studies',
-    'Physical education',
-    'Business administration',
-    'KTPI',
+    'English core', 'Hindi core', 'Hindi elective', 'Malayalam', 'Sanskrit',
+    'Physics', 'Chemistry', 'Biology', 'Mathematics', 'Computer science',
+    'Psychology', 'Informatics practices', 'History', 'Sociology',
+    'Political science', 'Economics', 'Accountancy', 'Business Studies',
+    'Home science', 'Fashion studies', 'Physical education', 'Business administration', 'KTPI',
 ];
 
 const masterSubjectList = computed(() =>
@@ -424,6 +436,7 @@ const pageTitle = computed(() => `Toppers — Class ${props.boardResult.class} (
 
 const activeTab = ref('overall');
 const editingId = ref(null);
+const selectedSubjectStream = ref('science');
 
 function urlEncode(val) {
     return encodeURIComponent(val ?? '');
@@ -433,7 +446,6 @@ const sortedToppers = computed(() =>
     [...(props.boardResult.toppers ?? [])].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)),
 );
 
-// 90%+ achievers — every added student at/above 90% overall, not limited to ranked toppers.
 const achievers90 = computed(() =>
     (props.boardResult.toppers ?? [])
         .filter((t) => t.percentage != null && Number(t.percentage) >= 90)
@@ -455,7 +467,7 @@ function blankRow() {
 }
 
 const batchForm = useForm({
-    total_marks: props.boardResult.total_marks ?? '',
+    total_marks: props.boardResult.total_marks || 500,
     toppers: [blankRow()],
 });
 
@@ -506,13 +518,11 @@ function submitSubjectTopper() {
 
     if (!finalSubject || !subjectForm.name || subjectForm.marks === '') return;
 
-    // Find existing topper or add new
     const existing = (props.boardResult.toppers ?? []).find(
         (t) => t.name.toLowerCase() === subjectForm.name.toLowerCase()
     );
 
     if (existing) {
-        // Update existing topper's subject_marks
         const currentSubjectMarks = { ...(existing.subject_marks ?? {}) };
         currentSubjectMarks[finalSubject] = subjectForm.marks;
 
@@ -529,7 +539,6 @@ function submitSubjectTopper() {
             },
         });
     } else {
-        // Create new topper record with this subject mark
         const subjectMarks = {};
         subjectMarks[finalSubject] = subjectForm.marks;
 
