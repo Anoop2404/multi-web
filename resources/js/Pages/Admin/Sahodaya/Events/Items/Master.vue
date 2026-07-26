@@ -6,9 +6,14 @@
         <PageHeader :title="`${event.title} — Event Items`" eyebrow="Items Management"
                     description="Search, filter, edit configurations, toggle availability, and add event items.">
             <template #actions>
-                <button type="button" class="btn-primary text-xs flex items-center gap-1.5 shadow-sm" @click="showAddModal = true">
-                    <span>+ Add event item</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <Link v-if="taxonomyMastersUrl" :href="taxonomyMastersUrl" class="btn-secondary text-xs flex items-center gap-1.5">
+                        <span>🏷️ Category masters</span>
+                    </Link>
+                    <button type="button" class="btn-primary text-xs flex items-center gap-1.5 shadow-sm" @click="showAddModal = true">
+                        <span>+ Add event item</span>
+                    </button>
+                </div>
             </template>
         </PageHeader>
 
@@ -35,9 +40,14 @@
                         </button>
                     </div>
 
-                    <button type="button" class="btn-primary text-xs" @click="showAddModal = true">
-                        + Add item
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <Link v-if="taxonomyMastersUrl" :href="taxonomyMastersUrl" class="btn-secondary text-xs flex items-center gap-1">
+                            <span>🏷️ Category masters</span>
+                        </Link>
+                        <button type="button" class="btn-primary text-xs" @click="showAddModal = true">
+                            + Add item
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Filter Chips -->
