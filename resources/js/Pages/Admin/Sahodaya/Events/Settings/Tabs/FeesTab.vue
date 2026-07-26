@@ -34,7 +34,7 @@
                 <FormField v-if="event.event_type !== 'sports'" label="Billing model">
                     <template #default="{ id }">
                         <select :id="id" v-model="feeSettingsForm.fee_model" class="field mt-1">
-                            <option v-for="(label, key) in feeModels" :key="key" :value="key">{{ label }}</option>
+                            <option v-for="(label, key) in feeModels" :key="key" :value="key">{{ billingModelLabel(key, label) }}</option>
                         </select>
                     </template>
                 </FormField>
@@ -390,6 +390,53 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Custom per-event categories — only relevant once "Custom categories for
+                         this event" is picked above and saved. These aren't fee-specific: once
+                         set, they're what item eligibility, registration checks, ID cards, and
+                         reports use for this event too (App\Support\FestClassGroupScheme). -->
+                    <div v-if="feeSettingsForm.class_group_scheme === 'custom'" class="space-y-3 border-t border-indigo-100 pt-3">
+                        <p class="text-[11px] text-slate-500">
+                            Save the scheme above first if you just switched to Custom, then define this event's
+                            own categories below — e.g. "Junior", "Senior", "Group A".
+                        </p>
+                        <form @submit.prevent="addClassGroup" class="bg-white/80 p-3 rounded-lg border border-indigo-100 space-y-2.5">
+                            <div class="grid gap-2.5 sm:grid-cols-3">
+                                <FormField label="Key" hint="Letters/numbers/dashes only" class-extra="mb-0">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model="classGroupForm.key" class="field text-xs" placeholder="e.g. junior" required>
+                                    </template>
+                                </FormField>
+                                <FormField label="Display label" class-extra="mb-0">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model="classGroupForm.label" class="field text-xs" placeholder="e.g. Junior (Class 5-7)" required>
+                                    </template>
+                                </FormField>
+                                <FormField label="Description (optional)" class-extra="mb-0">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model="classGroupForm.description" class="field text-xs" placeholder="Internal note">
+                                    </template>
+                                </FormField>
+                            </div>
+                            <div class="flex justify-end">
+                                <button type="submit" class="btn-secondary text-xs !py-1 !px-3" :disabled="classGroupForm.processing">Add category</button>
+                            </div>
+                        </form>
+
+                        <div v-if="customClassGroups.length" class="rounded-lg border border-indigo-100 overflow-hidden bg-white">
+                            <ul class="divide-y divide-slate-100 text-xs">
+                                <li v-for="g in customClassGroups" :key="g.id" class="p-2.5 flex items-center justify-between">
+                                    <div>
+                                        <span class="font-semibold text-slate-900">{{ g.label }}</span>
+                                        <span class="font-mono text-[10px] text-slate-400 ml-1">({{ g.key }})</span>
+                                        <p v-if="g.description" class="text-slate-500">{{ g.description }}</p>
+                                    </div>
+                                    <button type="button" @click="removeClassGroup(g.id)" class="text-red-600 text-xs shrink-0">Remove</button>
+                                </li>
+                            </ul>
+                        </div>
+                        <p v-else class="text-xs text-slate-400">No custom categories added yet.</p>
+                    </div>
                 </div>
             </section>
 
@@ -589,13 +636,27 @@ import { computed, inject, ref } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const {
-    feeSettingsForm, feeModels, event, classGroupSchemeOptions, classGroupScheme,
+    feeSettingsForm, feeModels, event, classGroupSchemeOptions, classGroupScheme, classGroupLabels,
     ageGroupLabels, defaultAgeGroupFees, defaultClassGroupFees, effectiveClassGroupLabels, saveFeeSettings,
-    sahodaya, ledgerAccount,
+    sahodaya, ledgerAccount, customClassGroups, classGroupForm, addClassGroup, removeClassGroup,
 } = inject('eventSettings');
 
 if (event.event_type === 'sports') {
     feeSettingsForm.fee_model = 'sports_composite';
+}
+
+// Display-only relabel — the stored fee_model value stays 'sports_composite' either way
+// (that's what FestEventFeeResolver, FestSchoolEventFeeService, FestInvoiceService, etc.
+// actually key off of; introducing a genuinely separate fee_model value would mean
+// touching every one of those calculators too, and any missed spot silently bills ₹0).
+// A non-sports fest (English/Science/Kids/Teacher Fest, Kalolsavam, ...) picking this
+// billing model gets the same school+student+item math under a name that doesn't call
+// it "sports composite".
+function billingModelLabel(key, label) {
+    if (key === 'sports_composite' && event.event_type !== 'sports') {
+        return 'Composite (school + student + included items)';
+    }
+    return label;
 }
 
 const ledgerForm = useForm({ name: ledgerAccount?.name ?? '' });

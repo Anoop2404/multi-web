@@ -135,6 +135,7 @@ const props = defineProps({
     event: Object,
     venues: Array,
     regions: { type: Array, default: () => [] },
+    customClassGroups: { type: Array, default: () => [] },
     stages: Array,
     comboRules: Array,
     gradeConfigs: Array,

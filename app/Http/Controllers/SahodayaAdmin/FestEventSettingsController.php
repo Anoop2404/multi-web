@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\FestCombinationRule;
+use App\Models\FestEventClassGroup;
 use App\Models\FestEventItem;
 use App\Models\FestEvent;
 use App\Models\FestGradeConfig;
@@ -85,6 +86,8 @@ class FestEventSettingsController extends SahodayaAdminController
             'classGroupSchemeOptions' => FestClassGroupScheme::options(),
             'classGroupLabels' => FestClassGroupScheme::labels($classGroupScheme, $event),
             'defaultClassGroupFees' => FestClassGroupScheme::defaultFees($classGroupScheme, $event),
+            'customClassGroups' => FestEventClassGroup::where('event_id', $event->id)
+                ->orderBy('sort_order')->orderBy('label')->get(),
             'defaultParticipantTypeFees' => config('fest_fees.default_participant_type_fees'),
             'ageGroupLabels' => FestSportsAgeGroup::labels($this->sahodaya->id),
             'defaultAgeGroupFees' => FestSportsAgeGroup::defaultFees($this->sahodaya->id),
@@ -378,7 +381,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'school_fee_cap' => 'nullable|numeric|min:0',
             'school_fee_min' => 'nullable|numeric|min:0',
             'include_school_registration' => 'nullable|boolean',
-            'class_group_scheme' => 'nullable|in:cbse,sahodaya,cluster',
+            'class_group_scheme' => 'nullable|in:cbse,sahodaya,cluster,custom',
             'class_group_fees' => 'nullable|array',
             'class_group_fees.*' => 'nullable|numeric|min:0',
             'age_group_fees' => 'nullable|array',
@@ -599,6 +602,55 @@ class FestEventSettingsController extends SahodayaAdminController
         );
 
         return back()->with('success', 'Venue added.');
+    }
+
+    public function storeClassGroup(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'key' => [
+                'required', 'string', 'max:60', 'alpha_dash',
+                \Illuminate\Validation\Rule::unique('fest_event_class_groups', 'key')->where('event_id', $event->id),
+            ],
+            'label' => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        $nextOrder = (int) FestEventClassGroup::where('event_id', $event->id)->max('sort_order') + 1;
+
+        FestEventClassGroup::create(array_merge($data, [
+            'tenant_id' => $this->sahodaya->id,
+            'event_id' => $event->id,
+            'sort_order' => $nextOrder,
+        ]));
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('fees'),
+            'fest.settings.class_group_created',
+            "Custom category added: {$data['label']}",
+        );
+
+        return back()->with('success', 'Category added.');
+    }
+
+    public function destroyClassGroup(string $tenantId, FestEvent $event, FestEventClassGroup $classGroup)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($classGroup->event_id !== $event->id, 404);
+
+        $label = $classGroup->label;
+        $classGroup->delete();
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('fees'),
+            'fest.settings.class_group_deleted',
+            "Custom category removed: {$label}",
+        );
+
+        return back()->with('success', 'Category removed.');
     }
 
     public function updateVenue(Request $request, string $tenantId, FestEvent $event, FestVenue $venue)

@@ -13,6 +13,7 @@ return [
         'cbse' => 'CBSE Kerala (Category I–IV)',
         'sahodaya' => 'Sahodaya standard (LP–HSS)',
         'cluster' => 'Class master (your CATEGORY1–4 setup)',
+        'custom' => 'Custom categories for this event',
     ],
 
     'schemes' => [

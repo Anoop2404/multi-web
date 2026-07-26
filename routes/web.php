@@ -1060,6 +1060,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::put('/{event}/fee-settings', [FestEventSettingsController::class, 'updateFeeSettings'])->name('fee-settings.update');
             Route::put('/{event}/ledger-account', [FestEventSettingsController::class, 'updateLedgerAccount'])->name('ledger-account.update');
             Route::patch('/{event}/items/{item}/fee', [FestEventSettingsController::class, 'updateItemFee'])->name('items.fee.update');
+            Route::post('/{event}/class-groups', [FestEventSettingsController::class, 'storeClassGroup'])->name('class-groups.store');
+            Route::delete('/{event}/class-groups/{classGroup}', [FestEventSettingsController::class, 'destroyClassGroup'])->name('class-groups.destroy');
             Route::post('/{event}/venues', [FestEventSettingsController::class, 'storeVenue'])->name('venues.store');
             Route::put('/{event}/venues/{venue}', [FestEventSettingsController::class, 'updateVenue'])->name('venues.update');
             Route::delete('/{event}/venues/{venue}', [FestEventSettingsController::class, 'destroyVenue'])->name('venues.destroy');

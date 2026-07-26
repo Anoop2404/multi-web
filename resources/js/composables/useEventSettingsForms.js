@@ -373,6 +373,16 @@ export function useEventSettingsForms(props) {
         router.delete(`${base}/venues/${id}`, { preserveScroll: true });
     }
 
+    const classGroupForm = useForm({ key: '', label: '', description: '' });
+
+    function addClassGroup() {
+        classGroupForm.post(`${base}/class-groups`, { preserveScroll: true, onSuccess: () => classGroupForm.reset() });
+    }
+
+    function removeClassGroup(id) {
+        router.delete(`${base}/class-groups/${id}`, { preserveScroll: true });
+    }
+
     const editingVenueId = ref(null);
     const venueEditForm = useForm({ name: '', location: '', capacity: null, region_id: '' });
 
@@ -522,6 +532,9 @@ export function useEventSettingsForms(props) {
         saveNumberingSettings,
         saveItemNumbering,
         backfillRegs,
+        classGroupForm,
+        addClassGroup,
+        removeClassGroup,
         addVenue,
         removeVenue,
         editingVenueId,

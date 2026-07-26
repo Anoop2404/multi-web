@@ -36,7 +36,7 @@ class FestClassGroupScheme
 
     public static function isValid(?string $scheme): bool
     {
-        if ($scheme === 'cluster') {
+        if ($scheme === 'cluster' || $scheme === 'custom') {
             return true;
         }
 
@@ -90,6 +90,10 @@ class FestClassGroupScheme
     {
         $resolved = self::resolve($scheme, $event);
 
+        if ($resolved === 'custom') {
+            return $event ? self::customLabelsForEvent($event) : ['open' => 'Open / All Categories'];
+        }
+
         if ($resolved === 'cluster') {
             $tenantId = $event?->tenant_id ?? null;
 
@@ -104,11 +108,37 @@ class FestClassGroupScheme
     {
         $resolved = self::resolve($scheme, $event);
 
-        if ($resolved === 'cluster') {
+        // Custom event categories carry no built-in fee defaults — this scheme is deliberately
+        // fee-agnostic (see fest_school_event_fee.custom class_group fee entry, which is set
+        // per event via the item catalog / class_group_fees form like any other scheme).
+        if ($resolved === 'custom' || $resolved === 'cluster') {
             return [];
         }
 
         return config("fest_class_group_schemes.schemes.{$resolved}.default_fees", []);
+    }
+
+    /**
+     * Custom per-event category labels, keyed the same way as every other scheme
+     * (machine key => display label), always including the universal 'open' catch-all
+     * so items without a specific category still resolve to something.
+     *
+     * @return array<string, string>
+     */
+    public static function customLabelsForEvent(FestEvent $event): array
+    {
+        $labels = ['open' => 'Open / All Categories'];
+
+        $rows = \App\Models\FestEventClassGroup::where('event_id', $event->id)
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->get(['key', 'label']);
+
+        foreach ($rows as $row) {
+            $labels[$row->key] = $row->label;
+        }
+
+        return $labels;
     }
 
     /** @return array<string, string> */
