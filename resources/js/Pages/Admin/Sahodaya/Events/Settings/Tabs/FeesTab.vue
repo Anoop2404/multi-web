@@ -355,13 +355,9 @@
                 </div>
             </section>
 
-            <section v-if="feeSettingsForm.fee_model === 'item_catalog'" class="card space-y-4">
-                <div>
-                    <h3 class="section-title">Category rates</h3>
-                    <p class="section-desc">Default fee applied when an item has no per-item override.</p>
-                </div>
-
-                <div v-if="event.event_type !== 'sports'" class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
+            <!-- Competition Class Category Scheme & Class Mappings -->
+            <section v-if="event.event_type !== 'sports'" class="card space-y-4">
+                <div class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
                     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2.5">
                         <div>
                             <h4 class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
@@ -394,6 +390,13 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <section v-if="feeSettingsForm.fee_model === 'item_catalog'" class="card space-y-4">
+                <div>
+                    <h3 class="section-title">Category rates</h3>
+                    <p class="section-desc">Default fee applied when an item has no per-item override.</p>
                 </div>
 
                 <label class="flex items-start gap-2 text-sm">
