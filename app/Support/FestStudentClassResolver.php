@@ -50,12 +50,67 @@ class FestStudentClassResolver
         return $categoryId > 0 ? FestClassGroupScheme::clusterKey($categoryId) : null;
     }
 
+    /**
+     * Match a student's class number against this event's custom FestEventClassGroup
+     * rows (each carries its own `classes` array of class numbers). Falls back to the
+     * 'open' catch-all key when no custom category claims this student's class — mirrors
+     * how the built-in schemes always keep an 'open' bucket in their labels() output.
+     */
+    public static function customClassGroupForStudent(Student $student, FestEvent $event): ?string
+    {
+        $classNumber = self::classNumberFromStudent($student);
+        if ($classNumber === null) {
+            return null;
+        }
+
+        $groups = \App\Models\FestEventClassGroup::where('event_id', $event->id)->get(['key', 'classes']);
+
+        foreach ($groups as $group) {
+            if (in_array($classNumber, array_map('intval', $group->classes ?? []), true)) {
+                return $group->key;
+            }
+        }
+
+        return 'open';
+    }
+
+    /**
+     * Match a student's class number against a named FestClassCategoryScheme's groups
+     * (the scheme's own `classes` arrays), mirroring customClassGroupForStudent() but for
+     * the Sahodaya-wide, reusable schemes rather than one-off per-event categories.
+     */
+    public static function schemeGroupForStudent(Student $student, int $schemeId): ?string
+    {
+        $classNumber = self::classNumberFromStudent($student);
+        if ($classNumber === null) {
+            return null;
+        }
+
+        $groups = \App\Models\FestClassCategorySchemeGroup::where('scheme_id', $schemeId)->get(['key', 'classes']);
+
+        foreach ($groups as $group) {
+            if (in_array($classNumber, array_map('intval', $group->classes ?? []), true)) {
+                return $group->key;
+            }
+        }
+
+        return 'open';
+    }
+
     public static function classGroupForStudent(Student $student, FestEvent $event): ?string
     {
         $scheme = FestClassGroupScheme::resolveForEvent($event);
 
+        if (is_string($scheme) && ctype_digit($scheme)) {
+            return self::schemeGroupForStudent($student, (int) $scheme);
+        }
+
         if ($scheme === 'cluster') {
             return self::clusterClassGroupForStudent($student);
+        }
+
+        if ($scheme === 'custom') {
+            return self::customClassGroupForStudent($student, $event);
         }
 
         return self::kalolsavClassGroupForStudent($student);

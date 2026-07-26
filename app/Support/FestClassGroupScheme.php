@@ -36,7 +36,14 @@ class FestClassGroupScheme
 
     public static function isValid(?string $scheme): bool
     {
+        // Legacy string values — still recognized so events saved before named schemes
+        // existed keep resolving. New saves from the fee-settings form now send a numeric
+        // FestClassCategoryScheme id instead (see the branch below).
         if ($scheme === 'cluster' || $scheme === 'custom') {
+            return true;
+        }
+
+        if (is_string($scheme) && ctype_digit($scheme)) {
             return true;
         }
 
@@ -90,6 +97,10 @@ class FestClassGroupScheme
     {
         $resolved = self::resolve($scheme, $event);
 
+        if (is_string($resolved) && ctype_digit($resolved)) {
+            return self::labelsForSchemeId((int) $resolved);
+        }
+
         if ($resolved === 'custom') {
             return $event ? self::customLabelsForEvent($event) : ['open' => 'Open / All Categories'];
         }
@@ -103,15 +114,40 @@ class FestClassGroupScheme
         return config("fest_class_group_schemes.schemes.{$resolved}.groups", []);
     }
 
+    /**
+     * Labels for a named FestClassCategoryScheme, keyed the same way as every other
+     * scheme (machine key => display label), always including the universal 'open'
+     * catch-all. A deleted/missing scheme id resolves to just the 'open' bucket rather
+     * than erroring, so a stale reference degrades gracefully instead of breaking the page.
+     *
+     * @return array<string, string>
+     */
+    public static function labelsForSchemeId(int $schemeId): array
+    {
+        $labels = ['open' => 'Open / All Categories'];
+
+        $rows = \App\Models\FestClassCategorySchemeGroup::where('scheme_id', $schemeId)
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->get(['key', 'label', 'classes']);
+
+        foreach ($rows as $row) {
+            $labels[$row->key] = $row->label.$row->classesSuffix();
+        }
+
+        return $labels;
+    }
+
     /** @return array<string, float> */
     public static function defaultFees(?string $scheme = null, ?FestEvent $event = null): array
     {
         $resolved = self::resolve($scheme, $event);
 
-        // Custom event categories carry no built-in fee defaults — this scheme is deliberately
-        // fee-agnostic (see fest_school_event_fee.custom class_group fee entry, which is set
-        // per event via the item catalog / class_group_fees form like any other scheme).
-        if ($resolved === 'custom' || $resolved === 'cluster') {
+        // Named/custom event categories carry no built-in fee defaults — this scheme is
+        // deliberately fee-agnostic (see fest_school_event_fee.custom class_group fee entry,
+        // which is set per event via the item catalog / class_group_fees form like any other
+        // scheme).
+        if ($resolved === 'custom' || $resolved === 'cluster' || (is_string($resolved) && ctype_digit($resolved))) {
             return [];
         }
 
@@ -132,10 +168,10 @@ class FestClassGroupScheme
         $rows = \App\Models\FestEventClassGroup::where('event_id', $event->id)
             ->orderBy('sort_order')
             ->orderBy('label')
-            ->get(['key', 'label']);
+            ->get(['key', 'label', 'classes']);
 
         foreach ($rows as $row) {
-            $labels[$row->key] = $row->label;
+            $labels[$row->key] = $row->label.$row->classesSuffix();
         }
 
         return $labels;

@@ -722,6 +722,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::put('/regions/{region}', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'update'])->name('regions.update');
         Route::delete('/regions/{region}', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'destroy'])->name('regions.destroy');
 
+        // Named class category schemes (Sahodaya-wide, reusable across events) — see
+        // FestEventSettingsController::storeClassCategoryScheme() and friends.
+        Route::post('/class-category-schemes', [FestEventSettingsController::class, 'storeClassCategoryScheme'])->name('class-category-schemes.store');
+        Route::delete('/class-category-schemes/{classCategoryScheme}', [FestEventSettingsController::class, 'destroyClassCategoryScheme'])->name('class-category-schemes.destroy');
+        Route::post('/class-category-schemes/{classCategoryScheme}/groups', [FestEventSettingsController::class, 'storeClassCategorySchemeGroup'])->name('class-category-schemes.groups.store');
+        Route::delete('/class-category-schemes/{classCategoryScheme}/groups/{classCategorySchemeGroup}', [FestEventSettingsController::class, 'destroyClassCategorySchemeGroup'])->name('class-category-schemes.groups.destroy');
+
         // Membership settings
         Route::get('/membership/settings', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'index'])->name('membership.settings');
         Route::put('/membership/settings', [\App\Http\Controllers\SahodayaAdmin\MembershipSettingsController::class, 'updateProfile'])->name('membership.settings.update');

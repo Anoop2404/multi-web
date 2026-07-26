@@ -11,22 +11,24 @@ export function studentVerificationModeFromEvent(event) {
     return feeSettings.require_verified_students ? 'required' : 'optional';
 }
 
-const schemeLabelMap = {
-    cbse: {
-        lp: 'Category I — Classes III & IV',
-        up: 'Category II — Classes V–VII',
-        hs: 'Category III — Classes VIII–X',
-        hss: 'Category IV — Classes XI & XII',
-        open: 'Open / All Categories',
-    },
-    sahodaya: {
-        lp: 'LP — Classes I–IV',
-        up: 'UP — Classes V–VII',
-        hs: 'HS — Classes VIII–X',
-        hss: 'HSS — Classes XI & XII',
-        open: 'Open / All Classes',
-    },
-};
+/**
+ * Build display labels for a named FestClassCategoryScheme (from the classCategorySchemes
+ * prop) purely client-side, so the "Fees by class category" table updates live as the admin
+ * switches the dropdown — mirrors FestClassGroupScheme::labelsForSchemeId() on the backend.
+ */
+function labelsForSchemeId(schemes, schemeId) {
+    if (!schemeId) return null;
+    const scheme = (schemes ?? []).find((s) => String(s.id) === String(schemeId));
+    if (!scheme) return null;
+
+    const labels = { open: 'Open / All Categories' };
+    for (const group of scheme.groups ?? []) {
+        const classes = [...(group.classes ?? [])].map(Number).sort((a, b) => a - b);
+        const suffix = classes.length ? ` — Classes ${classes.join(', ')}` : '';
+        labels[group.key] = group.label + suffix;
+    }
+    return labels;
+}
 
 const ATHLETICS_RANK_DEFAULTS = { 1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3 };
 
@@ -281,10 +283,11 @@ export function useEventSettingsForms(props) {
         })),
     });
 
-    const effectiveClassGroupLabels = computed(() => {
-        const scheme = feeSettingsForm.class_group_scheme || props.classGroupScheme || 'cbse';
-        return schemeLabelMap[scheme] ?? props.classGroupLabels ?? schemeLabelMap.cbse;
-    });
+    const effectiveClassGroupLabels = computed(() => (
+        labelsForSchemeId(props.classCategorySchemes, feeSettingsForm.class_group_scheme)
+            ?? props.classGroupLabels
+            ?? { open: 'Open / All Categories' }
+    ));
 
     function savePolicy() {
         policyForm.post(`${base}/participation-policy`, { preserveScroll: true });
@@ -373,7 +376,10 @@ export function useEventSettingsForms(props) {
         router.delete(`${base}/venues/${id}`, { preserveScroll: true });
     }
 
-    const classGroupForm = useForm({ key: '', label: '', description: '' });
+    // LEGACY — per-event custom categories (superseded by the named, Sahodaya-wide
+    // schemes below). Kept only so an event that already saved 'custom' with rows here
+    // stays editable; new setups should use classCategorySchemeForm/schemeGroupForm.
+    const classGroupForm = useForm({ key: '', label: '', description: '', classes: [] });
 
     function addClassGroup() {
         classGroupForm.post(`${base}/class-groups`, { preserveScroll: true, onSuccess: () => classGroupForm.reset() });
@@ -381,6 +387,35 @@ export function useEventSettingsForms(props) {
 
     function removeClassGroup(id) {
         router.delete(`${base}/class-groups/${id}`, { preserveScroll: true });
+    }
+
+    // Named, Sahodaya-wide class category schemes — reusable across every event, picked
+    // by id from the "Class Category Scheme" dropdown. See FestEventSettingsController's
+    // storeClassCategoryScheme()/storeClassCategorySchemeGroup() and friends.
+    const sahodayaBase = `/sahodaya-admin/${props.sahodaya.id}`;
+    const classCategorySchemeForm = useForm({ name: '', description: '' });
+    const schemeGroupForm = useForm({ key: '', label: '', description: '', classes: [] });
+
+    function addClassCategoryScheme() {
+        classCategorySchemeForm.post(`${sahodayaBase}/class-category-schemes`, {
+            preserveScroll: true,
+            onSuccess: () => classCategorySchemeForm.reset(),
+        });
+    }
+
+    function removeClassCategoryScheme(schemeId) {
+        router.delete(`${sahodayaBase}/class-category-schemes/${schemeId}`, { preserveScroll: true });
+    }
+
+    function addClassCategorySchemeGroup(schemeId) {
+        schemeGroupForm.post(`${sahodayaBase}/class-category-schemes/${schemeId}/groups`, {
+            preserveScroll: true,
+            onSuccess: () => schemeGroupForm.reset(),
+        });
+    }
+
+    function removeClassCategorySchemeGroup(schemeId, groupId) {
+        router.delete(`${sahodayaBase}/class-category-schemes/${schemeId}/groups/${groupId}`, { preserveScroll: true });
     }
 
     const editingVenueId = ref(null);
@@ -535,6 +570,12 @@ export function useEventSettingsForms(props) {
         classGroupForm,
         addClassGroup,
         removeClassGroup,
+        classCategorySchemeForm,
+        schemeGroupForm,
+        addClassCategoryScheme,
+        removeClassCategoryScheme,
+        addClassCategorySchemeGroup,
+        removeClassCategorySchemeGroup,
         addVenue,
         removeVenue,
         editingVenueId,

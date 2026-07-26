@@ -83,9 +83,40 @@ class FestEventSettingsController extends SahodayaAdminController
             'numberingSettings' => app(\App\Services\Events\FestNumberingService::class)->settings($event),
             'feeModels'    => config('fest_fees.fee_models'),
             'classGroupScheme' => $classGroupScheme,
-            'classGroupSchemeOptions' => FestClassGroupScheme::options(),
+            // Named, Sahodaya-wide category schemes (replaces the old fixed
+            // cbse/sahodaya/cluster/custom dropdown) — auto-seeded once per tenant from
+            // those same presets/live Class Master data so nothing already configured
+            // breaks. See FestClassCategoryScheme::ensureDefaultsForTenant().
+            'classCategorySchemes' => (function () {
+                \App\Models\FestClassCategoryScheme::ensureDefaultsForTenant($this->sahodaya->id);
+
+                $schemes = \App\Models\FestClassCategoryScheme::forTenant($this->sahodaya->id)
+                    ->with('groups:id,scheme_id,key,label,description,classes,sort_order')
+                    ->orderBy('sort_order')->orderBy('name')->get();
+
+                // Annotate each scheme with which events currently reference it, so the UI
+                // can warn before a delete ("3 events use this — you'll need to reassign
+                // them to a different scheme") instead of silently orphaning that reference.
+                // fee_settings is a JSON column read into PHP rather than queried with a raw
+                // JSON path — event counts per tenant are small enough that this is simpler
+                // and more portable than a DB-specific JSON where clause.
+                $eventsBySchemeId = FestEvent::where('tenant_id', $this->sahodaya->id)
+                    ->get(['id', 'title', 'fee_settings'])
+                    ->groupBy(fn ($e) => (string) ($e->fee_settings['class_group_scheme'] ?? ''));
+
+                foreach ($schemes as $scheme) {
+                    $usingEvents = $eventsBySchemeId->get((string) $scheme->id, collect());
+                    $scheme->events_count = $usingEvents->count();
+                    $scheme->event_titles = $usingEvents->pluck('title')->values();
+                }
+
+                return $schemes;
+            })(),
             'classGroupLabels' => FestClassGroupScheme::labels($classGroupScheme, $event),
             'defaultClassGroupFees' => FestClassGroupScheme::defaultFees($classGroupScheme, $event),
+            // LEGACY — only still populated so an event that already saved the literal
+            // 'custom' string keeps its old per-event categories visible/editable. New
+            // category setups are created under classCategorySchemes above instead.
             'customClassGroups' => FestEventClassGroup::where('event_id', $event->id)
                 ->orderBy('sort_order')->orderBy('label')->get(),
             'defaultParticipantTypeFees' => config('fest_fees.default_participant_type_fees'),
@@ -381,7 +412,19 @@ class FestEventSettingsController extends SahodayaAdminController
             'school_fee_cap' => 'nullable|numeric|min:0',
             'school_fee_min' => 'nullable|numeric|min:0',
             'include_school_registration' => 'nullable|boolean',
-            'class_group_scheme' => 'nullable|in:cbse,sahodaya,cluster,custom',
+            // Accepts a numeric FestClassCategoryScheme id (the new named schemes) or, for
+            // back-compat with events saved before that existed, the legacy string keys.
+            'class_group_scheme' => ['nullable', function ($attribute, $value, $fail) {
+                if ($value === null || $value === '') {
+                    return;
+                }
+                if (in_array($value, ['cbse', 'sahodaya', 'cluster', 'custom'], true)) {
+                    return;
+                }
+                if (! ctype_digit((string) $value) || ! \App\Models\FestClassCategoryScheme::forTenant($this->sahodaya->id)->whereKey($value)->exists()) {
+                    $fail('The selected class category scheme is invalid.');
+                }
+            }],
             'class_group_fees' => 'nullable|array',
             'class_group_fees.*' => 'nullable|numeric|min:0',
             'age_group_fees' => 'nullable|array',
@@ -433,6 +476,18 @@ class FestEventSettingsController extends SahodayaAdminController
                     ? (bool) $data['require_fee_before_registration'] : null,
                 'require_verified_students' => array_key_exists('require_verified_students', $data)
                     ? (bool) $data['require_verified_students'] : null,
+                // normalizeEventFeeSettings() above only threads class_group_scheme through for
+                // fee_model === 'item_catalog' — for every other billing model (which is most of
+                // them, including this event's own Composite/sports_composite) it's entirely
+                // absent from that method's return value, and since $feeSettings replaces the
+                // whole fee_settings column wholesale, saving fee settings on a non-item_catalog
+                // event would have silently wiped out whichever class category scheme was set
+                // here. Re-applying it on top, independent of fee_model, is what makes class
+                // categories actually persist for events like this one. Blank/invalid stays null
+                // (omitted) so "inherit Sahodaya default" keeps working rather than getting
+                // force-pinned to a value on every save.
+                'class_group_scheme' => \App\Support\FestClassGroupScheme::isValid($data['class_group_scheme'] ?? null)
+                    ? $data['class_group_scheme'] : null,
             ], fn ($v) => $v !== null),
         );
 
@@ -615,6 +670,8 @@ class FestEventSettingsController extends SahodayaAdminController
             ],
             'label' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
+            'classes' => 'nullable|array',
+            'classes.*' => 'integer|min:1|max:12',
         ]);
 
         $nextOrder = (int) FestEventClassGroup::where('event_id', $event->id)->max('sort_order') + 1;
@@ -649,6 +706,78 @@ class FestEventSettingsController extends SahodayaAdminController
             'fest.settings.class_group_deleted',
             "Custom category removed: {$label}",
         );
+
+        return back()->with('success', 'Category removed.');
+    }
+
+    // --- Named class category schemes (Sahodaya-wide, not per-event) -----------------
+    // Unlike storeClassGroup()/destroyClassGroup() above (legacy, one event's private
+    // category list), these manage FestClassCategoryScheme — a named setup reusable across
+    // every event in this Sahodaya. No $event in scope; these routes sit outside the
+    // events/{event} prefix but still resolve $this->sahodaya from {tenantId} like every
+    // other method on this controller.
+
+    public function storeClassCategoryScheme(Request $request, string $tenantId)
+    {
+        $data = $request->validate([
+            'name' => [
+                'required', 'string', 'max:255',
+                \Illuminate\Validation\Rule::unique('fest_class_category_schemes', 'name')->where('tenant_id', $this->sahodaya->id),
+            ],
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        $nextOrder = (int) \App\Models\FestClassCategoryScheme::forTenant($this->sahodaya->id)->max('sort_order') + 1;
+
+        \App\Models\FestClassCategoryScheme::create(array_merge($data, [
+            'tenant_id' => $this->sahodaya->id,
+            'sort_order' => $nextOrder,
+        ]));
+
+        return back()->with('success', 'Category scheme created.');
+    }
+
+    public function destroyClassCategoryScheme(string $tenantId, \App\Models\FestClassCategoryScheme $classCategoryScheme)
+    {
+        abort_if($classCategoryScheme->tenant_id !== $this->sahodaya->id, 403);
+
+        $name = $classCategoryScheme->name;
+        $classCategoryScheme->delete();
+
+        return back()->with('success', "Category scheme \"{$name}\" removed.");
+    }
+
+    public function storeClassCategorySchemeGroup(Request $request, string $tenantId, \App\Models\FestClassCategoryScheme $classCategoryScheme)
+    {
+        abort_if($classCategoryScheme->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'key' => [
+                'required', 'string', 'max:60', 'alpha_dash',
+                \Illuminate\Validation\Rule::unique('fest_class_category_scheme_groups', 'key')->where('scheme_id', $classCategoryScheme->id),
+            ],
+            'label' => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
+            'classes' => 'nullable|array',
+            'classes.*' => 'integer|min:1|max:12',
+        ]);
+
+        $nextOrder = (int) $classCategoryScheme->groups()->max('sort_order') + 1;
+
+        $classCategoryScheme->groups()->create(array_merge($data, [
+            'tenant_id' => $this->sahodaya->id,
+            'sort_order' => $nextOrder,
+        ]));
+
+        return back()->with('success', 'Category added.');
+    }
+
+    public function destroyClassCategorySchemeGroup(string $tenantId, \App\Models\FestClassCategoryScheme $classCategoryScheme, \App\Models\FestClassCategorySchemeGroup $classCategorySchemeGroup)
+    {
+        abort_if($classCategoryScheme->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($classCategorySchemeGroup->scheme_id !== $classCategoryScheme->id, 404);
+
+        $classCategorySchemeGroup->delete();
 
         return back()->with('success', 'Category removed.');
     }

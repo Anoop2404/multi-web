@@ -153,6 +153,7 @@ const props = defineProps({
     classGroupLabels: Object,
     classGroupScheme: String,
     classGroupSchemeOptions: Object,
+    classCategorySchemes: { type: Array, default: () => [] },
     defaultClassGroupFees: Object,
     defaultParticipantTypeFees: Object,
     ageGroupLabels: Object,

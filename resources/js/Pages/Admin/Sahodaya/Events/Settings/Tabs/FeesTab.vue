@@ -355,31 +355,33 @@
                 </div>
             </section>
 
-            <!-- Competition Class Category Scheme & Class Mappings -->
+            <!-- Class Category Schemes — named, Sahodaya-wide category setups (e.g. "CBSE
+                 Kerala", "English Fest") shared across every event, picked here by id.
+                 Superseded the old fixed cbse/sahodaya/cluster/custom choices. -->
             <section v-if="event.event_type !== 'sports'" class="card space-y-4">
                 <div class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
-                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2.5">
-                        <div>
-                            <h4 class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                                <span>🏷️</span> Event Competition Categories &amp; Linked Classes
-                            </h4>
-                            <p class="text-[11px] text-slate-500 mt-0.5">Select the category scheme and class range mappings for this event.</p>
-                        </div>
-                        <a :href="`/sahodaya-admin/${sahodaya.id}/membership/settings`" class="btn-secondary text-xs font-semibold !bg-white">
-                            ⚙️ Customize Categories &amp; Classes →
-                        </a>
+                    <div class="border-b border-indigo-100 pb-2.5">
+                        <h4 class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                            <span>🏷️</span> Event Competition Categories &amp; Linked Classes
+                        </h4>
+                        <p class="text-[11px] text-slate-500 mt-0.5">
+                            Pick a named category scheme for this event, or create a new one below — e.g. "Category I–IV", "English Fest".
+                        </p>
                     </div>
 
                     <FormField label="Class Category Scheme">
                         <template #default="{ id }">
                             <select :id="id" v-model="feeSettingsForm.class_group_scheme" class="field bg-white mt-1 font-medium">
                                 <option value="">Use Sahodaya Default Scheme</option>
-                                <option v-for="(label, key) in classGroupSchemeOptions" :key="key" :value="key">{{ label }}</option>
+                                <option v-for="scheme in classCategorySchemes" :key="scheme.id" :value="String(scheme.id)">
+                                    {{ scheme.name }}{{ scheme.is_default ? ' (Sahodaya default)' : '' }}
+                                </option>
                             </select>
                         </template>
                     </FormField>
 
-                    <!-- Active Category -> Linked Class List -->
+                    <!-- Active Category -> Linked Class List — reflects what's actually saved
+                         for this event (server-computed), not just what's selected above. -->
                     <div v-if="Object.keys(classGroupLabels ?? {}).length" class="space-y-1.5 pt-1">
                         <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Active Category &amp; Class Mappings</p>
                         <div class="grid sm:grid-cols-2 gap-2 text-xs">
@@ -391,51 +393,95 @@
                         </div>
                     </div>
 
-                    <!-- Custom per-event categories — only relevant once "Custom categories for
-                         this event" is picked above and saved. These aren't fee-specific: once
-                         set, they're what item eligibility, registration checks, ID cards, and
-                         reports use for this event too (App\Support\FestClassGroupScheme). -->
-                    <div v-if="feeSettingsForm.class_group_scheme === 'custom'" class="space-y-3 border-t border-indigo-100 pt-3">
-                        <p class="text-[11px] text-slate-500">
-                            Save the scheme above first if you just switched to Custom, then define this event's
-                            own categories below — e.g. "Junior", "Senior", "Group A".
-                        </p>
-                        <form @submit.prevent="addClassGroup" class="bg-white/80 p-3 rounded-lg border border-indigo-100 space-y-2.5">
-                            <div class="grid gap-2.5 sm:grid-cols-3">
-                                <FormField label="Key" hint="Letters/numbers/dashes only" class-extra="mb-0">
-                                    <template #default="{ id }">
-                                        <input :id="id" v-model="classGroupForm.key" class="field text-xs" placeholder="e.g. junior" required>
-                                    </template>
-                                </FormField>
-                                <FormField label="Display label" class-extra="mb-0">
-                                    <template #default="{ id }">
-                                        <input :id="id" v-model="classGroupForm.label" class="field text-xs" placeholder="e.g. Junior (Class 5-7)" required>
-                                    </template>
-                                </FormField>
-                                <FormField label="Description (optional)" class-extra="mb-0">
-                                    <template #default="{ id }">
-                                        <input :id="id" v-model="classGroupForm.description" class="field text-xs" placeholder="Internal note">
-                                    </template>
-                                </FormField>
-                            </div>
-                            <div class="flex justify-end">
-                                <button type="submit" class="btn-secondary text-xs !py-1 !px-3" :disabled="classGroupForm.processing">Add category</button>
-                            </div>
+                    <div class="border-t border-indigo-100 pt-3 space-y-3">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Manage Category Schemes</p>
+
+                        <!-- Create a brand new named scheme, reusable by any event in this Sahodaya -->
+                        <form @submit.prevent="addClassCategoryScheme"
+                              class="bg-white/80 p-3 rounded-lg border border-indigo-100 flex flex-wrap gap-2 items-end">
+                            <FormField label="New scheme name" class-extra="mb-0 flex-1 min-w-[10rem]">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model="classCategorySchemeForm.name" class="field text-xs" placeholder="e.g. English Fest" required>
+                                </template>
+                            </FormField>
+                            <FormField label="Description (optional)" class-extra="mb-0 flex-1 min-w-[10rem]">
+                                <template #default="{ id }">
+                                    <input :id="id" v-model="classCategorySchemeForm.description" class="field text-xs" placeholder="Internal note">
+                                </template>
+                            </FormField>
+                            <button type="submit" class="btn-secondary text-xs !py-1 !px-3" :disabled="classCategorySchemeForm.processing">
+                                Create scheme
+                            </button>
                         </form>
 
-                        <div v-if="customClassGroups.length" class="rounded-lg border border-indigo-100 overflow-hidden bg-white">
-                            <ul class="divide-y divide-slate-100 text-xs">
-                                <li v-for="g in customClassGroups" :key="g.id" class="p-2.5 flex items-center justify-between">
-                                    <div>
-                                        <span class="font-semibold text-slate-900">{{ g.label }}</span>
-                                        <span class="font-mono text-[10px] text-slate-400 ml-1">({{ g.key }})</span>
-                                        <p v-if="g.description" class="text-slate-500">{{ g.description }}</p>
+                        <!-- Categories within whichever scheme is selected above -->
+                        <div v-if="selectedScheme" class="bg-white/80 p-3 rounded-lg border border-indigo-100 space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-semibold text-slate-800">Categories in "{{ selectedScheme.name }}"</p>
+                                <button type="button" @click="confirmDeleteScheme(selectedScheme)" class="text-red-600 text-[11px] shrink-0">
+                                    Delete this scheme
+                                </button>
+                            </div>
+
+                            <form @submit.prevent="addClassCategorySchemeGroup(selectedScheme.id)" class="space-y-2.5">
+                                <div class="grid gap-2.5 sm:grid-cols-3">
+                                    <FormField label="Key" hint="Letters/numbers/dashes only" class-extra="mb-0">
+                                        <template #default="{ id }">
+                                            <input :id="id" v-model="schemeGroupForm.key" class="field text-xs" placeholder="e.g. junior" required>
+                                        </template>
+                                    </FormField>
+                                    <FormField label="Display label" class-extra="mb-0">
+                                        <template #default="{ id }">
+                                            <input :id="id" v-model="schemeGroupForm.label" class="field text-xs" placeholder="e.g. Junior" required>
+                                        </template>
+                                    </FormField>
+                                    <FormField label="Description (optional)" class-extra="mb-0">
+                                        <template #default="{ id }">
+                                            <input :id="id" v-model="schemeGroupForm.description" class="field text-xs" placeholder="Internal note">
+                                        </template>
+                                    </FormField>
+                                </div>
+                                <div>
+                                    <p class="form-label text-xs mb-1">Classes in this category</p>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <label v-for="n in 12" :key="n"
+                                               class="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs cursor-pointer select-none"
+                                               :class="schemeGroupForm.classes.includes(n)
+                                                   ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
+                                                   : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'">
+                                            <input type="checkbox" class="hidden" :value="n" v-model="schemeGroupForm.classes">
+                                            Class {{ n }}
+                                        </label>
                                     </div>
-                                    <button type="button" @click="removeClassGroup(g.id)" class="text-red-600 text-xs shrink-0">Remove</button>
-                                </li>
-                            </ul>
+                                    <p class="text-[11px] text-slate-400 mt-1">
+                                        A class left unassigned to any category in this scheme falls back to "Open / All Categories".
+                                    </p>
+                                </div>
+                                <div class="flex justify-end">
+                                    <button type="submit" class="btn-secondary text-xs !py-1 !px-3" :disabled="schemeGroupForm.processing">Add category</button>
+                                </div>
+                            </form>
+
+                            <div v-if="selectedScheme.groups?.length" class="rounded-lg border border-indigo-100 overflow-hidden bg-white">
+                                <ul class="divide-y divide-slate-100 text-xs">
+                                    <li v-for="g in selectedScheme.groups" :key="g.id" class="p-2.5 flex items-center justify-between">
+                                        <div>
+                                            <span class="font-semibold text-slate-900">{{ g.label }}</span>
+                                            <span class="font-mono text-[10px] text-slate-400 ml-1">({{ g.key }})</span>
+                                            <p class="text-slate-500">
+                                                {{ g.classes?.length ? `Classes ${[...g.classes].sort((a, b) => a - b).join(', ')}` : 'No classes assigned yet' }}
+                                            </p>
+                                            <p v-if="g.description" class="text-slate-400">{{ g.description }}</p>
+                                        </div>
+                                        <button type="button" @click="confirmDeleteSchemeGroup(selectedScheme, g)" class="text-red-600 text-xs shrink-0">
+                                            Remove
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                            <p v-else class="text-xs text-slate-400">No categories in this scheme yet.</p>
                         </div>
-                        <p v-else class="text-xs text-slate-400">No custom categories added yet.</p>
+                        <p v-else class="text-xs text-slate-400">Pick a scheme above (or create one) to manage its categories.</p>
                     </div>
                 </div>
             </section>
@@ -636,13 +682,49 @@ import { computed, inject, ref } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const {
-    feeSettingsForm, feeModels, event, classGroupSchemeOptions, classGroupScheme, classGroupLabels,
+    feeSettingsForm, feeModels, event, classGroupLabels,
     ageGroupLabels, defaultAgeGroupFees, defaultClassGroupFees, effectiveClassGroupLabels, saveFeeSettings,
-    sahodaya, ledgerAccount, customClassGroups, classGroupForm, addClassGroup, removeClassGroup,
+    sahodaya, ledgerAccount, classCategorySchemes,
+    classCategorySchemeForm, schemeGroupForm,
+    addClassCategoryScheme, removeClassCategoryScheme,
+    addClassCategorySchemeGroup, removeClassCategorySchemeGroup,
 } = inject('eventSettings');
 
 if (event.event_type === 'sports') {
     feeSettingsForm.fee_model = 'sports_composite';
+}
+
+// The scheme currently selected in the dropdown (by id) — drives both the "Manage
+// Category Schemes" editor below and, via effectiveClassGroupLabels in the composable,
+// the live "Fees by class category" preview as the admin switches schemes before saving.
+const selectedScheme = computed(() => (
+    (classCategorySchemes ?? []).find((s) => String(s.id) === String(feeSettingsForm.class_group_scheme)) ?? null
+));
+
+// Deleting a scheme or a category inside it doesn't cascade-fix anything elsewhere — any
+// event still pointed at the scheme, or any student/item already tagged with the category's
+// key, keeps that stale reference until someone manually reassigns it. Warn with exactly
+// what's affected (events_count/event_titles come from the backend) before either delete
+// actually fires, matching this codebase's existing confirm()-before-destructive-action
+// pattern (see AcademicYears/Index.vue, SportsAgeGroups/Index.vue, etc.).
+function confirmDeleteScheme(scheme) {
+    const count = scheme.events_count ?? 0;
+    const message = count > 0
+        ? `Delete "${scheme.name}"? ${count} event${count === 1 ? ' is' : 's are'} currently using it`
+            + (scheme.event_titles?.length ? ` (${scheme.event_titles.join(', ')})` : '')
+            + ` — you'll need to reassign ${count === 1 ? 'that event' : 'those events'} to a different scheme afterward. This cannot be undone.`
+        : `Delete "${scheme.name}"? This cannot be undone.`;
+
+    if (!confirm(message)) return;
+    removeClassCategoryScheme(scheme.id);
+}
+
+function confirmDeleteSchemeGroup(scheme, group) {
+    const message = `Remove category "${group.label}" from "${scheme.name}"? Any students or items already placed `
+        + `in this category will need to be reassigned to a different category afterward. This cannot be undone.`;
+
+    if (!confirm(message)) return;
+    removeClassCategorySchemeGroup(scheme.id, group.id);
 }
 
 // Display-only relabel — the stored fee_model value stays 'sports_composite' either way
