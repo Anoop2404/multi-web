@@ -361,18 +361,39 @@
                     <p class="section-desc">Default fee applied when an item has no per-item override.</p>
                 </div>
 
-                <div v-if="event.event_type !== 'sports'">
-                    <FormField label="Class category scheme">
+                <div v-if="event.event_type !== 'sports'" class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2.5">
+                        <div>
+                            <h4 class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                                <span>🏷️</span> Event Competition Categories &amp; Linked Classes
+                            </h4>
+                            <p class="text-[11px] text-slate-500 mt-0.5">Select the category scheme and class range mappings for this event.</p>
+                        </div>
+                        <a :href="`/sahodaya-admin/${sahodaya.id}/membership/settings`" class="btn-secondary text-xs font-semibold !bg-white">
+                            ⚙️ Customize Categories &amp; Classes →
+                        </a>
+                    </div>
+
+                    <FormField label="Class Category Scheme">
                         <template #default="{ id }">
-                            <select :id="id" v-model="feeSettingsForm.class_group_scheme" class="field mt-1">
-                                <option value="">Use Sahodaya default</option>
+                            <select :id="id" v-model="feeSettingsForm.class_group_scheme" class="field bg-white mt-1 font-medium">
+                                <option value="">Use Sahodaya Default Scheme</option>
                                 <option v-for="(label, key) in classGroupSchemeOptions" :key="key" :value="key">{{ label }}</option>
                             </select>
                         </template>
                     </FormField>
-                    <p class="text-xs text-slate-500 mt-1">
-                        Active scheme: <strong>{{ classGroupSchemeOptions[classGroupScheme] ?? classGroupScheme }}</strong>
-                    </p>
+
+                    <!-- Active Category -> Linked Class List -->
+                    <div v-if="Object.keys(classGroupLabels ?? {}).length" class="space-y-1.5 pt-1">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Active Category &amp; Class Mappings</p>
+                        <div class="grid sm:grid-cols-2 gap-2 text-xs">
+                            <div v-for="(label, key) in classGroupLabels" :key="key"
+                                 class="p-2.5 rounded-lg border border-white bg-white/80 shadow-xs flex items-center justify-between">
+                                <span class="font-semibold text-slate-800">{{ label }}</span>
+                                <span class="font-mono text-[10px] uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold">{{ key }}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <label class="flex items-start gap-2 text-sm">
