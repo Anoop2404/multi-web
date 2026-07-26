@@ -506,30 +506,7 @@ class SchoolApplicationForm
         return $config;
     }
 
-    /** @return list<string> Fields schools may update from their admin panel. */
-    public static function editableFieldKeys(): array
-    {
-        return [
-            'school_prefix', 'cbse_affiliation',
-            'phone', 'website', 'address', 'district', 'highest_class',
-            'principal_name', 'principal_email', 'principal_phone',
-            'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
-            'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
-        ];
-    }
 
-    /** @return array<string, list<string>> */
-    public static function profileSectionFieldKeys(): array
-    {
-        return [
-            'school' => ['school_prefix', 'cbse_affiliation', 'phone', 'website', 'address', 'district', 'highest_class'],
-            'principal' => ['principal_name', 'principal_email', 'principal_phone'],
-            'leadership' => [
-                'vice_principal_name', 'vice_principal_email', 'vice_principal_phone',
-                'event_coordinator_name', 'event_coordinator_email', 'event_coordinator_phone',
-            ],
-        ];
-    }
 
     /** @return array<string, mixed> */
     public static function schoolProfileValidationRulesForSection(Tenant $school, array $fields, string $section): array
