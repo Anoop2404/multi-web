@@ -399,7 +399,7 @@
                         <!-- Create a brand new named scheme, reusable by any event in this Sahodaya -->
                         <form @submit.prevent="addClassCategoryScheme"
                               class="bg-white/80 p-3 rounded-lg border border-indigo-100 flex flex-wrap gap-2 items-end">
-                            <FormField label="New scheme name" class-extra="mb-0 flex-1 min-w-[10rem]">
+                            <FormField label="New scheme name" :error="classCategorySchemeForm.errors.name" class-extra="mb-0 flex-1 min-w-[10rem]">
                                 <template #default="{ id }">
                                     <input :id="id" v-model="classCategorySchemeForm.name" class="field text-xs" placeholder="e.g. English Fest" required>
                                 </template>
@@ -425,17 +425,17 @@
 
                             <form @submit.prevent="addClassCategorySchemeGroup(selectedScheme.id)" class="space-y-2.5">
                                 <div class="grid gap-2.5 sm:grid-cols-3">
-                                    <FormField label="Key" hint="Letters/numbers/dashes only" class-extra="mb-0">
+                                    <FormField label="Key" hint="Letters/numbers/dashes only — no spaces" :error="schemeGroupForm.errors.key" class-extra="mb-0">
                                         <template #default="{ id }">
                                             <input :id="id" v-model="schemeGroupForm.key" class="field text-xs" placeholder="e.g. junior" required>
                                         </template>
                                     </FormField>
-                                    <FormField label="Display label" class-extra="mb-0">
+                                    <FormField label="Display label" :error="schemeGroupForm.errors.label" class-extra="mb-0">
                                         <template #default="{ id }">
                                             <input :id="id" v-model="schemeGroupForm.label" class="field text-xs" placeholder="e.g. Junior" required>
                                         </template>
                                     </FormField>
-                                    <FormField label="Description (optional)" class-extra="mb-0">
+                                    <FormField label="Description (optional)" :error="schemeGroupForm.errors.description" class-extra="mb-0">
                                         <template #default="{ id }">
                                             <input :id="id" v-model="schemeGroupForm.description" class="field text-xs" placeholder="Internal note">
                                         </template>
@@ -464,18 +464,60 @@
 
                             <div v-if="selectedScheme.groups?.length" class="rounded-lg border border-indigo-100 overflow-hidden bg-white">
                                 <ul class="divide-y divide-slate-100 text-xs">
-                                    <li v-for="g in selectedScheme.groups" :key="g.id" class="p-2.5 flex items-center justify-between">
-                                        <div>
-                                            <span class="font-semibold text-slate-900">{{ g.label }}</span>
-                                            <span class="font-mono text-[10px] text-slate-400 ml-1">({{ g.key }})</span>
-                                            <p class="text-slate-500">
-                                                {{ g.classes?.length ? `Classes ${[...g.classes].sort((a, b) => a - b).join(', ')}` : 'No classes assigned yet' }}
-                                            </p>
-                                            <p v-if="g.description" class="text-slate-400">{{ g.description }}</p>
+                                    <li v-for="g in selectedScheme.groups" :key="g.id" class="p-2.5">
+                                        <!-- Inline edit mode -->
+                                        <form v-if="editingSchemeGroupId === g.id" @submit.prevent="saveSchemeGroupEdit(selectedScheme.id)" class="space-y-2.5">
+                                            <div class="grid gap-2.5 sm:grid-cols-3">
+                                                <FormField label="Key" hint="Letters/numbers/dashes only — no spaces" :error="schemeGroupEditForm.errors.key" class-extra="mb-0">
+                                                    <template #default="{ id }">
+                                                        <input :id="id" v-model="schemeGroupEditForm.key" class="field text-xs" required>
+                                                    </template>
+                                                </FormField>
+                                                <FormField label="Display label" :error="schemeGroupEditForm.errors.label" class-extra="mb-0">
+                                                    <template #default="{ id }">
+                                                        <input :id="id" v-model="schemeGroupEditForm.label" class="field text-xs" required>
+                                                    </template>
+                                                </FormField>
+                                                <FormField label="Description (optional)" :error="schemeGroupEditForm.errors.description" class-extra="mb-0">
+                                                    <template #default="{ id }">
+                                                        <input :id="id" v-model="schemeGroupEditForm.description" class="field text-xs">
+                                                    </template>
+                                                </FormField>
+                                            </div>
+                                            <div>
+                                                <p class="form-label text-xs mb-1">Classes in this category</p>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    <label v-for="n in 12" :key="n"
+                                                           class="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs cursor-pointer select-none"
+                                                           :class="schemeGroupEditForm.classes.includes(n)
+                                                               ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
+                                                               : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'">
+                                                        <input type="checkbox" class="hidden" :value="n" v-model="schemeGroupEditForm.classes">
+                                                        Class {{ n }}
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="flex justify-end gap-2">
+                                                <button type="button" @click="cancelEditSchemeGroup" class="btn-secondary text-xs !py-1 !px-3">Cancel</button>
+                                                <button type="submit" class="btn-primary text-xs !py-1 !px-3" :disabled="schemeGroupEditForm.processing">Save</button>
+                                            </div>
+                                        </form>
+
+                                        <!-- Display mode -->
+                                        <div v-else class="flex items-center justify-between">
+                                            <div>
+                                                <span class="font-semibold text-slate-900">{{ g.label }}</span>
+                                                <span class="font-mono text-[10px] text-slate-400 ml-1">({{ g.key }})</span>
+                                                <p class="text-slate-500">
+                                                    {{ g.classes?.length ? `Classes ${[...g.classes].sort((a, b) => a - b).join(', ')}` : 'No classes assigned yet' }}
+                                                </p>
+                                                <p v-if="g.description" class="text-slate-400">{{ g.description }}</p>
+                                            </div>
+                                            <div class="flex items-center gap-3 shrink-0">
+                                                <button type="button" @click="startEditSchemeGroup(g)" class="text-slate-600 text-xs">Edit</button>
+                                                <button type="button" @click="confirmDeleteSchemeGroup(selectedScheme, g)" class="text-red-600 text-xs">Remove</button>
+                                            </div>
                                         </div>
-                                        <button type="button" @click="confirmDeleteSchemeGroup(selectedScheme, g)" class="text-red-600 text-xs shrink-0">
-                                            Remove
-                                        </button>
                                     </li>
                                 </ul>
                             </div>
@@ -688,6 +730,8 @@ const {
     classCategorySchemeForm, schemeGroupForm,
     addClassCategoryScheme, removeClassCategoryScheme,
     addClassCategorySchemeGroup, removeClassCategorySchemeGroup,
+    editingSchemeGroupId, schemeGroupEditForm,
+    startEditSchemeGroup, cancelEditSchemeGroup, saveSchemeGroupEdit,
 } = inject('eventSettings');
 
 if (event.event_type === 'sports') {

@@ -418,6 +418,33 @@ export function useEventSettingsForms(props) {
         router.delete(`${sahodayaBase}/class-category-schemes/${schemeId}/groups/${groupId}`, { preserveScroll: true });
     }
 
+    // Inline edit for an existing category within a scheme — mirrors the venue edit pattern
+    // above (editingVenueId/venueEditForm). Previously the only way to fix a category's key,
+    // label, or classes was delete-and-recreate; this lets it be corrected in place.
+    const editingSchemeGroupId = ref(null);
+    const schemeGroupEditForm = useForm({ key: '', label: '', description: '', classes: [] });
+
+    function startEditSchemeGroup(group) {
+        editingSchemeGroupId.value = group.id;
+        schemeGroupEditForm.clearErrors();
+        schemeGroupEditForm.key = group.key ?? '';
+        schemeGroupEditForm.label = group.label ?? '';
+        schemeGroupEditForm.description = group.description ?? '';
+        schemeGroupEditForm.classes = [...(group.classes ?? [])];
+    }
+
+    function cancelEditSchemeGroup() {
+        editingSchemeGroupId.value = null;
+        schemeGroupEditForm.clearErrors();
+    }
+
+    function saveSchemeGroupEdit(schemeId) {
+        schemeGroupEditForm.put(`${sahodayaBase}/class-category-schemes/${schemeId}/groups/${editingSchemeGroupId.value}`, {
+            preserveScroll: true,
+            onSuccess: () => { editingSchemeGroupId.value = null; },
+        });
+    }
+
     const editingVenueId = ref(null);
     const venueEditForm = useForm({ name: '', location: '', capacity: null, region_id: '' });
 
@@ -576,6 +603,11 @@ export function useEventSettingsForms(props) {
         removeClassCategoryScheme,
         addClassCategorySchemeGroup,
         removeClassCategorySchemeGroup,
+        editingSchemeGroupId,
+        schemeGroupEditForm,
+        startEditSchemeGroup,
+        cancelEditSchemeGroup,
+        saveSchemeGroupEdit,
         addVenue,
         removeVenue,
         editingVenueId,

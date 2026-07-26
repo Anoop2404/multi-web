@@ -727,6 +727,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/class-category-schemes', [FestEventSettingsController::class, 'storeClassCategoryScheme'])->name('class-category-schemes.store');
         Route::delete('/class-category-schemes/{classCategoryScheme}', [FestEventSettingsController::class, 'destroyClassCategoryScheme'])->name('class-category-schemes.destroy');
         Route::post('/class-category-schemes/{classCategoryScheme}/groups', [FestEventSettingsController::class, 'storeClassCategorySchemeGroup'])->name('class-category-schemes.groups.store');
+        Route::put('/class-category-schemes/{classCategoryScheme}/groups/{classCategorySchemeGroup}', [FestEventSettingsController::class, 'updateClassCategorySchemeGroup'])->name('class-category-schemes.groups.update');
         Route::delete('/class-category-schemes/{classCategoryScheme}/groups/{classCategorySchemeGroup}', [FestEventSettingsController::class, 'destroyClassCategorySchemeGroup'])->name('class-category-schemes.groups.destroy');
 
         // Membership settings

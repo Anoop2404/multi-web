@@ -772,6 +772,29 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', 'Category added.');
     }
 
+    public function updateClassCategorySchemeGroup(Request $request, string $tenantId, \App\Models\FestClassCategoryScheme $classCategoryScheme, \App\Models\FestClassCategorySchemeGroup $classCategorySchemeGroup)
+    {
+        abort_if($classCategoryScheme->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($classCategorySchemeGroup->scheme_id !== $classCategoryScheme->id, 404);
+
+        $data = $request->validate([
+            'key' => [
+                'required', 'string', 'max:60', 'alpha_dash',
+                \Illuminate\Validation\Rule::unique('fest_class_category_scheme_groups', 'key')
+                    ->where('scheme_id', $classCategoryScheme->id)
+                    ->ignore($classCategorySchemeGroup->id),
+            ],
+            'label' => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
+            'classes' => 'nullable|array',
+            'classes.*' => 'integer|min:1|max:12',
+        ]);
+
+        $classCategorySchemeGroup->update($data);
+
+        return back()->with('success', 'Category updated.');
+    }
+
     public function destroyClassCategorySchemeGroup(string $tenantId, \App\Models\FestClassCategoryScheme $classCategoryScheme, \App\Models\FestClassCategorySchemeGroup $classCategorySchemeGroup)
     {
         abort_if($classCategoryScheme->tenant_id !== $this->sahodaya->id, 403);
