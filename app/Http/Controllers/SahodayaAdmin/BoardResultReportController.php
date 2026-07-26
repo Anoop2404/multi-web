@@ -109,7 +109,11 @@ class BoardResultReportController extends SahodayaAdminController
             ->values()
             ->all();
 
-        $academicYearOptions = AcademicYear::optionsForSahodaya($this->sahodaya->id);
+        // AcademicYear::optionsForSahodaya() never existed — the Vue page expects
+        // {id, label} pairs for its <option :key="ay.id" :value="ay.label"> loop, not the
+        // flat label strings AcademicYear::options() returns. Matches the same query
+        // FestEventController already uses for the same shape (see its 'academicYearOptions').
+        $academicYearOptions = \App\Models\AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label']);
 
         return $this->inertia('Sahodaya/BoardResults/SubjectMeritRegister', [
             'rows' => $rows,
