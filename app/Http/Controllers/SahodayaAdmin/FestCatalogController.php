@@ -319,7 +319,7 @@ class FestCatalogController extends SahodayaAdminController
             'qualify_count'=> 'nullable|integer|min:1',
             'max_per_school'=> 'nullable|integer|min:1',
             'gender'             => 'nullable|in:male,female,mixed,open',
-            'participant_type'   => 'nullable|in:individual,group,team',
+            'participant_type'   => 'nullable|in:individual,pair,trio,group,team',
             'age_group'          => 'nullable|string|max:20',
             'class_group'        => 'nullable|in:lp,up,hs,hss,open',
             'kids_band'          => 'nullable|string|max:20',

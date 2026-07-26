@@ -89,9 +89,9 @@ return [
     ],
 
     'participant_type' => [
-        'individual' => 'Individual',
-        'pair'       => 'Pair',
-        'trio'       => 'Trio',
+        'individual' => 'Individual (1 student)',
+        'pair'       => 'Pair (2 students)',
+        'trio'       => 'Trio (3 students)',
         'group'      => 'Group',
         'team'       => 'Team',
     ],

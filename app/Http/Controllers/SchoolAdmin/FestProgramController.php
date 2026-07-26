@@ -201,7 +201,7 @@ class FestProgramController extends SchoolAdminController
             'title'            => 'required|string|max:255',
             'class_group'      => 'nullable|in:lp,up,hs,hss,open',
             'gender'           => 'nullable|in:male,female,mixed,open',
-            'participant_type' => 'nullable|in:individual,group,team',
+            'participant_type' => 'nullable|in:individual,pair,trio,group,team',
         ]);
 
         $data['event_id'] = $festProgram->id;

@@ -36,20 +36,18 @@ class FestTaxonomyRegistry
                 continue;
             }
 
-            if ($this->query($dim)->exists()) {
-                continue;
-            }
-
             $sort = 0;
             foreach ($this->configLabels($dim) as $key => $label) {
-                FestTaxonomyMaster::create([
-                    'tenant_id'  => $this->tenantId,
-                    'dimension'  => $dim,
-                    'entry_key'  => $key,
-                    'label'      => $label,
-                    'sort_order' => $sort++,
-                    'is_active'  => true,
-                ]);
+                if (! $this->query($dim)->where('entry_key', $key)->exists()) {
+                    FestTaxonomyMaster::create([
+                        'tenant_id'  => $this->tenantId,
+                        'dimension'  => $dim,
+                        'entry_key'  => $key,
+                        'label'      => $label,
+                        'sort_order' => $sort++,
+                        'is_active'  => true,
+                    ]);
+                }
             }
         }
     }
@@ -182,9 +180,9 @@ class FestTaxonomyRegistry
 
         if (empty($merged['participant_type'])) {
             $merged['participant_type'] = [
-                'individual' => 'Individual',
-                'pair'       => 'Pair',
-                'trio'       => 'Trio',
+                'individual' => 'Individual (1 student)',
+                'pair'       => 'Pair (2 students)',
+                'trio'       => 'Trio (3 students)',
                 'group'      => 'Group',
                 'team'       => 'Team',
             ];

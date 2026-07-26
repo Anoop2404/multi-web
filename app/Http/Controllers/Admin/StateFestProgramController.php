@@ -163,7 +163,7 @@ class StateFestProgramController extends Controller
             'venue_type'         => 'nullable|in:indoor,outdoor',
             'competition_format' => 'nullable|in:individual,singles,doubles,mixed_doubles,team,relay,group,board_game',
             'sport_discipline'   => 'nullable|string|max:40',
-            'participant_type'   => 'nullable|in:individual,group,team',
+            'participant_type'   => 'nullable|in:individual,pair,trio,group,team',
             'gender'             => 'nullable|in:male,female,mixed,open',
             'class_group'        => 'nullable|in:lp,up,hs,hss,open',
             'age_group'          => 'nullable|in:u8,u10,u11,u12,u14,u17,u19,open',
