@@ -697,8 +697,16 @@ if (event.event_type === 'sports') {
 // The scheme currently selected in the dropdown (by id) — drives both the "Manage
 // Category Schemes" editor below and, via effectiveClassGroupLabels in the composable,
 // the live "Fees by class category" preview as the admin switches schemes before saving.
+//
+// classCategorySchemes comes from inject('eventSettings'), which is built in Settings.vue
+// as `{ ...toRefs(props), ...ctx }` — every key sourced from props (this one included) is
+// therefore a real Vue Ref, not the plain array itself. Template expressions elsewhere in
+// this file auto-unwrap refs like this transparently, but plain script code (like this
+// computed's callback) does not get that treatment — calling `.find()` directly on the Ref
+// throws "TypeError: ...find is not a function" and crashes this component's entire render,
+// which is why the whole Fees tab was rendering blank. `.value` is required here.
 const selectedScheme = computed(() => (
-    (classCategorySchemes ?? []).find((s) => String(s.id) === String(feeSettingsForm.class_group_scheme)) ?? null
+    (classCategorySchemes.value ?? []).find((s) => String(s.id) === String(feeSettingsForm.class_group_scheme)) ?? null
 ));
 
 // Deleting a scheme or a category inside it doesn't cascade-fix anything elsewhere — any
