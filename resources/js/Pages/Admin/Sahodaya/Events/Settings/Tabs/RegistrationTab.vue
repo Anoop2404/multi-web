@@ -162,6 +162,14 @@ import { Link } from '@inertiajs/vue3';
 
 const { registrationSettingsForm, saveRegistrationSettings, saveItemWindow, saveAllItemWindows, bulkSavingItemWindows, saveHeadWindow, sahodaya, event, itemHeads, clusterRequireStudentVerification } = inject('eventSettings');
 
+// event and itemHeads come from inject('eventSettings'), which Settings.vue provides
+// as `{ ...toRefs(props), ...ctx }` — every prop-sourced key is a real Vue Ref, not
+// the plain value. Template expressions auto-unwrap refs transparently, but plain
+// script code does NOT get that treatment (see the identical bug fix in FeesTab.vue).
+// `.value` is required here to access the actual items/heads array.
+const eventVal = event.value ?? {};
+const itemHeadsVal = itemHeads.value ?? [];
+
 const savingId = ref(null);
 const savingHeadId = ref(null);
 
@@ -183,9 +191,9 @@ function mapItem(item) {
     };
 }
 
-const itemRows = ref((event.items ?? []).map(mapItem));
+const itemRows = ref((eventVal.items ?? []).map(mapItem));
 
-const headRows = ref((itemHeads ?? []).map((head) => ({
+const headRows = ref(itemHeadsVal.map((head) => ({
     id: head.id,
     name: head.name,
     reg_start: toDateInput(head.reg_start),
@@ -194,11 +202,11 @@ const headRows = ref((itemHeads ?? []).map((head) => ({
     competition_end: toDateInput(head.competition_end),
 })));
 
-watch(() => event.items, (items) => {
+watch(() => event.value?.items, (items) => {
     itemRows.value = (items ?? []).map(mapItem);
 }, { deep: true });
 
-watch(() => itemHeads, (heads) => {
+watch(() => itemHeads.value, (heads) => {
     headRows.value = (heads ?? []).map((head) => ({
         id: head.id,
         name: head.name,

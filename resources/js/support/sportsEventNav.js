@@ -58,6 +58,7 @@ export function sportsEventSidebarNav(base, caps) {
         items: [
             { label: 'Overview', href: `${base}?overview=1`, icon: 'grid', exact: true, permissions: FEST_VIEW },
             { label: 'Setup & Settings', href: `${base}/setup`, icon: 'settings', permissions: FEST_SETTINGS },
+            { label: 'Item windows', href: `${base}/settings/registration`, icon: 'calendar', permissions: FEST_SETTINGS },
             { label: 'Activity log', href: `${base}/activity`, icon: 'clock', permissions: FEST_VIEW },
         ],
     });
