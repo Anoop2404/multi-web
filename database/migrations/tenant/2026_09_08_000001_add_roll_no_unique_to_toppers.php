@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Topper;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -14,12 +13,16 @@ return new class extends Migration
         // index. The earlier duplication bug may have created multiple toppers with
         // the same roll_no within the same board_result. Keep only the most recently
         // updated row for each duplicate pair; older duplicates are removed.
+        //
+        // Uses HAVING COUNT(*) > 1 (not the alias "cnt") because PostgreSQL rejects
+        // column aliases in HAVING clauses.
         $duplicates = DB::table('toppers')
-            ->select('board_result_id', 'roll_no', DB::raw('COUNT(*) as cnt'))
+            ->select('board_result_id', 'roll_no')
+            ->selectRaw('COUNT(*) as cnt')
             ->whereNotNull('roll_no')
             ->where('roll_no', '!=', '')
             ->groupBy('board_result_id', 'roll_no')
-            ->having('cnt', '>', 1)
+            ->having(DB::raw('COUNT(*)'), '>', 1)
             ->get();
 
         foreach ($duplicates as $dup) {
