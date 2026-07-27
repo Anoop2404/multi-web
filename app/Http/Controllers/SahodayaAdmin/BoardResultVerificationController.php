@@ -226,7 +226,7 @@ class BoardResultVerificationController extends SahodayaAdminController
 
             if (! $locked->hasResultPdf()) {
                 throw ValidationException::withMessages([
-                    'result_pdf' => 'Cannot publish without a CBSE result PDF on file.',
+                    'result_pdf' => 'Cannot publish without a proof document on file.',
                 ]);
             }
 

@@ -170,7 +170,7 @@
                     <div>
                         <div class="flex items-center gap-2 mb-3">
                             <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">2</span>
-                            <h3 class="font-bold text-gray-800 text-sm">CBSE Result Document (PDF / Image Proof)</h3>
+                            <h3 class="font-bold text-gray-800 text-sm">Proof Document (PDF / Image)</h3>
                         </div>
 
                         <div class="grid sm:grid-cols-2 gap-4">
@@ -416,8 +416,19 @@ function rowTotalMarks(row) {
     return classXTotal.value;
 }
 
+function resolveStreamKey(raw) {
+    if (!raw) return searchStream.value || 'science';
+    const lower = String(raw).toLowerCase().trim();
+    for (const [key, label] of Object.entries(props.streamOptions ?? {})) {
+        if (key.toLowerCase() === lower || String(label).toLowerCase() === lower) {
+            return key;
+        }
+    }
+    return raw;
+}
+
 function blankRow() {
-    return { name: '', gender: '', stream_key: '', roll_no: '', marks_obtained: '', photo: null };
+    return { name: '', gender: '', stream_key: searchStream.value || 'science', roll_no: '', marks_obtained: '', photo: null };
 }
 
 function resultToFormData(r) {
@@ -426,7 +437,7 @@ function resultToFormData(r) {
             id: t.id,
             name: t.name || '',
             gender: t.gender || '',
-            stream_key: t.stream || (t.exam_stream?.slug) || '',
+            stream_key: resolveStreamKey(t.stream || (t.exam_stream?.slug)),
             roll_no: t.roll_no || '',
             marks_obtained: t.marks_obtained ?? t.total_marks ?? '',
             photo: null,

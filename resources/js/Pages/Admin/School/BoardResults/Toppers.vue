@@ -366,15 +366,15 @@
 
                 <!-- COMMON PROOF DOCUMENT UPLOAD -->
                 <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-3">
-                    <h3 class="font-bold text-gray-900 text-sm uppercase tracking-wide">Common Proof Document (CBSE Result PDF / Proof)</h3>
+                    <h3 class="font-bold text-gray-900 text-sm uppercase tracking-wide">Common Proof Document (PDF / Image)</h3>
                     <div v-if="boardResult.result_pdf_path" class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 flex items-center justify-between shadow-2xs">
                         <div class="flex items-center gap-2 text-xs font-semibold text-emerald-800">
-                            <span>✓ Common Proof Attached</span>
+                            <span>✓ Proof Attached</span>
                             <a :href="`/school-admin/${school.id}/board-results/${boardResult.id}/pdf`" target="_blank" class="underline text-indigo-600 hover:text-indigo-800 font-normal">View File ↗</a>
                         </div>
                         <span class="text-[11px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-medium">Ready</span>
                     </div>
-                    <p class="text-xs text-gray-500">Upload the common CBSE Tabulation Sheet or result proof PDF for verification.</p>
+                    <p class="text-xs text-gray-500">Upload the tabulation sheet or result proof document for verification.</p>
                 </div>
 
                 <!-- DISPLAY ALL SUBJECT-WISE ENTRIES (every student, every subject — not just the top scorer) -->

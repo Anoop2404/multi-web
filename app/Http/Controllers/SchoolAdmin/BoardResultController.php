@@ -183,7 +183,7 @@ class BoardResultController extends SchoolAdminController
         if ($request->boolean('submit_for_review')) {
             if (! $fresh->hasResultPdf()) {
                 throw ValidationException::withMessages([
-                    'result_pdf' => 'Upload the CBSE result PDF before submitting for verification.',
+                    'result_pdf' => 'Upload the proof document before submitting for verification.',
                 ]);
             }
             $this->performSubmit($request, $fresh);
@@ -249,7 +249,7 @@ class BoardResultController extends SchoolAdminController
         if ($request->boolean('submit_for_review')) {
             if (! $fresh->hasResultPdf()) {
                 throw ValidationException::withMessages([
-                    'result_pdf' => 'Upload the CBSE result PDF before submitting for verification.',
+                    'result_pdf' => 'Upload the proof document before submitting for verification.',
                 ]);
             }
             $this->performSubmit($request, $fresh);
@@ -300,12 +300,37 @@ class BoardResultController extends SchoolAdminController
             }
         }
 
+        // Check for duplicate roll_no WITHIN the submitted rows.
+        $rollNos = $rows->pluck('roll_no')->filter(fn ($v) => filled($v))->values();
+        if ($rollNos->count() !== $rollNos->unique()->count()) {
+            $dupes = $rollNos->duplicates()->unique()->values()->implode(', ');
+            throw ValidationException::withMessages([
+                'toppers' => "Duplicate CBSE Roll No(s) in the form: {$dupes}. Each roll number must be unique.",
+            ]);
+        }
+
         return $rows->all();
     }
 
     /**
+     * Find the existing topper (from a collection) that a form row matches, using
+     * admission_no → roll_no → name as priority order. Returns null when no match.
+     *
+     * @param  \Illuminate\Support\Collection<int, Topper>|list<Topper>  $toppers
+     * @param  array<string, mixed>  $row
+     */
+    private function matchTopper($toppers, array $row): ?Topper
+    {
+        return (new \Illuminate\Support\Collection($toppers))->first(
+            fn (Topper $t) => (filled($row['admission_no'] ?? null) && $t->admission_no === $row['admission_no'])
+                || (blank($row['admission_no'] ?? null) && filled($row['roll_no'] ?? null) && $t->roll_no === $row['roll_no'])
+                || (blank($row['admission_no'] ?? null) && blank($row['roll_no'] ?? null) && strtolower($t->name) === strtolower($row['name']))
+        );
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $rows  keyed by original request index
-     * @return int number of toppers created
+     * @return int number of toppers created (updated rows are not counted)
      */
     private function createToppersFromRows(Request $request, BoardResult $boardResult, array $rows): int
     {
@@ -321,6 +346,12 @@ class BoardResultController extends SchoolAdminController
         // on the Top-N cap check and rank auto-increment.
         return DB::transaction(function () use ($request, $boardResult, $rows, $sahodayaId, $isClass12, $marksConfig) {
             BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
+
+            // Pre-load existing toppers for this result so we can match rows to them
+            // and update in place — prevents duplicate toppers on every save.
+            $existingToppers = Topper::where('board_result_id', $boardResult->id)
+                ->get(['id', 'name', 'roll_no', 'admission_no', 'gender', 'stream', 'stream_id',
+                       'total_marks', 'marks_obtained', 'percentage', 'rank', 'photo']);
 
             // Schools can enter as many student toppers/achievers as needed.
             // Sahodaya Top-N config filters reports at the Sahodaya level.
@@ -359,8 +390,28 @@ class BoardResultController extends SchoolAdminController
                 $resolved[$i] = ['stream_label' => $streamLabel, 'stream_id' => $streamId, 'total_marks' => $totalMarks];
             }
 
-            $nextRank = (int) (Topper::where('board_result_id', $boardResult->id)->max('rank') ?? 0) + 1;
+            // Validate that each filled roll_no isn't already taken — queries the DB directly
+            // rather than relying on the potentially-stale pre-loaded collection.
+            foreach ($rows as $i => $row) {
+                if (blank($row['roll_no'] ?? null)) {
+                    continue;
+                }
+                $matched = $this->matchTopper($existingToppers, $row);
+                $conflict = Topper::query()
+                    ->where('board_result_id', $boardResult->id)
+                    ->where('roll_no', $row['roll_no'])
+                    ->when($matched, fn ($q) => $q->where('id', '!=', $matched->id))
+                    ->exists();
+                if ($conflict) {
+                    throw ValidationException::withMessages([
+                        "toppers.{$i}.roll_no" => "CBSE Roll No '{$row['roll_no']}' is already assigned to another topper in this result.",
+                    ]);
+                }
+            }
+
+            $nextRank = (int) ($existingToppers->max('rank') ?? 0) + 1;
             $created = 0;
+            $updated = 0;
 
             foreach ($rows as $i => $row) {
                 $marksObtained = (float) $row['marks_obtained'];
@@ -375,22 +426,42 @@ class BoardResultController extends SchoolAdminController
                     );
                 }
 
-                Topper::create([
-                    'board_result_id' => $boardResult->id,
-                    'tenant_id' => $this->school->id,
-                    'name' => $row['name'],
-                    'roll_no' => $row['roll_no'] ?? null,
-                    'admission_no' => $row['admission_no'] ?? null,
-                    'gender' => $row['gender'] ?? null,
-                    'stream' => $resolved[$i]['stream_label'] ?? $row['stream'] ?? null,
-                    'stream_id' => $resolved[$i]['stream_id'],
-                    'total_marks' => $totalMarks,
-                    'marks_obtained' => $marksObtained,
-                    'percentage' => $percentage,
-                    'rank' => $nextRank++,
-                    'photo' => $photoPath,
-                ]);
-                $created++;
+                // Try to match this row to an existing topper by admission_no, then roll_no,
+                // then name — prevents duplicate creation on every save.
+                $matched = $this->matchTopper($existingToppers, $row);
+
+                if ($matched) {
+                    $matched->update([
+                        'name' => $row['name'],
+                        'roll_no' => $row['roll_no'] ?? $matched->roll_no,
+                        'admission_no' => $row['admission_no'] ?? $matched->admission_no,
+                        'gender' => $row['gender'] ?? $matched->gender,
+                        'stream' => $resolved[$i]['stream_label'] ?? $row['stream'] ?? $matched->stream,
+                        'stream_id' => $resolved[$i]['stream_id'] ?? $matched->stream_id,
+                        'total_marks' => $totalMarks,
+                        'marks_obtained' => $marksObtained,
+                        'percentage' => $percentage,
+                        'photo' => $photoPath ?? $matched->photo,
+                    ]);
+                    $updated++;
+                } else {
+                    Topper::create([
+                        'board_result_id' => $boardResult->id,
+                        'tenant_id' => $this->school->id,
+                        'name' => $row['name'],
+                        'roll_no' => $row['roll_no'] ?? null,
+                        'admission_no' => $row['admission_no'] ?? null,
+                        'gender' => $row['gender'] ?? null,
+                        'stream' => $resolved[$i]['stream_label'] ?? $row['stream'] ?? null,
+                        'stream_id' => $resolved[$i]['stream_id'],
+                        'total_marks' => $totalMarks,
+                        'marks_obtained' => $marksObtained,
+                        'percentage' => $percentage,
+                        'rank' => $nextRank++,
+                        'photo' => $photoPath,
+                    ]);
+                    $created++;
+                }
             }
 
             app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
@@ -407,7 +478,7 @@ class BoardResultController extends SchoolAdminController
 
         if (! $boardResult->hasResultPdf()) {
             throw ValidationException::withMessages([
-                'result_pdf' => 'Upload the CBSE result PDF before submitting for verification.',
+                'result_pdf' => 'Upload the proof document before submitting for verification.',
             ]);
         }
 
@@ -477,7 +548,7 @@ class BoardResultController extends SchoolAdminController
             $boardResult,
         );
 
-        return back()->with('success', 'Result PDF uploaded.');
+        return back()->with('success', 'Proof document uploaded.');
     }
 
     public function destroy(string $tenantId, BoardResult $boardResult)
@@ -732,6 +803,38 @@ class BoardResultController extends SchoolAdminController
             $created = 0;
             $updated = 0;
 
+            // Validate roll_no uniqueness across all rows submitted AND existing toppers.
+            $submittedRollNos = [];
+            foreach ($data['rows'] as $i => $row) {
+                $rollNo = $row['roll_no'] ?? null;
+                if (blank($rollNo)) {
+                    continue;
+                }
+                // Check for duplicate within the submitted rows themselves.
+                if (isset($submittedRollNos[$rollNo])) {
+                    throw ValidationException::withMessages([
+                        "rows.{$i}.roll_no" => "Duplicate CBSE Roll No '{$rollNo}' within the same submission. Each roll number must be unique.",
+                    ]);
+                }
+                $submittedRollNos[$rollNo] = true;
+
+                // Check against existing toppers (excluding the one we'll match/update).
+                $matchedByRollNo = $boardResult->toppers->first(
+                    fn (Topper $t) => $t->roll_no === $rollNo
+                );
+                if ($matchedByRollNo) {
+                    // Allow the match if this row is updating that same topper; reject otherwise.
+                    $matchedByName = $boardResult->toppers->first(
+                        fn (Topper $t) => strtolower($t->name) === strtolower(trim($row['name']))
+                    );
+                    if (! $matchedByName || $matchedByName->id !== $matchedByRollNo->id) {
+                        throw ValidationException::withMessages([
+                            "rows.{$i}.roll_no" => "CBSE Roll No '{$rollNo}' is already assigned to another student ({$matchedByRollNo->name}).",
+                        ]);
+                    }
+                }
+            }
+
             foreach ($data['rows'] as $row) {
                 $name = trim($row['name']);
                 // Match by admission_no first (most reliable), then roll_no, then name
@@ -834,6 +937,20 @@ class BoardResultController extends SchoolAdminController
             throw ValidationException::withMessages([
                 'rank' => "Rank {$rank} is already assigned to another topper for this result.",
             ]);
+        }
+
+        // Validate roll_no uniqueness within this board result.
+        if (filled($data['roll_no'] ?? null)) {
+            $rollNoTaken = Topper::query()
+                ->where('board_result_id', $boardResult->id)
+                ->where('roll_no', $data['roll_no'])
+                ->when($exclude, fn ($q) => $q->where('id', '!=', $exclude->id))
+                ->exists();
+            if ($rollNoTaken) {
+                throw ValidationException::withMessages([
+                    'roll_no' => "CBSE Roll No '{$data['roll_no']}' is already assigned to another topper in this result.",
+                ]);
+            }
         }
 
         $sahodayaId = (string) $this->school->parent_id;
