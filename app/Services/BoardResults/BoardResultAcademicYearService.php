@@ -32,24 +32,7 @@ class BoardResultAcademicYearService
 
         if ($record->isClosed()) {
             throw ValidationException::withMessages([
-                'academic_year' => "Academic year {$record->label} is closed and read-only.",
-            ]);
-        }
-
-        // New entries + edits are blocked outside the academic year's start–end window,
-        // even if its status isn't "closed" — e.g. an "upcoming" or "active" year whose
-        // window hasn't started yet, or one whose end_date has quietly passed.
-        $today = now()->startOfDay();
-
-        if ($record->start_date && $today->lt($record->start_date->copy()->startOfDay())) {
-            throw ValidationException::withMessages([
-                'academic_year' => "Academic year {$record->label} does not open for entry until ".$record->start_date->format('d M Y').'.',
-            ]);
-        }
-
-        if ($record->end_date && $today->gt($record->end_date->copy()->endOfDay())) {
-            throw ValidationException::withMessages([
-                'academic_year' => "Academic year {$record->label} closed for entry on ".$record->end_date->format('d M Y').'. Contact your Sahodaya admin if this needs to be reopened.',
+                'academic_year' => "Academic year {$record->label} is closed for entry. Contact your Sahodaya admin if this needs to be reopened.",
             ]);
         }
     }

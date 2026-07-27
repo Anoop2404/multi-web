@@ -9,15 +9,18 @@ use Illuminate\Http\Request;
 
 class StudentRegistrationWindowController extends SahodayaAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
-        $academicYear = AcademicYear::forSahodaya($this->sahodaya->id);
+        $academicYears = \App\Models\AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']);
+        $academicYear = $request->string('academic_year')->trim()->toString() ?: AcademicYear::forSahodaya($this->sahodaya->id);
+
         $window = SahodayaRegistrationWindow::where('sahodaya_id', $this->sahodaya->id)
             ->where('academic_year', $academicYear)
             ->first();
 
         return $this->inertia('Sahodaya/Students/RegistrationWindows', [
             'academicYear' => $academicYear,
+            'academicYearOptions' => $academicYears,
             'window'       => $window ? [
                 'add_open_local'  => $window->add_open?->format('Y-m-d\TH:i'),
                 'add_close_local' => $window->add_close?->format('Y-m-d\TH:i'),

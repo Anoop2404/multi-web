@@ -16,9 +16,19 @@
         </div>
 
         <form class="card space-y-6" @submit.prevent="save">
-            <p class="text-sm text-slate-600">
-                Academic year <strong>{{ academicYear }}</strong>. Outside these windows, schools must submit change requests.
-            </p>
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                    <label class="form-label mb-1 font-bold text-xs text-slate-700">Academic Year Window</label>
+                    <select v-model="selectedYear" @change="onYearChange" class="field text-sm font-bold bg-white w-56">
+                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
+                            {{ ay.label }}{{ ay.status === 'active' ? ' (Active)' : '' }}
+                        </option>
+                    </select>
+                </div>
+                <p class="text-xs text-slate-500 max-w-sm">
+                    Configure student registration and editing windows for <strong>{{ academicYear }}</strong>. Outside these windows, schools must submit change requests.
+                </p>
+            </div>
 
             <FormSection title="Add students window"
                          hint="When schools can register new students in their roster.">
@@ -44,13 +54,14 @@
                 </FormGrid>
             </FormSection>
 
-            <button type="submit" class="btn-primary">Save student windows</button>
+            <button type="submit" class="btn-primary" :disabled="form.processing">Save student windows</button>
         </form>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
-import { Link, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import FormSection from '@/Components/ui/FormSection.vue';
@@ -62,9 +73,18 @@ const props = defineProps({
     publicUrl: String,
     pendingPaymentsCount: Number,
     academicYear: String,
+    academicYearOptions: { type: Array, default: () => [] },
     window: Object,
     emergencyLock: Boolean,
 });
+
+const selectedYear = ref(props.academicYear);
+
+function onYearChange() {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/students/registration-windows`, {
+        academic_year: selectedYear.value,
+    }, { preserveScroll: true });
+}
 
 const form = useForm({
     academic_year: props.academicYear,
