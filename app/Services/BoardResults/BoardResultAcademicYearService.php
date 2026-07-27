@@ -35,6 +35,25 @@ class BoardResultAcademicYearService
                 'academic_year' => "Academic year {$record->label} is closed for entry. Contact your Sahodaya admin if this needs to be reopened.",
             ]);
         }
+
+        $window = \App\Models\SahodayaRegistrationWindow::query()
+            ->where('academic_year', $record->label)
+            ->first();
+
+        if ($window) {
+            $now = now();
+            if ($window->board_entry_starts_at && $now->lt($window->board_entry_starts_at->copy()->startOfDay())) {
+                throw ValidationException::withMessages([
+                    'academic_year' => "Board result data entry for academic year {$record->label} opens on ".$window->board_entry_starts_at->format('d M Y').'.',
+                ]);
+            }
+
+            if ($window->board_entry_ends_at && $now->gt($window->board_entry_ends_at->copy()->endOfDay())) {
+                throw ValidationException::withMessages([
+                    'academic_year' => "Board result data entry for academic year {$record->label} closed on ".$window->board_entry_ends_at->format('d M Y').'. Contact your Sahodaya admin if this needs to be reopened.',
+                ]);
+            }
+        }
     }
 
     public function attachToPayload(array $data): array
