@@ -142,12 +142,9 @@
 
                         <div class="flex flex-wrap items-center gap-3 pt-2">
                             <button v-if="canEdit" type="button" class="btn-secondary text-xs px-3 py-2 font-semibold" @click="addRow">+ Add Row</button>
-                            <button v-if="canEdit" type="submit" class="btn-primary text-xs px-5 py-2 font-bold shadow-sm" :disabled="batchForm.processing || wouldExceedCap">
+                            <button v-if="canEdit" type="submit" class="btn-primary text-xs px-5 py-2 font-bold shadow-sm" :disabled="batchForm.processing">
                                 Save {{ batchForm.toppers.length }} Overall Topper{{ batchForm.toppers.length > 1 ? 's' : '' }}
                             </button>
-                            <p v-if="wouldExceedCap" class="text-xs font-semibold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
-                                {{ topperCount }} toppers added — adding {{ batchForm.toppers.length }} more exceeds limit ({{ topperCap }}).
-                            </p>
                         </div>
                     </form>
                 </div>

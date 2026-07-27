@@ -62,9 +62,13 @@ class BoardResultController extends SchoolAdminController
                 BoardResult::STATUS_PUBLISHED,
             ],
             'auditHistory' => $auditHistory,
+            // Was hardcoded to class 10 regardless of which class the admin is viewing/editing,
+            // so Class XII entry silently inherited Class X's (often lower) topper quota.
+            // The per-result activeResultContext.topperCap below is authoritative once a
+            // result is selected; this top-level value is just the page-load fallback.
             'topperCap' => app(TopperCountService::class)->resolveCap(
                 (string) $this->school->parent_id,
-                10
+                $class ?? 10
             ),
             'selectedClass' => $class,
             'selectedAcademicYear' => $academicYear,
@@ -318,15 +322,8 @@ class BoardResultController extends SchoolAdminController
         return DB::transaction(function () use ($request, $boardResult, $rows, $sahodayaId, $isClass12, $marksConfig) {
             BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
 
-            $cap = app(TopperCountService::class)->resolveCap($sahodayaId, (int) $boardResult->class);
-            $existingCount = Topper::where('board_result_id', $boardResult->id)->count();
-            $incoming = count($rows);
-
-            if ($existingCount + $incoming > $cap) {
-                throw ValidationException::withMessages([
-                    'toppers' => "Adding {$incoming} would exceed the Top-N limit ({$cap}). {$existingCount} already added — remove some rows or lower the batch size.",
-                ]);
-            }
+            // Schools can enter as many student toppers/achievers as needed.
+            // Sahodaya Top-N config filters reports at the Sahodaya level.
 
             // Resolve each row's stream (Class XII) and admin-locked "out of" total up front,
             // so marks_obtained can be validated against the correct per-stream total before
@@ -671,7 +668,6 @@ class BoardResultController extends SchoolAdminController
         app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
 
         $sahodayaId = (string) $this->school->parent_id;
-        app(TopperCountService::class)->assertCanAdd($boardResult, $sahodayaId);
 
         $isClass12 = (int) $boardResult->class === 12;
         $data = $this->validateTopper($request, $boardResult, $isClass12);
@@ -757,8 +753,6 @@ class BoardResultController extends SchoolAdminController
                     app(TopperSubjectMarkService::class)->sync($topper, $subjectMarks);
                     $updated++;
                 } else {
-                    app(TopperCountService::class)->assertCanAdd($boardResult, $sahodayaId);
-
                     $marksConfig = app(BoardResultMarksConfigService::class);
                     $totalMarks = $marksConfig->resolve($sahodayaId, (int) $boardResult->class, null);
 

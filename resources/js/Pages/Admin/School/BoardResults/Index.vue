@@ -281,11 +281,11 @@
                     <!-- FOOTER ACTION TOOLBAR -->
                     <div class="border-t border-gray-100 pt-5 flex flex-wrap items-center justify-between gap-4">
                         <div v-if="canEditActive" class="flex flex-wrap items-center gap-3">
-                            <button type="button" @click="submit(false)" :disabled="form.processing || wouldExceedCap"
+                            <button type="button" @click="submit(false)" :disabled="form.processing"
                                     class="btn-secondary text-sm px-5 py-2.5 font-semibold">
                                 Save Draft
                             </button>
-                            <button type="button" @click="submit(true)" :disabled="form.processing || wouldExceedCap"
+                            <button type="button" @click="submit(true)" :disabled="form.processing"
                                     class="btn-primary text-sm px-6 py-2.5 font-bold shadow-md bg-emerald-600 hover:bg-emerald-700 border-none">
                                 Save &amp; Submit for Verification
                             </button>
@@ -471,11 +471,15 @@ watch(() => form.toppers, (rows) => {
     }
 }, { deep: true });
 
+// Prefer the per-result cap (correctly scoped to this result's own class) over the
+// page-load default, which previously could reflect the wrong class's quota.
+const effectiveTopperCap = computed(() => props.activeResultContext?.topperCap ?? props.topperCap);
+
 const wouldExceedCap = computed(() => {
-    if (!props.topperCap) return false;
+    if (!effectiveTopperCap.value) return false;
     const existingCount = props.activeResult?.toppers?.length ?? 0;
     const validNew = form.toppers.filter((r) => r.name && r.marks_obtained !== '').length;
-    return (existingCount + validNew) > props.topperCap;
+    return (existingCount + validNew) > effectiveTopperCap.value;
 });
 
 function addRow() {
