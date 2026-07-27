@@ -28,6 +28,12 @@ class BoardResult extends Model
 
     public const STATUS_PUBLISHED = 'published';
 
+    /**
+     * Number of hours after submission during which the school can still edit
+     * and resubmit a board result before it locks for Sahodaya review.
+     */
+    public const RESUBMIT_WINDOW_HOURS = 24;
+
     protected $fillable = [
         'tenant_id',
         'class',
@@ -132,7 +138,48 @@ class BoardResult extends Model
 
     public function isEditable(): bool
     {
-        return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_REJECTED], true);
+        if (in_array($this->status, [self::STATUS_DRAFT, self::STATUS_REJECTED], true)) {
+            return true;
+        }
+
+        // Recently-submitted results are editable within the resubmit window so schools
+        // can fix mistakes before a Sahodaya reviewer picks them up. Once a reviewer has
+        // started (reviewed_by_user_id is set), the result is locked until rejected.
+        if ($this->status === self::STATUS_SUBMITTED
+            && $this->submitted_at !== null
+            && $this->reviewed_by_user_id === null
+        ) {
+            return $this->submitted_at->diffInHours(now()) < self::RESUBMIT_WINDOW_HOURS;
+        }
+
+        return false;
+    }
+
+    /**
+     * Human-readable description of why the result is locked, for the frontend.
+     */
+    public function editLockReason(): ?string
+    {
+        if ($this->status === self::STATUS_PUBLISHED) {
+            return 'This result has been published and cannot be modified.';
+        }
+        if ($this->status === self::STATUS_APPROVED) {
+            return 'This result has been approved by Sahodaya and is locked.';
+        }
+        if ($this->status === self::STATUS_VERIFIED) {
+            return 'This result is under Sahodaya verification and cannot be edited.';
+        }
+        if ($this->status === self::STATUS_SUBMITTED && $this->reviewed_by_user_id !== null) {
+            return 'Sahodaya has started reviewing this result. Wait for rejection or approval.';
+        }
+        if ($this->status === self::STATUS_SUBMITTED && $this->submitted_at !== null) {
+            $remaining = self::RESUBMIT_WINDOW_HOURS - $this->submitted_at->diffInHours(now());
+            if ($remaining <= 0) {
+                return 'The '.self::RESUBMIT_WINDOW_HOURS.'-hour editing window has closed. Contact Sahodaya admin to reopen.';
+            }
+        }
+
+        return null;
     }
 
     public function hasResultPdf(): bool

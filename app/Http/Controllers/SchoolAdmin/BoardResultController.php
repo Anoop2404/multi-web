@@ -199,7 +199,7 @@ class BoardResultController extends SchoolAdminController
     public function update(Request $request, string $tenantId, BoardResult $boardResult)
     {
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
-        abort_unless($boardResult->isEditable(), 422, 'Only draft or rejected results can be edited.');
+        abort_unless($boardResult->isEditable(), 422, 'This result cannot be edited in its current state.');
         app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
 
         $before = $boardResult->only([
@@ -473,7 +473,7 @@ class BoardResultController extends SchoolAdminController
     public function submit(Request $request, string $tenantId, BoardResult $boardResult)
     {
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
-        abort_unless($boardResult->isEditable(), 422, 'Only draft or rejected results can be submitted.');
+        abort_unless($boardResult->isEditable(), 422, 'This result cannot be submitted in its current state.');
         app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
 
         if (! $boardResult->hasResultPdf()) {
@@ -634,6 +634,7 @@ class BoardResultController extends SchoolAdminController
                 ->all() : [],
             'subjectWiseLeaders' => $isClass12 ? BoardExamSubjects::subjectWiseLeaders($boardResult->toppers) : [],
             'canEdit' => $boardResult->isEditable(),
+            'editLockReason' => $boardResult->isEditable() ? null : $boardResult->editLockReason(),
             'topperCap' => app(TopperCountService::class)->resolveCap($sahodayaId, (int) $boardResult->class),
             'topperCount' => $boardResult->toppers->count(),
             'marksConfig' => $this->marksConfigFor((int) $boardResult->class, $streamOptions, $sahodayaId),

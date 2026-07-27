@@ -8,6 +8,7 @@ use App\Models\FestLevelRegistration;
 use App\Models\FestParticipationPolicy;
 use App\Models\FestQualification;
 use App\Models\Student;
+use App\Services\Students\StudentVerificationGate;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestKidsFestBand;
 use App\Support\FestSportsAgeGroup;
@@ -31,7 +32,7 @@ class FestRegistrationEligibilityService
             $errors[] = "{$student->name}: {$genderError}";
         }
 
-        $verifyError = app(\App\Services\Students\StudentVerificationGate::class)
+        $verifyError = app(StudentVerificationGate::class)
             ->ineligibilityReason($student, $event);
         if ($verifyError) {
             $errors[] = "{$student->name}: {$verifyError}";
@@ -118,7 +119,7 @@ class FestRegistrationEligibilityService
 
         $eventType = $event->event_type ?? 'kalolsavam';
         $isSports = $eventType === 'sports';
-        $isKalolsav = in_array($eventType, ['kalolsavam', 'custom'], true);
+        $isKalolsav = in_array($eventType, ['kalolsavam', 'custom', 'english_fest', 'science_fest'], true);
         $isKidsFest = $eventType === 'kids_fest';
 
         return $students->map(function (Student $student) use ($event, $eventRegByStudent, $isSports, $isKalolsav, $isKidsFest) {
@@ -191,10 +192,12 @@ class FestRegistrationEligibilityService
     {
         return match ($event->event_type) {
             'kalolsavam' => $this->validateKalolsav($student, $item),
-            'kids_fest'  => $this->validateKidsFest($student, $item),
-            'sports'     => $this->validateSports($student, $event, $item),
-            'custom'     => $this->validateCustomClassGroup($student, $item, $event),
-            default      => null,
+            'kids_fest' => $this->validateKidsFest($student, $item),
+            'sports' => $this->validateSports($student, $event, $item),
+            'custom' => $this->validateCustomClassGroup($student, $item, $event),
+            'english_fest' => $this->validateCustomClassGroup($student, $item, $event),
+            'science_fest' => $this->validateCustomClassGroup($student, $item, $event),
+            default => null,
         };
     }
 

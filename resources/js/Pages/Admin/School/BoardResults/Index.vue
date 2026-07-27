@@ -291,7 +291,7 @@
                             </button>
                         </div>
                         <div v-else class="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
-                            This result is {{ activeResult?.status }} and locked from editing.
+                            {{ activeResultContext?.editLockReason || `This result is ${activeResult?.status} and locked from editing.` }}
                         </div>
                     </div>
                 </form>
@@ -401,7 +401,15 @@ function loadResult(r) {
 }
 
 // ── Step 2: combined summary + toppers form ──────────────────────────────
-const canEditActive = computed(() => !props.activeResult || ['draft', 'rejected'].includes(props.activeResult.status));
+const canEditActive = computed(() => {
+    if (!props.activeResult) return true;
+    // Prefer the server-provided context value which uses the model's isEditable()
+    // (handles draft, rejected, AND recently-submitted results within the window).
+    if (props.activeResultContext?.canEdit !== undefined) {
+        return props.activeResultContext.canEdit;
+    }
+    return ['draft', 'rejected'].includes(props.activeResult.status);
+});
 
 // Admin-locked "out of" marks — schools no longer type this in. Class X is one shared
 // value; Class XII varies per stream, so each topper row resolves its own total once a

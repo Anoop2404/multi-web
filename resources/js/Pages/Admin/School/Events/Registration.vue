@@ -978,7 +978,7 @@ function studentMatchesItem(student, event, item, { skipVerification = false } =
     if (event?.academic_year_id && student.academic_year_id && event.academic_year_id !== student.academic_year_id) {
         return false;
     }
-    if (['kalolsavam', 'custom'].includes(props.eventType)) {
+    if (['kalolsavam', 'custom', 'english_fest', 'science_fest'].includes(props.eventType)) {
         if (props.eventType === 'kalolsavam' && student.eligible_kalolsav === false) return false;
         if (item.class_group && item.class_group !== 'open') {
             if (!matchesClassGroup(student.kalolsav_class_group, item.class_group)) return false;
@@ -1064,7 +1064,7 @@ function studentIneligibilityReason(student, event, item) {
         }
     }
 
-    if (props.eventType === 'custom') {
+    if (['custom', 'english_fest', 'science_fest'].includes(props.eventType)) {
         if (item.class_group && item.class_group !== 'open') {
             if (!student.kalolsav_class_group) return 'Class is not assigned to a membership category';
             if (student.kalolsav_class_group !== item.class_group) {

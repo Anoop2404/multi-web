@@ -241,7 +241,63 @@
                         </div>
                     </div>
 
-                    <div v-if="sortedToppers.length" class="divide-y divide-gray-100">
+                    <!-- STREAM-GROUPED LISTING FOR CLASS XII -->
+                    <div v-if="isClass12 && sortedToppers.length" class="divide-y divide-gray-100">
+                        <div v-for="(group, stream) in sortedToppersByStream" :key="stream" class="p-5">
+                            <div class="flex items-center gap-2 mb-4">
+                                <span class="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border"
+                                      :class="{
+                                          'bg-blue-50 text-blue-700 border-blue-200': stream === 'Science',
+                                          'bg-emerald-50 text-emerald-700 border-emerald-200': stream === 'Commerce',
+                                          'bg-purple-50 text-purple-700 border-purple-200': stream === 'Humanities',
+                                          'bg-gray-50 text-gray-700 border-gray-200': !['Science','Commerce','Humanities'].includes(stream),
+                                      }">
+                                    📚 {{ stream }} Stream ({{ group.length }})
+                                </span>
+                            </div>
+                            <div class="space-y-3">
+                                <div v-for="t in group" :key="t.id"
+                                     class="flex items-start gap-4 p-4 rounded-xl border border-gray-100 hover:bg-slate-50/60 transition shadow-2xs">
+                                    <img v-if="t.photo" :src="t.photo" class="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0 shadow-xs" alt="">
+                                    <div v-else class="w-12 h-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0 text-base shadow-xs">
+                                        {{ t.name[0] }}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex flex-wrap items-start justify-between gap-2">
+                                            <div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-xs font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md">#{{ t.rank ?? '—' }}</span>
+                                                    <h4 class="font-bold text-gray-900 text-base">{{ t.name }}</h4>
+                                                </div>
+                                                <p class="text-xs text-gray-500 mt-1 flex flex-wrap items-center gap-3">
+                                                    <span v-if="t.roll_no" class="font-medium text-gray-700">CBSE Roll No: {{ t.roll_no }}</span>
+                                                    <span v-if="t.marks_obtained && t.total_marks" class="text-gray-600">· {{ t.marks_obtained }} / {{ t.total_marks }} Marks</span>
+                                                </p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-xl font-bold text-emerald-600 tracking-tight">{{ t.percentage }}%</p>
+                                            </div>
+                                        </div>
+
+                                        <div v-if="t.subject_marks && Object.keys(t.subject_marks).length" class="mt-3 flex flex-wrap gap-2">
+                                            <span v-for="(mark, subject) in t.subject_marks" :key="subject"
+                                                  class="text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200/60">
+                                                {{ subject }}: <strong class="font-bold text-indigo-700">{{ mark }}</strong>
+                                            </span>
+                                        </div>
+
+                                        <div v-if="canEdit" class="mt-3 flex items-center gap-3 text-xs">
+                                            <button type="button" class="text-indigo-600 font-semibold hover:underline" @click="startEdit(t)">Edit Details</button>
+                                            <button type="button" class="text-red-500 font-semibold hover:underline" @click="remove(t)">Remove</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FLAT LISTING FOR CLASS X -->
+                    <div v-else-if="sortedToppers.length" class="divide-y divide-gray-100">
                         <div v-for="t in sortedToppers" :key="t.id" class="p-5 hover:bg-slate-50/50 transition">
                             <div class="flex items-start gap-4">
                                 <img v-if="t.photo" :src="t.photo" class="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0 shadow-xs" alt="">
@@ -254,9 +310,6 @@
                                             <div class="flex items-center gap-2">
                                                 <span class="text-xs font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md">#{{ t.rank ?? '—' }}</span>
                                                 <h4 class="font-bold text-gray-900 text-base">{{ t.name }}</h4>
-                                                <span v-if="t.stream" class="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
-                                                    {{ t.stream }}
-                                                </span>
                                             </div>
                                             <p class="text-xs text-gray-500 mt-1 flex flex-wrap items-center gap-3">
                                                 <span v-if="t.roll_no" class="font-medium text-gray-700">CBSE Roll No: {{ t.roll_no }}</span>
@@ -266,13 +319,6 @@
                                         <div class="text-right">
                                             <p class="text-xl font-bold text-emerald-600 tracking-tight">{{ t.percentage }}%</p>
                                         </div>
-                                    </div>
-
-                                    <div v-if="isClass12 && t.subject_marks && Object.keys(t.subject_marks).length" class="mt-3 flex flex-wrap gap-2">
-                                        <span v-for="(mark, subject) in t.subject_marks" :key="subject"
-                                              class="text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200/60">
-                                            {{ subject }}: <strong class="font-bold text-indigo-700">{{ mark }}</strong>
-                                        </span>
                                     </div>
 
                                     <div v-if="canEdit" class="mt-3 flex items-center gap-3 text-xs">
@@ -503,6 +549,28 @@ function urlEncode(val) {
 const sortedToppers = computed(() =>
     [...(props.boardResult.toppers ?? [])].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)),
 );
+
+/**
+ * For Class XII, group overall toppers by stream (Science, Commerce, Humanities)
+ * so schools can view each stream's leaders separately rather than one flat list.
+ */
+const sortedToppersByStream = computed(() => {
+    const groups = {};
+    for (const t of sortedToppers.value) {
+        const stream = t.stream ?? 'Unspecified';
+        (groups[stream] ??= []).push(t);
+    }
+    // Order streams: Science, Commerce, Humanities, then everything else
+    const order = ['Science', 'Commerce', 'Humanities'];
+    const ordered = {};
+    for (const key of order) {
+        if (groups[key]) ordered[key] = groups[key];
+    }
+    for (const [key, val] of Object.entries(groups)) {
+        if (!order.includes(key)) ordered[key] = val;
+    }
+    return ordered;
+});
 
 const achievers90 = computed(() =>
     (props.boardResult.toppers ?? [])

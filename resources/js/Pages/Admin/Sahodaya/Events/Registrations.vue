@@ -476,6 +476,9 @@ function studentMatchesItem(student, item) {
         if (!student.eligible_kalolsav) return false;
         if (item.class_group && item.class_group !== 'open' && student.kalolsav_class_group !== item.class_group) return false;
     }
+    if (['custom', 'english_fest', 'science_fest'].includes(props.event.event_type)) {
+        if (item.class_group && item.class_group !== 'open' && student.kalolsav_class_group !== item.class_group) return false;
+    }
     if (props.event.event_type === 'kids_fest') {
         if (!student.eligible_kids_fest) return false;
         if (item.kids_band && item.kids_band !== 'open' && student.kids_fest_band !== item.kids_band) return false;
