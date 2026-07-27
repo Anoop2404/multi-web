@@ -421,6 +421,18 @@ function blankRow() {
 }
 
 function resultToFormData(r) {
+    const loadedToppers = (r?.toppers && r.toppers.length > 0)
+        ? r.toppers.map(t => ({
+            id: t.id,
+            name: t.name || '',
+            gender: t.gender || '',
+            stream_key: t.stream || (t.exam_stream?.slug) || '',
+            roll_no: t.roll_no || '',
+            marks_obtained: t.marks_obtained ?? t.total_marks ?? '',
+            photo: null,
+        }))
+        : [blankRow()];
+
     return {
         class: props.selectedClass ? String(props.selectedClass) : searchClass.value,
         academic_year: props.selectedAcademicYear ?? '',
@@ -435,7 +447,7 @@ function resultToFormData(r) {
         remarks: r?.remarks ?? '',
         result_pdf: null,
         attachments: [],
-        toppers: [blankRow()],
+        toppers: loadedToppers,
     };
 }
 
