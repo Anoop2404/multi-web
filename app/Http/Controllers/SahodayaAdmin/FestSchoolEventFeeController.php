@@ -141,42 +141,47 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             ?? $schoolEventFee->feeReceipt
             ?? $schoolEventFee->receipts()->latest('id')->first();
 
-        if ($receipt) {
-            if ($receipt->status === 'approved') {
-                app(\App\Services\Ledger\FeeReceiptReversalService::class)->reverse($receipt, $request->user(), $data['rejection_reason'] ?? 'Payment proof rejected by admin');
-            } elseif ($receipt->status === 'uploaded') {
-                $receipt->update([
-                    'status' => 'rejected',
-                    'rejection_reason' => $data['rejection_reason'] ?? null,
-                    'reviewed_by' => $request->user()->id,
-                    'reviewed_at' => now(),
-                ]);
+        DB::transaction(function () use ($request, $data, $receipt, $schoolEventFee) {
+            // Lock the fee record to prevent concurrent approve+reject from corrupting state.
+            FestSchoolEventFee::whereKey($schoolEventFee->id)->lockForUpdate()->first();
+
+            if ($receipt) {
+                if ($receipt->status === 'approved') {
+                    app(\App\Services\Ledger\FeeReceiptReversalService::class)->reverse($receipt, $request->user(), $data['rejection_reason'] ?? 'Payment proof rejected by admin');
+                } elseif ($receipt->status === 'uploaded') {
+                    $receipt->update([
+                        'status' => 'rejected',
+                        'rejection_reason' => $data['rejection_reason'] ?? null,
+                        'reviewed_by' => $request->user()->id,
+                        'reviewed_at' => now(),
+                    ]);
+                }
             }
-        }
 
-        // If fee_receipt_id pointed to this receipt, point to next approved/uploaded receipt or null
-        if ($schoolEventFee->fee_receipt_id === $receipt?->id) {
-            $nextReceipt = $schoolEventFee->receipts()->where('status', 'approved')->latest('id')->first()
-                ?? $schoolEventFee->receipts()->where('status', 'uploaded')->latest('id')->first();
-            $schoolEventFee->update(['fee_receipt_id' => $nextReceipt?->id]);
-        }
+            // If fee_receipt_id pointed to this receipt, point to next approved/uploaded receipt or null
+            if ($schoolEventFee->fee_receipt_id === $receipt?->id) {
+                $nextReceipt = $schoolEventFee->receipts()->where('status', 'approved')->latest('id')->first()
+                    ?? $schoolEventFee->receipts()->where('status', 'uploaded')->latest('id')->first();
+                $schoolEventFee->update(['fee_receipt_id' => $nextReceipt?->id]);
+            }
 
-        // Preserve any already-approved partial payments; fall back to partial/pending.
-        $schoolEventFee->refresh();
-        $schoolEventFee->refreshPaidState();
-        if ($schoolEventFee->fresh()->outstandingBalance() > 0 && ! $schoolEventFee->fresh()->isPartiallyPaid()) {
-            $schoolEventFee->update(['status' => 'rejected']);
-        }
+            // Preserve any already-approved partial payments; fall back to partial/pending.
+            $schoolEventFee->refresh();
+            $schoolEventFee->refreshPaidState();
+            if ($schoolEventFee->fresh()->outstandingBalance() > 0 && ! $schoolEventFee->fresh()->isPartiallyPaid()) {
+                $schoolEventFee->update(['status' => 'rejected']);
+            }
 
-        // Invoice-status rollup for per-head fee records is handled by FestInvoiceService
-        // (issueForSchool sums every head's fee record); only reset it directly here for
-        // the old non-head, single-record path.
-        if ($schoolEventFee->head_id === null && ! $schoolEventFee->fresh()->isFullyPaid()) {
-            FestEventInvoice::where('event_id', $schoolEventFee->event_id)
-                ->where('school_id', $schoolEventFee->school_id)
-                ->where('status', 'paid')
-                ->update(['status' => 'issued']);
-        }
+            // Invoice-status rollup for per-head fee records is handled by FestInvoiceService
+            // (issueForSchool sums every head's fee record); only reset it directly here for
+            // the old non-head, single-record path.
+            if ($schoolEventFee->head_id === null && ! $schoolEventFee->fresh()->isFullyPaid()) {
+                FestEventInvoice::where('event_id', $schoolEventFee->event_id)
+                    ->where('school_id', $schoolEventFee->school_id)
+                    ->where('status', 'paid')
+                    ->update(['status' => 'issued']);
+            }
+        });
 
         $audit->festEvent($event, FestPageActivity::FEES, 'fest.fee.rejected', 'School event fee rejected', [
             'school_id' => $schoolEventFee->school_id,
@@ -295,6 +300,7 @@ class FestSchoolEventFeeController extends SahodayaAdminController
             if ($schoolEventFee->head_id === null) {
                 FestEventInvoice::where('event_id', $schoolEventFee->event_id)
                     ->where('school_id', $schoolEventFee->school_id)
+                    ->where('status', 'paid')
                     ->update(['status' => 'paid']);
             }
         });

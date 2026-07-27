@@ -25,6 +25,7 @@ class TenantRolesAndPermissionsSeeder extends Seeder
             'judge', 'student', 'teacher', 'exam_controller', 'exam_staff', 'group_admin',
             'house_admin', 'fest_ops', 'registration_coordinator', 'sahodaya_finance',
             'certificate_collector', 'data_entry', 'event_coordinator', 'event_admin',
+            'region_admin',
         ] as $role) {
             Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
         }

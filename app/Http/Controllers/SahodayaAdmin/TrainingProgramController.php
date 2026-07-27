@@ -1218,15 +1218,20 @@ class TrainingProgramController extends SahodayaAdminController
         return $reports->exportAttendance($program);
     }
 
-    public function exportAttendanceSheetPdf(string $tenantId, TrainingProgram $program, TrainingReportService $reports)
+    public function exportAttendanceSheetPdf(string $tenantId, string $program, TrainingReportService $reports)
     {
+        // See BoardResultVerificationController::downloadPdf() — implicit route-model
+        // binding was found to unreliably deliver the resolved model to PDF/file-download
+        // controller methods in production. Resolving manually avoids that failure.
+        $program = TrainingProgram::findOrFail($program);
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 
         return $reports->exportAttendanceSheetPdf($program, $this->sahodaya);
     }
 
-    public function exportAttendanceReportPdf(string $tenantId, TrainingProgram $program, TrainingReportService $reports)
+    public function exportAttendanceReportPdf(string $tenantId, string $program, TrainingReportService $reports)
     {
+        $program = TrainingProgram::findOrFail($program);
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
 
         return $reports->exportAttendanceReportPdf($program, $this->sahodaya);

@@ -296,7 +296,7 @@ class RankingEngine
     }
 
     /**
-     * Dense ranking by pass_percent (desc). Ties share rank; next rank skips (competition ranking).
+     * Competition ranking by pass_percent (desc). Ties share rank; next rank skips (competition ranking).
      *
      * @return Collection<int, array<string, mixed>>
      */
@@ -467,12 +467,13 @@ class RankingEngine
                     $applied = 'subject_marks';
                 }
                 $topper = $mark->topper;
+                $resultClass = $topper?->boardResult?->class ?? 12;
                 $rows->push([
                     'entity_type' => 'student',
                     'entity_id' => (string) ($topper?->id ?? $mark->id),
                     'board_result_id' => $topper?->board_result_id,
                     'examination_type' => null,
-                    'class' => 12,
+                    'class' => $resultClass,
                     'rank' => $rank,
                     'score' => $score,
                     'tie_rule_applied' => $applied,

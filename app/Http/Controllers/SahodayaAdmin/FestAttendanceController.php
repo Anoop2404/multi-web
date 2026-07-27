@@ -56,6 +56,11 @@ class FestAttendanceController extends SahodayaAdminController
             'status'         => 'required|in:present,absent',
         ]);
 
+        // Cross-scope validation: verify the participant belongs to this event and item.
+        $participant = FestParticipant::with('registration')->findOrFail($data['participant_id']);
+        abort_if($participant->registration->event_id !== $event->id, 422, 'Participant does not belong to this event.');
+        abort_if($participant->registration->item_id !== (int) $data['item_id'], 422, 'Participant does not belong to this item.');
+
         $participantIds = $this->expandToTeam($event, $data['item_id'], $data['participant_id']);
 
         foreach ($participantIds as $participantId) {
@@ -111,6 +116,14 @@ class FestAttendanceController extends SahodayaAdminController
             'participant_ids.*' => 'exists:fest_participants,id',
             'status'          => 'required|in:present,absent',
         ]);
+
+        // Cross-scope validation for bulk: verify all participants belong to this event and item.
+        $mismatch = FestParticipant::whereIn('id', $data['participant_ids'])
+            ->whereHas('registration', fn ($q) => $q
+                ->where('event_id', '!=', $event->id)
+                ->orWhere('item_id', '!=', (int) $data['item_id']))
+            ->exists();
+        abort_if($mismatch, 422, 'One or more participants do not belong to this event or item.');
 
         $expandedIds = collect($data['participant_ids'])
             ->flatMap(fn ($id) => $this->expandToTeam($event, (int) $data['item_id'], (int) $id))

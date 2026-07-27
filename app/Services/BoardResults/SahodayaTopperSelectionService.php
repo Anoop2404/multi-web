@@ -150,19 +150,30 @@ class SahodayaTopperSelectionService
         $sorted = $toppers->sortByDesc('percentage')->values();
         $schoolNames = Tenant::whereIn('id', $sorted->pluck('tenant_id')->unique())->pluck('name', 'id');
 
-        return $sorted->map(fn (Topper $t, int $i) => [
-            'rank' => $i + 1, // sequence order — this list isn't rank-cut, just threshold-filtered
-            'percentage' => $t->percentage,
-            'student_name' => $t->name,
-            'school_id' => $t->tenant_id,
-            'school_name' => $schoolNames[$t->tenant_id] ?? $t->tenant_id,
-            'admission_no' => $t->admission_no,
-            'roll_no' => $t->roll_no,
-            'marks_obtained' => $t->marks_obtained,
-            'total_marks' => $t->total_marks,
-            'photo' => $t->photo,
-            'topper_id' => $t->id,
-        ])->values()->all();
+        $rank = 0;
+        $prevPercentage = null;
+
+        return $sorted->map(function (Topper $t, int $i) use ($schoolNames, &$rank, &$prevPercentage) {
+            // Competition (dense) ranking: ties get the same rank, next non-tie increments.
+            if ($prevPercentage === null || $t->percentage < $prevPercentage) {
+                $rank = $i + 1;
+            }
+            $prevPercentage = $t->percentage;
+
+            return [
+                'rank' => $rank,
+                'percentage' => $t->percentage,
+                'student_name' => $t->name,
+                'school_id' => $t->tenant_id,
+                'school_name' => $schoolNames[$t->tenant_id] ?? $t->tenant_id,
+                'admission_no' => $t->admission_no,
+                'roll_no' => $t->roll_no,
+                'marks_obtained' => $t->marks_obtained,
+                'total_marks' => $t->total_marks,
+                'photo' => $t->photo,
+                'topper_id' => $t->id,
+            ];
+        })->values()->all();
     }
 
     /**

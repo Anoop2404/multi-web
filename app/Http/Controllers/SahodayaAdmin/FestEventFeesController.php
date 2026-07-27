@@ -168,8 +168,13 @@ class FestEventFeesController extends SahodayaAdminController
         ]));
     }
 
-    public function pdfReport(Request $request, string $tenantId, FestEvent $event)
+    public function pdfReport(Request $request, string $tenantId, string $event)
     {
+        // Implicit route-model binding was found to unreliably deliver the resolved model
+        // to PDF/file-download controller methods in production (see downloadPdf() in
+        // BoardResultVerificationController for the first confirmed case). Resolving
+        // manually here avoids the same class of failure.
+        $event = FestEvent::findOrFail($event);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $feeService = app(FestSchoolEventFeeService::class);

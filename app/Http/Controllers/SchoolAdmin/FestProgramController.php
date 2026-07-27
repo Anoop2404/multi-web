@@ -282,6 +282,8 @@ class FestProgramController extends SchoolAdminController
             'kalolsavam'   => 'Kalolsavam',
             'sports'       => 'Sports Meet',
             'kids_fest'    => 'Kids Fest',
+            'english_fest' => 'English Fest',
+            'science_fest' => 'Science Fest',
             'teacher_fest' => 'Teacher Fest',
             'custom'       => 'Custom',
         ];

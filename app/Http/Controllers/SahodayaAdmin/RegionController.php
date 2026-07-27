@@ -112,6 +112,32 @@ class RegionController extends SahodayaAdminController
     {
         abort_if($region->tenant_id !== $this->sahodaya->id, 403);
 
+        // Check for event partitions keyed to this region before allowing deletion.
+        $partitionKey = \Illuminate\Support\Str::slug($region->code ?: $region->name);
+        $partitionEvents = \App\Models\FestEvent::query()
+            ->where('tenant_id', $this->sahodaya->id)
+            ->where('partition_key', $partitionKey)
+            ->whereNotNull('parent_event_id')
+            ->exists();
+
+        $assignedSchools = \App\Models\FestEventSchoolPartition::query()
+            ->where('tenant_id', $this->sahodaya->id)
+            ->where('partition_key', $partitionKey)
+            ->distinct()
+            ->pluck('event_id')
+            ->all();
+
+        if ($partitionEvents || $assignedSchools !== []) {
+            $details = [];
+            if ($partitionEvents) {
+                $details[] = 'active event partitions';
+            }
+            if ($assignedSchools !== []) {
+                $details[] = count($assignedSchools).' school assignments across events';
+            }
+            abort(422, 'Cannot delete "'.$region->name.'" — it still has '.implode(' and ', $details).'. Reassign schools to another region or sync partitions first.');
+        }
+
         $name = $region->name;
         $region->delete();
 

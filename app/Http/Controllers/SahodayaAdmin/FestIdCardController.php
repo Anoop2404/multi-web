@@ -84,11 +84,15 @@ class FestIdCardController extends SahodayaAdminController
         ));
     }
 
-    public function pdf(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
+    public function pdf(Request $request, string $tenantId, string $event, FestIdCardService $service, PlatformAuditLogger $audit)
     {
         @ini_set('memory_limit', '512M');
         @set_time_limit(300);
 
+        // See BoardResultVerificationController::downloadPdf() — implicit route-model
+        // binding was found to unreliably deliver the resolved model to PDF/file-download
+        // controller methods in production. Resolving manually avoids that failure.
+        $event = FestEvent::findOrFail($event);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $this->validated($request);

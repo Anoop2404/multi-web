@@ -145,16 +145,31 @@ class SportsProgramController extends SahodayaAdminController
             })
             ->filter(fn ($row) => $row['school_id'])
             ->sortByDesc('points')
-            ->values()
-            ->map(function (array $row, int $index) {
-                $row['rank'] = $index + 1;
+            ->values();
 
-                return $row;
-            });
+        // Assign ranks with correct tie handling: tied schools share the same rank,
+        // and the next rank skips ahead by the number of tied entries.
+        $rankedRows = [];
+        $currentRank = 1;
+        $i = 0;
+        while ($i < $rows->count()) {
+            $currentPoints = $rows[$i]['points'];
+            $tiedCount = 0;
+            while ($i + $tiedCount < $rows->count() && $rows[$i + $tiedCount]['points'] === $currentPoints) {
+                $tiedCount++;
+            }
+            for ($j = 0; $j < $tiedCount; $j++) {
+                $row = $rows[$i + $j];
+                $row['rank'] = $currentRank;
+                $rankedRows[] = $row;
+            }
+            $currentRank += $tiedCount;
+            $i += $tiedCount;
+        }
 
         return $this->inertia('Sahodaya/Sports/Rankings', $this->programNavProps('sports-meet') + [
             'events'   => $events,
-            'rankings' => $rows,
+            'rankings' => collect($rankedRows),
         ]);
     }
 }

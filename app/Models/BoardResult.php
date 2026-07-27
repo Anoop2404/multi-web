@@ -86,6 +86,15 @@ class BoardResult extends Model
         return $this->hasMany(Topper::class)->orderBy('rank');
     }
 
+    protected static function booted(): void
+    {
+        static::deleting(function (BoardResult $result) {
+            $result->toppers()->each(fn (Topper $t) => $t->delete());
+            $result->rankings()->delete();
+            $result->uploads()->delete();
+        });
+    }
+
     public function uploads(): HasMany
     {
         return $this->hasMany(BoardResultUpload::class)->orderByDesc('version');

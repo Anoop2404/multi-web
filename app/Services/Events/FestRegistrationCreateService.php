@@ -97,32 +97,33 @@ class FestRegistrationCreateService
             throw ValidationException::withMessages(['student_ids' => 'This item allows only one participant.']);
         }
 
-        $limitErrors = (new FestParticipationLimitService($event))
-            ->validateRegistration($item, $school->id, $performerIds, $standbyIds);
-        if ($limitErrors) {
-            throw ValidationException::withMessages(['student_ids' => implode(' ', $limitErrors)]);
-        }
-
-        $eligibilityErrors = app(FestRegistrationEligibilityService::class)
-            ->validateStudents($event, $item, array_merge($performerIds, $standbyIds));
-        if ($eligibilityErrors) {
-            throw ValidationException::withMessages(['student_ids' => implode(' ', $eligibilityErrors)]);
-        }
-
         $item->loadMissing('head');
-        $limitService = new FestParticipationLimitService($event);
-        $waitlisted = $event->event_type === 'sports' && $limitService->isHeadAtCapacity($item, $school->id);
-        // Falls back to the event-level approval policy when the item has no head
-        // (Kalotsav items assigned a plain category instead — see
-        // docs/KALOTSAV_ITEM_CATEGORY_REPLACES_HEAD_PLAN.md §5 #3).
-        $initialStatus = match (true) {
-            $waitlisted => 'waitlisted',
-            $item->head?->requiresManualApproval() || $event->requiresManualApproval() => 'pending_approval',
-            default => 'submitted',
-        };
 
         try {
-            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $initialStatus) {
+            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts) {
+                // Quota and eligibility checks are inside the transaction with lockForUpdate
+                // to prevent race conditions where concurrent requests overflow per-school quotas.
+                \App\Models\FestEvent::query()->whereKey($event->id)->lockForUpdate()->first();
+
+                $limitErrors = (new FestParticipationLimitService($event))
+                    ->validateRegistration($item, $school->id, $performerIds, $standbyIds);
+                if ($limitErrors) {
+                    throw ValidationException::withMessages(['student_ids' => implode(' ', $limitErrors)]);
+                }
+
+                $eligibilityErrors = app(FestRegistrationEligibilityService::class)
+                    ->validateStudents($event, $item, array_merge($performerIds, $standbyIds));
+                if ($eligibilityErrors) {
+                    throw ValidationException::withMessages(['student_ids' => implode(' ', $eligibilityErrors)]);
+                }
+
+                $limitService = new FestParticipationLimitService($event);
+                $waitlisted = $event->event_type === 'sports' && $limitService->isHeadAtCapacity($item, $school->id);
+                $initialStatus = match (true) {
+                    $waitlisted => 'waitlisted',
+                    $item->head?->requiresManualApproval() || $event->requiresManualApproval() => 'pending_approval',
+                    default => 'submitted',
+                };
                 $eventRegService = app(FestEventRegistrationService::class);
                 foreach (array_merge($performerIds, $standbyIds) as $studentId) {
                     if ($eventRegService->requireEventRegistration($event)) {

@@ -212,8 +212,19 @@
                         </div>
 
                         <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
-                            📌 Enter at least your top 5 students here. Also add <strong>every</strong> student scoring 90% or above, even beyond the top 5 — they won't be left out, but they only show up in the 90%+ Achievers list, not the ranked Top-N.
+                            📌 Enter your top students here. Also add <strong>every</strong> student scoring 90% or above — they will be included in the Sahodaya Board Results reports and 90%+ Achievers list.
                         </p>
+
+                        <div v-if="isXii" class="flex flex-wrap items-center justify-between gap-3 bg-indigo-50/50 p-2.5 rounded-xl border border-indigo-100 mb-3">
+                            <span class="text-xs font-semibold text-slate-700">⚡ Quick Stream Fill for All Rows:</span>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <button v-for="(label, key) in streamOptions" :key="key" type="button"
+                                        @click="setStreamForAll(key)"
+                                        class="btn-secondary text-[11px] py-1 px-2.5 !bg-white hover:!bg-indigo-50 border-slate-200">
+                                    Set all to {{ label }}
+                                </button>
+                            </div>
+                        </div>
 
                         <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
                             <table class="w-full text-sm">
@@ -468,7 +479,17 @@ const wouldExceedCap = computed(() => {
 });
 
 function addRow() {
-    form.toppers.push(blankRow());
+    const lastStream = form.toppers.length > 0
+        ? (form.toppers[form.toppers.length - 1].stream_key || searchStream.value || '')
+        : (searchStream.value || '');
+    form.toppers.push({ name: '', gender: '', stream_key: lastStream, roll_no: '', marks_obtained: '', photo: null });
+}
+
+function setStreamForAll(streamKey) {
+    if (!streamKey) return;
+    form.toppers.forEach(row => {
+        row.stream_key = streamKey;
+    });
 }
 
 function removeRow(i) {

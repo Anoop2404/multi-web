@@ -117,7 +117,7 @@ class BoardExamSubjects
             }
 
             $value = is_numeric($mark) ? (int) $mark : null;
-            if ($value === null || $value < 0 || $value > 100) {
+            if ($value === null || $value < 0) {
                 continue;
             }
 

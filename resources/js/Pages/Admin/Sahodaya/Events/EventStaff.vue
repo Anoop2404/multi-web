@@ -34,6 +34,13 @@
                     <option v-for="h in heads" :key="h.id" :value="h.id">{{ h.name }}</option>
                 </select>
             </div>
+            <div v-if="regionOptions && regionOptions.length" class="min-w-[180px]">
+                <label class="text-xs text-gray-500">Region (optional scope)</label>
+                <select v-model="form.region_id" class="field w-full">
+                    <option value="">All regions</option>
+                    <option v-for="r in regionOptions" :key="r.id" :value="r.id">{{ r.name }}</option>
+                </select>
+            </div>
             <button class="btn-primary" :disabled="form.processing">Assign</button>
         </form>
         <p v-if="!staffPool.length" class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3 mb-4">
@@ -59,6 +66,7 @@
                         — {{ dutyLabel(a.duty) }}
                         <template v-if="a.stage"> · {{ a.stage.name }}</template>
                         <template v-if="a.head"> · {{ a.head.name }}</template>
+                        <template v-if="a.region"> · {{ a.region.name }}</template>
                     </span>
                 </span>
                 <button @click="remove(a)" class="text-xs text-red-600">Remove</button>
@@ -84,6 +92,7 @@ const props = defineProps({
     staffPool: Array,
     stages: Array,
     heads: { type: Array, default: () => [] },
+    regionOptions: { type: Array, default: () => [] },
     duties: Array,
     activityLogs: { type: Array, default: () => [] },
 });
@@ -113,7 +122,7 @@ const defaultDuty = computed(() => {
     return props.duties[0]?.value ?? 'coordinator';
 });
 
-const form = useForm({ user_id: '', duty: defaultDuty.value, stage_id: '', head_id: '' });
+const form = useForm({ user_id: '', duty: defaultDuty.value, stage_id: '', head_id: '', region_id: '' });
 
 watch(defaultDuty, (duty) => {
     if (!form.user_id) {

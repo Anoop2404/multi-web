@@ -22,7 +22,7 @@ class FestEventStaffController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $assignments = FestEventStaff::where('event_id', $event->id)
-            ->with(['stage:id,name', 'venue:id,name', 'head:id,name'])
+            ->with(['stage:id,name', 'venue:id,name', 'head:id,name', 'region:id,name'])
             ->get();
 
         $userIds = $assignments->pluck('user_id')->unique();
@@ -38,6 +38,11 @@ class FestEventStaffController extends SahodayaAdminController
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
+        $regionOptions = \App\Models\Region::forTenant($this->sahodaya->id)
+            ->active()
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return $this->inertia('Sahodaya/Events/EventStaff', $this->withEventActivity($event, FestPageActivity::EVENT_STAFF, [
             'event'       => $event->only('id', 'title', 'status', 'event_type'),
             'assignments' => $assignments->map(fn (FestEventStaff $a) => [
@@ -47,12 +52,15 @@ class FestEventStaffController extends SahodayaAdminController
                 'stage_id' => $a->stage_id,
                 'venue_id' => $a->venue_id,
                 'head_id'  => $a->head_id,
+                'region_id'=> $a->region_id,
                 'user'     => $usersById->get($a->user_id),
                 'stage'    => $a->stage?->only('id', 'name'),
                 'venue'    => $a->venue?->only('id', 'name'),
                 'head'     => $a->head?->only('id', 'name'),
+                'region'   => $a->region?->only('id', 'name'),
             ]),
             'staffPool'   => $staffPool,
+            'regionOptions' => $regionOptions,
             'heads'       => Schema::hasTable('fest_item_heads')
                 ? FestItemHead::forTenant($this->sahodaya->id)
                     ->forEvent($event->id)
@@ -91,6 +99,8 @@ class FestEventStaffController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $regionIds = \App\Models\Region::forTenant($this->sahodaya->id)->pluck('id')->all();
+
         $data = $request->validate([
             'user_id' => [
                 'required',
@@ -111,6 +121,10 @@ class FestEventStaffController extends SahodayaAdminController
                     Schema::hasTable('fest_item_heads'),
                     Rule::exists('fest_item_heads', 'id'),
                 ),
+            ],
+            'region_id' => [
+                'nullable',
+                Rule::in($regionIds),
             ],
         ]);
 
@@ -150,6 +164,7 @@ class FestEventStaffController extends SahodayaAdminController
             'stage_id' => $data['stage_id'] ?? null,
             'venue_id' => $data['venue_id'] ?? null,
             'head_id'  => $data['head_id'] ?? null,
+            'region_id'=> $data['region_id'] ?? null,
         ]);
 
         $user = User::find($data['user_id']);

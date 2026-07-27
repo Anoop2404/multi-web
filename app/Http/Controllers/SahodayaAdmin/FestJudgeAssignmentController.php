@@ -41,7 +41,10 @@ class FestJudgeAssignmentController extends SahodayaAdminController
         abort_if($event->event_type === 'sports', 404);
 
         $data = $request->validate([
-            'item_id' => 'required|exists:fest_event_items,id',
+            'item_id' => [
+                'required',
+                Rule::exists('fest_event_items', 'id')->where('event_id', $event->id),
+            ],
             'user_id' => [
                 'required',
                 Rule::exists('users', 'id')->where('tenant_id', $this->sahodaya->id),

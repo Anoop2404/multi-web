@@ -36,7 +36,7 @@ class AcademicPerformanceAndAwardsHelpersTest extends TestCase
 
     public function test_topper_count_default_cap(): void
     {
-        $this->assertSame(5, TopperCountService::DEFAULT_TOP_N);
+        $this->assertSame(500, TopperCountService::DEFAULT_TOP_N);
     }
 
     public function test_api_engine_and_awards_engine_are_constructible(): void

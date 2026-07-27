@@ -185,6 +185,7 @@ class FestResultsController extends SahodayaAdminController
         abort_if($item->event_id !== $event->id, 404);
 
         app(FestItemResultsService::class)->unpublishItem($item);
+        EventContext::for($event)->recalculateSchoolPoints();
 
         $audit->festEvent($event, FestPageActivity::RESULTS, 'fest.results.item_unpublished', "Results unpublished for {$item->title}", [
             'item_id' => $item->id,

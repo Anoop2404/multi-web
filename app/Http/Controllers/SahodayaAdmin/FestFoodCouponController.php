@@ -85,6 +85,9 @@ class FestFoodCouponController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($coupon->event_id !== $event->id, 404);
 
+        // Prevent double-redeem: only issued coupons can be marked redeemed.
+        abort_if($coupon->status !== 'issued', 422, 'Only issued coupons can be redeemed.');
+
         $coupon->update(['status' => 'redeemed', 'redeemed_at' => now()]);
 
         $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupon.redeemed', 'Food coupon marked redeemed', [

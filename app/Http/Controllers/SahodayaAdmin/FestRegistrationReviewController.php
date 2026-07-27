@@ -44,6 +44,23 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $itemIds = $this->itemIdsForHeadFilter($event, $headId, $itemId);
         $filterSchoolId = $request->input('school_id') ?: null;
         $filterStatus = $request->input('status') ?: null;
+        $filterRegionId = $request->input('region_id') ?: null;
+
+        // When a region filter is active, resolve school IDs in that region and
+        // restrict the query to only those schools.
+        $regionSchoolIds = null;
+        if ($filterRegionId) {
+            $year = AcademicYear::forSahodaya($this->sahodaya->id);
+            $regionSchoolIds = SchoolRegionAssignment::forTenant($this->sahodaya->id)
+                ->forYear($year)
+                ->where('region_id', $filterRegionId)
+                ->pluck('school_id')
+                ->all();
+            // Also apply to school_id filter so they work together.
+            if ($filterSchoolId && ! in_array($filterSchoolId, $regionSchoolIds, true)) {
+                $filterSchoolId = null;
+            }
+        }
 
         $feeService = app(FestSchoolEventFeeService::class);
 
@@ -53,7 +70,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         // constraints (school_id and status were client-side-only filters before, doing
         // nothing to reduce what got fetched) and the result set is paginated.
         // See docs/SCALE_AND_PAGINATION_PLAN.md §2.
-        $scopedQuery = fn () => $this->scopedRegistrationsQuery($event, $itemIds, $filterSchoolId, $request->input('search'));
+        $scopedQuery = fn () => $this->scopedRegistrationsQuery($event, $itemIds, $filterSchoolId, $request->input('search'), $regionSchoolIds);
 
         $registrations = $scopedQuery()
             ->when($filterStatus, fn ($q) => $q->where('status', $filterStatus))
@@ -99,6 +116,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         };
 
         $schoolRegions = [];
+        $regionOptions = collect();
         if (in_array($event->event_type, ['kalolsavam', 'sports', 'english_fest', 'science_fest', 'kids_fest', 'teacher_fest'], true)) {
             $schoolRegions = SchoolRegionAssignment::query()
                 ->where('school_region_assignments.tenant_id', $this->sahodaya->id)
@@ -106,6 +124,11 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 ->join('regions', 'regions.id', '=', 'school_region_assignments.region_id')
                 ->pluck('regions.name', 'school_region_assignments.school_id')
                 ->all();
+
+            $regionOptions = \App\Models\Region::forTenant($this->sahodaya->id)
+                ->active()
+                ->orderBy('name')
+                ->get(['id', 'name']);
         }
 
         return $this->inertia('Sahodaya/Events/Registrations', $this->withEventActivity($event, FestPageActivity::REGISTRATIONS, [
@@ -114,6 +137,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'pendingMatchingCount' => $pendingMatchingCount,
             'schools'            => $schools,
             'schoolRegions'      => $schoolRegions,
+            'regionOptions'      => $regionOptions,
             'feeRequired'        => $feeService->feeRequired($event),
             'registerStudents'   => $registerStudents,
             'registerSchoolId'   => $registerSchoolId,
@@ -122,6 +146,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 'search'    => $request->input('search', ''),
                 'school_id' => $filterSchoolId ?? '',
                 'status'    => $filterStatus ?? '',
+                'region_id' => $filterRegionId ?? '',
             ],
             'selectedHeadId'     => $selectedHeadId,
             'selectedItemId'     => $itemId,
@@ -137,11 +162,16 @@ class FestRegistrationReviewController extends SahodayaAdminController
      *
      * @param  ?list<int>  $itemIds
      */
-    private function scopedRegistrationsQuery(FestEvent $event, ?array $itemIds, ?string $schoolId, ?string $search)
+    /**
+     * @param  ?list<int>  $itemIds
+     * @param  ?list<string>  $regionSchoolIds  school IDs scoped to a region filter
+     */
+    private function scopedRegistrationsQuery(FestEvent $event, ?array $itemIds, ?string $schoolId, ?string $search, ?array $regionSchoolIds = null)
     {
         return FestRegistration::where('event_id', $event->id)
             ->when($itemIds !== null, fn ($q) => $q->whereIn('item_id', $itemIds))
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->when($regionSchoolIds !== null && $schoolId === null, fn ($q) => $q->whereIn('school_id', $regionSchoolIds))
             ->when(filled($search), function ($q) use ($search) {
                 $term = '%'.$search.'%';
                 $q->where(function ($inner) use ($term) {
@@ -468,8 +498,12 @@ class FestRegistrationReviewController extends SahodayaAdminController
             ->with('importErrors', array_slice($result['errors'], 0, 20));
     }
 
-    public function printApproved(Request $request, string $tenantId, FestEvent $event)
+    public function printApproved(Request $request, string $tenantId, string $event)
     {
+        // See BoardResultVerificationController::downloadPdf() — implicit route-model
+        // binding was found to unreliably deliver the resolved model to PDF/file-download
+        // controller methods in production. Resolving manually avoids that failure.
+        $event = FestEvent::findOrFail($event);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $schoolId = $request->input('school_id') ?: null;

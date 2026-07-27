@@ -42,10 +42,17 @@ class FestSubstitutionReviewController extends SahodayaAdminController
         $original = $substitutionRequest->originalParticipant;
         abort_unless($original, 422, 'Original participant not found.');
 
+        $registration = $substitutionRequest->registration;
+        $schoolId = $registration?->school_id;
+
         if ($substitutionRequest->replacement_participant_id) {
             $standby = FestParticipant::findOrFail($substitutionRequest->replacement_participant_id);
+            abort_if($standby->registration->school_id !== $schoolId, 422, 'The replacement standby participant belongs to a different school.');
             app(FestRegistrationService::class)->substitutePerformer($original, $standby);
         } elseif ($substitutionRequest->replacement_student_id) {
+            // Verify the replacement student belongs to the same school as the original registration.
+            $student = \App\Models\Student::findOrFail($substitutionRequest->replacement_student_id);
+            abort_if($student->tenant_id !== $schoolId, 422, 'The replacement student belongs to a different school.');
             $original->update(['student_id' => $substitutionRequest->replacement_student_id]);
         }
 

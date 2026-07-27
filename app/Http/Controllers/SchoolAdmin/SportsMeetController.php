@@ -103,6 +103,8 @@ class SportsMeetController extends SchoolAdminController
 
     public function storeMark(Request $request, string $tenantId, FestEvent $event)
     {
+        $this->assertSchoolSportsEvent($event);
+
         return app(FestProgramController::class)->storeMark($request, $tenantId, $event);
     }
 

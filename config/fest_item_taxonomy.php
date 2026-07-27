@@ -109,5 +109,8 @@ return [
         'kalolsavam' => ['stage_type', 'category', 'class_group', 'gender', 'title'],
         'sports'     => ['head_key', 'age_group', 'gender', 'title'],
         'kids_fest'  => ['stage_type', 'kids_band', 'category', 'title'],
+        'english_fest' => ['class_group', 'stage_type', 'category', 'title'],
+        'science_fest' => ['class_group', 'stage_type', 'category', 'title'],
+        'teacher_fest' => ['stage_type', 'category', 'title'],
     ],
 ];

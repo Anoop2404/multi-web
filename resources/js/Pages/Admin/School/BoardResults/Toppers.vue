@@ -81,6 +81,17 @@
                             </p>
                         </div>
 
+                        <div v-if="isClass12" class="flex flex-wrap items-center justify-between gap-3 bg-indigo-50/50 p-2.5 rounded-xl border border-indigo-100 mb-3">
+                            <span class="text-xs font-semibold text-slate-700">⚡ Quick Stream Fill for All Rows:</span>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <button v-for="(label, key) in streamOptions" :key="key" type="button"
+                                        @click="setStreamForAll(key)"
+                                        class="btn-secondary text-[11px] py-1 px-2.5 !bg-white hover:!bg-indigo-50 border-slate-200">
+                                    Set all to {{ label }}
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="border border-gray-200 rounded-xl overflow-hidden shadow-xs">
                             <table class="w-full text-sm">
                                 <thead class="text-left text-xs uppercase font-bold text-gray-500 bg-gray-50 border-b border-gray-200">
@@ -536,7 +547,17 @@ const wouldExceedCap = computed(() =>
 );
 
 function addRow() {
-    batchForm.toppers.push(blankRow());
+    const lastStream = batchForm.toppers.length > 0
+        ? (batchForm.toppers[batchForm.toppers.length - 1].stream_key || '')
+        : '';
+    batchForm.toppers.push({ name: '', gender: '', stream_key: lastStream, roll_no: '', marks_obtained: '', photo: null });
+}
+
+function setStreamForAll(streamKey) {
+    if (!streamKey) return;
+    batchForm.toppers.forEach(row => {
+        row.stream_key = streamKey;
+    });
 }
 
 function removeRow(i) {

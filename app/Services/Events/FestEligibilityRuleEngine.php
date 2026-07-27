@@ -195,9 +195,24 @@ class FestEligibilityRuleEngine
             return null;
         }
 
+        // Use SchoolRegionAssignment (the canonical source for membership region)
+        // instead of $school->region_id or getSetting('region_id'), which are stale
+        // for schools that migrated to the new region assignment system.
         $school = $student->relationLoaded('tenant') ? $student->tenant : $student->tenant()->first();
-        $schoolRegion = $school?->region_id ?? $school?->getSetting('region_id');
-        $ok = $schoolRegion && in_array($schoolRegion, $regionIds, true);
+        $schoolId = $school?->id;
+        if (! $schoolId) {
+            return 'school not found for this student.';
+        }
+
+        $year = \App\Support\AcademicYear::forSahodaya($school->parent_id);
+        $assignment = \App\Models\SchoolRegionAssignment::forTenant($school->parent_id)
+            ->forYear($year)
+            ->where('school_id', $schoolId)
+            ->with('region')
+            ->first();
+        $schoolRegionId = $assignment?->region_id;
+
+        $ok = $schoolRegionId && in_array($schoolRegionId, $regionIds, true);
         if ($op === 'not_in') {
             $ok = ! $ok;
         }

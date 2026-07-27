@@ -58,6 +58,14 @@ class FestEventPortalController extends SchoolAdminController
             'notes'      => 'nullable|string|max:500',
         ]);
 
+        // Prevent duplicate: same meal_date + meal_type + school already ordered.
+        $exists = FestCateringOrder::where('event_id', $event->id)
+            ->where('school_id', $this->school->id)
+            ->where('meal_date', $data['meal_date'])
+            ->where('meal_type', $data['meal_type'])
+            ->exists();
+        abort_if($exists, 422, 'A catering order for this meal date and type already exists.');
+
         FestCateringOrder::create(array_merge($data, [
             'event_id'              => $event->id,
             'school_id'             => $this->school->id,
@@ -81,6 +89,13 @@ class FestEventPortalController extends SchoolAdminController
         $participant = FestParticipant::findOrFail($data['participant_id']);
         abort_if($participant->registration->school_id !== $this->school->id, 403);
         abort_if($participant->registration->event_id !== $event->id, 403);
+
+        // Prevent duplicate appeal for the same participant.
+        $existing = FestAppeal::where('event_id', $event->id)
+            ->where('participant_id', $participant->id)
+            ->whereIn('status', ['pending', 'approved'])
+            ->exists();
+        abort_if($existing, 422, 'An active appeal already exists for this participant. Resolve or wait for the existing appeal to be processed.');
 
         FestAppeal::create([
             'event_id'              => $event->id,
@@ -168,7 +183,8 @@ class FestEventPortalController extends SchoolAdminController
         abort_if($certificates->isEmpty(), 404, 'No certificates to download for your school.');
 
         $service = app(FestCertificateService::class);
-        $zipPath = storage_path('app/tmp/school-fest-certs-'.$event->id.'-'.$this->school->id.'-'.time().'.zip');
+        $uniqueId = $event->id.'-'.$this->school->id.'-'.bin2hex(random_bytes(4));
+        $zipPath = storage_path('app/tmp/school-fest-certs-'.$uniqueId.'.zip');
         @mkdir(dirname($zipPath), 0755, true);
 
         $zip = new \ZipArchive;

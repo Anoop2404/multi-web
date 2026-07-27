@@ -657,7 +657,10 @@ class FestRegistrationController extends SchoolAdminController
 
         $rules = [
             'event_id'       => 'required|exists:fest_events,id',
-            'item_id'        => 'required|exists:fest_event_items,id',
+            'item_id'        => [
+                'required',
+                \Illuminate\Validation\Rule::exists('fest_event_items', 'id')->where('event_id', $request->input('event_id')),
+            ],
             'team_name'      => 'nullable|string|max:255',
             'coach_name'     => 'nullable|string|max:255',
             'coach_phone'    => 'nullable|string|max:40',

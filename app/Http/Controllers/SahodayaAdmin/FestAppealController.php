@@ -55,6 +55,9 @@ class FestAppealController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($appeal->event_id !== $event->id, 403);
 
+        // Prevent re-resolving an already-resolved appeal (approved ↔ rejected flip-flop).
+        abort_if($appeal->status !== 'pending', 422, 'Only pending appeals can be resolved.');
+
         $data = $request->validate([
             'status'          => 'required|in:approved,rejected',
             'resolution_note' => 'nullable|string|max:1000',
@@ -76,6 +79,10 @@ class FestAppealController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($appeal->event_id !== $event->id, 403);
+
+        // Only pending appeals should have their fee tracked — rejected/approved appeals
+        // should not have their fee status mutated retroactively.
+        abort_if($appeal->status !== 'pending', 422, 'Fee can only be marked paid for pending appeals.');
 
         $appeal->update(['fee_paid_at' => now()]);
 

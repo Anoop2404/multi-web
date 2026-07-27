@@ -31,9 +31,15 @@ class FestRegistrationFeeGate
         return $this->feeService->isPaid($event, $schoolId);
     }
 
-    /** Registration is allowed before fee verification; downloads are gated separately. */
+    /** Block registration when the fee schedule requires prior payment. */
     public function assertCanRegister(FestEvent $event, Tenant $school): void
     {
-        // No-op — schools may register before Sahodaya verifies event fees.
+        if ($this->requiredBeforeRegistration($event)) {
+            abort_unless(
+                $this->isSchoolFeeCleared($event, $school->id),
+                422,
+                'Fee payment must be approved before registering for this event.'
+            );
+        }
     }
 }

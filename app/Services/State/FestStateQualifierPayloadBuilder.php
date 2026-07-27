@@ -62,7 +62,7 @@ class FestStateQualifierPayloadBuilder
                         'class_name'             => $student?->class_name,
                         'position'               => $mark->position,
                         'grade'                  => $mark->grade,
-                        'points'                 => $mark->points ?? 0,
+                        'points'                 => $mark->score ?? 0,
                         'partition_key'          => $this->partitions->partitionKey($event),
                         'qualifier_type'         => $role === 'finale' ? 'district_winner' : 'regional_winner',
                     ];

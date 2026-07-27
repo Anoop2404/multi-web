@@ -27,7 +27,7 @@ class TopperSubjectMarkService
                     continue;
                 }
                 $value = (float) $marks;
-                if ($value < 0 || $value > 100) {
+                if ($value < 0) {
                     continue;
                 }
 
@@ -68,19 +68,46 @@ class TopperSubjectMarkService
         $leaders = [];
         foreach ($rows as $row) {
             $key = $row->subject_label;
+            $marks = (float) $row->marks;
+
             if (! isset($leaders[$key])) {
                 $leaders[$key] = [
                     'subject' => $row->subject_label,
+                    'entries' => [],
+                    'top_marks' => $marks,
+                ];
+            }
+
+            // Collect ALL students tied at the top marks, not just the first.
+            if ($marks > $leaders[$key]['top_marks']) {
+                $leaders[$key] = [
+                    'subject' => $row->subject_label,
+                    'entries' => [[
+                        'name' => $row->topper?->name ?? '',
+                        'marks' => $marks,
+                        'stream' => $row->topper?->stream,
+                    ]],
+                    'top_marks' => $marks,
+                ];
+            } elseif ($marks === $leaders[$key]['top_marks']) {
+                $leaders[$key]['entries'][] = [
                     'name' => $row->topper?->name ?? '',
-                    'marks' => (float) $row->marks,
+                    'marks' => $marks,
                     'stream' => $row->topper?->stream,
-                    'subject_id' => $row->subject_id,
                 ];
             }
         }
         ksort($leaders);
 
-        return array_values($leaders);
+        return collect($leaders)->map(fn ($leader, $subject) => [
+            'subject'    => $subject,
+            'name'       => $leader['entries'][0]['name'] ?? '',   // first leader for backward compat
+            'marks'      => $leader['entries'][0]['marks'] ?? 0,
+            'stream'     => $leader['entries'][0]['stream'] ?? null,
+            'entries'    => $leader['entries'],                     // all tied leaders
+            'top_marks'  => $leader['top_marks'],
+            'subject_id' => $rows->firstWhere('subject_label', $subject)?->subject_id,
+        ])->values()->all();
     }
 
     private function resolveSubjectId(string $label): ?int

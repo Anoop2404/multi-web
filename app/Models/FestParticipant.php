@@ -6,6 +6,7 @@ use App\Services\Events\FestNumberingService;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class FestParticipant extends Model
 {
@@ -40,9 +41,9 @@ class FestParticipant extends Model
         return $this->belongsTo(Teacher::class);
     }
 
-    public function mark(): BelongsTo
+    public function mark(): HasOne
     {
-        return $this->belongsTo(FestMark::class, 'id', 'participant_id');
+        return $this->hasOne(FestMark::class, 'participant_id');
     }
 
     protected function chestNo(): Attribute

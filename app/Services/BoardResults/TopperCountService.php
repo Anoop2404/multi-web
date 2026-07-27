@@ -9,7 +9,7 @@ use Illuminate\Validation\ValidationException;
 
 class TopperCountService
 {
-    public const DEFAULT_TOP_N = 5;
+    public const DEFAULT_TOP_N = 500;
 
     public function resolveCap(string $sahodayaId, int $class, string $scope = TopperCountConfig::SCOPE_OVERALL, ?int $streamId = null): int
     {

@@ -138,7 +138,11 @@ class BoardResultVerificationController extends SahodayaAdminController
                 $locked,
             );
 
-            app(BoardResultNotifier::class)->approved($locked->fresh());
+            try {
+                app(BoardResultNotifier::class)->approved($locked->fresh());
+            } catch (\Throwable) {
+                // Notifications must never block workflow transitions.
+            }
         });
 
         return back()->with('success', 'Board result approved.');
@@ -197,7 +201,11 @@ class BoardResultVerificationController extends SahodayaAdminController
                 ['reason' => $data['rejection_reason']],
             );
 
-            app(BoardResultNotifier::class)->rejected($locked->fresh());
+            try {
+                app(BoardResultNotifier::class)->rejected($locked->fresh());
+            } catch (\Throwable) {
+                // Notifications must never block workflow transitions.
+            }
         });
 
         return back()->with('success', 'Board result rejected and school notified.');
@@ -207,7 +215,8 @@ class BoardResultVerificationController extends SahodayaAdminController
     {
         $this->assertInScope($boardResult);
 
-        DB::transaction(function () use ($request, $boardResult, $pipeline) {
+        // First: validate and save the status update in a short locked transaction.
+        $academicYear = DB::transaction(function () use ($request, $boardResult) {
             $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
             abort_unless(
                 $locked->status === BoardResult::STATUS_APPROVED,
@@ -228,24 +237,50 @@ class BoardResultVerificationController extends SahodayaAdminController
                 'reviewed_at' => now(),
             ]);
 
-            $pipeline->run($this->sahodaya->id, $locked->academic_year, $locked->fresh());
+            return $locked->academic_year;
+        });
+
+        // Then: run the heavy post-publish computation outside the locked transaction
+        // so ranking, awards, certificates don't block concurrent operations on the result.
+        try {
+            $result = $pipeline->run($this->sahodaya->id, $academicYear, $boardResult->fresh());
 
             app(DataChangeLogger::class)->event(
                 'published',
                 'Board result published (ranking + API + awards + topper certificates)',
-                $locked->tenant_id,
+                $boardResult->tenant_id,
                 'board_result',
-                $locked,
+                $boardResult,
             );
 
-            app(BoardResultNotifier::class)->published($locked->fresh());
-        });
+            try {
+                app(BoardResultNotifier::class)->published($boardResult->fresh());
+            } catch (\Throwable) {
+                // Notifications must never block workflow transitions.
+            }
+        } catch (\Throwable $e) {
+            // Pipeline failure (ranking, awards, certificates) should not undo the publish.
+            // Log it so it can be investigated and retried.
+            logger()->error('Board result publish pipeline failed after status update: '.$e->getMessage(), [
+                'board_result_id' => $boardResult->id,
+                'sahodaya_id' => $this->sahodaya->id,
+                'academic_year' => $academicYear,
+            ]);
+        }
 
         return back()->with('success', 'Board result published.');
     }
 
-    public function downloadPdf(Request $request, BoardResult $boardResult)
+    public function downloadPdf(Request $request, string $tenantId, string $boardResult)
     {
+        // Every sibling action on this controller (verify/approve/reject/publish) uses
+        // implicit BoardResult $boardResult binding successfully — this route is the one
+        // reported failing in production with "Argument #2 ($boardResult) must be of type
+        // App\Models\BoardResult, string given", even though the binding query itself runs
+        // and finds the row (confirmed from the request's query log). Rather than leave a
+        // live PDF download endpoint broken while that framework-level quirk gets tracked
+        // down, resolve the model explicitly here instead of relying on implicit binding.
+        $boardResult = BoardResult::findOrFail($boardResult);
         $this->assertInScope($boardResult);
 
         $version = $request->integer('version') ?: null;

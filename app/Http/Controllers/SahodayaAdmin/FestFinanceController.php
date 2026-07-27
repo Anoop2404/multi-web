@@ -71,16 +71,23 @@ class FestFinanceController extends SahodayaAdminController
         return back()->with('success', 'Invoice issued for '.$school->name.'.');
     }
 
-    public function pdf(Request $request, string $tenantId, FestEvent $event, FestEventInvoice $invoice)
+    public function pdf(Request $request, string $tenantId, string $event, string $invoice)
     {
+        // See BoardResultVerificationController::downloadPdf() — implicit route-model
+        // binding was found to unreliably deliver the resolved model to PDF/file-download
+        // controller methods in production. Resolving manually avoids that failure.
+        $event = FestEvent::findOrFail($event);
+        $invoice = FestEventInvoice::findOrFail($invoice);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($invoice->event_id !== $event->id, 404);
 
         return $this->renderInvoicePdf($request, $event, $invoice, 'fest.finance.invoice');
     }
 
-    public function pdfDetailed(Request $request, string $tenantId, FestEvent $event, FestEventInvoice $invoice)
+    public function pdfDetailed(Request $request, string $tenantId, string $event, string $invoice)
     {
+        $event = FestEvent::findOrFail($event);
+        $invoice = FestEventInvoice::findOrFail($invoice);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($invoice->event_id !== $event->id, 404);
 

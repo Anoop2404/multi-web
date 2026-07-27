@@ -107,6 +107,10 @@ class AwardsEngine
         return ['awards' => $created, 'achievements' => $achievements];
     }
 
+    /**
+     * Award all tied rank-1 schools for a given scope (e.g. overall pass percent).
+     * Previously only the first was awarded via ->first().
+     */
     private function awardFromRanking(
         string $sahodayaId,
         string $academicYear,
@@ -126,30 +130,41 @@ class AwardsEngine
             $query->where('class', $class);
         }
 
-        $top = $query->first();
-        if (! $top) {
+        $top = $query->get();
+        if ($top->isEmpty()) {
             return 0;
         }
 
-        AcademicAward::create([
-            'sahodaya_id' => $sahodayaId,
-            'tenant_id' => $top->entity_id,
-            'academic_year' => $academicYear,
-            'award_type' => $awardType,
-            'board_result_id' => $top->board_result_id,
-            'score' => $top->score,
-            'title' => $title,
-            'meta' => array_merge($top->meta ?? [], [
-                'class' => $class ?? $top->class,
-                'examination_type' => $top->examination_type,
-            ]),
-            'computed_at' => now(),
-        ]);
+        $created = 0;
+        foreach ($top as $tied) {
+            AcademicAward::create([
+                'sahodaya_id' => $sahodayaId,
+                'tenant_id' => $tied->entity_id,
+                'academic_year' => $academicYear,
+                'award_type' => $awardType,
+                'board_result_id' => $tied->board_result_id,
+                'score' => $tied->score,
+                'title' => $title,
+                'meta' => array_merge($tied->meta ?? [], [
+                    'class' => $class ?? $tied->class,
+                    'examination_type' => $tied->examination_type,
+                ]),
+                'computed_at' => now(),
+            ]);
+            $created++;
+        }
 
-        return 1;
+        return $created;
     }
 
-    /** @param  list<string>  $schoolIds */
+    /**
+     * Count DISTINCT subjects where each school produced a subject leader,
+     * not raw topper count — a school with 50 average toppers shouldn't beat
+     * a school with 5 genuine subject leaders. Also awards ALL tied schools
+     * at the top count, not just the first.
+     *
+     * @param  list<string>  $schoolIds
+     */
     private function awardMostSubjectToppers(string $sahodayaId, string $academicYear, array $schoolIds): int
     {
         if ($schoolIds === []) {
@@ -162,7 +177,8 @@ class AwardsEngine
                     ->where('academic_year', $academicYear)
                     ->whereIn('status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED]);
             })
-            ->selectRaw('tenant_id, COUNT(*) as c')
+            ->whereHas('subjectMarks', fn ($q) => $q->whereNotNull('score'))
+            ->selectRaw('tenant_id, COUNT(DISTINCT subject_id) as c')
             ->groupBy('tenant_id')
             ->orderByDesc('c')
             ->first();
@@ -171,18 +187,35 @@ class AwardsEngine
             return 0;
         }
 
-        AcademicAward::create([
-            'sahodaya_id' => $sahodayaId,
-            'tenant_id' => $counts->tenant_id,
-            'academic_year' => $academicYear,
-            'award_type' => AcademicAward::TYPE_MOST_SUBJECT_TOPPERS,
-            'score' => (float) $counts->c,
-            'title' => 'Most Subject Toppers',
-            'meta' => ['topper_count' => (int) $counts->c],
-            'computed_at' => now(),
-        ]);
+        // Collect ALL tied schools at the top count.
+        $allTied = Topper::query()
+            ->whereHas('boardResult', function ($q) use ($schoolIds, $academicYear) {
+                $q->whereIn('tenant_id', $schoolIds)
+                    ->where('academic_year', $academicYear)
+                    ->whereIn('status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED]);
+            })
+            ->whereHas('subjectMarks', fn ($q) => $q->whereNotNull('score'))
+            ->selectRaw('tenant_id, COUNT(DISTINCT subject_id) as c')
+            ->groupBy('tenant_id')
+            ->having('c', '>=', (int) $counts->c)
+            ->pluck('c', 'tenant_id');
 
-        return 1;
+        $created = 0;
+        foreach ($allTied as $schoolId => $subjectCount) {
+            AcademicAward::create([
+                'sahodaya_id' => $sahodayaId,
+                'tenant_id' => $schoolId,
+                'academic_year' => $academicYear,
+                'award_type' => AcademicAward::TYPE_MOST_SUBJECT_TOPPERS,
+                'score' => (float) $subjectCount,
+                'title' => 'Most Subject Toppers',
+                'meta' => ['topper_count' => (int) $subjectCount, 'distinct_subjects' => (int) $subjectCount],
+                'computed_at' => now(),
+            ]);
+            $created++;
+        }
+
+        return $created;
     }
 
     /** @param  list<string>  $schoolIds */
@@ -364,8 +397,13 @@ class AwardsEngine
             return 0;
         }
 
-        uasort($bySchool, fn ($a, $b) => $b['avg'] <=> $a['avg']);
-        $winnerId = array_key_first($bySchool);
+        // Stable sort: when averages are equal, sort by school ID to ensure
+        // deterministic results. uasort is unstable for equal elements in PHP,
+        // so use array_multisort for deterministic tie-breaking.
+        $keys = array_keys($bySchool);
+        $values = array_values($bySchool);
+        array_multisort(array_column($values, 'avg'), SORT_DESC, $keys, $values);
+        $winnerId = $keys[0];
 
         AcademicAward::create([
             'sahodaya_id' => $sahodayaId,
