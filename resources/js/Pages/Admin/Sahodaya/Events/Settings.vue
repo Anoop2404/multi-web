@@ -20,7 +20,7 @@
                 <!-- Group Tab 1: Fees & Windows -->
                 <template v-if="['fees', 'registration', 'participation'].includes(activeTab)">
                     <div id="section-fees" class="scroll-mt-6"><FeesTab /></div>
-                    <div v-if="isSports" id="section-registration" class="scroll-mt-6"><RegistrationTab /></div>
+                    <div id="section-registration" class="scroll-mt-6"><RegistrationTab /></div>
                     <div id="section-participation" class="scroll-mt-6"><ParticipationTab /></div>
                 </template>
 
@@ -195,7 +195,7 @@ const activeCategory = computed(() => {
         const sections = [
             { id: 'fees', label: isSports.value ? 'Sport Event Fees' : 'Fest Event Fees', href: `${base.value}/settings/fees` },
         ];
-        if (isSports.value) sections.push({ id: 'registration', label: 'Registration Windows', href: `${base.value}/settings/registration` });
+        sections.push({ id: 'registration', label: 'Registration Windows', href: `${base.value}/settings/registration` });
         sections.push({ id: 'participation', label: 'Participation Policies', href: `${base.value}/settings/participation` });
         return { title: '💳 Fees & Windows', sections };
     }
