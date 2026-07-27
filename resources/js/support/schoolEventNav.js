@@ -105,10 +105,11 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
             { label: 'Step 3 · Billing & Payment', href: `${eventBase}/registration?tab=fees`, icon: 'credit-card', matchQuery: { tab: 'fees' } },
         );
     } else {
+        // Non-sports events (English Fest, Science Fest, etc.) have no separate event-reg step —
+        // students are registered directly against items, so only show 2 steps.
         workflowItems.push(
-            { label: 'Step 1 · Participant Roster', href: `${eventBase}/registration?tab=student-reg`, icon: 'clipboard', matchQuery: { tab: 'student-reg' } },
-            { label: 'Step 2 · Item Registration', href: `${eventBase}/registration?tab=item-reg`, icon: 'layers', matchQuery: { tab: 'item-reg' } },
-            { label: 'Step 3 · Billing & Payment', href: `${eventBase}/registration?tab=fees`, icon: 'credit-card', matchQuery: { tab: 'fees' } },
+            { label: 'Item Registration', href: `${eventBase}/registration?tab=item-reg`, icon: 'layers', matchQuery: { tab: 'item-reg' } },
+            { label: 'Billing & Payment', href: `${eventBase}/registration?tab=fees`, icon: 'credit-card', matchQuery: { tab: 'fees' } },
         );
     }
 

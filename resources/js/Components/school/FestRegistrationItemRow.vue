@@ -251,6 +251,7 @@ const props = defineProps({
     editingRegistrationId: { type: [Number, String], default: null },
     columnCount: { type: Number, default: 6 },
     layout: { type: String, default: 'default' },
+    classGroupLabels: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['register', 'update', 'withdraw', 'edit', 'cancel-edit', 'add-student', 'search-students']);
@@ -285,13 +286,27 @@ const eligibilityLabel = computed(() => {
     if (age && age !== 'open') {
         parts.push(String(age).toUpperCase());
     }
-    if (props.item.eligibility_label && props.item.eligibility_label !== 'Open') {
-        parts.push(props.item.eligibility_label);
-    } else {
-        const title = String(props.item.title ?? '').toLowerCase();
-        if (title.includes('boys')) parts.push('Boys');
-        else if (title.includes('girls')) parts.push('Girls');
-        else if (props.item.eligibility_label) parts.push(props.item.eligibility_label);
+    // Show class category for events that use class_group (English Fest, Science Fest, etc.)
+    const classGroup = props.item.class_group;
+    if (classGroup && classGroup !== 'open') {
+        // Use the event's class_group_labels if available, otherwise fallback to uppercase
+        const label = props.classGroupLabels[classGroup] ?? String(classGroup).toUpperCase();
+        parts.push(label);
+    }
+    // Also show gender if present and meaningful
+    const gender = String(props.item.gender ?? '').toLowerCase();
+    if (gender && !['open', 'mixed'].includes(gender)) {
+        parts.push(gender === 'male' ? 'Boys' : gender === 'female' ? 'Girls' : props.item.gender);
+    } else if (!classGroup || classGroup === 'open') {
+        // Fall back to eligibility_label only if no class_group was shown
+        if (props.item.eligibility_label && props.item.eligibility_label !== 'Open') {
+            parts.push(props.item.eligibility_label);
+        } else {
+            const title = String(props.item.title ?? '').toLowerCase();
+            if (title.includes('boys')) parts.push('Boys');
+            else if (title.includes('girls')) parts.push('Girls');
+            else if (props.item.eligibility_label) parts.push(props.item.eligibility_label);
+        }
     }
     return parts.length ? parts.join(' · ') : 'Open';
 });
