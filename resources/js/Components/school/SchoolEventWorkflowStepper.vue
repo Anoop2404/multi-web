@@ -32,11 +32,18 @@ const emit = defineEmits(['select-step']);
 
 const eventBase = computed(() => schoolEventBase(props.schoolId, props.programPrefix, props.eventId));
 
-const steps = computed(() => [
-    { num: 1, key: 'event-reg', tab: 'athletes', label: '1. Event Registration', href: `${eventBase.value}/registration?tab=event-reg` },
-    { num: 2, key: 'item-reg', tab: 'items', label: '2. Item Registration', href: `${eventBase.value}/registration?tab=item-reg` },
-    { num: 3, key: 'payment', tab: 'payment', label: '3. Payment & Fees', href: `${eventBase.value}/registration?tab=payment` },
-]);
+const steps = computed(() => {
+    const all = [
+        { num: 1, key: 'event-reg', tab: 'athletes', label: 'Event Registration', href: `${eventBase.value}/registration?tab=event-reg` },
+        { num: 2, key: 'item-reg', tab: 'items', label: 'Item Registration', href: `${eventBase.value}/registration?tab=item-reg` },
+        { num: 3, key: 'payment', tab: 'payment', label: 'Payment & Fees', href: `${eventBase.value}/registration?tab=payment` },
+    ];
+    // Non-sports events (Kalotsav, English Fest, etc.) have no separate event-reg step —
+    // students are registered directly against items, so skip step 1.
+    const filtered = props.isSports ? all : all.filter(s => s.key !== 'event-reg');
+    // Re-number after filtering so badges stay sequential.
+    return filtered.map((s, i) => ({ ...s, num: i + 1 }));
+});
 
 function onStepClick(step) {
     emit('select-step', step);

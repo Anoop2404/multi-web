@@ -514,7 +514,8 @@ function getTab(eventId) {
         const tabParam = urlParams ? urlParams.get('tab') : null;
 
         if (tabParam === 'event-reg' || tabParam === 'athletes' || tabParam === 'student-reg') {
-            activeTabMap[eventId] = 'athletes';
+            // Non-sports events have no separate event-reg step — fall back to items.
+            activeTabMap[eventId] = (props.eventType === 'sports' || isSports.value) ? 'athletes' : 'items';
         } else if (tabParam === 'item-reg' || tabParam === 'items') {
             activeTabMap[eventId] = 'items';
         } else if (tabParam === 'payment' || tabParam === 'billing' || tabParam === 'fees') {
