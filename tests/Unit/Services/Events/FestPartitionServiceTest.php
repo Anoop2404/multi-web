@@ -156,6 +156,10 @@ class FestPartitionServiceTest extends TestCase
         $regionItem = FestEventItem::where('event_id', $region->id)
             ->where('inherited_from_item_id', $item->id)
             ->firstOrFail();
+        $this->assertEqualsCanonicalizing(
+            [$item->id, $regionItem->id],
+            $hub->reportableItemIds([$item->id]),
+        );
         $regionItem->update(['class_group' => 'CATEGORY__II']);
         $syncedItem = app(FestItemSyncService::class)
             ->copyItemToPartition($hub, $item->fresh(), $region, 'region');

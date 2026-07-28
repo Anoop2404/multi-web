@@ -26,13 +26,13 @@ class FestParticipationPolicyService
 
     public function resolveForEvent(FestEvent $event, ?string $classGroup = null): array
     {
-        $policy = FestParticipationPolicy::where('event_id', $event->id)
-            ->where('is_active', true)
-            ->when($classGroup, fn ($q) => $q->where(fn ($q2) => $q2
-                ->where('class_group', $classGroup)
-                ->orWhereNull('class_group')))
-            ->orderByRaw('class_group IS NULL')
-            ->first();
+        $policy = $this->eventPolicy($event->id, $classGroup);
+
+        // Partition children execute registrations, but inherit the program-wide
+        // participation policy from their parent unless explicitly overridden.
+        if (! $policy && $event->parent_event_id) {
+            $policy = $this->eventPolicy((int) $event->parent_event_id, $classGroup);
+        }
 
         if ($policy) {
             return $policy->toLimitArray();
@@ -53,6 +53,17 @@ class FestParticipationPolicyService
         };
 
         return $this->mergePreset(['preset_key' => $presetKey]);
+    }
+
+    private function eventPolicy(int $eventId, ?string $classGroup): ?FestParticipationPolicy
+    {
+        return FestParticipationPolicy::where('event_id', $eventId)
+            ->where('is_active', true)
+            ->when($classGroup, fn ($q) => $q->where(fn ($q2) => $q2
+                ->where('class_group', $classGroup)
+                ->orWhereNull('class_group')))
+            ->orderByRaw('class_group IS NULL')
+            ->first();
     }
 
     /** @param array<string, mixed> $data */

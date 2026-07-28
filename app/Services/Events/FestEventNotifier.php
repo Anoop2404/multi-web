@@ -282,7 +282,7 @@ class FestEventNotifier
     /** Notify schools when an event is cancelled by the admin. */
     public function eventCancelled(FestEvent $event, \Illuminate\Support\Collection $credits): void
     {
-        $schoolIds = FestRegistration::where('event_id', $event->id)
+        $schoolIds = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->distinct()
             ->pluck('school_id');
 
@@ -346,7 +346,7 @@ class FestEventNotifier
             return;
         }
 
-        $schoolIds = FestRegistration::where('event_id', $event->id)
+        $schoolIds = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->distinct()
             ->pluck('school_id');
 
@@ -384,7 +384,7 @@ class FestEventNotifier
             return;
         }
 
-        $schoolIds = FestRegistration::where('event_id', $event->id)
+        $schoolIds = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->distinct()
             ->pluck('school_id');
 
@@ -426,7 +426,7 @@ class FestEventNotifier
             return;
         }
 
-        $schoolIds = FestRegistration::where('event_id', $event->id)
+        $schoolIds = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->distinct()
             ->pluck('school_id');
 
@@ -642,7 +642,7 @@ class FestEventNotifier
     {
         $participants = FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $schoolId)
                 ->where('status', 'approved'))
             ->with(['student.user', 'teacher.user'])

@@ -169,7 +169,7 @@ class FestSportsCompositeFeeService
                         ->count();
                     $itemFee = (float) ($defaultItemFee ?? $studentRegRate);
                     $amount = $itemFee * $performersCount;
-                    $itemLineLabel = ($registration->item->title ?? 'Team item')." ({$performersCount} × ₹".number_format($itemFee, 0).")";
+                    $itemLineLabel = ($registration->item->title ?? 'Team item')." ({$performersCount} × ₹".number_format($itemFee, 0).')';
                     $quantity = $performersCount;
                     $unitAmount = $itemFee;
                 } else {
@@ -423,7 +423,7 @@ class FestSportsCompositeFeeService
                         ->count();
                     $itemFee = (float) ($head->default_item_fee ?? $studentRegRate);
                     $amount = $itemFee * $performersCount;
-                    $label = ($registration->item->title ?? 'Team item')." ({$performersCount} × ₹".number_format($itemFee, 0).")";
+                    $label = ($registration->item->title ?? 'Team item')." ({$performersCount} × ₹".number_format($itemFee, 0).')';
                     $quantity = $performersCount;
                     $unitAmount = $itemFee;
                 } else {
@@ -506,7 +506,9 @@ class FestSportsCompositeFeeService
         $perStudent = (float) ($schedule['per_student_amount'] ?? 300);
         $includedQuota = max(0, (int) ($schedule['included_items_per_student'] ?? 2));
 
-        $studentIds = FestLevelRegistration::where('event_id', $event->id)
+        $eventIds = $event->reportableEventIds();
+
+        $studentIds = FestLevelRegistration::whereIn('event_id', $eventIds)
             ->where('school_id', $schoolId)
             ->where('status', 'active')
             ->pluck('student_id')
@@ -515,7 +517,7 @@ class FestSportsCompositeFeeService
             ->values();
 
         if ($studentIds->isEmpty()) {
-            $studentIds = FestRegistration::where('event_id', $event->id)
+            $studentIds = FestRegistration::whereIn('event_id', $eventIds)
                 ->where('school_id', $schoolId)
                 ->whereIn('status', ['submitted', 'approved'])
                 ->with('participants')
@@ -534,7 +536,7 @@ class FestSportsCompositeFeeService
         $extraLines = [];
         $extraTotal = 0.0;
 
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $registrations = FestRegistration::whereIn('event_id', $eventIds)
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved'])
             ->whereHas('item', fn ($q) => $q->where('is_enabled', true))

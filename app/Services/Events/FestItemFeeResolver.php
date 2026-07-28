@@ -113,7 +113,7 @@ class FestItemFeeResolver
     /** @return Collection<int, FestRegistration> */
     public function billableRegistrations(FestEvent $event, string $schoolId): Collection
     {
-        return FestRegistration::where('event_id', $event->id)
+        return FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved'])
             ->with(['item.head:id,name'])
@@ -146,7 +146,7 @@ class FestItemFeeResolver
         if ($schedule['charge_standbys'] ?? false) {
             $standbys = FestParticipant::query()
                 ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $event->id)
+                    ->whereIn('event_id', $event->reportableEventIds())
                     ->where('school_id', $schoolId)
                     ->whereIn('status', ['submitted', 'approved']))
                 ->where('participant_role', 'standby')

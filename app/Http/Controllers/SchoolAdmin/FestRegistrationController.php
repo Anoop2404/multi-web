@@ -935,7 +935,7 @@ class FestRegistrationController extends SchoolAdminController
         $receipt = $schoolFee->feeReceipt;
         abort_if(! $receipt || $receipt->status !== 'approved', 403, 'Receipt is not yet approved.');
 
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->whereIn('status', ['submitted', 'approved'])
             ->when($schoolFee->head_id, function ($q) use ($schoolFee) {
@@ -997,7 +997,7 @@ class FestRegistrationController extends SchoolAdminController
         abort_if(! in_array($event->status, ['ongoing', 'registration_open', 'published'], true), 404);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->where('status', 'approved'))
             ->with(['student', 'teacher', 'registration.item'])

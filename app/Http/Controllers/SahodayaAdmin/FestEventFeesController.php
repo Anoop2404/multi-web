@@ -20,7 +20,7 @@ class FestEventFeesController extends SahodayaAdminController
         $feeService = app(FestSchoolEventFeeService::class);
         $schedule = $feeService->resolveSchedule($event);
 
-        FestRegistration::where('event_id', $event->id)
+        FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->distinct()
             ->pluck('school_id')
             ->each(fn (string $schoolId) => $feeService->recalculate($event, $schoolId));
@@ -31,7 +31,7 @@ class FestEventFeesController extends SahodayaAdminController
             ->orderBy('school_id')
             ->get()
             ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event) {
-                $regs = FestRegistration::where('event_id', $fee->event_id)
+                $regs = FestRegistration::whereIn('event_id', $event->reportableEventIds())
                     ->where('school_id', $fee->school_id)
                     ->whereIn('status', ['submitted', 'approved'])
                     ->with(['item', 'participants'])
@@ -202,7 +202,7 @@ class FestEventFeesController extends SahodayaAdminController
             ->get()
             ->filter(fn ($fee) => (int) $fee->participation_item_count > 0 || (float) $fee->total_due > 0)
             ->map(function (FestSchoolEventFee $fee) use ($feeService, $schedule, $event) {
-                $regs = FestRegistration::where('event_id', $fee->event_id)
+                $regs = FestRegistration::whereIn('event_id', $event->reportableEventIds())
                     ->where('school_id', $fee->school_id)
                     ->whereIn('status', ['submitted', 'approved'])
                     ->with(['item', 'participants'])

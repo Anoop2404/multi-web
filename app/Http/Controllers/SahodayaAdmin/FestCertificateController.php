@@ -16,7 +16,7 @@ class FestCertificateController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id))
+            ->whereIn('event_id', $event->reportableEventIds()))
             ->pluck('id');
 
         $service = app(FestCertificateService::class);
@@ -63,7 +63,7 @@ class FestCertificateController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id))
+            ->whereIn('event_id', $event->reportableEventIds()))
             ->pluck('id');
 
         $certificates = Certificate::where('entity_type', FestParticipant::class)

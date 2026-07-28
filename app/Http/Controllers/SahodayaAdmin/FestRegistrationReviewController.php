@@ -168,8 +168,10 @@ class FestRegistrationReviewController extends SahodayaAdminController
      */
     private function scopedRegistrationsQuery(FestEvent $event, ?array $itemIds, ?string $schoolId, ?string $search, ?array $regionSchoolIds = null)
     {
-        return FestRegistration::where('event_id', $event->id)
-            ->when($itemIds !== null, fn ($q) => $q->whereIn('item_id', $itemIds))
+        $scopedItemIds = $itemIds === null ? null : $event->reportableItemIds($itemIds);
+
+        return FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->when($scopedItemIds !== null, fn ($q) => $q->whereIn('item_id', $scopedItemIds))
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->when($regionSchoolIds !== null && $schoolId === null, fn ($q) => $q->whereIn('school_id', $regionSchoolIds))
             ->when(filled($search), function ($q) use ($search) {

@@ -21,13 +21,17 @@ class FestMandatoryItemService
             return collect();
         }
 
-        $registeredIds = FestRegistration::where('event_id', $event->id)
+        $registeredItemIds = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved'])
-            ->whereIn('item_id', $mandatoryIds)
+            ->whereIn('item_id', $event->reportableItemIds($mandatoryIds->map(fn ($id) => (int) $id)->all()))
             ->pluck('item_id');
 
-        return FestEventItem::whereIn('id', $mandatoryIds->diff($registeredIds))
+        $registeredSourceIds = FestEventItem::whereIn('id', $registeredItemIds)
+            ->get(['id', 'inherited_from_item_id'])
+            ->map(fn (FestEventItem $item) => (int) ($item->inherited_from_item_id ?: $item->id));
+
+        return FestEventItem::whereIn('id', $mandatoryIds->diff($registeredSourceIds))
             ->orderBy('display_order')
             ->get();
     }
@@ -44,7 +48,7 @@ class FestMandatoryItemService
     /** @return list<array{school_id: string, school_name: string, missing: list<string>}> */
     public function schoolsWithMissing(FestEvent $event): array
     {
-        $schoolIds = FestRegistration::where('event_id', $event->id)
+        $schoolIds = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->distinct()
             ->pluck('school_id');
 

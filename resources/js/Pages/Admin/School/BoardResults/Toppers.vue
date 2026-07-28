@@ -574,6 +574,18 @@ const activeTab = ref('overall');
 const editingId = ref(null);
 const selectedSubjectStream = ref('science');
 
+function normalizeStreamKey(value) {
+    return String(value ?? '').trim().toLowerCase();
+}
+
+function streamDisplayLabel(value) {
+    const normalized = normalizeStreamKey(value);
+    if (normalized === 'science') return 'Science';
+    if (normalized === 'commerce') return 'Commerce';
+    if (normalized === 'humanities' || normalized === 'arts') return 'Humanities';
+    return String(value ?? '').trim() || 'Unspecified';
+}
+
 function urlEncode(val) {
     return encodeURIComponent(val ?? '');
 }
@@ -589,7 +601,7 @@ const sortedToppers = computed(() =>
 const sortedToppersByStream = computed(() => {
     const groups = {};
     for (const t of sortedToppers.value) {
-        const stream = t.stream ?? 'Unspecified';
+        const stream = streamDisplayLabel(t.stream);
         (groups[stream] ??= []).push(t);
     }
     // Order streams: Science, Commerce, Humanities, then everything else
@@ -613,7 +625,7 @@ const achievers90 = computed(() =>
 const achievers90ByStream = computed(() => {
     const groups = {};
     for (const t of achievers90.value) {
-        const key = t.stream ?? 'Overall';
+        const key = streamDisplayLabel(t.stream) || 'Overall';
         (groups[key] ??= []).push(t);
     }
     return groups;
@@ -867,7 +879,8 @@ function onStreamChange() {
 
 function streamKeyFromTopper(t) {
     if (!t.stream) return '';
-    const entry = Object.entries(props.streamOptions).find(([, label]) => label === t.stream);
+    const target = normalizeStreamKey(t.stream);
+    const entry = Object.entries(props.streamOptions).find(([, label]) => normalizeStreamKey(label) === target);
     return entry?.[0] ?? 'other';
 }
 

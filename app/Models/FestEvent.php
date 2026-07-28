@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
+use App\Services\Events\FestCompetitionTypeRegistry;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -51,54 +53,54 @@ class FestEvent extends Model
     ];
 
     protected $casts = [
-        'is_cascaded'                         => 'boolean',
-        'nav_hidden'                          => 'boolean',
-        'results_published'                   => 'boolean',
-        'scoring_locked'                      => 'boolean',
-        'appeals_open'                        => 'boolean',
+        'is_cascaded' => 'boolean',
+        'nav_hidden' => 'boolean',
+        'results_published' => 'boolean',
+        'scoring_locked' => 'boolean',
+        'appeals_open' => 'boolean',
         'require_judge_scores_before_publish' => 'boolean',
-        'certificate_collection_open'         => 'boolean',
-        'registration_locked'                 => 'boolean',
-        'schedule_published'                  => 'boolean',
-        'require_all_marks_before_publish'    => 'boolean',
-        'require_event_registration'          => 'boolean',
-        'allow_student_self_register'         => 'boolean',
-        'record_tracking_enabled'             => 'boolean',
-        'is_team_heading'                     => 'boolean',
-        'strict_item_payment_gating'           => 'boolean',
-        'combine_regions_at_finale'           => 'boolean',
-        'conduct_levels'                      => 'array',
-        'aggregation_config'                  => 'array',
-        'notification_settings'               => 'array',
+        'certificate_collection_open' => 'boolean',
+        'registration_locked' => 'boolean',
+        'schedule_published' => 'boolean',
+        'require_all_marks_before_publish' => 'boolean',
+        'require_event_registration' => 'boolean',
+        'allow_student_self_register' => 'boolean',
+        'record_tracking_enabled' => 'boolean',
+        'is_team_heading' => 'boolean',
+        'strict_item_payment_gating' => 'boolean',
+        'combine_regions_at_finale' => 'boolean',
+        'conduct_levels' => 'array',
+        'aggregation_config' => 'array',
+        'notification_settings' => 'array',
         // date:Y-m-d — plain-date serialization. Bare 'date' casts serialize to a UTC
         // ISO timestamp (2026-07-25 IST → "2026-07-24T18:30:00Z"), so date inputs
         // display the previous day and each save silently shifts the date back one.
-        'registration_open'                   => 'date:Y-m-d',
-        'registration_close'                  => 'date:Y-m-d',
-        'event_reg_start'                     => 'date:Y-m-d',
-        'event_reg_end'                       => 'date:Y-m-d',
-        'reg_start'                           => 'date:Y-m-d',
-        'reg_end'                             => 'date:Y-m-d',
-        'competition_start'                   => 'date:Y-m-d',
-        'competition_end'                     => 'date:Y-m-d',
-        'event_start'                         => 'date:Y-m-d',
-        'event_end'                           => 'date:Y-m-d',
-        'verification_day'                    => 'date:Y-m-d',
-        'sports_age_cutoff_date'              => 'date:Y-m-d',
-        'fee_amount'                          => 'decimal:2',
-        'default_item_fee'                    => 'decimal:2',
-        'extra_item_fee'                      => 'decimal:2',
-        'school_registration_fee'             => 'decimal:2',
-        'student_registration_fee'            => 'decimal:2',
-        'team_registration_fee'               => 'decimal:2',
-        'fee_settings'                        => 'array',
-        'numbering_settings'                  => 'array',
-        'appeal_fee_amount'                   => 'decimal:2',
-        'included_items_per_student'          => 'integer',
-        'included_teams'                      => 'integer',
-        'max_participants'                    => 'integer',
-        'max_teams'                           => 'integer',
-        'sort_order'                          => 'integer',
+        'registration_open' => 'date:Y-m-d',
+        'registration_close' => 'date:Y-m-d',
+        'event_reg_start' => 'date:Y-m-d',
+        'event_reg_end' => 'date:Y-m-d',
+        'reg_start' => 'date:Y-m-d',
+        'reg_end' => 'date:Y-m-d',
+        'competition_start' => 'date:Y-m-d',
+        'competition_end' => 'date:Y-m-d',
+        'event_start' => 'date:Y-m-d',
+        'event_end' => 'date:Y-m-d',
+        'verification_day' => 'date:Y-m-d',
+        'sports_age_cutoff_date' => 'date:Y-m-d',
+        'fee_amount' => 'decimal:2',
+        'default_item_fee' => 'decimal:2',
+        'extra_item_fee' => 'decimal:2',
+        'school_registration_fee' => 'decimal:2',
+        'student_registration_fee' => 'decimal:2',
+        'team_registration_fee' => 'decimal:2',
+        'fee_settings' => 'array',
+        'numbering_settings' => 'array',
+        'appeal_fee_amount' => 'decimal:2',
+        'included_items_per_student' => 'integer',
+        'included_teams' => 'integer',
+        'max_participants' => 'integer',
+        'max_teams' => 'integer',
+        'sort_order' => 'integer',
     ];
 
     /** Whether composite sports fee columns are configured (checklist readiness). */
@@ -284,11 +286,56 @@ class FestEvent extends Model
     {
         $ids = [$this->id];
 
-        if ($this->isSportsSeasonEvent()) {
+        if ($this->isSportsSeasonEvent()
+            || ($this->parent_event_id === null && ($this->conduct_mode ?? 'standard') === 'partitioned')
+        ) {
             $ids = array_merge($ids, self::where('parent_event_id', $this->id)->pluck('id')->all());
         }
 
         return $ids;
+    }
+
+    /**
+     * Resolve source item ids to every equivalent copied item inside this event's
+     * report topology. Partition children copy hub items, so filtering only by the
+     * hub item id would otherwise exclude every regional registration.
+     *
+     * @param  list<int>|null  $itemIds
+     * @return list<int>
+     */
+    public function reportableItemIds(?array $itemIds = null): array
+    {
+        $query = FestEventItem::query()->whereIn('event_id', $this->reportableEventIds());
+
+        if ($itemIds === null) {
+            return $query->pluck('id')->map(fn ($id) => (int) $id)->all();
+        }
+
+        $selected = (clone $query)->whereIn('id', $itemIds)->get(['id', 'item_code', 'inherited_from_item_id']);
+        if ($selected->isEmpty()) {
+            return [];
+        }
+
+        $rootIds = $selected
+            ->map(fn (FestEventItem $item) => (int) ($item->inherited_from_item_id ?: $item->id))
+            ->unique()
+            ->values();
+        $codes = $selected->pluck('item_code')->filter()->unique()->values();
+
+        return $query
+            ->where(function ($items) use ($rootIds, $codes) {
+                $items->whereIn('id', $rootIds)
+                    ->orWhereIn('inherited_from_item_id', $rootIds);
+
+                if ($codes->isNotEmpty()) {
+                    $items->orWhereIn('item_code', $codes);
+                }
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /** Fest program types that are unique (one per Sahodaya per academic year). */
@@ -296,7 +343,7 @@ class FestEvent extends Model
     {
         if ($tenantId) {
             try {
-                return app(\App\Services\Events\FestCompetitionTypeRegistry::class)
+                return app(FestCompetitionTypeRegistry::class)
                     ->forTenant($tenantId)
                     ->singletonKeys();
             } catch (\Throwable) {
@@ -334,8 +381,8 @@ class FestEvent extends Model
      * Sports: only once registration opens (draft/published stay Sahodaya-only).
      * Other fest types: published preview remains allowed.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\FestEvent>  $q
-     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\FestEvent>
+     * @param  Builder<FestEvent>  $q
+     * @return Builder<FestEvent>
      */
     public function scopeListedForSchool($q, string $schoolId, ?string $eventType = null)
     {

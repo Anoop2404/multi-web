@@ -26,7 +26,7 @@ trait DownloadsStudentFestIdCard
         $hasRegistration = FestParticipant::query()
             ->where('student_id', $student->id)
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $school->id)
                 ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->exists();
@@ -56,7 +56,7 @@ trait DownloadsStudentFestIdCard
             $filters['item_id'] = FestParticipant::query()
                 ->where('student_id', $student->id)
                 ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $event->id)
+                    ->whereIn('event_id', $event->reportableEventIds())
                     ->where('school_id', $school->id)
                     ->whereNotIn('status', ['rejected', 'withdrawn']))
                 ->with('registration:id,item_id')
@@ -74,7 +74,7 @@ trait DownloadsStudentFestIdCard
             $headId = FestParticipant::query()
                 ->where('student_id', $student->id)
                 ->whereHas('registration', fn ($q) => $q
-                    ->where('event_id', $event->id)
+                    ->whereIn('event_id', $event->reportableEventIds())
                     ->where('school_id', $school->id)
                     ->whereNotIn('status', ['rejected', 'withdrawn'])
                     ->when(! empty($filters['item_id']), fn ($qq) => $qq->where('item_id', $filters['item_id'])))

@@ -11,7 +11,13 @@ class TopperCountService
 {
     public const DEFAULT_TOP_N = 500;
 
-    public function resolveCap(string $sahodayaId, int $class, string $scope = TopperCountConfig::SCOPE_OVERALL, ?int $streamId = null): int
+    public function resolveCap(
+        string $sahodayaId,
+        int $class,
+        string $scope = TopperCountConfig::SCOPE_OVERALL,
+        ?int $streamId = null,
+        ?int $subjectId = null,
+    ): int
     {
         $query = TopperCountConfig::query()
             ->where('sahodaya_id', $sahodayaId)
@@ -24,11 +30,16 @@ class TopperCountService
             $query->where(function ($q) use ($streamId) {
                 $q->where('stream_id', $streamId)->orWhereNull('stream_id');
             });
+        } elseif ($scope === TopperCountConfig::SCOPE_SUBJECT && $subjectId) {
+            $query->where(function ($q) use ($subjectId) {
+                $q->where('subject_id', $subjectId)->orWhereNull('subject_id');
+            });
         }
 
         $config = $query
             ->orderByRaw('class is null') // prefer class-specific
             ->orderByRaw('stream_id is null')
+            ->orderByRaw('subject_id is null')
             ->first();
 
         return max(1, (int) ($config?->top_n ?? self::DEFAULT_TOP_N));
@@ -75,7 +86,13 @@ class TopperCountService
     }
 
     /** Resolve the tie-break mode for a given scope (include_group|hard_cap). */
-    public function resolveTieMode(string $sahodayaId, int $class, string $scope = TopperCountConfig::SCOPE_OVERALL, ?int $streamId = null): string
+    public function resolveTieMode(
+        string $sahodayaId,
+        int $class,
+        string $scope = TopperCountConfig::SCOPE_OVERALL,
+        ?int $streamId = null,
+        ?int $subjectId = null,
+    ): string
     {
         $query = TopperCountConfig::query()
             ->where('sahodaya_id', $sahodayaId)
@@ -88,11 +105,16 @@ class TopperCountService
             $query->where(function ($q) use ($streamId) {
                 $q->where('stream_id', $streamId)->orWhereNull('stream_id');
             });
+        } elseif ($scope === TopperCountConfig::SCOPE_SUBJECT && $subjectId) {
+            $query->where(function ($q) use ($subjectId) {
+                $q->where('subject_id', $subjectId)->orWhereNull('subject_id');
+            });
         }
 
         $config = $query
             ->orderByRaw('class is null')
             ->orderByRaw('stream_id is null')
+            ->orderByRaw('subject_id is null')
             ->first();
 
         return $config?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP;

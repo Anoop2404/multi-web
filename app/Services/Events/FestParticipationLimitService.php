@@ -8,6 +8,7 @@ use App\Models\FestItemHead;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\Student;
+use Illuminate\Support\Collection;
 
 class FestParticipationLimitService
 {
@@ -43,10 +44,10 @@ class FestParticipationLimitService
 
     /**
      * @param  ?int  $excludeRegistrationId  When re-validating an EDIT of an existing
-     *                                        registration (not a brand new one), pass its
-     *                                        id so its own current participants/entry
-     *                                        aren't double-counted against school/student
-     *                                        quotas or the "already has an entry" check.
+     *                                       registration (not a brand new one), pass its
+     *                                       id so its own current participants/entry
+     *                                       aren't double-counted against school/student
+     *                                       quotas or the "already has an entry" check.
      * @return list<string>
      */
     public function validateRegistration(FestEventItem $item, string $schoolId, array $studentIds, array $standbyIds = [], ?int $excludeRegistrationId = null): array
@@ -60,9 +61,9 @@ class FestParticipationLimitService
 
         $maxPerSchool = (int) ($item->max_per_school ?? 1);
         if ($maxPerSchool > 0) {
-            $itemCount = FestRegistration::where('event_id', $this->event->id)
+            $itemCount = FestRegistration::whereIn('event_id', $this->scopeEventIds())
                 ->where('school_id', $schoolId)
-                ->where('item_id', $item->id)
+                ->whereIn('item_id', $this->equivalentItemIds($item))
                 ->whereIn('status', $this->countableStatuses($policy))
                 ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
                 ->count();
@@ -453,18 +454,20 @@ class FestParticipationLimitService
 
     private function schoolHasItemEntry(string $schoolId, int $itemId, array $policy, ?int $excludeRegistrationId = null): bool
     {
-        return FestRegistration::where('event_id', $this->event->id)
+        $item = FestEventItem::find($itemId);
+
+        return FestRegistration::whereIn('event_id', $this->scopeEventIds())
             ->where('school_id', $schoolId)
-            ->where('item_id', $itemId)
+            ->whereIn('item_id', $item ? $this->equivalentItemIds($item) : [$itemId])
             ->whereIn('status', $this->countableStatuses($policy))
             ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
             ->exists();
     }
 
-    /** @return \Illuminate\Support\Collection<int, FestRegistration> */
+    /** @return Collection<int, FestRegistration> */
     private function schoolRegistrations(string $schoolId, array $policy, ?int $excludeRegistrationId = null)
     {
-        return FestRegistration::where('event_id', $this->event->id)
+        return FestRegistration::whereIn('event_id', $this->scopeEventIds())
             ->where('school_id', $schoolId)
             ->whereIn('status', $this->countableStatuses($policy))
             ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
@@ -472,13 +475,13 @@ class FestParticipationLimitService
             ->get();
     }
 
-    /** @return \Illuminate\Support\Collection<int, FestRegistration> */
+    /** @return Collection<int, FestRegistration> */
     private function studentRegistrations(int $studentId, string $schoolId, array $policy, ?int $excludeRegistrationId = null)
     {
         $registrationIds = FestParticipant::where('student_id', $studentId)
             ->where('participant_role', 'performer')
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $this->event->id)
+                ->whereIn('event_id', $this->scopeEventIds())
                 ->where('school_id', $schoolId)
                 ->whereIn('status', $this->countableStatuses($policy)))
             ->when($excludeRegistrationId, fn ($q) => $q->where('registration_id', '!=', $excludeRegistrationId))
@@ -487,7 +490,44 @@ class FestParticipationLimitService
         return FestRegistration::whereIn('id', $registrationIds)->with('item')->get();
     }
 
-    /** @param \Illuminate\Support\Collection<int, FestRegistration> $regs */
+    /** @return list<int> */
+    private function scopeEventIds(): array
+    {
+        if (! $this->event->parent_event_id) {
+            return $this->event->reportableEventIds();
+        }
+
+        $hub = FestEvent::find($this->event->parent_event_id);
+
+        return $hub && ($hub->conduct_mode ?? 'standard') === 'partitioned'
+            ? $hub->reportableEventIds()
+            : [$this->event->id];
+    }
+
+    /** @return list<int> */
+    private function equivalentItemIds(FestEventItem $item): array
+    {
+        $rootId = (int) ($item->inherited_from_item_id ?: $item->id);
+
+        return FestEventItem::query()
+            ->whereIn('event_id', $this->scopeEventIds())
+            ->where(function ($query) use ($item, $rootId) {
+                $query->where('id', $rootId)
+                    ->orWhere('inherited_from_item_id', $rootId);
+
+                if (filled($item->item_code)) {
+                    $query->orWhere('item_code', $item->item_code);
+                }
+            })
+            ->pluck('id')
+            ->push($item->id)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** @param Collection<int, FestRegistration> $regs */
     private function filterRegs($regs, string $dimension)
     {
         return $regs->filter(function (FestRegistration $r) use ($dimension) {
@@ -520,7 +560,7 @@ class FestParticipationLimitService
         return in_array($item->sport_discipline, ['relay', 'march_past'], true);
     }
 
-    /** @param \Illuminate\Support\Collection<int, FestRegistration> $regs */
+    /** @param Collection<int, FestRegistration> $regs */
     private function countableTotalForStudent($regs): int
     {
         return $regs->filter(function (FestRegistration $r) {

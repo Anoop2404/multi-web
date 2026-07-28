@@ -27,11 +27,11 @@ class FestRegistrationBulkService
         $notifier = app(FestEventNotifier::class);
         $audit = app(PlatformAuditLogger::class);
 
-        $query = FestRegistration::where('event_id', $event->id)
+        $query = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'submitted')
             ->when($registrationIds !== [], fn ($q) => $q->whereIn('id', $registrationIds))
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-            ->when($itemId, fn ($q) => $q->where('item_id', $itemId));
+            ->when($itemId, fn ($q) => $q->whereIn('item_id', $event->reportableItemIds([$itemId])));
 
         foreach ($query->with(['participants', 'item', 'event'])->get() as $registration) {
             if (($policy['require_fee_before_approval'] ?? true) && $feeService->feeRequired($event)) {
@@ -65,11 +65,11 @@ class FestRegistrationBulkService
         $notifier = app(FestEventNotifier::class);
         $audit = app(PlatformAuditLogger::class);
 
-        $query = FestRegistration::where('event_id', $event->id)
+        $query = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'submitted')
             ->when($registrationIds !== [], fn ($q) => $q->whereIn('id', $registrationIds))
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-            ->when($itemId, fn ($q) => $q->where('item_id', $itemId));
+            ->when($itemId, fn ($q) => $q->whereIn('item_id', $event->reportableItemIds([$itemId])));
 
         foreach ($query->get() as $registration) {
             // Only the DB-mutating snapshot/update/credit critical section is locked and

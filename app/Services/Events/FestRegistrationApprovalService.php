@@ -24,7 +24,7 @@ class FestRegistrationApprovalService
         $count = 0;
 
         FestRegistration::query()
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->whereIn('status', ['draft', 'submitted', 'pending_approval'])
             ->when($headId !== null, fn ($q) => $q->whereHas('item', fn ($qq) => $qq->where('head_id', $headId)))
@@ -63,7 +63,7 @@ class FestRegistrationApprovalService
         }
 
         $next = FestRegistration::query()
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'waitlisted')
             ->whereHas('item', fn ($q) => $q->where('head_id', $headId))
             ->with(['item.head'])

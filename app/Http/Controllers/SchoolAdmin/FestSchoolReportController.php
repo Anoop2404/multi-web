@@ -345,7 +345,7 @@ class FestSchoolReportController extends SchoolAdminController
      */
     private function teacherWiseLookups(FestEvent $event): array
     {
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->active()
             ->with(['item:id,title', 'participants:id,registration_id,teacher_id'])
@@ -372,7 +372,7 @@ class FestSchoolReportController extends SchoolAdminController
 
         $allParticipantIds = $participantIdsByTeacher->flatten()->unique()->values();
 
-        $marksByParticipant = FestMark::where('event_id', $event->id)
+        $marksByParticipant = FestMark::whereIn('event_id', $event->reportableEventIds())
             ->whereIn('participant_id', $allParticipantIds)
             ->with('item:id,title')
             ->get()

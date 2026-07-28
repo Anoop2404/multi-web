@@ -24,13 +24,13 @@ class FestClashRequestController extends SchoolAdminController
             ->get();
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->where('status', 'approved'))
             ->with(['student', 'registration.item'])
             ->get()
             ->map(function (FestParticipant $p) use ($event) {
-                $schedules = FestSchedule::where('event_id', $event->id)
+                $schedules = FestSchedule::whereIn('event_id', $event->reportableEventIds())
                     ->where('participant_id', $p->id)
                     ->with('item')
                     ->orderBy('scheduled_at')
@@ -74,7 +74,7 @@ class FestClashRequestController extends SchoolAdminController
 
         FestParticipant::where('id', $data['participant_id'])
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $this->school->id))
             ->firstOrFail();
 

@@ -12,10 +12,16 @@ use App\Models\FestSchoolEventFee;
 use App\Models\FestSchoolEventFeeLine;
 use App\Models\FestStateProgram;
 use App\Models\Tenant;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Fees\FeeReceiptAttachmentService;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestSportsAgeGroup;
 use App\Support\TenantStorage;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class FestSchoolEventFeeService
 {
@@ -89,15 +95,15 @@ class FestSchoolEventFeeService
         }
 
         if (($schedule['fee_model'] ?? '') === 'item_catalog') {
-            $scheme = \App\Support\FestClassGroupScheme::resolveForEvent($event, $schedule);
+            $scheme = FestClassGroupScheme::resolveForEvent($event, $schedule);
             $schedule['class_group_scheme'] = $scheme;
             $schedule['class_group_fees'] = array_merge(
-                \App\Support\FestClassGroupScheme::defaultFees($scheme, $event),
+                FestClassGroupScheme::defaultFees($scheme, $event),
                 $schedule['class_group_fees'] ?? []
             );
             if ($event->event_type === 'sports') {
                 $schedule['age_group_fees'] = array_merge(
-                    \App\Support\FestSportsAgeGroup::defaultFees($event->tenant_id),
+                    FestSportsAgeGroup::defaultFees($event->tenant_id),
                     $schedule['age_group_fees'] ?? []
                 );
             }
@@ -144,15 +150,15 @@ class FestSchoolEventFeeService
     /** @param  array<string, mixed>  $schedule */
     private function applyItemCatalogDefaults(FestEvent $event, array $schedule): array
     {
-        $scheme = \App\Support\FestClassGroupScheme::resolveForEvent($event, $schedule);
+        $scheme = FestClassGroupScheme::resolveForEvent($event, $schedule);
         $schedule['class_group_scheme'] = $scheme;
         $schedule['class_group_fees'] = array_merge(
-            \App\Support\FestClassGroupScheme::defaultFees($scheme, $event),
+            FestClassGroupScheme::defaultFees($scheme, $event),
             $schedule['class_group_fees'] ?? []
         );
         if ($event->event_type === 'sports') {
             $schedule['age_group_fees'] = array_merge(
-                \App\Support\FestSportsAgeGroup::defaultFees($event->tenant_id),
+                FestSportsAgeGroup::defaultFees($event->tenant_id),
                 $schedule['age_group_fees'] ?? []
             );
         }
@@ -198,7 +204,7 @@ class FestSchoolEventFeeService
             ?? $school->getSetting('institution_level', null);
 
         if (! $category) {
-            \Illuminate\Support\Facades\Log::warning('School institution_level missing; defaulting to secondary fee tier.', [
+            Log::warning('School institution_level missing; defaulting to secondary fee tier.', [
                 'school_id' => $school->id,
             ]);
             $category = 'secondary';
@@ -227,7 +233,7 @@ class FestSchoolEventFeeService
 
     public function billableItemCount(FestEvent $event, string $schoolId, array $schedule = []): int
     {
-        $count = FestRegistration::where('event_id', $event->id)
+        $count = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved'])
             ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
@@ -239,7 +245,7 @@ class FestSchoolEventFeeService
 
         $standbys = FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $schoolId)
                 ->whereIn('status', ['submitted', 'approved']))
             ->where('participant_role', 'standby')
@@ -252,7 +258,7 @@ class FestSchoolEventFeeService
     {
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $schoolId)
                 ->whereIn('status', ['submitted', 'approved']))
             ->where('participant_role', 'standby')
@@ -263,7 +269,7 @@ class FestSchoolEventFeeService
     {
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $schoolId)
                 ->whereIn('status', ['submitted', 'approved']))
             ->where('participant_role', '!=', 'standby')
@@ -376,7 +382,7 @@ class FestSchoolEventFeeService
     }
 
     /** Heads under this event that this school has (or previously had) billable activity for. */
-    public function headsWithActivityForSchool(FestEvent $event, string $schoolId): \Illuminate\Support\Collection
+    public function headsWithActivityForSchool(FestEvent $event, string $schoolId): Collection
     {
         return FestItemHead::where('event_id', $event->id)
             ->orderBy('sort_order')
@@ -435,9 +441,9 @@ class FestSchoolEventFeeService
     /**
      * Recalculate every head this school has activity under for this event.
      *
-     * @return \Illuminate\Support\Collection<int, FestSchoolEventFee>
+     * @return Collection<int, FestSchoolEventFee>
      */
-    public function recalculateAllHeadsForSchool(FestEvent $event, string $schoolId): \Illuminate\Support\Collection
+    public function recalculateAllHeadsForSchool(FestEvent $event, string $schoolId): Collection
     {
         return $this->headsWithActivityForSchool($event, $schoolId)
             ->map(fn (FestItemHead $head) => $this->recalculateForHead($event, $schoolId, $head))
@@ -508,7 +514,7 @@ class FestSchoolEventFeeService
         // a UTR screenshot) — see docs/FLOW_GAP_FIX_PLAN.md multi-image upload feature.
         // Never creates additional receipts; $proof above remains the one reviewed record.
         if (! empty($extraProofs)) {
-            app(\App\Services\Fees\FeeReceiptAttachmentService::class)
+            app(FeeReceiptAttachmentService::class)
                 ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
         }
 
@@ -522,6 +528,15 @@ class FestSchoolEventFeeService
 
     public function recalculate(FestEvent $event, string $schoolId): FestSchoolEventFee
     {
+        // Regional registrations live on a partition child, while the fee
+        // schedule and the school's single invoice live on the parent hub.
+        if ($event->parent_event_id) {
+            $hub = FestEvent::find($event->parent_event_id);
+            if ($hub && ($hub->conduct_mode ?? 'standard') === 'partitioned') {
+                return $this->recalculate($hub, $schoolId);
+            }
+        }
+
         // Unified sports: always bill at event level when fees are on the event (or can dual-read).
         if ($event->event_type === 'sports'
             && ($this->resolveSchedule($event)['fee_model'] ?? 'none') === 'sports_composite'
@@ -691,6 +706,7 @@ class FestSchoolEventFeeService
             ]);
         }
     }
+
     /** @return array<string, mixed> */
     public function breakdown(FestEvent $event, FestSchoolEventFee $fee, array $schedule): array
     {
@@ -826,7 +842,7 @@ class FestSchoolEventFeeService
         // See attachPaymentForHead() above for why this exists — same additive, no-new-
         // receipt behavior.
         if (! empty($extraProofs)) {
-            app(\App\Services\Fees\FeeReceiptAttachmentService::class)
+            app(FeeReceiptAttachmentService::class)
                 ->attachExtra($receipt, $extraProofs, "fest-payments/{$schoolId}");
         }
 
@@ -1092,7 +1108,7 @@ class FestSchoolEventFeeService
      */
     private function demoteSiblingApprovals(FestEvent $event, string $schoolId, FestSchoolEventFee $fee): void
     {
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->where('status', 'approved')
             ->get(['id']);
@@ -1104,7 +1120,7 @@ class FestSchoolEventFeeService
         FestRegistration::whereIn('id', $registrations->pluck('id'))
             ->update(['status' => 'submitted']);
 
-        app(\App\Services\Audit\PlatformAuditLogger::class)->log(
+        app(PlatformAuditLogger::class)->log(
             action: 'fest.registration.demoted_unpaid',
             description: "{$registrations->count()} approved registration(s) demoted back to submitted — school's balance for \"{$event->title}\" is unpaid again after new items were added",
             subject: $fee,
@@ -1151,7 +1167,7 @@ class FestSchoolEventFeeService
 
         $paidRemaining = (float) ($fee?->amount_paid ?? 0);
 
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved'])
             ->with('item')

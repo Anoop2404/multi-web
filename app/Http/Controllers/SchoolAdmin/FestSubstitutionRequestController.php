@@ -29,7 +29,7 @@ class FestSubstitutionRequestController extends SchoolAdminController
             ->latest()
             ->get();
 
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->where('status', 'approved')
             ->with(['item', 'participants.student'])
@@ -73,7 +73,7 @@ class FestSubstitutionRequestController extends SchoolAdminController
         }
 
         $registration = FestRegistration::where('id', $data['registration_id'])
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->where('status', 'approved')
             ->firstOrFail();

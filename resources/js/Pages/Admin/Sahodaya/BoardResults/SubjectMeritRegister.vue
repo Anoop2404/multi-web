@@ -69,12 +69,55 @@
                 </div>
 
                 <!-- SUBJECT FILTER -->
-                <div>
+                <div class="relative">
                     <label class="form-label mb-1 text-[11px] font-bold text-gray-600 uppercase">Subject</label>
-                    <select v-model="selectedSubject" class="field text-xs bg-white">
-                        <option value="">All Subjects ({{ availableSubjects.length }})</option>
-                        <option v-for="subj in availableSubjects" :key="subj" :value="subj">{{ subj }}</option>
-                    </select>
+                    <button
+                        type="button"
+                        class="field text-xs bg-white font-semibold w-full flex items-center justify-between gap-2"
+                        @click="toggleSubjectDropdown"
+                    >
+                        <span class="truncate">{{ selectedSubjectLabel || `All Subjects (${availableSubjects.length})` }}</span>
+                        <span class="text-slate-400">▾</span>
+                    </button>
+
+                    <div
+                        v-if="subjectDropdownOpen"
+                        class="absolute z-30 mt-2 w-full rounded-xl border border-slate-200 bg-white shadow-xl p-3"
+                    >
+                        <input
+                            v-model="subjectSearch"
+                            type="text"
+                            class="field text-xs w-full bg-slate-50"
+                            placeholder="Search subjects..."
+                            @input="subjectDropdownOpen = true"
+                        >
+
+                        <div class="mt-2 max-h-60 overflow-y-auto space-y-1">
+                            <button
+                                type="button"
+                                class="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition"
+                                :class="!selectedSubject ? 'bg-[#0f3d7a] text-white' : 'hover:bg-slate-50 text-slate-600'"
+                                @click="selectSubject('')"
+                            >
+                                All Subjects
+                            </button>
+
+                            <button
+                                v-for="subj in filteredSubjectOptions"
+                                :key="subj.id ?? subj.label"
+                                type="button"
+                                class="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition"
+                                :class="selectedSubject === subj.label ? 'bg-[#0f3d7a] text-white' : 'hover:bg-slate-50 text-slate-700'"
+                                @click="selectSubject(subj.label)"
+                            >
+                                {{ subj.label }}
+                            </button>
+
+                            <p v-if="!filteredSubjectOptions.length" class="px-3 py-3 text-xs text-slate-400">
+                                No matching subjects.
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- MEMBER SCHOOL FILTER -->
@@ -109,6 +152,35 @@
                     </select>
                 </div>
             </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
+            <div class="flex flex-wrap items-center gap-2">
+                <button
+                    type="button"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
+                    :class="previewMode === 'single' ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+                    @click="previewMode = 'single'"
+                >
+                    Preview selected subject
+                </button>
+                <button
+                    type="button"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
+                    :class="previewMode === 'all' ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+                    @click="previewMode = 'all'"
+                >
+                    Preview all subjects
+                </button>
+            </div>
+
+            <button
+                type="button"
+                class="btn-secondary text-xs flex items-center gap-1.5 font-bold"
+                @click="printReport"
+            >
+                <span>🖨</span> Print / Save PDF
+            </button>
         </div>
 
         <!-- STATS SUMMARY BAR -->
@@ -207,6 +279,148 @@
                 </tbody>
             </table>
         </div>
+
+        <div class="mt-8 space-y-6">
+            <div class="flex items-center justify-between gap-3 print:hidden">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-800">Preview</h2>
+                    <p class="text-xs text-slate-500">
+                        {{ previewMode === 'all'
+                            ? 'All subjects are rendered as separate report pages for print / PDF.'
+                            : 'Use the selected subject preview before generating the full bundle.' }}
+                    </p>
+                </div>
+                <p class="text-xs text-slate-400">
+                    {{ previewMode === 'all' ? `${previewPages.length} page(s)` : `${previewRows.length} row(s)` }}
+                </p>
+            </div>
+
+            <template v-if="previewMode === 'single'">
+                <section v-if="previewRows.length" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 preview-page">
+                    <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[11px] uppercase font-semibold text-slate-400">Sahodaya</p>
+                            <p class="text-sm font-bold text-slate-900 mt-1">{{ sahodaya.name }}</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[11px] uppercase font-semibold text-slate-400">Class / Subject</p>
+                            <p class="text-sm font-bold text-[#0f3d7a] mt-1">Class {{ selectedClass || 'XII' }} · {{ previewSubjectLabel || 'All Subjects' }}</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[11px] uppercase font-semibold text-slate-400">Report</p>
+                            <p class="text-sm font-bold text-violet-700 mt-1">Subject Merit Register</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[11px] uppercase font-semibold text-slate-400">Academic Year</p>
+                            <p class="text-sm font-bold text-emerald-700 mt-1">{{ selectedYear }}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">{{ previewSubjectLabel || 'Selected Subject' }}</h3>
+                            <p class="text-xs text-slate-500">Page preview for print or PDF generation.</p>
+                        </div>
+                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700">
+                            {{ previewRows.length }} row(s)
+                        </span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-50 text-left text-[11px] uppercase text-slate-500">
+                                <tr>
+                                    <th class="p-3 w-16">S.No</th>
+                                    <th class="p-3 w-20">Rank</th>
+                                    <th class="p-3">Student</th>
+                                    <th class="p-3">School</th>
+                                    <th class="p-3">Percentage</th>
+                                    <th class="p-3">Marks</th>
+                                    <th class="p-3">Roll No</th>
+                                    <th class="p-3">Stream</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(row, index) in previewRows" :key="`${row.subject}-${row.student_name}-${index}`" class="border-t">
+                                    <td class="p-3 text-slate-400 font-semibold">{{ index + 1 }}</td>
+                                    <td class="p-3 font-semibold text-[#0f3d7a]">#{{ row.rank }}</td>
+                                    <td class="p-3 font-semibold text-slate-900">{{ row.student_name }}</td>
+                                    <td class="p-3 text-slate-600">{{ row.school_name }}</td>
+                                    <td class="p-3 font-semibold text-emerald-600">{{ row.percentage != null ? `${row.percentage}%` : '—' }}</td>
+                                    <td class="p-3 font-semibold text-slate-700">{{ row.marks }} / 100</td>
+                                    <td class="p-3 text-slate-500">{{ row.roll_no || '—' }}</td>
+                                    <td class="p-3 text-slate-500">{{ row.stream || '—' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </template>
+
+            <template v-else>
+                <section
+                    v-for="(page, pageIndex) in previewPages"
+                    :key="page.subject"
+                    class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 preview-page"
+                    :style="pageIndex < previewPages.length - 1 ? 'page-break-after: always;' : ''"
+                >
+                    <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[11px] uppercase font-semibold text-slate-400">Sahodaya</p>
+                            <p class="text-sm font-bold text-slate-900 mt-1">{{ sahodaya.name }}</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[11px] uppercase font-semibold text-slate-400">Class / Subject</p>
+                            <p class="text-sm font-bold text-[#0f3d7a] mt-1">Class {{ selectedClass || 'XII' }} · {{ page.subject }}</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[11px] uppercase font-semibold text-slate-400">Report</p>
+                            <p class="text-sm font-bold text-violet-700 mt-1">Subject Merit Register</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[11px] uppercase font-semibold text-slate-400">Academic Year</p>
+                            <p class="text-sm font-bold text-emerald-700 mt-1">{{ selectedYear }}</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">{{ page.subject }}</h3>
+                            <p class="text-xs text-slate-500">Page {{ pageIndex + 1 }} of {{ previewPages.length }} · {{ page.rows.length }} row(s)</p>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-50 text-left text-[11px] uppercase text-slate-500">
+                                <tr>
+                                    <th class="p-3 w-16">S.No</th>
+                                    <th class="p-3 w-20">Rank</th>
+                                    <th class="p-3">Student</th>
+                                    <th class="p-3">School</th>
+                                    <th class="p-3">Percentage</th>
+                                    <th class="p-3">Marks</th>
+                                    <th class="p-3">Roll No</th>
+                                    <th class="p-3">Stream</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(row, index) in page.rows" :key="`${page.subject}-${row.student_name}-${index}`" class="border-t">
+                                    <td class="p-3 text-slate-400 font-semibold">{{ index + 1 }}</td>
+                                    <td class="p-3 font-semibold text-[#0f3d7a]">#{{ row.rank }}</td>
+                                    <td class="p-3 font-semibold text-slate-900">{{ row.student_name }}</td>
+                                    <td class="p-3 text-slate-600">{{ row.school_name }}</td>
+                                    <td class="p-3 font-semibold text-emerald-600">{{ row.percentage != null ? `${row.percentage}%` : '—' }}</td>
+                                    <td class="p-3 font-semibold text-slate-700">{{ row.marks }} / 100</td>
+                                    <td class="p-3 text-slate-500">{{ row.roll_no || '—' }}</td>
+                                    <td class="p-3 text-slate-500">{{ row.stream || '—' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </template>
+        </div>
     </SahodayaAdminLayout>
 </template>
 
@@ -224,22 +438,55 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     classOptions: { type: Array, default: () => [10, 12] },
     schoolOptions: { type: Array, default: () => [] },
+    subjectOptions: { type: Array, default: () => [] },
     academicYearOptions: { type: Array, default: () => [] },
 });
 
 const selectedYear = ref(props.filters.academic_year || '');
 const selectedClass = ref(props.filters.class ?? null);
 const selectedSubject = ref('');
+const subjectSearch = ref('');
+const subjectDropdownOpen = ref(false);
 const selectedSchoolId = ref('');
 const selectedStream = ref('');
 const selectedRankCap = ref(0);
 const searchQuery = ref('');
+const previewMode = ref('single');
 
 const availableSubjects = computed(() => {
     const set = new Set();
     props.rows.forEach(r => { if (r.subject) set.add(r.subject); });
     return Array.from(set).sort();
 });
+
+const subjectChoices = computed(() => {
+    if (props.subjectOptions.length) return props.subjectOptions;
+    return availableSubjects.value.map(label => ({ id: label, label }));
+});
+
+const filteredSubjectOptions = computed(() => {
+    const q = subjectSearch.value.trim().toLowerCase();
+    if (!q) return subjectChoices.value;
+    return subjectChoices.value.filter((subj) => subj.label?.toLowerCase().includes(q));
+});
+
+const selectedSubjectLabel = computed(() => selectedSubject.value || '');
+
+function toggleSubjectDropdown() {
+    if (subjectDropdownOpen.value) {
+        subjectDropdownOpen.value = false;
+        return;
+    }
+
+    subjectSearch.value = selectedSubject.value || '';
+    subjectDropdownOpen.value = true;
+}
+
+function selectSubject(label) {
+    selectedSubject.value = label;
+    subjectSearch.value = label;
+    subjectDropdownOpen.value = false;
+}
 
 const filteredRows = computed(() => {
     let result = [...props.rows];
@@ -271,6 +518,63 @@ const filteredRows = computed(() => {
     }
 
     return result;
+});
+
+const baseRows = computed(() => {
+    let result = [...props.rows];
+
+    if (selectedSchoolId.value) {
+        result = result.filter(r => r.school_id === selectedSchoolId.value);
+    }
+
+    if (selectedStream.value) {
+        result = result.filter(r => r.stream?.toLowerCase().includes(selectedStream.value.toLowerCase()));
+    }
+
+    if (selectedRankCap.value > 0) {
+        result = result.filter(r => (r.rank ?? 1) <= selectedRankCap.value);
+    }
+
+    if (searchQuery.value.trim()) {
+        const q = searchQuery.value.toLowerCase();
+        result = result.filter(r =>
+            r.subject?.toLowerCase().includes(q) ||
+            r.student_name?.toLowerCase().includes(q) ||
+            r.school_name?.toLowerCase().includes(q) ||
+            r.roll_no?.toLowerCase().includes(q)
+        );
+    }
+
+    return result;
+});
+
+const previewGroups = computed(() => {
+    const map = new Map();
+    for (const row of baseRows.value) {
+        const subject = row.subject || 'Unknown Subject';
+        if (!map.has(subject)) {
+            map.set(subject, []);
+        }
+        map.get(subject).push(row);
+    }
+
+    return Array.from(map.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([subject, rows]) => ({
+            subject,
+            rows: [...rows].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0) || (b.marks ?? 0) - (a.marks ?? 0)),
+        }));
+});
+
+const previewSubjectLabel = computed(() => {
+    if (selectedSubject.value) return selectedSubject.value;
+    return previewGroups.value[0]?.subject || '';
+});
+
+const previewRows = computed(() => {
+    if (!previewGroups.value.length) return [];
+    const target = selectedSubject.value || previewGroups.value[0]?.subject;
+    return previewGroups.value.find(group => group.subject?.toLowerCase() === target?.toLowerCase())?.rows || [];
 });
 
 const distinctSubjectCount = computed(() => {
@@ -308,6 +612,8 @@ function resetFilters() {
     selectedYear.value = props.filters.academic_year || '';
     selectedClass.value = props.filters.class ?? null;
     selectedSubject.value = '';
+    subjectSearch.value = '';
+    subjectDropdownOpen.value = false;
     selectedSchoolId.value = '';
     selectedStream.value = '';
     selectedRankCap.value = 0;
@@ -316,6 +622,7 @@ function resetFilters() {
 }
 
 function applyServerFilters() {
+    subjectDropdownOpen.value = false;
     router.get(`/sahodaya-admin/${props.sahodaya.id}/board-results/reports/subject-merit`, {
         academic_year: selectedYear.value,
         class: selectedClass.value || undefined,
@@ -325,4 +632,6 @@ function applyServerFilters() {
 function printReport() {
     window.print();
 }
+
+const previewPages = computed(() => previewGroups.value);
 </script>

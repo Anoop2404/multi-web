@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Models\Subject;
 use App\Services\BoardResults\AcademicExcellenceReportService;
 use App\Services\BoardResults\SubjectMeritRegisterService;
 use App\Support\AcademicYear;
@@ -109,6 +110,15 @@ class BoardResultReportController extends SahodayaAdminController
             ->values()
             ->all();
 
+        $subjectOptions = Subject::query()
+            ->forSahodaya($this->sahodaya->id)
+            ->active()
+            ->orderBy('label')
+            ->get(['id', 'label'])
+            ->map(fn ($subject) => ['id' => $subject->id, 'label' => $subject->label])
+            ->values()
+            ->all();
+
         // AcademicYear::optionsForSahodaya() never existed — the Vue page expects
         // {id, label} pairs for its <option :key="ay.id" :value="ay.label"> loop, not the
         // flat label strings AcademicYear::options() returns. Matches the same query
@@ -123,6 +133,7 @@ class BoardResultReportController extends SahodayaAdminController
             ],
             'classOptions' => [10, 12],
             'schoolOptions' => $schoolOptions,
+            'subjectOptions' => $subjectOptions,
             'academicYearOptions' => $academicYearOptions,
         ]);
     }

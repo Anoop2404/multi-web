@@ -6,7 +6,9 @@ use App\Models\FestEvent;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Services\Events\FestHeadItemNavigationService;
+use App\Services\Events\FestRegionPartitionService;
 use App\Services\Events\FestSchoolEventFeeService;
+use App\Services\School\SchoolUserScopeService;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
 
@@ -30,7 +32,7 @@ trait BuildsSchoolFestEventContext
             ->listedForSchool($this->school->id, $meta['eventType'])
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'status', 'event_start'])
-            ->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)
+            ->pipe(fn ($rows) => app(SchoolUserScopeService::class)
                 ->filterFestEventsForUser(request()->user(), $this->school->id, $meta['slug'], $rows));
 
         return [
@@ -59,14 +61,14 @@ trait BuildsSchoolFestEventContext
         }
 
         $sahodayaId = $this->school->parent_id;
-        $regionService = app(\App\Services\Events\FestRegionPartitionService::class);
+        $regionService = app(FestRegionPartitionService::class);
         if (! $regionService->regionsApply($sahodayaId)) {
             return null;
         }
 
         return [
             'applies' => true,
-            'region'  => $regionService->schoolRegion($sahodayaId, $this->school->id)?->name,
+            'region' => $regionService->schoolRegion($sahodayaId, $this->school->id)?->name,
             'set_url' => "/school-admin/{$this->school->id}/registration",
         ];
     }
@@ -82,7 +84,7 @@ trait BuildsSchoolFestEventContext
             ->first();
 
         $registrations = FestRegistration::query()
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->whereIn('status', FestRegistration::ACTIVE_STATUSES)
             ->count();

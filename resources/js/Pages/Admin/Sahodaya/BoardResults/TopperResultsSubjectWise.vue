@@ -2,7 +2,9 @@
     <SahodayaAdminLayout title="Subject-Wise Top Scorers" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader title="Subject-Wise Top Scorers" eyebrow="Academic Results · Class XII"
-                    description="Highest scorer per subject, pooled across every member school.">
+                    :description="selectedStreamLabel
+                        ? `Highest scorer per subject for ${selectedStreamLabel} stream, pooled across every member school.`
+                        : 'Highest scorer per subject, pooled across every member school.'">
             <template #actions>
                 <button type="button" @click="printReport" class="btn-secondary text-sm font-bold flex items-center gap-1.5 print:hidden">
                     <span>🖨</span> Print
@@ -11,12 +13,31 @@
             </template>
         </PageHeader>
 
+        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4 print:hidden">
+            <div class="card !p-4">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Sahodaya</p>
+                <p class="text-lg font-bold text-slate-900 mt-1">{{ sahodaya.name }}</p>
+            </div>
+            <div class="card !p-4">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Class / Stream</p>
+                <p class="text-lg font-bold text-[#0f3d7a] mt-1">Class 12{{ selectedStreamLabel ? ` · ${selectedStreamLabel}` : '' }}</p>
+            </div>
+            <div class="card !p-4">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Report</p>
+                <p class="text-lg font-bold text-violet-700 mt-1">Subject-Wise Top Scorers</p>
+            </div>
+            <div class="card !p-4">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Academic Year</p>
+                <p class="text-lg font-bold text-emerald-700 mt-1">{{ filters.academic_year }}</p>
+            </div>
+        </div>
+
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
             <div class="flex flex-wrap gap-2">
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=12&academic_year=${filters.academic_year}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=12&academic_year=${filters.academic_year}${selectedStream ? `&stream=${selectedStream}` : ''}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
                     ← Overall Result
                 </Link>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/achievers?class=12&academic_year=${filters.academic_year}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/achievers?class=12&academic_year=${filters.academic_year}${selectedStream ? `&stream=${selectedStream}` : ''}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
                     90%+ Achievers →
                 </Link>
                 <span class="text-xs text-slate-300 mx-1">|</span>
@@ -26,10 +47,21 @@
                     </option>
                 </select>
             </div>
+            <div class="flex flex-wrap gap-2">
+                <Link
+                    v-for="[code, label] in streamEntries"
+                    :key="code"
+                    :href="streamHref(code)"
+                    class="px-3 py-1.5 rounded-lg text-sm font-semibold border"
+                    :class="selectedStream === code ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]' : 'border-slate-200 text-slate-600'"
+                >
+                    {{ label }}
+                </Link>
+            </div>
         </div>
 
         <div class="card !p-4 mb-4 print:hidden flex flex-wrap items-center justify-between gap-3">
-            <p class="text-xs text-slate-500">Academic year {{ filters.academic_year }} · {{ filteredRows.length }} of {{ subjectLeaders.length }} subject(s)</p>
+            <p class="text-xs text-slate-500">Academic year {{ filters.academic_year }} · {{ filteredRows.length }} subject row(s)</p>
             <input v-model="search" type="text" placeholder="Search subject, student, school…" class="field text-xs py-1.5 w-64">
         </div>
 
@@ -37,22 +69,30 @@
             <table v-if="filteredRows.length" class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
+                        <th class="p-3 w-16">S.No</th>
+                        <th class="p-3 w-20">Rank</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('subject')">Subject{{ sortArrow('subject') }}</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('student_name')">Student{{ sortArrow('student_name') }}</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('school_name')">School{{ sortArrow('school_name') }}</th>
+                        <th class="p-3">Stream</th>
                         <th class="p-3">Roll No</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('marks')">Marks{{ sortArrow('marks') }}</th>
+                        <th class="p-3 cursor-pointer select-none" @click="toggleSort('percentage')">Percentage{{ sortArrow('percentage') }}</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="row in filteredRows" :key="row.subject" class="border-t hover:bg-slate-50/60">
+                    <tr v-for="(row, i) in filteredRows" :key="row.subject + '-' + row.student_name" class="border-t hover:bg-slate-50/60">
+                        <td class="p-3 text-slate-400 font-semibold">{{ i + 1 }}</td>
+                        <td class="p-3 font-semibold text-[#0f3d7a]">#{{ row.rank }}</td>
                         <td class="p-3">
                             <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded">{{ row.subject }}</span>
                         </td>
                         <td class="p-3 font-semibold text-gray-900">{{ row.student_name }}</td>
                         <td class="p-3 text-gray-600">{{ row.school_name }}</td>
+                        <td class="p-3 text-gray-600">{{ row.stream || '—' }}</td>
                         <td class="p-3 text-xs text-gray-500">{{ row.roll_no || '—' }}</td>
                         <td class="p-3 font-semibold text-emerald-600">{{ row.marks }} / 100</td>
+                        <td class="p-3 font-semibold text-[#0f3d7a]">{{ row.percentage != null ? `${row.percentage}%` : '—' }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -76,10 +116,14 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     academicYearOptions: { type: Array, default: () => [] },
     subjectLeaders: { type: Array, default: () => [] },
+    streamOptions: { type: Object, default: () => ({}) },
+    selectedStream: { type: String, default: null },
+    selectedStreamLabel: { type: String, default: null },
 });
 
 function switchYear(year) {
-    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/subject-wise?academic_year=${year}`;
+    const stream = props.selectedStream ? `&stream=${props.selectedStream}` : '';
+    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/subject-wise?academic_year=${year}${stream}`;
 }
 
 function printReport() {
@@ -89,6 +133,12 @@ function printReport() {
 const search = ref('');
 const sortKey = ref('subject');
 const sortDir = ref('asc');
+
+const streamEntries = computed(() => Object.entries(props.streamOptions ?? {}));
+
+function streamHref(code) {
+    return `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/subject-wise?academic_year=${props.filters.academic_year}&stream=${code}`;
+}
 
 function toggleSort(key) {
     if (sortKey.value === key) {

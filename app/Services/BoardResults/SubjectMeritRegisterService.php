@@ -4,6 +4,7 @@ namespace App\Services\BoardResults;
 
 use App\Models\BoardResult;
 use App\Models\Tenant;
+use App\Models\TopperCountConfig;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -44,7 +45,7 @@ class SubjectMeritRegisterService
 
         $names = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
 
-        return $this->fromNormalizedTable($schoolIds, $academicYear, $class, $names) ?? [];
+        return $this->fromNormalizedTable($sahodayaId, $schoolIds, $academicYear, $class, $names) ?? [];
     }
 
     /**
@@ -52,7 +53,7 @@ class SubjectMeritRegisterService
      * @param  Collection<string, string>  $names
      * @return list<array<string, mixed>>
      */
-    private function fromNormalizedTable(array $schoolIds, string $academicYear, ?int $class, Collection $names): array
+    private function fromNormalizedTable(string $sahodayaId, array $schoolIds, string $academicYear, ?int $class, Collection $names): array
     {
         if (! Schema::hasTable('topper_subject_marks')) {
             return [];
@@ -66,6 +67,7 @@ class SubjectMeritRegisterService
             ->whereIn('br.status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED])
             ->select([
                 'tsm.marks',
+                'tsm.subject_id',
                 'tsm.subject_label as subject',
                 't.name as student_name',
                 't.percentage',
@@ -84,6 +86,7 @@ class SubjectMeritRegisterService
         $items = $query->orderBy('subject')->orderByDesc('tsm.marks')->get()
             ->map(fn ($row) => [
                 'subject' => (string) $row->subject,
+                'subject_id' => $row->subject_id !== null ? (int) $row->subject_id : null,
                 'student_name' => (string) $row->student_name,
                 'school_id' => (string) $row->school_id,
                 'school_name' => $names[$row->school_id] ?? (string) $row->school_id,
@@ -96,10 +99,11 @@ class SubjectMeritRegisterService
                 'roll_no' => $row->roll_no,
             ]);
 
-        $grouped = $items->groupBy('subject');
+        $grouped = $items->groupBy(fn (array $row) => $row['subject_id'] ?? $row['subject']);
         $rankedList = [];
+        $counts = app(TopperCountService::class);
 
-        foreach ($grouped as $subject => $subjectItems) {
+        foreach ($grouped as $subjectKey => $subjectItems) {
             $sorted = $subjectItems->sortByDesc('marks')->values();
             $currentRank = 1;
             $prevMarks = null;
@@ -111,6 +115,31 @@ class SubjectMeritRegisterService
                 }
                 $row['rank'] = $currentRank;
                 $prevMarks = $marks;
+                $sorted[$idx] = $row;
+            }
+
+            if ($class !== null) {
+                $subjectId = is_numeric($subjectKey) ? (int) $subjectKey : ($sorted->first()['subject_id'] ?? null);
+                $topN = $counts->resolveCap($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
+                $tieMode = $counts->resolveTieMode($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
+
+                $selected = [];
+                foreach ($sorted as $row) {
+                    if (count($selected) >= $topN) {
+                        $lastRank = end($selected)['rank'];
+                        if ($tieMode === TopperCountConfig::TIE_INCLUDE_GROUP && $row['rank'] === $lastRank) {
+                            // Keep the full tie group at the cutoff rank for this subject.
+                        } else {
+                            break;
+                        }
+                    }
+                    $selected[] = $row;
+                }
+            } else {
+                $selected = $sorted->all();
+            }
+
+            foreach ($selected as $row) {
                 $rankedList[] = $row;
             }
         }

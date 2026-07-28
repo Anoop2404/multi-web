@@ -88,7 +88,7 @@ class FestEventPortalController extends SchoolAdminController
 
         $participant = FestParticipant::findOrFail($data['participant_id']);
         abort_if($participant->registration->school_id !== $this->school->id, 403);
-        abort_if($participant->registration->event_id !== $event->id, 403);
+        abort_unless(in_array($participant->registration->event_id, $event->reportableEventIds(), true), 403);
 
         // Prevent duplicate appeal for the same participant.
         $existing = FestAppeal::where('event_id', $event->id)
@@ -119,7 +119,7 @@ class FestEventPortalController extends SchoolAdminController
             ->latest()
             ->get();
 
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->with(['item', 'participants.student', 'participants.teacher'])
             ->get();
@@ -146,7 +146,7 @@ class FestEventPortalController extends SchoolAdminController
 
         $programSlug = SchoolFestProgram::slugForEventType($event->event_type);
 
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id)
             ->with(['item', 'participants.student', 'participants.teacher'])
             ->get();
@@ -172,7 +172,7 @@ class FestEventPortalController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $this->school->id))
             ->pluck('id');
 

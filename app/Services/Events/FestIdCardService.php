@@ -179,7 +179,7 @@ class FestIdCardService
 
         $rows = FestParticipant::query()
             ->whereHas('registration', function ($q) use ($event, $filters) {
-                $q->where('event_id', $event->id);
+                $q->whereIn('event_id', $event->reportableEventIds());
                 $this->constrainRegistrationStatus($q, $filters);
                 if (! empty($filters['school_id'])) {
                     $q->where('school_id', $filters['school_id']);
@@ -192,7 +192,7 @@ class FestIdCardService
             ->groupBy('fest_registrations.item_id')
             ->pluck('aggregate', 'item_id');
 
-        return $rows->map(fn ($count) => (int) $count)->all();
+        return $this->normalizeItemCounts($rows);
     }
 
     /** @return array<int, int> item_id => approved registration count */
@@ -203,18 +203,18 @@ class FestIdCardService
             'school_downloads' => $schoolDownloads || $schoolId !== null,
         ]);
 
-        $query = FestRegistration::query()->where('event_id', $event->id);
+        $query = FestRegistration::query()->whereIn('event_id', $event->reportableEventIds());
         $this->constrainRegistrationStatus($query, $filters);
         if (! empty($filters['school_id'])) {
             $query->where('school_id', $filters['school_id']);
         }
 
-        return $query
+        $rows = $query
             ->selectRaw('item_id, COUNT(*) as aggregate')
             ->groupBy('item_id')
-            ->pluck('aggregate', 'item_id')
-            ->map(fn ($count) => (int) $count)
-            ->all();
+            ->pluck('aggregate', 'item_id');
+
+        return $this->normalizeItemCounts($rows);
     }
 
     /**
@@ -251,7 +251,7 @@ class FestIdCardService
         ]);
 
         return FestParticipant::whereHas('registration', function ($q) use ($event, $filters) {
-            $q->where('event_id', $event->id);
+            $q->whereIn('event_id', $event->reportableEventIds());
             $this->constrainRegistrationStatus($q, $filters);
             if (! empty($filters['school_id'])) {
                 $q->where('school_id', $filters['school_id']);
@@ -260,6 +260,22 @@ class FestIdCardService
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->where('participant_role', '!=', 'standby')
             ->count();
+    }
+
+    /** @return array<int, int> */
+    private function normalizeItemCounts(\Illuminate\Support\Collection $counts): array
+    {
+        $items = FestEventItem::whereIn('id', $counts->keys())
+            ->get(['id', 'inherited_from_item_id'])
+            ->keyBy('id');
+
+        return $counts->reduce(function (array $result, $count, $itemId) use ($items) {
+            $item = $items->get((int) $itemId);
+            $key = (int) ($item?->inherited_from_item_id ?: $itemId);
+            $result[$key] = ($result[$key] ?? 0) + (int) $count;
+
+            return $result;
+        }, []);
     }
 
     /** @param  array<string, mixed>  $filters */
@@ -297,7 +313,7 @@ class FestIdCardService
         $participantIds = $filters['participant_ids'] ?? null;
 
         $query = FestParticipant::whereHas('registration', function ($q) use ($event, $filters) {
-            $q->where('event_id', $event->id);
+            $q->whereIn('event_id', $event->reportableEventIds());
             $this->constrainRegistrationStatus($q, $filters);
             if (! empty($filters['school_id'])) {
                 $q->where('school_id', $filters['school_id']);
@@ -409,13 +425,13 @@ class FestIdCardService
         $participantIds = $filters['participant_ids'] ?? null;
 
         $query = FestParticipant::whereHas('registration', function ($q) use ($event, $filters) {
-            $q->where('event_id', $event->id);
+            $q->whereIn('event_id', $event->reportableEventIds());
             $this->constrainRegistrationStatus($q, $filters);
             if (! empty($filters['school_id'])) {
                 $q->where('school_id', $filters['school_id']);
             }
             if (! empty($filters['item_id'])) {
-                $q->where('item_id', $filters['item_id']);
+                $q->whereIn('item_id', $event->reportableItemIds([(int) $filters['item_id']]));
             }
         })
             ->where('participant_role', '!=', 'standby')
@@ -482,13 +498,13 @@ class FestIdCardService
         $participantIds = $filters['participant_ids'] ?? null;
 
         $query = FestParticipant::whereHas('registration', function ($q) use ($event, $filters, $itemId) {
-            $q->where('event_id', $event->id);
+            $q->whereIn('event_id', $event->reportableEventIds());
             $this->constrainRegistrationStatus($q, $filters);
             if (! empty($filters['school_id'])) {
                 $q->where('school_id', $filters['school_id']);
             }
             if ($itemId) {
-                $q->where('item_id', $itemId);
+                $q->whereIn('item_id', $event->reportableItemIds([$itemId]));
             }
         })
             ->where('participant_role', '!=', 'standby')
@@ -519,13 +535,13 @@ class FestIdCardService
         $includeDataUris = (bool) ($filters['include_data_uris'] ?? false);
 
         $query = FestRegistration::query()
-            ->where('event_id', $event->id);
+            ->whereIn('event_id', $event->reportableEventIds());
         $this->constrainRegistrationStatus($query, $filters);
         if ($schoolId) {
             $query->where('school_id', $schoolId);
         }
         $query
-            ->when($itemId, fn ($q) => $q->where('item_id', $itemId))
+            ->when($itemId, fn ($q) => $q->whereIn('item_id', $event->reportableItemIds([$itemId])))
             ->when(! empty($filters['student_id']), fn ($q) => $q->whereHas(
                 'participants',
                 fn ($p) => $p->where('student_id', (int) $filters['student_id'])->where('participant_role', '!=', 'standby'),
@@ -776,7 +792,7 @@ class FestIdCardService
             return collect();
         }
 
-        return FestSchedule::where('event_id', $event->id)
+        return FestSchedule::whereIn('event_id', $event->reportableEventIds())
             ->whereIn('participant_id', $participantIds)
             ->with('festStage:id,name')
             ->get()

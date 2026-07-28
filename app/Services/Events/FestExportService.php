@@ -19,7 +19,7 @@ class FestExportService
     {
         $schools = $this->schoolNames($event);
 
-        $rows = FestRegistration::where('event_id', $event->id)
+        $rows = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->with(['item', 'participants.student', 'participants.teacher', 'feeReceipt'])
             ->orderBy('school_id')
             ->get()
@@ -46,7 +46,7 @@ class FestExportService
     {
         $schools = $this->schoolNames($event);
 
-        $rows = FestMark::where('fest_marks.event_id', $event->id)
+        $rows = FestMark::whereIn('fest_marks.event_id', $event->reportableEventIds())
             ->with(['participant.student', 'participant.teacher', 'participant.registration.item', 'item'])
             ->join('fest_event_items', 'fest_marks.item_id', '=', 'fest_event_items.id')
             ->orderBy('fest_event_items.title')
@@ -81,14 +81,14 @@ class FestExportService
         $schools = $this->schoolNames($event);
         $numbering = app(FestNumberingService::class);
 
-        $attendance = FestAttendance::where('event_id', $event->id)
+        $attendance = FestAttendance::whereIn('event_id', $event->reportableEventIds())
             ->get()
             ->keyBy(fn (FestAttendance $a) => $a->item_id.'-'.$a->participant_id);
 
         $rows = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'approved')
-            ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId)))
+            ->when($itemId, fn ($q2) => $q2->whereIn('item_id', $event->reportableItemIds([$itemId]))))
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->with(['student', 'teacher', 'registration.item', 'registration.event', 'registration.school', 'group'])
@@ -218,7 +218,7 @@ class FestExportService
 
     public function studentEventRegistrations(FestEvent $event): StreamedResponse
     {
-        $rows = \App\Models\FestLevelRegistration::where('event_id', $event->id)
+        $rows = \App\Models\FestLevelRegistration::whereIn('event_id', $event->reportableEventIds())
             ->with(['student:id,name,reg_no', 'school:id,name'])
             ->orderBy('registration_number')
             ->get()
@@ -240,7 +240,7 @@ class FestExportService
 
     private function schoolNames(FestEvent $event): array
     {
-        $ids = FestRegistration::where('event_id', $event->id)->pluck('school_id')->unique();
+        $ids = FestRegistration::whereIn('event_id', $event->reportableEventIds())->pluck('school_id')->unique();
 
         return Tenant::whereIn('id', $ids)->pluck('name', 'id')->all();
     }

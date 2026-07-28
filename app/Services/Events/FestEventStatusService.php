@@ -32,7 +32,7 @@ class FestEventStatusService
         }
 
         DB::transaction(function () use ($event, $paidFees) {
-            $registrations = FestRegistration::where('event_id', $event->id)
+            $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
                 ->whereIn('status', FestRegistration::ACTIVE_STATUSES)
                 ->get();
 

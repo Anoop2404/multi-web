@@ -22,7 +22,7 @@ class FestCertificateService
     {
         $created = [];
 
-        $marks = FestMark::where('event_id', $event->id)
+        $marks = FestMark::whereIn('event_id', $event->reportableEventIds())
             ->whereNotNull('position')
             ->where('position', '<=', 3)
             ->with(['participant.student', 'participant.registration.item'])
@@ -61,7 +61,7 @@ class FestCertificateService
         $created = [];
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'approved'))
             ->whereNull('disqualified_at')
             ->with('registration.item')
