@@ -645,128 +645,61 @@ class FestReportService
             null,
             false,
         )
-            // Unfilled standby slots and rows with no student/teacher attached aren't
-            // real attendees — exclude them so the printed sheet has no blank rows.
             ->filter(fn ($p) => $p->participant_role !== 'standby' && ($p->student_id || $p->teacher_id))
             ->values();
 
         $audience = $this->reportAudience($request);
         $isPreview = $this->preview;
 
-        // Group participants by item, then collapse teams into a single row per team
-        // (matching the Vue Attendance.vue displayRows logic) so the PDF shows one
-        // entry per team, not every individual member.
-        $GROUP_PARTICIPANT_TYPES = ['team', 'group', 'pair', 'trio'];
-
-        // Pre-built photo URL map — uses photoUrl() which returns a public HTTP/S3
-        // URL (browsers and headless Chrome handle these natively).  DomPDF fallback
-        // will skip photos (the blade uses @if check).
+        // Build photo map using photoUrl() (returns public HTTP/S3 URLs).
         $photoMap = [];
-        $participantMap = []; // participant_id -> participant for attendance lookups
         foreach ($participants as $p) {
-            $participantMap[$p->id] = $p;
             $sid = $p->student_id;
             if ($sid && ! isset($photoMap[$sid]) && method_exists($p->student ?? null, 'photoUrl')) {
                 $photoMap[$sid] = $p->student->photoUrl();
             }
         }
 
-        // Build item-wise rows, collapsing teams
-        $rowsByItem = collect();
-        $items = $participants->pluck('registration.item')->unique('id');
+        // Build rows using participantReportRows (individual students with team metadata).
+        $rows = $this->participantReportRows($participants, $audience);
 
-        foreach ($items as $item) {
-            $itemParticipants = $participants->filter(fn ($p) => $p->registration?->item_id === $item->id)->values();
-            $isGroupItem = $item && in_array($item->participant_type, $GROUP_PARTICIPANT_TYPES, true);
-            $itemRows = [];
+        // Enrich with photo_url, dob
+        $rows = array_map(function ($row) use ($photoMap) {
+            $sid = $row['_student_id'] ?? null;
+            $row['photo_url'] = $sid ? ($photoMap[$sid] ?? null) : null;
+            return $row;
+        }, $rows);
 
-            if ($isGroupItem) {
-                // Collapse team members into a single row per team
-                $seenGroups = [];
-                foreach ($itemParticipants as $p) {
-                    if (! $p->group_id) {
-                        continue;
-                    }
-                    $key = (string) $p->group_id;
-                    if (isset($seenGroups[$key])) {
-                        continue;
-                    }
-                    $seenGroups[$key] = true;
+        // Group by item
+        $rowsByItem = collect($rows)->groupBy(fn ($r) => $r['item'] ?? 'Item')->sortKeys();
 
-                    $members = $itemParticipants->filter(fn ($m) => $m->group_id === $p->group_id);
-                    $firstMember = $members->first();
-
-                    $itemRows[] = [
-                        'reference'    => $firstMember?->group?->chest_no ?? $p->chest_no ?? '—',
-                        'name'         => $firstMember?->group?->team_name ?? 'Team',
-                        'school'       => $p->registration?->school?->name ?? '',
-                        'item'         => $item->title,
-                        'team_name'    => $firstMember?->group?->team_name ?? null,
-                        'group_id'     => $p->group_id,
-                        'member_count' => $members->count(),
-                        'photo_url'    => $photoMap[$members->first()?->student_id] ?? null,
-                        'dob'          => $this->event->event_type === 'sports'
-                            ? ($members->first()?->student?->dob?->format('d M Y') ?? null) : null,
-                        '_student_id'  => $members->first()?->student_id,
-                        '_participant_ids' => $members->pluck('id')->all(),
-                    ];
-                }
-            } else {
-                // Individual participants — one row per person
-                foreach ($itemParticipants as $p) {
-                    $itemRows[] = [
-                        'reference'    => $p->chest_no ?? '—',
-                        'name'         => $p->student?->name ?? $p->teacher?->name ?? 'Participant',
-                        'school'       => $p->registration?->school?->name ?? '',
-                        'item'         => $item->title,
-                        'team_name'    => null,
-                        'group_id'     => null,
-                        'member_count' => null,
-                        'photo_url'    => $photoMap[$p->student_id] ?? null,
-                        'dob'          => $this->event->event_type === 'sports'
-                            ? ($p->student?->dob?->format('d M Y') ?? null) : null,
-                        '_student_id'  => $p->student_id,
-                        '_participant_ids' => [$p->id],
-                    ];
-                }
-            }
-
-            // Sort rows by chest number (numeric), then school name
-            usort($itemRows, function ($a, $b) {
-                $aNum = (int) preg_replace('/[^0-9]/', '', $a['reference'] ?? '0');
-                $bNum = (int) preg_replace('/[^0-9]/', '', $b['reference'] ?? '0');
-                return [$aNum <=> $bNum, $a['school'] <=> $b['school']];
-            });
-
-            if ($itemRows) {
-                $rowsByItem[$item->title] = $itemRows;
-            }
-        }
+        // Sort participants: group_id (team), school, then chest_no.
+        // This keeps all members of the same team together under one divider.
+        $rowsByItem = $rowsByItem->map(fn ($itemRows) => $itemRows->sortBy([
+            fn ($a, $b) => ($a['group_id'] ?? 0) <=> ($b['group_id'] ?? 0),
+            fn ($a, $b) => ($a['school'] ?? '') <=> ($b['school'] ?? ''),
+            fn ($a, $b) => ((int) preg_replace('/[^0-9]/', '', $a['reference'] ?? '0'))
+                <=> ((int) preg_replace('/[^0-9]/', '', $b['reference'] ?? '0')),
+        ])->values()->all());
 
         $sahodaya = Tenant::find($this->event->tenant_id);
 
-        // Preview mode: return raw HTML for in-browser viewing (handles S3
-        // images via photoUrl, proper page headers via browser print).
-        if ($isPreview) {
-            $html = view('fest.reports.attendance-sheet', [
-                'event'      => $this->event,
-                'sahodaya'   => $sahodaya,
-                'logo'       => $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null,
-                'rowsByItem' => $rowsByItem,
-                'audience'   => $audience,
-                'isPreview'  => true,
-            ])->render();
-
-            return response($html)->header('Content-Type', 'text/html');
-        }
-
-        return $this->renderPdf('fest.reports.attendance-sheet', [
+        $bladeData = [
             'event'      => $this->event,
             'sahodaya'   => $sahodaya,
             'logo'       => $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null,
             'rowsByItem' => $rowsByItem,
             'audience'   => $audience,
-        ], $this->slug().'-attendance.pdf');
+            'isPreview'  => $isPreview,
+        ];
+
+        // Preview mode: return raw HTML (browser handles S3 images, proper page layout)
+        if ($isPreview) {
+            return response(view('fest.reports.attendance-sheet', $bladeData)->render())
+                ->header('Content-Type', 'text/html');
+        }
+
+        return $this->renderPdf('fest.reports.attendance-sheet', $bladeData, $this->slug().'-attendance.pdf');
     }
 
     private function attendanceSheetSchoolPdf(Request $request): \Symfony\Component\HttpFoundation\Response

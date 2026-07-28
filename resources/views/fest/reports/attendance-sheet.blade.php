@@ -17,7 +17,13 @@
             margin: 0;
             padding: 0;
         }
-
+@if(!empty($isPreview))
+        .report-header {
+            border-bottom: 2px solid #0f172a;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+        }
+@else
         header {
             position: fixed;
             top: -28mm;
@@ -25,7 +31,7 @@
             right: 0px;
             height: 25mm;
         }
-
+@endif
         .footer-container {
             position: fixed;
             bottom: -10mm;
@@ -37,11 +43,9 @@
             color: #64748b;
             text-align: center;
         }
-
         main {
             width: 100%;
         }
-
         table {
             width: 100%;
             border-collapse: collapse;
@@ -84,6 +88,20 @@
             color: #334155;
             font-size: 8px;
         }
+        .team-divider td {
+            background: #f1f5f9;
+            color: #0f172a;
+            font-weight: bold;
+            font-size: 9px;
+            padding: 4px 6px;
+            border-top: 2px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .team-divider {
+            page-break-inside: avoid;
+        }
         .team-tag {
             display: inline-block;
             background: #dbeafe;
@@ -93,16 +111,6 @@
             padding: 1px 4px;
             border-radius: 3px;
             margin-top: 1px;
-        }
-        .member-badge {
-            display: inline-block;
-            background: #f0fdf4;
-            color: #166534;
-            font-size: 7px;
-            font-weight: bold;
-            padding: 1px 5px;
-            border-radius: 3px;
-            margin-left: 4px;
         }
         .photo-cell {
             width: 32px;
@@ -151,13 +159,23 @@
 </head>
 <body>
 
-<header>
-    @include('partials.pdf-branding-header', [
-        'orgName' => $sahodaya->name ?? 'SAHODAYA',
-        'logoSrc' => $logo ?? null,
-        'docTitle' => 'ATTENDANCE SHEET',
-    ])
-</header>
+@if(!empty($isPreview))
+    <div class="report-header">
+        @include('partials.pdf-branding-header', [
+            'orgName' => $sahodaya->name ?? 'SAHODAYA',
+            'logoSrc' => $logo ?? null,
+            'docTitle' => 'ATTENDANCE SHEET',
+        ])
+    </div>
+@else
+    <header>
+        @include('partials.pdf-branding-header', [
+            'orgName' => $sahodaya->name ?? 'SAHODAYA',
+            'logoSrc' => $logo ?? null,
+            'docTitle' => 'ATTENDANCE SHEET',
+        ])
+    </header>
+@endif
 
 <div class="footer-container">
     Generated on {{ now()->format('d M Y, h:i A') }} &bull; Page {PAGE_NUM} of {PAGE_COUNT}
@@ -171,46 +189,72 @@
     <div style="margin-bottom: 16px;">
         <div class="item-heading-bar">
             {{ $cleanTitle }}
-            <span class="count-badge">{{ count($rows) }} {{ count($rows) === 1 ? 'Entry' : 'Entries' }}</span>
+            <span class="count-badge">{{ count($rows) }} {{ count($rows) === 1 ? 'Participant' : 'Participants' }}</span>
         </div>
         <table>
             <thead>
                 <tr>
                     <th style="width: 28px;" class="text-center">Sl</th>
-                    <th class="photo-cell"></th>
-                    <th style="width: 50px;" class="text-center">Chest</th>
-                    <th>Participant / Team</th>
+                    @if(!empty($isPreview))
+                        <th class="photo-cell"></th>
+                    @endif
+                    <th style="width: 55px;" class="text-center">Chest No</th>
+                    <th>Participant / Team Name</th>
                     @if($event->event_type === 'sports')
-                        <th style="width: 70px;" class="text-center">DOB</th>
+                        <th style="width: 75px;" class="text-center">DOB</th>
                     @endif
                     <th style="width: 28%;">School</th>
-                    <th style="width: 70px;" class="text-center">Attendance</th>
+                    <th style="width: 80px;" class="text-center">Attendance</th>
                 </tr>
             </thead>
             <tbody>
+                @php
+                    $lastTeamKey = null;
+                @endphp
                 @foreach($rows as $i => $row)
+                    @php
+                        $teamName = $row['team_name'] ?? null;
+                        $school = $row['school'] ?? '';
+                        $groupId = $row['group_id'] ?? null;
+                        $currentTeamKey = $groupId
+                            ? 'g_'.$groupId
+                            : ($teamName ? 't_'.$teamName.'_'.$school : null);
+                    @endphp
+
+                    @if($currentTeamKey && $currentTeamKey !== $lastTeamKey)
+                        @php $lastTeamKey = $currentTeamKey; @endphp
+                        <tr class="team-divider">
+                            <td colspan="{{ $event->event_type === 'sports' ? 6 : 5 }}">
+                                <strong>TEAM: {{ strtoupper($teamName ?? 'Team Entry') }}</strong>
+                                @if(!empty($school))
+                                    &bull; <span style="color: #475569;">{{ strtoupper($school) }}</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endif
+
                     <tr>
                         <td class="text-center">{{ $i + 1 }}</td>
-                        <td class="photo-cell text-center">
-                            @if(!empty($row['photo_url']) && !empty($isPreview))
-                                <img src="{{ $row['photo_url'] }}" alt="">
-                            @elseif(!empty($isPreview))
-                                <span class="initials">{{ strtoupper(substr($row['name'] ?? '?', 0, 1)) }}</span>
-                            @else
-                                <span class="initials">{{ strtoupper(substr($row['name'] ?? '?', 0, 1)) }}</span>
-                            @endif
-                        </td>
+                        @if(!empty($isPreview))
+                            <td class="photo-cell text-center">
+                                @if(!empty($row['photo_url']))
+                                    <img src="{{ $row['photo_url'] }}" alt="">
+                                @else
+                                    <span class="initials">{{ strtoupper(substr($row['name'] ?? '?', 0, 1)) }}</span>
+                                @endif
+                            </td>
+                        @endif
                         <td class="text-center chest-no">{{ $row['reference'] ?? '—' }}</td>
                         <td>
                             <strong style="font-size: 9px;">{{ $row['name'] ?? '' }}</strong>
-                            @if(!empty($row['member_count']))
-                                <span class="member-badge">Team · {{ $row['member_count'] }} members</span>
+                            @if(!empty($row['team_name']))
+                                <div><span class="team-tag">Team: {{ $row['team_name'] }}</span></div>
                             @endif
                         </td>
                         @if($event->event_type === 'sports')
                             <td class="text-center" style="font-size: 8px; color: #475569;">{{ $row['dob'] ?? '—' }}</td>
                         @endif
-                        <td class="school-name">{{ strtoupper($row['school'] ?? '') }}</td>
+                        <td class="school-name">{{ strtoupper($school) }}</td>
                         <td class="text-center"></td>
                     </tr>
                 @endforeach
