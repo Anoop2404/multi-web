@@ -5,14 +5,26 @@
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }} — {{ strtoupper($school->name) }}</h2>
-<table><thead><tr><th>Sl No</th><th>Student</th><th>Items (Chest No)</th><th>Present</th></tr></thead>
+<table><thead><tr><th style="width: 35px; text-align: center;">Sl No</th>@if($event->event_type === 'sports')<th style="width: 45px; text-align: center;">Photo</th>@endif<th>Student</th>@if($event->event_type === 'sports')<th style="width: 75px; text-align: center;">DOB</th>@endif<th>Items (Chest No)</th><th style="width: 70px; text-align: center;">Present</th></tr></thead>
 <tbody>
 @foreach($studentRows as $row)
 <tr>
-<td>{{ $loop->iteration }}</td>
+<td style="text-align: center;">{{ $loop->iteration }}</td>
+@if($event->event_type === 'sports')
+<td style="text-align: center; padding: 2px;">
+@if(!empty($row['photo_src']))
+<img src="{{ $row['photo_src'] }}" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px;" alt="">
+@else
+—
+@endif
+</td>
+@endif
 <td>{{ $row['student']->name }}</td>
+@if($event->event_type === 'sports')
+<td style="text-align: center;">{{ $row['dob'] ?? '—' }}</td>
+@endif
 <td>@foreach($row['events'] as $e){{ $e['event_name'] }} ({{ $e['chest_number'] }})@if(!$loop->last), @endif @endforeach</td>
-<td></td>
+<td style="text-align: center;"></td>
 </tr>
 @endforeach
 </tbody></table></body></html>

@@ -157,22 +157,40 @@
         <table>
             <thead>
                 <tr>
-                    <th style="width: 35px;" class="text-center">Sl</th>
-                    <th style="width: 70px;" class="text-center">Chest No</th>
+                    <th style="width: 30px;" class="text-center">Sl</th>
+                    @if($event->event_type === 'sports')
+                        <th style="width: 45px;" class="text-center">Photo</th>
+                    @endif
+                    <th style="width: 65px;" class="text-center">Chest No</th>
                     @if(($audience ?? 'staff') === 'staff')
                         <th>Participant / Team Name</th>
-                        <th style="width: 42%;">School</th>
+                        @if($event->event_type === 'sports')
+                            <th style="width: 75px;" class="text-center">DOB</th>
+                        @endif
+                        <th style="width: 32%;">School</th>
                     @endif
-                    <th style="width: 100px;" class="text-center">Attendance</th>
+                    <th style="width: 90px;" class="text-center">Attendance</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($rows as $i => $row)
                     <tr>
                         <td class="text-center">{{ $i + 1 }}</td>
+                        @if($event->event_type === 'sports')
+                            <td class="text-center" style="padding: 2px;">
+                                @if(!empty($row['photo_src']))
+                                    <img src="{{ $row['photo_src'] }}" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px;" alt="">
+                                @else
+                                    <span style="color: #cbd5e1; font-size: 8px;">—</span>
+                                @endif
+                            </td>
+                        @endif
                         <td class="text-center chest-no">{{ $row['reference'] ?? '—' }}</td>
                         @if(($audience ?? 'staff') === 'staff')
                             <td><strong>{{ $row['name'] ?? '' }}</strong></td>
+                            @if($event->event_type === 'sports')
+                                <td class="text-center" style="font-size: 9px; color: #475569;">{{ $row['dob'] ?? '—' }}</td>
+                            @endif
                             <td class="school-name">{{ strtoupper($row['school'] ?? '') }}</td>
                         @endif
                         <td class="text-center"></td>

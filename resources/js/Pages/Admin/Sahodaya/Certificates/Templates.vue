@@ -107,6 +107,10 @@
                                     <input v-model="form.layout_json.bold_variables" type="checkbox" class="rounded" :true-value="true" :false-value="false">
                                     Bold placeholder values in body text
                                 </label>
+                                <label class="flex items-center gap-2 text-sm text-slate-700 font-medium">
+                                    <input v-model="form.layout_json.show_certificate_date" type="checkbox" class="rounded" :true-value="true" :false-value="false">
+                                    Show certificate date
+                                </label>
                             </div>
 
                             <FormField label="Recipient name — top %" hint="Vertical position on canvas (0–100)">
@@ -378,7 +382,7 @@ const props = defineProps({
     defaultSignatories: { type: Array, default: () => [] },
     defaultLayout: { type: Object, default: () => ({}) },
     fontFamilyOptions: { type: Array, default: () => [
-        'Times New Roman', 'Georgia', 'Arial', 'Helvetica', 'Verdana', 'Courier New', 'Palatino Linotype', 'Garamond',
+        'Montserrat', 'Times New Roman', 'Georgia', 'Arial', 'Helvetica', 'Verdana', 'Courier New', 'Palatino Linotype', 'Garamond',
     ] },
 });
 
@@ -474,15 +478,16 @@ function layoutDefaults(from = null) {
         show_recipient_name: src.show_recipient_name ?? d.show_recipient_name ?? false,
         show_participation_label: src.show_participation_label ?? d.show_participation_label ?? true,
         bold_variables: src.bold_variables ?? d.bold_variables ?? true,
+        show_certificate_date: src.show_certificate_date ?? d.show_certificate_date ?? true,
         recipient_name: textFieldDefaults(src.recipient_name, d.recipient_name, {
-            top: 38, left: 10, width: 80, font_size: 28, font_family: 'Georgia', font_weight: 'bold',
+            top: 38, left: 10, width: 80, font_size: 24, font_family: 'Montserrat', font_weight: 'bold',
         }),
         body: textFieldDefaults(src.body, d.body, {
-            top: 48, left: 12, width: 76, font_size: 13, font_family: 'Times New Roman',
+            top: 48, left: 12, width: 76, font_size: 12.5, font_family: 'Montserrat',
         }),
         certificate_date: {
             ...textFieldDefaults(src.certificate_date, d.certificate_date, {
-                top: 72, left: 8, width: 42, font_size: 12, font_family: 'Times New Roman',
+                top: 72, left: 8, width: 42, font_size: 12, font_family: 'Montserrat',
             }),
             align: src.certificate_date?.align ?? d.certificate_date?.align ?? 'left',
         },

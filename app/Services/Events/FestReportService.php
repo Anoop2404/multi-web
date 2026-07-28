@@ -18,6 +18,7 @@ use App\Models\Tenant;
 use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
 use App\Support\TenantBranding;
+use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -661,12 +662,24 @@ class FestReportService
         $participants = $this->participantsFlat(null, null, $school->id, null, null, false);
         $studentRows = [];
 
+        $tenant = Tenant::find($this->event->tenant_id);
+
         foreach ($participants as $p) {
             if (! $p->student) {
                 continue;
             }
             $id = $p->student_id;
-            $studentRows[$id] ??= ['student' => $p->student, 'events' => []];
+            $relativePath = $p->student->photo;
+            $photoSrc = $relativePath ? (str_starts_with($relativePath, 'http') ? $relativePath : TenantStorage::photoDataUri($tenant, $relativePath)) : null;
+            $dobRaw = $p->student->dob;
+            $dob = $dobRaw ? (is_string($dobRaw) ? date('d M Y', strtotime($dobRaw)) : $dobRaw->format('d M Y')) : null;
+
+            $studentRows[$id] ??= [
+                'student' => $p->student,
+                'photo_src' => $photoSrc,
+                'dob' => $dob,
+                'events' => [],
+            ];
             $studentRows[$id]['events'][] = [
                 'event_name'   => $p->registration?->item?->title ?? '',
                 'chest_number' => $p->chest_no ?? '—',

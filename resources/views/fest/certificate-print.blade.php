@@ -94,6 +94,7 @@
         $boldVariables = (bool) ($layout['bold_variables'] ?? true);
         $showRecipientName = (bool) ($layout['show_recipient_name'] ?? true);
         $showParticipationLabel = (bool) ($layout['show_participation_label'] ?? true);
+        $showCertificateDate = (bool) ($layout['show_certificate_date'] ?? true);
         $body = $template?->body ?? \App\Models\CertificateTemplate::defaultFestBody();
         foreach (($fieldValues ?? []) as $key => $value) {
             $safe = e((string) $value);
@@ -131,22 +132,24 @@
 
             @if($showRecipientName)
                 @php $r = $layout['recipient_name'] ?? []; @endphp
-                <div class="overlay-field recipient" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($r, ['top' => 38, 'left' => 10, 'width' => 80, 'font_size' => 28, 'font_family' => 'Georgia', 'font_weight' => 'bold']) }}">
+                <div class="overlay-field recipient" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($r, ['top' => 38, 'left' => 10, 'width' => 80, 'font_size' => 24, 'font_family' => 'Montserrat', 'font_weight' => 'bold']) }}">
                     {{ $fieldValues['recipient_name'] ?? '' }}
                 </div>
             @endif
 
             @php $b = $layout['body'] ?? []; @endphp
-            <div class="overlay-field body" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($b, ['top' => 48, 'left' => 12, 'width' => 76, 'font_size' => 13, 'font_family' => 'Times New Roman']) }}">
+            <div class="overlay-field body" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($b, ['top' => 48, 'left' => 12, 'width' => 76, 'font_size' => 12.5, 'font_family' => 'Montserrat']) }}">
                 @foreach($paragraphs as $paragraph)
                     <p style="margin-bottom:8px;">{!! nl2br($paragraph) !!}</p>
                 @endforeach
             </div>
 
-            @php $d = $layout['certificate_date'] ?? []; $dateValue = $fieldValues['certificate_date'] ?? now()->format('j F Y'); @endphp
-            <div class="overlay-field" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($d, ['top' => 72, 'left' => 8, 'width' => 42, 'font_size' => 12, 'font_family' => 'Times New Roman', 'align' => 'left']) }}">
-                @if($boldVariables)<strong>Date :</strong> <strong>{{ $dateValue }}</strong>@else Date : {{ $dateValue }}@endif
-            </div>
+            @if($showCertificateDate)
+                @php $d = $layout['certificate_date'] ?? []; $dateValue = $fieldValues['certificate_date'] ?? now()->format('j F Y'); @endphp
+                <div class="overlay-field" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($d, ['top' => 72, 'left' => 8, 'width' => 42, 'font_size' => 12, 'font_family' => 'Montserrat', 'align' => 'left']) }}">
+                    @if($boldVariables)<strong>Date :</strong> <strong>{{ $dateValue }}</strong>@else Date : {{ $dateValue }}@endif
+                </div>
+            @endif
 
             @php $u = $layout['uuid'] ?? []; @endphp
             <div class="overlay-field uuid" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($u, ['top' => 92, 'left' => 5, 'width' => 90, 'font_size' => 8, 'font_family' => 'Arial']) }}">
@@ -180,7 +183,9 @@
                 @foreach($paragraphs as $paragraph)
                     <p>{!! nl2br($paragraph) !!}</p>
                 @endforeach
-                <p class="date-line"><strong>Date:</strong> {{ $fieldValues['certificate_date'] ?? now()->format('j F Y') }}</p>
+                @if($showCertificateDate)
+                    <p class="date-line"><strong>Date:</strong> {{ $fieldValues['certificate_date'] ?? now()->format('j F Y') }}</p>
+                @endif
             </div>
 
             @if(!empty($sealUrl))

@@ -31,21 +31,21 @@
                 <!-- Recipient Name Overlay -->
                 <div v-if="showRecipientName && recipientNameLayout"
                      class="absolute text-center text-slate-900 leading-snug whitespace-nowrap overflow-hidden text-ellipsis"
-                     :style="overlayStyle(recipientNameLayout, { top: 38, left: 10, width: 80, font_size: 28, font_family: 'Georgia', font_weight: 'bold' })">
+                     :style="overlayStyle(recipientNameLayout, { top: 38, left: 10, width: 80, font_size: 24, font_family: 'Montserrat', font_weight: 'bold' })">
                     {{ sampleRecipientName }}
                 </div>
 
                 <!-- Body Text Paragraph Overlay -->
                 <div v-if="bodyLayout"
                      class="absolute text-center text-slate-700 leading-relaxed"
-                     :style="overlayStyle(bodyLayout, { top: 48, left: 12, width: 76, font_size: 13, font_family: 'Times New Roman' })">
+                     :style="overlayStyle(bodyLayout, { top: 48, left: 12, width: 76, font_size: 12.5, font_family: 'Montserrat' })">
                     <p v-for="(paragraph, idx) in paragraphs" :key="idx" class="mb-2" v-html="paragraph"></p>
                 </div>
 
                 <!-- Date Overlay -->
-                <div v-if="dateLayout"
+                <div v-if="showCertificateDate && dateLayout"
                      class="absolute text-slate-800"
-                     :style="overlayStyle(dateLayout, { top: 72, left: 8, width: 42, font_size: 12, font_family: 'Times New Roman', align: 'left' })">
+                     :style="overlayStyle(dateLayout, { top: 72, left: 8, width: 42, font_size: 12, font_family: 'Montserrat', align: 'left' })">
                     <strong v-if="boldVariables">Date : </strong>
                     <span v-else>Date : </span>
                     <strong v-if="boldVariables">22 July 2026</strong>
@@ -109,6 +109,7 @@ const bgUrl = computed(() => props.localFileUrl || props.backgroundUrl);
 const showRecipientName = computed(() => props.layout?.show_recipient_name !== false);
 const showParticipationLabel = computed(() => props.layout?.show_participation_label !== false);
 const boldVariables = computed(() => props.layout?.bold_variables !== false);
+const showCertificateDate = computed(() => props.layout?.show_certificate_date !== false);
 
 const participationLabelCover = computed(() => props.layout?.participation_label_cover);
 const recipientNameLayout = computed(() => props.layout?.recipient_name);
@@ -117,6 +118,7 @@ const dateLayout = computed(() => props.layout?.certificate_date);
 const uuidLayout = computed(() => props.layout?.uuid);
 
 const fontFamilyStackMap = {
+    'Montserrat': 'Montserrat, Arial, sans-serif',
     'Georgia': 'Georgia, "Times New Roman", Times, serif',
     'Arial': 'Arial, Helvetica, sans-serif',
     'Helvetica': 'Helvetica, Arial, sans-serif',

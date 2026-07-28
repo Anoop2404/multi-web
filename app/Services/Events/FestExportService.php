@@ -103,6 +103,7 @@ class FestExportService
                     $index + 1,
                     $p->registration?->item?->title ?? '',
                     $p->student?->name ?? $p->teacher?->name ?? '',
+                    $p->student?->admission_number ?? $p->student?->reg_no ?? '',
                     strtoupper((string) $schoolName),
                     $numbering->effectiveChestNumber($p) ?? '',
                     $a?->status ?? 'Not marked',
@@ -115,7 +116,7 @@ class FestExportService
 
         return ExcelExport::download(
             $this->filename($event, $filenameSuffix),
-            ['Sl No', 'Item', 'Participant', 'School', 'Chest No', 'Status', 'Marked At'],
+            ['Sl No', 'Item', 'Participant', 'Doc', 'School', 'Chest No', 'Status', 'Marked At'],
             $rows,
         );
     }

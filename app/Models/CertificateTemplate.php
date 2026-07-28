@@ -50,6 +50,7 @@ class CertificateTemplate extends Model
             'show_recipient_name' => false,
             'show_participation_label' => true,
             'bold_variables' => true,
+            'show_certificate_date' => true,
             'participation_label_cover' => [
                 'top' => 28,
                 'left' => 18,
@@ -60,8 +61,8 @@ class CertificateTemplate extends Model
                 'top' => 38,
                 'left' => 10,
                 'width' => 80,
-                'font_size' => 28,
-                'font_family' => 'Georgia',
+                'font_size' => 24,
+                'font_family' => 'Montserrat',
                 'font_weight' => 'bold',
                 'font_style' => 'normal',
             ],
@@ -69,8 +70,8 @@ class CertificateTemplate extends Model
                 'top' => 48,
                 'left' => 12,
                 'width' => 76,
-                'font_size' => 13,
-                'font_family' => 'Times New Roman',
+                'font_size' => 12.5,
+                'font_family' => 'Montserrat',
                 'font_weight' => 'normal',
                 'font_style' => 'normal',
             ],
@@ -79,7 +80,7 @@ class CertificateTemplate extends Model
                 'left' => 8,
                 'width' => 42,
                 'font_size' => 12,
-                'font_family' => 'Times New Roman',
+                'font_family' => 'Montserrat',
                 'font_weight' => 'normal',
                 'font_style' => 'normal',
                 'align' => 'left',
@@ -100,6 +101,7 @@ class CertificateTemplate extends Model
     public static function fontFamilyOptions(): array
     {
         return [
+            'Montserrat',
             'Times New Roman',
             'Georgia',
             'Arial',
@@ -127,6 +129,7 @@ class CertificateTemplate extends Model
             $family = 'Times New Roman';
         }
         $stack = match ($family) {
+            'Montserrat' => 'Montserrat, Arial, sans-serif',
             'Georgia' => 'Georgia, "Times New Roman", Times, serif',
             'Arial' => 'Arial, Helvetica, sans-serif',
             'Helvetica' => 'Helvetica, Arial, sans-serif',
@@ -169,7 +172,7 @@ class CertificateTemplate extends Model
         $defaults = self::defaultBackgroundLayout();
         $custom = is_array($this->layout_json) ? $this->layout_json : [];
 
-        foreach (['show_recipient_name', 'show_participation_label', 'bold_variables'] as $flag) {
+        foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date'] as $flag) {
             if (array_key_exists($flag, $custom)) {
                 $defaults[$flag] = filter_var($custom[$flag], FILTER_VALIDATE_BOOLEAN);
             }
@@ -199,7 +202,7 @@ class CertificateTemplate extends Model
     public static function defaultTrainingBody(): string
     {
         return <<<'BODY'
-This is to certify that {salutation} {recipient_name}, {designation} of {school_name} has successfully participated in the {program_title} organized by {sahodaya_name} on {conducted_on} at {venue}.
+This is to certify that Mr./Ms. {recipient_name}, {designation} of {school_name} has successfully participated in the {program_title} organized by {sahodaya_name} on {conducted_on} at {venue}.
 
 The programme was designed to enhance professional competencies, strengthen pedagogical practices, and foster collaborative learning among educators. We appreciate the participant's active involvement and commitment to continuous professional growth and excellence in education.
 BODY;
