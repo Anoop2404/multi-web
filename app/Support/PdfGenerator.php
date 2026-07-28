@@ -9,6 +9,8 @@ class PdfGenerator
 {
     public static function download(string $html, string $filename, bool $inline = false, bool $isLandscape = false)
     {
+        ini_set('memory_limit', '512M');
+
         $url = env('PDF_CONVERTER_URL');
 
         if ($url) {
