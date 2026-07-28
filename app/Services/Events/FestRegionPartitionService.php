@@ -98,6 +98,26 @@ class FestRegionPartitionService
     }
 
     /**
+     * Auto-created regional children share the hub's school-registration lifecycle.
+     * Preserve any child that an administrator has already moved beyond draft.
+     */
+    public function inheritRegistrationLifecycle(FestEvent $hub, FestEvent $partition): FestEvent
+    {
+        if ($partition->status !== 'draft'
+            || ! in_array($hub->status, ['published', 'registration_open'], true)) {
+            return $partition;
+        }
+
+        $partition->update([
+            'status' => $hub->status,
+            'registration_open' => $partition->registration_open ?? $hub->registration_open,
+            'registration_close' => $partition->registration_close ?? $hub->registration_close,
+        ]);
+
+        return $partition;
+    }
+
+    /**
      * Ensure a partition child event exists per membership region and (re)assign every
      * school to its region's partition. Returns a summary for the admin.
      *
@@ -135,6 +155,7 @@ class FestRegionPartitionService
             // catalogue import and older English Fest children that only received
             // off-stage individual items.
             app(FestItemSyncService::class)->copyItemsToPartition($hub, $partition, 'region');
+            $this->inheritRegistrationLifecycle($hub, $partition);
         }
 
         $year = AcademicYear::forSahodaya($hub->tenant_id);

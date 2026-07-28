@@ -86,4 +86,19 @@ class ReportFilenameTest extends TestCase
 
         $this->assertStringEndsWith('.pdf', $filename);
     }
+
+    public function test_attendance_filename_identifies_sahodaya_event_and_item(): void
+    {
+        $filename = ReportFilename::build(
+            'attendance-sheet',
+            'Malappuram Central Sahodaya',
+            Carbon::create(2026, 8, 10),
+            ['Chess 2026-27', 'U14 Chess Individual-Girls'],
+        );
+
+        $this->assertSame(
+            'attendance-sheet_malappuram-central-sahodaya_chess-2026-27_u14-chess-individual-girls_2026-08-10.pdf',
+            $filename,
+        );
+    }
 }

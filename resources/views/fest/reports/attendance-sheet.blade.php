@@ -206,28 +206,29 @@
             padding: 0;
         }
         .brand-cell-table .logo-cell {
-            width: 34px;
+            width: 50px;
             vertical-align: middle;
-            padding-right: 8px;
+            padding-right: 10px;
         }
         .brand-cell-table .logo-cell img {
-            width: 28px;
-            height: 28px;
+            width: 42px;
+            height: 42px;
             object-fit: contain;
         }
         .brand-cell-table .org-cell {
             vertical-align: middle;
         }
         .brand-cell-table .org-name {
-            font-size: 12px;
+            font-size: 16px;
             font-weight: 800;
             color: #0f172a;
             text-transform: uppercase;
         }
         .brand-cell-table .org-context {
-            font-size: 8px;
+            font-size: 10px;
+            font-weight: 600;
             color: #475569;
-            margin-top: 1px;
+            margin-top: 3px;
         }
         .brand-cell-table .doc-badge-cell {
             text-align: right;
@@ -238,9 +239,9 @@
             display: inline-block;
             background: #0f172a;
             color: #ffffff;
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 8px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 9px;
             font-weight: bold;
             letter-spacing: 0.3px;
         }
@@ -293,15 +294,34 @@
     $reportSections = collect($rowsByItem)->flatMap(function ($itemRows, $itemName) use ($isPreview, $isDomPdf) {
         $allRows = collect($itemRows)->values();
         $chunks = empty($isPreview) && ($isDomPdf ?? true)
-            ? $allRows->chunk(15)
+            ? $allRows->chunk(16)->values()
             : collect([$allRows]);
 
-        return $chunks->values()->map(fn ($chunk, $chunkIndex) => [
-            'itemName' => $itemName,
-            'rows' => $chunk->values()->all(),
-            'allRows' => $allRows->all(),
-            'offset' => $chunkIndex * 15,
-        ]);
+        // Avoid a nearly empty final page. For example, 17 students become 13 + 4
+        // instead of 16 + 1, while exactly 16 students remain on one page.
+        if ($chunks->count() > 1 && $chunks->last()->count() < 4) {
+            $lastIndex = $chunks->count() - 1;
+            $previous = $chunks->get($lastIndex - 1)->values();
+            $last = $chunks->get($lastIndex)->values();
+            $moved = $previous->splice(-1 * (4 - $last->count()));
+
+            $chunks->put($lastIndex - 1, $previous->values());
+            $chunks->put($lastIndex, $moved->concat($last)->values());
+        }
+
+        $offset = 0;
+
+        return $chunks->values()->map(function ($chunk) use ($itemName, $allRows, &$offset) {
+            $section = [
+                'itemName' => $itemName,
+                'rows' => $chunk->values()->all(),
+                'allRows' => $allRows->all(),
+                'offset' => $offset,
+            ];
+            $offset += $chunk->count();
+
+            return $section;
+        });
     })->values();
 @endphp
 @forelse($reportSections as $sectionIndex => $section)

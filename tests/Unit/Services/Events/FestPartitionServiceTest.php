@@ -7,6 +7,7 @@ use App\Models\FestEventItem;
 use App\Models\FestEventSchoolPartition;
 use App\Models\Tenant;
 use App\Services\Events\FestPartitionService;
+use App\Services\Events\FestRegionPartitionService;
 use App\Services\Events\FestRegistrationRouterService;
 use Database\Seeders\SahodayaMasterDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -150,6 +151,9 @@ class FestPartitionServiceTest extends TestCase
             'inherited_from_item_id' => $item->id,
             'item_code' => 'EF104',
         ]);
+        $this->assertSame('draft', $region->status);
+        app(FestRegionPartitionService::class)->inheritRegistrationLifecycle($hub, $region);
+        $this->assertSame('registration_open', $region->fresh()->status);
         $this->assertSame(
             $region->id,
             app(FestRegistrationRouterService::class)

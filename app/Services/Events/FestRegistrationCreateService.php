@@ -43,6 +43,11 @@ class FestRegistrationCreateService
         $router = app(FestRegistrationRouterService::class);
         $targetEvent = $router->resolveTargetEvent($event, $item, $school->id);
         if ($targetEvent->id !== $event->id) {
+            // Region children are infrastructure behind the school-facing hub. Older
+            // children were left in draft even after the hub opened registration.
+            app(FestRegionPartitionService::class)
+                ->inheritRegistrationLifecycle($event, $targetEvent);
+
             $targetItem = FestEventItem::where('event_id', $targetEvent->id)
                 ->where(function ($q) use ($item) {
                     $q->where('inherited_from_item_id', $item->id)

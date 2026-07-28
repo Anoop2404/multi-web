@@ -9,6 +9,7 @@ use App\Services\Events\FestItemRegistrationGate;
 use App\Services\Events\FestItemWindowResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class FestItemWindowResolverTest extends TestCase
@@ -88,5 +89,33 @@ class FestItemWindowResolverTest extends TestCase
         $item->setRelation('head', $head);
 
         $this->assertFalse(app(FestItemWindowResolver::class)->isRegistrationOpen($item));
+    }
+
+    public function test_closed_event_returns_form_validation_instead_of_unhandled_http_exception(): void
+    {
+        $event = FestEvent::create([
+            'tenant_id' => (string) Str::uuid(),
+            'title' => 'Closed English Fest Region',
+            'event_type' => 'english_fest',
+            'level_round' => 'sahodaya',
+            'status' => 'draft',
+        ]);
+        $item = FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => 'Choral Reading',
+            'participant_type' => 'group',
+            'is_enabled' => true,
+        ]);
+        $item->setRelation('event', $event);
+
+        try {
+            app(FestItemRegistrationGate::class)->assertOpen($item);
+            $this->fail('Expected closed registration validation.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                ['Registration is closed for this event.'],
+                $exception->errors()['registration'],
+            );
+        }
     }
 }

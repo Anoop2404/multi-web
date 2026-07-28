@@ -3,6 +3,7 @@
 namespace App\Services\Events;
 
 use App\Models\FestEventItem;
+use Illuminate\Validation\ValidationException;
 
 class FestItemRegistrationGate
 {
@@ -35,15 +36,23 @@ class FestItemRegistrationGate
 
     public function assertOpen(FestEventItem $item): void
     {
-        abort_if(! ($item->is_enabled ?? true), 422, 'This item is not open for registration.');
+        if (! ($item->is_enabled ?? true)) {
+            throw ValidationException::withMessages([
+                'registration' => 'This item is not open for registration.',
+            ]);
+        }
 
         $event = $item->event ?? $item->event()->first();
         if (! $event) {
-            abort(422, 'Event not found.');
+            throw ValidationException::withMessages([
+                'registration' => 'Event not found.',
+            ]);
         }
 
         if (! $event->isRegistrationOpen()) {
-            abort(422, 'Registration is closed for this event.');
+            throw ValidationException::withMessages([
+                'registration' => 'Registration is closed for this event.',
+            ]);
         }
 
         if ($this->windows->isRegistrationOpen($item)) {
@@ -54,6 +63,8 @@ class FestItemRegistrationGate
         $end = $this->windows->effectiveRegEnd($item)?->format('j M Y');
         $detail = ($start || $end) ? " Registration window: {$start} – {$end}." : '';
 
-        abort(422, 'Registration is closed for this item.'.$detail);
+        throw ValidationException::withMessages([
+            'registration' => 'Registration is closed for this item.'.$detail,
+        ]);
     }
 }

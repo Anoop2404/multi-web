@@ -74,6 +74,37 @@ class SahodayaAttendancePresentationTest extends TestCase
         $this->assertStringNotContainsString('{PAGE_COUNT}', $html);
     }
 
+    public function test_sixteen_students_fit_on_one_dompdf_page_section(): void
+    {
+        $rows = collect(range(1, 16))->map(fn ($number) => [
+            'reference' => (string) (400 + $number),
+            'name' => 'Student '.$number,
+            'school' => 'Demo School',
+            'item' => 'Sample Item',
+            'photo_url' => null,
+            'team_name' => null,
+            'group_id' => null,
+            '_uses_age' => true,
+            '_uses_class' => false,
+            'dob' => '10 Jun 2012',
+            'class' => '8 A',
+        ])->all();
+
+        $html = view('fest.reports.attendance-sheet', [
+            'event' => (object) ['title' => 'Demo Fest', 'event_type' => 'sports'],
+            'sahodaya' => (object) ['name' => 'Demo Sahodaya'],
+            'logo' => null,
+            'rowsByItem' => new Collection(['Sample Item' => $rows]),
+            'audience' => 'staff',
+            'isPreview' => false,
+            'singleItemName' => 'Sample Item',
+            'isDomPdf' => true,
+        ])->render();
+
+        $this->assertSame(1, substr_count($html, 'class="report-header"'));
+        $this->assertStringContainsString('>16<', $html);
+    }
+
     /** @param array<string, mixed> $eligibility */
     private function renderAttendanceSheet(array $eligibility, bool $isDomPdf = false): string
     {

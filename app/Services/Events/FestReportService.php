@@ -18,6 +18,7 @@ use App\Models\Tenant;
 use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
 use App\Support\PdfGenerator;
+use App\Support\ReportFilename;
 use App\Support\TenantBranding;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -759,15 +760,21 @@ class FestReportService
         // relying on any CSS trick. Ignored by the dompdf fallback (only used locally),
         // which gets its own branding baked into the page content — see the blade file.
         [$headerTemplate, $footerTemplate] = $this->attendanceSheetHeaderFooterTemplates($sahodaya, $logo, $singleItemName);
+        $filename = ReportFilename::build(
+            'attendance-sheet',
+            $sahodaya?->name ?? 'Sahodaya',
+            $this->event->event_start,
+            [$this->event->title, $singleItemName ?? 'all-items'],
+        );
 
         return $this->renderPdf(
             'fest.reports.attendance-sheet',
             $bladeData,
-            $this->slug().'-attendance.pdf',
+            $filename,
             false,
             $headerTemplate,
             $footerTemplate,
-            ['top' => '85px', 'right' => '38px', 'bottom' => '55px', 'left' => '38px'],
+            ['top' => '102px', 'right' => '38px', 'bottom' => '55px', 'left' => '38px'],
         );
     }
 
@@ -785,24 +792,24 @@ class FestReportService
         $eventTitle = e($this->event->title);
         $generated = e(now()->format('d M Y, h:i A'));
         $itemLine = $singleItemName
-            ? '<div style="font-size:7px; font-weight:700; color:#475569; margin-top:1px; text-transform:uppercase;">'.e($singleItemName).'</div>'
+            ? '<div style="font-size:8px; font-weight:700; color:#475569; margin-top:2px; text-transform:uppercase;">'.e($singleItemName).'</div>'
             : '';
 
         $logoImg = $logo
-            ? '<img src="'.e($logo).'" style="width:20px;height:20px;object-fit:contain;margin-right:6px;">'
+            ? '<img src="'.e($logo).'" style="width:34px;height:34px;object-fit:contain;margin-right:10px;">'
             : '';
 
         $header = <<<HTML
-            <div style="width:100%; font-family:Arial,sans-serif; padding:0 38px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; border-bottom:1.5px solid #0f172a; padding-bottom:5px;">
+            <div style="width:100%; font-family:Arial,sans-serif; padding:0 38px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid #0f172a; padding-bottom:7px;">
                 <div style="display:flex; align-items:center;">
                     {$logoImg}
                     <div>
-                        <div style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase;">{$orgName}</div>
-                        <div style="font-size:8px; font-weight:600; color:#334155; margin-top:2px;">{$eventTitle}</div>
+                        <div style="font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase;">{$orgName}</div>
+                        <div style="font-size:9px; font-weight:600; color:#334155; margin-top:3px;">{$eventTitle}</div>
                         {$itemLine}
                     </div>
                 </div>
-                <div style="background:#0f172a; color:#fff; padding:3px 8px; border-radius:3px; font-size:7px; font-weight:bold; letter-spacing:0.3px;">ATTENDANCE SHEET</div>
+                <div style="background:#0f172a; color:#fff; padding:4px 10px; border-radius:4px; font-size:8px; font-weight:bold; letter-spacing:0.4px;">ATTENDANCE SHEET</div>
             </div>
             HTML;
 
