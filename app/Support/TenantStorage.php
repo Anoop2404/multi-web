@@ -312,7 +312,7 @@ class TenantStorage
         return self::storeUploadedFile($file, 'teachers/'.$schoolId, self::photosDisk());
     }
 
-    /** Embed path as data URI for PDF rendering (local file path or base64). */
+    /** Embed path as data URI or local filesystem path for PDF rendering. */
     public static function photoDataUri(?Tenant $tenant, ?string $relativePath): ?string
     {
         if (! $relativePath) {
@@ -327,11 +327,9 @@ class TenantStorage
             return $relativePath;
         }
 
-        if ($tenant) {
-            $absolute = self::publicFilePath($tenant, $relativePath);
-            if ($absolute && is_file($absolute)) {
-                return $absolute;
-            }
+        $local = self::localAbsolutePath($tenant, $relativePath);
+        if ($local && is_file($local)) {
+            return $local;
         }
 
         foreach (self::downloadDisks() as $disk) {
@@ -344,6 +342,40 @@ class TenantStorage
                 }
             } catch (\Throwable) {
                 continue;
+            }
+        }
+
+        return null;
+    }
+
+    public static function localAbsolutePath(?Tenant $tenant, ?string $relativePath): ?string
+    {
+        if (! $relativePath) {
+            return null;
+        }
+
+        $relativePath = ltrim($relativePath, '/');
+
+        $directCandidates = [
+            base_path('storage/app/'.$relativePath),
+            base_path('storage/app/shared/'.$relativePath),
+            base_path('storage/app/private/'.$relativePath),
+            base_path('storage/app/public/'.$relativePath),
+            storage_path('app/'.$relativePath),
+            public_path($relativePath),
+            public_path('storage/'.$relativePath),
+        ];
+
+        foreach ($directCandidates as $cand) {
+            if (is_file($cand)) {
+                return $cand;
+            }
+        }
+
+        if ($tenant) {
+            $found = self::publicFilePath($tenant, $relativePath);
+            if ($found && is_file($found)) {
+                return $found;
             }
         }
 

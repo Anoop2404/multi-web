@@ -169,11 +169,16 @@
         $cleanTitle = str_replace('_', ' ', $itemName);
     @endphp
     <div class="item-block">
-        <div class="item-heading">
-            <span class="item-title">{{ $cleanTitle }}</span>
-            <span class="item-count">{{ count($rows) }} {{ count($rows) === 1 ? 'Participant' : 'Participants' }}</span>
-            <div class="clear"></div>
-        </div>
+        <table style="width: 100%; border: none; margin-bottom: 0;">
+            <tr>
+                <td style="background: #0f172a; color: #ffffff; padding: 6px 10px; font-size: 11px; font-weight: bold; border: none; border-radius: 4px 0 0 0; text-transform: uppercase; letter-spacing: 0.03em;">
+                    {{ $cleanTitle }}
+                </td>
+                <td style="background: #0f172a; color: #ffffff; padding: 6px 10px; font-size: 9px; text-align: right; border: none; border-radius: 0 4px 0 0;">
+                    <span style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 10px;">{{ count($rows) }} {{ count($rows) === 1 ? 'Participant' : 'Participants' }}</span>
+                </td>
+            </tr>
+        </table>
         <table>
             <thead>
                 <tr>
