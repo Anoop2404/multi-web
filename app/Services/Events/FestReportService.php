@@ -783,8 +783,10 @@ class FestReportService
     {
         $orgName = e($sahodaya->name ?? 'SAHODAYA');
         $eventTitle = e($this->event->title);
-        $context = $singleItemName ? $eventTitle.' &bull; '.e($singleItemName) : $eventTitle;
         $generated = e(now()->format('d M Y, h:i A'));
+        $itemLine = $singleItemName
+            ? '<div style="font-size:7px; font-weight:700; color:#475569; margin-top:1px; text-transform:uppercase;">'.e($singleItemName).'</div>'
+            : '';
 
         $logoImg = $logo
             ? '<img src="'.e($logo).'" style="width:20px;height:20px;object-fit:contain;margin-right:6px;">'
@@ -796,7 +798,8 @@ class FestReportService
                     {$logoImg}
                     <div>
                         <div style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase;">{$orgName}</div>
-                        <div style="font-size:7px; color:#475569; margin-top:1px;">{$context}</div>
+                        <div style="font-size:8px; font-weight:600; color:#334155; margin-top:2px;">{$eventTitle}</div>
+                        {$itemLine}
                     </div>
                 </div>
                 <div style="background:#0f172a; color:#fff; padding:3px 8px; border-radius:3px; font-size:7px; font-weight:bold; letter-spacing:0.3px;">ATTENDANCE SHEET</div>

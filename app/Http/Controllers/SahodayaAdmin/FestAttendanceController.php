@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
-use App\Support\FestPageActivity;
 use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestParticipant;
-use App\Models\FestRegistration;
 use App\Services\Audit\PlatformAuditLogger;
-use App\Services\Events\FestNumberingService;
-use Illuminate\Http\Request;
 use App\Services\Events\FestAttendanceImportService;
+use App\Services\Events\FestNumberingService;
+use App\Support\FestPageActivity;
+use Illuminate\Http\Request;
 
 class FestAttendanceController extends SahodayaAdminController
 {
@@ -18,7 +17,9 @@ class FestAttendanceController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $event->load('items');
+        $event->load([
+            'items' => fn ($query) => $query->where('is_enabled', true),
+        ]);
 
         // For sports season events (parent hub), registrations live under
         // child events — filtering by event_id alone returns nothing.
@@ -26,7 +27,8 @@ class FestAttendanceController extends SahodayaAdminController
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $eventIds)
-            ->whereNotIn('status', ['rejected', 'withdrawn']))
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->whereHas('item', fn ($itemQuery) => $itemQuery->where('is_enabled', true)))
             // Exclude unfilled standby slots and any row with no actual person
             // attached (student_id/teacher_id both null) — these aren't real
             // attendees and were showing up as blank rows with no name.
@@ -49,9 +51,9 @@ class FestAttendanceController extends SahodayaAdminController
             ->keyBy(fn ($a) => $a->item_id.'-'.$a->participant_id);
 
         return $this->inertia('Sahodaya/Events/Attendance', $this->withEventActivity($event, FestPageActivity::ATTENDANCE, [
-            'event'        => $event,
+            'event' => $event,
             'participants' => $participants,
-            'attendance'   => $attendance,
+            'attendance' => $attendance,
         ]));
     }
 
@@ -66,9 +68,9 @@ class FestAttendanceController extends SahodayaAdminController
         }
 
         $data = $request->validate([
-            'item_id'        => 'required|exists:fest_event_items,id',
+            'item_id' => 'required|exists:fest_event_items,id',
             'participant_id' => 'required|exists:fest_participants,id',
-            'status'         => 'required|in:present,absent',
+            'status' => 'required|in:present,absent',
         ]);
 
         // Cross-scope validation: verify the participant belongs to this event (or
@@ -83,8 +85,8 @@ class FestAttendanceController extends SahodayaAdminController
             FestAttendance::updateOrCreate(
                 ['item_id' => $data['item_id'], 'participant_id' => $participantId],
                 [
-                    'event_id'  => $event->id,
-                    'status'    => $data['status'],
+                    'event_id' => $event->id,
+                    'status' => $data['status'],
                     'marked_by' => $request->user()->id,
                     'marked_at' => now(),
                 ]
@@ -93,9 +95,9 @@ class FestAttendanceController extends SahodayaAdminController
 
         $audit->festEvent($event, FestPageActivity::ATTENDANCE, 'fest.attendance.saved', 'Attendance saved', [
             'participant_id' => $data['participant_id'],
-            'item_id'        => $data['item_id'],
-            'status'         => $data['status'],
-            'team_size'      => count($participantIds),
+            'item_id' => $data['item_id'],
+            'status' => $data['status'],
+            'team_size' => count($participantIds),
         ]);
 
         return back()->with('success', 'Attendance saved.');
@@ -127,10 +129,10 @@ class FestAttendanceController extends SahodayaAdminController
     private function bulkStore(Request $request, FestEvent $event, array $eventIds, PlatformAuditLogger $audit)
     {
         $data = $request->validate([
-            'item_id'         => 'required|exists:fest_event_items,id',
+            'item_id' => 'required|exists:fest_event_items,id',
             'participant_ids' => 'required|array|min:1',
             'participant_ids.*' => 'exists:fest_participants,id',
-            'status'          => 'required|in:present,absent',
+            'status' => 'required|in:present,absent',
         ]);
 
         // Cross-scope validation for bulk: verify all participants belong to this event (or child events) and item.
@@ -152,8 +154,8 @@ class FestAttendanceController extends SahodayaAdminController
             FestAttendance::updateOrCreate(
                 ['item_id' => $data['item_id'], 'participant_id' => $participantId],
                 [
-                    'event_id'  => $event->id,
-                    'status'    => $data['status'],
+                    'event_id' => $event->id,
+                    'status' => $data['status'],
                     'marked_by' => $request->user()->id,
                     'marked_at' => now(),
                 ]
@@ -161,9 +163,9 @@ class FestAttendanceController extends SahodayaAdminController
         }
 
         $audit->festEvent($event, FestPageActivity::ATTENDANCE, 'fest.attendance.bulk_saved', count($data['participant_ids']).' attendance record(s) saved', [
-            'count'   => count($data['participant_ids']),
+            'count' => count($data['participant_ids']),
             'item_id' => $data['item_id'],
-            'status'  => $data['status'],
+            'status' => $data['status'],
         ]);
 
         return back()->with('success', count($data['participant_ids']).' attendance record(s) saved.');
@@ -195,7 +197,7 @@ class FestAttendanceController extends SahodayaAdminController
 
         $audit->festEvent($event, FestPageActivity::ATTENDANCE, 'fest.attendance.imported', "Imported {$result['imported']} attendance record(s)", [
             'imported' => $result['imported'],
-            'skipped'  => $result['skipped'],
+            'skipped' => $result['skipped'],
         ]);
 
         $message = "Imported {$result['imported']} attendance record(s).";

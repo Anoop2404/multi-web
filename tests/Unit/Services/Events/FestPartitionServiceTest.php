@@ -3,8 +3,11 @@
 namespace Tests\Unit\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
+use App\Models\FestEventSchoolPartition;
 use App\Models\Tenant;
 use App\Services\Events\FestPartitionService;
+use App\Services\Events\FestRegistrationRouterService;
 use Database\Seeders\SahodayaMasterDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -96,5 +99,62 @@ class FestPartitionServiceTest extends TestCase
         $service = app(FestPartitionService::class);
 
         $this->assertFalse($service->shouldCombineAtFinale($hub));
+    }
+
+    public function test_english_fest_copies_on_stage_group_items_to_region_and_routes_there(): void
+    {
+        $sahodaya = $this->sahodaya();
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'parent_id' => $sahodaya->id,
+            'type' => 'school',
+            'name' => 'English Fest School',
+            'domain' => 'english-fest-school.test',
+            'is_active' => true,
+        ]);
+        $hub = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'English Fest',
+            'event_type' => 'english_fest',
+            'conductor_level' => 'sahodaya',
+            'conduct_mode' => 'partitioned',
+            'level_round' => 'sahodaya',
+            'status' => 'registration_open',
+        ]);
+        $item = FestEventItem::create([
+            'event_id' => $hub->id,
+            'title' => 'Choral Reading',
+            'item_code' => 'EF104',
+            'stage_type' => 'on_stage',
+            'participant_type' => 'group',
+            'min_group_size' => 10,
+            'max_group_size' => 12,
+            'max_per_school' => 1,
+            'is_enabled' => true,
+        ]);
+
+        $region = app(FestPartitionService::class)->spawnPartition($hub, [
+            'title' => 'Tirur Region',
+            'partition_key' => 'tirur',
+            'partition_role' => 'region',
+        ]);
+        FestEventSchoolPartition::create([
+            'event_id' => $hub->id,
+            'school_id' => $school->id,
+            'partition_key' => 'tirur',
+            'assigned_at' => now(),
+        ]);
+
+        $this->assertDatabaseHas('fest_event_items', [
+            'event_id' => $region->id,
+            'inherited_from_item_id' => $item->id,
+            'item_code' => 'EF104',
+        ]);
+        $this->assertSame(
+            $region->id,
+            app(FestRegistrationRouterService::class)
+                ->resolveTargetEvent($hub, $item, $school->id)
+                ->id,
+        );
     }
 }

@@ -117,7 +117,7 @@ class FestItemSyncService
         $count = 0;
 
         foreach ($hub->items as $item) {
-            if (! $this->itemEnabledForPartition($item, $partitionRole)) {
+            if (! $this->itemEnabledForPartition($hub, $item, $partitionRole)) {
                 continue;
             }
 
@@ -139,22 +139,32 @@ class FestItemSyncService
         return $count;
     }
 
-    private function itemEnabledForPartition(FestEventItem $item, string $partitionRole): bool
+    private function itemEnabledForPartition(
+        FestEvent $hub,
+        FestEventItem $item,
+        string $partitionRole,
+    ): bool
     {
         $criteria = $item->criteria_json ?? [];
         $roles = $criteria['partition_roles'] ?? null;
 
-        if ($roles === null) {
-            return match ($partitionRole) {
-                'region', 'cluster' => ($item->stage_type ?? '') === 'off_stage'
-                    && ! in_array($item->participant_type, ['group', 'team'], true),
-                'finale' => ($item->stage_type ?? '') === 'on_stage'
-                    || in_array($item->participant_type, ['group', 'team'], true),
-                default => true,
-            };
+        if ($roles !== null) {
+            return in_array($partitionRole, (array) $roles, true);
         }
 
-        return in_array($partitionRole, (array) $roles, true);
+        // A region-based English Fest conducts its complete catalogue in each
+        // region. Do not inherit Kalotsav's implicit off-stage/on-stage split.
+        if ($hub->event_type === 'english_fest') {
+            return in_array($partitionRole, ['region', 'cluster'], true);
+        }
+
+        return match ($partitionRole) {
+            'region', 'cluster' => ($item->stage_type ?? '') === 'off_stage'
+                && ! in_array($item->participant_type, ['group', 'team'], true),
+            'finale' => ($item->stage_type ?? '') === 'on_stage'
+                || in_array($item->participant_type, ['group', 'team'], true),
+            default => true,
+        };
     }
 
     private function maxPerSchoolForPartition(FestEventItem $item, string $partitionRole): int

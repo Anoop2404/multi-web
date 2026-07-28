@@ -94,7 +94,7 @@
             text-align: left;
         }
         td {
-            padding: 5px 6px;
+            padding: 8px 7px;
             border: 1px solid #cbd5e1;
             font-size: 9px;
             color: #1e293b;
@@ -141,18 +141,18 @@
             margin-top: 1px;
         }
         .photo-cell {
-            width: 32px;
+            width: 40px;
         }
         .photo-cell img {
-            width: 28px;
-            height: 28px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             object-fit: cover;
             border: 1px solid #e2e8f0;
         }
         .photo-cell .initials {
-            width: 28px;
-            height: 28px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             background: #e2e8f0;
             color: #64748b;
@@ -160,7 +160,7 @@
             font-weight: bold;
             display: inline-block;
             text-align: center;
-            line-height: 28px;
+            line-height: 36px;
         }
         .item-heading-bar {
             background: #0f172a;
@@ -188,6 +188,11 @@
         .brand-row td, .foot-row td {
             border: none;
             padding: 0 0 6px;
+        }
+        .item-title-row td {
+            border: none;
+            padding: 4px 0 0;
+            background: #ffffff;
         }
         .foot-row td {
             padding: 4px 0 0;
@@ -281,8 +286,30 @@
 @endif
 
 <main>
-@forelse($rowsByItem as $itemName => $rows)
+@php
+    // DomPDF is most reliable when each physical page is an explicit, standalone
+    // table. Chunking prevents continuation pages from losing their organization,
+    // event, item, and column headings when a long table crosses a page boundary.
+    $reportSections = collect($rowsByItem)->flatMap(function ($itemRows, $itemName) use ($isPreview, $isDomPdf) {
+        $allRows = collect($itemRows)->values();
+        $chunks = empty($isPreview) && ($isDomPdf ?? true)
+            ? $allRows->chunk(15)
+            : collect([$allRows]);
+
+        return $chunks->values()->map(fn ($chunk, $chunkIndex) => [
+            'itemName' => $itemName,
+            'rows' => $chunk->values()->all(),
+            'allRows' => $allRows->all(),
+            'offset' => $chunkIndex * 15,
+        ]);
+    })->values();
+@endphp
+@forelse($reportSections as $sectionIndex => $section)
     @php
+        $itemName = $section['itemName'];
+        $rows = $section['rows'];
+        $allRows = $section['allRows'];
+        $serialOffset = $section['offset'];
         $cleanTitle = str_replace('_', ' ', $itemName);
         $showDob = collect($rows)->contains(fn ($row) => !empty($row['_uses_age']));
         $showClass = !$showDob && collect($rows)->contains(fn ($row) => !empty($row['_uses_class']));
@@ -291,7 +318,7 @@
         // Team-based items (chess, quiz, group items, sports team events, etc.) group
         // several members under one chest/registration; count teams for those instead
         // of raw row count so the badge reads "56 Teams" rather than "223 Participants".
-        $teamKeys = collect($rows)->map(function ($r) {
+        $teamKeys = collect($allRows)->map(function ($r) {
             if (!empty($r['group_id'])) {
                 return 'g_'.$r['group_id'];
             }
@@ -301,41 +328,41 @@
             return null;
         })->filter()->unique();
         $teamCount = $teamKeys->count();
-        $individualCount = collect($rows)->filter(fn ($r) => empty($r['group_id']) && empty($r['team_name']))->count();
+        $individualCount = collect($allRows)->filter(fn ($r) => empty($r['group_id']) && empty($r['team_name']))->count();
 
         if ($teamCount > 0 && $individualCount === 0) {
             $countLabel = $teamCount.' '.($teamCount === 1 ? 'Team' : 'Teams');
         } elseif ($teamCount > 0) {
-            $countLabel = $teamCount.' '.($teamCount === 1 ? 'Team' : 'Teams').' &middot; '.count($rows).' '.(count($rows) === 1 ? 'Participant' : 'Participants');
+            $countLabel = $teamCount.' '.($teamCount === 1 ? 'Team' : 'Teams').' &middot; '.count($allRows).' '.(count($allRows) === 1 ? 'Participant' : 'Participants');
         } else {
-            $countLabel = count($rows).' '.(count($rows) === 1 ? 'Participant' : 'Participants');
+            $countLabel = count($allRows).' '.(count($allRows) === 1 ? 'Participant' : 'Participants');
         }
     @endphp
-    <div style="margin-bottom: 16px;">
+    <div style="margin-bottom: 18px; @if(empty($isPreview) && ($isDomPdf ?? true) && $sectionIndex > 0) page-break-before: always; @endif">
+        @if(empty($isPreview) && ($isDomPdf ?? true))
+        <div class="report-header">
+            <table class="brand-cell-table">
+                <tr>
+                    @if(!empty($logo))
+                        <td class="logo-cell"><img src="{{ $logo }}" alt=""></td>
+                    @endif
+                    <td class="org-cell">
+                        <div class="org-name">{{ $sahodaya->name ?? 'SAHODAYA' }}</div>
+                        <div class="org-context">{{ $event->title }}</div>
+                    </td>
+                    <td class="doc-badge-cell"><span class="doc-badge">ATTENDANCE SHEET</span></td>
+                </tr>
+            </table>
+        </div>
+        @endif
+        @if(!empty($isPreview) || ($isDomPdf ?? true) || empty($singleItemName))
         <div class="item-heading-bar">
             {{ $cleanTitle }}
             <span class="count-badge">{!! $countLabel !!}</span>
         </div>
+        @endif
         <table>
             <thead>
-                @if(empty($isPreview) && ($isDomPdf ?? true))
-                <tr class="brand-row">
-                    <td colspan="{{ $colspan }}">
-                        <table class="brand-cell-table">
-                            <tr>
-                                @if(!empty($logo))
-                                    <td class="logo-cell"><img src="{{ $logo }}" alt=""></td>
-                                @endif
-                                <td class="org-cell">
-                                    <div class="org-name">{{ $sahodaya->name ?? 'SAHODAYA' }}</div>
-                                    <div class="org-context">{{ $event->title }} &bull; {{ $cleanTitle }}</div>
-                                </td>
-                                <td class="doc-badge-cell"><span class="doc-badge">ATTENDANCE SHEET</span></td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-                @endif
                 <tr>
                     <th style="width: 28px;" class="text-center">Sl</th>
                     <th class="photo-cell"></th>
@@ -377,7 +404,7 @@
                     @endif
 
                     <tr>
-                        <td class="text-center">{{ $i + 1 }}</td>
+                        <td class="text-center">{{ $serialOffset + $i + 1 }}</td>
                         <td class="photo-cell text-center">
                             @if(!empty($row['photo_url']))
                                 <img src="{{ $row['photo_url'] }}" alt="">
@@ -402,21 +429,12 @@
                     </tr>
                 @endforeach
             </tbody>
-            @if(empty($isPreview) && ($isDomPdf ?? true))
-            <tfoot>
-                <tr class="foot-row">
-                    <td colspan="{{ $colspan }}">
-                        <table class="foot-cell-table">
-                            <tr>
-                                <td class="foot-left">{{ $sahodaya->name ?? 'SAHODAYA' }} &bull; {{ $event->title }} &bull; Generated {{ now()->format('d M Y, h:i A') }}</td>
-                                <td class="foot-right">Page {PAGE_NUM} of {PAGE_COUNT}</td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </tfoot>
-            @endif
         </table>
+        @if(empty($isPreview) && ($isDomPdf ?? true))
+        <div class="footer-container" style="margin-top: 7px;">
+            <span class="footer-left">{{ $sahodaya->name ?? 'SAHODAYA' }} &bull; {{ $event->title }} &bull; Generated {{ now()->format('d M Y, h:i A') }}</span>
+        </div>
+        @endif
     </div>
 @empty
     <p style="text-align: center; margin-top: 40px; color: #64748b;">No participants to display.</p>

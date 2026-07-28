@@ -52,8 +52,30 @@ class SahodayaAttendancePresentationTest extends TestCase
         $this->assertStringContainsString('data:image/jpeg;base64,photo', $html);
     }
 
+    public function test_dompdf_attendance_header_is_in_the_required_order_without_literal_page_tokens(): void
+    {
+        $html = $this->renderAttendanceSheet([
+            '_uses_age' => true,
+            '_uses_class' => false,
+            'dob' => '10 Jun 2012',
+            'class' => '8 A',
+        ], true);
+
+        $sahodayaPosition = strpos($html, 'Demo Sahodaya');
+        $eventPosition = strpos($html, 'Demo Fest', $sahodayaPosition);
+        $itemPosition = strpos($html, 'Sample Item', $eventPosition);
+
+        $this->assertIsInt($sahodayaPosition);
+        $this->assertIsInt($eventPosition);
+        $this->assertIsInt($itemPosition);
+        $this->assertLessThan($eventPosition, $sahodayaPosition);
+        $this->assertLessThan($itemPosition, $eventPosition);
+        $this->assertStringNotContainsString('{PAGE_NUM}', $html);
+        $this->assertStringNotContainsString('{PAGE_COUNT}', $html);
+    }
+
     /** @param array<string, mixed> $eligibility */
-    private function renderAttendanceSheet(array $eligibility): string
+    private function renderAttendanceSheet(array $eligibility, bool $isDomPdf = false): string
     {
         $row = array_merge([
             'reference' => '101',
@@ -73,7 +95,7 @@ class SahodayaAttendancePresentationTest extends TestCase
             'audience' => 'staff',
             'isPreview' => false,
             'singleItemName' => 'Sample Item',
-            'isDomPdf' => false,
+            'isDomPdf' => $isDomPdf,
         ])->render();
     }
 }

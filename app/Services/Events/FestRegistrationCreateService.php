@@ -43,12 +43,36 @@ class FestRegistrationCreateService
         $router = app(FestRegistrationRouterService::class);
         $targetEvent = $router->resolveTargetEvent($event, $item, $school->id);
         if ($targetEvent->id !== $event->id) {
-            $item = FestEventItem::where('event_id', $targetEvent->id)
+            $targetItem = FestEventItem::where('event_id', $targetEvent->id)
                 ->where(function ($q) use ($item) {
                     $q->where('inherited_from_item_id', $item->id)
                         ->orWhere('item_code', $item->item_code);
                 })
-                ->firstOrFail();
+                ->first();
+
+            // Heal regional children created before their hub catalogue was complete.
+            // A missing inherited item used to escape as a generic 404/Inertia modal.
+            if (! $targetItem) {
+                app(FestItemSyncService::class)->copyItemsToPartition(
+                    $event,
+                    $targetEvent,
+                    $targetEvent->partition_role ?? 'region',
+                );
+                $targetItem = FestEventItem::where('event_id', $targetEvent->id)
+                    ->where(function ($q) use ($item) {
+                        $q->where('inherited_from_item_id', $item->id)
+                            ->orWhere('item_code', $item->item_code);
+                    })
+                    ->first();
+            }
+
+            if (! $targetItem) {
+                throw ValidationException::withMessages([
+                    'registration' => 'This item is not configured for your region. Ask the Sahodaya administrator to sync regional items.',
+                ]);
+            }
+
+            $item = $targetItem;
             $event = $targetEvent;
         }
 

@@ -87,7 +87,29 @@ class PdfGenerator
         if ($isLandscape) {
             $pdf->setPaper('A4', 'landscape');
         }
-        
+
+        // DomPDF does not replace {PAGE_NUM}/{PAGE_COUNT} tokens written inside
+        // ordinary HTML. When a caller supplied a footer template (the Chromium
+        // path's signal that page furniture is required), draw the real page count
+        // directly on DomPDF's canvas instead.
+        if ($footerTemplate !== null) {
+            $pdf->render();
+
+            $domPdf = $pdf->getDomPDF();
+            $canvas = $domPdf->getCanvas();
+            $font = $domPdf->getFontMetrics()->getFont('DejaVu Sans', 'normal');
+            $label = 'Page {PAGE_NUM} of {PAGE_COUNT}';
+            $fontSize = 7;
+            $canvas->page_text(
+                max(38, $canvas->get_width() - 105),
+                $canvas->get_height() - 28,
+                $label,
+                $font,
+                $fontSize,
+                [0.39, 0.45, 0.55],
+            );
+        }
+
         return $inline ? $pdf->stream($filename) : $pdf->download($filename);
     }
 }

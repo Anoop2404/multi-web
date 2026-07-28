@@ -25,13 +25,13 @@
 
         <div v-if="schoolRegion?.applies" class="mb-5 max-w-2xl">
             <div v-if="schoolRegion.region" class="notice-banner notice-banner--info text-sm">
-                <p>Your Kalotsav region: <strong>{{ schoolRegion.region }}</strong>.
+                <p>Your {{ programLabel }} region: <strong>{{ schoolRegion.region }}</strong>.
                     <a :href="schoolRegion.set_url" class="link-brand font-semibold">Change →</a>
                 </p>
             </div>
             <div v-else class="notice-banner notice-banner--warning text-sm">
-                <p class="font-semibold">Select your Kalotsav region</p>
-                <p class="mt-1">Your Sahodaya runs Kalotsav by region. Choose your region in
+                <p class="font-semibold">Select your {{ programLabel }} region</p>
+                <p class="mt-1">Your Sahodaya runs {{ programLabel }} by region. Choose your region in
                     <a :href="schoolRegion.set_url" class="link-brand font-semibold">annual registration →</a>
                     (or ask your Sahodaya to assign it).
                 </p>

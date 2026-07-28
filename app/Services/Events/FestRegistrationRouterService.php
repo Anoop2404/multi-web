@@ -28,7 +28,7 @@ class FestRegistrationRouterService
         }
 
         $partitionKey = $this->schoolPartitions->requireAssignment($hub, $schoolId);
-        $role = $this->targetPartitionRole($item);
+        $role = $this->targetPartitionRole($hub, $item);
 
         if ($role === 'finale') {
             $finale = $this->partitions->partitions($hub)
@@ -65,14 +65,23 @@ class FestRegistrationRouterService
         return $key ? $this->partitions->partitionLabel($hub, $key) : null;
     }
 
-    private function targetPartitionRole(FestEventItem $item): string
+    private function targetPartitionRole(FestEvent $hub, FestEventItem $item): string
     {
         $criteria = $item->criteria_json ?? [];
         if (! empty($criteria['partition_roles'])) {
             $roles = (array) $criteria['partition_roles'];
-            if (in_array('finale', $roles, true) || in_array('district', $roles, true)) {
-                return 'finale';
-            }
+
+            return in_array('finale', $roles, true) || in_array('district', $roles, true)
+                ? 'finale'
+                : 'region';
+        }
+
+        // English Fest's regional topology conducts every item inside the school's
+        // assigned region. The on-stage/group split below belongs to the Kalotsav
+        // region + common-finale topology and made most English Fest items resolve
+        // to a non-existent finale item.
+        if ($hub->event_type === 'english_fest') {
+            return 'region';
         }
 
         if (($item->stage_type ?? '') === 'on_stage') {

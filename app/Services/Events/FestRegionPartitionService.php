@@ -74,17 +74,18 @@ class FestRegionPartitionService
         return Str::slug($region->code ?: $region->name);
     }
 
-    /**
-     * Block Kalotsav registration until a school has picked/been assigned a region,
-     * but only when the Sahodaya actually runs Kalotsav by region.
-     */
+    /** Block regional registration until the school has a membership region. */
     public function assertRegionSelected(FestEvent $event, Tenant $school): void
     {
-        if (($event->conduct_mode ?? 'standard') !== 'partitioned' && ! in_array($event->event_type, ['kalolsavam', 'sports', 'english_fest', 'science_fest', 'kids_fest', 'teacher_fest'], true)) {
+        $hub = $event->parent_event_id
+            ? FestEvent::find($event->parent_event_id) ?? $event
+            : $event;
+
+        if ($this->partitions->conductMode($hub) !== 'partitioned') {
             return;
         }
 
-        $sahodayaId = $event->tenant_id;
+        $sahodayaId = $hub->tenant_id;
         if (! $this->regionsApply($sahodayaId)) {
             return;
         }
@@ -119,8 +120,9 @@ class FestRegionPartitionService
             $key = $this->partitionKeyForRegion($region);
             $keyByRegionId[$region->id] = $key;
 
-            if (! $this->partitions->partitionByKey($hub, $key)) {
-                $this->partitions->spawnPartition($hub, [
+            $partition = $this->partitions->partitionByKey($hub, $key);
+            if (! $partition) {
+                $partition = $this->partitions->spawnPartition($hub, [
                     'title'          => $region->name,
                     'partition_key'  => $key,
                     'cluster_label'  => $region->name,
@@ -128,6 +130,11 @@ class FestRegionPartitionService
                 ]);
                 $created++;
             }
+
+            // Re-sync existing children too. This repairs partitions created before
+            // catalogue import and older English Fest children that only received
+            // off-stage individual items.
+            app(FestItemSyncService::class)->copyItemsToPartition($hub, $partition, 'region');
         }
 
         $year = AcademicYear::forSahodaya($hub->tenant_id);
