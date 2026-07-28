@@ -30,7 +30,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="r in registrations" :key="r.id" class="border-t">
+                    <tr v-for="r in registrations.data" :key="r.id" class="border-t">
                         <td class="p-3 font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
                         <td class="p-3">{{ r.student?.name }}</td>
                         <td class="p-3 text-xs text-gray-500">{{ r.school?.name }}</td>
@@ -57,25 +57,27 @@
                             <button v-else @click="save(r)" class="text-xs font-semibold text-indigo-600">Save</button>
                         </td>
                     </tr>
-                    <tr v-if="!registrations.length">
+                    <tr v-if="!registrations.data?.length">
                         <td colspan="6" class="p-6 text-center text-gray-400">No registrations.</td>
                     </tr>
                 </tbody>
             </table>
+            <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total }" />
         </div>
     </PortalLayout>
 </template>
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 
-const props = defineProps({ sahodaya: Object, exam: Object, registrations: Array, isTrustedReviewer: { type: Boolean, default: false } });
+const props = defineProps({ sahodaya: Object, exam: Object, registrations: Object, isTrustedReviewer: { type: Boolean, default: false } });
 const csvFile = ref(null);
 const forms = reactive({});
-for (const r of props.registrations) {
+for (const r of props.registrations.data ?? []) {
     forms[r.id] = { attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' };
 }
 
@@ -102,4 +104,3 @@ function importCsv() {
 
 const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id));
 </script>
-

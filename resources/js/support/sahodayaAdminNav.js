@@ -155,6 +155,7 @@ export function sahodayaMembershipScopedNav(sahodayaId, options = {}) {
                 { label: 'Subject Master', href: `${base}/board-results/masters`, icon: 'layers' },
                 { label: 'Membership reports', href: `${base}/membership/reports`, icon: 'bar-chart' },
                 { label: 'Program calendar', href: `${base}/calendar`, icon: 'calendar' },
+                { label: 'Activity log', href: `${base}/audit-logs`, icon: 'file-text' },
                 { label: 'Login audit', href: `${base}/auth/login-audit`, icon: 'shield' },
             ],
         },

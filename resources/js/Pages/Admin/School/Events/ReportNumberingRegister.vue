@@ -11,7 +11,7 @@
         <div class="card overflow-hidden p-0">
             <table class="data-table text-sm">
                 <thead>
-                    <tr><th>Head</th><th>Item</th><th>Participant</th><th>Reg no</th><th>Status</th><th>Fest ID</th><th>Item reg</th><th>Chest</th></tr>
+                    <tr><th>Head</th><th>Item</th><th>Participant</th><th>Admission No</th><th>Status</th><th>Fest ID</th><th>Item reg</th><th>Chest</th></tr>
                 </thead>
                 <tbody>
                     <tr v-for="row in rows.data" :key="row.participant_id">

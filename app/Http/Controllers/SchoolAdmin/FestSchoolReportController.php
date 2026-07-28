@@ -170,7 +170,7 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no']);
+        $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'admission_number']);
 
         [$itemsByStudent, $marksByStudent] = $this->studentWiseLookups($event);
 
@@ -178,7 +178,7 @@ class FestSchoolReportController extends SchoolAdminController
             $marks = $marksByStudent->get($student->id) ?? collect();
 
             return [
-                'student'       => $student->only(['id', 'name', 'reg_no']),
+                'student'       => $student->only(['id', 'name', 'admission_number']),
                 'registrations' => ($itemsByStudent->get($student->id) ?? collect())->values(),
                 'total_score'   => $marks->sum('score'),
                 'results'       => $marks->map(fn ($m) => [
@@ -269,7 +269,7 @@ class FestSchoolReportController extends SchoolAdminController
                 ->where('school_id', $this->school->id)
                 ->where('item_id', $itemId)
                 ->active())
-                ->with(['student', 'teacher', 'mark'])
+                ->with(['student:id,name,admission_number,school_class_id', 'student.schoolClass:id,name', 'teacher:id,name,reg_no', 'mark'])
                 ->get();
         }
 
@@ -385,6 +385,32 @@ class FestSchoolReportController extends SchoolAdminController
         return [$itemsByTeacher, $marksByTeacher];
     }
 
+    /** @param array<int, array<string, mixed>> $rows */
+    private function rowsWithAdmissionNumbers(array $rows): array
+    {
+        $studentIds = collect($rows)
+            ->pluck('student_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($studentIds->isEmpty()) {
+            return $rows;
+        }
+
+        $admissionNumbers = Student::where('tenant_id', $this->school->id)
+            ->whereIn('id', $studentIds)
+            ->pluck('admission_number', 'id');
+
+        return array_map(function (array $row) use ($admissionNumbers) {
+            if (isset($row['student_id']) && array_key_exists($row['student_id'], $admissionNumbers->all())) {
+                $row['reg_no'] = $admissionNumbers[$row['student_id']] ?: null;
+            }
+
+            return $row;
+        }, $rows);
+    }
+
     public function exportStudentWise(Request $request, string $tenantId, FestEvent $event, string $program)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
@@ -393,13 +419,13 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($event, $itemsByStudent, $marksByStudent) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Reg No', 'Name', 'Items', 'Total Score', 'Results']);
-            $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no']);
+            fputcsv($out, ['Admission No', 'Name', 'Items', 'Total Score', 'Results']);
+            $students = \App\Models\Student::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'admission_number']);
             foreach ($students as $student) {
                 $items = ($itemsByStudent->get($student->id) ?? collect())->filter()->implode('; ');
                 $marks = $marksByStudent->get($student->id) ?? collect();
                 $results = $marks->map(fn ($m) => ($m->item?->title ?? '').':'.($m->grade ?? $m->position ?? $m->score))->implode('; ');
-                fputcsv($out, [$student->reg_no, $student->name, $items, $marks->sum('score'), $results]);
+                fputcsv($out, [$student->admission_number, $student->name, $items, $marks->sum('score'), $results]);
             }
             fclose($out);
         }, "{$event->id}-student-wise.csv", ['Content-Type' => 'text/csv']);
@@ -437,19 +463,19 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($event, $eventIds, $itemId, $item) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Item', 'Participant', 'Reg No', 'Class', 'Fest ID', 'Item reg', 'Chest', 'Grade', 'Position', 'Score']);
+            fputcsv($out, ['Item', 'Participant', 'Admission No', 'Class', 'Fest ID', 'Item reg', 'Chest', 'Grade', 'Position', 'Score']);
             $participants = FestParticipant::whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $eventIds)
                 ->where('school_id', $this->school->id)
                 ->where('item_id', $itemId)
                 ->active())
-                ->with(['student.schoolClass', 'teacher', 'mark'])
+                ->with(['student:id,name,admission_number,school_class_id', 'student.schoolClass:id,name', 'teacher:id,name,reg_no', 'mark'])
                 ->get();
             foreach ($participants as $p) {
                 fputcsv($out, [
                     $item->title,
                     $p->student?->name ?? $p->teacher?->name,
-                    $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    $p->student?->admission_number ?? $p->teacher?->reg_no ?? '',
                     $p->student?->schoolClass?->name,
                     $p->level_registration_number,
                     $p->item_registration_number,
@@ -485,7 +511,7 @@ class FestSchoolReportController extends SchoolAdminController
             ->get()
             ->map(fn (FestParticipant $p) => [
                 'participant' => $p->student?->name ?? $p->teacher?->name,
-                'reg_no'      => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                'reg_no'      => $p->student?->admission_number ?? $p->teacher?->reg_no ?? '',
                 'class'       => $p->student?->schoolClass?->name,
                 'fest_id'     => $p->level_registration_number,
                 'item_reg'    => $p->item_registration_number,
@@ -889,7 +915,7 @@ class FestSchoolReportController extends SchoolAdminController
                 'event'        => $event->only('id', 'title', 'status', 'event_start', 'event_end', 'venue', 'results_published', 'schedule_published'),
                 'eventMeta'    => FestEventMeta::reportSnapshot($event),
                 'summary'      => $analytics->headRegistrationSummary(),
-                'rows'         => $analytics->headWiseParticipantRows($headId),
+                'rows'         => $this->rowsWithAdmissionNumbers($analytics->headWiseParticipantRows($headId)),
                 'filterHeadId' => $headId,
                 'filterItemId' => $request->integer('item_id') ?: null,
                 'pdfUrl'       => "{$base}/head-wise/pdf".($exportQuery ? "?{$exportQuery}" : ''),
@@ -1314,7 +1340,7 @@ class FestSchoolReportController extends SchoolAdminController
                 'school'       => $this->school->only('id', 'name'),
                 'event'        => $event->only('id', 'title', 'status', 'event_start', 'event_end', 'venue', 'results_published', 'schedule_published'),
                 'eventMeta'    => FestEventMeta::reportSnapshot($event),
-                'rows'         => $analytics->attendanceRows($headId, $itemId),
+                'rows'         => $this->rowsWithAdmissionNumbers($analytics->attendanceRows($headId, $itemId)),
                 'filterHeadId' => $headId,
                 'filterItemId' => $itemId,
                 'pdfUrl'       => "{$base}/attendance-sheet".($exportQuery ? "?{$exportQuery}" : ''),
@@ -1348,7 +1374,7 @@ class FestSchoolReportController extends SchoolAdminController
                 'school'       => $this->school->only('id', 'name'),
                 'event'        => $event->only('id', 'title', 'status', 'results_published', 'schedule_published'),
                 'eventMeta'    => FestEventMeta::reportSnapshot($event),
-                'results'      => $analytics->publishedResultsRows($headId, $itemId),
+                'results'      => $this->rowsWithAdmissionNumbers($analytics->publishedResultsRows($headId, $itemId)),
                 'filterHeadId' => $headId,
                 'filterItemId' => $itemId,
                 'pdfUrl'       => "{$base}/export/school-wise".($exportQuery ? "?{$exportQuery}" : ''),

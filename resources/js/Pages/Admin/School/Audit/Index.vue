@@ -1,43 +1,38 @@
 <template>
-    <AdminLayout title="Audit Log">
+    <SchoolAdminLayout title="Activity log" :school="school" :show-header-title="false">
         <PageHeader
-            title="Platform audit log"
+            title="School activity log"
             eyebrow="Security & compliance"
-            description="Detailed activity across authentication, membership, fest operations, MCQ, training, and platform admin actions."
+            description="Detailed change history for students, teachers, membership records, board results, and other school actions."
         >
             <template #actions>
                 <a :href="exportUrl" class="btn-secondary text-sm">Export CSV ↓</a>
             </template>
         </PageHeader>
 
-        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
-            <button v-for="(label, key) in categories" :key="key" type="button"
+        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
+            <button v-for="(count, key) in logNameSummary" :key="key" type="button"
                     class="card card--muted text-left !py-3 transition hover:border-[#6366f1]/40"
-                    :class="localFilters.category === key ? 'ring-2 ring-[#6366f1]/30 border-[#6366f1]/40' : ''"
-                    @click="toggleCategory(key)">
-                <p class="text-xs uppercase font-bold text-slate-500 tracking-wide">{{ label }}</p>
-                <p class="text-2xl font-bold text-slate-900 mt-1">{{ summary[key] ?? 0 }}</p>
+                    :class="localFilters.log_name === key ? 'ring-2 ring-[#6366f1]/30 border-[#6366f1]/40' : ''"
+                    @click="toggleLogName(key)">
+                <p class="text-xs uppercase font-bold text-slate-500 tracking-wide">{{ labelForLogName(key) }}</p>
+                <p class="text-2xl font-bold text-slate-900 mt-1">{{ count }}</p>
             </button>
         </div>
 
         <div class="card mb-4 flex flex-wrap gap-2 items-end">
             <div>
-                <label class="form-label">Sahodaya</label>
-                <select v-model="localFilters.tenant_id" class="field text-sm min-w-[10rem]">
-                    <option value="">All Sahodayas</option>
-                    <option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option>
-                </select>
-            </div>
-            <div>
-                <label class="form-label">Category</label>
-                <select v-model="localFilters.category" class="field text-sm min-w-[10rem]">
-                    <option value="">All categories</option>
-                    <option v-for="(label, key) in categories" :key="key" :value="key">{{ label }}</option>
+                <label class="form-label">Log type</label>
+                <select v-model="localFilters.log_name" class="field text-sm min-w-[11rem]">
+                    <option value="">All logs</option>
+                    <option v-for="(count, key) in logNameSummary" :key="key" :value="key">
+                        {{ labelForLogName(key) }} ({{ count }})
+                    </option>
                 </select>
             </div>
             <div>
                 <label class="form-label">Action</label>
-                <input v-model="localFilters.action" class="field text-sm min-w-[10rem]" placeholder="e.g. login.failed">
+                <input v-model="localFilters.action" class="field text-sm min-w-[10rem]" placeholder="e.g. updated">
             </div>
             <div>
                 <label class="form-label">From</label>
@@ -49,7 +44,7 @@
             </div>
             <div class="flex-1 min-w-[12rem]">
                 <label class="form-label">Search</label>
-                <input v-model="localFilters.q" class="field text-sm w-full" placeholder="Email, IP, description…">
+                <input v-model="localFilters.q" class="field text-sm w-full" placeholder="Student, teacher, IP, description…">
             </div>
             <button type="button" class="btn-secondary text-sm" @click="clearFilters">Clear</button>
         </div>
@@ -64,34 +59,32 @@
         </div>
 
         <DetailedLogTable :logs="logs" />
-    </AdminLayout>
+    </SchoolAdminLayout>
 </template>
 
 <script setup>
 import { computed, reactive } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import DetailedLogTable from '@/Components/logs/DetailedLogTable.vue';
 
 const props = defineProps({
+    school: { type: Object, required: true },
     logs: { type: Object, default: () => ({ data: [], links: [] }) },
-    summary: { type: Object, default: () => ({}) },
+    logNameSummary: { type: Object, default: () => ({}) },
     actionSummary: { type: Object, default: () => ({}) },
     filters: { type: Object, default: () => ({}) },
-    categories: { type: Object, default: () => ({}) },
-    tenants: { type: Array, default: () => [] },
-    total: { type: Number, default: 0 },
+    exportUrl: { type: String, default: '' },
 });
 
 const localFilters = reactive({
-    category: props.filters.category ?? '',
+    log_name: props.filters.log_name ?? '',
     action: props.filters.action ?? '',
     from: props.filters.from ?? '',
     to: props.filters.to ?? '',
     q: props.filters.q ?? '',
-    tenant_id: props.filters.tenant_id ?? '',
 });
 
 const exportUrl = computed(() => {
@@ -101,11 +94,11 @@ const exportUrl = computed(() => {
     });
 
     const qs = params.toString();
-    return `/admin/audit-logs/export${qs ? `?${qs}` : ''}`;
+    return `/school-admin/${props.school.id}/audit-logs/export${qs ? `?${qs}` : ''}`;
 });
 
 function applyFilters() {
-    router.get('/admin/audit-logs', { ...localFilters }, { preserveState: true, replace: true });
+    router.get(`/school-admin/${props.school.id}/audit-logs`, { ...localFilters }, { preserveState: true, replace: true });
 }
 
 useDebouncedInertiaFilters(localFilters, applyFilters, () => props.filters);
@@ -115,13 +108,20 @@ function clearFilters() {
     applyFilters();
 }
 
-function toggleCategory(key) {
-    localFilters.category = localFilters.category === key ? '' : key;
+function toggleLogName(key) {
+    localFilters.log_name = localFilters.log_name === key ? '' : key;
     applyFilters();
 }
 
 function filterAction(action) {
     localFilters.action = action;
     applyFilters();
+}
+
+function labelForLogName(key) {
+    if (!key) return 'General';
+    return key
+        .replace(/[_-]/g, ' ')
+        .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 </script>

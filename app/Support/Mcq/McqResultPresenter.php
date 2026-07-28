@@ -40,6 +40,7 @@ class McqResultPresenter
             'score'        => $mark?->score,
             'percentage'   => $mark?->percentage,
             'grade'        => $mark?->grade,
+            'rank'         => $mark?->rank,
             'correct_count'=> $mark?->correct_count,
             'wrong_count'  => $mark?->wrong_count,
             'unanswered_count' => $mark?->unanswered_count,

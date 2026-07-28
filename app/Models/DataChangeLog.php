@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
 class DataChangeLog extends Model
@@ -17,5 +18,13 @@ class DataChangeLog extends Model
         'properties' => 'array',
     ];
 
-    public function subject() { return $this->morphTo(); }
+    public function subject()
+    {
+        return $this->morphTo();
+    }
+
+    public function causer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'causer_user_id');
+    }
 }

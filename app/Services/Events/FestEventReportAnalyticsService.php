@@ -808,7 +808,7 @@ class FestEventReportAnalyticsService
                 ->active()
                 ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
             ->with([
-                'student:id,name,reg_no',
+                'student:id,name,admission_number',
                 'teacher:id,name,reg_no',
                 'registration:id,event_id,item_id,school_id,status',
                 'registration.school:id,name',
@@ -831,7 +831,7 @@ class FestEventReportAnalyticsService
                 'school'         => $p->registration?->school?->name,
                 'school_id'      => $p->registration?->school_id,
                 'name'           => $p->student?->name ?? $p->teacher?->name,
-                'reg_no'         => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                'reg_no'         => $p->student?->admission_number ?? $p->teacher?->reg_no,
                 'reg_status'     => $p->registration?->status,
                 'role'           => $p->participant_role ?? 'performer',
                 'fest_id'        => $p->level_registration_number,

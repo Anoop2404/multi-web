@@ -34,7 +34,7 @@
                     <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Fee / student</p>
                 </div>
                 <div class="card card--muted !py-3 text-center">
-                    <p class="text-lg font-bold">{{ registerStats.available ?? 0 }}</p>
+                    <p class="text-lg font-bold">{{ availableStudentCountLabel }}</p>
                     <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Eligible to add</p>
                 </div>
                 <div class="card card--muted !py-3 text-center">
@@ -895,6 +895,11 @@ const schoolDiscountLabel = computed(() => props.exam?.school_discount_label ?? 
 const payablePerStudentLabel = computed(() => props.exam?.payable_per_student_label ?? formatRupee(props.feeBreakdown?.payable_per_student));
 
 const feeLabel = computed(() => payablePerStudentLabel.value);
+const availableStudentCountLabel = computed(() =>
+    props.registerStats?.available == null
+        ? (props.lazyLoadStudents ? '—' : 0)
+        : props.registerStats.available,
+);
 
 const batchDueLabel = computed(() => {
     const due = props.feeBreakdown?.payable_total ?? props.registerStats?.batch_due ?? props.schoolFee?.total_due ?? 0;
@@ -1006,7 +1011,10 @@ function cancelTeacher(id, name) {
 }
 
 function registerStudentById(id) {
-    router.post(`${base.value}/register`, { student_id: id }, { preserveScroll: true });
+    router.post(`${base.value}/register`, { student_id: id }, {
+        preserveScroll: true,
+        onSuccess: () => fetchEligibleStudents(),
+    });
 }
 
 function registerSelected() {
@@ -1018,6 +1026,7 @@ function registerSelected() {
         preserveScroll: true,
         onSuccess: () => {
             clearSelection();
+            fetchEligibleStudents();
         },
         onFinish: () => {
             bulkRegistering.value = false;

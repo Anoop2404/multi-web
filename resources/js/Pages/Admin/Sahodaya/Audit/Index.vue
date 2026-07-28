@@ -1,9 +1,10 @@
 <template>
-    <AdminLayout title="Audit Log">
+    <SahodayaAdminLayout title="Activity log" :sahodaya="sahodaya" :publicUrl="publicUrl"
+                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader
-            title="Platform audit log"
+            title="Sahodaya activity log"
             eyebrow="Security & compliance"
-            description="Detailed activity across authentication, membership, fest operations, MCQ, training, and platform admin actions."
+            description="Detailed log trail across Sahodaya administration, member schools, fest operations, MCQ, training, and finance."
         >
             <template #actions>
                 <a :href="exportUrl" class="btn-secondary text-sm">Export CSV ↓</a>
@@ -22,10 +23,10 @@
 
         <div class="card mb-4 flex flex-wrap gap-2 items-end">
             <div>
-                <label class="form-label">Sahodaya</label>
-                <select v-model="localFilters.tenant_id" class="field text-sm min-w-[10rem]">
-                    <option value="">All Sahodayas</option>
-                    <option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option>
+                <label class="form-label">School</label>
+                <select v-model="localFilters.school_id" class="field text-sm min-w-[11rem]">
+                    <option value="">All schools</option>
+                    <option v-for="school in schools" :key="school.id" :value="school.id">{{ school.name }}</option>
                 </select>
             </div>
             <div>
@@ -49,7 +50,7 @@
             </div>
             <div class="flex-1 min-w-[12rem]">
                 <label class="form-label">Search</label>
-                <input v-model="localFilters.q" class="field text-sm w-full" placeholder="Email, IP, description…">
+                <input v-model="localFilters.q" class="field text-sm w-full" placeholder="User, IP, description…">
             </div>
             <button type="button" class="btn-secondary text-sm" @click="clearFilters">Clear</button>
         </div>
@@ -64,25 +65,28 @@
         </div>
 
         <DetailedLogTable :logs="logs" />
-    </AdminLayout>
+    </SahodayaAdminLayout>
 </template>
 
 <script setup>
 import { computed, reactive } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import DetailedLogTable from '@/Components/logs/DetailedLogTable.vue';
 
 const props = defineProps({
+    sahodaya: { type: Object, required: true },
+    publicUrl: { type: String, default: null },
+    pendingPaymentsCount: { type: Number, default: 0 },
     logs: { type: Object, default: () => ({ data: [], links: [] }) },
     summary: { type: Object, default: () => ({}) },
     actionSummary: { type: Object, default: () => ({}) },
     filters: { type: Object, default: () => ({}) },
     categories: { type: Object, default: () => ({}) },
-    tenants: { type: Array, default: () => [] },
-    total: { type: Number, default: 0 },
+    schools: { type: Array, default: () => [] },
+    exportUrl: { type: String, default: '' },
 });
 
 const localFilters = reactive({
@@ -90,8 +94,8 @@ const localFilters = reactive({
     action: props.filters.action ?? '',
     from: props.filters.from ?? '',
     to: props.filters.to ?? '',
+    school_id: props.filters.school_id ?? '',
     q: props.filters.q ?? '',
-    tenant_id: props.filters.tenant_id ?? '',
 });
 
 const exportUrl = computed(() => {
@@ -101,11 +105,11 @@ const exportUrl = computed(() => {
     });
 
     const qs = params.toString();
-    return `/admin/audit-logs/export${qs ? `?${qs}` : ''}`;
+    return `/sahodaya-admin/${props.sahodaya.id}/audit-logs/export${qs ? `?${qs}` : ''}`;
 });
 
 function applyFilters() {
-    router.get('/admin/audit-logs', { ...localFilters }, { preserveState: true, replace: true });
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/audit-logs`, { ...localFilters }, { preserveState: true, replace: true });
 }
 
 useDebouncedInertiaFilters(localFilters, applyFilters, () => props.filters);

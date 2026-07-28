@@ -142,6 +142,7 @@ class SchoolMembershipCancellationService
                     'reason'          => 'Membership cancelled: credit toward next year',
                     'created_by_user_id' => $reviewerId ?? auth()->id(),
                 ]);
+                app(\App\Services\Ledger\ProgramFeeCreditLedgerService::class)->postIssued($credit);
 
                 try {
                     app(\App\Services\Fees\CreditNoteService::class)->issue($credit);

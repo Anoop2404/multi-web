@@ -387,6 +387,14 @@ class AuthController extends Controller
             return "/sahodaya-admin/{$user->tenant_id}";
         }
 
+        if ($user->hasRole('event_admin') && $user->tenant_id) {
+            return "/sahodaya-admin/{$user->tenant_id}/events";
+        }
+
+        if ($user->hasRole('training_admin') && $user->tenant_id) {
+            return "/sahodaya-admin/{$user->tenant_id}/training";
+        }
+
         if ($user->hasAnyRole([
             'registration_coordinator',
             'event_coordinator',

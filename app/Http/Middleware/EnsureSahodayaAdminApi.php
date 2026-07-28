@@ -31,6 +31,11 @@ class EnsureSahodayaAdminApi
             return response()->json(['message' => 'Forbidden.'], 403);
         }
 
+        if ($user->hasRole('training_admin') && ! $user->hasRole('sahodaya_admin')
+            && ! preg_match('#(?:^|/)training(?:/|$)#', $request->path())) {
+            return response()->json(['message' => 'This account is limited to teacher training.'], 403);
+        }
+
         $isStaff = ! $user->isSuperAdmin()
             && ! $user->hasRole('sahodaya_admin')
             && $user->hasAnyRole(TenantUserCatalog::sahodayaPermissionRoles());
@@ -58,6 +63,10 @@ class EnsureSahodayaAdminApi
 
             if ($requestedEventId !== null && ! in_array((int) $requestedEventId, $allowedEventIds, true)) {
                 return response()->json(['message' => 'You are not assigned to this event.'], 403);
+            }
+
+            if ($requestedEventId === null && ! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
+                return response()->json(['message' => 'Event admins can only modify their assigned events.'], 403);
             }
 
             $request->attributes->set('eventAdminEventIds', $allowedEventIds);

@@ -71,6 +71,18 @@ class McqPaymentsController extends SahodayaAdminController
     {
         abort_if($schoolFee->exam?->tenant_id !== $this->sahodaya->id, 403);
 
+        return $this->approveResponse($request, $schoolFee);
+    }
+
+    public function approveForExam(Request $request, string $tenantId, McqExam $exam, McqSchoolFee $schoolFee)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id || $schoolFee->exam_id !== $exam->id, 403);
+
+        return $this->approveResponse($request, $schoolFee);
+    }
+
+    private function approveResponse(Request $request, McqSchoolFee $schoolFee)
+    {
         $approvedCount = app(McqSchoolFeeService::class)->approve($schoolFee, $request->user()->id);
 
         if ($request->expectsJson()) {
@@ -84,6 +96,18 @@ class McqPaymentsController extends SahodayaAdminController
     {
         abort_if($schoolFee->exam?->tenant_id !== $this->sahodaya->id, 403);
 
+        return $this->rejectResponse($request, $schoolFee);
+    }
+
+    public function rejectForExam(Request $request, string $tenantId, McqExam $exam, McqSchoolFee $schoolFee)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id || $schoolFee->exam_id !== $exam->id, 403);
+
+        return $this->rejectResponse($request, $schoolFee);
+    }
+
+    private function rejectResponse(Request $request, McqSchoolFee $schoolFee)
+    {
         $data = $request->validate([
             'rejection_reason' => 'required|string|max:500',
         ]);

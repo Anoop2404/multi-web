@@ -179,7 +179,7 @@ class FestSchoolReportAnalyticsService
                     fn ($i) => $i->where('head_id', $headId),
                 )))
             ->with([
-                'student:id,name,reg_no,photo,tenant_id',
+                'student:id,name,admission_number,photo,tenant_id',
                 'student.schoolClass:id,name',
                 'registration.item:id,title,head_id',
                 'registration.item.head:id,name',
@@ -196,7 +196,7 @@ class FestSchoolReportAnalyticsService
             $byStudent[$sid] ??= [
                 'student_id' => $sid,
                 'student'    => $p->student->name,
-                'reg_no'     => $p->student->reg_no,
+                'reg_no'     => $p->student->admission_number,
                 'class'      => $p->student->schoolClass?->name,
                 'photo_url'  => $p->student->photoUrl(),
                 'fest_id'    => $p->level_registration_number,
@@ -249,7 +249,7 @@ class FestSchoolReportAnalyticsService
             ->with([
                 'item:id,title,head_id,results_published_at',
                 'item.head:id,name',
-                'participant.student:id,name,reg_no,photo,tenant_id',
+                'participant.student:id,name,admission_number,photo,tenant_id',
                 'participant.student.schoolClass:id,name',
                 'participant.teacher:id,name,reg_no',
             ])
@@ -262,7 +262,7 @@ class FestSchoolReportAnalyticsService
             'item'        => $m->item?->title,
             'student_id'  => $m->participant?->student_id,
             'participant' => $m->participant?->student?->name ?? $m->participant?->teacher?->name,
-            'reg_no'      => $m->participant?->student?->reg_no ?? $m->participant?->teacher?->reg_no,
+            'reg_no'      => $m->participant?->student?->admission_number ?? $m->participant?->teacher?->reg_no,
             'class'       => $m->participant?->student?->schoolClass?->name,
             'photo_url'   => $m->participant?->student?->photoUrl(),
             'fest_id'     => $m->participant?->level_registration_number,
@@ -348,7 +348,7 @@ class FestSchoolReportAnalyticsService
                 ->where('item_id', $itemId)
                 ->active())
             ->with([
-                'student:id,name,reg_no,photo,tenant_id,gender',
+                'student:id,name,admission_number,photo,tenant_id,gender',
                 'student.schoolClass:id,name',
                 'teacher:id,name,reg_no',
                 'registration:id,status',
@@ -359,7 +359,7 @@ class FestSchoolReportAnalyticsService
             ->map(fn (FestParticipant $p) => [
                 'student_id' => $p->student_id,
                 'name'       => $p->student?->name ?? $p->teacher?->name,
-                'reg_no'     => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                'reg_no'     => $p->student?->admission_number ?? $p->teacher?->reg_no,
                 'class'      => $p->student?->schoolClass?->name,
                 'photo_url'  => $p->student?->photoUrl(),
                 'fest_id'    => $p->level_registration_number,

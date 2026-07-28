@@ -53,4 +53,28 @@ class AuthControllerHomeForTest extends TestCase
         $this->assertTrue($user->isSuperAdmin());
         $this->assertSame(route('admin.dashboard'), AuthController::homeFor($user));
     }
+
+    public function test_event_admin_routes_to_scoped_event_index(): void
+    {
+        $sahodayaId = (string) Str::uuid();
+        $user = User::factory()->create(['tenant_id' => $sahodayaId]);
+        $user->assignRole(Role::findByName('event_admin', 'web'));
+
+        $this->assertSame(
+            "/sahodaya-admin/{$sahodayaId}/events",
+            AuthController::homeFor($user),
+        );
+    }
+
+    public function test_training_admin_routes_to_training_module(): void
+    {
+        $sahodayaId = (string) Str::uuid();
+        $user = User::factory()->create(['tenant_id' => $sahodayaId]);
+        $user->assignRole(Role::findByName('training_admin', 'web'));
+
+        $this->assertSame(
+            "/sahodaya-admin/{$sahodayaId}/training",
+            AuthController::homeFor($user),
+        );
+    }
 }

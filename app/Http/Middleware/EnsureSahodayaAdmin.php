@@ -34,6 +34,16 @@ class EnsureSahodayaAdmin
             abort(403);
         }
 
+        if ($user->hasRole('training_admin') && ! $user->hasRole('sahodaya_admin')) {
+            $trainingPrefix = "sahodaya-admin/{$tenantId}/training";
+            $path = trim($request->path(), '/');
+            abort_unless(
+                $path === $trainingPrefix || str_starts_with($path, $trainingPrefix.'/'),
+                403,
+                'This account is limited to teacher training.',
+            );
+        }
+
         $request->attributes->set(
             'isSahodayaStaff',
             ! $user->isSuperAdmin()
@@ -57,6 +67,10 @@ class EnsureSahodayaAdmin
             $requestedEventId = $this->resolveRouteEventId($request);
             if ($requestedEventId !== null && ! in_array($requestedEventId, $allowedEventIds, true)) {
                 abort(403, 'You are not assigned to this event.');
+            }
+
+            if ($requestedEventId === null && ! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
+                abort(403, 'Event admins can only modify their assigned events.');
             }
 
             $request->attributes->set('eventAdminEventIds', $allowedEventIds);

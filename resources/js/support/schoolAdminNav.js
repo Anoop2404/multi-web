@@ -296,6 +296,7 @@ export function schoolAdminNav(schoolId, options = {}) {
             { label: 'School houses', href: schoolAdminHref(schoolId, 'houses'), icon: 'layers' },
             { label: 'Payment history', href: schoolAdminHref(schoolId, 'payments'), icon: 'credit-card' },
             { label: 'Settings', href: schoolAdminHref(schoolId, 'settings'), icon: 'settings' },
+            { label: 'Activity log', href: `${base}/audit-logs`, icon: 'file-text' },
         );
         // User management links
         if (canNav('users')) {

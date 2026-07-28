@@ -32,8 +32,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="(r, idx) in registrations" :key="r.id">
-                        <td>{{ idx + 1 }}</td>
+                    <tr v-for="(r, idx) in registrations.data" :key="r.id">
+                        <td>{{ (registrations.from ?? 0) + idx }}</td>
                         <td>{{ r.student_name }}</td>
                         <td>{{ (r.school_name || '').toUpperCase() }}</td>
                         <td>{{ r.hall_ticket_no || '—' }}</td>
@@ -45,19 +45,21 @@
                     </tr>
                 </tbody>
             </table>
+            <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total }" />
         </div>
     </PortalLayout>
 </template>
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed } from 'vue';
 
 const props = defineProps({
     sahodaya: Object,
     exam: Object,
-    registrations: Array,
+    registrations: Object,
     summary: Object,
 });
 

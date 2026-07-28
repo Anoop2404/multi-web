@@ -85,6 +85,7 @@ class TrainingSchoolFeeService
                     'reason'             => $cancellationReason,
                     'created_by_user_id' => $cancelledByUserId ?? auth()->id(),
                 ]);
+                app(\App\Services\Ledger\ProgramFeeCreditLedgerService::class)->postIssued($credit);
 
                 try {
                     app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
@@ -147,6 +148,7 @@ class TrainingSchoolFeeService
             'reason'             => $reason,
             'created_by_user_id' => $userId,
         ]);
+        app(\App\Services\Ledger\ProgramFeeCreditLedgerService::class)->postIssued($credit);
 
         try {
             app(\App\Services\Fees\CreditNoteService::class)->issue($credit);

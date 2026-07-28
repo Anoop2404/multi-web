@@ -114,7 +114,7 @@ class FestPortalController extends Controller
 
         $itemResults = $marks
             ->groupBy('item_id')
-            ->map(function ($group) {
+            ->map(function ($group) use ($event) {
                 /** @var FestMark $first */
                 $first = $group->first();
 

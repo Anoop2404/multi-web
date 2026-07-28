@@ -128,12 +128,27 @@ class FestEventFeesController extends SahodayaAdminController
             ->values();
 
         $summary = [
-            'total_due'  => $schoolFees->sum('total_due'),
-            'total_paid' => $schoolFees->sum('amount_paid'),
+            'total_due'  => round((float) $schoolFees->sum('total_due'), 2),
+            // Keep gross receipts separate from the amount actually settled against the
+            // current bill. A cancellation or fee reduction can make amount_paid exceed
+            // total_due; calling that "103% settled" hides money owed back to the school.
+            'total_paid' => round((float) $schoolFees->sum('amount_paid'), 2),
+            'total_settled' => round((float) $schoolFees->sum(
+                fn (array $row) => min((float) ($row['total_due'] ?? 0), (float) ($row['amount_paid'] ?? 0))
+            ), 2),
+            'overpayment' => round((float) $schoolFees->sum(
+                fn (array $row) => max(0, (float) ($row['amount_paid'] ?? 0) - (float) ($row['total_due'] ?? 0))
+            ), 2),
+            'recorded_credit' => round((float) $schoolFees->sum('available_credit'), 2),
             'pending'    => $schoolFees->where('status', 'pending')->count(),
             'awaiting'   => $schoolFees->where('status', 'proof_uploaded')->count(),
             'approved'   => $schoolFees->where('status', 'approved')->count(),
+            'total_schools' => $schoolFees->count(),
         ];
+        $summary['unreconciled_overpayment'] = round(
+            max(0, $summary['overpayment'] - $summary['recorded_credit']),
+            2,
+        );
 
         return $this->inertia('Sahodaya/Events/Fees', $this->withEventActivity($event, FestPageActivity::FEES, [
             'event' => $event,

@@ -31,7 +31,9 @@ class FinanceHubController extends SahodayaAdminController
             ->forAmountAggregation()
             ->whereNotIn('status', ['approved', 'waived']);
 
-        $festOutstanding = (clone $festOutstandingFeeIds)->sum('total_due');
+        $festOutstanding = (clone $festOutstandingFeeIds)
+            ->get(['total_due', 'amount_paid'])
+            ->sum(fn (FestSchoolEventFee $fee) => $fee->outstandingBalance());
 
         // Money already owed BACK to schools (FestFeeCredit) — shown alongside the raw
         // outstanding total rather than netted into it, so this headline figure keeps its
@@ -55,7 +57,8 @@ class FinanceHubController extends SahodayaAdminController
 
         $mcqOutstanding = McqSchoolFee::whereHas('exam', fn ($q) => $q->where('tenant_id', $this->sahodaya->id))
             ->whereNotIn('status', ['approved', 'waived'])
-            ->sum('total_due');
+            ->get(['total_due', 'amount_paid'])
+            ->sum(fn (McqSchoolFee $fee) => $fee->outstandingBalance());
 
         $trainingPending = TrainingRegistration::whereIn('school_id', $schoolIds)
             ->whereHas('feeReceipt', fn ($q) => $q->where('status', 'uploaded'))
@@ -143,7 +146,9 @@ class FinanceHubController extends SahodayaAdminController
                 'school'           => $f->school?->name,
                 'school_id'        => $f->school_id,
                 'program'          => $f->event?->title,
-                'amount'           => (float) $f->total_due,
+                'amount'           => $f->outstandingBalance(),
+                'original_due'     => (float) $f->total_due,
+                'amount_paid'      => (float) $f->amount_paid,
                 // New, additive — the "amount" field above keeps its existing meaning
                 // (gross total_due) so nothing that already reads it changes; this is
                 // context on top. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.

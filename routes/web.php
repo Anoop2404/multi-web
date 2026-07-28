@@ -46,6 +46,7 @@ use App\Http\Controllers\SchoolAdmin\SportsMeetController;
 use App\Http\Controllers\SchoolAdmin\TeacherController;
 use App\Http\Controllers\SchoolAdmin\CircularAcknowledgementController;
 use App\Http\Controllers\SchoolAdmin\AchievementController;
+use App\Http\Controllers\SchoolAdmin\AuditLogController as SchoolAuditLogController;
 use App\Http\Controllers\SchoolAdmin\AnnualRegistrationController;
 use App\Http\Controllers\SchoolAdmin\AlumniController;
 use App\Http\Controllers\SchoolAdmin\BoardResultController;
@@ -65,6 +66,7 @@ use App\Http\Controllers\SchoolAdmin\SiteBuilderController;
 use App\Http\Controllers\SchoolAdmin\SiteBuilderApiController;
 use App\Http\Controllers\SchoolAdmin\StudentController;
 use App\Http\Controllers\SchoolAdmin\StudentSportsController;
+use App\Http\Controllers\SahodayaAdmin\AuditLogController as SahodayaAuditLogController;
 use App\Models\SkinPreset;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Route;
@@ -288,6 +290,9 @@ Route::prefix('school-admin/{tenantId}')
 
     Route::get('/',          [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/setup/dismiss-wizard', [DashboardController::class, 'dismissSetupWizard'])->name('setup.dismiss-wizard');
+    Route::redirect('/audit', '/audit-logs');
+    Route::get('/audit-logs', [SchoolAuditLogController::class, 'index'])->name('audit-logs.index');
+    Route::get('/audit-logs/export', [SchoolAuditLogController::class, 'export'])->name('audit-logs.export');
 
     Route::get('/setup/code',  [SchoolSetupController::class, 'code'])->name('setup.code');
     Route::post('/setup/code', [SchoolSetupController::class, 'saveCode'])->name('setup.code.save');
@@ -576,6 +581,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
 
         // Dashboard
         Route::get('/', [\App\Http\Controllers\SahodayaAdmin\DashboardController::class, 'index'])->name('dashboard');
+        Route::redirect('/audit', '/audit-logs');
+        Route::get('/audit-logs', [SahodayaAuditLogController::class, 'index'])->name('audit-logs.index');
+        Route::get('/audit-logs/export', [SahodayaAuditLogController::class, 'export'])->name('audit-logs.export');
 
         Route::get('/users', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'index'])->name('users.index');
         Route::post('/users', [\App\Http\Controllers\SahodayaAdmin\TenantUserController::class, 'store'])->name('users.store');
@@ -1180,8 +1188,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/payments', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'exam'])->name('payments');
             Route::get('/{exam}/ledger', [McqExamController::class, 'ledger'])->name('ledger');
             Route::put('/{exam}/ledger-account', [McqExamController::class, 'updateLedgerAccount'])->name('ledger-account.update');
-            Route::post('/{exam}/payments/{schoolFee}/approve', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'approve'])->name('payments.approve');
-            Route::post('/{exam}/payments/{schoolFee}/reject', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'reject'])->name('payments.reject');
+            Route::post('/{exam}/payments/{schoolFee}/approve', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'approveForExam'])->name('payments.approve');
+            Route::post('/{exam}/payments/{schoolFee}/reject', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'rejectForExam'])->name('payments.reject');
             Route::get('/{exam}/reports', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'show'])->name('reports');
             Route::get('/{exam}/reports/registration/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRegistration'])->name('reports.registration.export');
             Route::get('/{exam}/reports/fees/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportFees'])->name('reports.fees.export');

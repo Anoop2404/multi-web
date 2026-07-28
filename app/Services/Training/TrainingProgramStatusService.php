@@ -47,22 +47,26 @@ class TrainingProgramStatusService
             $issuedCredits = collect();
             
             foreach ($paidFees as $fee) {
-                $feeAfter = app(TrainingSchoolFeeService::class)->recalculate($program, $fee->school_id);
-                $reduction = round((float)$fee->total_due - (float)$feeAfter->total_due, 2);
-                $paidBefore = (float)$fee->amount_paid;
-                
-                $creditAmount = min($reduction, $paidBefore);
-                
-                if ($creditAmount > 0) {
-                    $credit = ProgramFeeCredit::create([
-                        'creditable_type' => TrainingSchoolFee::class,
-                        'creditable_id'   => $feeAfter->id,
-                        'source_type'     => TrainingProgram::class,
-                        'source_id'       => $program->id,
-                        'amount'          => $creditAmount,
-                        'reason'          => 'Program cancelled after payment',
-                        'created_by_user_id' => auth()->id(),
-                    ]);
+                $school = $fee->school;
+                if (! $school) {
+                    continue;
+                }
+
+                $feeAfter = app(TrainingSchoolFeeService::class)->syncForSchool(
+                    $program,
+                    $school,
+                    'Program cancelled after payment',
+                    auth()->id(),
+                    null,
+                );
+
+                $credit = ProgramFeeCredit::query()
+                    ->where('creditable_type', TrainingSchoolFee::class)
+                    ->where('creditable_id', $feeAfter->id)
+                    ->where('source_type', TrainingRegistration::class)
+                    ->latest('id')
+                    ->first();
+                if ($credit) {
                     $issuedCredits->push($credit);
                 }
             }

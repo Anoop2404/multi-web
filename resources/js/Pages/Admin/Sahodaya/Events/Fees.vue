@@ -64,16 +64,20 @@
 
             <div class="card !p-5 border border-emerald-200/90 bg-gradient-to-br from-emerald-50/60 to-emerald-100/20 shadow-xs hover:shadow transition rounded-xl">
                 <div class="flex items-center justify-between">
-                    <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Collected &amp; Settled</p>
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Applied to Current Dues</p>
                     <span class="w-8 h-8 rounded-lg bg-emerald-100/80 flex items-center justify-center text-emerald-700 text-sm">✓</span>
                 </div>
-                <p class="text-2xl lg:text-3xl font-black text-emerald-700 mt-2 tabular-nums">₹{{ fmt(summary.total_paid) }}</p>
+                <p class="text-2xl lg:text-3xl font-black text-emerald-700 mt-2 tabular-nums">₹{{ fmt(summary.total_settled ?? summary.total_paid) }}</p>
                 <div class="flex items-center gap-2 mt-1">
                     <span class="text-xs font-bold text-emerald-800">
-                        {{ summary.total_due > 0 ? Math.round((summary.total_paid / summary.total_due) * 100) : 0 }}% collected
+                        {{ summary.total_due > 0 ? Math.min(100, Math.round(((summary.total_settled ?? summary.total_paid) / summary.total_due) * 100)) : 0 }}% settled
                     </span>
                     <span class="text-[11px] text-emerald-700/70 font-medium">({{ summary.approved || 0 }} schools)</span>
                 </div>
+                <p v-if="Number(summary.total_paid || 0) !== Number(summary.total_settled ?? summary.total_paid ?? 0)"
+                   class="mt-1 text-[11px] font-medium text-emerald-800/75">
+                    Gross approved receipts: ₹{{ fmt(summary.total_paid) }}
+                </p>
             </div>
 
             <div class="card !p-5 border border-amber-200/90 bg-gradient-to-br from-amber-50/60 to-amber-100/20 shadow-xs hover:shadow transition rounded-xl">
@@ -93,6 +97,26 @@
                 <p class="text-2xl lg:text-3xl font-black text-indigo-700 mt-2 tabular-nums">{{ summary.awaiting }}</p>
                 <p class="text-xs text-indigo-800/80 mt-1 font-medium">Payment proofs requiring approval</p>
             </div>
+        </div>
+
+        <div v-if="Number(summary.overpayment || 0) > 0"
+             class="mb-6 rounded-xl border p-4 text-sm"
+             :class="Number(summary.unreconciled_overpayment || 0) > 0
+                ? 'border-red-200 bg-red-50 text-red-900'
+                : 'border-amber-200 bg-amber-50 text-amber-950'">
+            <p class="font-bold">
+                {{ Number(summary.unreconciled_overpayment || 0) > 0 ? 'Payment reconciliation required' : 'School credit recorded' }}
+            </p>
+            <p class="mt-1 leading-relaxed">
+                Approved receipts exceed the current event dues by
+                <strong>₹{{ fmt(summary.overpayment) }}</strong>.
+                <template v-if="Number(summary.recorded_credit || 0) > 0">
+                    ₹{{ fmt(summary.recorded_credit) }} is recorded as credit owed to schools.
+                </template>
+                <template v-if="Number(summary.unreconciled_overpayment || 0) > 0">
+                    ₹{{ fmt(summary.unreconciled_overpayment) }} has no matching outstanding credit and must be reviewed in Finance → Credits &amp; payouts.
+                </template>
+            </p>
         </div>
 
         <!-- Filter Chips Bar & Search Toolbar -->

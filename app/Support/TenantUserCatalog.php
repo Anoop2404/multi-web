@@ -16,6 +16,7 @@ class TenantUserCatalog
             'certificate_collector',
             'data_entry',
             'event_coordinator',
+            'training_admin',
             'judge',
             'mark_entry_admin',
             'mark_entry_coordinator',
@@ -125,6 +126,7 @@ class TenantUserCatalog
             'certificate_collector'    => 'Certificate collector',
             'data_entry'               => 'Data entry',
             'event_coordinator'        => 'Event coordinator',
+            'training_admin'           => 'Teacher training admin',
             'school_staff'             => 'School staff (view + optional permissions)',
             'school_principal'         => 'School principal (full access + user management)',
             'school_vice_principal'    => 'Vice principal (manage coordinators & staff)',
@@ -157,6 +159,7 @@ class TenantUserCatalog
             'certificate_collector'    => 'Issues and prints certificates once results are published.',
             'data_entry'               => 'Enters marks/results but cannot change event settings.',
             'event_coordinator'        => 'Sahodaya-wide: manage settings, schedule, marks, and results for every event — not limited to one event.',
+            'training_admin'           => 'Manage teacher-training programs only; other Sahodaya modules are blocked.',
             'judge'                    => 'Portal login for entering marks for events they officiate — no admin panel access.',
             'mark_entry_admin'         => 'Enters and corrects marks across events.',
             'mark_entry_coordinator'   => 'Portal login for entering marks for assigned events only.',
@@ -180,7 +183,7 @@ class TenantUserCatalog
             'General'            => ['sahodaya_staff', 'school_principal'],
             'Registration & finance' => ['registration_coordinator', 'sahodaya_finance', 'certificate_collector', 'data_entry'],
             'Event roles'        => ['event_coordinator', 'fest_ops', 'event_admin', 'judge'],
-            'Exams & marks'      => ['mark_entry_admin', 'mark_entry_coordinator', 'exam_controller', 'exam_staff'],
+            'Exams & training'   => ['training_admin', 'mark_entry_admin', 'mark_entry_coordinator', 'exam_controller', 'exam_staff'],
         ];
     }
 
@@ -292,6 +295,7 @@ class TenantUserCatalog
             'event_coordinator',
             'mark_entry_admin',
             'event_admin',
+            'training_admin',
         ];
     }
 
@@ -335,6 +339,7 @@ class TenantUserCatalog
             'certificate_collector'    => ['fest.view', 'fest.certificates'],
             'data_entry'               => ['fest.view', 'fest.manage', 'fest.marks'],
             'event_coordinator'        => ['fest.view', 'fest.manage', 'fest.schedule', 'fest.settings'],
+            'training_admin'           => ['training.view', 'training.manage'],
             'mark_entry_admin'         => ['fest.view', 'fest.marks'],
             'event_admin'              => [
                 'fest.view', 'fest.manage', 'fest.marks', 'fest.registrations',

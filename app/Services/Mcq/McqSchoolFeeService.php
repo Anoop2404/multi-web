@@ -76,6 +76,7 @@ class McqSchoolFeeService
                 'reason'              => $cancellationReason,
                 'created_by_user_id'  => $cancelledByUserId ?? auth()->id(),
             ]);
+            app(\App\Services\Ledger\ProgramFeeCreditLedgerService::class)->postIssued($credit);
 
             try {
                 app(\App\Services\Fees\CreditNoteService::class)->issue($credit);
@@ -122,13 +123,19 @@ class McqSchoolFeeService
                 $count = app(McqRegistrationApprovalService::class)->approveSchoolBatch($schoolFee->fresh(), $userId);
             }
 
-            app(OfflineProgramFeeOrchestrator::class)->notifyApproved(
-                $schoolFee->school,
-                $issued,
-                'Talent Search exam fee',
-                $schoolFee->exam?->title ?? 'Talent Search Exam',
-                adminPath: 'payments',
-            );
+            try {
+                app(OfflineProgramFeeOrchestrator::class)->notifyApproved(
+                    $schoolFee->school,
+                    $issued,
+                    'Talent Search exam fee',
+                    $schoolFee->exam?->title ?? 'Talent Search Exam',
+                    adminPath: 'payments',
+                );
+            } catch (\Throwable $exception) {
+                report($exception);
+                // Payment approval, ledger posting, and hall-ticket issuance must not
+                // roll back when receipt delivery/storage is temporarily unavailable.
+            }
 
             $schoolFee->loadMissing(['exam', 'school']);
             if ($schoolFee->exam) {

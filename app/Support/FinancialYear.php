@@ -6,7 +6,7 @@ use App\Models\FinancialYear as FinancialYearRecord;
 
 class FinancialYear
 {
-    /** Current financial year record id (April–March), falling back to academic year when unset. */
+    /** Current financial year record id (April–March), or null when finance setup is incomplete. */
     public static function currentId(): ?int
     {
         $record = FinancialYearRecord::query()->where('is_current', true)->first();
@@ -17,7 +17,7 @@ class FinancialYear
         $label = FinancialYearRecord::calendarCurrent();
         $record = FinancialYearRecord::query()->where('label', $label)->first();
 
-        return $record?->id ?? AcademicYear::activeId();
+        return $record?->id;
     }
 
     public static function currentLabel(): string

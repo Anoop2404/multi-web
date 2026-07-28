@@ -114,6 +114,7 @@ class GoLiveReadinessTest extends TestCase
             'score'           => 95,
             'percentage'      => 95,
             'grade'           => 'A',
+            'rank'            => 1,
         ]);
 
         $registration->load('exam', 'mark');
@@ -121,6 +122,13 @@ class GoLiveReadinessTest extends TestCase
 
         $this->assertTrue($presented['pending'] ?? false);
         $this->assertArrayNotHasKey('score', $presented);
+        $this->assertArrayNotHasKey('rank', $presented);
+
+        $exam->update(['results_published' => true]);
+        $registration->setRelation('exam', $exam->fresh());
+        $presented = McqResultPresenter::forRegistration($registration, $registration->mark);
+
+        $this->assertSame(1, $presented['rank']);
     }
 
     public function test_qr_scan_detects_duplicate_within_ttl(): void

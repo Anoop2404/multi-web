@@ -9,6 +9,7 @@ use App\Support\AuditLogCatalog;
 use Illuminate\Http\Request;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Arr;
 
 class AuditLogController extends Controller
 {
@@ -42,9 +43,18 @@ class AuditLogController extends Controller
         $logs = (clone $query)
             ->with('user:id,name,email')
             ->latest()
-            ->limit(200)
-            ->get()
-            ->map(fn (AuditLog $log) => $this->serializeLog($log));
+            ->paginate(25)
+            ->withQueryString();
+
+        $tenantIds = collect($logs->items())
+            ->map(fn (AuditLog $log) => Arr::get($log->properties, 'tenant_id'))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $tenantNames = Tenant::whereIn('id', $tenantIds)->pluck('name', 'id')->all();
+
+        $logs->getCollection()->transform(fn (AuditLog $log) => $this->serializeLog($log, $tenantNames));
 
         return inertia('Audit/Index', [
             'logs'          => $logs,
@@ -78,7 +88,7 @@ class AuditLogController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['When', 'Category', 'Action', 'Description', 'User', 'Email', 'IP', 'Properties']);
+            fputcsv($out, ['When', 'Category', 'Action', 'Description', 'User', 'Email', 'IP', 'Subject type', 'Subject ID', 'Properties']);
 
             foreach ($rows as $log) {
                 fputcsv($out, [
@@ -89,6 +99,8 @@ class AuditLogController extends Controller
                     $log->user?->name,
                     $log->user?->email ?? ($log->properties['email'] ?? null),
                     $log->ip_address,
+                    $log->subject_type,
+                    $log->subject_id,
                     $log->properties ? json_encode($log->properties) : null,
                 ]);
             }
@@ -119,19 +131,26 @@ class AuditLogController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function serializeLog(AuditLog $log): array
+    private function serializeLog(AuditLog $log, array $tenantNames = []): array
     {
+        $originId = $log->properties['tenant_id'] ?? $log->properties['school_id'] ?? null;
+
         return [
-            'id'          => $log->id,
-            'category'    => $log->category ?? AuditLogCatalog::categoryForAction($log->action),
-            'category_label' => AuditLogCatalog::label($log->category ?? AuditLogCatalog::categoryForAction($log->action)),
-            'action'      => $log->action,
-            'description' => $log->description,
-            'user'        => $log->user?->only('id', 'name', 'email'),
-            'email'       => $log->user?->email ?? ($log->properties['email'] ?? null),
-            'ip_address'  => $log->ip_address,
-            'properties'  => $log->properties,
-            'created_at'  => $log->created_at?->toDateTimeString(),
+            'id'            => $log->id,
+            'scope_key'     => $log->category ?? AuditLogCatalog::categoryForAction($log->action),
+            'scope_label'   => AuditLogCatalog::label($log->category ?? AuditLogCatalog::categoryForAction($log->action)),
+            'origin_label'  => $originId ? ($tenantNames[$originId] ?? $originId) : '—',
+            'origin_sub_label' => $log->properties['page'] ?? null,
+            'action'        => $log->action,
+            'description'   => $log->description,
+            'actor'         => $log->user?->only('id', 'name', 'email'),
+            'actor_email'   => $log->user?->email ?? ($log->properties['email'] ?? null),
+            'ip_address'    => $log->ip_address,
+            'subject_type'  => $log->subject_type,
+            'subject_id'    => $log->subject_id,
+            'properties'    => $log->properties,
+            'changes'       => null,
+            'created_at'    => $log->created_at?->toDateTimeString(),
         ];
     }
 }

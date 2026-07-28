@@ -56,16 +56,28 @@ class HouseAdminController extends Controller
     {
         $user = $request->user();
         $house = $this->resolveHouse($user, $tenantId);
+        $filters = $request->validate([
+            'search' => 'nullable|string|max:100',
+        ]);
 
-        $students = Student::where('tenant_id', $tenantId)
+        $studentsQuery = Student::where('tenant_id', $tenantId)
             ->when($house, fn ($q) => $q->where('school_house_id', $house->id))
             ->active()
+            ->when(! empty($filters['search']), function ($q) use ($filters) {
+                $term = '%'.$filters['search'].'%';
+                $q->where(function ($inner) use ($term) {
+                    $inner->where('name', 'like', $term)
+                        ->orWhere('reg_no', 'like', $term)
+                        ->orWhere('roll_number', 'like', $term);
+                });
+            })
             ->with('schoolClass.classCategory')
             ->orderBy('school_class_id')
-            ->orderBy('name')
-            ->get(['id', 'name', 'reg_no', 'school_class_id', 'roll_number', 'gender', 'school_house_id']);
+            ->orderBy('name');
 
-        $festCounts = FestParticipant::whereIn('student_id', $students->pluck('id'))
+        $students = $studentsQuery->paginate(25)->withQueryString();
+
+        $festCounts = FestParticipant::whereIn('student_id', $students->getCollection()->pluck('id'))
             ->whereHas('registration', fn ($q) => $q->where('school_id', $tenantId)->whereIn('status', ['submitted', 'approved']))
             ->selectRaw('student_id, count(*) as cnt')
             ->groupBy('student_id')
@@ -74,10 +86,11 @@ class HouseAdminController extends Controller
         return inertia('Portal/HouseAdmin/Students', [
             'tenantId'   => $tenantId,
             'house'      => $house?->only('id', 'name', 'color'),
-            'students'   => $students->map(fn ($s) => [
+            'students'   => $students->through(fn ($s) => [
                 ...$s->toArray(),
                 'fest_entries' => $festCounts[$s->id] ?? 0,
             ]),
+            'filters'    => $filters,
         ]);
     }
 
@@ -118,8 +131,8 @@ class HouseAdminController extends Controller
             ->whereHas('participants', fn ($q) => $q->whereIn('student_id', $studentIds))
             ->with(['event', 'item', 'participants.student'])
             ->latest()
-            ->limit(200)
-            ->get();
+            ->paginate(25)
+            ->withQueryString();
 
         $events = $school->parent_id
             ? FestEvent::where('tenant_id', $school->parent_id)

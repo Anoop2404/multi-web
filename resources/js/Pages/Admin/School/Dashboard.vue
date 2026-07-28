@@ -322,7 +322,10 @@
 
             <!-- Recent activity -->
             <div v-if="recentActivity?.length" class="card">
-                <h3 class="section-title mb-4 text-base">Recent activity</h3>
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <h3 class="section-title text-base">Recent activity</h3>
+                    <Link :href="`/school-admin/${school.id}/audit-logs`" class="link-brand text-xs">Detailed log report →</Link>
+                </div>
                 <ul class="activity-timeline">
                     <li v-for="entry in recentActivity" :key="entry.id" class="activity-item">
                         <span class="activity-dot" :class="entry.action === 'created' && 'activity-dot--success'" />

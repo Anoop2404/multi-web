@@ -23,7 +23,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="r in registrations" :key="r.id" class="border-t">
+                    <tr v-for="r in registrations.data" :key="r.id" class="border-t">
                         <td class="p-3">{{ r.student?.name }}</td>
                         <td class="p-3"><input v-model.number="forms[r.id].correct_count" type="number" min="0" class="w-14 field" :disabled="exam.results_published"></td>
                         <td class="p-3"><input v-model.number="forms[r.id].wrong_count" type="number" min="0" class="w-14 field" :disabled="exam.results_published"></td>
@@ -39,25 +39,27 @@
                             <button v-if="!exam.results_published" @click="save(r)" class="text-xs font-semibold text-indigo-600">Save</button>
                         </td>
                     </tr>
-                    <tr v-if="!registrations.length">
+                    <tr v-if="!registrations.data?.length">
                         <td colspan="7" class="p-6 text-center text-gray-400">No present students to mark.</td>
                     </tr>
                 </tbody>
             </table>
+            <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total }" />
         </div>
     </PortalLayout>
 </template>
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive } from 'vue';
 import { router } from '@inertiajs/vue3';
 
-const props = defineProps({ sahodaya: Object, exam: Object, registrations: Array, gradeBands: { type: Array, default: () => [] } });
+const props = defineProps({ sahodaya: Object, exam: Object, registrations: Object, gradeBands: { type: Array, default: () => [] } });
 const gradeOptions = computed(() => props.gradeBands?.length ? props.gradeBands.map((b) => b.label) : ['A+', 'A', 'B', 'C', 'D', 'F']);
 const forms = reactive({});
-for (const r of props.registrations) {
+for (const r of props.registrations.data ?? []) {
     forms[r.id] = {
         correct_count: r.mark?.correct_count ?? 0,
         wrong_count: r.mark?.wrong_count ?? 0,
@@ -73,4 +75,3 @@ function save(r) {
 
 const navItems = computed(() => examPortalNavItems(props.sahodaya.id, props.exam.id));
 </script>
-

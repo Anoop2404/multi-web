@@ -62,6 +62,16 @@ class CreditPayoutService
                 'recorded_by_user_id' => $actor->id,
             ]);
 
+            $tenantId = app(\App\Services\Ledger\ProgramFeeCreditLedgerService::class)
+                ->tenantIdForCredit($locked);
+            if (! $tenantId) {
+                throw ValidationException::withMessages([
+                    'credit' => 'Cannot resolve the Sahodaya ledger for this credit payout.',
+                ]);
+            }
+            app(\App\Services\Ledger\ProgramFeeCreditLedgerService::class)
+                ->postPayout($payout, $tenantId);
+
             $locked->update(['applied_at' => now()]);
 
             app(PlatformAuditLogger::class)->log(

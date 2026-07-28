@@ -50,22 +50,30 @@ class McqExamStatusService
             $issuedCredits = collect();
             
             foreach ($paidFees as $fee) {
-                $feeAfter = app(McqSchoolFeeService::class)->recalculate($exam, $fee->school_id);
-                $reduction = round((float)$fee->total_due - (float)$feeAfter->total_due, 2);
-                $paidBefore = (float)$fee->amount_paid;
-                
-                $creditAmount = min($reduction, $paidBefore);
-                
-                if ($creditAmount > 0) {
-                    $credit = ProgramFeeCredit::create([
-                        'creditable_type' => McqSchoolFee::class,
-                        'creditable_id'   => $feeAfter->id,
-                        'source_type'     => McqExam::class,
-                        'source_id'       => $exam->id,
-                        'amount'          => $creditAmount,
-                        'reason'          => 'Exam cancelled after payment',
-                        'created_by_user_id' => auth()->id(),
-                    ]);
+                $school = $fee->school;
+                if (! $school) {
+                    continue;
+                }
+
+                // syncForSchool() is the canonical recalculation path and owns the
+                // cancellation-credit delta calculation. The old call targeted a
+                // non-existent recalculate() method and then attempted to create a second
+                // credit manually.
+                $feeAfter = app(McqSchoolFeeService::class)->syncForSchool(
+                    $exam,
+                    $school,
+                    'Exam cancelled after payment',
+                    auth()->id(),
+                    null,
+                );
+
+                $credit = ProgramFeeCredit::query()
+                    ->where('creditable_type', McqSchoolFee::class)
+                    ->where('creditable_id', $feeAfter->id)
+                    ->where('source_type', McqRegistration::class)
+                    ->latest('id')
+                    ->first();
+                if ($credit) {
                     $issuedCredits->push($credit);
                 }
             }

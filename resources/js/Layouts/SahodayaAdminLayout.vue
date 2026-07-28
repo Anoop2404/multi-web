@@ -83,7 +83,8 @@
                         </svg>
                     </button>
                     <h1 v-if="showHeaderTitle" class="text-base font-bold text-[#041525] truncate">{{ title }}</h1>
-                    <span v-if="isStaffUser" class="hidden sm:inline text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-medium">View only</span>
+                    <span v-if="isReadOnlyStaff" class="hidden sm:inline text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-medium">View only</span>
+                    <span v-else-if="isStaffUser" class="hidden sm:inline text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-medium">Scoped access</span>
                     <slot name="header-suffix" />
                 </div>
                 <div class="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -98,8 +99,8 @@
                 </div>
             </header>
 
-            <main class="sa-main flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isStaffUser }">
-                <StaffReadOnlyBanner v-if="isStaffUser" />
+            <main class="sa-main flex-1 p-4 lg:p-6 overflow-auto" :class="{ 'staff-readonly': isReadOnlyStaff }">
+                <StaffReadOnlyBanner v-if="isReadOnlyStaff" />
                 <FlashBanner />
                 <ValidationBanner />
                 <slot />
@@ -155,6 +156,9 @@ const page = usePage();
 const mobileNavOpen = ref(false);
 const navSearch = ref('');
 const isStaffUser = computed(() => props.isStaff || page.props.isStaff);
+const staffPermissions = computed(() => page.props.staffPermissions ?? []);
+const isReadOnlyStaff = computed(() => isStaffUser.value
+    && !staffPermissions.value.some(permission => !permission.endsWith('.view')));
 const websiteEnabled = computed(() => page.props.features?.website_enabled ?? false);
 const publicWebsiteEnabled = computed(() => page.props.publicWebsiteEnabled ?? true);
 const showPublicSiteLink = computed(() => websiteEnabled.value && publicWebsiteEnabled.value && props.publicUrl);
@@ -171,7 +175,7 @@ const STAFF_NAV = {
 
 function canNav(section) {
     if (!isStaffUser.value) return true;
-    const perms = page.props.staffPermissions ?? [];
+    const perms = staffPermissions.value;
     const required = STAFF_NAV[section];
     if (!required) return true;
     return required.some(p => perms.includes(p));

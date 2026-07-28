@@ -915,10 +915,15 @@ function formatMoney(value) {
 }
 
 function registrationsForItem(eventId, itemId) {
-    return (props.registrations ?? []).filter(
-        reg => Number(reg.event_id) === Number(eventId) && Number(reg.item_id) === Number(itemId)
-            && !['withdrawn', 'rejected'].includes(reg.status),
-    );
+    return (props.registrations ?? []).filter((reg) => {
+        const directMatch = Number(reg.event_id) === Number(eventId)
+            && Number(reg.item_id) === Number(itemId);
+        const partitionMatch = Number(reg.event?.parent_event_id) === Number(eventId)
+            && Number(reg.item?.inherited_from_item_id) === Number(itemId);
+
+        return (directMatch || partitionMatch)
+            && !['withdrawn', 'rejected'].includes(reg.status);
+    });
 }
 
 function registeredNames(reg) {

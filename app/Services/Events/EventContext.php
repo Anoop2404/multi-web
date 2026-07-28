@@ -10,6 +10,7 @@ use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestResult;
 use App\Models\Tenant;
+use App\Support\FestClassGroupScheme;
 use App\Support\FestSportsAgeGroup;
 use Illuminate\Support\Collection;
 
@@ -84,7 +85,28 @@ class EventContext
                 ->all();
         }
 
-        return ['lp', 'up', 'hs', 'hss'];
+        $available = FestEventItem::where('event_id', $this->event->id)
+            ->where('is_enabled', true)
+            ->whereNotNull('class_group')
+            ->where('class_group', '!=', 'open')
+            ->distinct()
+            ->pluck('class_group')
+            ->values();
+
+        if ($available->isEmpty()) {
+            return array_values(array_filter(
+                array_keys(FestClassGroupScheme::labels(null, $this->event)),
+                fn (string $key) => $key !== 'open',
+            ));
+        }
+
+        $configuredOrder = collect(array_keys(FestClassGroupScheme::labels(null, $this->event)))
+            ->filter(fn (string $key) => $key !== 'open' && $available->contains($key));
+
+        return $configuredOrder
+            ->concat($available->diff($configuredOrder))
+            ->values()
+            ->all();
     }
 
     public function scoreboardCategoryLabel(?string $category): string
@@ -98,7 +120,8 @@ class EventContext
                 ?? strtoupper($category);
         }
 
-        return config("fest_item_taxonomy.class_group.{$category}", strtoupper($category));
+        return FestClassGroupScheme::labels(null, $this->event)[$category]
+            ?? config("fest_item_taxonomy.class_group.{$category}", strtoupper($category));
     }
 
     /** @return list<array{school_id: string, school_name: string, total_points: int, rank: int}> */

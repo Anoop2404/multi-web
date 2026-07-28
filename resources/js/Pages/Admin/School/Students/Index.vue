@@ -174,7 +174,7 @@
                         </div>
                     </td>
                     <td class="px-4 py-3 font-mono text-xs text-gray-500">
-                        {{ student.reg_no || '—' }}
+                        {{ student.admission_number || '—' }}
                     </td>
                     <td class="px-4 py-3 text-xs text-gray-600 capitalize">{{ formatGender(student.gender) }}</td>
                     <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
@@ -441,7 +441,7 @@ const columns = computed(() => {
     const base = [
         { key: 'photo',        label: 'Photo',  sortable: false, class: 'w-14' },
         { key: 'name',         label: 'Name',   sortable: true, class: 'min-w-[13rem]' },
-        { key: 'reg_no',       label: 'Student ID', sortable: false },
+        { key: 'admission_number', label: 'Admission No.', sortable: false },
         { key: 'gender',       label: 'Gender', sortable: false },
         { key: 'dob',          label: 'DOB',    sortable: false },
         { key: 'parent_email', label: 'Email',  sortable: true },

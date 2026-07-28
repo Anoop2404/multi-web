@@ -12,8 +12,19 @@
         <ul class="card-list">
             <li v-for="c in certificates" :key="c.id" class="p-4 flex justify-between items-center text-sm">
                 <div>
-                    <p class="font-medium">{{ c.student?.name ?? 'Participant' }}</p>
-                    <p class="text-gray-500 text-xs">{{ c.item?.title }} · Position {{ c.mark?.position ?? '—' }}</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <p class="font-medium">{{ c.student?.name ?? 'Participant' }}</p>
+                        <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                              :class="c.cert_type === 'winner'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-sky-100 text-sky-800'">
+                            {{ certificateTypeLabel(c.cert_type) }}
+                        </span>
+                    </div>
+                    <p class="text-gray-500 text-xs">
+                        {{ c.item?.title }}
+                        <template v-if="c.cert_type === 'winner'"> · Position {{ c.mark?.position ?? '—' }}</template>
+                    </p>
                 </div>
                 <a :href="`/certificates/verify/${c.uuid}`" target="_blank" class="text-indigo-600 text-xs font-medium mr-3">Verify ↗</a>
                 <a :href="`/certificates/print/${c.uuid}`" target="_blank" class="text-gray-600 text-xs font-medium">Print ↗</a>
@@ -37,5 +48,9 @@ const props = defineProps({
 
 function generate() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/generate`, {}, { preserveScroll: true });
+}
+
+function certificateTypeLabel(type) {
+    return type === 'winner' ? 'Winner' : 'Participation';
 }
 </script>

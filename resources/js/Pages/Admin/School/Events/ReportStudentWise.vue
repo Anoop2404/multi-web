@@ -13,7 +13,7 @@
 
         <div class="mt-4 space-y-2">
             <div v-for="row in rows" :key="row.student.id" class="card text-sm">
-                <p class="font-medium">{{ row.student.name }} <span class="text-gray-400 text-xs">{{ row.student.reg_no }}</span></p>
+                <p class="font-medium">{{ row.student.name }} <span class="text-gray-400 text-xs">{{ row.student.admission_number }}</span></p>
                 <p class="text-xs text-gray-500 mt-1">Items: {{ row.registrations.join(', ') || '—' }}</p>
                 <p v-if="row.results.length" class="text-xs mt-1">Results: <span v-for="(r, i) in row.results" :key="i">{{ r.item }} (#{{ r.position }}) </span></p>
                 <p class="text-xs font-mono mt-1">Total score: {{ row.total_score }}</p>

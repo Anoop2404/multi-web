@@ -40,7 +40,9 @@ class McqMarkSaveService
         $score = (float) ($data['score'] ?? $correct);
         $total = $correct + $wrong + $unanswered;
         $denominator = max($exam->total_questions ?: $total, 1);
-        $percentage = $total > 0 ? round(($score / $denominator) * 100, 2) : 0;
+        // Offline mark entry records the final score without exposing the
+        // online-only correct/wrong/unanswered counters in the admin UI.
+        $percentage = round(($score / $denominator) * 100, 2);
 
         $grade = filled($data['grade'] ?? null)
             ? (string) $data['grade']

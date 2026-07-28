@@ -225,7 +225,18 @@ class LedgerReportingService
                 'ledger_posted'   => $fee->status === 'approved' && $fee->feeReceipt?->status === 'approved',
             ]);
 
-        $collected = (float) $schoolPayments->where('status', 'approved')->sum('total_due');
+        $approvedReceiptIds = FestSchoolEventFee::where('event_id', $event->id)
+            ->forAmountAggregation()
+            ->pluck('id');
+        $grossReceipts = (float) \App\Models\FeeReceipt::query()
+            ->where('feeable_type', FestSchoolEventFee::class)
+            ->whereIn('feeable_id', $approvedReceiptIds)
+            ->where('status', \App\Models\FeeReceipt::STATUS_APPROVED)
+            ->sum('amount');
+        $settled = (float) FestSchoolEventFee::where('event_id', $event->id)
+            ->forAmountAggregation()
+            ->get(['total_due', 'amount_paid'])
+            ->sum(fn (FestSchoolEventFee $fee) => min((float) $fee->total_due, (float) $fee->amount_paid));
 
         return [
             'head'             => $head,
@@ -235,7 +246,9 @@ class LedgerReportingService
             'school_payments'  => $schoolPayments,
             'summary'          => [
                 'total_due'      => (float) $schoolPayments->sum('total_due'),
-                'collected'      => $collected,
+                'collected'      => round($settled, 2),
+                'gross_receipts' => round($grossReceipts, 2),
+                'overpayment'    => round(max(0, $grossReceipts - $settled), 2),
                 'pending'        => $schoolPayments->where('status', 'pending')->count(),
                 'awaiting'       => $schoolPayments->where('status', 'proof_uploaded')->count(),
                 'ledger_credits' => (float) $transactions->where('entry_type', 'credit')->sum('amount'),

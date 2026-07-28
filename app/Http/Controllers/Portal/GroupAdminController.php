@@ -49,18 +49,31 @@ class GroupAdminController extends Controller
     {
         $user = $request->user();
         $classIds = $this->assignedClassIds($user, $tenantId);
+        $filters = $request->validate([
+            'search' => 'nullable|string|max:100',
+        ]);
 
         $students = Student::where('tenant_id', $tenantId)
             ->when($classIds !== null, fn ($q) => $q->whereIn('school_class_id', $classIds))
             ->active()
+            ->when(! empty($filters['search']), function ($q) use ($filters) {
+                $term = '%'.$filters['search'].'%';
+                $q->where(function ($inner) use ($term) {
+                    $inner->where('name', 'like', $term)
+                        ->orWhere('reg_no', 'like', $term)
+                        ->orWhere('roll_number', 'like', $term);
+                });
+            })
             ->with('schoolClass.classCategory')
             ->orderBy('school_class_id')
             ->orderBy('name')
-            ->get(['id', 'name', 'reg_no', 'school_class_id', 'roll_number', 'gender']);
+            ->paginate(25)
+            ->withQueryString();
 
         return inertia('Portal/Group/Students', [
             'tenantId' => $tenantId,
             'students' => $students,
+            'filters'  => $filters,
         ]);
     }
 
@@ -79,9 +92,9 @@ class GroupAdminController extends Controller
             ->whereHas('participants', fn ($q) => $q->whereIn('student_id', $studentIds))
             ->with(['event:id,title,event_type,status', 'item:id,title', 'participants.student:id,name,reg_no'])
             ->latest('submitted_at')
-            ->limit(100)
-            ->get()
-            ->map(fn (FestRegistration $reg) => [
+            ->paginate(25)
+            ->withQueryString()
+            ->through(fn (FestRegistration $reg) => [
                 'id'           => $reg->id,
                 'event_title'  => $reg->event?->title,
                 'event_type'   => $reg->event?->event_type,

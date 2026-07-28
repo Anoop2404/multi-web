@@ -7,6 +7,8 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -97,5 +99,37 @@ class AuthAuditTest extends TestCase
                 ->has('summary')
                 ->has('categories')
             );
+    }
+
+    public function test_forgot_password_reset_updates_password_without_clearing_login_identity(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'username'          => 'demo.user',
+            'plain_password'    => 'OldTemp123',
+        ]);
+
+        $oldPassword = 'OldTemp123';
+        $newPassword = 'NewTemp123!';
+        $token = Password::broker()->createToken($user);
+
+        $response = $this->post('/reset-password', [
+            'token'                 => $token,
+            'email'                 => $user->email,
+            'password'              => $newPassword,
+            'password_confirmation' => $newPassword,
+        ]);
+
+        $response->assertRedirect('/portal/login');
+        $response->assertSessionHas('success', 'Password reset. You can sign in now.');
+
+        $fresh = $user->fresh();
+
+        $this->assertSame('demo.user', $fresh->username);
+        $this->assertSame($user->email, $fresh->email);
+        $this->assertNull($fresh->plain_password);
+        $this->assertFalse(Hash::check($oldPassword, $fresh->password));
+        $this->assertTrue(Hash::check($newPassword, $fresh->password));
+        $this->assertFalse((bool) $fresh->must_change_password);
     }
 }

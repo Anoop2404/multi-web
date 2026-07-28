@@ -37,7 +37,7 @@
                 <thead>
                     <tr>
                         <th>Participant</th>
-                        <th>Reg No</th>
+                        <th>Admission No</th>
                         <th>Fest ID</th>
                         <th>Item reg</th>
                         <th>Chest</th>
@@ -49,7 +49,7 @@
                 <tbody>
                     <tr v-for="p in participants" :key="p.id">
                         <td>{{ p.student?.name ?? p.teacher?.name }}</td>
-                        <td class="font-mono text-xs">{{ p.student?.reg_no ?? p.teacher?.reg_no }}</td>
+                        <td class="font-mono text-xs">{{ p.student?.admission_number ?? p.teacher?.reg_no }}</td>
                         <td class="font-mono text-xs">{{ p.level_registration_number ?? '—' }}</td>
                         <td class="font-mono text-xs">{{ p.item_registration_number ?? '—' }}</td>
                         <td class="font-mono text-xs">{{ p.chest_no ?? '—' }}</td>

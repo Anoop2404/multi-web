@@ -260,14 +260,29 @@ class FestRegistrationController extends SchoolAdminController
             });
         }
 
-        // Was previously unbounded — fine for the small-roster case (where this endpoint
-        // was rarely even reached, since index()/eventRegistration() always eagerly sent
-        // the full list anyway), but a real problem now that those two methods actually
-        // defer to this endpoint for large rosters. 150 is generous for "in the process of
-        // typing a name/admission number" while still bounding the worst case (a large
-        // school opening the picker with no search text yet).
-        // See docs/SCALE_AND_PAGINATION_PLAN.md §6.
-        $studentRows = $studentQuery->limit(150)->get();
+        // Keep the response bounded for large schools, but make the initial pool useful
+        // for every class. A simple alphabetical limit can contain only the first few
+        // classes, which incorrectly makes items for later classes look ineligible.
+        if (! $classId && blank($search)) {
+            $classIds = Student::where('tenant_id', $this->school->id)
+                ->active()
+                ->whereNotNull('school_class_id')
+                ->distinct()
+                ->orderBy('school_class_id')
+                ->limit(150)
+                ->pluck('school_class_id');
+
+            $perClass = max(1, intdiv(150, max(1, $classIds->count())));
+            $studentRows = $classIds
+                ->flatMap(fn ($id) => (clone $studentQuery)
+                    ->where('school_class_id', $id)
+                    ->limit($perClass)
+                    ->get())
+                ->take(150)
+                ->values();
+        } else {
+            $studentRows = $studentQuery->limit(150)->get();
+        }
 
         $annotated = app(FestRegistrationEligibilityService::class)
             ->annotateStudents($studentRows, $event, $this->school->id)

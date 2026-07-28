@@ -126,14 +126,15 @@
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-[#0f3d7a]">{{ headerEyebrow }}</p>
                         <h1 class="text-base font-bold text-[#041525] truncate">{{ title }}</h1>
                     </div>
-                    <span v-if="isStaffUser" class="hidden sm:inline text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-medium">View only</span>
+                    <span v-if="isReadOnlyStaff" class="hidden sm:inline text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-medium">View only</span>
+                    <span v-else-if="isStaffUser" class="hidden sm:inline text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-medium">Scoped access</span>
                     <slot name="header-suffix" />
                 </div>
             </header>
 
-            <main class="sa-main flex-1 p-4 sm:p-6 lg:p-8 overflow-auto" :class="{ 'staff-readonly': isStaffUser }">
+            <main class="sa-main flex-1 p-4 sm:p-6 lg:p-8 overflow-auto" :class="{ 'staff-readonly': isReadOnlyStaff }">
                 <div class="sa-page mx-auto w-full" :class="maxWidth">
-                    <StaffReadOnlyBanner v-if="isStaffUser" />
+                    <StaffReadOnlyBanner v-if="isReadOnlyStaff" />
                     <FlashBanner />
                     <slot />
                 </div>
@@ -175,6 +176,9 @@ const page = usePage();
 const mobileNavOpen = ref(false);
 const navSearch = ref('');
 const isStaffUser = computed(() => props.isStaff || page.props.isStaff);
+const staffPermissions = computed(() => page.props.staffPermissions ?? []);
+const isReadOnlyStaff = computed(() => isStaffUser.value
+    && !staffPermissions.value.some(permission => !permission.endsWith('.view')));
 
 const eventContext = computed(() => props.event ?? page.props.event ?? null);
 
@@ -244,7 +248,7 @@ const navGroups = computed(() => {
         return groups;
     }
 
-    const perms = page.props.staffPermissions ?? [];
+    const perms = staffPermissions.value;
     return filterNavByPermissions(groups, (item) => staffCanSeeNavItem(item, perms));
 });
 

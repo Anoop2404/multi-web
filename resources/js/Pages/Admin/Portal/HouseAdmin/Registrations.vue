@@ -35,7 +35,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="reg in registrations" :key="reg.id" class="border-t">
+                    <tr v-for="reg in registrations.data" :key="reg.id" class="border-t">
                         <td class="p-3 font-medium">{{ reg.item?.title }}</td>
                         <td class="p-3 text-gray-600">{{ reg.event?.title }}</td>
                         <td class="p-3 text-xs text-gray-600">
@@ -45,11 +45,12 @@
                             <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 capitalize">{{ reg.status }}</span>
                         </td>
                     </tr>
-                    <tr v-if="!registrations.length">
+                    <tr v-if="!registrations.data?.length">
                         <td colspan="4" class="p-8 text-center text-gray-400">No registrations for your house students.</td>
                     </tr>
                 </tbody>
             </table>
+            <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total }" />
         </div>
 
         <p class="mt-4 text-xs text-gray-500 text-center">
@@ -60,6 +61,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { router } from '@inertiajs/vue3';
 import { computed, reactive } from 'vue';
 import { houseAdminPortalNavItems } from '@/support/houseAdminPortalNav.js';
@@ -67,7 +69,7 @@ import { houseAdminPortalNavItems } from '@/support/houseAdminPortalNav.js';
 const props = defineProps({
     school: Object,
     house: Object,
-    registrations: Array,
+    registrations: Object,
     events: Array,
     filters: Object,
     statusOptions: Array,
@@ -87,4 +89,3 @@ function applyFilters() {
     router.get(`/portal/house-admin/${props.school.id}/registrations`, params, { preserveState: true });
 }
 </script>
-

@@ -25,7 +25,11 @@ class FestCertificateController extends SahodayaAdminController
             ->orderByDesc('generated_at')
             ->get()
             ->map(fn ($c) => array_merge(
-                ['id' => $c->id, 'uuid' => $c->verification_uuid],
+                [
+                    'id' => $c->id,
+                    'uuid' => $c->verification_uuid,
+                    'cert_type' => $c->cert_type,
+                ],
                 $service->payloadFor($c)
             ));
 

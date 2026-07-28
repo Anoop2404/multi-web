@@ -47,7 +47,8 @@ class ExamOpsController extends Controller
         $registrations = McqRegistration::where('exam_id', $exam->id)
             ->with(['student', 'school'])
             ->orderBy('hall_ticket_no')
-            ->get();
+            ->paginate(50)
+            ->withQueryString();
 
         $pendingCorrectionsByReg = \App\Models\McqAttendanceCorrectionRequest::where('exam_id', $exam->id)
             ->where('status', 'pending')
@@ -126,7 +127,8 @@ class ExamOpsController extends Controller
             ->where('attendance_status', 'present')
             ->with(['student', 'school', 'mark'])
             ->orderBy('hall_ticket_no')
-            ->get();
+            ->paginate(50)
+            ->withQueryString();
 
         return inertia('Portal/Exam/MarkEntry', [
             'sahodaya'      => Tenant::findOrFail($tenantId)->only('id', 'name'),
@@ -166,11 +168,14 @@ class ExamOpsController extends Controller
     {
         $this->authorizeExam($request, $tenantId, $exam);
 
-        $registrations = McqRegistration::where('exam_id', $exam->id)
+        $baseQuery = McqRegistration::where('exam_id', $exam->id);
+
+        $registrations = (clone $baseQuery)
             ->with(['student', 'school', 'mark'])
             ->orderBy('hall_ticket_no')
-            ->get()
-            ->map(fn (McqRegistration $r) => [
+            ->paginate(50)
+            ->withQueryString()
+            ->through(fn (McqRegistration $r) => [
                 'id'                 => $r->id,
                 'student_name'       => $r->student?->name,
                 'school_name'        => $r->school?->name,
@@ -183,13 +188,13 @@ class ExamOpsController extends Controller
             ]);
 
         $summary = [
-            'total'       => $registrations->count(),
-            'present'     => $registrations->where('attendance_status', 'present')->count(),
-            'started'     => $registrations->whereIn('status', ['started', 'submitted'])->count(),
-            'submitted'   => $registrations->where('status', 'submitted')->count(),
-            'absent'      => $registrations->where('attendance_status', 'absent')->count(),
-            'malpractice' => $registrations->where('attendance_status', 'malpractice')->count(),
-            'withheld'    => $registrations->where('attendance_status', 'withheld')->count(),
+            'total'       => (clone $baseQuery)->count(),
+            'present'     => (clone $baseQuery)->where('attendance_status', 'present')->count(),
+            'started'     => (clone $baseQuery)->whereIn('status', ['started', 'submitted'])->count(),
+            'submitted'   => (clone $baseQuery)->where('status', 'submitted')->count(),
+            'absent'      => (clone $baseQuery)->where('attendance_status', 'absent')->count(),
+            'malpractice' => (clone $baseQuery)->where('attendance_status', 'malpractice')->count(),
+            'withheld'    => (clone $baseQuery)->where('attendance_status', 'withheld')->count(),
         ];
 
         return inertia('Portal/Exam/Supervision', [
