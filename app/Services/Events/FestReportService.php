@@ -25,6 +25,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FestReportService
 {
+    private bool $preview = false;
+
     public function __construct(public FestEvent $event) {}
 
     /**
@@ -247,6 +249,7 @@ class FestReportService
     public function export(string $type, Request $request): StreamedResponse|\Symfony\Component\HttpFoundation\Response
     {
         $audience = $request->input('audience', 'staff') === 'public' ? 'public' : 'staff';
+        $this->preview = $request->boolean('preview');
 
         EventLifecycleGate::allowReportExport($this->event, $type, $audience);
         EventLifecycleGate::allowResultReport($this->event, $type);
@@ -327,7 +330,7 @@ class FestReportService
     {
         $html = view($view, $data)->render();
 
-        return PdfGenerator::download($html, $filename, false, $landscape);
+        return PdfGenerator::download($html, $filename, $this->preview, $landscape);
     }
 
     private function reportAudience(Request $request): string
@@ -659,22 +662,29 @@ class FestReportService
 
         $sahodaya = Tenant::find($this->event->tenant_id);
 
-        // DOB enrichment only for sports events (photos skipped — DomPDF memory
-        // overhead with 200+ embedded images exceeds 128MB limit).
-        if ($this->event->event_type === 'sports') {
-            $dobMap = [];
-            foreach ($participants as $p) {
-                $sid = $p->student_id;
-                if ($sid && ! isset($dobMap[$sid])) {
-                    $dobMap[$sid] = $p->student?->dob?->format('d M Y');
-                }
+        // Enrich rows with photo data URIs and DOB (sports only).
+        $photoMap = [];
+        $dobMap = [];
+        foreach ($participants as $p) {
+            $sid = $p->student_id;
+            if (! $sid) {
+                continue;
             }
-            if ($dobMap) {
-                $rowsByItem = $rowsByItem->map(fn ($rows) => $rows->map(
-                    fn ($row) => array_merge($row, ['photo_src' => null, 'dob' => $dobMap[$row['_student_id'] ?? null] ?? null]),
-                )->all());
+            if (! isset($photoMap[$sid]) && $p->student?->photo) {
+                $photoMap[$sid] = \App\Support\TenantStorage::photoDataUri($sahodaya, $p->student->photo);
+            }
+            if ($this->event->event_type === 'sports' && ! isset($dobMap[$sid])) {
+                $dobMap[$sid] = $p->student?->dob?->format('d M Y');
             }
         }
+
+        $rowsByItem = $rowsByItem->map(fn ($rows) => $rows->map(function ($row) use ($photoMap, $dobMap) {
+            $sid = $row['_student_id'] ?? null;
+            return array_merge($row, [
+                'photo_src' => $sid ? ($photoMap[$sid] ?? null) : null,
+                'dob'       => $dobMap[$sid] ?? ($row['dob'] ?? null),
+            ]);
+        })->all());
 
         return $this->renderPdf('fest.reports.attendance-sheet', [
             'event'      => $this->event,

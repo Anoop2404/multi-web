@@ -5,7 +5,7 @@
     <title>Attendance Sheet — {{ $event->title }}</title>
     <style>
         @page {
-            margin-top: 36mm;
+            margin-top: 10mm;
             margin-bottom: 16mm;
             margin-left: 10mm;
             margin-right: 10mm;
@@ -17,36 +17,6 @@
             margin: 0;
             padding: 0;
         }
-        .header-container {
-            position: fixed;
-            top: -30mm;
-            left: 0;
-            right: 0;
-            height: 24mm;
-            border-bottom: 2px solid #0f172a;
-            text-align: center;
-        }
-        .logo-img {
-            max-height: 36px;
-            margin-bottom: 2px;
-        }
-        .sahodaya-title {
-            font-size: 15px;
-            font-weight: bold;
-            color: #0f172a;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin: 0;
-            line-height: 1.1;
-        }
-        .event-subtitle {
-            font-size: 10px;
-            font-weight: bold;
-            color: #475569;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin-top: 3px;
-        }
         .footer-container {
             position: fixed;
             bottom: -10mm;
@@ -57,36 +27,6 @@
             font-size: 8px;
             color: #64748b;
             text-align: center;
-        }
-        .item-block {
-            margin-bottom: 20px;
-        }
-        .item-heading {
-            background: #0f172a;
-            color: #ffffff;
-            padding: 6px 10px;
-            font-size: 11px;
-            font-weight: bold;
-            border-radius: 4px 4px 0 0;
-            display: block;
-            box-sizing: border-box;
-        }
-        .item-title {
-            float: left;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-        .item-count {
-            float: right;
-            background: #334155;
-            color: #f8fafc;
-            font-size: 9px;
-            padding: 1px 8px;
-            border-radius: 10px;
-            font-weight: normal;
-        }
-        .clear {
-            clear: both;
         }
         table {
             width: 100%;
@@ -103,14 +43,14 @@
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.04em;
-            padding: 6px 8px;
+            padding: 5px 6px;
             border: 1px solid #cbd5e1;
             text-align: left;
         }
         td {
-            padding: 6px 8px;
+            padding: 5px 6px;
             border: 1px solid #cbd5e1;
-            font-size: 10px;
+            font-size: 9px;
             color: #1e293b;
             vertical-align: middle;
         }
@@ -123,19 +63,19 @@
         .chest-no {
             font-weight: bold;
             color: #0f172a;
-            font-size: 11px;
+            font-size: 10px;
         }
         .school-name {
             text-transform: uppercase;
             color: #334155;
-            font-size: 9px;
+            font-size: 8px;
         }
         .team-divider td {
             background: #f1f5f9;
             color: #0f172a;
             font-weight: bold;
             font-size: 9px;
-            padding: 4px 8px;
+            padding: 4px 6px;
             border-top: 2px solid #cbd5e1;
             border-bottom: 1px solid #cbd5e1;
             text-transform: uppercase;
@@ -148,56 +88,89 @@
             display: inline-block;
             background: #dbeafe;
             color: #1e40af;
+            font-size: 7px;
+            font-weight: bold;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-top: 1px;
+        }
+        .photo-cell {
+            width: 32px;
+        }
+        .photo-cell img {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid #e2e8f0;
+        }
+        .photo-cell .initials {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            color: #64748b;
             font-size: 8px;
             font-weight: bold;
-            padding: 1px 5px;
-            border-radius: 3px;
-            margin-top: 2px;
+            display: inline-block;
+            text-align: center;
+            line-height: 28px;
+        }
+        .item-heading-bar {
+            background: #0f172a;
+            color: #ffffff;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 0;
+        }
+        .item-heading-bar .count-badge {
+            float: right;
+            background: #334155;
+            color: #f8fafc;
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: normal;
         }
     </style>
 </head>
 <body>
 
-<div class="header-container">
-    @if(!empty($logo))
-        <img src="{{ $logo }}" class="logo-img" alt="">
-    @endif
-    <h1 class="sahodaya-title">{{ $sahodaya->name ?? 'Sahodaya' }}</h1>
-    <div class="event-subtitle">{{ $event->title }} &bull; ATTENDANCE SHEET</div>
-</div>
-
 <div class="footer-container">
     Generated on {{ now()->format('d M Y, h:i A') }} &bull; Page {PAGE_NUM} of {PAGE_COUNT}
 </div>
+
+@include('partials.pdf-branding-header', [
+    'orgName' => $sahodaya->name ?? 'SAHODAYA',
+    'logoSrc' => $logo ?? null,
+    'docTitle' => 'ATTENDANCE SHEET',
+])
 
 @forelse($rowsByItem as $itemName => $rows)
     @php
         $cleanTitle = str_replace('_', ' ', $itemName);
     @endphp
-    <div class="item-block">
-        <table style="width: 100%; border: none; margin-bottom: 0;">
-            <tr>
-                <td style="background: #0f172a; color: #ffffff; padding: 6px 10px; font-size: 11px; font-weight: bold; border: none; border-radius: 4px 0 0 0; text-transform: uppercase; letter-spacing: 0.03em;">
-                    {{ $cleanTitle }}
-                </td>
-                <td style="background: #0f172a; color: #ffffff; padding: 6px 10px; font-size: 9px; text-align: right; border: none; border-radius: 0 4px 0 0;">
-                    <span style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 10px;">{{ count($rows) }} {{ count($rows) === 1 ? 'Participant' : 'Participants' }}</span>
-                </td>
-            </tr>
-        </table>
+    <div style="margin-bottom: 16px;">
+        <div class="item-heading-bar">
+            {{ $cleanTitle }}
+            <span class="count-badge">{{ count($rows) }} {{ count($rows) === 1 ? 'Participant' : 'Participants' }}</span>
+        </div>
         <table>
             <thead>
                 <tr>
-                    <th style="width: 30px;" class="text-center">Sl</th>
-                    <th style="width: 65px;" class="text-center">Chest No</th>
-                    @if(($audience ?? 'staff') === 'staff')
-                        <th>Participant / Team Name</th>
-                        @if($event->event_type === 'sports')
-                            <th style="width: 75px;" class="text-center">DOB</th>
-                        @endif
-                        <th style="width: 32%;">School</th>
+                    <th style="width: 28px;" class="text-center">Sl</th>
+                    <th class="photo-cell"></th>
+                    <th style="width: 50px;" class="text-center">Chest</th>
+                    <th>Participant / Team Name</th>
+                    @if($event->event_type === 'sports')
+                        <th style="width: 70px;" class="text-center">DOB</th>
                     @endif
-                    <th style="width: 90px;" class="text-center">Attendance</th>
+                    <th style="width: 28%;">School</th>
+                    <th style="width: 70px;" class="text-center">Attendance</th>
                 </tr>
             </thead>
             <tbody>
@@ -207,17 +180,20 @@
                 @foreach($rows as $i => $row)
                     @php
                         $teamName = $row['team_name'] ?? null;
+                        $school = $row['school'] ?? '';
                         $groupId = $row['group_id'] ?? null;
-                        $currentTeamKey = $groupId ? 'group_'.$groupId : ($teamName ? 'team_'.$teamName.'_'.($row['school'] ?? '') : null);
+                        $currentTeamKey = $groupId
+                            ? 'g_'.$groupId
+                            : ($teamName ? 't_'.str_replace(' ', '_', $teamName).'_'.str_replace(' ', '_', $school) : null);
                     @endphp
 
                     @if($currentTeamKey && $currentTeamKey !== $lastTeamKey)
                         @php $lastTeamKey = $currentTeamKey; @endphp
                         <tr class="team-divider">
-                            <td colspan="{{ $event->event_type === 'sports' ? 6 : 5 }}">
+                            <td colspan="{{ $event->event_type === 'sports' ? 7 : 6 }}">
                                 <strong>TEAM: {{ strtoupper($teamName ?? 'Team Entry') }}</strong>
-                                @if(!empty($row['school']))
-                                    &bull; <span style="color: #475569;">{{ strtoupper($row['school']) }}</span>
+                                @if(!empty($school))
+                                    &bull; <span style="color: #475569;">{{ strtoupper($school) }}</span>
                                 @endif
                             </td>
                         </tr>
@@ -225,19 +201,24 @@
 
                     <tr>
                         <td class="text-center">{{ $i + 1 }}</td>
-                        <td class="text-center chest-no">{{ $row['reference'] ?? '—' }}</td>
-                        @if(($audience ?? 'staff') === 'staff')
-                            <td>
-                                <strong>{{ $row['name'] ?? '' }}</strong>
-                                @if(!empty($row['team_name']))
-                                    <div><span class="team-tag">Team: {{ $row['team_name'] }}</span></div>
-                                @endif
-                            </td>
-                            @if($event->event_type === 'sports')
-                                <td class="text-center" style="font-size: 9px; color: #475569;">{{ $row['dob'] ?? '—' }}</td>
+                        <td class="photo-cell text-center">
+                            @if(!empty($row['photo_src']))
+                                <img src="{{ $row['photo_src'] }}" alt="">
+                            @else
+                                <span class="initials">{{ strtoupper(substr($row['name'] ?? '?', 0, 1)) }}</span>
                             @endif
-                            <td class="school-name">{{ strtoupper($row['school'] ?? '') }}</td>
+                        </td>
+                        <td class="text-center chest-no">{{ $row['reference'] ?? '—' }}</td>
+                        <td>
+                            <strong style="font-size: 9px;">{{ $row['name'] ?? '' }}</strong>
+                            @if(!empty($row['team_name']))
+                                <div><span class="team-tag">Team: {{ $row['team_name'] }}</span></div>
+                            @endif
+                        </td>
+                        @if($event->event_type === 'sports')
+                            <td class="text-center" style="font-size: 8px; color: #475569;">{{ $row['dob'] ?? '—' }}</td>
                         @endif
+                        <td class="school-name">{{ strtoupper($school) }}</td>
                         <td class="text-center"></td>
                     </tr>
                 @endforeach

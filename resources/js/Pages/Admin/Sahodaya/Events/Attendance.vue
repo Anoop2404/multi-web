@@ -14,9 +14,13 @@
                        class="btn-secondary text-xs flex items-center gap-1">
                         <span>Download XLSX report ↓</span>
                     </a>
-                    <a :href="attendanceSheetPdfHref" target="_blank" rel="noopener"
+                    <a :href="attendanceSheetPreviewHref" target="_blank" rel="noopener"
+                       class="btn-secondary text-xs flex items-center gap-1">
+                        <span>Preview PDF ↗</span>
+                    </a>
+                    <a :href="attendanceSheetPdfHref"
                        class="btn-primary text-xs flex items-center gap-1">
-                        <span>Print attendance sheet (PDF) ↗</span>
+                        <span>Download PDF ↓</span>
                     </a>
                 </div>
             </template>
@@ -293,6 +297,11 @@ const attendanceXlsxHref = computed(() => {
 const attendanceSheetPdfHref = computed(() => {
     const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet`;
     return itemFilter.value ? `${base}?item_id=${itemFilter.value}` : base;
+});
+
+const attendanceSheetPreviewHref = computed(() => {
+    const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet?preview=1`;
+    return itemFilter.value ? `${base}&item_id=${itemFilter.value}` : base;
 });
 
 function attendanceKey(p) {

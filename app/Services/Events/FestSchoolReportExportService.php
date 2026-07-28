@@ -13,6 +13,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FestSchoolReportExportService
 {
+    private bool $preview = false;
+
     /**
      * Sahodaya branding (org name + logo data URI) for PDF report headers.
      *
@@ -20,7 +22,7 @@ class FestSchoolReportExportService
      */
     private function renderPdf(string $view, array $data, string $filename, bool $landscape = false)
     {
-        return PdfGenerator::download(view($view, $data)->render(), $filename, false, $landscape);
+        return PdfGenerator::download(view($view, $data)->render(), $filename, $this->preview, $landscape);
     }
 
     private function brandingData(FestEvent $event): array

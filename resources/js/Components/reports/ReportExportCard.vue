@@ -9,7 +9,12 @@
                 <p v-if="missingParams" class="text-xs text-amber-700 mt-1">Select required filters below before downloading.</p>
             </div>
             <div class="flex flex-wrap gap-2 shrink-0">
-                <Link v-if="previewHref" :href="previewHref" class="btn-secondary text-xs px-3 py-2">
+                <a v-if="pdfPreviewHref" :href="pdfPreviewHref"
+                   target="_blank" rel="noopener"
+                   class="btn-secondary text-xs px-3 py-2">
+                    Preview PDF ↗
+                </a>
+                <Link v-else-if="previewHref" :href="previewHref" class="btn-secondary text-xs px-3 py-2">
                     Preview
                 </Link>
                 <a :href="downloadHref"
@@ -116,6 +121,12 @@ const emit = defineEmits(['update:param']);
 const previewHref = computed(() =>
     props.exp.previewHref ?? previewHrefForExport(props.exp.id, props.reportsBase),
 );
+
+const pdfPreviewHref = computed(() => {
+    if (previewHref.value) return null;
+    if (props.exp.format !== 'pdf') return null;
+    return downloadHref.value + (downloadHref.value.includes('?') ? '&' : '?') + 'preview=1';
+});
 
 const formatLabel = computed(() => FORMAT_LABELS[props.exp.format] ?? props.exp.format?.toUpperCase() ?? 'FILE');
 const formatClass = computed(() => `reports-format-badge--${props.exp.format ?? 'pdf'}`);
