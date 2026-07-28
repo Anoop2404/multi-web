@@ -653,7 +653,21 @@ class FestRegistrationController extends SchoolAdminController
 
     public function store(Request $request, string $tenantId, string $program)
     {
+        // Validate event_id before touching the model at all. The old code called
+        // FestEvent::findOrFail($request->input('event_id')) first thing, on raw
+        // unvalidated input — if event_id was ever missing, blank, or stale (e.g. a
+        // form re-submitted after a session hiccup wiped client-side state), that
+        // threw a bare ModelNotFoundException -> generic 404 instead of a normal
+        // validation error the form could actually show the user.
+        $request->validate(['event_id' => 'required|integer|exists:fest_events,id']);
+
         $event = FestEvent::findOrFail($request->input('event_id'));
+
+        // Also close a real authorization gap: unlike update() below, this method
+        // never checked that the event even belongs to this school's own Sahodaya —
+        // any school admin who knew/guessed a valid event_id could register students
+        // into a completely different Sahodaya's event.
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $rules = [
             'event_id'       => 'required|exists:fest_events,id',

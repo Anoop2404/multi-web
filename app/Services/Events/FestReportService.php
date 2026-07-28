@@ -659,23 +659,39 @@ class FestReportService
         $isPreview = $this->preview;
         $isDomPdf = empty(env('PDF_CONVERTER_URL'));
 
-        // Build photo map. In the browser preview, the viewer's own session can fetch
-        // an authenticated photo route fine (see resolveParticipantPhotoUrl()). But the
-        // real PDF export via dompdf makes its own outbound HTTP request to fetch each
-        // <img src> with no cookies/session at all, so any auth-gated URL just 404s —
-        // that's why photos render in preview but show as broken images in the download.
-        // For the actual PDF we embed the photo bytes directly as a base64 data URI
-        // instead (photoBase64DataUri never hands dompdf a bare filesystem path, which
-        // it can fail to open when storage is a symlinked/mounted volume — see that
-        // method's docblock).
+        // Build photo map. Embed every photo as a base64 data URI — for the PDF this
+        // avoids handing the renderer an auth-gated URL it has no session cookies to
+        // fetch (see photoBase64DataUri's docblock); for the on-screen preview it
+        // avoids the browser firing ~200 separate authenticated <img> requests, each
+        // re-running disk-existence probes (a network round trip for S3), which is
+        // exactly what was making photos load slowly and a handful randomly fail —
+        // classic PHP-FPM-worker/connection contention under concurrent load.
+        //
+        // The trade-off: embedding means this request itself does up to ~200
+        // sequential S3 reads before it can respond at all. Caching each student's
+        // resized thumbnail (keyed on their own updated_at) means only the very
+        // first view of a given student's photo, across ANY report, pays that cost —
+        // an edited photo naturally busts its own cache key since updated_at changes.
         $photoMap = [];
         foreach ($participants as $p) {
             $sid = $p->student_id;
-            if ($sid && ! isset($photoMap[$sid]) && $p->student) {
-                $photoMap[$sid] = $isPreview
-                    ? $this->resolveParticipantPhotoUrl($p->student, $request)
-                    : \App\Support\TenantStorage::photoBase64DataUri($p->student->tenant, $p->student->photo);
+            $student = $p->student;
+            if (! $sid || isset($photoMap[$sid]) || ! $student) {
+                continue;
             }
+
+            if (! $student->photo) {
+                $photoMap[$sid] = null;
+
+                continue;
+            }
+
+            $cacheKey = 'student-photo-thumb:'.$sid.':'.($student->updated_at?->timestamp ?? 0);
+            $photoMap[$sid] = \Illuminate\Support\Facades\Cache::remember(
+                $cacheKey,
+                now()->addDays(30),
+                fn () => \App\Support\TenantStorage::photoBase64DataUri($student->tenant, $student->photo),
+            );
         }
 
         // Build rows using participantReportRows (individual students with team metadata).
@@ -803,40 +819,6 @@ class FestReportService
             HTML;
 
         return [$header, $footer];
-    }
-
-    /**
-     * Resolve a photo URL this specific viewer can actually load.
-     *
-     * Student::photoUrl() always builds a `school.students.photo` link, which is
-     * gated by EnsureSchoolAdmin's `$user->tenant_id === route tenantId` check. That
-     * works when a school admin views their own school's report, but 403s for a
-     * Sahodaya admin (their tenant_id is the Sahodaya org, not the school) — which is
-     * exactly the "attendance-sheet" export reached via /sahodaya-admin/.../reports/export.
-     * When this report is being viewed from the sahodaya-admin panel, build the
-     * sahodaya-scoped photo route instead, which authorizes on the student's school
-     * being a member of that Sahodaya rather than an exact tenant match.
-     */
-    private function resolveParticipantPhotoUrl(Student $student, Request $request): ?string
-    {
-        if (! $student->photo || ! $student->tenant_id) {
-            return null;
-        }
-
-        if (str_starts_with($student->photo, 'http://') || str_starts_with($student->photo, 'https://')) {
-            return $student->photo;
-        }
-
-        if ($request->routeIs('sahodaya.*')) {
-            $version = $student->updated_at?->timestamp ?? 0;
-
-            return url(route('sahodaya.students.photo', [
-                'tenantId' => $this->event->tenant_id,
-                'student'  => $student->id,
-            ], absolute: false)).($version ? '?v='.$version : '');
-        }
-
-        return $student->photoUrl();
     }
 
     private function attendanceSheetSchoolPdf(Request $request): \Symfony\Component\HttpFoundation\Response

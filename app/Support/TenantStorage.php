@@ -350,7 +350,8 @@ class TenantStorage
 
     /**
      * Like photoDataUri(), but never hands dompdf a bare filesystem path — always
-     * reads the bytes ourselves and returns a true base64 data URI.
+     * reads the bytes ourselves and returns a true base64 data URI, downscaled to a
+     * thumbnail.
      *
      * photoDataUri() returns the raw local path when it finds one on disk, which is
      * fine in principle (dompdf can open local files), but production storage is
@@ -361,8 +362,22 @@ class TenantStorage
      * silently swaps in its own broken-image placeholder for every single photo.
      * Reading the bytes in PHP and inlining them as base64 sidesteps dompdf's path
      * resolution entirely, so it can't be tripped up by chroot/symlink mismatches.
+     *
+     * This is also what a roster report (attendance sheets, etc.) should use even for
+     * an on-screen preview, not just the PDF: rendering ~200 participant photos as
+     * separate authenticated <img> requests means the browser fires ~200 concurrent
+     * fetches, each of which re-runs disk-existence probes (and, for S3, a network
+     * round trip) — under load that exhausts PHP-FPM workers and a handful of images
+     * randomly fail or crawl in. Embedding the bytes once, server-side, during the
+     * single request that renders the report removes that whole class of failure.
+     *
+     * Photos are uploaded at full resolution (up to 2MB) but only ever displayed as a
+     * ~28px circular thumbnail, so this also downscales before embedding when GD is
+     * available — a typical 200KB-2MB original becomes a few KB, which is most of why
+     * this is faster, not just more reliable. Falls back to the original bytes if GD
+     * isn't installed or resizing fails for any reason.
      */
-    public static function photoBase64DataUri(?Tenant $tenant, ?string $relativePath): ?string
+    public static function photoBase64DataUri(?Tenant $tenant, ?string $relativePath, int $maxDimension = 160): ?string
     {
         if (! $relativePath) {
             return null;
@@ -382,7 +397,8 @@ class TenantStorage
         if ($local && is_file($local)) {
             $contents = @file_get_contents($local);
             if ($contents !== false && $contents !== '') {
-                $mime = @mime_content_type($local) ?: 'image/jpeg';
+                [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension)
+                    ?? [$contents, @mime_content_type($local) ?: 'image/jpeg'];
 
                 return 'data:'.$mime.';base64,'.base64_encode($contents);
             }
@@ -396,6 +412,7 @@ class TenantStorage
                         continue;
                     }
                     $mime = self::disk($disk)->mimeType($relativePath) ?: 'image/jpeg';
+                    [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension) ?? [$contents, $mime];
 
                     return 'data:'.$mime.';base64,'.base64_encode($contents);
                 }
@@ -405,6 +422,58 @@ class TenantStorage
         }
 
         return null;
+    }
+
+    /**
+     * Downscale image bytes to fit within $maxDimension×$maxDimension and re-encode
+     * as JPEG, for cheap embedding as a data URI. Returns null (caller keeps the
+     * original bytes/mime) if GD isn't available, decoding fails, or the image is
+     * already small enough that resizing wouldn't help.
+     *
+     * @return array{0: string, 1: string}|null [contents, mime]
+     */
+    private static function shrinkImageForEmbed(string $contents, int $maxDimension): ?array
+    {
+        if (! function_exists('imagecreatefromstring') || $contents === '') {
+            return null;
+        }
+
+        try {
+            $src = @imagecreatefromstring($contents);
+            if (! $src) {
+                return null;
+            }
+
+            $width = imagesx($src);
+            $height = imagesy($src);
+
+            if ($width <= $maxDimension && $height <= $maxDimension) {
+                imagedestroy($src);
+
+                return null;
+            }
+
+            $scale = $maxDimension / max($width, $height);
+            $newWidth = max(1, (int) round($width * $scale));
+            $newHeight = max(1, (int) round($height * $scale));
+
+            $dst = imagecreatetruecolor($newWidth, $newHeight);
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+            imagedestroy($src);
+
+            ob_start();
+            imagejpeg($dst, null, 82);
+            $resized = ob_get_clean();
+            imagedestroy($dst);
+
+            if (! is_string($resized) || $resized === '') {
+                return null;
+            }
+
+            return [$resized, 'image/jpeg'];
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public static function localAbsolutePath(?Tenant $tenant, ?string $relativePath): ?string
