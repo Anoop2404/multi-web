@@ -650,15 +650,22 @@ class FestReportService
 
         $audience = $this->reportAudience($request);
         $isPreview = $this->preview;
+        $isDomPdf = empty(env('PDF_CONVERTER_URL'));
 
-        // Build photo map using a route reachable by whoever is viewing this report
-        // (Student::photoUrl() always points at the school-admin panel route, which
-        // 403s when a Sahodaya admin's session views it — see resolveParticipantPhotoUrl()).
+        // Build photo map. In the browser preview, the viewer's own session can fetch
+        // an authenticated photo route fine (see resolveParticipantPhotoUrl()). But the
+        // real PDF export via dompdf makes its own outbound HTTP request to fetch each
+        // <img src> with no cookies/session at all, so any auth-gated URL just 404s —
+        // that's why photos render in preview but show as broken images in the download.
+        // For the dompdf path we embed the photo bytes directly as a base64 data URI
+        // instead (same technique already used for fest ID cards).
         $photoMap = [];
         foreach ($participants as $p) {
             $sid = $p->student_id;
             if ($sid && ! isset($photoMap[$sid]) && $p->student) {
-                $photoMap[$sid] = $this->resolveParticipantPhotoUrl($p->student, $request);
+                $photoMap[$sid] = ($isDomPdf && ! $isPreview)
+                    ? \App\Support\TenantStorage::photoDataUri($p->student->tenant, $p->student->photo)
+                    : $this->resolveParticipantPhotoUrl($p->student, $request);
             }
         }
 
@@ -720,7 +727,7 @@ class FestReportService
             // dompdf supports literal {PAGE_NUM}/{PAGE_COUNT} substitution; an external
             // Chromium-based converter (PDF_CONVERTER_URL) does not, so avoid printing
             // unresolved placeholder text on that path.
-            'isDomPdf'       => empty(env('PDF_CONVERTER_URL')),
+            'isDomPdf'       => $isDomPdf,
         ];
 
         // Preview mode: return raw HTML (browser handles S3 images, proper page layout)

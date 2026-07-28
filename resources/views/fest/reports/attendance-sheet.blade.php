@@ -4,11 +4,23 @@
     <meta charset="utf-8">
     <title>Attendance Sheet — {{ $event->title }}</title>
     <style>
+        /* @page margins and the fixed header/footer positioning only make sense for
+           an actual paginated PDF — a browser tab showing the raw preview HTML has no
+           concept of pages, and "position:fixed; top:-150px" would just push the
+           header off-screen there (that's why the preview was missing its header).
+           We can't rely on @media print to tell these apart: dompdf's default_media_type
+           is "screen", so it never applies @media print rules at all. Instead the two
+           variants are rendered server-side based on $isPreview — same markup either
+           way, just different positioning rules.
+           dompdf's fixed-position math is only reliable in px, and only when the
+           negative offset exactly cancels the @page margin it's pulled into — a
+           partial offset (or mm units) makes dompdf misplace the element mid-page
+           instead of repeating it at the top/bottom of each page. */
         @page {
-            margin-top: 40mm;
-            margin-bottom: 20mm;
-            margin-left: 10mm;
-            margin-right: 10mm;
+            margin-top: 150px;
+            margin-bottom: 80px;
+            margin-left: 38px;
+            margin-right: 38px;
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
@@ -17,17 +29,10 @@
             margin: 0;
             padding: 0;
         }
-        /* Fixed-position header/footer repeat on every printed page (both dompdf and
-           Chromium-based print engines honor position:fixed for pagination). The
-           negative top/bottom offsets pull them into the @page margin box reserved
-           above, so table content never has to share space with them. */
         .report-header {
-            position: fixed;
-            top: -40mm;
-            left: 0;
-            right: 0;
             border-bottom: 2px solid #0f172a;
             padding-bottom: 6px;
+            margin-bottom: 12px;
         }
         .event-context-bar {
             display: table;
@@ -45,26 +50,45 @@
             padding: 0 4px;
         }
         .footer-container {
-            position: fixed;
-            bottom: -14mm;
-            left: 0;
-            right: 0;
             display: table;
             width: 100%;
             border-top: 1px solid #cbd5e1;
             padding-top: 4px;
+            margin-top: 16px;
             font-size: 8px;
             color: #64748b;
         }
         .footer-container .footer-left {
             display: table-cell;
             text-align: left;
+            vertical-align: top;
         }
         .footer-container .footer-right {
             display: table-cell;
             text-align: right;
             white-space: nowrap;
+            vertical-align: top;
         }
+        @if(empty($isPreview))
+        .report-header {
+            position: fixed;
+            top: -150px;
+            left: 0;
+            right: 0;
+            height: 150px;
+            box-sizing: border-box;
+            margin-bottom: 0;
+        }
+        .footer-container {
+            position: fixed;
+            bottom: -80px;
+            left: 0;
+            right: 0;
+            height: 80px;
+            box-sizing: border-box;
+            margin-top: 0;
+        }
+        @endif
         main {
             width: 100%;
         }
