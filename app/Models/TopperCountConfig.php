@@ -19,6 +19,12 @@ class TopperCountConfig extends Model
 
     public const TIE_HARD_CAP = 'hard_cap';
 
+    public const RANK_COMPETITION = 'competition';
+
+    public const RANK_DENSE = 'dense';
+
+    public const RANK_SEQUENTIAL = 'sequential';
+
     protected $fillable = [
         'sahodaya_id',
         'class',
@@ -27,6 +33,7 @@ class TopperCountConfig extends Model
         'subject_id',
         'top_n',
         'tie_mode',
+        'rank_style',
     ];
 
     protected $casts = [

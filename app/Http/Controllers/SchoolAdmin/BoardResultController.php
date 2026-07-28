@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
-use App\Models\AcademicYearRecord;
 use App\Models\BoardResult;
 use App\Models\BoardResultUpload;
 use App\Models\DataChangeLog;
@@ -28,6 +27,7 @@ class BoardResultController extends SchoolAdminController
     {
         $class = $request->filled('class') ? $request->integer('class') : null;
         abort_if($class !== null && ! in_array($class, [10, 12], true), 404);
+        $yearService = app(BoardResultAcademicYearService::class);
 
         $results = BoardResult::where('tenant_id', $this->school->id)
             ->when($class, fn ($q) => $q->where('class', $class))
@@ -52,7 +52,7 @@ class BoardResultController extends SchoolAdminController
 
         return $this->inertia('School/BoardResults/Index', array_merge([
             'results' => $results,
-            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
+            'academicYearOptions' => $yearService->entryYearOptions((string) $this->school->parent_id),
             'statuses' => [
                 BoardResult::STATUS_DRAFT,
                 BoardResult::STATUS_SUBMITTED,
@@ -577,12 +577,16 @@ class BoardResultController extends SchoolAdminController
     {
         $class = $request->filled('class') ? (int) $request->input('class') : 12;
         $academicYear = $request->string('academic_year')->trim()->toString();
+        $yearService = app(BoardResultAcademicYearService::class);
+        $academicYearOptions = $yearService->entryYearOptions((string) $this->school->parent_id);
         if ($academicYear === '') {
-            $active = AcademicYearRecord::query()->where('status', 'active')->first();
-            $academicYear = $active?->label ?? ((date('Y') - 1).'-'.substr((string) date('Y'), 2));
+            $configuredOpenYear = collect($academicYearOptions)
+                ->first(fn (array $year) => $year['entry_configured'] && $year['entry_status'] === 'open');
+            $openYear = $configuredOpenYear
+                ?? collect($academicYearOptions)->firstWhere('entry_status', 'open');
+            $academicYear = $openYear['label'] ?? ((date('Y') - 1).'-'.substr((string) date('Y'), 2));
         }
 
-        $yearService = app(BoardResultAcademicYearService::class);
         $yearService->assertEditableYear($yearService->resolveId($academicYear), $academicYear);
 
         $sahodayaId = (string) $this->school->parent_id;
@@ -609,7 +613,7 @@ class BoardResultController extends SchoolAdminController
         return $this->inertia('School/BoardResults/SubjectToppers', array_merge([
             'boardResult' => $boardResult,
             'academicYear' => $academicYear,
-            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
+            'academicYearOptions' => $academicYearOptions,
         ], $this->topperContext($boardResult)));
     }
 

@@ -5,6 +5,7 @@ namespace Tests\Feature\SchoolAdmin;
 use App\Models\AcademicYearRecord;
 use App\Models\BoardResult;
 use App\Models\SahodayaProfile;
+use App\Models\SahodayaRegistrationWindow;
 use App\Models\Tenant;
 use App\Models\Topper;
 use App\Models\TopperSubjectMark;
@@ -76,6 +77,89 @@ class BoardResultsControllerTest extends TestCase
         }
 
         return $rows;
+    }
+
+    public function test_board_entry_window_year_is_listed_without_an_academic_year_master_record(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['sahodaya' => $sahodaya, 'school' => $school, 'admin' => $admin] = $this->createSchoolContext();
+
+        SahodayaRegistrationWindow::create([
+            'sahodaya_id' => $sahodaya->id,
+            'academic_year' => '2025-26',
+            'board_entry_starts_at' => now()->subDay()->toDateString(),
+            'board_entry_ends_at' => now()->addDay()->toDateString(),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get("/school-admin/{$school->id}/board-results?class=12");
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('School/BoardResults/Index', false)
+            ->has('academicYearOptions', 2)
+            ->where('academicYearOptions.1.label', '2025-26')
+            ->where('academicYearOptions.1.entry_status', 'open')
+            ->where('academicYearOptions.1.entry_configured', true));
+    }
+
+    public function test_open_board_entry_dates_allow_entry_for_a_closed_academic_year(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['sahodaya' => $sahodaya, 'school' => $school, 'year' => $year, 'admin' => $admin] = $this->createSchoolContext();
+
+        $year->update(['status' => 'closed']);
+        SahodayaRegistrationWindow::create([
+            'sahodaya_id' => $sahodaya->id,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'board_entry_starts_at' => now()->subDay()->toDateString(),
+            'board_entry_ends_at' => now()->addDay()->toDateString(),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->post("/school-admin/{$school->id}/board-results", [
+                'class' => 12,
+                'academic_year' => $year->label,
+                'total_appeared' => 10,
+                'pass_count' => 10,
+            ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertDatabaseHas('board_results', [
+            'tenant_id' => $school->id,
+            'class' => 12,
+            'academic_year' => $year->label,
+        ]);
+    }
+
+    public function test_expired_board_entry_dates_block_entry_even_for_an_active_academic_year(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['sahodaya' => $sahodaya, 'school' => $school, 'year' => $year, 'admin' => $admin] = $this->createSchoolContext();
+
+        SahodayaRegistrationWindow::create([
+            'sahodaya_id' => $sahodaya->id,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'board_entry_starts_at' => now()->subDays(10)->toDateString(),
+            'board_entry_ends_at' => now()->subDay()->toDateString(),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->post("/school-admin/{$school->id}/board-results", [
+                'class' => 12,
+                'academic_year' => $year->label,
+                'total_appeared' => 10,
+                'pass_count' => 10,
+            ]);
+
+        $response->assertSessionHasErrors('academic_year');
+        $this->assertDatabaseMissing('board_results', [
+            'tenant_id' => $school->id,
+            'class' => 12,
+            'academic_year' => $year->label,
+        ]);
     }
 
     public function test_subject_wise_batch_updates_existing_topper_name_and_marks(): void

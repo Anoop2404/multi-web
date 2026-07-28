@@ -95,7 +95,7 @@
                         <label class="form-label mb-1 font-semibold text-xs text-gray-700">1. Academic Year *</label>
                         <select v-model="selectedYear" class="field text-sm font-semibold bg-white" @change="onYearChange">
                             <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                                {{ ay.label }}{{ ay.status === 'active' ? ' (Active)' : '' }}
+                                {{ academicYearOptionLabel(ay) }}
                             </option>
                         </select>
                     </div>
@@ -385,6 +385,13 @@ const selectedYear = ref(props.academicYear);
 const searchQuery = ref('');
 const rowError = ref('');
 
+function academicYearOptionLabel(year) {
+    if (year.entry_status === 'open') return `${year.label} (Entry Open)`;
+    if (year.entry_status === 'upcoming') return `${year.label} (Entry Opens ${year.board_entry_starts_at})`;
+    if (year.entry_status === 'closed') return `${year.label} (Entry Closed)`;
+    return year.label;
+}
+
 const default23Subjects = [
     'English core', 'Hindi core', 'Hindi elective', 'Malayalam', 'Sanskrit',
     'Physics', 'Chemistry', 'Biology', 'Mathematics', 'Computer science',
@@ -429,6 +436,10 @@ const allSubjectRows = computed(() => {
     }
     return out.sort((a, b) => a.subject.localeCompare(b.subject) || b.marks - a.marks);
 });
+
+const availableSubjects = computed(() => [
+    ...new Set(allSubjectRows.value.map(row => row.subject).filter(Boolean)),
+]);
 
 const filteredSubjectRows = computed(() => {
     if (!searchQuery.value.trim()) return allSubjectRows.value;

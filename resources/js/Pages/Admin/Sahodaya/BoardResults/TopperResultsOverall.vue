@@ -215,3 +215,34 @@ const filteredRows = computed(() => {
     });
 });
 </script>
+
+<style scoped>
+@media print {
+    @page {
+        size: landscape;
+        margin: 8mm;
+    }
+
+    :deep(.card),
+    :deep(.card--flush) {
+        box-shadow: none !important;
+        border-color: #e2e8f0 !important;
+    }
+
+    :deep(.field) {
+        min-height: 0 !important;
+        padding-top: 0.3rem !important;
+        padding-bottom: 0.3rem !important;
+    }
+
+    :deep(table) {
+        font-size: 10px !important;
+    }
+
+    :deep(th),
+    :deep(td) {
+        padding-top: 0.3rem !important;
+        padding-bottom: 0.3rem !important;
+    }
+}
+</style>

@@ -51,6 +51,7 @@ class SahodayaTopperController extends SahodayaAdminController
                 'overall' => [
                     'top_n' => $overallConfig?->top_n ?? TopperCountService::DEFAULT_TOP_N,
                     'tie_mode' => $overallConfig?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP,
+                    'rank_style' => $overallConfig?->rank_style ?? TopperCountConfig::RANK_COMPETITION,
                 ],
                 'streams' => $streamConfigs,
                 'subjects' => $subjectConfigs,
@@ -181,7 +182,7 @@ class SahodayaTopperController extends SahodayaAdminController
     }
 
     /** @param  list<array{id:int, label:string}>  $subjects
-     *  @return array{0: ?TopperCountConfig, 1: array<string, array{stream_id:int, stream_code:string, stream_label:string, top_n:int, tie_mode:string}>, 2: array<string, array{subject_id:int, subject_label:string, top_n:int, tie_mode:string}>}
+     *  @return array{0: ?TopperCountConfig, 1: array<string, array{stream_id:int, stream_code:string, stream_label:string, top_n:int, tie_mode:string, rank_style:string}>, 2: array<string, array{subject_id:int, subject_label:string, top_n:int, tie_mode:string, rank_style:string}>}
      */
     private function loadConfigs(array $streams, array $subjects, int $class): array
     {
@@ -232,6 +233,7 @@ class SahodayaTopperController extends SahodayaAdminController
                 'stream_label' => $label,
                 'top_n' => $config?->top_n ?? TopperCountService::DEFAULT_TOP_N,
                 'tie_mode' => $config?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP,
+                'rank_style' => $config?->rank_style ?? TopperCountConfig::RANK_COMPETITION,
             ];
         }
 
@@ -244,6 +246,7 @@ class SahodayaTopperController extends SahodayaAdminController
                 'subject_label' => $subject['label'],
                 'top_n' => $config?->top_n ?? TopperCountService::DEFAULT_TOP_N,
                 'tie_mode' => $config?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP,
+                'rank_style' => $config?->rank_style ?? TopperCountConfig::RANK_COMPETITION,
             ];
         }
 

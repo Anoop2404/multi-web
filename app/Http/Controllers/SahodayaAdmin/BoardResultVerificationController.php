@@ -79,6 +79,7 @@ class BoardResultVerificationController extends SahodayaAdminController
             'scope' => 'nullable|string|in:overall,stream,subject',
             'top_n' => 'required|integer|min:1|max:50',
             'tie_mode' => 'nullable|string|in:include_group,hard_cap',
+            'rank_style' => 'nullable|string|in:competition,dense,sequential',
             'stream_id' => 'nullable|integer',
             'subject_id' => 'nullable|integer',
         ]);

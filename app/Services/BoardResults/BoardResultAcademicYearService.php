@@ -4,10 +4,64 @@ namespace App\Services\BoardResults;
 
 use App\Models\AcademicYearRecord;
 use App\Models\BoardResult;
+use App\Models\SahodayaRegistrationWindow;
 use Illuminate\Validation\ValidationException;
 
 class BoardResultAcademicYearService
 {
+    /**
+     * Return every year that can be relevant to board-result entry.
+     *
+     * Registration-window rows are included even when they pre-date the
+     * academic_years master table, because the board-entry dates are the
+     * authoritative configuration for this workflow.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function entryYearOptions(string $sahodayaId): array
+    {
+        $records = AcademicYearRecord::query()
+            ->orderByDesc('start_date')
+            ->get(['id', 'label', 'status'])
+            ->keyBy('label');
+
+        $windows = SahodayaRegistrationWindow::query()
+            ->where('sahodaya_id', $sahodayaId)
+            ->where(function ($query) {
+                $query->whereNotNull('board_entry_starts_at')
+                    ->orWhereNotNull('board_entry_ends_at');
+            })
+            ->get([
+                'academic_year',
+                'academic_year_id',
+                'board_entry_starts_at',
+                'board_entry_ends_at',
+            ])
+            ->keyBy('academic_year');
+
+        return $records->keys()
+            ->merge($windows->keys())
+            ->unique()
+            ->sortDesc()
+            ->values()
+            ->map(function (string $label) use ($records, $windows): array {
+                $record = $records->get($label);
+                $window = $windows->get($label);
+                $entryStatus = $this->entryStatus($record, $window);
+
+                return [
+                    'id' => $record?->id ?? $window?->academic_year_id ?? 'window-'.$label,
+                    'label' => $label,
+                    'status' => $record?->status,
+                    'entry_status' => $entryStatus,
+                    'entry_configured' => $window !== null,
+                    'board_entry_starts_at' => $window?->board_entry_starts_at?->toDateString(),
+                    'board_entry_ends_at' => $window?->board_entry_ends_at?->toDateString(),
+                ];
+            })
+            ->all();
+    }
+
     public function resolveId(?string $label): ?int
     {
         if (! $label) {
@@ -26,42 +80,61 @@ class BoardResultAcademicYearService
             $record = AcademicYearRecord::query()->where('label', $label)->first();
         }
 
-        if (! $record) {
-            return;
-        }
-
-        if ($record->isClosed()) {
-            throw ValidationException::withMessages([
-                'academic_year' => "Academic year {$record->label} is closed for entry. Contact your Sahodaya admin if this needs to be reopened.",
-            ]);
-        }
-
-        $window = \App\Models\SahodayaRegistrationWindow::query()
-            ->where('academic_year', $record->label)
+        $resolvedLabel = $record?->label ?? $label;
+        $window = SahodayaRegistrationWindow::query()
+            ->where('academic_year', $resolvedLabel)
             ->first();
 
-        if (! $window) {
+        $hasExplicitBoardWindow = $window
+            && ($window->board_entry_starts_at || $window->board_entry_ends_at);
+
+        // Explicit board-entry dates override the academic-year lifecycle. Board
+        // results are normally entered after that academic year itself is closed.
+        if ($hasExplicitBoardWindow) {
+            $this->assertWithinWindow($resolvedLabel, $window);
             return;
         }
 
-        // If neither start nor end date is set, the window is not configured —
-        // allow entry so schools are not blocked by an empty placeholder row.
-        if (empty($window->board_entry_starts_at) && empty($window->board_entry_ends_at)) {
-            return;
+        if ($record?->isClosed()) {
+            throw ValidationException::withMessages([
+                'academic_year' => "Academic year {$record->label} is closed for entry. Configure a board-result entry window to reopen it.",
+            ]);
         }
+    }
 
+    private function assertWithinWindow(?string $label, SahodayaRegistrationWindow $window): void
+    {
         $now = now();
         if ($window->board_entry_starts_at && $now->lt($window->board_entry_starts_at->copy()->startOfDay())) {
             throw ValidationException::withMessages([
-                'academic_year' => "Board result data entry for academic year {$record->label} opens on ".$window->board_entry_starts_at->format('d M Y').'.',
+                'academic_year' => "Board result data entry for academic year {$label} opens on ".$window->board_entry_starts_at->format('d M Y').'.',
             ]);
         }
 
         if ($window->board_entry_ends_at && $now->gt($window->board_entry_ends_at->copy()->endOfDay())) {
             throw ValidationException::withMessages([
-                'academic_year' => "Board result data entry for academic year {$record->label} closed on ".$window->board_entry_ends_at->format('d M Y').'. Contact your Sahodaya admin if this needs to be reopened.',
+                'academic_year' => "Board result data entry for academic year {$label} closed on ".$window->board_entry_ends_at->format('d M Y').'. Contact your Sahodaya admin if this needs to be reopened.',
             ]);
         }
+    }
+
+    private function entryStatus(
+        ?AcademicYearRecord $record,
+        ?SahodayaRegistrationWindow $window,
+    ): string {
+        if ($window && ($window->board_entry_starts_at || $window->board_entry_ends_at)) {
+            $now = now();
+            if ($window->board_entry_starts_at && $now->lt($window->board_entry_starts_at->copy()->startOfDay())) {
+                return 'upcoming';
+            }
+            if ($window->board_entry_ends_at && $now->gt($window->board_entry_ends_at->copy()->endOfDay())) {
+                return 'closed';
+            }
+
+            return 'open';
+        }
+
+        return $record?->isClosed() ? 'closed' : 'open';
     }
 
     public function attachToPayload(array $data): array

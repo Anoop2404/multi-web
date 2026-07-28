@@ -111,7 +111,7 @@
                         <select v-model="searchYear" required class="field text-xs py-1.5 w-48 font-medium">
                             <option value="" disabled>Select Academic Year</option>
                             <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
-                                {{ ay.label }}{{ ay.status === 'active' ? ' (Active)' : '' }}
+                                {{ academicYearOptionLabel(ay) }}
                             </option>
                         </select>
                     </div>
@@ -443,6 +443,13 @@ const props = defineProps({
     activeResultContext: { type: Object, default: null },
     marksConfig: { type: Object, default: () => ({ classX: 500, byStream: {} }) },
 });
+
+function academicYearOptionLabel(year) {
+    if (year.entry_status === 'open') return `${year.label} (Entry Open)`;
+    if (year.entry_status === 'upcoming') return `${year.label} (Entry Opens ${year.board_entry_starts_at})`;
+    if (year.entry_status === 'closed') return `${year.label} (Entry Closed)`;
+    return year.label;
+}
 
 const pageTitle = computed(() => {
     if (props.selectedClass === 12) return 'Class XII Board Results';

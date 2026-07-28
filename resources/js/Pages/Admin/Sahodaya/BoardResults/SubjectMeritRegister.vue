@@ -76,7 +76,7 @@
                         class="field text-xs bg-white font-semibold w-full flex items-center justify-between gap-2"
                         @click="toggleSubjectDropdown"
                     >
-                        <span class="truncate">{{ selectedSubjectLabel || `All Subjects (${availableSubjects.length})` }}</span>
+                        <span class="truncate">{{ selectedSubjectLabel || `All Subjects (${subjectChoices.length})` }}</span>
                         <span class="text-slate-400">▾</span>
                     </button>
 

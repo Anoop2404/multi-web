@@ -4,7 +4,6 @@ namespace App\Services\Mcq;
 
 use App\Models\MasterClass;
 use App\Models\McqExam;
-use App\Models\McqMark;
 use App\Models\McqRegistration;
 use App\Models\SchoolClass;
 use App\Models\Student;
@@ -19,6 +18,12 @@ class McqEligibilityService
 {
     /** @var array<string, array<int, string>> */
     private array $masterClassNameCache = [];
+
+    /** @var array<int, McqExam|null> */
+    private array $parentExamCache = [];
+
+    /** @var array<string, McqRegistration|null> */
+    private array $parentRegistrationCache = [];
 
     public function __construct(
         private StudentVerificationGate $verificationGate,
@@ -164,7 +169,41 @@ class McqEligibilityService
     /** @return Collection<int, Student> */
     public function eligibleStudents(McqExam $exam, Collection $students): Collection
     {
+        $this->primeStudentEligibility($exam, $students);
+
         return $students->filter(fn (Student $student) => $this->isEligible($exam, $student))->values();
+    }
+
+    /**
+     * Prime Level 2 parent registrations and their marks for a student batch. This
+     * prevents automatic promotion checks from issuing registration and mark queries
+     * once per displayed student.
+     */
+    public function primeStudentEligibility(McqExam $exam, Collection $students): void
+    {
+        if ((int) ($exam->exam_level ?? 1) <= 1
+            || in_array($exam->eligibility_mode ?? 'open', ['open', 'manual'], true)
+            || ! $exam->parent_exam_id
+            || $students->isEmpty()) {
+            return;
+        }
+
+        $parentExamId = (int) $exam->parent_exam_id;
+        if (! array_key_exists($parentExamId, $this->parentExamCache)) {
+            $this->parentExamCache[$parentExamId] = McqExam::find($parentExamId);
+        }
+
+        $registrations = McqRegistration::where('exam_id', $parentExamId)
+            ->whereIn('student_id', $students->pluck('id'))
+            ->whereIn('status', ['registered', 'submitted'])
+            ->with('mark')
+            ->get()
+            ->keyBy('student_id');
+
+        foreach ($students as $student) {
+            $key = $parentExamId.':'.$student->id;
+            $this->parentRegistrationCache[$key] = $registrations->get($student->id);
+        }
     }
 
     public function ineligibilityReason(McqExam $exam, Student $student): ?string
@@ -204,7 +243,11 @@ class McqEligibilityService
             return 0;
         }
 
-        $parentExam = McqExam::find($exam->parent_exam_id);
+        $parentExamId = (int) $exam->parent_exam_id;
+        if (! array_key_exists($parentExamId, $this->parentExamCache)) {
+            $this->parentExamCache[$parentExamId] = McqExam::find($parentExamId);
+        }
+        $parentExam = $this->parentExamCache[$parentExamId];
         if (! $parentExam) {
             return 0;
         }
@@ -361,10 +404,15 @@ class McqEligibilityService
             return 'Level 2 qualifier list is not locked yet.';
         }
 
-        $registration = McqRegistration::where('exam_id', $exam->parent_exam_id)
-            ->where('student_id', $student->id)
-            ->whereIn('status', ['registered', 'submitted'])
-            ->first();
+        $registrationKey = $parentExamId.':'.$student->id;
+        if (! array_key_exists($registrationKey, $this->parentRegistrationCache)) {
+            $this->parentRegistrationCache[$registrationKey] = McqRegistration::where('exam_id', $parentExamId)
+                ->where('student_id', $student->id)
+                ->whereIn('status', ['registered', 'submitted'])
+                ->with('mark')
+                ->first();
+        }
+        $registration = $this->parentRegistrationCache[$registrationKey];
 
         if (! $registration) {
             return 'Student was not registered for Level 1.';
@@ -378,7 +426,7 @@ class McqEligibilityService
             return 'Student did not complete Level 1 exam.';
         }
 
-        $mark = McqMark::where('registration_id', $registration->id)->first();
+        $mark = $registration->mark;
         if (! $mark) {
             return 'Level 1 marks are not available for this student.';
         }

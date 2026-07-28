@@ -35,7 +35,7 @@
                 {{ selectedClass === 12 ? `${selectedStreamLabel || 'Selected stream'} Top-N settings` : 'Overall Top-N settings' }}
             </h3>
             <p class="text-xs text-slate-500 mb-3">
-                Top-N is a target, not a hard count — "Include tie group" keeps every student sharing the cutoff rank (list may exceed Top-N); "Hard cap" always truncates to exactly Top-N.
+                Top-N is a target, not a hard count — "Include rank cutoff" keeps every student whose rank is within the Top-N cutoff (list may exceed Top-N); "Hard cap" always truncates to exactly Top-N rows. Rank style controls whether tied scores appear as competition, dense, or sequential ranks.
             </p>
             <form class="flex flex-wrap gap-3 items-end" @submit.prevent="saveSettings">
                 <div>
@@ -45,8 +45,16 @@
                 <div>
                     <label class="form-label mb-1 text-xs">Tie handling</label>
                     <select v-model="settingsForm.tie_mode" class="field text-sm">
-                        <option value="include_group">Include tie group</option>
+                        <option value="include_group">Include rank cutoff</option>
                         <option value="hard_cap">Hard cap</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label mb-1 text-xs">Rank style</label>
+                    <select v-model="settingsForm.rank_style" class="field text-sm">
+                        <option v-for="opt in rankStyleOptions" :key="opt.value" :value="opt.value">
+                            {{ opt.label }}
+                        </option>
                     </select>
                 </div>
                 <button type="submit" class="btn-secondary text-xs">Save settings</button>
@@ -63,7 +71,7 @@
                 >
                     <p class="text-sm font-bold text-slate-900">{{ label }}</p>
                     <p class="text-[11px] text-slate-500 mt-1">
-                        Top-N {{ streamSettings[code]?.top_n ?? 5 }} · {{ streamSettings[code]?.tie_mode === 'hard_cap' ? 'Hard cap' : 'Include tie group' }}
+                        Top-N {{ streamSettings[code]?.top_n ?? 5 }} · {{ streamSettings[code]?.tie_mode === 'hard_cap' ? 'Hard cap' : 'Include rank cutoff' }} · {{ rankStyleLabel(streamSettings[code]?.rank_style) }}
                     </p>
                 </button>
             </div>
@@ -84,7 +92,7 @@
                 </span>
             </div>
 
-            <div class="grid gap-3 lg:grid-cols-[minmax(0,2fr)_1fr_1fr_auto] items-end">
+            <div class="grid gap-3 lg:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_auto] items-end">
                 <div class="relative">
                     <label class="form-label mb-1 text-xs">Subject</label>
                     <button
@@ -135,8 +143,17 @@
                 <div>
                     <label class="form-label mb-1 text-xs">Tie handling</label>
                     <select v-model="subjectSettingsForm.tie_mode" class="field text-sm w-full">
-                        <option value="include_group">Include tie group</option>
+                        <option value="include_group">Include rank cutoff</option>
                         <option value="hard_cap">Hard cap</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="form-label mb-1 text-xs">Rank style</label>
+                    <select v-model="subjectSettingsForm.rank_style" class="field text-sm w-full">
+                        <option v-for="opt in rankStyleOptions" :key="`subject-${opt.value}`" :value="opt.value">
+                            {{ opt.label }}
+                        </option>
                     </select>
                 </div>
 
@@ -194,7 +211,7 @@ const props = defineProps({
     academicYearOptions: { type: Array, default: () => [] },
     settings: {
         type: Object,
-        default: () => ({ overall: { top_n: 5, tie_mode: 'include_group' }, streams: {} }),
+        default: () => ({ overall: { top_n: 5, tie_mode: 'include_group', rank_style: 'competition' }, streams: {} }),
     },
     streamOptions: { type: Object, default: () => ({}) },
     subjectOptions: { type: Array, default: () => [] },
@@ -235,6 +252,15 @@ const selectedSubjectLabel = computed(() => {
 const scopeKey = computed(() => props.selectedClass === 12 ? 'stream' : 'overall');
 const streamSettings = computed(() => props.settings.streams ?? {});
 const subjectSettings = computed(() => props.settings.subjects ?? {});
+const rankStyleOptions = [
+    { value: 'competition', label: 'Competition (1,2,2,2,5)' },
+    { value: 'dense', label: 'Dense (1,2,2,2,3)' },
+    { value: 'sequential', label: 'Sequential (1,2,3,4,5)' },
+];
+
+function rankStyleLabel(value) {
+    return rankStyleOptions.find(opt => opt.value === value)?.label ?? 'Competition (1,2,2,2,5)';
+}
 
 const subjectSearch = ref('');
 const subjectDropdownOpen = ref(false);
@@ -251,11 +277,15 @@ const settingsForm = reactive({
     tie_mode: props.selectedClass === 12
         ? (streamSettings.value[selectedStreamCode.value || '']?.tie_mode ?? 'include_group')
     : (props.settings[scopeKey.value]?.tie_mode ?? 'include_group'),
+    rank_style: props.selectedClass === 12
+        ? (streamSettings.value[selectedStreamCode.value || '']?.rank_style ?? 'competition')
+        : (props.settings[scopeKey.value]?.rank_style ?? 'competition'),
 });
 
 const subjectSettingsForm = reactive({
     top_n: 5,
     tie_mode: 'include_group',
+    rank_style: 'competition',
 });
 
 watch(subjectEntries, () => {
@@ -278,11 +308,15 @@ watch([() => props.selectedClass, selectedStreamCode], () => {
     settingsForm.tie_mode = props.selectedClass === 12
         ? (streamSettings.value[selectedStreamCode.value || '']?.tie_mode ?? 'include_group')
         : (props.settings[scopeKey.value]?.tie_mode ?? 'include_group');
+    settingsForm.rank_style = props.selectedClass === 12
+        ? (streamSettings.value[selectedStreamCode.value || '']?.rank_style ?? 'competition')
+        : (props.settings[scopeKey.value]?.rank_style ?? 'competition');
 });
 
 watch(selectedSubjectKey, () => {
     subjectSettingsForm.top_n = subjectSettings.value[selectedSubjectKey.value || '']?.top_n ?? 5;
     subjectSettingsForm.tie_mode = subjectSettings.value[selectedSubjectKey.value || '']?.tie_mode ?? 'include_group';
+    subjectSettingsForm.rank_style = subjectSettings.value[selectedSubjectKey.value || '']?.rank_style ?? 'competition';
     subjectSearch.value = selectedSubjectLabel.value || '';
 }, { immediate: true });
 
@@ -299,6 +333,7 @@ function saveSettings() {
             : null,
         top_n: settingsForm.top_n,
         tie_mode: settingsForm.tie_mode,
+        rank_style: settingsForm.rank_style,
     }, { preserveScroll: true });
 }
 
@@ -310,6 +345,7 @@ function saveSubjectSettings() {
         subject_id: Number(selectedSubjectKey.value),
         top_n: subjectSettingsForm.top_n,
         tie_mode: subjectSettingsForm.tie_mode,
+        rank_style: subjectSettingsForm.rank_style,
     }, { preserveScroll: true });
 }
 
@@ -333,6 +369,7 @@ function selectSubject(id) {
     selectedSubjectKey.value = id || null;
     subjectSettingsForm.top_n = subjectSettings.value[id]?.top_n ?? 5;
     subjectSettingsForm.tie_mode = subjectSettings.value[id]?.tie_mode ?? 'include_group';
+    subjectSettingsForm.rank_style = subjectSettings.value[id]?.rank_style ?? 'competition';
 }
 
 function recompute() {

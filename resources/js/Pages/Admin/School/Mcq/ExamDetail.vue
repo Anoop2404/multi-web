@@ -192,13 +192,17 @@
                             </table>
                         </div>
 
-                        <EmptyState v-if="!filteredStudents.length" title="No students in this view"
+                        <div v-if="studentsLoading" class="py-10 text-center text-sm text-slate-500">
+                            Loading students…
+                        </div>
+
+                        <EmptyState v-else-if="!filteredStudents.length" title="No students in this view"
                                     description="Change class filter, search, or status chip." icon="👥" class="py-8" />
 
-                        <div v-if="filteredStudents.length > registerPageSize"
+                        <div v-if="studentResultTotal > registerPageSize"
                              class="px-4 py-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm">
                             <p class="text-xs text-slate-500">
-                                Showing {{ pageRangeStart }}–{{ pageRangeEnd }} of {{ filteredStudents.length }}
+                                Showing {{ pageRangeStart }}–{{ pageRangeEnd }} of {{ studentResultTotal }}
                             </p>
                             <div class="flex items-center gap-2">
                                 <button type="button" class="btn-secondary text-xs" :disabled="registerPage <= 1"
@@ -676,7 +680,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SchoolMcqSubNav from '@/Components/school/SchoolMcqSubNav.vue';
@@ -719,7 +723,10 @@ const studentSearch = ref('');
 const studentFilter = ref('available');
 const selectedIds = ref(new Set());
 const registerPage = ref(1);
-const registerPageSize = 100;
+const registerPageSize = 50;
+const studentsLoading = ref(false);
+const remoteStudentTotal = ref(null);
+const remoteLastPage = ref(1);
 const bulkRegistering = ref(false);
 const proofInput = ref(null);
 const transactionRef = ref('');
@@ -729,9 +736,8 @@ const pdfUrl = computed(() => `${base.value}/hall-tickets/pdf`);
 const canDownloadDocuments = computed(() => !props.downloadGate?.blocked);
 
 // For large schools (see lazyLoadStudents/studentCount below), the server sends an
-// empty `students` list and this page fetches bounded, searched batches on demand,
-// merging them in here by id. For small schools, `localStudents` is simply the full
-// eagerly-loaded `students` prop — behavior is unchanged.
+// empty `students` list and this page fetches 50-row batches on demand. For small
+// schools, `localStudents` is simply the full eagerly-loaded `students` prop.
 // See docs/SCALE_AND_PAGINATION_PLAN.md §6/§9-new.
 const localStudents = ref([...props.students]);
 watch(() => props.students, (value) => {
@@ -773,34 +779,50 @@ const filteredStudents = computed(() =>
     localStudents.value.filter(s => matchesFilter(s, studentFilter.value) && matchesSearch(s) && matchesClass(s)),
 );
 
-// Debounced server-side lookup when the roster is too large to ship eagerly. Merges
-// into localStudents by id so already-fetched/selected rows aren't lost.
+// Debounced server-side lookup when the roster is too large to ship eagerly.
 let studentSearchDebounce = null;
-async function fetchEligibleStudents() {
+let studentRequestSequence = 0;
+async function fetchEligibleStudents({ resetPage = false } = {}) {
     if (!props.lazyLoadStudents) return;
+    if (resetPage) registerPage.value = 1;
+    const requestSequence = ++studentRequestSequence;
+    studentsLoading.value = true;
     try {
         const params = new URLSearchParams();
         if (studentSearch.value.trim()) params.set('search', studentSearch.value.trim());
         if (classFilter.value) params.set('class_id', classFilter.value);
-        if (!params.toString()) return;
+        params.set('status', studentFilter.value);
+        params.set('page', String(registerPage.value));
+        params.set('per_page', String(registerPageSize));
         const res = await fetch(`${base.value}/eligible-students?${params.toString()}`, {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
         });
         if (!res.ok) return;
         const data = await res.json();
-        const byId = new Map(localStudents.value.map(s => [s.id, s]));
-        for (const s of (data.students ?? [])) byId.set(s.id, s);
-        localStudents.value = Array.from(byId.values());
+        if (requestSequence !== studentRequestSequence) return;
+        localStudents.value = data.students ?? [];
+        remoteStudentTotal.value = Number(data.meta?.total ?? localStudents.value.length);
+        remoteLastPage.value = Math.max(1, Number(data.meta?.last_page ?? 1));
     } catch {
         // keep whatever's already loaded
+    } finally {
+        if (requestSequence === studentRequestSequence) studentsLoading.value = false;
     }
 }
 
-watch([studentSearch, classFilter], () => {
+watch([studentSearch, classFilter, studentFilter], () => {
     if (!props.lazyLoadStudents) return;
     if (studentSearchDebounce) clearTimeout(studentSearchDebounce);
-    studentSearchDebounce = setTimeout(fetchEligibleStudents, 300);
+    studentSearchDebounce = setTimeout(() => fetchEligibleStudents({ resetPage: true }), 300);
+});
+
+watch(registerPage, () => {
+    if (props.lazyLoadStudents) fetchEligibleStudents();
+});
+
+onMounted(() => {
+    if (props.lazyLoadStudents) fetchEligibleStudents();
 });
 
 const selectableInView = computed(() =>
@@ -808,20 +830,27 @@ const selectableInView = computed(() =>
 );
 
 const totalPages = computed(() =>
-    Math.max(1, Math.ceil(filteredStudents.value.length / registerPageSize)),
+    props.lazyLoadStudents
+        ? remoteLastPage.value
+        : Math.max(1, Math.ceil(filteredStudents.value.length / registerPageSize)),
 );
 
 const paginatedStudents = computed(() => {
+    if (props.lazyLoadStudents) return filteredStudents.value;
     const start = (registerPage.value - 1) * registerPageSize;
     return filteredStudents.value.slice(start, start + registerPageSize);
 });
 
+const studentResultTotal = computed(() =>
+    props.lazyLoadStudents ? (remoteStudentTotal.value ?? 0) : filteredStudents.value.length,
+);
+
 const pageRangeStart = computed(() =>
-    filteredStudents.value.length ? (registerPage.value - 1) * registerPageSize + 1 : 0,
+    studentResultTotal.value ? (registerPage.value - 1) * registerPageSize + 1 : 0,
 );
 
 const pageRangeEnd = computed(() =>
-    Math.min(registerPage.value * registerPageSize, filteredStudents.value.length),
+    Math.min(registerPage.value * registerPageSize, studentResultTotal.value),
 );
 
 const selectionCount = computed(() => selectedIds.value.size);

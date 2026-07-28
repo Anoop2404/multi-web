@@ -5,6 +5,7 @@ namespace App\Services\BoardResults;
 use App\Models\BoardResult;
 use App\Models\Tenant;
 use App\Models\TopperCountConfig;
+use App\Support\TenancyDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -15,6 +16,10 @@ use Illuminate\Support\Facades\Schema;
  */
 class SubjectMeritRegisterService
 {
+    public function __construct(
+        private readonly RankStyleService $rankStyles,
+    ) {}
+
     /**
      * @return list<array{
      *   subject: string,
@@ -44,8 +49,17 @@ class SubjectMeritRegisterService
         }
 
         $names = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
+        $sahodaya = Tenant::query()->where('id', $sahodayaId)->where('type', 'sahodaya')->first();
 
-        return $this->fromNormalizedTable($sahodayaId, $schoolIds, $academicYear, $class, $names) ?? [];
+        if (! $sahodaya) {
+            return [];
+        }
+
+        return TenancyDatabase::whenDatabaseReady(
+            $sahodaya,
+            fn () => $this->fromNormalizedTable($sahodayaId, $schoolIds, $academicYear, $class, $names),
+            [],
+        ) ?? [];
     }
 
     /**
@@ -83,7 +97,7 @@ class SubjectMeritRegisterService
             $query->where('br.class', $class);
         }
 
-        $items = $query->orderBy('subject')->orderByDesc('tsm.marks')->get()
+        $items = $query->orderBy('subject')->orderByDesc('tsm.marks')->orderBy('tsm.id')->get()
             ->map(fn ($row) => [
                 'subject' => (string) $row->subject,
                 'subject_id' => $row->subject_id !== null ? (int) $row->subject_id : null,
@@ -122,17 +136,20 @@ class SubjectMeritRegisterService
                 $subjectId = is_numeric($subjectKey) ? (int) $subjectKey : ($sorted->first()['subject_id'] ?? null);
                 $topN = $counts->resolveCap($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
                 $tieMode = $counts->resolveTieMode($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
+                $rankStyle = $counts->resolveRankStyle($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
+                $sorted = collect($this->rankStyles->assign($sorted->all(), $rankStyle, fn (array $row) => $row['marks'] ?? null));
 
                 $selected = [];
                 foreach ($sorted as $row) {
-                    if (count($selected) >= $topN) {
-                        $lastRank = end($selected)['rank'];
-                        if ($tieMode === TopperCountConfig::TIE_INCLUDE_GROUP && $row['rank'] === $lastRank) {
-                            // Keep the full tie group at the cutoff rank for this subject.
-                        } else {
+                    if ($tieMode === TopperCountConfig::TIE_HARD_CAP) {
+                        if (count($selected) >= $topN) {
                             break;
                         }
+                    } elseif ($row['rank'] > $topN) {
+                        // Rank-cutoff mode: include every row whose rank is within Top-N.
+                        break;
                     }
+
                     $selected[] = $row;
                 }
             } else {

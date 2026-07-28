@@ -134,4 +134,35 @@ class McqRegistrationCancelTest extends TestCase
         $this->assertSame(1, (int) $fee->student_count);
         $this->assertEquals(50, (float) $fee->total_due);
     }
+
+    public function test_large_roster_lookup_returns_fifty_students_per_page_without_requiring_a_filter(): void
+    {
+        ['school' => $school, 'admin' => $admin, 'exam' => $exam, 'student' => $student] = $this->setUpExam();
+
+        foreach (range(1, 54) as $index) {
+            Student::create([
+                'tenant_id'       => $school->id,
+                'school_class_id' => $student->school_class_id,
+                'name'            => sprintf('Paged Student %02d', $index),
+                'status'          => 'active',
+            ]);
+        }
+
+        $firstPage = $this->actingAs($admin)
+            ->getJson("/school-admin/{$school->id}/mcq/{$exam->id}/eligible-students");
+
+        $firstPage
+            ->assertOk()
+            ->assertJsonCount(50, 'students')
+            ->assertJsonPath('meta.current_page', 1)
+            ->assertJsonPath('meta.per_page', 50)
+            ->assertJsonPath('meta.total', 55)
+            ->assertJsonPath('meta.last_page', 2);
+
+        $this->actingAs($admin)
+            ->getJson("/school-admin/{$school->id}/mcq/{$exam->id}/eligible-students?page=2")
+            ->assertOk()
+            ->assertJsonCount(5, 'students')
+            ->assertJsonPath('meta.current_page', 2);
+    }
 }

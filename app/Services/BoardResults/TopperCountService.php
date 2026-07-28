@@ -79,9 +79,19 @@ class TopperCountService
             $tieMode = TopperCountConfig::TIE_INCLUDE_GROUP;
         }
 
+        $rankStyle = $data['rank_style'] ?? TopperCountConfig::RANK_COMPETITION;
+        if (! in_array($rankStyle, [
+            TopperCountConfig::RANK_COMPETITION,
+            TopperCountConfig::RANK_DENSE,
+            TopperCountConfig::RANK_SEQUENTIAL,
+        ], true)) {
+            $rankStyle = TopperCountConfig::RANK_COMPETITION;
+        }
+
         return TopperCountConfig::updateOrCreate($keys, [
             'top_n' => max(1, min(50, (int) ($data['top_n'] ?? self::DEFAULT_TOP_N))),
             'tie_mode' => $tieMode,
+            'rank_style' => $rankStyle,
         ]);
     }
 
@@ -118,5 +128,40 @@ class TopperCountService
             ->first();
 
         return $config?->tie_mode ?? TopperCountConfig::TIE_INCLUDE_GROUP;
+    }
+
+    /** Resolve rank numbering style for a given scope. */
+    public function resolveRankStyle(
+        string $sahodayaId,
+        int $class,
+        string $scope = TopperCountConfig::SCOPE_OVERALL,
+        ?int $streamId = null,
+        ?int $subjectId = null,
+    ): string
+    {
+        $query = TopperCountConfig::query()
+            ->where('sahodaya_id', $sahodayaId)
+            ->where('scope', $scope)
+            ->where(function ($q) use ($class) {
+                $q->where('class', $class)->orWhereNull('class');
+            });
+
+        if ($scope === TopperCountConfig::SCOPE_STREAM && $streamId) {
+            $query->where(function ($q) use ($streamId) {
+                $q->where('stream_id', $streamId)->orWhereNull('stream_id');
+            });
+        } elseif ($scope === TopperCountConfig::SCOPE_SUBJECT && $subjectId) {
+            $query->where(function ($q) use ($subjectId) {
+                $q->where('subject_id', $subjectId)->orWhereNull('subject_id');
+            });
+        }
+
+        $config = $query
+            ->orderByRaw('class is null')
+            ->orderByRaw('stream_id is null')
+            ->orderByRaw('subject_id is null')
+            ->first();
+
+        return $config?->rank_style ?? TopperCountConfig::RANK_COMPETITION;
     }
 }

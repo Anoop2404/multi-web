@@ -129,8 +129,8 @@ class McqController extends SchoolAdminController
         // and per-student-annotating the whole roster on every page view of every exam
         // does not scale — mirrors the fix already applied to FestRegistrationController
         // (see docs/SCALE_AND_PAGINATION_PLAN.md §6/§9-new). Above the threshold, skip the
-        // eager load: ship an empty list and let the frontend fetch a bounded, searched
-        // batch on demand via eligibleStudents() below.
+        // eager load: ship an empty list and let the frontend fetch a 50-row page on
+        // demand via eligibleStudents() below.
         $studentTotalCount = Student::where('tenant_id', $this->school->id)->active()->count();
         $lazyThreshold = (int) config('erp.fest_registration_lazy_student_threshold', 300);
         $lazyStudents = $allowsStudents && $studentTotalCount > $lazyThreshold;
@@ -157,6 +157,7 @@ class McqController extends SchoolAdminController
             }
 
             $allStudents = $studentQuery->get(['id', 'name', 'admission_number', 'reg_no', 'school_class_id', 'gender', 'user_id', 'verified_at']);
+            $eligibilityService->primeStudentEligibility($exam, $allStudents);
             $registeredIdSet = array_flip($registeredIds);
 
             $students = $allStudents->map(function (Student $s) use ($exam, $registeredIdSet, $eligibilityService, $cancelledStudentIds, $cancellableStudentIds) {
@@ -342,11 +343,9 @@ class McqController extends SchoolAdminController
     }
 
     /**
-     * Bounded, searchable student lookup for the exam's register tab — the counterpart
-     * to FestRegistrationController::eligibleStudents() for large rosters. Only reached
-     * when exam() reports lazyLoadStudents = true; capped at 150 regardless of search
-     * term so a large school opening the picker with no search text yet can't trigger
-     * an unbounded scan. See docs/SCALE_AND_PAGINATION_PLAN.md §6/§9-new.
+     * Paginated, searchable student lookup for the exam's register tab. Large schools
+     * call this immediately, including with no class/search filter, so the first page
+     * is never blank. The server caps pages at 50 students.
      */
     public function eligibleStudents(Request $request, string $tenantId, McqExam $exam)
     {
@@ -354,6 +353,8 @@ class McqController extends SchoolAdminController
 
         $search = $request->query('search');
         $classId = $request->query('class_id');
+        $status = $request->query('status', 'available');
+        $perPage = min(50, max(1, $request->integer('per_page', 50)));
 
         $eligibilityService = app(McqEligibilityService::class);
 
@@ -377,6 +378,29 @@ class McqController extends SchoolAdminController
             $studentQuery->whereIn('id', $exam->promoted_student_ids);
         }
 
+        $activeRegistrationStudentIds = McqRegistration::query()
+            ->select('student_id')
+            ->where('exam_id', $exam->id)
+            ->where('school_id', $this->school->id)
+            ->active()
+            ->whereNotNull('student_id');
+
+        if ($status === 'available') {
+            $studentQuery->whereNotIn('id', $activeRegistrationStudentIds);
+            app(StudentVerificationGate::class)->scopeEligible(
+                $studentQuery,
+                sahodayaId: $exam->tenant_id,
+                mcqExam: $exam,
+            );
+
+            $eligibilityConfig = McqExamEligibilityConfig::normalize($exam->eligibility_config);
+            if (($eligibilityConfig['gender'] ?? 'open') !== 'open') {
+                $studentQuery->whereRaw('LOWER(gender) = ?', [strtolower($eligibilityConfig['gender'])]);
+            }
+        } elseif ($status === 'registered') {
+            $studentQuery->whereIn('id', $activeRegistrationStudentIds);
+        }
+
         if ($classId) {
             $studentQuery->where('school_class_id', $classId);
         }
@@ -390,7 +414,12 @@ class McqController extends SchoolAdminController
             });
         }
 
-        $matches = $studentQuery->limit(150)->get(['id', 'name', 'admission_number', 'reg_no', 'school_class_id', 'gender', 'user_id', 'verified_at']);
+        $matchesPage = $studentQuery
+            ->orderBy('id')
+            ->paginate($perPage, ['id', 'name', 'admission_number', 'reg_no', 'school_class_id', 'gender', 'user_id', 'verified_at']);
+        $matches = $matchesPage->getCollection();
+
+        $eligibilityService->primeStudentEligibility($exam, $matches);
 
         $registeredIdSet = McqRegistration::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
@@ -438,7 +467,15 @@ class McqController extends SchoolAdminController
             ];
         })->values();
 
-        return response()->json(['students' => $students]);
+        return response()->json([
+            'students' => $students,
+            'meta' => [
+                'current_page' => $matchesPage->currentPage(),
+                'last_page'    => $matchesPage->lastPage(),
+                'per_page'     => $matchesPage->perPage(),
+                'total'        => $matchesPage->total(),
+            ],
+        ]);
     }
 
     public function register(Request $request, string $tenantId, McqExam $exam)

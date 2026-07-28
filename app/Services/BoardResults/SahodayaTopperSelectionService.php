@@ -19,6 +19,7 @@ class SahodayaTopperSelectionService
     public function __construct(
         private readonly RankingEngine $ranking,
         private readonly TopperCountService $counts,
+        private readonly RankStyleService $rankStyles,
     ) {}
 
     /**
@@ -86,7 +87,9 @@ class SahodayaTopperSelectionService
             ->orderByDesc('percentage')
             ->get();
 
-        return $this->hydrateAchievers($toppers);
+        $rankStyle = $this->counts->resolveRankStyle($sahodayaId, 10, TopperCountConfig::SCOPE_OVERALL, null, null);
+
+        return $this->hydrateAchievers($toppers, $rankStyle);
     }
 
     /**
@@ -113,7 +116,9 @@ class SahodayaTopperSelectionService
 
         $out = [];
         foreach ($grouped as $streamLabel => $group) {
-            $out[$streamLabel] = $this->hydrateAchievers($group);
+            $streamId = $group->first()?->stream_id;
+            $rankStyle = $this->counts->resolveRankStyle($sahodayaId, 12, TopperCountConfig::SCOPE_STREAM, is_numeric($streamId) ? (int) $streamId : null, null);
+            $out[$streamLabel] = $this->hydrateAchievers($group, $rankStyle);
         }
 
         return $out;
@@ -145,24 +150,35 @@ class SahodayaTopperSelectionService
      * @param  Collection<int, Topper>  $toppers
      * @return list<array<string, mixed>>
      */
-    private function hydrateAchievers(Collection $toppers): array
+    private function hydrateAchievers(Collection $toppers, string $rankStyle = RankStyleService::STYLE_COMPETITION): array
     {
         $sorted = $toppers->sortByDesc('percentage')->values();
         $schoolNames = Tenant::whereIn('id', $sorted->pluck('tenant_id')->unique())->pluck('name', 'id');
 
+        $rankStyle = $this->rankStyles->normalize($rankStyle);
         $rank = 0;
+        $denseRank = 0;
         $prevPercentage = null;
 
-        return $sorted->map(function (Topper $t, int $i) use ($schoolNames, &$rank, &$prevPercentage) {
-            // Competition (dense) ranking: ties get the same rank, next non-tie increments.
-            if ($prevPercentage === null || $t->percentage < $prevPercentage) {
+        return $sorted->map(function (Topper $t, int $i) use ($schoolNames, $rankStyle, &$rank, &$denseRank, &$prevPercentage) {
+            $percentage = (float) $t->percentage;
+            if ($rankStyle === RankStyleService::STYLE_SEQUENTIAL) {
                 $rank = $i + 1;
+            } elseif ($rankStyle === RankStyleService::STYLE_DENSE) {
+                if ($prevPercentage === null || abs($percentage - $prevPercentage) > 0.0001) {
+                    $denseRank++;
+                }
+                $rank = max(1, $denseRank);
+            } else {
+                if ($prevPercentage === null || abs($percentage - $prevPercentage) > 0.0001) {
+                    $rank = $i + 1;
+                }
             }
-            $prevPercentage = $t->percentage;
+            $prevPercentage = $percentage;
 
             return [
                 'rank' => $rank,
-                'percentage' => $t->percentage,
+                'percentage' => $percentage,
                 'student_name' => $t->name,
                 'school_id' => $t->tenant_id,
                 'school_name' => $schoolNames[$t->tenant_id] ?? $t->tenant_id,
@@ -187,7 +203,9 @@ class SahodayaTopperSelectionService
             ->where('scope', $scope)
             ->where('entity_type', 'student')
             ->where('class', $class)
-            ->orderBy('rank');
+            ->orderBy('rank')
+            ->orderByDesc('score')
+            ->orderBy('entity_id');
 
         $rows = $query()->get();
 
@@ -218,17 +236,20 @@ class SahodayaTopperSelectionService
 
         $topN = $this->counts->resolveCap($sahodayaId, $class, $configScope, $streamId);
         $tieMode = $this->counts->resolveTieMode($sahodayaId, $class, $configScope, $streamId);
+        $rankStyle = $this->counts->resolveRankStyle($sahodayaId, $class, $configScope, $streamId);
+        $rows = $this->rankStyles->assign($rows, $rankStyle, fn (array $row) => $row['score'] ?? null);
 
         $selected = [];
         foreach ($rows as $row) {
-            if (count($selected) >= $topN) {
-                $lastRank = end($selected)['rank'];
-                if ($tieMode === TopperCountConfig::TIE_INCLUDE_GROUP && $row['rank'] === $lastRank) {
-                    // Keep the full tie group at the cutoff rank — list may exceed top_n.
-                } else {
+            if ($tieMode === TopperCountConfig::TIE_HARD_CAP) {
+                if (count($selected) >= $topN) {
                     break;
                 }
+            } elseif ($row['rank'] > $topN) {
+                // Rank-cutoff mode: include every row whose rank is within Top-N.
+                break;
             }
+
             $selected[] = $row;
         }
 
