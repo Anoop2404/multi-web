@@ -348,6 +348,65 @@ class TenantStorage
         return null;
     }
 
+    /**
+     * Like photoDataUri(), but never hands dompdf a bare filesystem path — always
+     * reads the bytes ourselves and returns a true base64 data URI.
+     *
+     * photoDataUri() returns the raw local path when it finds one on disk, which is
+     * fine in principle (dompdf can open local files), but production storage is
+     * often a symlink/mounted volume outside the app root (e.g. per-tenant upload
+     * storage). dompdf's chroot check resolves symlinks and rejects anything that
+     * lands outside base_path() once resolved, even though our own is_file() check
+     * (which doesn't care about dompdf's chroot) says the file is there — so dompdf
+     * silently swaps in its own broken-image placeholder for every single photo.
+     * Reading the bytes in PHP and inlining them as base64 sidesteps dompdf's path
+     * resolution entirely, so it can't be tripped up by chroot/symlink mismatches.
+     */
+    public static function photoBase64DataUri(?Tenant $tenant, ?string $relativePath): ?string
+    {
+        if (! $relativePath) {
+            return null;
+        }
+
+        if (str_starts_with($relativePath, 'data:image/')) {
+            return $relativePath;
+        }
+
+        if (str_starts_with($relativePath, 'http://') || str_starts_with($relativePath, 'https://')) {
+            return null;
+        }
+
+        $relativePath = ltrim($relativePath, '/');
+
+        $local = self::localAbsolutePath($tenant, $relativePath);
+        if ($local && is_file($local)) {
+            $contents = @file_get_contents($local);
+            if ($contents !== false && $contents !== '') {
+                $mime = @mime_content_type($local) ?: 'image/jpeg';
+
+                return 'data:'.$mime.';base64,'.base64_encode($contents);
+            }
+        }
+
+        foreach (self::downloadDisks() as $disk) {
+            try {
+                if (self::disk($disk)->exists($relativePath)) {
+                    $contents = self::disk($disk)->get($relativePath);
+                    if ($contents === null || $contents === '') {
+                        continue;
+                    }
+                    $mime = self::disk($disk)->mimeType($relativePath) ?: 'image/jpeg';
+
+                    return 'data:'.$mime.';base64,'.base64_encode($contents);
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
     public static function localAbsolutePath(?Tenant $tenant, ?string $relativePath): ?string
     {
         if (! $relativePath) {

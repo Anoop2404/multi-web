@@ -326,11 +326,18 @@ class FestReportService
         return str($this->event->title)->slug()->limit(40)->toString();
     }
 
-    private function renderPdf(string $view, array $data, string $filename, bool $landscape = false): \Symfony\Component\HttpFoundation\Response
-    {
+    private function renderPdf(
+        string $view,
+        array $data,
+        string $filename,
+        bool $landscape = false,
+        ?string $headerTemplate = null,
+        ?string $footerTemplate = null,
+        ?array $margin = null,
+    ): \Symfony\Component\HttpFoundation\Response {
         $html = view($view, $data)->render();
 
-        return PdfGenerator::download($html, $filename, $this->preview, $landscape);
+        return PdfGenerator::download($html, $filename, $this->preview, $landscape, $headerTemplate, $footerTemplate, $margin);
     }
 
     private function reportAudience(Request $request): string
@@ -657,15 +664,17 @@ class FestReportService
         // real PDF export via dompdf makes its own outbound HTTP request to fetch each
         // <img src> with no cookies/session at all, so any auth-gated URL just 404s —
         // that's why photos render in preview but show as broken images in the download.
-        // For the dompdf path we embed the photo bytes directly as a base64 data URI
-        // instead (same technique already used for fest ID cards).
+        // For the actual PDF we embed the photo bytes directly as a base64 data URI
+        // instead (photoBase64DataUri never hands dompdf a bare filesystem path, which
+        // it can fail to open when storage is a symlinked/mounted volume — see that
+        // method's docblock).
         $photoMap = [];
         foreach ($participants as $p) {
             $sid = $p->student_id;
             if ($sid && ! isset($photoMap[$sid]) && $p->student) {
-                $photoMap[$sid] = ($isDomPdf && ! $isPreview)
-                    ? \App\Support\TenantStorage::photoDataUri($p->student->tenant, $p->student->photo)
-                    : $this->resolveParticipantPhotoUrl($p->student, $request);
+                $photoMap[$sid] = $isPreview
+                    ? $this->resolveParticipantPhotoUrl($p->student, $request)
+                    : \App\Support\TenantStorage::photoBase64DataUri($p->student->tenant, $p->student->photo);
             }
         }
 
@@ -710,6 +719,7 @@ class FestReportService
         ])->values()->all());
 
         $sahodaya = Tenant::find($this->event->tenant_id);
+        $logo = $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null;
 
         // Single-item filter → header can name the item; combined report → just the event name.
         $singleItemName = $rowsByItem->count() === 1
@@ -719,7 +729,7 @@ class FestReportService
         $bladeData = [
             'event'          => $this->event,
             'sahodaya'       => $sahodaya,
-            'logo'           => $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null,
+            'logo'           => $logo,
             'rowsByItem'     => $rowsByItem,
             'audience'       => $audience,
             'isPreview'      => $isPreview,
@@ -736,7 +746,63 @@ class FestReportService
                 ->header('Content-Type', 'text/html');
         }
 
-        return $this->renderPdf('fest.reports.attendance-sheet', $bladeData, $this->slug().'-attendance.pdf');
+        // The real PDF renderer is an external Puppeteer/Chromium service (chrome-print-
+        // server.js) — pass its native repeating headerTemplate/footerTemplate instead of
+        // relying on any CSS trick. Ignored by the dompdf fallback (only used locally),
+        // which gets its own branding baked into the page content — see the blade file.
+        [$headerTemplate, $footerTemplate] = $this->attendanceSheetHeaderFooterTemplates($sahodaya, $logo, $singleItemName);
+
+        return $this->renderPdf(
+            'fest.reports.attendance-sheet',
+            $bladeData,
+            $this->slug().'-attendance.pdf',
+            false,
+            $headerTemplate,
+            $footerTemplate,
+            ['top' => '85px', 'right' => '38px', 'bottom' => '55px', 'left' => '38px'],
+        );
+    }
+
+    /**
+     * Build Puppeteer header/footer template HTML for the attendance sheet. These are
+     * rendered by Chromium in isolation from the main page (no external/page stylesheet
+     * access), so every style must be inline. `pageNumber`/`totalPages` are special
+     * classes Chromium fills in automatically.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function attendanceSheetHeaderFooterTemplates(?Tenant $sahodaya, ?string $logo, ?string $singleItemName): array
+    {
+        $orgName = e($sahodaya->name ?? 'SAHODAYA');
+        $eventTitle = e($this->event->title);
+        $context = $singleItemName ? $eventTitle.' &bull; '.e($singleItemName) : $eventTitle;
+        $generated = e(now()->format('d M Y, h:i A'));
+
+        $logoImg = $logo
+            ? '<img src="'.e($logo).'" style="width:20px;height:20px;object-fit:contain;margin-right:6px;">'
+            : '';
+
+        $header = <<<HTML
+            <div style="width:100%; font-family:Arial,sans-serif; padding:0 38px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; border-bottom:1.5px solid #0f172a; padding-bottom:5px;">
+                <div style="display:flex; align-items:center;">
+                    {$logoImg}
+                    <div>
+                        <div style="font-size:11px; font-weight:800; color:#0f172a; text-transform:uppercase;">{$orgName}</div>
+                        <div style="font-size:7px; color:#475569; margin-top:1px;">{$context}</div>
+                    </div>
+                </div>
+                <div style="background:#0f172a; color:#fff; padding:3px 8px; border-radius:3px; font-size:7px; font-weight:bold; letter-spacing:0.3px;">ATTENDANCE SHEET</div>
+            </div>
+            HTML;
+
+        $footer = <<<HTML
+            <div style="width:100%; font-family:Arial,sans-serif; font-size:7px; color:#64748b; padding:0 38px; box-sizing:border-box; display:flex; justify-content:space-between; border-top:1px solid #cbd5e1; padding-top:4px;">
+                <span>{$orgName} &bull; {$eventTitle} &bull; Generated {$generated}</span>
+                <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+            </div>
+            HTML;
+
+        return [$header, $footer];
     }
 
     /**
