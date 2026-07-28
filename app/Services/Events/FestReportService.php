@@ -670,6 +670,24 @@ class FestReportService
             return $row;
         }, $rows);
 
+        // Build DOB map for sports events
+        if ($this->event->event_type === 'sports') {
+            $dobMap = [];
+            foreach ($participants as $p) {
+                $sid = $p->student_id;
+                if ($sid && ! isset($dobMap[$sid])) {
+                    $dobMap[$sid] = $p->student?->dob?->format('d M Y');
+                }
+            }
+            if ($dobMap) {
+                $rows = array_map(function ($row) use ($dobMap) {
+                    $sid = $row['_student_id'] ?? null;
+                    $row['dob'] = $sid ? ($dobMap[$sid] ?? null) : null;
+                    return $row;
+                }, $rows);
+            }
+        }
+
         // Group by item
         $rowsByItem = collect($rows)->groupBy(fn ($r) => $r['item'] ?? 'Item')->sortKeys();
 

@@ -17,21 +17,11 @@
             margin: 0;
             padding: 0;
         }
-@if(!empty($isPreview))
         .report-header {
             border-bottom: 2px solid #0f172a;
             margin-bottom: 12px;
             padding-bottom: 8px;
         }
-@else
-        header {
-            position: fixed;
-            top: -28mm;
-            left: 0px;
-            right: 0px;
-            height: 25mm;
-        }
-@endif
         .footer-container {
             position: fixed;
             bottom: -10mm;
@@ -159,23 +149,13 @@
 </head>
 <body>
 
-@if(!empty($isPreview))
-    <div class="report-header">
-        @include('partials.pdf-branding-header', [
-            'orgName' => $sahodaya->name ?? 'SAHODAYA',
-            'logoSrc' => $logo ?? null,
-            'docTitle' => 'ATTENDANCE SHEET',
-        ])
-    </div>
-@else
-    <header>
-        @include('partials.pdf-branding-header', [
-            'orgName' => $sahodaya->name ?? 'SAHODAYA',
-            'logoSrc' => $logo ?? null,
-            'docTitle' => 'ATTENDANCE SHEET',
-        ])
-    </header>
-@endif
+<div class="report-header">
+    @include('partials.pdf-branding-header', [
+        'orgName' => $sahodaya->name ?? 'SAHODAYA',
+        'logoSrc' => $logo ?? null,
+        'docTitle' => 'ATTENDANCE SHEET',
+    ])
+</div>
 
 <div class="footer-container">
     Generated on {{ now()->format('d M Y, h:i A') }} &bull; Page {PAGE_NUM} of {PAGE_COUNT}
@@ -195,9 +175,7 @@
             <thead>
                 <tr>
                     <th style="width: 28px;" class="text-center">Sl</th>
-                    @if(!empty($isPreview))
-                        <th class="photo-cell"></th>
-                    @endif
+                    <th class="photo-cell"></th>
                     <th style="width: 55px;" class="text-center">Chest No</th>
                     <th>Participant / Team Name</th>
                     @if($event->event_type === 'sports')
@@ -224,7 +202,7 @@
                     @if($currentTeamKey && $currentTeamKey !== $lastTeamKey)
                         @php $lastTeamKey = $currentTeamKey; @endphp
                         <tr class="team-divider">
-                            <td colspan="{{ $event->event_type === 'sports' ? 6 : 5 }}">
+                            <td colspan="{{ $event->event_type === 'sports' ? 7 : 6 }}">
                                 <strong>TEAM: {{ strtoupper($teamName ?? 'Team Entry') }}</strong>
                                 @if(!empty($school))
                                     &bull; <span style="color: #475569;">{{ strtoupper($school) }}</span>
@@ -235,15 +213,13 @@
 
                     <tr>
                         <td class="text-center">{{ $i + 1 }}</td>
-                        @if(!empty($isPreview))
-                            <td class="photo-cell text-center">
-                                @if(!empty($row['photo_url']))
-                                    <img src="{{ $row['photo_url'] }}" alt="">
-                                @else
-                                    <span class="initials">{{ strtoupper(substr($row['name'] ?? '?', 0, 1)) }}</span>
-                                @endif
-                            </td>
-                        @endif
+                        <td class="photo-cell text-center">
+                            @if(!empty($row['photo_url']))
+                                <img src="{{ $row['photo_url'] }}" alt="">
+                            @else
+                                <span class="initials">{{ strtoupper(substr($row['name'] ?? '?', 0, 1)) }}</span>
+                            @endif
+                        </td>
                         <td class="text-center chest-no">{{ $row['reference'] ?? '—' }}</td>
                         <td>
                             <strong style="font-size: 9px;">{{ $row['name'] ?? '' }}</strong>
