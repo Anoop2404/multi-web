@@ -110,14 +110,15 @@ class AuditPaymentIntegrity extends Command
     {
         $issues = collect();
         $carriers = collect();
+        $eventId = $this->option('event');
 
         $fest = FestSchoolEventFee::query()
-            ->when($this->option('event'), fn ($query, $eventId) => $query->where('event_id', $eventId))
+            ->when($eventId, fn ($query) => $query->where('event_id', $eventId))
             ->forAmountAggregation()
             ->get();
         $carriers = $carriers->concat($fest);
 
-        if (! $this->option('event')) {
+        if (! $eventId) {
             $carriers = $carriers
                 ->concat(McqSchoolFee::all())
                 ->concat(TrainingSchoolFee::all());
@@ -171,10 +172,27 @@ class AuditPaymentIntegrity extends Command
             \App\Models\TrainingRegistration::class,
         ];
 
-        $approvedReceipts = FeeReceipt::query()
+        $approvedReceiptQuery = FeeReceipt::query()
             ->where('status', FeeReceipt::STATUS_APPROVED)
-            ->whereIn('feeable_type', $feeableTypes)
-            ->get();
+            ->whereIn('feeable_type', $feeableTypes);
+
+        if ($eventId) {
+            $registrationIds = \App\Models\FestRegistration::query()
+                ->where('event_id', $eventId)
+                ->pluck('id');
+
+            $approvedReceiptQuery->where(function ($query) use ($fest, $registrationIds) {
+                $query->where(function ($feeQuery) use ($fest) {
+                    $feeQuery->where('feeable_type', FestSchoolEventFee::class)
+                        ->whereIn('feeable_id', $fest->pluck('id'));
+                })->orWhere(function ($registrationQuery) use ($registrationIds) {
+                    $registrationQuery->where('feeable_type', \App\Models\FestRegistration::class)
+                        ->whereIn('feeable_id', $registrationIds);
+                });
+            });
+        }
+
+        $approvedReceipts = $approvedReceiptQuery->get();
 
         foreach ($approvedReceipts as $receipt) {
             $posted = round((float) LedgerTransaction::query()
@@ -197,7 +215,11 @@ class AuditPaymentIntegrity extends Command
             }
         }
 
-        $credits = FestFeeCredit::all()->concat(ProgramFeeCredit::all());
+        $credits = $eventId
+            ? FestFeeCredit::query()
+                ->whereIn('fest_school_event_fee_id', $fest->pluck('id'))
+                ->get()
+            : FestFeeCredit::all()->concat(ProgramFeeCredit::all());
         foreach ($credits as $credit) {
             $posted = round((float) LedgerTransaction::query()
                 ->where('tenant_id', $tenant->id)
@@ -220,7 +242,12 @@ class AuditPaymentIntegrity extends Command
             }
         }
 
-        $payouts = CreditPayout::all();
+        $payouts = $eventId
+            ? CreditPayout::query()
+                ->where('creditable_type', FestFeeCredit::class)
+                ->whereIn('creditable_id', $credits->pluck('id'))
+                ->get()
+            : CreditPayout::all();
         foreach ($payouts as $payout) {
             $posted = round((float) LedgerTransaction::query()
                 ->where('tenant_id', $tenant->id)
@@ -243,8 +270,27 @@ class AuditPaymentIntegrity extends Command
             }
         }
 
-        $journals = LedgerTransaction::query()
-            ->where('tenant_id', $tenant->id)
+        $journalQuery = LedgerTransaction::query()
+            ->where('tenant_id', $tenant->id);
+
+        if ($eventId) {
+            $eventHeadIds = \App\Models\AccountHead::query()
+                ->where('tenant_id', $tenant->id)
+                ->where('event_id', $eventId)
+                ->pluck('id');
+            $eventJournalIds = LedgerTransaction::query()
+                ->where('tenant_id', $tenant->id)
+                ->whereIn('account_head_id', $eventHeadIds)
+                ->whereNotNull('journal_id')
+                ->pluck('journal_id');
+
+            $journalQuery->where(function ($query) use ($eventHeadIds, $eventJournalIds) {
+                $query->whereIn('journal_id', $eventJournalIds)
+                    ->orWhereIn('account_head_id', $eventHeadIds);
+            });
+        }
+
+        $journals = $journalQuery
             ->selectRaw("journal_id, SUM(CASE WHEN entry_type = 'debit' THEN amount ELSE 0 END) AS debits, SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE 0 END) AS credits")
             ->groupBy('journal_id')
             ->get();
@@ -252,6 +298,20 @@ class AuditPaymentIntegrity extends Command
         foreach ($journals as $journal) {
             $debits = round((float) $journal->debits, 2);
             $journalCredits = round((float) $journal->credits, 2);
+
+            if ($journal->journal_id === null || $journal->journal_id === '') {
+                $issues->push($this->issue(
+                    'missing_journal_id',
+                    'LedgerTransaction',
+                    null,
+                    $debits,
+                    $journalCredits,
+                    'One or more legacy ledger rows have no journal ID and cannot be reconciled as an individual double-entry journal.'
+                ));
+
+                continue;
+            }
+
             if (abs($debits - $journalCredits) > 0.01) {
                 $issues->push($this->issue(
                     'unbalanced_journal',
@@ -298,7 +358,7 @@ class AuditPaymentIntegrity extends Command
     private function issue(
         string $issue,
         string $source,
-        int|string $id,
+        int|string|null $id,
         float $expected,
         float $actual,
         string $detail,
@@ -306,7 +366,7 @@ class AuditPaymentIntegrity extends Command
         return [
             'issue' => $issue,
             'source' => $source,
-            'id' => $id,
+            'id' => $id ?? '(missing)',
             'expected' => number_format($expected, 2, '.', ''),
             'actual' => number_format($actual, 2, '.', ''),
             'difference' => number_format($actual - $expected, 2, '.', ''),

@@ -372,11 +372,14 @@ class BoardResultController extends SchoolAdminController
                         ]);
                     }
                     $normalizedKey = BoardExamSubjects::normalizeStream($streamKey, $sahodayaId);
-                    if ($normalizedKey) {
-                        $labels = BoardExamSubjects::class12StreamLabels($sahodayaId);
-                        $streamLabel = $labels[$normalizedKey] ?? $streamKey;
-                        $streamId = BoardExamSubjects::resolveStreamId($normalizedKey, $sahodayaId);
+                    if ($normalizedKey === null) {
+                        throw ValidationException::withMessages([
+                            "toppers.{$i}.stream_key" => "The selected stream '{$streamKey}' is not available for this Sahodaya.",
+                        ]);
                     }
+                    $labels = BoardExamSubjects::class12StreamLabels($sahodayaId);
+                    $streamLabel = $labels[$normalizedKey] ?? $streamKey;
+                    $streamId = BoardExamSubjects::resolveStreamId($normalizedKey, $sahodayaId);
                 }
 
                 $totalMarks = $marksConfig->resolve($sahodayaId, (int) $boardResult->class, $streamId);
@@ -579,11 +582,14 @@ class BoardResultController extends SchoolAdminController
             $academicYear = $active?->label ?? ((date('Y') - 1).'-'.substr((string) date('Y'), 2));
         }
 
+        $yearService = app(BoardResultAcademicYearService::class);
+        $yearService->assertEditableYear($yearService->resolveId($academicYear), $academicYear);
+
         $sahodayaId = (string) $this->school->parent_id;
         $marksConfigService = app(BoardResultMarksConfigService::class);
         $totalMarks = (int) $class === 10
             ? $marksConfigService->resolve($sahodayaId, 10, null)
-            : 500;
+            : null;
 
         $boardResult = BoardResult::firstOrCreate(
             [
@@ -803,6 +809,7 @@ class BoardResultController extends SchoolAdminController
             $nextRank = (int) (Topper::where('board_result_id', $boardResult->id)->max('rank') ?? 0) + 1;
             $created = 0;
             $updated = 0;
+            $workingToppers = $boardResult->toppers;
 
             // Validate roll_no uniqueness across all rows submitted AND existing toppers.
             $submittedRollNos = [];
@@ -820,12 +827,12 @@ class BoardResultController extends SchoolAdminController
                 $submittedRollNos[$rollNo] = true;
 
                 // Check against existing toppers (excluding the one we'll match/update).
-                $matchedByRollNo = $boardResult->toppers->first(
+                $matchedByRollNo = $workingToppers->first(
                     fn (Topper $t) => $t->roll_no === $rollNo
                 );
                 if ($matchedByRollNo) {
                     // Allow the match if this row is updating that same topper; reject otherwise.
-                    $matchedByName = $boardResult->toppers->first(
+                    $matchedByName = $workingToppers->first(
                         fn (Topper $t) => strtolower($t->name) === strtolower(trim($row['name']))
                     );
                     if (! $matchedByName || $matchedByName->id !== $matchedByRollNo->id) {
@@ -840,7 +847,7 @@ class BoardResultController extends SchoolAdminController
                 $name = trim($row['name']);
                 // Match by admission_no first (most reliable), then roll_no, then name
                 // as last resort — prevents duplicate-name collisions.
-                $topper = $boardResult->toppers->first(
+                $topper = $workingToppers->first(
                     fn (Topper $t) => (filled($row['admission_no'] ?? null) && $t->admission_no === $row['admission_no'])
                         || (filled($row['roll_no'] ?? null) && $t->roll_no === $row['roll_no'])
                         || strtolower($t->name) === strtolower($name)
@@ -851,14 +858,14 @@ class BoardResultController extends SchoolAdminController
                     $subjectMarks[$subject] = $row['marks'];
 
                     $topper->update([
+                        'name' => $name,
                         'gender' => $row['gender'],
                         'roll_no' => filled($row['roll_no'] ?? null) ? $row['roll_no'] : $topper->roll_no,
                     ]);
                     app(TopperSubjectMarkService::class)->sync($topper, $subjectMarks);
                     $updated++;
                 } else {
-                    $marksConfig = app(BoardResultMarksConfigService::class);
-                    $totalMarks = $marksConfig->resolve($sahodayaId, (int) $boardResult->class, null);
+                    $totalMarks = 100;
 
                     $topper = Topper::create([
                         'board_result_id' => $boardResult->id,
@@ -866,13 +873,13 @@ class BoardResultController extends SchoolAdminController
                         'name' => $name,
                         'gender' => $row['gender'],
                         'roll_no' => $row['roll_no'] ?? null,
-                        'percentage' => $totalMarks > 0 ? round(((float) $row['marks'] / $totalMarks) * 100, 2) : 0,
+                        'percentage' => round((float) $row['marks'], 2),
                         'marks_obtained' => $row['marks'],
                         'total_marks' => $totalMarks,
                         'rank' => $nextRank++,
                     ]);
                     app(TopperSubjectMarkService::class)->sync($topper, [$subject => $row['marks']]);
-                    $boardResult->toppers->push($topper);
+                    $workingToppers->push($topper);
                     $created++;
                 }
             }
