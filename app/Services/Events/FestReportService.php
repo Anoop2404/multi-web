@@ -94,7 +94,7 @@ class FestReportService
             ->when($studentId, fn ($q) => $q->where('student_id', $studentId))
             ->when($teacherId, fn ($q) => $q->where('teacher_id', $teacherId))
             ->whereHas('registration', function ($q) use ($itemId, $classGroup, $schoolId, $approvedOnly) {
-                $q->where('event_id', $this->event->id)
+                $q->whereIn('event_id', $this->event->reportableEventIds())
                     ->when($approvedOnly, fn ($q2) => $q2->where('status', 'approved'), fn ($q2) => $q2->active())
                     ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId))
                     ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId))

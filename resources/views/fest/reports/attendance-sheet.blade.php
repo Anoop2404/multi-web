@@ -93,6 +93,9 @@
             border-collapse: collapse;
             margin-top: 0;
         }
+        thead {
+            display: table-header-group;
+        }
         th {
             background: #f1f5f9;
             color: #334155;
@@ -137,6 +140,9 @@
             border-bottom: 1px solid #cbd5e1;
             text-transform: uppercase;
             letter-spacing: 0.03em;
+        }
+        .team-divider {
+            page-break-inside: avoid;
         }
         .team-tag {
             display: inline-block;
