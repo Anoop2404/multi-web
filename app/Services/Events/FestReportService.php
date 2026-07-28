@@ -17,9 +17,8 @@ use App\Models\Student;
 use App\Models\Tenant;
 use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
+use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
-use App\Support\TenantStorage;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -324,6 +323,13 @@ class FestReportService
         return str($this->event->title)->slug()->limit(40)->toString();
     }
 
+    private function renderPdf(string $view, array $data, string $filename, bool $landscape = false)
+    {
+        $html = view($view, $data)->render();
+
+        return PdfGenerator::download($html, $filename, false, $landscape);
+    }
+
     private function reportAudience(Request $request): string
     {
         return $request->input('audience', 'staff') === 'public' ? 'public' : 'staff';
@@ -478,11 +484,11 @@ class FestReportService
             $request->input('school_id'),
         );
 
-        return Pdf::loadView('fest.reports.registration-list', [
+        return $this->renderPdf('fest.reports.registration-list', [
             'event' => $this->event,
             'rows'  => $regs,
             ...$this->brandingData(),
-        ])->download($this->slug().'-registration-list.pdf');
+        ], $this->slug().'-registration-list.pdf');
     }
 
     private function schoolWisePdf(Request $request): \Illuminate\Http\Response
@@ -493,20 +499,20 @@ class FestReportService
             $request->input('class_group'),
         );
 
-        return Pdf::loadView('fest.reports.school-wise', [
+        return $this->renderPdf('fest.reports.school-wise', [
             'event'   => $this->event,
             'marks'   => $marks,
             ...$this->brandingData(),
-        ])->download($this->slug().'-school-wise.pdf');
+        ], $this->slug().'-school-wise.pdf');
     }
 
     private function overallRankingPdf(): \Illuminate\Http\Response
     {
-        return Pdf::loadView('fest.reports.overall-ranking', [
+        return $this->renderPdf('fest.reports.overall-ranking', [
             'event'   => $this->event,
             'schools' => $this->schoolRankingRows(),
             ...$this->brandingData(),
-        ])->download($this->slug().'-overall-ranking.pdf');
+        ], $this->slug().'-overall-ranking.pdf');
     }
 
     private function houseWisePdf(): \Illuminate\Http\Response
@@ -514,12 +520,12 @@ class FestReportService
         $houses = FestHouse::where('event_id', $this->event->id)->with('schoolAssignments')->get();
         $board = EventContext::for($this->event)->scoreboardByHouse();
 
-        return Pdf::loadView('fest.reports.house-wise', [
+        return $this->renderPdf('fest.reports.house-wise', [
             'event'  => $this->event,
             'houses' => $houses,
             'board'  => $board,
             ...$this->brandingData(),
-        ])->download($this->slug().'-house-wise.pdf');
+        ], $this->slug().'-house-wise.pdf');
     }
 
     private function itemListPdf(): \Illuminate\Http\Response
@@ -538,11 +544,11 @@ class FestReportService
             'fee_per_item'     => $row['fee_per_item'],
         ]);
 
-        return Pdf::loadView('fest.reports.item-list', [
+        return $this->renderPdf('fest.reports.item-list', [
             'event' => $this->event,
             'items' => $items,
             ...$this->brandingData(),
-        ])->download($this->slug().'-item-list.pdf');
+        ], $this->slug().'-item-list.pdf');
     }
 
     private function itemWisePdf(Request $request): \Illuminate\Http\Response
@@ -560,22 +566,22 @@ class FestReportService
 
         $item = FestEventItem::find($itemId);
 
-        return Pdf::loadView('fest.reports.item-wise', [
+        return $this->renderPdf('fest.reports.item-wise', [
             'event' => $this->event,
             'item'  => $item,
             'marks' => $marks,
             'topN'  => $topN,
             ...$this->brandingData(),
-        ])->download($this->slug().'-item-wise.pdf');
+        ], $this->slug().'-item-wise.pdf');
     }
 
     private function cumulativePdf(): \Illuminate\Http\Response
     {
-        return Pdf::loadView('fest.reports.cumulative', [
+        return $this->renderPdf('fest.reports.cumulative', [
             'event'   => $this->event,
             'schools' => $this->schoolRankingRows(),
             ...$this->brandingData(),
-        ])->download($this->slug().'-cumulative.pdf');
+        ], $this->slug().'-cumulative.pdf');
     }
 
     private function dayWisePdf(Request $request): \Illuminate\Http\Response
@@ -617,13 +623,13 @@ class FestReportService
             ];
         });
 
-        return Pdf::loadView('fest.reports.day-wise', [
+        return $this->renderPdf('fest.reports.day-wise', [
             'event'    => $this->event,
             'date'     => $date,
             'rows'     => $rows,
             'audience' => $audience,
             ...$this->brandingData(),
-        ])->download($this->slug()."-day-{$date}.pdf");
+        ], $this->slug()."-day-{$date}.pdf");
     }
 
     private function attendanceSheetPdf(Request $request): \Illuminate\Http\Response
@@ -653,39 +659,30 @@ class FestReportService
 
         $sahodaya = Tenant::find($this->event->tenant_id);
 
-        // Photo and DOB enrichment for sports events.
+        // DOB enrichment only for sports events (photos skipped — DomPDF memory
+        // overhead with 200+ embedded images exceeds 128MB limit).
         if ($this->event->event_type === 'sports') {
-            $studentMap = [];
+            $dobMap = [];
             foreach ($participants as $p) {
                 $sid = $p->student_id;
-                if ($sid && ! isset($studentMap[$sid])) {
-                    $relativePath = $p->student?->photo;
-                    $photoSrc = null;
-                    if ($relativePath) {
-                        $photoSrc = str_starts_with($relativePath, 'http')
-                            ? $relativePath
-                            : ($sahodaya ? TenantStorage::photoDataUri($sahodaya, $relativePath) : null);
-                    }
-                    $studentMap[$sid] = [
-                        'photo_src' => $photoSrc,
-                        'dob' => $p->student?->dob?->format('d M Y'),
-                    ];
+                if ($sid && ! isset($dobMap[$sid])) {
+                    $dobMap[$sid] = $p->student?->dob?->format('d M Y');
                 }
             }
-            if ($studentMap) {
+            if ($dobMap) {
                 $rowsByItem = $rowsByItem->map(fn ($rows) => $rows->map(
-                    fn ($row) => array_merge($row, $studentMap[$row['_student_id'] ?? null] ?? ['photo_src' => null, 'dob' => null]),
+                    fn ($row) => array_merge($row, ['photo_src' => null, 'dob' => $dobMap[$row['_student_id'] ?? null] ?? null]),
                 )->all());
             }
         }
 
-        return Pdf::loadView('fest.reports.attendance-sheet', [
+        return $this->renderPdf('fest.reports.attendance-sheet', [
             'event'      => $this->event,
             'sahodaya'   => $sahodaya,
             'logo'       => $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null,
             'rowsByItem' => $rowsByItem,
             'audience'   => $audience,
-        ])->download($this->slug().'-attendance.pdf');
+        ], $this->slug().'-attendance.pdf');
     }
 
     private function attendanceSheetSchoolPdf(Request $request): \Illuminate\Http\Response
@@ -695,11 +692,6 @@ class FestReportService
 
         $participants = $this->participantsFlat(null, null, $school->id, null, null, false);
         $studentRows = [];
-
-        $sahodaya = Tenant::find($this->event->tenant_id);
-
-        // Photo/DOB enrichment only for sports events (memory optimization).
-        $isSports = $this->event->event_type === 'sports';
 
         foreach ($participants as $p) {
             if (! $p->student) {
@@ -713,25 +705,19 @@ class FestReportService
             ];
         }
 
-        // Batch-load photo/DOB for sports events only.
-        if ($isSports && $sahodaya) {
+        // DOB enrichment for sports events only (photos skipped — DomPDF memory limit).
+        if ($this->event->event_type === 'sports') {
             foreach ($studentRows as $id => $row) {
-                if (! isset($row['photo_src'])) {
-                    $relativePath = $row['student']->photo;
-                    $studentRows[$id]['photo_src'] = $relativePath
-                        ? (str_starts_with($relativePath, 'http') ? $relativePath : TenantStorage::photoDataUri($sahodaya, $relativePath))
-                        : null;
-                    $studentRows[$id]['dob'] = $row['student']->dob?->format('d M Y');
-                }
+                $studentRows[$id]['dob'] = $row['student']->dob?->format('d M Y');
             }
         }
 
-        return Pdf::loadView('fest.reports.attendance-sheet-school', [
+        return $this->renderPdf('fest.reports.attendance-sheet-school', [
             'event'       => $this->event,
             'school'      => $school,
             'studentRows' => $studentRows,
             ...$this->brandingData(),
-        ])->setPaper('a4', 'landscape')->download($this->slug()."-attendance-{$school->id}.pdf");
+        ], $this->slug()."-attendance-{$school->id}.pdf", true);
     }
 
     private function judgeSheetPdf(Request $request): \Illuminate\Http\Response
@@ -751,7 +737,7 @@ class FestReportService
 
         $participants = $this->participantsFlat($itemId, null, null, null, null, false);
 
-        return Pdf::loadView('fest.reports.judge-sheet', [
+        return $this->renderPdf('fest.reports.judge-sheet', [
             'event'    => $this->event,
             'item'     => $item,
             'criteria' => $criteria,
@@ -759,7 +745,7 @@ class FestReportService
             'rows'     => $this->participantReportRows($participants, $audience),
             'audience' => $audience,
             ...$this->brandingData(),
-        ])->download($this->slug()."-judge-{$itemId}.pdf");
+        ], $this->slug()."-judge-{$itemId}.pdf");
     }
 
     private function markEntrySheetPdf(Request $request): \Illuminate\Http\Response
@@ -771,14 +757,14 @@ class FestReportService
 
         $sahodaya = Tenant::find($this->event->tenant_id);
 
-        return Pdf::loadView('fest.reports.mark-entry-sheet', [
+        return $this->renderPdf('fest.reports.mark-entry-sheet', [
             'event'    => $this->event,
             'item'     => $item,
             'rows'     => $this->participantReportRows($participants, $audience),
             'audience' => $audience,
             'sahodaya' => $sahodaya,
             'logoSrc'  => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
-        ])->download($this->slug()."-mark-entry-{$itemId}.pdf");
+        ], $this->slug()."-mark-entry-{$itemId}.pdf");
     }
 
     private function itemOrderPublicPdf(Request $request): \Illuminate\Http\Response
@@ -810,12 +796,12 @@ class FestReportService
             ];
         });
 
-        return Pdf::loadView('fest.reports.item-order-public', [
+        return $this->renderPdf('fest.reports.item-order-public', [
             'event' => $this->event,
             'item'  => $item,
             'rows'  => $rows,
             ...$this->brandingData(),
-        ])->download($this->slug()."-item-order-{$itemId}.pdf");
+        ], $this->slug()."-item-order-{$itemId}.pdf");
     }
 
     private function greenRoomListPdf(Request $request): \Illuminate\Http\Response
@@ -839,11 +825,11 @@ class FestReportService
             'revealed'  => (bool) $p->chest_revealed_at,
         ]);
 
-        return Pdf::loadView('fest.reports.green-room-list', [
+        return $this->renderPdf('fest.reports.green-room-list', [
             'event' => $this->event,
             'rows'  => $rows,
             ...$this->brandingData(),
-        ])->download($this->slug().'-green-room.pdf');
+        ], $this->slug().'-green-room.pdf');
     }
 
     private function markEntryStatusCsv(): StreamedResponse
@@ -907,13 +893,13 @@ class FestReportService
         $date = $request->input('date');
         $stageId = $request->integer('stage_id') ?: null;
 
-        return Pdf::loadView('fest.reports.item-schedule', [
+        return $this->renderPdf('fest.reports.item-schedule', [
             'event'   => $this->event,
             'date'    => $date,
             'rows'    => $this->itemScheduleRows($date, $stageId),
             'summary' => $this->itemScheduleSummary(),
             ...$this->brandingData(),
-        ])->download($this->slug().'-item-schedule.pdf');
+        ], $this->slug().'-item-schedule.pdf');
     }
 
     private function clashesSchoolPdf(Request $request): \Illuminate\Http\Response
@@ -922,12 +908,12 @@ class FestReportService
         $school = Tenant::findOrFail($request->input('school_id'));
         $conflicts = (new FestScheduleConflictService($this->event))->detectAll($school->id);
 
-        return Pdf::loadView('fest.reports.clash-school', [
+        return $this->renderPdf('fest.reports.clash-school', [
             'event'     => $this->event,
             'school'    => $school,
             'conflicts' => $conflicts,
             ...$this->brandingData(),
-        ])->download($this->slug()."-clash-{$school->id}.pdf");
+        ], $this->slug()."-clash-{$school->id}.pdf");
     }
 
     private function promotionsCsv(): StreamedResponse
@@ -958,11 +944,11 @@ class FestReportService
             ->with(['participant.student', 'participant.registration.school', 'participant.registration.item', 'nextLevelEvent'])
             ->get();
 
-        return Pdf::loadView('fest.reports.promotion-sheet', [
+        return $this->renderPdf('fest.reports.promotion-sheet', [
             'event'  => $this->event,
             'quals'  => $quals,
             ...$this->brandingData(),
-        ])->download($this->slug().'-promotions.pdf');
+        ], $this->slug().'-promotions.pdf');
     }
 
     private function certificateCountsCsv(): StreamedResponse
@@ -1059,21 +1045,21 @@ class FestReportService
             true,
         );
 
-        return Pdf::loadView('fest.reports.admit-cards', [
+        return $this->renderPdf('fest.reports.admit-cards', [
             'event'        => $this->event,
             'participants' => $participants,
             ...$this->brandingData(),
-        ])->download($this->slug().'-admit-cards.pdf');
+        ], $this->slug().'-admit-cards.pdf');
     }
 
     private function sahodayaRankingPdf(): \Illuminate\Http\Response
     {
-        return Pdf::loadView('fest.reports.overall-ranking', [
+        return $this->renderPdf('fest.reports.overall-ranking', [
             'event'   => $this->event,
             'schools' => $this->schoolRankingRows(),
             'title'   => 'Sahodaya School Ranking',
             ...$this->brandingData(),
-        ])->download($this->slug().'-sahodaya-ranking.pdf');
+        ], $this->slug().'-sahodaya-ranking.pdf');
     }
 
     private function studentParticipationXls(Request $request): StreamedResponse

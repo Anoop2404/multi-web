@@ -183,9 +183,6 @@
             <thead>
                 <tr>
                     <th style="width: 30px;" class="text-center">Sl</th>
-                    @if($event->event_type === 'sports')
-                        <th style="width: 45px;" class="text-center">Photo</th>
-                    @endif
                     <th style="width: 65px;" class="text-center">Chest No</th>
                     @if(($audience ?? 'staff') === 'staff')
                         <th>Participant / Team Name</th>
@@ -211,7 +208,7 @@
                     @if($currentTeamKey && $currentTeamKey !== $lastTeamKey)
                         @php $lastTeamKey = $currentTeamKey; @endphp
                         <tr class="team-divider">
-                            <td colspan="{{ $event->event_type === 'sports' ? 7 : 5 }}">
+                            <td colspan="{{ $event->event_type === 'sports' ? 6 : 5 }}">
                                 <strong>TEAM: {{ strtoupper($teamName ?? 'Team Entry') }}</strong>
                                 @if(!empty($row['school']))
                                     &bull; <span style="color: #475569;">{{ strtoupper($row['school']) }}</span>
@@ -222,15 +219,6 @@
 
                     <tr>
                         <td class="text-center">{{ $i + 1 }}</td>
-                        @if($event->event_type === 'sports')
-                            <td class="text-center" style="padding: 2px;">
-                                @if(!empty($row['photo_src']))
-                                    <img src="{{ $row['photo_src'] }}" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px;" alt="">
-                                @else
-                                    <span style="color: #cbd5e1; font-size: 8px;">—</span>
-                                @endif
-                            </td>
-                        @endif
                         <td class="text-center chest-no">{{ $row['reference'] ?? '—' }}</td>
                         @if(($audience ?? 'staff') === 'staff')
                             <td>

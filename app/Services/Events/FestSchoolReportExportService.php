@@ -5,8 +5,8 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\Tenant;
 use App\Support\ExcelExport;
+use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -18,6 +18,11 @@ class FestSchoolReportExportService
      *
      * @return array{orgName: string, logoSrc: ?string}
      */
+    private function renderPdf(string $view, array $data, string $filename, bool $landscape = false)
+    {
+        return PdfGenerator::download(view($view, $data)->render(), $filename, false, $landscape);
+    }
+
     private function brandingData(FestEvent $event): array
     {
         $sahodaya = Tenant::find($event->tenant_id);
@@ -36,13 +41,13 @@ class FestSchoolReportExportService
         $data = $register->build($event, $school->id);
         $slug = str($event->title)->slug()->limit(40);
 
-        return Pdf::loadView('fest.reports.school-registration-register', [
+        return $this->renderPdf('fest.reports.school-registration-register', [
             'event'   => $event,
             'school'  => $school,
             'rows'    => $data['rows'],
             'summary' => $data['school_summaries'][0] ?? null,
             ...$this->brandingData($event),
-        ])->setPaper('a4', 'landscape')->download("{$slug}-registration-register.pdf");
+        ], "{$slug}-registration-register.pdf", true);
     }
 
     public function headWisePdf(
@@ -54,13 +59,13 @@ class FestSchoolReportExportService
         $analytics = new FestSchoolReportAnalyticsService($event, $school->id);
         $slug = str($event->title)->slug()->limit(40);
 
-        return Pdf::loadView('fest.reports.head-wise-school', [
+        return $this->renderPdf('fest.reports.head-wise-school', [
             'event'   => $event,
             'school'  => $school,
             'summary' => $analytics->headRegistrationSummary(),
             'rows'    => $analytics->headWiseParticipantRows($headId),
             ...$this->brandingData($event),
-        ])->setPaper('a4', 'landscape')->download("{$slug}-head-wise-participants.pdf");
+        ], "{$slug}-head-wise-participants.pdf", true);
     }
 
     /** @param list<array<string, mixed>> $rows */
@@ -73,7 +78,7 @@ class FestSchoolReportExportService
         $slug = str($event->title)->slug()->limit(40);
         $itemSlug = str($item->title)->slug()->limit(30);
 
-        return Pdf::loadView('fest.reports.item-wise-school', [
+        return $this->renderPdf('fest.reports.item-wise-school', [
             'event'  => $event,
             'school' => $school,
             'item'   => $item,
@@ -109,7 +114,7 @@ class FestSchoolReportExportService
     {
         $slug = str($event->title)->slug()->limit(40);
 
-        return Pdf::loadView('fest.reports.discipline-school', [
+        return $this->renderPdf('fest.reports.discipline-school', [
             'event'  => $event,
             'school' => $school,
             'rows'   => $rows,
@@ -121,7 +126,7 @@ class FestSchoolReportExportService
     {
         $slug = str($event->title)->slug()->limit(40);
 
-        return Pdf::loadView('fest.reports.participation-school', [
+        return $this->renderPdf('fest.reports.participation-school', [
             'event'  => $event,
             'school' => $school,
             'used'   => $used,
@@ -134,13 +139,13 @@ class FestSchoolReportExportService
     {
         $slug = str($event->title)->slug()->limit(40);
 
-        return Pdf::loadView('fest.reports.mark-entry-school', [
+        return $this->renderPdf('fest.reports.mark-entry-school', [
             'event'   => $event,
             'school'  => $school,
             'rows'    => $rows,
             'summary' => $summary,
             ...$this->brandingData($event),
-        ])->setPaper('a4', 'landscape')->download("{$slug}-mark-entry-status.pdf");
+        ], "{$slug}-mark-entry-status.pdf", true);
     }
 
     public function viaFestReport(FestEvent $event, string $exportType, Request $request): Response|\Symfony\Component\HttpFoundation\StreamedResponse
@@ -153,14 +158,14 @@ class FestSchoolReportExportService
     {
         $slug = str($event->title)->slug()->limit(40);
 
-        return Pdf::loadView('fest.reports.school-item-counts', [
+        return $this->renderPdf('fest.reports.school-item-counts', [
             'event'       => $event,
             'school'      => $school,
             'headSummary' => $headSummary,
             'rows'        => $rows,
             'totals'      => $totals,
             ...$this->brandingData($event),
-        ])->setPaper('a4', 'landscape')->download("{$slug}-item-registration-counts.pdf");
+        ], "{$slug}-item-registration-counts.pdf", true);
     }
 
     /** @param list<array<string, mixed>> $rows */
