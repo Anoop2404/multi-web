@@ -284,7 +284,9 @@
 @forelse($rowsByItem as $itemName => $rows)
     @php
         $cleanTitle = str_replace('_', ' ', $itemName);
-        $colspan = $event->event_type === 'sports' ? 7 : 6;
+        $showDob = collect($rows)->contains(fn ($row) => !empty($row['_uses_age']));
+        $showClass = !$showDob && collect($rows)->contains(fn ($row) => !empty($row['_uses_class']));
+        $colspan = 6 + ($showDob || $showClass ? 1 : 0);
 
         // Team-based items (chess, quiz, group items, sports team events, etc.) group
         // several members under one chest/registration; count teams for those instead
@@ -339,8 +341,10 @@
                     <th class="photo-cell"></th>
                     <th style="width: 55px;" class="text-center">Chest No</th>
                     <th>Participant / Team Name</th>
-                    @if($event->event_type === 'sports')
+                    @if($showDob)
                         <th style="width: 75px;" class="text-center">DOB</th>
+                    @elseif($showClass)
+                        <th style="width: 55px;" class="text-center">Class</th>
                     @endif
                     <th style="width: 28%;">School</th>
                     <th style="width: 80px;" class="text-center">Attendance</th>
@@ -388,8 +392,10 @@
                                 <div><span class="team-tag">Team: {{ $row['team_name'] }}</span></div>
                             @endif
                         </td>
-                        @if($event->event_type === 'sports')
+                        @if($showDob)
                             <td class="text-center" style="font-size: 8px; color: #475569;">{{ $row['dob'] ?? '—' }}</td>
+                        @elseif($showClass)
+                            <td class="text-center" style="font-size: 8px; color: #475569;">{{ $row['class'] ?? '—' }}</td>
                         @endif
                         <td class="school-name">{{ strtoupper($school) }}</td>
                         <td class="text-center"></td>

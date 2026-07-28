@@ -82,6 +82,8 @@
                             <th class="p-3.5 w-12"></th>
                             <th class="p-3.5 w-20 text-center">Chest #</th>
                             <th class="p-3.5">Participant / Team</th>
+                            <th v-if="usesAgeEligibility" class="p-3.5">DOB</th>
+                            <th v-else-if="usesClassEligibility" class="p-3.5">Class</th>
                             <th class="p-3.5">School</th>
                             <th class="p-3.5">Item</th>
                             <th class="p-3.5 text-right">Attendance Status</th>
@@ -108,6 +110,12 @@
                                         Team · {{ row.member_count }} members
                                     </span>
                                 </div>
+                            </td>
+                            <td v-if="usesAgeEligibility" class="p-3.5 text-slate-600 whitespace-nowrap">
+                                {{ formatDate(row.dob) }}
+                            </td>
+                            <td v-else-if="usesClassEligibility" class="p-3.5 text-slate-600">
+                                {{ row.class_name || '—' }}
                             </td>
                             <td class="p-3.5 text-slate-600">
                                 {{ (row.school || '').toUpperCase() }}
@@ -212,6 +220,16 @@ const importForm = useForm({ file: null });
 
 const GROUP_PARTICIPANT_TYPES = ['team', 'group', 'pair', 'trio'];
 
+const selectedItem = computed(() =>
+    (props.event.items ?? []).find((item) => String(item.id) === String(itemFilter.value)) ?? null
+);
+const usesAgeEligibility = computed(() => Boolean(selectedItem.value?.age_group));
+const usesClassEligibility = computed(() =>
+    !usesAgeEligibility.value
+    && Boolean(selectedItem.value?.class_group)
+    && selectedItem.value.class_group !== 'open'
+);
+
 const filteredParticipants = computed(() => {
     let list = props.participants ?? [];
     if (itemFilter.value) {
@@ -249,6 +267,8 @@ const displayRows = computed(() => {
                 status: statusFor(p),
                 representative: p,
                 photo_url: p.student?.photo_url ?? null,
+                dob: p.student?.dob ?? null,
+                class_name: p.student?.school_class?.name ?? null,
             };
 
             if (q) {
@@ -273,6 +293,8 @@ const displayRows = computed(() => {
             status: statusFor(p),
             representative: p,
             photo_url: p.student?.photo_url ?? null,
+            dob: p.student?.dob ?? null,
+            class_name: p.student?.school_class?.name ?? null,
         };
 
         if (q) {
@@ -306,6 +328,19 @@ const attendanceSheetPreviewHref = computed(() => {
 
 function attendanceKey(p) {
     return `${p.registration.item_id}-${p.id}`;
+}
+
+function formatDate(value) {
+    if (!value) return '—';
+    const dateOnly = String(value).slice(0, 10);
+    const [year, month, day] = dateOnly.split('-').map(Number);
+    if (!year || !month || !day) return value;
+    return new Intl.DateTimeFormat('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+    }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 function statusFor(p) {

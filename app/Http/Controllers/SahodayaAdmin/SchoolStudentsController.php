@@ -59,6 +59,10 @@ class SchoolStudentsController extends SahodayaAdminController
             ->paginate(50)
             ->withQueryString();
 
+        $students->getCollection()->each(function (Student $student) {
+            $student->setAttribute('photo_url', $student->sahodayaPhotoUrl($this->sahodaya->id));
+        });
+
         $verifiedCount = Student::where('tenant_id', $school->id)->where('status', 'active')->whereNotNull('verified_at')->count();
         $unverifiedCount = Student::where('tenant_id', $school->id)->where('status', 'active')->whereNull('verified_at')->count();
 

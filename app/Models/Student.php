@@ -87,4 +87,31 @@ class Student extends Model
         // Always serve through the app route so private S3/shared disks work in the browser.
         return $serveRoute.($version ? '?v='.$version : '');
     }
+
+    /**
+     * Photo URL for a Sahodaya admin viewing a student from one of its schools.
+     *
+     * The regular photoUrl() intentionally uses the school-admin route. Sahodaya
+     * screens must use their own authorized route; otherwise the image request is
+     * rejected by the school-admin middleware even though the stored photo exists.
+     */
+    public function sahodayaPhotoUrl(string $sahodayaId): ?string
+    {
+        if (! $this->photo) {
+            return null;
+        }
+
+        if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
+            return $this->photo;
+        }
+
+        $serveRoute = url(route('sahodaya.students.photo', [
+            'tenantId' => $sahodayaId,
+            'student'  => $this->id,
+        ], absolute: false));
+
+        $version = $this->updated_at?->timestamp ?? 0;
+
+        return $serveRoute.($version ? '?v='.$version : '');
+    }
 }

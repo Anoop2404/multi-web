@@ -90,6 +90,7 @@
                     <table class="w-full text-sm">
                         <thead class="bg-gray-50">
                             <tr>
+                                <th class="px-4 py-2.5 w-14"></th>
                                 <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Admission No.</th>
                                 <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Name</th>
                                 <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Category</th>
@@ -101,6 +102,12 @@
                         </thead>
                         <tbody class="divide-y divide-gray-50">
                             <tr v-for="s in students.data" :key="s.id" class="hover:bg-gray-50/50">
+                                <td class="px-4 py-3">
+                                    <div class="w-9 h-9 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
+                                        <img v-if="s.photo_url" :src="s.photo_url" :alt="s.name" class="w-full h-full object-cover">
+                                        <span v-else class="text-xs font-bold text-gray-400">{{ (s.name || '?').charAt(0).toUpperCase() }}</span>
+                                    </div>
+                                </td>
                                 <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ s.admission_number }}</td>
                                 <td class="px-4 py-3 font-medium text-gray-800">
                                     <Link :href="`/sahodaya-admin/${sahodaya.id}/students/${s.id}`"
@@ -135,7 +142,7 @@
                                 </td>
                             </tr>
                             <tr v-if="!students.data?.length">
-                                <td colspan="7" class="px-4 py-12 text-center text-gray-400 text-sm">
+                                <td colspan="8" class="px-4 py-12 text-center text-gray-400 text-sm">
                                     No students enrolled yet. School admin adds students from the Students page.
                                 </td>
                             </tr>

@@ -317,7 +317,7 @@ class StudentVerificationController extends SahodayaAdminController
             'parent_name'       => $student->parent_name,
             'parent_phone'      => $student->parent_phone,
             'parent_email'      => $student->parent_email,
-            'photo_url'         => $student->photoUrl(),
+            'photo_url'         => $student->sahodayaPhotoUrl($this->sahodaya->id),
             'school_id'         => $student->tenant_id,
             'school_name'       => $school?->name,
             'is_verified'       => $student->isVerified(),

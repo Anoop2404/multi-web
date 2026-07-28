@@ -76,7 +76,6 @@ foreach ($festPrograms as $cfg) {
         Route::post('/register', [FestRegistrationController::class, 'store'])
             ->defaults('program', $slug)
             ->name('register');
-        Route::get('/register', fn (string $tenantId) => redirect("/school-admin/{$tenantId}/{$prefix}/registration"));
         Route::post('/events/{event}/register-students', [\App\Http\Controllers\SchoolAdmin\FestEventStudentRegistrationController::class, 'store'])
             ->defaults('program', $slug)
             ->name('event.register-students');

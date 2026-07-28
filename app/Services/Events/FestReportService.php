@@ -345,7 +345,7 @@ class FestReportService
         return $request->input('audience', 'staff') === 'public' ? 'public' : 'staff';
     }
 
-    /** @return list<array{reference: string, name: ?string, school: ?string, order: ?int, item: ?string, _student_id: ?int}> */
+    /** @return list<array<string, mixed>> */
     private function participantReportRows($participants, string $audience): array
     {
         $visibility = app(FestPublicVisibilityService::class);
@@ -358,9 +358,19 @@ class FestReportService
         return collect($participants)->map(function (FestParticipant $p) use ($visibility, $audience, $schedules) {
             $schedule = $schedules->get($p->id);
 
+            $item = $p->registration?->item;
+            $ageGroup = trim((string) ($item?->age_group ?? ''));
+            $classGroup = trim((string) ($item?->class_group ?? ''));
+
             return array_merge(
                 $visibility->formatReportRow($this->event, $p, $audience, $schedule),
-                ['_student_id' => $p->student_id],
+                [
+                    '_student_id' => $p->student_id,
+                    '_uses_age'   => $ageGroup !== '',
+                    '_uses_class' => $ageGroup === '' && $classGroup !== '' && $classGroup !== 'open',
+                    'dob'         => $p->student?->dob?->format('d M Y'),
+                    'class'       => $p->student?->schoolClass?->name,
+                ],
             );
         })->all();
     }
@@ -704,24 +714,6 @@ class FestReportService
             return $row;
         }, $rows);
 
-        // Build DOB map for sports events
-        if ($this->event->event_type === 'sports') {
-            $dobMap = [];
-            foreach ($participants as $p) {
-                $sid = $p->student_id;
-                if ($sid && ! isset($dobMap[$sid])) {
-                    $dobMap[$sid] = $p->student?->dob?->format('d M Y');
-                }
-            }
-            if ($dobMap) {
-                $rows = array_map(function ($row) use ($dobMap) {
-                    $sid = $row['_student_id'] ?? null;
-                    $row['dob'] = $sid ? ($dobMap[$sid] ?? null) : null;
-                    return $row;
-                }, $rows);
-            }
-        }
-
         // Group by item
         $rowsByItem = collect($rows)->groupBy(fn ($r) => $r['item'] ?? 'Item')->sortKeys();
 
@@ -841,17 +833,27 @@ class FestReportService
             ];
         }
 
-        // DOB enrichment for sports events only (photos skipped — DomPDF memory limit).
-        if ($this->event->event_type === 'sports') {
-            foreach ($studentRows as $id => $row) {
-                $studentRows[$id]['dob'] = $row['student']->dob?->format('d M Y');
-            }
+        $items = $participants->pluck('registration.item')->filter();
+        $showDob = $items->contains(fn ($item) => filled($item->age_group));
+        $showClass = ! $showDob && $items->contains(
+            fn ($item) => filled($item->class_group) && $item->class_group !== 'open',
+        );
+
+        foreach ($studentRows as $id => $row) {
+            $student = $row['student'];
+            $studentRows[$id]['photo_url'] = $student->photo
+                ? \App\Support\TenantStorage::photoBase64DataUri($student->tenant, $student->photo)
+                : null;
+            $studentRows[$id]['dob'] = $student->dob?->format('d M Y');
+            $studentRows[$id]['class'] = $student->schoolClass?->name;
         }
 
         return $this->renderPdf('fest.reports.attendance-sheet-school', [
             'event'       => $this->event,
             'school'      => $school,
             'studentRows' => $studentRows,
+            'showDob'      => $showDob,
+            'showClass'    => $showClass,
             ...$this->brandingData(),
         ], $this->slug()."-attendance-{$school->id}.pdf", true);
     }

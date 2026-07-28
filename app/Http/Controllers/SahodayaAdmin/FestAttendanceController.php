@@ -32,8 +32,17 @@ class FestAttendanceController extends SahodayaAdminController
             // attendees and were showing up as blank rows with no name.
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
-            ->with(['registration.item', 'registration.school', 'student', 'teacher', 'group'])
+            ->with(['registration.item', 'registration.school', 'student.schoolClass', 'teacher', 'group'])
             ->get();
+
+        foreach ($participants as $participant) {
+            if ($participant->student) {
+                $participant->student->setAttribute(
+                    'photo_url',
+                    $participant->student->sahodayaPhotoUrl($this->sahodaya->id),
+                );
+            }
+        }
 
         $attendance = FestAttendance::whereIn('event_id', $eventIds)
             ->get()

@@ -67,13 +67,6 @@ class StudentProfileController extends SahodayaAdminController
     /** @return array<string, mixed> */
     private function profilePayload(Student $student, Tenant $school): array
     {
-        $photoUrl = $student->photo
-            ? route('sahodaya.students.photo', [
-                'tenantId' => $this->sahodaya->id,
-                'student'  => $student->id,
-            ], false)
-            : null;
-
         return [
             'id'               => $student->id,
             'name'             => $student->name,
@@ -101,7 +94,7 @@ class StudentProfileController extends SahodayaAdminController
             'has_portal_login' => $student->user_id !== null,
             'portal_username'  => $student->user?->username ?? $student->reg_no,
             'portal_password'  => $student->user?->plain_password,
-            'photo_url'        => $photoUrl,
+            'photo_url'        => $student->sahodayaPhotoUrl($this->sahodaya->id),
             'school_id'        => $school->id,
             'school_name'      => $school->name,
         ];
