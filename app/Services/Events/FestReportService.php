@@ -670,10 +670,9 @@ class FestReportService
                 }
             }
             if ($photoMap) {
-                $rowsByItem = $rowsByItem->map(fn ($rows) => array_map(
+                $rowsByItem = $rowsByItem->map(fn ($rows) => $rows->map(
                     fn ($row) => array_merge($row, $photoMap[$row['_student_id'] ?? null] ?? ['photo_src' => null, 'dob' => null]),
-                    $rows,
-                ));
+                )->all());
             }
         }
 
