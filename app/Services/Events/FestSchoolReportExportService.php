@@ -8,7 +8,7 @@ use App\Support\ExcelExport;
 use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FestSchoolReportExportService

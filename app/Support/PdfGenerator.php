@@ -7,7 +7,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class PdfGenerator
 {
-    public static function download(string $html, string $filename, bool $inline = false, bool $isLandscape = true)
+    public static function download(string $html, string $filename, bool $inline = false, bool $isLandscape = false)
     {
         $url = env('PDF_CONVERTER_URL');
 

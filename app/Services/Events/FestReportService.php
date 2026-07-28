@@ -244,7 +244,7 @@ class FestReportService
         });
     }
 
-    public function export(string $type, Request $request): StreamedResponse|\Illuminate\Http\Response
+    public function export(string $type, Request $request): StreamedResponse|\Symfony\Component\HttpFoundation\Response
     {
         $audience = $request->input('audience', 'staff') === 'public' ? 'public' : 'staff';
 
@@ -323,7 +323,7 @@ class FestReportService
         return str($this->event->title)->slug()->limit(40)->toString();
     }
 
-    private function renderPdf(string $view, array $data, string $filename, bool $landscape = false)
+    private function renderPdf(string $view, array $data, string $filename, bool $landscape = false): \Symfony\Component\HttpFoundation\Response
     {
         $html = view($view, $data)->render();
 
@@ -477,7 +477,7 @@ class FestReportService
         ], $rows);
     }
 
-    private function registrationListPdf(Request $request): \Illuminate\Http\Response
+    private function registrationListPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $regs = $this->activeRegistrations(
             $request->input('class_group'),
@@ -491,7 +491,7 @@ class FestReportService
         ], $this->slug().'-registration-list.pdf');
     }
 
-    private function schoolWisePdf(Request $request): \Illuminate\Http\Response
+    private function schoolWisePdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $marks = $this->marks(
             $request->input('school_id'),
@@ -506,7 +506,7 @@ class FestReportService
         ], $this->slug().'-school-wise.pdf');
     }
 
-    private function overallRankingPdf(): \Illuminate\Http\Response
+    private function overallRankingPdf(): \Symfony\Component\HttpFoundation\Response
     {
         return $this->renderPdf('fest.reports.overall-ranking', [
             'event'   => $this->event,
@@ -515,7 +515,7 @@ class FestReportService
         ], $this->slug().'-overall-ranking.pdf');
     }
 
-    private function houseWisePdf(): \Illuminate\Http\Response
+    private function houseWisePdf(): \Symfony\Component\HttpFoundation\Response
     {
         $houses = FestHouse::where('event_id', $this->event->id)->with('schoolAssignments')->get();
         $board = EventContext::for($this->event)->scoreboardByHouse();
@@ -528,7 +528,7 @@ class FestReportService
         ], $this->slug().'-house-wise.pdf');
     }
 
-    private function itemListPdf(): \Illuminate\Http\Response
+    private function itemListPdf(): \Symfony\Component\HttpFoundation\Response
     {
         $items = collect($this->itemRegistrationCountRows())->map(fn ($row) => (object) [
             'title'            => $row['title'],
@@ -551,7 +551,7 @@ class FestReportService
         ], $this->slug().'-item-list.pdf');
     }
 
-    private function itemWisePdf(Request $request): \Illuminate\Http\Response
+    private function itemWisePdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $itemId = $request->integer('item_id') ?: $this->items()->first()?->id;
         $topN = min(50, max(1, $request->integer('top_n') ?: 10));
@@ -575,7 +575,7 @@ class FestReportService
         ], $this->slug().'-item-wise.pdf');
     }
 
-    private function cumulativePdf(): \Illuminate\Http\Response
+    private function cumulativePdf(): \Symfony\Component\HttpFoundation\Response
     {
         return $this->renderPdf('fest.reports.cumulative', [
             'event'   => $this->event,
@@ -584,7 +584,7 @@ class FestReportService
         ], $this->slug().'-cumulative.pdf');
     }
 
-    private function dayWisePdf(Request $request): \Illuminate\Http\Response
+    private function dayWisePdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $date = $request->input('date', today()->toDateString());
         $audience = $this->reportAudience($request);
@@ -632,7 +632,7 @@ class FestReportService
         ], $this->slug()."-day-{$date}.pdf");
     }
 
-    private function attendanceSheetPdf(Request $request): \Illuminate\Http\Response
+    private function attendanceSheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $participants = $this->participantsFlat(
             $request->integer('item_id') ?: null,
@@ -685,7 +685,7 @@ class FestReportService
         ], $this->slug().'-attendance.pdf');
     }
 
-    private function attendanceSheetSchoolPdf(Request $request): \Illuminate\Http\Response
+    private function attendanceSheetSchoolPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $request->validate(['school_id' => 'required|string']);
         $school = Tenant::findOrFail($request->input('school_id'));
@@ -720,7 +720,7 @@ class FestReportService
         ], $this->slug()."-attendance-{$school->id}.pdf", true);
     }
 
-    private function judgeSheetPdf(Request $request): \Illuminate\Http\Response
+    private function judgeSheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $itemId = $request->integer('item_id') ?: $this->items()->first()?->id;
         $item = FestEventItem::findOrFail($itemId);
@@ -748,7 +748,7 @@ class FestReportService
         ], $this->slug()."-judge-{$itemId}.pdf");
     }
 
-    private function markEntrySheetPdf(Request $request): \Illuminate\Http\Response
+    private function markEntrySheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $itemId = $request->integer('item_id') ?: $this->items()->first()?->id;
         $item = FestEventItem::find($itemId);
@@ -767,7 +767,7 @@ class FestReportService
         ], $this->slug()."-mark-entry-{$itemId}.pdf");
     }
 
-    private function itemOrderPublicPdf(Request $request): \Illuminate\Http\Response
+    private function itemOrderPublicPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $itemId = $request->integer('item_id') ?: $this->items()->first()?->id;
         abort_unless($itemId, 422, 'Select an item.');
@@ -804,7 +804,7 @@ class FestReportService
         ], $this->slug()."-item-order-{$itemId}.pdf");
     }
 
-    private function greenRoomListPdf(Request $request): \Illuminate\Http\Response
+    private function greenRoomListPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $itemId = $request->integer('item_id') ?: null;
 
@@ -888,7 +888,7 @@ class FestReportService
         );
     }
 
-    private function itemSchedulePdf(Request $request): \Illuminate\Http\Response
+    private function itemSchedulePdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $date = $request->input('date');
         $stageId = $request->integer('stage_id') ?: null;
@@ -902,7 +902,7 @@ class FestReportService
         ], $this->slug().'-item-schedule.pdf');
     }
 
-    private function clashesSchoolPdf(Request $request): \Illuminate\Http\Response
+    private function clashesSchoolPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $request->validate(['school_id' => 'required|string']);
         $school = Tenant::findOrFail($request->input('school_id'));
@@ -938,7 +938,7 @@ class FestReportService
         );
     }
 
-    private function promotionsPdf(): \Illuminate\Http\Response
+    private function promotionsPdf(): \Symfony\Component\HttpFoundation\Response
     {
         $quals = FestQualification::where('event_id', $this->event->id)
             ->with(['participant.student', 'participant.registration.school', 'participant.registration.item', 'nextLevelEvent'])
@@ -1029,12 +1029,12 @@ class FestReportService
         ], $rows);
     }
 
-    public function downloadAdmitCards(Request $request): \Illuminate\Http\Response
+    public function downloadAdmitCards(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         return $this->admitCardsPdf($request);
     }
 
-    private function admitCardsPdf(Request $request): \Illuminate\Http\Response
+    private function admitCardsPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $participants = $this->participantsFlat(
             null,
@@ -1052,7 +1052,7 @@ class FestReportService
         ], $this->slug().'-admit-cards.pdf');
     }
 
-    private function sahodayaRankingPdf(): \Illuminate\Http\Response
+    private function sahodayaRankingPdf(): \Symfony\Component\HttpFoundation\Response
     {
         return $this->renderPdf('fest.reports.overall-ranking', [
             'event'   => $this->event,
