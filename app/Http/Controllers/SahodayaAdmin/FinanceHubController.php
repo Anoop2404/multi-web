@@ -112,6 +112,7 @@ class FinanceHubController extends SahodayaAdminController
             ],
             'links' => [
                 'unified_payments'    => "/sahodaya-admin/{$this->sahodaya->id}/finance/payments",
+                'payment_reconciliation' => "/sahodaya-admin/{$this->sahodaya->id}/finance/payment-reconciliation",
                 'email_delivery'      => "/sahodaya-admin/{$this->sahodaya->id}/finance/email-delivery",
                 'receipt_emails'      => "/sahodaya-admin/{$this->sahodaya->id}/finance/receipt-emails",
                 'fest_payments'       => "/sahodaya-admin/{$this->sahodaya->id}/fest/payments",

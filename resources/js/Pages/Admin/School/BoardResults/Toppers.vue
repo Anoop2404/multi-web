@@ -738,7 +738,10 @@ function submitSubjectTopper() {
 
     const existing = editingSubjectRow.value
         ? (props.boardResult.toppers ?? []).find((t) => t.id === editingSubjectRow.value.topper_id)
-        : (props.boardResult.toppers ?? []).find((t) => t.name.toLowerCase() === subjectForm.name.toLowerCase());
+        : (props.boardResult.toppers ?? []).find((t) =>
+            (subjectForm.roll_no && t.roll_no === subjectForm.roll_no)
+            || t.name.toLowerCase() === subjectForm.name.toLowerCase()
+        );
 
     if (existing) {
         const currentSubjectMarks = { ...(existing.subject_marks ?? {}) };
@@ -776,7 +779,11 @@ function submitSubjectTopper() {
 function removeSubjectTopper(row) {
     if (!confirm(`Remove subject topper "${row.name}" for ${row.subject}?`)) return;
 
-    const existing = (props.boardResult.toppers ?? []).find((t) => t.id === row.topper_id);
+    const existing = (props.boardResult.toppers ?? []).find((t) =>
+        t.id === row.topper_id
+        || (t.roll_no && row.roll_no && t.roll_no === row.roll_no)
+        || t.name.toLowerCase() === row.name.toLowerCase()
+    );
     if (!existing) return;
 
     const updatedSubjectMarks = { ...(existing.subject_marks ?? {}) };

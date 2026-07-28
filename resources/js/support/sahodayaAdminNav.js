@@ -468,6 +468,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
             items: [
                 { label: 'Finance hub', href: `${base}/finance`, icon: 'credit-card' },
                 { label: 'Unified payments', href: `${base}/finance/payments`, icon: 'credit-card' },
+                { label: 'Payment reconciliation', href: `${base}/finance/payment-reconciliation`, icon: 'clipboard' },
                 { label: 'Receipt emails', href: `${base}/finance/receipt-emails`, icon: 'file-text' },
                 { label: 'Email delivery log', href: `${base}/finance/email-delivery`, icon: 'file-text' },
                 { label: 'Accounts ledger', href: `${base}/ledger`, icon: 'layers' },

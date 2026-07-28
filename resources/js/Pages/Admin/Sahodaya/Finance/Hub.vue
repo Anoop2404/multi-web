@@ -39,6 +39,10 @@
         </div>
 
         <div class="grid md:grid-cols-2 gap-4 mb-8">
+            <Link :href="links.payment_reconciliation" class="card hover:border-red-300 transition !p-5 block border-2 border-red-200 bg-red-50/40">
+                <h3 class="font-semibold text-red-800">Payment reconciliation</h3>
+                <p class="text-sm text-red-700 mt-1">Find overpayments, missing credits, paid-total drift, and receipt ledger mismatches by school.</p>
+            </Link>
             <Link :href="links.unified_payments" class="card hover:border-[#0f3d7a]/30 transition !p-5 block border-2 border-[#0f3d7a]/20">
                 <h3 class="font-semibold text-[#0f3d7a]">All payments register</h3>
                 <p class="text-sm text-slate-600 mt-1">Unified view of verified payments, receipts, and email delivery status.</p>

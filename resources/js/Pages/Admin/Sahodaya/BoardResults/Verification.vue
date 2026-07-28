@@ -15,6 +15,19 @@
             </Link>
         </p>
 
+        <div class="card !p-4 mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h3 class="text-sm font-semibold text-slate-800">Verification queue</h3>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Review school-submitted results, open the latest proof PDF, then verify, approve, or reject.
+                </p>
+            </div>
+            <div class="text-right">
+                <p class="text-2xl font-bold text-[#0f3d7a]">{{ results.total }}</p>
+                <p class="text-[11px] uppercase tracking-wide text-slate-400">matching results</p>
+            </div>
+        </div>
+
         <div class="flex flex-wrap gap-2 mb-4">
             <Link v-for="(label, value) in statusOptions" :key="value"
                   :href="statusHref(value)"

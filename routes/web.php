@@ -774,6 +774,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/payments', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'index'])->name('payments.index');
             Route::get('/payments/export', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'export'])->name('payments.export');
             Route::get('/payments/credits', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'creditsReport'])->name('payments.credits');
+            Route::get('/payment-reconciliation', [\App\Http\Controllers\SahodayaAdmin\PaymentReconciliationController::class, 'index'])->name('payment-reconciliation.index');
+            Route::post('/payment-reconciliation/record-credit', [\App\Http\Controllers\SahodayaAdmin\PaymentReconciliationController::class, 'recordCredit'])->name('payment-reconciliation.record-credit');
+            Route::post('/payment-reconciliation/refresh-paid-state', [\App\Http\Controllers\SahodayaAdmin\PaymentReconciliationController::class, 'refreshPaidState'])->name('payment-reconciliation.refresh-paid-state');
+            Route::post('/payment-reconciliation/receipts/{feeReceipt}/repost', [\App\Http\Controllers\SahodayaAdmin\PaymentReconciliationController::class, 'repostReceipt'])->name('payment-reconciliation.repost-receipt');
             Route::get('/payments/receipts/{feeReceipt}', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'programReceipt'])->name('payments.receipt');
             Route::get('/payments/receipts/{feeReceipt}/proof', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'proof'])->name('payments.proof');
             Route::post('/payments/resend-receipt', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'resendReceipt'])->name('payments.resend-receipt');

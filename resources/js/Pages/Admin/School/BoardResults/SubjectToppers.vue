@@ -29,6 +29,7 @@
                         <div>
                             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Class XII Examination</p>
                             <p class="text-base font-bold text-gray-900">Subject-Wise Entry Portal</p>
+                            <p class="text-[11px] text-gray-500 mt-0.5">Each row is one student for one subject. Marks are entered out of 100.</p>
                         </div>
                     </div>
 
@@ -534,7 +535,11 @@ function saveAllRows() {
 function removeSubjectTopper(row) {
     if (!confirm(`Remove subject topper "${row.name}" for ${row.subject}?`)) return;
 
-    const existing = (props.boardResult.toppers ?? []).find((t) => t.id === row.topper_id);
+    const existing = (props.boardResult.toppers ?? []).find((t) =>
+        t.id === row.topper_id
+        || (t.roll_no && row.roll_no && t.roll_no === row.roll_no)
+        || t.name.toLowerCase() === row.name.toLowerCase()
+    );
 
     if (!existing) return;
 

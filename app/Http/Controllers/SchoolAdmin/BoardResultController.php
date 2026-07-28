@@ -826,21 +826,6 @@ class BoardResultController extends SchoolAdminController
                 }
                 $submittedRollNos[$rollNo] = true;
 
-                // Check against existing toppers (excluding the one we'll match/update).
-                $matchedByRollNo = $workingToppers->first(
-                    fn (Topper $t) => $t->roll_no === $rollNo
-                );
-                if ($matchedByRollNo) {
-                    // Allow the match if this row is updating that same topper; reject otherwise.
-                    $matchedByName = $workingToppers->first(
-                        fn (Topper $t) => strtolower($t->name) === strtolower(trim($row['name']))
-                    );
-                    if (! $matchedByName || $matchedByName->id !== $matchedByRollNo->id) {
-                        throw ValidationException::withMessages([
-                            "rows.{$i}.roll_no" => "CBSE Roll No '{$rollNo}' is already assigned to another student ({$matchedByRollNo->name}).",
-                        ]);
-                    }
-                }
             }
 
             foreach ($data['rows'] as $row) {
@@ -964,11 +949,29 @@ class BoardResultController extends SchoolAdminController
         $sahodayaId = (string) $this->school->parent_id;
 
         if ($isClass12) {
-            $streamKey = BoardExamSubjects::normalizeStream($data['stream_key'] ?? $data['stream'] ?? null, $sahodayaId);
+            $hasSubjectMarks = is_array($data['subject_marks'] ?? null) && $data['subject_marks'] !== [];
+            $rawStream = $data['stream_key'] ?? $data['stream'] ?? null;
+            if (blank($rawStream) && ! $hasSubjectMarks) {
+                throw ValidationException::withMessages([
+                    'stream_key' => 'Select a stream for Class XII overall toppers.',
+                ]);
+            }
+
+            $streamKey = BoardExamSubjects::normalizeStream($rawStream, $sahodayaId);
+            if ($rawStream !== null && $rawStream !== '' && $streamKey === null) {
+                throw ValidationException::withMessages([
+                    'stream_key' => "The selected stream '{$rawStream}' is not available for this Sahodaya.",
+                ]);
+            }
             if ($streamKey) {
                 $labels = BoardExamSubjects::class12StreamLabels($sahodayaId);
                 $data['stream'] = $labels[$streamKey] ?? $data['stream'] ?? null;
                 $data['stream_id'] = BoardExamSubjects::resolveStreamId($streamKey, $sahodayaId);
+                if ($data['stream_id'] === null) {
+                    throw ValidationException::withMessages([
+                        'stream_key' => "The selected stream '{$rawStream}' is not configured in the stream master.",
+                    ]);
+                }
             }
 
             $data['subject_marks'] = BoardExamSubjects::normalizeSubjectMarks($data['subject_marks'] ?? []);
