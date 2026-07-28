@@ -653,22 +653,28 @@ class FestReportService
 
         $sahodaya = Tenant::find($this->event->tenant_id);
 
-        // DOB enrichment only for sports events (photos skipped — loading them as
-        // data URIs exhausts PHP memory under DomPDF with many participants).
+        // Photo and DOB enrichment for sports events.
         if ($this->event->event_type === 'sports') {
-            $dobMap = [];
+            $studentMap = [];
             foreach ($participants as $p) {
                 $sid = $p->student_id;
-                if ($sid && ! isset($dobMap[$sid])) {
-                    $dobMap[$sid] = $p->student?->dob?->format('d M Y');
+                if ($sid && ! isset($studentMap[$sid])) {
+                    $relativePath = $p->student?->photo;
+                    $photoSrc = null;
+                    if ($relativePath) {
+                        $photoSrc = str_starts_with($relativePath, 'http')
+                            ? $relativePath
+                            : ($sahodaya ? TenantStorage::photoDataUri($sahodaya, $relativePath) : null);
+                    }
+                    $studentMap[$sid] = [
+                        'photo_src' => $photoSrc,
+                        'dob' => $p->student?->dob?->format('d M Y'),
+                    ];
                 }
             }
-            if ($dobMap) {
+            if ($studentMap) {
                 $rowsByItem = $rowsByItem->map(fn ($rows) => $rows->map(
-                    fn ($row) => array_merge($row, [
-                        'photo_src' => null,
-                        'dob' => $dobMap[$row['_student_id'] ?? null] ?? null,
-                    ]),
+                    fn ($row) => array_merge($row, $studentMap[$row['_student_id'] ?? null] ?? ['photo_src' => null, 'dob' => null]),
                 )->all());
             }
         }

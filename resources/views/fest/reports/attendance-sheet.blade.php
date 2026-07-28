@@ -60,7 +60,6 @@
         }
         .item-block {
             margin-bottom: 20px;
-            page-break-inside: avoid;
         }
         .item-heading {
             background: #0f172a;
@@ -128,6 +127,27 @@
             color: #334155;
             font-size: 9px;
         }
+        .team-divider td {
+            background: #f1f5f9;
+            color: #0f172a;
+            font-weight: bold;
+            font-size: 9px;
+            padding: 4px 8px;
+            border-top: 2px solid #cbd5e1;
+            border-bottom: 1px solid #cbd5e1;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .team-tag {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            font-size: 8px;
+            font-weight: bold;
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>
@@ -173,7 +193,28 @@
                 </tr>
             </thead>
             <tbody>
+                @php
+                    $lastTeamKey = null;
+                @endphp
                 @foreach($rows as $i => $row)
+                    @php
+                        $teamName = $row['team_name'] ?? null;
+                        $groupId = $row['group_id'] ?? null;
+                        $currentTeamKey = $groupId ? 'group_'.$groupId : ($teamName ? 'team_'.$teamName.'_'.($row['school'] ?? '') : null);
+                    @endphp
+
+                    @if($currentTeamKey && $currentTeamKey !== $lastTeamKey)
+                        @php $lastTeamKey = $currentTeamKey; @endphp
+                        <tr class="team-divider">
+                            <td colspan="{{ $event->event_type === 'sports' ? 7 : 5 }}">
+                                <strong>TEAM: {{ strtoupper($teamName ?? 'Team Entry') }}</strong>
+                                @if(!empty($row['school']))
+                                    &bull; <span style="color: #475569;">{{ strtoupper($row['school']) }}</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endif
+
                     <tr>
                         <td class="text-center">{{ $i + 1 }}</td>
                         @if($event->event_type === 'sports')
@@ -187,7 +228,12 @@
                         @endif
                         <td class="text-center chest-no">{{ $row['reference'] ?? '—' }}</td>
                         @if(($audience ?? 'staff') === 'staff')
-                            <td><strong>{{ $row['name'] ?? '' }}</strong></td>
+                            <td>
+                                <strong>{{ $row['name'] ?? '' }}</strong>
+                                @if(!empty($row['team_name']))
+                                    <div><span class="team-tag">Team: {{ $row['team_name'] }}</span></div>
+                                @endif
+                            </td>
                             @if($event->event_type === 'sports')
                                 <td class="text-center" style="font-size: 9px; color: #475569;">{{ $row['dob'] ?? '—' }}</td>
                             @endif

@@ -162,12 +162,14 @@ class FestPublicVisibilityService
         return (bool) $event->schedule_published;
     }
 
-    /** @return array{reference: string, name: ?string, school: ?string, order: ?int} */
+    /** @return array{reference: string, name: ?string, school: ?string, order: ?int, team_name: ?string, group_id: ?int} */
     public function formatReportRow(FestEvent $event, FestParticipant $participant, string $audience = 'staff', ?FestSchedule $schedule = null): array
     {
         $public = $this->isPublicAudience($audience);
         $showName = ! $public || $this->showParticipantName($event, $participant);
         $showSchool = ! $public || $this->showSchoolName($event);
+
+        $teamName = $participant->group?->team_name ?? $participant->registration?->team_name;
 
         return [
             'reference' => $this->publicReference($event, $participant),
@@ -175,6 +177,8 @@ class FestPublicVisibilityService
             'school'    => $showSchool ? ($participant->registration?->school?->name ?? '') : null,
             'order'     => $schedule?->sort_order,
             'item'      => $participant->registration?->item?->title,
+            'team_name' => $showName ? $teamName : null,
+            'group_id'  => $participant->group_id,
         ];
     }
 
