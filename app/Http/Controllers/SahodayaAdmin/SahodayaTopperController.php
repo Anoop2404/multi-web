@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Models\AcademicYearRecord;
 use App\Models\TopperCountConfig;
 use App\Services\BoardResults\SahodayaTopperSelectionService;
 use App\Services\BoardResults\TopperCountService;
@@ -32,6 +33,7 @@ class SahodayaTopperController extends SahodayaAdminController
         return $this->inertia('Sahodaya/BoardResults/Toppers', [
             'selectedClass' => $class,
             'filters' => ['academic_year' => $year],
+            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
             'settings' => [
                 'overall' => [
                     'top_n' => $overallConfig?->top_n ?? TopperCountService::DEFAULT_TOP_N,
@@ -56,6 +58,7 @@ class SahodayaTopperController extends SahodayaAdminController
         return $this->inertia('Sahodaya/BoardResults/TopperResultsOverall', [
             'selectedClass' => $class,
             'filters' => ['academic_year' => $year],
+            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
             'overall' => $class === 10 ? $selection->overallForClassX($this->sahodaya->id, $year) : [],
             'byStream' => $class === 12 ? $selection->byStreamForClassXII($this->sahodaya->id, $year) : [],
         ]);
@@ -72,6 +75,7 @@ class SahodayaTopperController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/BoardResults/TopperResultsSubjectWise', [
             'filters' => ['academic_year' => $year],
+            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
             'subjectLeaders' => $subjectLeaders,
         ]);
     }
@@ -88,6 +92,7 @@ class SahodayaTopperController extends SahodayaAdminController
         return $this->inertia('Sahodaya/BoardResults/TopperResultsAchievers', [
             'selectedClass' => $class,
             'filters' => ['academic_year' => $year, 'threshold' => rtrim(rtrim(number_format($threshold, 2), '0'), '.')],
+            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
             'achieversOverall' => $class === 10 ? $selection->achieversForClassX($this->sahodaya->id, $year, $threshold) : [],
             'achieversByStream' => $class === 12 ? $selection->achieversByStreamForClassXII($this->sahodaya->id, $year, $threshold) : [],
         ]);

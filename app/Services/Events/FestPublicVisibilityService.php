@@ -7,7 +7,6 @@ use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestSchedule;
 use App\Models\Tenant;
-use App\Support\TenantStorage;
 
 /**
  * Real-world public visibility rules for festival portals.
@@ -170,21 +169,12 @@ class FestPublicVisibilityService
         $showName = ! $public || $this->showParticipantName($event, $participant);
         $showSchool = ! $public || $this->showSchoolName($event);
 
-        $tenant = Tenant::find($event->tenant_id);
-        $relativePath = $participant->student?->photo;
-        $photoSrc = $relativePath ? (str_starts_with($relativePath, 'http') ? $relativePath : TenantStorage::photoDataUri($tenant, $relativePath)) : null;
-
-        $dobRaw = $participant->student?->dob;
-        $dob = $dobRaw ? (is_string($dobRaw) ? date('d M Y', strtotime($dobRaw)) : $dobRaw->format('d M Y')) : null;
-
         return [
             'reference' => $this->publicReference($event, $participant),
             'name'      => $showName ? ($participant->student?->name ?? $participant->teacher?->name) : null,
-            'school'    => $showSchool ? ($participant->registration?->school?->name ?? Tenant::find($participant->registration?->school_id)?->name) : null,
+            'school'    => $showSchool ? ($participant->registration?->school?->name ?? '') : null,
             'order'     => $schedule?->sort_order,
             'item'      => $participant->registration?->item?->title,
-            'photo_src' => $photoSrc,
-            'dob'       => $dob,
         ];
     }
 

@@ -13,12 +13,18 @@
 
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
             <div class="flex flex-wrap gap-2">
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=12`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=12&academic_year=${filters.academic_year}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
                     ← Overall Result
                 </Link>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/achievers?class=12`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/achievers?class=12&academic_year=${filters.academic_year}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
                     90%+ Achievers →
                 </Link>
+                <span class="text-xs text-slate-300 mx-1">|</span>
+                <select class="field text-xs py-1.5" :value="filters.academic_year" @change="switchYear($event.target.value)">
+                    <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label" :disabled="ay.status === 'closed'">
+                        {{ ay.label }}
+                    </option>
+                </select>
             </div>
         </div>
 
@@ -68,8 +74,13 @@ const props = defineProps({
     publicUrl: String,
     pendingPaymentsCount: Number,
     filters: { type: Object, default: () => ({}) },
+    academicYearOptions: { type: Array, default: () => [] },
     subjectLeaders: { type: Array, default: () => [] },
 });
+
+function switchYear(year) {
+    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/subject-wise?academic_year=${year}`;
+}
 
 function printReport() {
     window.print();

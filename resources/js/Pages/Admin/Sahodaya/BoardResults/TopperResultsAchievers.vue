@@ -21,12 +21,18 @@
                       :class="selectedClass === 12 ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]' : 'border-slate-200 text-slate-600'">
                     Class XII
                 </Link>
+                <span class="text-xs text-slate-300 mx-1">|</span>
+                <select class="field text-xs py-1.5" :value="filters.academic_year" @change="switchYear($event.target.value)">
+                    <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label" :disabled="ay.status === 'closed'">
+                        {{ ay.label }}
+                    </option>
+                </select>
             </div>
             <div class="flex flex-wrap gap-2">
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=${selectedClass}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=${selectedClass}&academic_year=${filters.academic_year}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
                     ← Overall Result
                 </Link>
-                <Link v-if="selectedClass === 12" :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/subject-wise`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
+                <Link v-if="selectedClass === 12" :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/subject-wise?academic_year=${filters.academic_year}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
                     Subject-Wise Top Scorers →
                 </Link>
             </div>
@@ -85,6 +91,7 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     selectedClass: { type: Number, default: 10 },
     filters: { type: Object, default: () => ({}) },
+    academicYearOptions: { type: Array, default: () => [] },
     achieversOverall: { type: Array, default: () => [] },
     achieversByStream: { type: Object, default: () => ({}) },
 });
@@ -92,7 +99,12 @@ const props = defineProps({
 const pageTitle = computed(() => props.selectedClass === 12 ? 'Class XII Achievers' : 'Class X Achievers');
 
 function classHref(cls) {
-    return `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/achievers?class=${cls}`;
+    return `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/achievers?class=${cls}&academic_year=${props.filters.academic_year}`;
+}
+
+function switchYear(year) {
+    const threshold = props.filters.threshold ? `&threshold=${props.filters.threshold}` : '';
+    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/achievers?class=${props.selectedClass}&academic_year=${year}${threshold}`;
 }
 
 function printReport() {

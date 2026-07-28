@@ -10,7 +10,7 @@
             </template>
         </PageHeader>
 
-        <div class="flex flex-wrap gap-2 mb-4">
+        <div class="flex flex-wrap items-center gap-3 mb-4">
             <Link :href="classHref(10)" class="px-3 py-1.5 rounded-lg text-sm font-semibold border"
                   :class="selectedClass === 10 ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]' : 'border-slate-200 text-slate-600'">
                 Class X
@@ -19,6 +19,12 @@
                   :class="selectedClass === 12 ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]' : 'border-slate-200 text-slate-600'">
                 Class XII
             </Link>
+            <span class="text-xs text-slate-300 mx-1">|</span>
+            <select class="field text-xs py-1.5" :value="filters.academic_year" @change="switchYear($event.target.value)">
+                <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label" :disabled="ay.status === 'closed'">
+                    {{ ay.label }}
+                </option>
+            </select>
         </div>
 
         <div class="card !p-4 mb-6">
@@ -46,7 +52,7 @@
 
         <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wide mb-3">Reports</h2>
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=${selectedClass}`"
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=${selectedClass}&academic_year=${filters.academic_year}`"
                   class="card p-5 hover:shadow-md transition block">
                 <p class="text-2xl mb-2">🏆</p>
                 <h3 class="font-bold text-slate-800">Overall Result</h3>
@@ -55,7 +61,7 @@
                 </p>
             </Link>
 
-            <Link v-if="selectedClass === 12" :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/subject-wise`"
+            <Link v-if="selectedClass === 12" :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/subject-wise?academic_year=${filters.academic_year}`"
                   class="card p-5 hover:shadow-md transition block">
                 <p class="text-2xl mb-2">🎯</p>
                 <h3 class="font-bold text-slate-800">Subject-Wise Top Scorers</h3>
@@ -67,7 +73,7 @@
                 <p class="text-xs text-slate-500 mt-1">Class XII only.</p>
             </div>
 
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/achievers?class=${selectedClass}`"
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/achievers?class=${selectedClass}&academic_year=${filters.academic_year}`"
                   class="card p-5 hover:shadow-md transition block">
                 <p class="text-2xl mb-2">🌟</p>
                 <h3 class="font-bold text-slate-800">90%+ Achievers</h3>
@@ -89,6 +95,7 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     selectedClass: { type: Number, default: 10 },
     filters: { type: Object, default: () => ({}) },
+    academicYearOptions: { type: Array, default: () => [] },
     settings: {
         type: Object,
         default: () => ({ overall: { top_n: 5, tie_mode: 'include_group' }, stream: { top_n: 5, tie_mode: 'include_group' } }),
@@ -98,7 +105,11 @@ const props = defineProps({
 const pageTitle = computed(() => props.selectedClass === 12 ? 'Class XII Sahodaya Toppers' : 'Class X Sahodaya Toppers');
 
 function classHref(cls) {
-    return `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers?class=${cls}`;
+    return `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers?class=${cls}&academic_year=${props.filters.academic_year}`;
+}
+
+function switchYear(year) {
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/board-results/toppers?class=${props.selectedClass}&academic_year=${year}`);
 }
 
 const scopeKey = computed(() => props.selectedClass === 12 ? 'stream' : 'overall');

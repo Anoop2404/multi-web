@@ -329,15 +329,23 @@ class FestReportService
         return $request->input('audience', 'staff') === 'public' ? 'public' : 'staff';
     }
 
-    /** @return list<array{reference: string, name: ?string, school: ?string, order: ?int, item: ?string}> */
+    /** @return list<array{reference: string, name: ?string, school: ?string, order: ?int, item: ?string, _student_id: ?int}> */
     private function participantReportRows($participants, string $audience): array
     {
         $visibility = app(FestPublicVisibilityService::class);
 
-        return collect($participants)->map(function (FestParticipant $p) use ($visibility, $audience) {
-            $schedule = FestSchedule::where('participant_id', $p->id)->first();
+        $participantIds = collect($participants)->pluck('id')->all();
+        $schedules = FestSchedule::whereIn('participant_id', $participantIds)
+            ->get()
+            ->keyBy('participant_id');
 
-            return $visibility->formatReportRow($this->event, $p, $audience, $schedule);
+        return collect($participants)->map(function (FestParticipant $p) use ($visibility, $audience, $schedules) {
+            $schedule = $schedules->get($p->id);
+
+            return array_merge(
+                $visibility->formatReportRow($this->event, $p, $audience, $schedule),
+                ['_student_id' => $p->student_id],
+            );
         })->all();
     }
 
@@ -645,6 +653,30 @@ class FestReportService
 
         $sahodaya = Tenant::find($this->event->tenant_id);
 
+        // Photo/DOB enrichment only for sports events (avoids memory from loading
+        // hundreds of images into data URIs for non-sports attendance sheets).
+        if ($this->event->event_type === 'sports' && $sahodaya) {
+            $photoMap = [];
+            foreach ($participants as $p) {
+                $sid = $p->student_id;
+                if ($sid && ! isset($photoMap[$sid])) {
+                    $relativePath = $p->student?->photo;
+                    $photoMap[$sid] = [
+                        'photo_src' => $relativePath
+                            ? (str_starts_with($relativePath, 'http') ? $relativePath : TenantStorage::photoDataUri($sahodaya, $relativePath))
+                            : null,
+                        'dob' => $p->student?->dob?->format('d M Y'),
+                    ];
+                }
+            }
+            if ($photoMap) {
+                $rowsByItem = $rowsByItem->map(fn ($rows) => array_map(
+                    fn ($row) => array_merge($row, $photoMap[$row['_student_id'] ?? null] ?? ['photo_src' => null, 'dob' => null]),
+                    $rows,
+                ));
+            }
+        }
+
         return Pdf::loadView('fest.reports.attendance-sheet', [
             'event'      => $this->event,
             'sahodaya'   => $sahodaya,
@@ -662,28 +694,34 @@ class FestReportService
         $participants = $this->participantsFlat(null, null, $school->id, null, null, false);
         $studentRows = [];
 
-        $tenant = Tenant::find($this->event->tenant_id);
+        $sahodaya = Tenant::find($this->event->tenant_id);
+
+        // Photo/DOB enrichment only for sports events (memory optimization).
+        $isSports = $this->event->event_type === 'sports';
 
         foreach ($participants as $p) {
             if (! $p->student) {
                 continue;
             }
             $id = $p->student_id;
-            $relativePath = $p->student->photo;
-            $photoSrc = $relativePath ? (str_starts_with($relativePath, 'http') ? $relativePath : TenantStorage::photoDataUri($tenant, $relativePath)) : null;
-            $dobRaw = $p->student->dob;
-            $dob = $dobRaw ? (is_string($dobRaw) ? date('d M Y', strtotime($dobRaw)) : $dobRaw->format('d M Y')) : null;
-
-            $studentRows[$id] ??= [
-                'student' => $p->student,
-                'photo_src' => $photoSrc,
-                'dob' => $dob,
-                'events' => [],
-            ];
+            $studentRows[$id] ??= ['student' => $p->student, 'events' => []];
             $studentRows[$id]['events'][] = [
                 'event_name'   => $p->registration?->item?->title ?? '',
                 'chest_number' => $p->chest_no ?? '—',
             ];
+        }
+
+        // Batch-load photo/DOB for sports events only.
+        if ($isSports && $sahodaya) {
+            foreach ($studentRows as $id => $row) {
+                if (! isset($row['photo_src'])) {
+                    $relativePath = $row['student']->photo;
+                    $studentRows[$id]['photo_src'] = $relativePath
+                        ? (str_starts_with($relativePath, 'http') ? $relativePath : TenantStorage::photoDataUri($sahodaya, $relativePath))
+                        : null;
+                    $studentRows[$id]['dob'] = $row['student']->dob?->format('d M Y');
+                }
+            }
         }
 
         return Pdf::loadView('fest.reports.attendance-sheet-school', [
