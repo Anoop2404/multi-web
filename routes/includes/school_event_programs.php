@@ -15,6 +15,7 @@ use App\Http\Controllers\SchoolAdmin\TeacherFestController;
 use App\Http\Controllers\SchoolAdmin\CustomFestController;
 use App\Http\Controllers\SchoolAdmin\TrainingController;
 use App\Http\Controllers\SchoolAdmin\TrainingRegistrationController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 $festProgramSlugs = 'kalotsav|sports-meet|kids-fest|teacher-fest|english-fest|science-fest|custom';
@@ -70,6 +71,15 @@ foreach ($festPrograms as $cfg) {
         Route::get('/import-template', [FestRegistrationController::class, 'importTemplate'])
             ->defaults('program', $slug)
             ->name('import-template');
+        Route::get('/register', function (Request $request) use ($prefix) {
+            $event = $request->query('event');
+
+            if ($event) {
+                return redirect("/school-admin/{$request->route('tenantId')}/{$prefix}/events/{$event}/registration");
+            }
+
+            return redirect("/school-admin/{$request->route('tenantId')}/{$prefix}/registration");
+        })->name('register.redirect');
         Route::post('/import', [FestRegistrationController::class, 'importStore'])
             ->defaults('program', $slug)
             ->name('import');
