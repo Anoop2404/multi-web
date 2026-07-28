@@ -17,8 +17,7 @@
             margin: 0;
             padding: 0;
         }
-        
-        /* Proper DomPDF repeating header technique */
+
         header {
             position: fixed;
             top: -28mm;
@@ -38,7 +37,7 @@
             color: #64748b;
             text-align: center;
         }
-        
+
         main {
             width: 100%;
         }
@@ -85,20 +84,6 @@
             color: #334155;
             font-size: 8px;
         }
-        .team-divider td {
-            background: #f1f5f9;
-            color: #0f172a;
-            font-weight: bold;
-            font-size: 9px;
-            padding: 4px 6px;
-            border-top: 2px solid #cbd5e1;
-            border-bottom: 1px solid #cbd5e1;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-        .team-divider {
-            page-break-inside: avoid;
-        }
         .team-tag {
             display: inline-block;
             background: #dbeafe;
@@ -108,6 +93,16 @@
             padding: 1px 4px;
             border-radius: 3px;
             margin-top: 1px;
+        }
+        .member-badge {
+            display: inline-block;
+            background: #f0fdf4;
+            color: #166534;
+            font-size: 7px;
+            font-weight: bold;
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-left: 4px;
         }
         .photo-cell {
             width: 32px;
@@ -176,7 +171,7 @@
     <div style="margin-bottom: 16px;">
         <div class="item-heading-bar">
             {{ $cleanTitle }}
-            <span class="count-badge">{{ count($rows) }} {{ count($rows) === 1 ? 'Participant' : 'Participants' }}</span>
+            <span class="count-badge">{{ count($rows) }} {{ count($rows) === 1 ? 'Entry' : 'Entries' }}</span>
         </div>
         <table>
             <thead>
@@ -184,7 +179,7 @@
                     <th style="width: 28px;" class="text-center">Sl</th>
                     <th class="photo-cell"></th>
                     <th style="width: 50px;" class="text-center">Chest</th>
-                    <th>Participant / Team Name</th>
+                    <th>Participant / Team</th>
                     @if($event->event_type === 'sports')
                         <th style="width: 70px;" class="text-center">DOB</th>
                     @endif
@@ -193,35 +188,14 @@
                 </tr>
             </thead>
             <tbody>
-                @php
-                    $lastTeamKey = null;
-                @endphp
                 @foreach($rows as $i => $row)
-                    @php
-                        $teamName = $row['team_name'] ?? null;
-                        $school = $row['school'] ?? '';
-                        // Fix for split tables: we ignore `group_id` entirely so mismatched database records
-                        // don't divide a team across multiple blocks. We group purely by "School + Team Name".
-                        $currentTeamKey = $teamName ? 't_'.md5($teamName.$school) : null;
-                    @endphp
-
-                    @if($currentTeamKey && $currentTeamKey !== $lastTeamKey)
-                        @php $lastTeamKey = $currentTeamKey; @endphp
-                        <tr class="team-divider">
-                            <td colspan="{{ $event->event_type === 'sports' ? 7 : 6 }}">
-                                <strong>TEAM: {{ strtoupper($teamName ?? 'Team Entry') }}</strong>
-                                @if(!empty($school))
-                                    &bull; <span style="color: #475569;">{{ strtoupper($school) }}</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @endif
-
                     <tr>
                         <td class="text-center">{{ $i + 1 }}</td>
                         <td class="photo-cell text-center">
-                            @if(!empty($row['photo_src']))
-                                <img src="{{ $row['photo_src'] }}" alt="">
+                            @if(!empty($row['photo_url']) && !empty($isPreview))
+                                <img src="{{ $row['photo_url'] }}" alt="">
+                            @elseif(!empty($isPreview))
+                                <span class="initials">{{ strtoupper(substr($row['name'] ?? '?', 0, 1)) }}</span>
                             @else
                                 <span class="initials">{{ strtoupper(substr($row['name'] ?? '?', 0, 1)) }}</span>
                             @endif
@@ -229,14 +203,14 @@
                         <td class="text-center chest-no">{{ $row['reference'] ?? '—' }}</td>
                         <td>
                             <strong style="font-size: 9px;">{{ $row['name'] ?? '' }}</strong>
-                            @if(!empty($row['team_name']))
-                                <div><span class="team-tag">Team: {{ $row['team_name'] }}</span></div>
+                            @if(!empty($row['member_count']))
+                                <span class="member-badge">Team · {{ $row['member_count'] }} members</span>
                             @endif
                         </td>
                         @if($event->event_type === 'sports')
                             <td class="text-center" style="font-size: 8px; color: #475569;">{{ $row['dob'] ?? '—' }}</td>
                         @endif
-                        <td class="school-name">{{ strtoupper($school) }}</td>
+                        <td class="school-name">{{ strtoupper($row['school'] ?? '') }}</td>
                         <td class="text-center"></td>
                     </tr>
                 @endforeach

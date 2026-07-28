@@ -651,42 +651,114 @@ class FestReportService
             ->values();
 
         $audience = $this->reportAudience($request);
+        $isPreview = $this->preview;
 
-        // Grouped by item — when generated for "All items" this previously dumped
-        // every participant into one undifferentiated list with no indication of
-        // which item they belonged to. Filtering to a single item still works the
-        // same way (one group). Sahodaya name/logo added for print branding.
-        $rowsByItem = collect($this->participantReportRows($participants, $audience))
-            ->groupBy(fn ($row) => $row['item'] ?? 'Item')
-            ->sortKeys();
+        // Group participants by item, then collapse teams into a single row per team
+        // (matching the Vue Attendance.vue displayRows logic) so the PDF shows one
+        // entry per team, not every individual member.
+        $GROUP_PARTICIPANT_TYPES = ['team', 'group', 'pair', 'trio'];
 
-        $sahodaya = Tenant::find($this->event->tenant_id);
-
-        // Enrich rows with photo absolute paths and DOB (sports only).
-        // We use local absolute paths instead of Base64 Data URIs to prevent
-        // the HTML payload from causing a 128MB memory exhaustion (OOM).
+        // Pre-built photo URL map — uses photoUrl() which returns a public HTTP/S3
+        // URL (browsers and headless Chrome handle these natively).  DomPDF fallback
+        // will skip photos (the blade uses @if check).
         $photoMap = [];
-        $dobMap = [];
+        $participantMap = []; // participant_id -> participant for attendance lookups
         foreach ($participants as $p) {
+            $participantMap[$p->id] = $p;
             $sid = $p->student_id;
-            if (! $sid) {
-                continue;
-            }
-            if (! isset($photoMap[$sid]) && $p->student?->photo) {
-                $photoMap[$sid] = \App\Support\TenantStorage::localAbsolutePath($sahodaya, $p->student->photo);
-            }
-            if ($this->event->event_type === 'sports' && ! isset($dobMap[$sid])) {
-                $dobMap[$sid] = $p->student?->dob?->format('d M Y');
+            if ($sid && ! isset($photoMap[$sid]) && method_exists($p->student ?? null, 'photoUrl')) {
+                $photoMap[$sid] = $p->student->photoUrl();
             }
         }
 
-        $rowsByItem = $rowsByItem->map(fn ($rows) => $rows->map(function ($row) use ($photoMap, $dobMap) {
-            $sid = $row['_student_id'] ?? null;
-            return array_merge($row, [
-                'photo_src' => $sid ? ($photoMap[$sid] ?? null) : null,
-                'dob'       => $dobMap[$sid] ?? ($row['dob'] ?? null),
-            ]);
-        })->all());
+        // Build item-wise rows, collapsing teams
+        $rowsByItem = collect();
+        $items = $participants->pluck('registration.item')->unique('id');
+
+        foreach ($items as $item) {
+            $itemParticipants = $participants->filter(fn ($p) => $p->registration?->item_id === $item->id)->values();
+            $isGroupItem = $item && in_array($item->participant_type, $GROUP_PARTICIPANT_TYPES, true);
+            $itemRows = [];
+
+            if ($isGroupItem) {
+                // Collapse team members into a single row per team
+                $seenGroups = [];
+                foreach ($itemParticipants as $p) {
+                    if (! $p->group_id) {
+                        continue;
+                    }
+                    $key = (string) $p->group_id;
+                    if (isset($seenGroups[$key])) {
+                        continue;
+                    }
+                    $seenGroups[$key] = true;
+
+                    $members = $itemParticipants->filter(fn ($m) => $m->group_id === $p->group_id);
+                    $firstMember = $members->first();
+
+                    $itemRows[] = [
+                        'reference'    => $firstMember?->group?->chest_no ?? $p->chest_no ?? '—',
+                        'name'         => $firstMember?->group?->team_name ?? 'Team',
+                        'school'       => $p->registration?->school?->name ?? '',
+                        'item'         => $item->title,
+                        'team_name'    => $firstMember?->group?->team_name ?? null,
+                        'group_id'     => $p->group_id,
+                        'member_count' => $members->count(),
+                        'photo_url'    => $photoMap[$members->first()?->student_id] ?? null,
+                        'dob'          => $this->event->event_type === 'sports'
+                            ? ($members->first()?->student?->dob?->format('d M Y') ?? null) : null,
+                        '_student_id'  => $members->first()?->student_id,
+                        '_participant_ids' => $members->pluck('id')->all(),
+                    ];
+                }
+            } else {
+                // Individual participants — one row per person
+                foreach ($itemParticipants as $p) {
+                    $itemRows[] = [
+                        'reference'    => $p->chest_no ?? '—',
+                        'name'         => $p->student?->name ?? $p->teacher?->name ?? 'Participant',
+                        'school'       => $p->registration?->school?->name ?? '',
+                        'item'         => $item->title,
+                        'team_name'    => null,
+                        'group_id'     => null,
+                        'member_count' => null,
+                        'photo_url'    => $photoMap[$p->student_id] ?? null,
+                        'dob'          => $this->event->event_type === 'sports'
+                            ? ($p->student?->dob?->format('d M Y') ?? null) : null,
+                        '_student_id'  => $p->student_id,
+                        '_participant_ids' => [$p->id],
+                    ];
+                }
+            }
+
+            // Sort rows by chest number (numeric), then school name
+            usort($itemRows, function ($a, $b) {
+                $aNum = (int) preg_replace('/[^0-9]/', '', $a['reference'] ?? '0');
+                $bNum = (int) preg_replace('/[^0-9]/', '', $b['reference'] ?? '0');
+                return [$aNum <=> $bNum, $a['school'] <=> $b['school']];
+            });
+
+            if ($itemRows) {
+                $rowsByItem[$item->title] = $itemRows;
+            }
+        }
+
+        $sahodaya = Tenant::find($this->event->tenant_id);
+
+        // Preview mode: return raw HTML for in-browser viewing (handles S3
+        // images via photoUrl, proper page headers via browser print).
+        if ($isPreview) {
+            $html = view('fest.reports.attendance-sheet', [
+                'event'      => $this->event,
+                'sahodaya'   => $sahodaya,
+                'logo'       => $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null,
+                'rowsByItem' => $rowsByItem,
+                'audience'   => $audience,
+                'isPreview'  => true,
+            ])->render();
+
+            return response($html)->header('Content-Type', 'text/html');
+        }
 
         return $this->renderPdf('fest.reports.attendance-sheet', [
             'event'      => $this->event,
