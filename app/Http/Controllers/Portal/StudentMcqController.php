@@ -71,7 +71,7 @@ class StudentMcqController extends Controller
         if ($registration->status === 'submitted') {
             return inertia('Portal/Student/McqResult', [
                 'school'       => Tenant::findOrFail($tenantId)->only('id', 'name'),
-                'student'      => $student->only('id', 'name', 'reg_no'),
+                'student'      => $student->only('id', 'name', 'admission_number', 'reg_no'),
                 'registration' => array_merge(
                     $registration->only('id', 'status', 'submitted_at', 'attendance_status'),
                     ['exam' => $registration->exam?->only('id', 'title')],
@@ -102,7 +102,7 @@ class StudentMcqController extends Controller
 
         return inertia('Portal/Student/McqExam', [
             'school'       => Tenant::findOrFail($tenantId)->only('id', 'name'),
-            'student'      => $student->only('id', 'name', 'reg_no'),
+            'student'      => $student->only('id', 'name', 'admission_number', 'reg_no'),
             'registration' => $registration->only('id', 'status', 'started_at'),
             'exam'         => $registration->exam->only('id', 'title', 'duration_minutes', 'scheduled_at'),
             'questions'    => $sessions->paperForStudent($registration),

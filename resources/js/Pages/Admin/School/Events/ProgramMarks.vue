@@ -67,6 +67,7 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { reactive } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     school: Object,
@@ -97,7 +98,7 @@ function performers(reg) {
 }
 
 function participantName(p) {
-    return p.student?.name ?? p.teacher?.name ?? 'Participant';
+    return p.student ? studentDisplayName(p.student) : (p.teacher?.name ?? 'Participant');
 }
 
 function applyBulkRank(reg) {

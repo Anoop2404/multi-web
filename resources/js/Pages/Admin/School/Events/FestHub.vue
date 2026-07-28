@@ -83,6 +83,7 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SchoolEventWorkflowStepper from '@/Components/school/SchoolEventWorkflowStepper.vue';
 import { SLUG_TO_PREFIX } from '@/support/schoolProgramNav.js';
 import { schoolProgramHref } from '@/support/schoolProgramNav.js';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     school: Object,
@@ -109,7 +110,7 @@ const resultsUrl = computed(() => schoolProgramHref(props.school.id, props.progr
 
 function participantName(appeal) {
     const p = appeal.participant;
-    return p?.student?.name ?? p?.teacher?.name ?? '—';
+    return p?.student ? studentDisplayName(p.student) : (p?.teacher?.name ?? '—');
 }
 
 function statusClass(status) {

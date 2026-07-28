@@ -14,11 +14,11 @@
                 </a>
             </div>
             <div class="px-4 py-2 flex flex-wrap gap-1.5 bg-white/70">
-                <span v-for="athlete in eventRegisteredAthletes" :key="athlete.id"
-                      class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-white border border-indigo-100 text-indigo-900">
-                    <span class="font-mono font-semibold text-indigo-700">{{ athlete.event_registration_number || '—' }}</span>
-                    <span>{{ athlete.name }}</span>
-                </span>
+                    <span v-for="athlete in eventRegisteredAthletes" :key="athlete.id"
+                          class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-white border border-indigo-100 text-indigo-900">
+                        <span class="font-mono font-semibold text-indigo-700">{{ athlete.event_registration_number || '—' }}</span>
+                        <span>{{ studentDisplayName(athlete) }}</span>
+                    </span>
             </div>
         </section>
         <p v-else
@@ -171,6 +171,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import FestRegistrationItemRow from '@/Components/school/FestRegistrationItemRow.vue';
 import { genderLabel } from '@/support/festItemEligibility.js';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     event: { type: Object, required: true },
@@ -385,9 +386,9 @@ function registeredNames(reg) {
     const labels = (reg.participants ?? [])
         .filter((p) => p.participant_role !== 'standby')
         .map((p) => {
-            const name = p.student?.name;
+            const name = p.student ? studentDisplayName(p.student) : null;
             const festId = p.level_registration_number;
-            const regNo = p.student?.reg_no;
+            const regNo = p.student?.admission_number || p.student?.reg_no;
             if (name && festId) return `${name} (${festId})`;
             if (name && regNo) return `${name} (${regNo})`;
             return name ?? regNo;
@@ -438,7 +439,7 @@ function studentOptionLabel(student) {
     } else if (student.event_registered) {
         parts.push('Event registered');
     }
-    if (student.reg_no) parts.push(student.reg_no);
+    parts.push(studentDisplayName(student));
     parts.push(student.class_name || 'no class');
     if (student.sports_age_on_cutoff != null) parts.push(`age ${student.sports_age_on_cutoff}`);
     const g = genderLabel(student.gender);

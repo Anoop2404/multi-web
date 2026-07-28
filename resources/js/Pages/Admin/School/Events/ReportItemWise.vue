@@ -48,7 +48,7 @@
                 </thead>
                 <tbody>
                     <tr v-for="p in participants" :key="p.id">
-                        <td>{{ p.student?.name ?? p.teacher?.name }}</td>
+                        <td>{{ p.student ? studentDisplayName(p.student) : (p.teacher?.name ?? '—') }}</td>
                         <td class="font-mono text-xs">{{ p.student?.admission_number ?? p.teacher?.reg_no }}</td>
                         <td class="font-mono text-xs">{{ p.level_registration_number ?? '—' }}</td>
                         <td class="font-mono text-xs">{{ p.item_registration_number ?? '—' }}</td>
@@ -71,6 +71,7 @@ import ReportHeadSubNav from '@/Components/reports/ReportHeadSubNav.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { useReportHeadFilters } from '@/composables/useReportHeadFilters.js';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     school: Object,

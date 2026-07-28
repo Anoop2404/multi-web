@@ -33,6 +33,21 @@
                 </div>
             </div>
 
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Active filters</span>
+                <span v-for="chip in activeFilters" :key="chip.label" class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                    {{ chip.label }}
+                </span>
+                <button
+                    v-if="activeFilters.length"
+                    type="button"
+                    class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                    @click="resetFilters"
+                >
+                    Reset all
+                </button>
+            </div>
+
             <div class="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
                 <!-- ACADEMIC YEAR -->
                 <div>
@@ -273,6 +288,32 @@ const distinctSchoolCount = computed(() => {
 const rankOneCount = computed(() => {
     return filteredRows.value.filter(r => r.rank === 1).length;
 });
+
+const activeFilters = computed(() => {
+    const chips = [];
+    if (selectedYear.value) chips.push({ label: `Year: ${selectedYear.value}` });
+    if (selectedClass.value) chips.push({ label: `Class: ${selectedClass.value}` });
+    if (selectedSubject.value) chips.push({ label: `Subject: ${selectedSubject.value}` });
+    if (selectedSchoolId.value) {
+        const school = props.schoolOptions.find(s => s.id === selectedSchoolId.value);
+        chips.push({ label: `School: ${school?.name || selectedSchoolId.value}` });
+    }
+    if (selectedStream.value) chips.push({ label: `Stream: ${selectedStream.value}` });
+    if (selectedRankCap.value > 0) chips.push({ label: `Top ${selectedRankCap.value}` });
+    if (searchQuery.value.trim()) chips.push({ label: `Search: ${searchQuery.value.trim()}` });
+    return chips;
+});
+
+function resetFilters() {
+    selectedYear.value = props.filters.academic_year || '';
+    selectedClass.value = props.filters.class ?? null;
+    selectedSubject.value = '';
+    selectedSchoolId.value = '';
+    selectedStream.value = '';
+    selectedRankCap.value = 0;
+    searchQuery.value = '';
+    applyServerFilters();
+}
 
 function applyServerFilters() {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/board-results/reports/subject-merit`, {

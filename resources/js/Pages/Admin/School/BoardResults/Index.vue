@@ -40,6 +40,48 @@
             </div>
         </div>
 
+        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6 print:hidden">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Selected Class</p>
+                <p class="text-2xl font-bold text-[#0f3d7a] mt-1">Class {{ selectedClass ?? searchClass }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ (selectedClass ?? searchClass) == 12 ? 'AISSCE flow with stream-wise toppers' : 'AISSE flow with one shared topper pool' }}</p>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Saved Results</p>
+                <p class="text-2xl font-bold text-emerald-600 mt-1">{{ results.length }}</p>
+                <p class="text-xs text-gray-500 mt-1">Draft, submitted, approved, or published rows</p>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Current Toppers</p>
+                <p class="text-2xl font-bold text-violet-600 mt-1">{{ activeResultContext?.topperCount ?? activeResult?.toppers?.length ?? 0 }}</p>
+                <p class="text-xs text-gray-500 mt-1">Rows saved in the active board result</p>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Next Action</p>
+                <p class="text-sm font-bold text-gray-800 mt-1">{{ workflowLabel }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ workflowHint }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-6 print:hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <div>
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Board Result Workflow</p>
+                    <p class="text-sm text-gray-700 mt-0.5">Use this path to keep the school submission complete and reviewer-friendly.</p>
+                </div>
+                <span class="text-xs font-semibold px-3 py-1 rounded-full border" :class="statusClass(activeResult?.status || 'draft')">
+                    {{ activeResult?.status || 'draft' }}
+                </span>
+            </div>
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div v-for="step in workflowSteps" :key="step.key" class="rounded-xl border p-3"
+                     :class="step.active ? 'border-[#0f3d7a] bg-[#0f3d7a]/5' : 'border-gray-200 bg-gray-50/60'">
+                    <p class="text-[11px] font-bold uppercase tracking-wide" :class="step.active ? 'text-[#0f3d7a]' : 'text-gray-500'">{{ step.label }}</p>
+                    <p class="text-xs mt-1" :class="step.active ? 'text-gray-700' : 'text-gray-500'">{{ step.hint }}</p>
+                </div>
+            </div>
+        </div>
+
         <div class="space-y-6">
             <!-- WORKING YEAR SELECTOR BAR -->
             <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
@@ -170,21 +212,25 @@
                     <div>
                         <div class="flex items-center gap-2 mb-3">
                             <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">2</span>
-                            <h3 class="font-bold text-gray-800 text-sm">Proof Document (PDF / Image)</h3>
+                            <h3 class="font-bold text-gray-800 text-sm">Proof Document (PDF / DOC / Image)</h3>
                         </div>
 
                         <div class="grid sm:grid-cols-2 gap-4">
                             <div>
                                 <label class="form-label mb-1">CBSE Tabulation Sheet / Proof Document (Required for verification)</label>
                                 <div v-if="activeResult?.result_pdf_path" class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 mb-2 flex items-center justify-between shadow-xs">
-                                    <div class="flex items-center gap-2 text-xs font-semibold text-emerald-800">
+                                    <div class="flex items-center gap-2 text-xs font-semibold text-emerald-800 min-w-0">
                                         <span>✓ Proof Attached</span>
-                                        <a :href="`/school-admin/${school.id}/board-results/${activeResult.id}/pdf`" target="_blank" class="underline text-indigo-600 hover:text-indigo-800 font-normal">View Attached File ↗</a>
+                                        <button type="button" class="underline text-indigo-600 hover:text-indigo-800 font-normal truncate text-left" @click="openProofPreview(activeResult)">
+                                            {{ activeProofLabel }}
+                                        </button>
                                     </div>
-                                    <span class="text-[11px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-medium">Ready</span>
+                                    <span class="text-[11px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-medium whitespace-nowrap">
+                                        {{ activeProofTypeLabel }}
+                                    </span>
                                 </div>
-                                <input type="file" accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp" class="field text-sm bg-white" :disabled="!canEditActive" @change="form.result_pdf = $event.target.files[0]">
-                                <p class="text-[11px] text-gray-400 mt-1">Accepts PDF, JPG, PNG, WEBP files up to 20MB.</p>
+                                <input type="file" accept="application/pdf,.doc,.docx,.xls,.xlsx,image/png,image/jpeg,image/jpg,image/webp" class="field text-sm bg-white" :disabled="!canEditActive" @change="form.result_pdf = $event.target.files[0]">
+                                <p class="text-[11px] text-gray-400 mt-1">Accepts PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, WEBP files up to 20MB.</p>
                             </div>
                             <div>
                                 <label class="form-label mb-1">Additional Attachments (Word/Excel/Images)</label>
@@ -352,6 +398,29 @@
                 </div>
             </div>
         </div>
+
+        <div v-if="proofPreview" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/70" @click="closeProofPreview"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Board result proof</p>
+                        <h3 class="font-bold text-slate-900 truncate">{{ proofPreview.label }}</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">{{ proofPreview.typeLabel }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <a :href="proofPreview.viewUrl" target="_blank" rel="noopener" class="btn-secondary text-xs">
+                            Open in new tab
+                        </a>
+                        <button type="button" class="btn-ghost text-sm" @click="closeProofPreview">Close</button>
+                    </div>
+                </div>
+                <div class="flex-1 bg-slate-50 overflow-hidden">
+                    <img v-if="proofPreview.kind === 'image'" :src="proofPreviewUrl" alt="Proof preview" class="w-full h-full object-contain bg-slate-50">
+                    <iframe v-else :src="proofPreviewUrl" class="w-full h-full bg-slate-50" title="Board result proof preview"></iframe>
+                </div>
+            </div>
+        </div>
     </SchoolAdminLayout>
 </template>
 
@@ -381,6 +450,11 @@ const pageTitle = computed(() => {
     return 'Board Results';
 });
 
+const proofPreview = ref(null);
+const proofPreviewUrl = computed(() => proofPreview.value?.viewUrl ? withPreview(proofPreview.value.viewUrl) : null);
+const activeProofLabel = computed(() => proofLabelFor(props.activeResult));
+const activeProofTypeLabel = computed(() => proofTypeLabelFor(props.activeResult));
+
 // ── Step 1: search ──────────────────────────────────────────────────────
 const searchYear = ref(props.selectedAcademicYear ?? '');
 const searchClass = ref(props.selectedClass ? String(props.selectedClass) : '10');
@@ -400,6 +474,22 @@ function loadResult(r) {
     }, { preserveScroll: true });
 }
 
+function openProofPreview(result) {
+    const viewUrl = `/school-admin/${props.school.id}/board-results/${result.id}/pdf`;
+    const latest = result?.uploads?.[0];
+    proofPreview.value = {
+        label: proofLabelFor(result),
+        kind: proofKindFor(result),
+        typeLabel: proofTypeLabelFor(result),
+        viewUrl,
+        fileName: latest?.file_name || null,
+    };
+}
+
+function closeProofPreview() {
+    proofPreview.value = null;
+}
+
 // ── Step 2: combined summary + toppers form ──────────────────────────────
 const canEditActive = computed(() => {
     if (!props.activeResult) return true;
@@ -409,6 +499,44 @@ const canEditActive = computed(() => {
         return props.activeResultContext.canEdit;
     }
     return ['draft', 'rejected'].includes(props.activeResult.status);
+});
+
+const workflowProgress = computed(() => {
+    if (!props.selectedAcademicYear) return 1;
+    if (!props.activeResult) return 2;
+    if (!props.activeResult.result_pdf_path) return 3;
+    if ((props.activeResult.toppers?.length ?? 0) === 0) return 4;
+    if (props.activeResult.status === 'submitted') return 5;
+    if (['verified', 'approved', 'published'].includes(props.activeResult.status)) return 5;
+    return 4;
+});
+
+const workflowSteps = computed(() => [
+    { key: 'year', label: '1. Year', hint: 'Pick the academic year before entering anything.', active: workflowProgress.value >= 1 },
+    { key: 'result', label: '2. Result', hint: 'Create or reopen the board result for this class.', active: workflowProgress.value >= 2 },
+    { key: 'proof', label: '3. Proof', hint: 'Upload the result PDF before submission.', active: workflowProgress.value >= 3 },
+    { key: 'toppers', label: '4. Toppers', hint: 'Add overall and subject toppers.', active: workflowProgress.value >= 4 },
+    { key: 'submit', label: '5. Review', hint: 'Send the finished result to Sahodaya.', active: workflowProgress.value >= 5 },
+]);
+
+const workflowLabel = computed(() => {
+    if (!props.selectedAcademicYear) return 'Choose academic year';
+    if (!props.activeResult) return 'Create result';
+    if (!props.activeResult.result_pdf_path) return 'Upload proof';
+    if ((props.activeResult.toppers?.length ?? 0) === 0) return 'Add toppers';
+    if (props.activeResult.status === 'draft' || props.activeResult.status === 'rejected') return 'Submit for review';
+    if (props.activeResult.status === 'submitted') return 'Awaiting Sahodaya';
+    if (props.activeResult.status === 'verified') return 'Verify next step';
+    if (props.activeResult.status === 'approved') return 'Ready to publish';
+    return 'Locked / published';
+});
+
+const workflowHint = computed(() => {
+    if (!props.selectedAcademicYear) return 'Start by selecting the year and class.';
+    if (!props.activeResult) return 'Save the board result, then add proof and topper rows.';
+    if (!props.activeResult.result_pdf_path) return 'Attach the CBSE proof document so verification can begin.';
+    if ((props.activeResult.toppers?.length ?? 0) === 0) return 'Use the toppers page to add overall and subject-wise rows.';
+    return 'Use the status button when you are ready to move it to Sahodaya.';
 });
 
 // Admin-locked "out of" marks — schools no longer type this in. Class X is one shared
@@ -670,5 +798,38 @@ function removeSubjectTopper(row) {
 
 function printReport() {
     window.print();
+}
+
+function proofLabelFor(result) {
+    const upload = result?.uploads?.[0];
+    return upload?.file_name || (result?.result_pdf_path ? basename(result.result_pdf_path) : 'Latest proof');
+}
+
+function proofKindFor(result) {
+    const upload = result?.uploads?.[0];
+    const name = upload?.file_name || result?.result_pdf_path || '';
+    const ext = String(name).split('.').pop()?.toLowerCase();
+
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image';
+    if (ext === 'pdf') return 'pdf';
+    if (['doc', 'docx', 'xls', 'xlsx'].includes(ext)) return 'document';
+    return 'file';
+}
+
+function proofTypeLabelFor(result) {
+    switch (proofKindFor(result)) {
+        case 'image': return 'Image proof';
+        case 'pdf': return 'PDF proof';
+        case 'document': return 'Document proof';
+        default: return 'Proof file';
+    }
+}
+
+function withPreview(url) {
+    return `${url}${url.includes('?') ? '&' : '?'}preview=1`;
+}
+
+function basename(path) {
+    return String(path || '').split('/').pop() || 'Latest proof';
 }
 </script>

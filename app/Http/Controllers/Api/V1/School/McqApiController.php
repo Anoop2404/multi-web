@@ -25,7 +25,7 @@ class McqApiController extends SchoolApiController
                 return array_merge(
                     McqResultPresenter::forExamList($reg->exam, $reg),
                     [
-                        'student' => $reg->student?->only('id', 'name', 'reg_no'),
+                        'student' => $reg->student?->only('id', 'name', 'admission_number', 'reg_no'),
                     ]
                 );
             });

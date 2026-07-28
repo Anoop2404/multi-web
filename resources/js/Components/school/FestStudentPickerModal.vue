@@ -25,7 +25,7 @@
                             v-model="search"
                             type="search"
                             class="field flex-1 min-w-[180px] !py-2 !text-sm"
-                            placeholder="Search name, reg no, class…"
+                            placeholder="Search name, admission no, class…"
                             autocomplete="off"
                         >
                         <label v-if="hasIneligible" class="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap cursor-pointer select-none">
@@ -54,7 +54,7 @@
                             @click="toggleId(chip.id)"
                         >
                             <span class="font-mono">{{ chip.regNo }}</span>
-                            <span class="truncate max-w-[140px]">{{ chip.name }}</span>
+                            <span class="truncate max-w-[140px]">{{ chip.displayName || chip.name }}</span>
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -90,7 +90,7 @@
                                         <span class="font-mono text-xs font-semibold text-[#0f3d7a] shrink-0">
                                             {{ entry.regNo || '—' }}
                                         </span>
-                                        <span class="font-medium text-sm text-gray-900">{{ entry.name }}</span>
+                                        <span class="font-medium text-sm text-gray-900">{{ entry.displayName || entry.name }}</span>
                                     </span>
                                     <span v-if="entry.meta" class="block text-xs text-gray-500 mt-0.5">{{ entry.meta }}</span>
                                     <span v-if="entry.eventRegistered"
@@ -215,7 +215,7 @@ const selectedChips = computed(() => {
     return localSelected.value
         .map(id => map.get(id))
         .filter(Boolean)
-        .map(e => ({ id: e.id, name: e.name, regNo: e.regNo || '—' }));
+        .map(e => ({ id: e.id, name: e.name, displayName: e.displayName, regNo: e.regNo || '—' }));
 });
 
 const canConfirm = computed(() => {

@@ -536,7 +536,7 @@ class BoardResultController extends SchoolAdminController
         app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
 
         $request->validate([
-            'result_pdf' => 'required|file|mimes:pdf,jpg,jpeg,png,webp|max:20480',
+            'result_pdf' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,webp|max:20480',
             'attachments' => 'nullable|array|max:5',
             'attachments.*' => 'file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,webp|max:20480',
         ]);
@@ -1031,7 +1031,7 @@ class BoardResultController extends SchoolAdminController
             'average_mark' => 'nullable|numeric|min:0',
             'total_marks' => 'nullable|integer|min:1',
             'remarks' => 'nullable|string|max:5000',
-            'result_pdf' => ($existing?->hasResultPdf() ? 'nullable' : 'nullable').'|file|mimes:pdf,jpg,jpeg,png,webp|max:20480',
+            'result_pdf' => ($existing?->hasResultPdf() ? 'nullable' : 'nullable').'|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,webp|max:20480',
             'attachments' => 'nullable|array|max:5',
             'attachments.*' => 'file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,webp|max:20480',
         ]);
@@ -1073,7 +1073,12 @@ class BoardResultController extends SchoolAdminController
             $file = $request->file('result_pdf');
             $path = TenantStorage::storeUploadedFile($file, $dir, $disk);
             $ext = strtolower($file->getClientOriginalExtension());
-            $fileType = in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) ? 'image' : 'pdf';
+            $fileType = match (true) {
+                in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) => 'image',
+                $ext === 'pdf' => 'pdf',
+                in_array($ext, ['doc', 'docx', 'xls', 'xlsx'], true) => 'document',
+                default => 'document',
+            };
 
             DB::transaction(function () use ($result, $path, $disk, $file, $fileType, $request) {
                 BoardResult::query()->whereKey($result->id)->lockForUpdate()->first();

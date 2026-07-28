@@ -151,7 +151,7 @@
                                     <tr>
                                         <th v-if="studentFilter === 'available'" class="w-10"></th>
                                         <th>Student</th>
-                                        <th>Reg. no.</th>
+                                        <th>Admission no.</th>
                                         <th>Class</th>
                                         <th>Portal</th>
                                         <th>Status</th>
@@ -166,8 +166,8 @@
                                                    :checked="isSelected(s.id)"
                                                    @change="toggleSelect(s.id)">
                                         </td>
-                                        <td class="font-medium">{{ s.name }}</td>
-                                        <td class="font-mono text-xs">{{ s.reg_no || '—' }}</td>
+                                        <td class="font-medium">{{ studentDisplayName(s) }}</td>
+                                        <td class="font-mono text-xs">{{ s.admission_number || '—' }}</td>
                                         <td class="text-xs">{{ s.class_name || '—' }}</td>
                                         <td class="text-xs">{{ s.has_portal_login ? 'Has login' : 'New on register' }}</td>
                                         <td>
@@ -318,7 +318,7 @@
                         <div class="space-y-2 max-h-48 overflow-y-auto">
                             <div v-for="r in registrations.slice(0, 8)" :key="r.id"
                                  class="flex justify-between gap-2 text-sm border border-slate-100 rounded-lg px-3 py-2">
-                                <span class="truncate">{{ r.participant_name || r.student?.name || r.teacher?.name }}</span>
+                                <span class="truncate">{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</span>
                                 <span class="text-xs capitalize shrink-0 text-slate-500">{{ r.approval_status_label || r.approval_status }}</span>
                             </div>
                         </div>
@@ -337,7 +337,7 @@
                 <thead><tr><th>Student</th><th>Approval</th><th>Exam reg. no.</th><th>Seat</th><th>Status</th><th class="text-right">Action</th></tr></thead>
                 <tbody>
                     <tr v-for="r in registrations" :key="r.id">
-                        <td>{{ r.participant_name || r.student?.name || r.teacher?.name }}</td>
+                        <td>{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</td>
                         <td><span class="text-xs capitalize">{{ r.approval_status_label || r.approval_status }}</span></td>
                         <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
                         <td>{{ r.seat_no || '—' }}</td>
@@ -348,7 +348,7 @@
                             <a v-if="examHasFee" :href="`${base}/registrations/${r.id}/invoice`" target="_blank" class="text-xs font-semibold text-indigo-600 hover:underline">Invoice</a>
                             <button v-if="r.can_cancel && canRegister" type="button"
                                     class="text-xs font-semibold text-red-600 hover:text-red-700"
-                                    @click="r.teacher_id ? cancelTeacher(r.teacher_id, r.participant_name || r.teacher?.name) : cancelStudent(r.student_id, r.participant_name || r.student?.name)">Cancel</button>
+                                    @click="r.teacher_id ? cancelTeacher(r.teacher_id, r.participant_name || r.teacher?.name) : cancelStudent(r.student_id, r.participant_name || studentDisplayName(r.student))">Cancel</button>
                         </td>
                     </tr>
                 </tbody>
@@ -548,7 +548,7 @@
                         <tbody>
                             <tr v-for="row in attendanceState" :key="row.id">
                                 <td class="font-mono text-xs">{{ row.hall_ticket_no || '—' }}</td>
-                                <td>{{ row.student?.name }} <span class="text-slate-400 text-xs">{{ row.student?.reg_no }}</span></td>
+                                <td>{{ studentDisplayName(row.student) }}</td>
                                 <td class="text-xs">{{ row.class_name || row.student?.class_name || '—' }}</td>
                                 <td class="text-center">
                                     <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-xs">
@@ -601,7 +601,7 @@
                 <thead><tr><th>Student</th><th>Score</th><th>Rank</th><th>Grade</th></tr></thead>
                 <tbody>
                     <tr v-for="r in registrations" :key="r.id">
-                        <td>{{ r.participant_name || r.student?.name || r.teacher?.name }}</td>
+                        <td>{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</td>
                         <td>{{ r.mark?.score ?? '—' }}</td>
                         <td>{{ r.mark?.rank ?? '—' }}</td>
                         <td>{{ r.mark?.grade ?? '—' }}</td>
@@ -622,7 +622,7 @@
                 <tbody>
                     <tr v-for="(t, i) in toppers" :key="i">
                         <td class="font-semibold">{{ t.rank ?? '—' }}</td>
-                        <td>{{ t.name }} <span class="text-slate-400 text-xs">{{ t.reg_no }}</span></td>
+                        <td>{{ studentDisplayName(t) }}</td>
                         <td class="text-xs">{{ t.class_name || '—' }}</td>
                         <td>{{ t.score ?? '—' }}</td>
                         <td>{{ t.grade ?? '—' }}</td>
@@ -682,6 +682,7 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SchoolMcqSubNav from '@/Components/school/SchoolMcqSubNav.vue';
 import McqSchoolWorkflowStepper from '@/Components/school/McqSchoolWorkflowStepper.vue';
 import { TALENT_SEARCH_EXAMS_LABEL } from '@/support/mcqSchoolLabels.js';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     school: Object,
@@ -748,6 +749,7 @@ function matchesSearch(s) {
     const q = studentSearch.value.trim().toLowerCase();
     if (!q) return true;
     return s.name?.toLowerCase().includes(q)
+        || s.admission_number?.toLowerCase().includes(q)
         || s.reg_no?.toLowerCase().includes(q)
         || s.class_name?.toLowerCase().includes(q);
 }

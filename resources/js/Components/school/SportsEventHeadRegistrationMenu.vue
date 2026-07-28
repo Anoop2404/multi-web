@@ -22,7 +22,7 @@
                 <span v-for="athlete in eventRegisteredAthletes" :key="athlete.id"
                       class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-white border border-indigo-100 text-indigo-900">
                     <span class="font-mono font-semibold text-indigo-700">{{ athlete.event_registration_number || '—' }}</span>
-                    <span>{{ athlete.name }}</span>
+                    <span>{{ studentDisplayName(athlete) }}</span>
                 </span>
             </div>
         </div>
@@ -83,6 +83,7 @@
 import { computed } from 'vue';
 import EmptyState from '@/Components/ui/EmptyState.vue';
 import { Link } from '@inertiajs/vue3';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     event: { type: Object, required: true },

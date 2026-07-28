@@ -11,13 +11,17 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Auth\UserCredentialService;
 use App\Services\Membership\MembershipNotifier;
 use App\Services\Membership\SchoolMembershipCancellationService;
 use App\Services\Tenancy\SchoolDataPurger;
+use App\Services\Mail\SahodayaMailer;
+use App\Support\TenantAuth;
 use App\Support\AcademicYear;
 use App\Support\ExcelExport;
 use App\Support\SchoolDetailFields;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MemberSchoolsController extends SahodayaAdminController
@@ -172,10 +176,11 @@ class MemberSchoolsController extends SahodayaAdminController
                 'id', 'name', 'school_prefix', 'membership_status', 'is_non_affiliated', 'is_active',
                 'fest_registration_closed', 'subdomain', 'created_at', 'application_payload'
             ), [
+                'contact_email'  => $payload['school_email'] ?? $payload['contact_email'] ?? null,
                 'student_count'  => Student::where('tenant_id', $school->id)->where('status', 'active')->count(),
                 'classes_count'  => SchoolClass::where('tenant_id', $school->id)->where('is_active', true)->count(),
-                'has_login'      => User::where('tenant_id', $school->id)->exists(),
-                'login_email'    => User::where('tenant_id', $school->id)->value('email'),
+                'has_login'      => $this->schoolLoginUser($school) !== null,
+                'login_email'    => $this->schoolLoginUser($school)?->email,
                 'can_cancel_membership' => $cancellation->canCancel($school),
                 'can_cancel_with_settlement' => $school->membership_status === 'approved' && !$cancellation->canCancel($school),
                 'has_payment'    => $payment !== null,
@@ -231,6 +236,124 @@ class MemberSchoolsController extends SahodayaAdminController
         $cancellation->cancel($school, $data['reason'], $notifier, $audit, $request->user()?->id);
 
         return back()->with('success', "Membership cancelled for {$school->name}.");
+    }
+
+    public function updateSchoolEmail(
+        Request $request,
+        string $tenantId,
+        Tenant $school,
+        PlatformAuditLogger $audit,
+    ) {
+        abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+
+        return TenantAuth::withTenantUsers($school, function () use ($request, $school, $audit) {
+            $loginUser = $this->schoolLoginUser($school);
+
+            $rules = ['email' => ['required', 'email', 'max:255']];
+            if ($loginUser) {
+                $rules['email'][] = Rule::unique('users', 'email')->ignore($loginUser->id);
+            }
+
+            $data = $request->validate($rules);
+            $newEmail = strtolower(trim($data['email']));
+
+            $before = [
+                'school_email' => $school->application_payload['school_email'] ?? $school->application_payload['contact_email'] ?? null,
+                'login_email'  => $loginUser?->email,
+            ];
+
+            $payload = $school->application_payload ?? [];
+            $payload['school_email'] = $newEmail;
+            $payload['contact_email'] = $newEmail;
+            $payload['updated_at'] = now()->toIso8601String();
+            $school->update(['application_payload' => $payload]);
+
+            if ($loginUser) {
+                $loginUser->forceFill([
+                    'email' => $newEmail,
+                    'email_verified_at' => null,
+                ])->save();
+
+                SahodayaMailer::for($school->parent_id)->sendVerification($loginUser->fresh());
+            }
+
+            app(DataChangeLogger::class)->updated(
+                $school,
+                "School email updated: {$school->name}",
+                DataChangeLogger::diff($before, [
+                    'school_email' => $newEmail,
+                    'login_email'  => $newEmail,
+                ]),
+                $school->id,
+                'membership',
+            );
+
+            $audit->log(
+                'membership.school.email.updated',
+                "School email updated for {$school->name}",
+                $school,
+                ['updated_by_user_id' => $request->user()?->id, 'email' => $newEmail],
+            );
+
+            return back()->with('success', "School email updated for {$school->name}.");
+        });
+    }
+
+    public function resendSchoolCredentials(
+        Request $request,
+        string $tenantId,
+        Tenant $school,
+        MembershipNotifier $notifier,
+        PlatformAuditLogger $audit,
+    ) {
+        abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+
+        return TenantAuth::withTenantUsers($school, function () use ($request, $school, $notifier, $audit) {
+            $loginUser = $this->schoolLoginUser($school);
+            abort_unless($loginUser, 422, 'No school login exists to resend credentials.');
+
+            $plainPassword = $loginUser->plain_password;
+            abort_unless(is_string($plainPassword) && trim($plainPassword) !== '', 422, 'No stored temporary password is available. Reset the password instead.');
+
+            $notifier->schoolCredentialsIssued($loginUser->fresh(), $plainPassword, $school);
+
+            $audit->log(
+                'membership.school.credentials.resent',
+                "School credentials resent for {$school->name}",
+                $school,
+                ['updated_by_user_id' => $request->user()?->id, 'user_id' => $loginUser->id],
+            );
+
+            return back()->with('success', "Credentials resent to {$loginUser->email}.");
+        });
+    }
+
+    public function resetSchoolPassword(
+        Request $request,
+        string $tenantId,
+        Tenant $school,
+        UserCredentialService $credentials,
+        MembershipNotifier $notifier,
+        PlatformAuditLogger $audit,
+    ) {
+        abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
+
+        return TenantAuth::withTenantUsers($school, function () use ($request, $school, $credentials, $notifier, $audit) {
+            $loginUser = $this->schoolLoginUser($school);
+            abort_unless($loginUser, 422, 'No school login exists to reset.');
+
+            $result = $credentials->resetPassword($loginUser, $request->user()?->id);
+            $notifier->schoolCredentialsIssued($result['user'], $result['password'], $school);
+
+            $audit->log(
+                'membership.school.password.reset',
+                "School password reset for {$school->name}",
+                $school,
+                ['updated_by_user_id' => $request->user()?->id, 'user_id' => $result['user']->id],
+            );
+
+            return back()->with('success', "Password reset for {$result['user']->email}. A new temporary password was emailed.");
+        });
     }
 
     public function bulkCancelMembership(
@@ -471,5 +594,24 @@ class MemberSchoolsController extends SahodayaAdminController
             ->selectRaw('tenant_id, count(*) as total')
             ->groupBy('tenant_id')
             ->pluck('total', 'tenant_id');
+    }
+
+    private function schoolLoginUser(Tenant $school): ?User
+    {
+        return TenantAuth::withTenantUsers($school, function () use ($school) {
+            foreach (['school_admin', 'school_principal', 'school_vice_principal'] as $role) {
+                $user = User::query()
+                    ->where('tenant_id', $school->id)
+                    ->whereHas('roles', fn ($q) => $q->where('name', $role))
+                    ->orderBy('id')
+                    ->first();
+
+                if ($user) {
+                    return $user;
+                }
+            }
+
+            return User::query()->where('tenant_id', $school->id)->orderBy('id')->first();
+        });
     }
 }

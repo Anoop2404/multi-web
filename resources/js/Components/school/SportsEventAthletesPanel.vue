@@ -77,8 +77,8 @@
                             <span v-else class="text-slate-300 text-xs">—</span>
                         </td>
                         <td class="font-medium">
-                            <span class="font-mono text-xs text-indigo-800 mr-1.5">{{ row.reg_no || '—' }}</span>
-                            {{ row.name }}
+                            <span class="font-mono text-xs text-indigo-800 mr-1.5">{{ row.school_number || row.reg_no || '—' }}</span>
+                            {{ row.displayName || row.name }}
                             <span v-if="row.registered && row.event_reg_number"
                                   class="ml-1.5 text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
                                 Fest ID {{ row.event_reg_number }}
@@ -123,6 +123,7 @@
 <script setup>
 import { computed, ref, watch, watchEffect } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     event: { type: Object, required: true },
@@ -251,6 +252,8 @@ const rows = computed(() => {
         result[i] = {
             id,
             name: s.name,
+            displayName: studentDisplayName(s),
+            school_number: s.admission_number || s.reg_no,
             reg_no: s.reg_no,
             class_name: s.class_name ?? s.school_class?.name,
             age_label: ageLabelForStudent(s),
@@ -283,9 +286,11 @@ const visibleRows = computed(() => {
         if (ageVal && !studentMatchesAgeFilter(row, ageVal)) continue;
         if (q) {
             const nameMatch = row.name && String(row.name).toLowerCase().includes(q);
+            const displayMatch = row.displayName && String(row.displayName).toLowerCase().includes(q);
             const regMatch = row.reg_no && String(row.reg_no).toLowerCase().includes(q);
+            const schoolMatch = row.school_number && String(row.school_number).toLowerCase().includes(q);
             const classMatch = row.class_name && String(row.class_name).toLowerCase().includes(q);
-            if (!nameMatch && !regMatch && !classMatch) continue;
+            if (!nameMatch && !displayMatch && !regMatch && !schoolMatch && !classMatch) continue;
         }
         result.push(row);
     }

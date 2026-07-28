@@ -720,6 +720,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/schools/{school}/approve', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'approve'])->name('schools.approve');
         Route::post('/schools/{school}/reject', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'reject'])->name('schools.reject');
         Route::post('/schools/{school}/cancel-membership', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'cancelMembership'])->name('schools.cancel-membership');
+        Route::put('/schools/{school}/email', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'updateSchoolEmail'])->name('schools.email.update');
+        Route::post('/schools/{school}/resend-credentials', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'resendSchoolCredentials'])->name('schools.credentials.resend');
+        Route::post('/schools/{school}/reset-password', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'resetSchoolPassword'])->name('schools.password.reset');
         Route::post('/schools/{school}/toggle-fest-registration', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'toggleFestRegistration'])->name('schools.toggle-fest-registration');
         Route::delete('/schools/{school}', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'destroy'])->name('schools.destroy');
 

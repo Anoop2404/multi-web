@@ -62,7 +62,7 @@ class McqController extends SchoolAdminController
             ->map(function (McqRegistration $reg) use ($exam) {
                 $row = $reg->toArray();
                 $row['student'] = $reg->student
-                    ? array_merge($reg->student->only('id', 'name', 'reg_no'), ['class_name' => $reg->student->schoolClass?->name])
+                    ? array_merge($reg->student->only('id', 'name', 'admission_number', 'reg_no'), ['class_name' => $reg->student->schoolClass?->name])
                     : null;
                 $row['teacher'] = $reg->teacher
                     ? $reg->teacher->only('id', 'name', 'employee_code', 'reg_no')
@@ -156,7 +156,7 @@ class McqController extends SchoolAdminController
                 $studentQuery->whereIn('id', $exam->promoted_student_ids);
             }
 
-            $allStudents = $studentQuery->get(['id', 'name', 'reg_no', 'school_class_id', 'gender', 'user_id', 'verified_at']);
+            $allStudents = $studentQuery->get(['id', 'name', 'admission_number', 'reg_no', 'school_class_id', 'gender', 'user_id', 'verified_at']);
             $registeredIdSet = array_flip($registeredIds);
 
             $students = $allStudents->map(function (Student $s) use ($exam, $registeredIdSet, $eligibilityService, $cancelledStudentIds, $cancellableStudentIds) {
@@ -166,6 +166,7 @@ class McqController extends SchoolAdminController
                 return [
                     'id'                   => $s->id,
                     'name'                 => $s->name,
+                    'admission_number'     => $s->admission_number,
                     'reg_no'               => $s->reg_no,
                     'gender'               => $s->gender,
                     'class_name'           => $s->schoolClass?->name,
@@ -384,11 +385,12 @@ class McqController extends SchoolAdminController
             $term = strtolower(trim((string) $search));
             $studentQuery->where(function ($q) use ($term) {
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
-                  ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"]);
+                  ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"])
+                  ->orWhereRaw('LOWER(admission_number) LIKE ?', ["%{$term}%"]);
             });
         }
 
-        $matches = $studentQuery->limit(150)->get(['id', 'name', 'reg_no', 'school_class_id', 'gender', 'user_id', 'verified_at']);
+        $matches = $studentQuery->limit(150)->get(['id', 'name', 'admission_number', 'reg_no', 'school_class_id', 'gender', 'user_id', 'verified_at']);
 
         $registeredIdSet = McqRegistration::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
@@ -422,6 +424,7 @@ class McqController extends SchoolAdminController
             return [
                 'id'                   => $s->id,
                 'name'                 => $s->name,
+                'admission_number'     => $s->admission_number,
                 'reg_no'               => $s->reg_no,
                 'gender'               => $s->gender,
                 'class_name'           => $s->schoolClass?->name,

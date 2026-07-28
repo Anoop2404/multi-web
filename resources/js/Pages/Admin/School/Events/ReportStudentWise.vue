@@ -13,7 +13,7 @@
 
         <div class="mt-4 space-y-2">
             <div v-for="row in rows" :key="row.student.id" class="card text-sm">
-                <p class="font-medium">{{ row.student.name }} <span class="text-gray-400 text-xs">{{ row.student.admission_number }}</span></p>
+                <p class="font-medium">{{ studentDisplayName(row.student) }}</p>
                 <p class="text-xs text-gray-500 mt-1">Items: {{ row.registrations.join(', ') || '—' }}</p>
                 <p v-if="row.results.length" class="text-xs mt-1">Results: <span v-for="(r, i) in row.results" :key="i">{{ r.item }} (#{{ r.position }}) </span></p>
                 <p class="text-xs font-mono mt-1">Total score: {{ row.total_score }}</p>
@@ -27,6 +27,7 @@ import { Link } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     school: Object,

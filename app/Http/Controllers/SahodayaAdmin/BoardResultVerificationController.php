@@ -31,7 +31,7 @@ class BoardResultVerificationController extends SahodayaAdminController
             ->whereIn('tenant_id', $schoolIds)
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
             ->when($class, fn ($q) => $q->where('class', $class))
-            ->with(['toppers', 'uploads' => fn ($q) => $q->where('file_type', 'pdf')->orderByDesc('version')->limit(3)])
+            ->with(['toppers', 'uploads' => fn ($q) => $q->orderByDesc('version')->limit(5)])
             ->orderByDesc('submitted_at')
             ->orderByDesc('updated_at')
             ->paginate(25)
@@ -44,6 +44,14 @@ class BoardResultVerificationController extends SahodayaAdminController
             ->where('sahodaya_id', $this->sahodaya->id)
             ->orderBy('class')
             ->get();
+
+        $results->getCollection()->transform(function (BoardResult $result) {
+            $result->setAttribute('latest_proof_label', $this->proofLabelForResult($result));
+            $result->setAttribute('latest_proof_type', $this->proofTypeForResult($result));
+            $result->setAttribute('latest_proof_url', $this->proofUrlForResult($result));
+
+            return $result;
+        });
 
         return $this->inertia('Sahodaya/BoardResults/Verification', [
             'results' => $results,
@@ -295,8 +303,50 @@ class BoardResultVerificationController extends SahodayaAdminController
         return TenantStorage::downloadPrivate(
             $path,
             $boardResult->result_pdf_disk ?? $upload?->storage_disk,
-            $upload?->file_name ?? ('board-result-v'.($upload?->version ?? 'latest').'.pdf')
+            $request->boolean('preview') ? null : ($upload?->file_name ?? basename($path))
         );
+    }
+
+    private function proofLabelForResult(BoardResult $result): string
+    {
+        $upload = $result->uploads->first();
+
+        if ($upload?->file_name) {
+            return $upload->file_name;
+        }
+
+        return basename((string) $result->result_pdf_path ?: 'proof-file');
+    }
+
+    private function proofTypeForResult(BoardResult $result): string
+    {
+        $upload = $result->uploads->first();
+        if ($upload?->file_type) {
+            return $upload->file_type;
+        }
+
+        return $this->guessProofType($upload?->file_name ?? $result->result_pdf_path);
+    }
+
+    private function proofUrlForResult(BoardResult $result): ?string
+    {
+        if (! $result->result_pdf_path && $result->uploads->isEmpty()) {
+            return null;
+        }
+
+        return "/sahodaya-admin/{$this->sahodaya->id}/board-results/{$result->id}/pdf?preview=1";
+    }
+
+    private function guessProofType(?string $path): string
+    {
+        $ext = strtolower(pathinfo((string) $path, PATHINFO_EXTENSION));
+
+        return match (true) {
+            in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true) => 'image',
+            $ext === 'pdf' => 'pdf',
+            in_array($ext, ['doc', 'docx', 'xls', 'xlsx'], true) => 'document',
+            default => 'file',
+        };
     }
 
     private function assertInScope(BoardResult $boardResult): void

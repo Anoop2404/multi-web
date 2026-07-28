@@ -23,6 +23,29 @@
             </div>
         </div>
 
+        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Overall Toppers</p>
+                <p class="text-2xl font-bold text-[#0f3d7a] mt-1">{{ overallTopperCount }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ isClass12 ? 'Stream-grouped topper list' : 'Flat topper list for Class X' }}</p>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Subject Entries</p>
+                <p class="text-2xl font-bold text-emerald-600 mt-1">{{ subjectEntryCount }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ isClass12 ? 'Rows with subject marks saved' : 'Not used for Class X' }}</p>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">90%+ Achievers</p>
+                <p class="text-2xl font-bold text-violet-600 mt-1">{{ achieversCount }}</p>
+                <p class="text-xs text-gray-500 mt-1">Students at or above the achiever threshold</p>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Active Mode</p>
+                <p class="text-sm font-bold text-gray-800 mt-1">{{ activeTabLabel }}</p>
+                <p class="text-xs text-gray-500 mt-1">Switch tabs to manage a different topper flow</p>
+            </div>
+        </div>
+
         <!-- 3 CATEGORY NAVIGATION TABS (CLASS 12 EXCLUSIVE) -->
         <div v-if="isClass12" class="flex items-center bg-white p-1.5 rounded-2xl shadow-xs border border-gray-200 mb-6 space-x-1 max-w-2xl">
             <button
@@ -31,7 +54,7 @@
                 class="flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                 :class="activeTab === 'overall' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
             >
-                <span>🏆</span> Overall Stream Toppers
+                <span>🏆</span> Overall Stream Toppers ({{ overallTopperCount }})
             </button>
 
             <button
@@ -40,7 +63,7 @@
                 class="flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                 :class="activeTab === 'subject' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
             >
-                <span>🎯</span> Subject-Wise Mark Entry
+                <span>🎯</span> Subject-Wise Mark Entry ({{ subjectEntryCount }})
             </button>
 
             <button
@@ -49,7 +72,7 @@
                 class="flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                 :class="activeTab === 'achievers' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
             >
-                <span>🌟</span> 90%+ Achievers ({{ achievers90.length }})
+                <span>🌟</span> 90%+ Achievers ({{ achieversCount }})
             </button>
         </div>
 
@@ -537,6 +560,15 @@ const masterSubjectList = computed(() =>
 );
 
 const pageTitle = computed(() => `Toppers — Class ${props.boardResult.class} (${props.boardResult.academic_year})`);
+const overallTopperCount = computed(() => sortedToppers.value.length);
+const subjectEntryCount = computed(() => allSubjectRows.value.length);
+const achieversCount = computed(() => achievers90.value.length);
+const activeTabLabel = computed(() => {
+    if (!props.isClass12) return 'Overall';
+    if (activeTab.value === 'overall') return 'Overall Toppers';
+    if (activeTab.value === 'subject') return 'Subject-Wise';
+    return 'High Achievers';
+});
 
 const activeTab = ref('overall');
 const editingId = ref(null);

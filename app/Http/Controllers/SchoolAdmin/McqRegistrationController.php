@@ -44,7 +44,7 @@ class McqRegistrationController extends SchoolAdminController
             ->active()
             ->with('schoolClass:id,name,class_category_id')
             ->orderBy('name')
-            ->get(['id', 'name', 'reg_no', 'school_class_id', 'gender', 'verified_at']);
+            ->get(['id', 'name', 'admission_number', 'reg_no', 'school_class_id', 'gender', 'verified_at']);
 
         $eligibility = app(McqEligibilityService::class);
 
@@ -127,7 +127,7 @@ class McqRegistrationController extends SchoolAdminController
                     'approval_status_label' => $reg->approvalStatusLabel(),
                     'hall_ticket_no' => $reg->hall_ticket_no,
                     'student_id' => $reg->student_id,
-                    'student'    => $reg->student?->only('id', 'name', 'reg_no'),
+                    'student'    => $reg->student?->only('id', 'name', 'admission_number', 'reg_no'),
                     'fee_receipt'=> $reg->feeReceipt?->only('id', 'status'),
                 ];
 

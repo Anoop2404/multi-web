@@ -11,10 +11,33 @@
                 </p>
             </div>
 
-            <div class="flex items-center gap-2">
-                <span class="text-xs font-bold px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100 uppercase">
-                    Class XII (AISSCE)
-                </span>
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-bold px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100 uppercase">
+                Class XII (AISSCE)
+            </span>
+        </div>
+    </div>
+
+        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Saved Rows</p>
+                <p class="text-2xl font-bold text-[#0f3d7a] mt-1">{{ sortedSubjectRows.length }}</p>
+                <p class="text-xs text-gray-500 mt-1">Rows already stored for the selected year</p>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Subjects</p>
+                <p class="text-2xl font-bold text-emerald-600 mt-1">{{ availableSubjects.length }}</p>
+                <p class="text-xs text-gray-500 mt-1">Unique subjects in the current result set</p>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Students</p>
+                <p class="text-2xl font-bold text-violet-600 mt-1">{{ distinctStudentCount }}</p>
+                <p class="text-xs text-gray-500 mt-1">Unique students with subject marks</p>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Quick Jump</p>
+                <p class="text-sm font-bold text-gray-800 mt-1">{{ activeSubjectName || 'Select a subject' }}</p>
+                <p class="text-xs text-gray-500 mt-1">Use the chips below to move faster</p>
             </div>
         </div>
 
@@ -43,6 +66,27 @@
                         >
                         <span class="absolute left-2.5 top-2.5 text-gray-400 text-xs">🔍</span>
                     </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <button
+                        v-for="subj in filteredSubjectOptions.slice(0, 10)"
+                        :key="subj"
+                        type="button"
+                        class="px-2.5 py-1 rounded-full text-[11px] font-semibold border transition"
+                        :class="selectedSubjectOption === subj ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+                        @click="selectedSubjectOption = subj"
+                    >
+                        {{ subj }}
+                    </button>
+                    <button
+                        v-if="selectedSubjectOption || customSubjectInput || searchQuery"
+                        type="button"
+                        class="px-2.5 py-1 rounded-full text-[11px] font-semibold border border-slate-200 text-slate-500 hover:bg-slate-50"
+                        @click="clearSubjectSelection"
+                    >
+                        Clear
+                    </button>
                 </div>
 
                 <!-- CONTROLS ROW: ACADEMIC YEAR & SUBJECT DROP-DOWN -->
@@ -359,6 +403,12 @@ const filteredSubjectOptions = computed(() => {
     return masterSubjectList.value.filter(s => s.toLowerCase().includes(q));
 });
 
+const distinctStudentCount = computed(() => {
+    const set = new Set();
+    sortedSubjectRows.value.forEach(row => { if (row.name) set.add(row.name.toLowerCase()); });
+    return set.size;
+});
+
 // Every student's marks for every subject — not just the top scorer per subject
 // (props.subjectWiseLeaders is a leaderboard, one row per subject, which was hiding
 // every other student's entries from this listing and from the edit prefill below).
@@ -426,6 +476,14 @@ function onYearChange() {
     router.get(`/school-admin/${props.school.id}/board-results/subject-toppers`, {
         academic_year: selectedYear.value,
     }, { preserveScroll: true });
+}
+
+function clearSubjectSelection() {
+    selectedSubjectOption.value = '';
+    customSubjectInput.value = '';
+    searchQuery.value = '';
+    rows.value = [blankRow()];
+    rowError.value = '';
 }
 
 // ── Multi-Row Subject Topper Form ─────────────────────────────────────────

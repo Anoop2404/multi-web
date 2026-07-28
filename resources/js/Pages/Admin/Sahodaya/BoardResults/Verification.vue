@@ -15,6 +15,29 @@
             </Link>
         </p>
 
+        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+            <div class="card !p-4">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Queue Size</p>
+                <p class="text-2xl font-bold text-[#0f3d7a] mt-1">{{ results.total }}</p>
+                <p class="text-xs text-slate-500 mt-1">Results awaiting action in the selected view</p>
+            </div>
+            <div class="card !p-4">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Submitted</p>
+                <p class="text-2xl font-bold text-amber-600 mt-1">{{ statusCounts.submitted }}</p>
+                <p class="text-xs text-slate-500 mt-1">Need review before verification</p>
+            </div>
+            <div class="card !p-4">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Verified / Approved</p>
+                <p class="text-2xl font-bold text-emerald-600 mt-1">{{ statusCounts.verified + statusCounts.approved }}</p>
+                <p class="text-xs text-slate-500 mt-1">Ready for publish or already approved</p>
+            </div>
+            <div class="card !p-4">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">With Toppers</p>
+                <p class="text-2xl font-bold text-violet-600 mt-1">{{ topperCount }}</p>
+                <p class="text-xs text-slate-500 mt-1">Submissions containing topper data</p>
+            </div>
+        </div>
+
         <div class="card !p-4 mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h3 class="text-sm font-semibold text-slate-800">Verification queue</h3>
@@ -65,22 +88,31 @@
                             <span v-if="r.highest_mark"> · high {{ r.highest_mark }}</span>
                             <span v-if="r.toppers?.length"> · {{ r.toppers.length }} toppers</span>
                         </p>
+                        <p v-if="r.latest_proof_label" class="text-xs text-slate-500 mt-1">
+                            Latest proof:
+                            <span class="font-medium text-slate-700">{{ r.latest_proof_label }}</span>
+                            <span v-if="r.latest_proof_type" class="ml-1 text-slate-400">
+                                ({{ proofTypeLabel(r.latest_proof_type) }})
+                            </span>
+                        </p>
                         <p v-if="r.rejection_reason" class="text-xs text-red-600 mt-1">{{ r.rejection_reason }}</p>
                         <p v-if="r.uploads?.length" class="text-xs text-slate-500 mt-1 flex flex-wrap gap-2 items-center">
-                            <span class="text-slate-400">PDF versions:</span>
-                            <a v-for="u in r.uploads" :key="u.id"
-                               :href="`/sahodaya-admin/${sahodaya.id}/board-results/${r.id}/pdf?version=${u.version}`"
-                               class="underline text-indigo-700 hover:text-indigo-900">
-                                v{{ u.version }}
-                            </a>
+                            <span class="text-slate-400">Uploaded versions:</span>
+                            <button v-for="u in r.uploads" :key="u.id"
+                                    type="button"
+                                    @click="openVersionPreview(r, u)"
+                                    class="underline text-indigo-700 hover:text-indigo-900">
+                                v{{ u.version }}{{ u.file_name ? ` · ${u.file_name}` : '' }}
+                            </button>
                         </p>
                     </div>
                     <div class="flex flex-wrap gap-2 items-center">
-                        <a v-if="r.result_pdf_path"
-                           :href="`/sahodaya-admin/${sahodaya.id}/board-results/${r.id}/pdf`"
-                           class="px-3 py-1.5 border border-slate-300 text-xs font-semibold rounded-lg hover:bg-slate-50">
-                            Latest PDF
-                        </a>
+                        <button v-if="r.latest_proof_url"
+                                type="button"
+                                class="px-3 py-1.5 border border-slate-300 text-xs font-semibold rounded-lg hover:bg-slate-50"
+                                @click="openProofPreview(r)">
+                            Preview proof
+                        </button>
                         <template v-if="r.status === 'submitted'">
                             <button type="button" class="btn-secondary text-xs" @click="act(r, 'verify')">Verify</button>
                             <button type="button" class="px-3 py-1.5 border border-red-300 text-red-700 text-xs font-semibold rounded-lg"
@@ -101,12 +133,35 @@
             </div>
             <p v-if="!results.data.length" class="text-center text-slate-400 py-10">No board results in this queue.</p>
         </div>
+
+        <div v-if="proofPreview" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-[#041525]/70" @click="closeProofPreview"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Board result proof</p>
+                        <h3 class="font-bold text-slate-900 truncate">{{ proofPreview.label }}</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">{{ proofPreview.typeLabel }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <a :href="proofPreview.viewUrl" target="_blank" rel="noopener" class="btn-secondary text-xs">
+                            Open in new tab
+                        </a>
+                        <button type="button" class="btn-ghost text-sm" @click="closeProofPreview">Close</button>
+                    </div>
+                </div>
+                <div class="flex-1 bg-slate-50 overflow-hidden">
+                    <img v-if="proofPreview.kind === 'image'" :src="proofPreview.viewUrl" alt="Proof preview" class="w-full h-full object-contain bg-slate-50">
+                    <iframe v-else :src="proofPreview.viewUrl" class="w-full h-full bg-slate-50" title="Board result proof preview"></iframe>
+                </div>
+            </div>
+        </div>
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 
@@ -129,10 +184,67 @@ const pageTitle = computed(() => {
     return 'Board Result Verification';
 });
 
+const statusCounts = computed(() => {
+    const counts = { submitted: 0, verified: 0, approved: 0, rejected: 0 };
+    (props.results?.data ?? []).forEach((row) => {
+        const status = row.status || 'submitted';
+        if (counts[status] === undefined) counts[status] = 0;
+        counts[status] += 1;
+    });
+    return counts;
+});
+
+const topperCount = computed(() => {
+    return (props.results?.data ?? []).reduce((total, row) => total + (row.toppers?.length || 0), 0);
+});
+
+const proofPreview = ref(null);
+
 function statusHref(status) {
     const params = new URLSearchParams({ status });
     if (props.selectedClass) params.set('class', props.selectedClass);
     return `/sahodaya-admin/${props.sahodaya.id}/board-results/verification?${params.toString()}`;
+}
+
+function openProofPreview(result) {
+    if (!result?.latest_proof_url) return;
+    proofPreview.value = {
+        label: result.latest_proof_label || 'Latest proof',
+        kind: proofKind(result.latest_proof_type || result.latest_proof_label || ''),
+        typeLabel: proofTypeLabel(result.latest_proof_type || result.latest_proof_label || ''),
+        viewUrl: result.latest_proof_url,
+    };
+}
+
+function openVersionPreview(result, upload) {
+    if (!upload) return;
+    proofPreview.value = {
+        label: upload.file_name || `Version ${upload.version}`,
+        kind: proofKind(upload.file_name || upload.file_type || ''),
+        typeLabel: proofTypeLabel(upload.file_type || upload.file_name || ''),
+        viewUrl: `/sahodaya-admin/${props.sahodaya.id}/board-results/${result.id}/pdf?version=${upload.version}&preview=1`,
+    };
+}
+
+function closeProofPreview() {
+    proofPreview.value = null;
+}
+
+function proofKind(input) {
+    const ext = String(input || '').split('.').pop()?.toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image';
+    if (ext === 'pdf') return 'pdf';
+    if (['doc', 'docx', 'xls', 'xlsx'].includes(ext)) return 'document';
+    return 'file';
+}
+
+function proofTypeLabel(input) {
+    switch (proofKind(input)) {
+        case 'image': return 'Image proof';
+        case 'pdf': return 'PDF proof';
+        case 'document': return 'Document proof';
+        default: return 'Proof file';
+    }
 }
 
 function act(r, action) {

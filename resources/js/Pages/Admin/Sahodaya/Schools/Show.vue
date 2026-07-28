@@ -119,10 +119,59 @@
             <!-- Login -->
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                 <h3 class="font-bold text-gray-900 mb-3">Portal Access</h3>
-                <p class="text-sm text-gray-600">
-                    Login account:
-                    <span class="font-medium">{{ school.has_login ? (school.login_email || 'Yes') : 'Not created' }}</span>
-                </p>
+                <div class="space-y-4">
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div class="rounded-xl bg-slate-50 px-4 py-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Contact email</p>
+                            <p class="mt-1 text-sm font-medium text-slate-900">
+                                {{ school.contact_email || 'Not set' }}
+                            </p>
+                        </div>
+                        <div class="rounded-xl bg-slate-50 px-4 py-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Login email</p>
+                            <p class="mt-1 text-sm font-medium text-slate-900">
+                                {{ school.has_login ? (school.login_email || 'Set') : 'Not created' }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">Update school email</p>
+                            <p class="text-xs text-slate-600">
+                                This updates the school contact email and the portal login email together.
+                                A verification email is sent to the new address when a login exists.
+                            </p>
+                        </div>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <div class="flex-1">
+                                <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Email</label>
+                                <input v-model="schoolEmail" type="email" class="field mt-1" placeholder="school@example.com">
+                            </div>
+                            <button type="button"
+                                    class="btn-primary text-sm"
+                                    :disabled="emailProcessing || !schoolEmail.trim()"
+                                    @click="saveSchoolEmail">
+                                {{ emailProcessing ? 'Saving…' : 'Save email' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button"
+                                class="btn-secondary text-sm"
+                                :disabled="credentialProcessing || !school.has_login"
+                                @click="resendSchoolCredentials">
+                            Resend credentials
+                        </button>
+                        <button type="button"
+                                class="btn-secondary text-sm text-red-700 border-red-200"
+                                :disabled="credentialProcessing || !school.has_login"
+                                @click="resetSchoolPassword">
+                            Reset password
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- Fest registration -->
@@ -240,6 +289,9 @@ const props = defineProps({
 const deleteReason = ref('');
 const deleteConfirmName = ref('');
 const deleteProcessing = ref(false);
+const schoolEmail = ref(props.school.contact_email || props.school.login_email || '');
+const emailProcessing = ref(false);
+const credentialProcessing = ref(false);
 
 const canDeleteSchool = computed(() =>
     deleteReason.value.trim() !== '' && deleteConfirmName.value === props.school.name,
@@ -263,6 +315,42 @@ function toggleFestRegistration() {
     const action = props.school.fest_registration_closed ? 'reopen' : 'close';
     if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} fest registration for this school?`)) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/toggle-fest-registration`, {}, { preserveScroll: true });
+}
+
+function saveSchoolEmail() {
+    const nextEmail = schoolEmail.value.trim();
+    if (!nextEmail) return;
+    if (!confirm(`Update the school email to ${nextEmail}? This will also update the login email.`)) return;
+
+    emailProcessing.value = true;
+    router.put(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/email`, {
+        email: nextEmail,
+    }, {
+        preserveScroll: true,
+        onFinish: () => { emailProcessing.value = false; },
+    });
+}
+
+function resendSchoolCredentials() {
+    if (!props.school.has_login) return;
+    if (!confirm(`Resend the current credentials for ${props.school.name}?`)) return;
+
+    credentialProcessing.value = true;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/resend-credentials`, {}, {
+        preserveScroll: true,
+        onFinish: () => { credentialProcessing.value = false; },
+    });
+}
+
+function resetSchoolPassword() {
+    if (!props.school.has_login) return;
+    if (!confirm(`Reset the password for ${props.school.name}? A new temporary password will be emailed.`)) return;
+
+    credentialProcessing.value = true;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/schools/${props.school.id}/reset-password`, {}, {
+        preserveScroll: true,
+        onFinish: () => { credentialProcessing.value = false; },
+    });
 }
 
 function approveSchool() {

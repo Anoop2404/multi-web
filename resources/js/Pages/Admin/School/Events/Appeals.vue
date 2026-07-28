@@ -63,7 +63,7 @@
                     <tr v-for="a in appeals" :key="a.id" class="border-t align-top">
                         <td class="p-3 font-medium">
                             {{ participantName(a) }}
-                            <p v-if="a.participant?.student?.reg_no" class="text-xs font-mono text-[#0f3d7a]">{{ a.participant.student.reg_no }}</p>
+                            <p v-if="a.participant?.student?.admission_number || a.participant?.student?.reg_no" class="text-xs font-mono text-[#0f3d7a]">{{ a.participant.student.admission_number || a.participant.student.reg_no }}</p>
                         </td>
                         <td class="p-3 text-xs">{{ a.participant?.registration?.item?.title ?? '—' }}</td>
                         <td class="p-3 text-xs max-w-xs">
@@ -93,6 +93,7 @@
 import { computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     school: Object,
@@ -108,7 +109,7 @@ const allParticipants = computed(() =>
 );
 
 function participantLabel(p) {
-    return p.student?.name ?? p.teacher?.name ?? 'Participant';
+    return p.student ? studentDisplayName(p.student) : (p.teacher?.name ?? 'Participant');
 }
 
 function participantName(a) {

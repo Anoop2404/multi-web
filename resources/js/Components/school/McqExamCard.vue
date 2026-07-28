@@ -72,7 +72,7 @@
             <div class="space-y-2">
                 <div v-for="registration in registrations.slice(0, 5)" :key="registration.id"
                      class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm">
-                    <span class="font-medium">{{ registration.student?.name ?? 'Student' }}</span>
+                    <span class="font-medium">{{ studentDisplayName(registration.student) }}</span>
                     <span class="text-xs capitalize text-slate-600">{{ registration.approval_status_label || registration.approval_status }}</span>
                 </div>
             </div>
@@ -86,6 +86,7 @@
 <script setup>
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     exam: Object,

@@ -45,7 +45,7 @@ class FestStudentRegistrationController extends Controller
 
         return inertia('Portal/Student/FestRegistrations', [
             'school' => $school->only('id', 'name'),
-            'student' => $student->only('id', 'name', 'reg_no'),
+            'student' => $student->only('id', 'name', 'admission_number', 'reg_no'),
             'events' => $events,
         ]);
     }

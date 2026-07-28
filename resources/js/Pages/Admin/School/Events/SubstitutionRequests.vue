@@ -39,8 +39,8 @@
                 <tbody>
                     <tr v-for="r in requests" :key="r.id">
                         <td>{{ r.registration?.item?.title }}</td>
-                        <td>{{ r.original_participant?.student?.name || '—' }}</td>
-                        <td>{{ r.replacement_participant?.student?.name || r.replacement_student?.name || '—' }}</td>
+                        <td>{{ r.original_participant?.student ? studentDisplayName(r.original_participant.student) : '—' }}</td>
+                        <td>{{ r.replacement_participant?.student ? studentDisplayName(r.replacement_participant.student) : (r.replacement_student?.name || '—') }}</td>
                         <td><span class="text-xs capitalize">{{ r.status }}</span></td>
                         <td class="text-xs">{{ r.created_at ? new Date(r.created_at).toLocaleString() : '—' }}</td>
                     </tr>
@@ -58,6 +58,7 @@ import { computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     school: Object,

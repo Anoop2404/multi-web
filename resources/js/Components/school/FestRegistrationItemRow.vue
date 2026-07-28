@@ -224,6 +224,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import FestStudentPickerModal from '@/Components/school/FestStudentPickerModal.vue';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     item: { type: Object, required: true },
@@ -332,7 +333,8 @@ const standbyEntries = computed(() => {
         return {
             id: student.id,
             name: student.name,
-            regNo: student.reg_no || '',
+            displayName: studentDisplayName(student),
+            regNo: student.admission_number || student.reg_no || '',
             meta: props.studentLabel(student),
             eligible,
             reason: eligible ? null : (props.studentIneligibilityReason?.(student) ?? 'Not eligible'),
@@ -353,7 +355,8 @@ const rosterEntries = computed(() => {
         return {
             id: student.id,
             name: student.name,
-            regNo: student.reg_no || '',
+            displayName: studentDisplayName(student),
+            regNo: student.admission_number || student.reg_no || '',
             meta: props.studentLabel(student),
             eligible,
             reason,

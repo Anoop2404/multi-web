@@ -474,6 +474,7 @@ import SchoolEventWorkflowStepper from '@/Components/school/SchoolEventWorkflowS
 import EventBillingPanel from '@/Components/school/EventBillingPanel.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
 import { genderLabel } from '@/support/festItemEligibility.js';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     school: Object,
@@ -930,8 +931,8 @@ function registeredNames(reg) {
     const labels = (reg.participants ?? [])
         .filter(p => p.participant_role !== 'standby')
         .map((p) => {
-            const name = p.student?.name ?? p.teacher?.name;
-            const regNo = p.student?.reg_no ?? p.teacher?.reg_no;
+            const name = p.student ? studentDisplayName(p.student) : (p.teacher?.name ?? null);
+            const regNo = p.student?.admission_number ?? p.teacher?.reg_no;
             const festId = p.level_registration_number;
             if (name && festId) return `${name} (${festId})`;
             if (name && regNo) return `${name} (${regNo})`;
@@ -1154,10 +1155,10 @@ function registrationClosedMessage(event) {
 
 function studentOptionLabel(student) {
     const parts = [];
+    parts.push(studentDisplayName(student));
     if (student.event_registration_number) {
         parts.push(`Fest ID ${student.event_registration_number}`);
     }
-    if (student.reg_no) parts.push(student.reg_no);
     parts.push(student.class_name || 'no class');
     if (student.sports_age_on_cutoff != null) parts.push(`age ${student.sports_age_on_cutoff}`);
     if (student.sports_age_group) parts.push(String(student.sports_age_group).toUpperCase());

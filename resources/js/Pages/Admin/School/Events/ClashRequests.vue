@@ -12,7 +12,7 @@
             <h3 class="font-semibold text-slate-900">Report a clash</h3>
             <select v-model="form.participant_id" class="field text-sm" required @change="onParticipantChange">
                 <option value="">Select participant</option>
-                <option v-for="p in participants" :key="p.id" :value="p.id">{{ p.name }} — {{ p.item }}</option>
+                <option v-for="p in participants" :key="p.id" :value="p.id">{{ p.student ? studentDisplayName(p.student) : p.name }} — {{ p.item }}</option>
             </select>
             <select v-if="participantSchedules.length" v-model="form.schedule_id_a" class="field text-sm">
                 <option value="">Schedule slot A (optional)</option>
@@ -39,7 +39,7 @@
                 </thead>
                 <tbody>
                     <tr v-for="r in requests" :key="r.id">
-                        <td>{{ r.participant?.student?.name || '—' }}</td>
+                        <td>{{ r.participant?.student ? studentDisplayName(r.participant.student) : '—' }}</td>
                         <td class="text-sm">{{ r.description }}</td>
                         <td><span class="text-xs capitalize">{{ r.status }}</span></td>
                         <td class="text-xs">{{ r.created_at ? new Date(r.created_at).toLocaleString() : '—' }}</td>
@@ -58,6 +58,7 @@ import { computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     school: Object,
