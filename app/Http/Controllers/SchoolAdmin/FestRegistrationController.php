@@ -362,6 +362,18 @@ class FestRegistrationController extends SchoolAdminController
         ));
     }
 
+    public function legacyRegisterRedirect(Request $request, string $tenantId, string $program = 'kalotsav')
+    {
+        $prefix = ProgramRouteMap::prefixFromSlug($program);
+        $event = $request->query('event');
+
+        if ($event) {
+            return redirect("/school-admin/{$tenantId}/{$prefix}/events/{$event}/registration");
+        }
+
+        return redirect("/school-admin/{$tenantId}/{$prefix}/registration");
+    }
+
     /**
      * Resolve the single yearly Sahodaya event a school registers into for a singleton
      * fest type. Returns null when there is no open event or the coordinator cannot
