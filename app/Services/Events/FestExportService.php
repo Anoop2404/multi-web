@@ -91,7 +91,7 @@ class FestExportService
             ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId)))
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
-            ->with(['student', 'teacher', 'registration.item', 'registration.school', 'group'])
+            ->with(['student', 'teacher', 'registration.item', 'registration.event', 'registration.school', 'group'])
             ->get()
             ->sortBy(fn (FestParticipant $p) => $p->registration?->item?->title)
             ->values()

@@ -101,7 +101,7 @@ class FestReportService
                     ->when($itemId, fn ($q2) => $q2->where('item_id', $itemId))
                     ->when($classGroup, fn ($q2) => $q2->whereHas('item', fn ($i) => $i->where('class_group', $classGroup)));
             })
-            ->with(['registration.item.head', 'registration.school', 'student.schoolClass.classCategory', 'teacher'])
+            ->with(['group', 'registration.event', 'registration.item.head', 'registration.school', 'student.schoolClass.classCategory', 'teacher'])
             ->orderBy('chest_no')
             ->get();
     }
@@ -653,25 +653,22 @@ class FestReportService
 
         $sahodaya = Tenant::find($this->event->tenant_id);
 
-        // Photo/DOB enrichment only for sports events (avoids memory from loading
-        // hundreds of images into data URIs for non-sports attendance sheets).
-        if ($this->event->event_type === 'sports' && $sahodaya) {
-            $photoMap = [];
+        // DOB enrichment only for sports events (photos skipped — loading them as
+        // data URIs exhausts PHP memory under DomPDF with many participants).
+        if ($this->event->event_type === 'sports') {
+            $dobMap = [];
             foreach ($participants as $p) {
                 $sid = $p->student_id;
-                if ($sid && ! isset($photoMap[$sid])) {
-                    $relativePath = $p->student?->photo;
-                    $photoMap[$sid] = [
-                        'photo_src' => $relativePath
-                            ? (str_starts_with($relativePath, 'http') ? $relativePath : TenantStorage::photoDataUri($sahodaya, $relativePath))
-                            : null,
-                        'dob' => $p->student?->dob?->format('d M Y'),
-                    ];
+                if ($sid && ! isset($dobMap[$sid])) {
+                    $dobMap[$sid] = $p->student?->dob?->format('d M Y');
                 }
             }
-            if ($photoMap) {
+            if ($dobMap) {
                 $rowsByItem = $rowsByItem->map(fn ($rows) => $rows->map(
-                    fn ($row) => array_merge($row, $photoMap[$row['_student_id'] ?? null] ?? ['photo_src' => null, 'dob' => null]),
+                    fn ($row) => array_merge($row, [
+                        'photo_src' => null,
+                        'dob' => $dobMap[$row['_student_id'] ?? null] ?? null,
+                    ]),
                 )->all());
             }
         }

@@ -153,17 +153,23 @@ class FestNumberingService
     /** Resolved chest for display — includes sibling registrations under the same item head. */
     public function effectiveChestNumber(FestParticipant $participant): ?int
     {
-        $participant->loadMissing('group');
-        if ($participant->group_id && $participant->group?->chest_no !== null) {
-            return (int) $participant->group->chest_no;
-        }
-
         $persisted = $this->persistedChestNumber($participant);
         if ($persisted !== null) {
             return $persisted;
         }
 
-        $participant->loadMissing('registration.event', 'registration.item');
+        if ($participant->group_id) {
+            if (! $participant->relationLoaded('group')) {
+                $participant->loadMissing('group');
+            }
+            if ($participant->group?->chest_no !== null) {
+                return (int) $participant->group->chest_no;
+            }
+        }
+
+        if (! $participant->relationLoaded('registration') || ! $participant->registration?->relationLoaded('event') || ! $participant->registration?->relationLoaded('item')) {
+            $participant->loadMissing('registration.event', 'registration.item');
+        }
         $event = $participant->registration?->event;
         $item = $participant->registration?->item;
 

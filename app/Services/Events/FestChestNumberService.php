@@ -34,9 +34,13 @@ class FestChestNumberService
 
     private function isRevealed(FestParticipant $participant): bool
     {
-        $participant->loadMissing('group');
-        if ($participant->group_id && $participant->group) {
-            return (bool) $participant->group->chest_revealed_at;
+        if ($participant->group_id) {
+            if (! $participant->relationLoaded('group')) {
+                $participant->loadMissing('group');
+            }
+            if ($participant->group) {
+                return (bool) $participant->group->chest_revealed_at;
+            }
         }
 
         return (bool) $participant->chest_revealed_at;
