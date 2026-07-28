@@ -276,7 +276,7 @@
                                          show a misleading "Proofs N" badge while its status is
                                          still (correctly) "Not uploaded yet". -->
                                     <button v-if="realProofsCount(row) > 0" type="button"
-                                            @click="activeProofModalRow = row"
+                                            @click="openProofModal(row)"
                                             :class="row.status === 'proof_uploaded'
                                                 ? 'bg-amber-500 hover:bg-amber-600 text-white font-bold animate-pulse shadow-xs'
                                                 : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 shadow-2xs'"
@@ -296,7 +296,7 @@
                                          distinct, non-misleading indicator instead of "Proofs".
                                          Still opens the same modal so the credit is auditable. -->
                                     <button v-else-if="row.all_receipts?.length" type="button"
-                                            @click="activeProofModalRow = row"
+                                            @click="openProofModal(row)"
                                             title="No uploaded payment proof — an existing fee credit was applied toward this balance"
                                             class="px-2.5 py-1 rounded-lg text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold border border-amber-200 transition inline-flex items-center gap-1.5">
                                         <span>💳 Credit applied</span>
@@ -346,10 +346,10 @@
                                        class="text-[11px] font-mono font-bold text-emerald-700 hover:text-emerald-900 underline decoration-emerald-300 hover:decoration-emerald-600 transition">
                                         #{{ row.fee_receipt.receipt_number }} ↗
                                     </a>
-                                    <button type="button" @click="reject(row.id, row.school)"
+                                    <button type="button" @click="openProofModal(row)"
                                             title="Reverse or reject this approved receipt if needed"
                                             class="text-[10px] font-semibold text-slate-400 hover:text-rose-600 transition">
-                                        Reverse
+                                        Choose receipt
                                     </button>
                                 </div>
                             </td>
@@ -366,7 +366,7 @@
 
         <!-- Multi-Proof History & Approval Modal -->
         <div v-if="activeProofModalRow" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-xs" @click="activeProofModalRow = null"></div>
+            <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-xs" @click="closeProofModal"></div>
             <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200">
                 <!-- Modal Header -->
                 <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
@@ -374,7 +374,7 @@
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Payment Proofs &amp; Approval</span>
                         <h3 class="text-base font-bold text-white mt-0.5">{{ activeProofModalRow.school }}</h3>
                     </div>
-                    <button type="button" @click="activeProofModalRow = null" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+                    <button type="button" @click="closeProofModal" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
                 </div>
 
                 <!-- Financial Summary Bar -->
@@ -447,7 +447,46 @@
                                        class="btn-secondary !py-1 !px-2.5 text-xs text-indigo-600 font-semibold shadow-xs">
                                         +{{ ai + 1 }} ↗
                                     </a>
+                                    <button v-if="!rc.is_system_credit && (rc.status === 'uploaded' || rc.status === 'approved')"
+                                            type="button"
+                                            @click="beginReceiptRejection(rc)"
+                                            class="btn-secondary !py-1 !px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-50 shadow-xs">
+                                        {{ rc.status === 'approved' ? 'Reverse this payment' : 'Reject this proof' }}
+                                    </button>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div v-if="receiptAction?.id === rc.id"
+                             class="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3">
+                            <p class="text-xs font-bold text-rose-900">
+                                {{ rc.status === 'approved'
+                                    ? `Reverse approved receipt ${rc.receipt_number ? `#${rc.receipt_number}` : `#${rc.id}`} for ₹${fmt(rc.amount)}?`
+                                    : `Reject this ₹${fmt(rc.amount)} payment proof?` }}
+                            </p>
+                            <p class="mt-1 text-[11px] text-rose-700">
+                                {{ rc.status === 'approved'
+                                    ? 'Compensating ledger entries will be posted and the school balance will be recalculated.'
+                                    : 'The school will be allowed to upload a replacement proof.' }}
+                            </p>
+                            <label class="mt-3 block text-[11px] font-bold text-slate-700">
+                                Reason <span class="font-normal text-slate-500">(optional)</span>
+                                <textarea v-model="receiptActionReason" rows="2" maxlength="500"
+                                          class="field mt-1 text-xs"
+                                          placeholder="Example: Duplicate payment proof, incorrect transaction, bank chargeback..."></textarea>
+                            </label>
+                            <div class="mt-3 flex items-center justify-end gap-2">
+                                <button type="button" class="btn-secondary text-xs"
+                                        :disabled="receiptActionBusy"
+                                        @click="cancelReceiptAction">
+                                    Cancel
+                                </button>
+                                <button type="button"
+                                        class="btn-primary !bg-rose-700 hover:!bg-rose-800 text-xs"
+                                        :disabled="receiptActionBusy"
+                                        @click="submitReceiptRejection(rc)">
+                                    {{ receiptActionBusy ? 'Processing…' : (rc.status === 'approved' ? 'Confirm reversal' : 'Confirm rejection') }}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -455,17 +494,17 @@
 
                 <!-- Modal Footer -->
                 <div class="px-6 py-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between">
-                    <button type="button" @click="activeProofModalRow = null" class="btn-secondary text-xs">Close</button>
+                    <button type="button" @click="closeProofModal" class="btn-secondary text-xs">Close</button>
 
                     <div class="flex items-center gap-2">
                         <button v-if="activeProofModalRow.status === 'proof_uploaded' || activeProofModalRow.status === 'rejected'" type="button"
                                 @click="approve(activeProofModalRow.id, activeProofModalRow.school)" class="btn-primary !bg-emerald-600 hover:!bg-emerald-500 text-xs shadow-xs">
                             {{ activeProofModalRow.status === 'rejected' ? 'Re-approve / Verify Payment ✓' : 'Approve Pending Proof ✓' }}
                         </button>
-                        <button v-if="activeProofModalRow.status === 'proof_uploaded' || activeProofModalRow.status === 'approved' || activeProofModalRow.status === 'partial'" type="button"
-                                @click="reject(activeProofModalRow.id, activeProofModalRow.school)" class="btn-secondary text-xs text-rose-700 hover:bg-rose-50 shadow-xs">
-                            {{ activeProofModalRow.status === 'approved' || activeProofModalRow.status === 'partial' ? 'Reject / Reverse Payment ✕' : 'Reject Pending Proof' }}
-                        </button>
+                        <span v-if="activeProofModalRow.status === 'proof_uploaded' || activeProofModalRow.status === 'approved' || activeProofModalRow.status === 'partial'"
+                              class="text-[11px] text-slate-500">
+                            Select the exact receipt above to reject or reverse it.
+                        </span>
                     </div>
                 </div>
             </div>
@@ -493,6 +532,45 @@ const props = defineProps({
 
 const search = ref('');
 const activeProofModalRow = ref(null);
+const receiptAction = ref(null);
+const receiptActionReason = ref('');
+const receiptActionBusy = ref(false);
+
+function openProofModal(row) {
+    activeProofModalRow.value = row;
+    cancelReceiptAction();
+}
+
+function closeProofModal() {
+    activeProofModalRow.value = null;
+    cancelReceiptAction();
+}
+
+function beginReceiptRejection(receipt) {
+    receiptAction.value = receipt;
+    receiptActionReason.value = '';
+}
+
+function cancelReceiptAction() {
+    receiptAction.value = null;
+    receiptActionReason.value = '';
+    receiptActionBusy.value = false;
+}
+
+function submitReceiptRejection(receipt) {
+    if (!activeProofModalRow.value || receiptActionBusy.value) return;
+
+    receiptActionBusy.value = true;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-fees/${activeProofModalRow.value.id}/receipts/${receipt.id}/reject`,
+        { rejection_reason: receiptActionReason.value },
+        {
+            preserveScroll: true,
+            onSuccess: () => { closeProofModal(); },
+            onFinish: () => { receiptActionBusy.value = false; },
+        },
+    );
+}
 
 function fmt(n) {
     return Number(n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });

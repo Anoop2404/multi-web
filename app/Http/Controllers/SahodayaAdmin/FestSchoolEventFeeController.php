@@ -199,6 +199,94 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         return back()->with('success', 'Fee payment proof rejected/reversed. School can re-upload.');
     }
 
+    /**
+     * Reject or reverse one explicitly selected receipt from the proof-history modal.
+     * This avoids the legacy aggregate reject action guessing which receipt is "latest"
+     * when a school has several uploaded, superseded, and approved proofs.
+     */
+    public function rejectReceipt(
+        Request $request,
+        string $tenantId,
+        FestEvent $event,
+        FestSchoolEventFee $schoolEventFee,
+        \App\Models\FeeReceipt $feeReceipt,
+        PlatformAuditLogger $audit,
+    ) {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($schoolEventFee->event_id !== $event->id, 403);
+        abort_if(
+            $feeReceipt->feeable_type !== FestSchoolEventFee::class
+                || (int) $feeReceipt->feeable_id !== (int) $schoolEventFee->id,
+            403,
+        );
+        abort_if($feeReceipt->isSystemCredit(), 422, 'System-applied fee credits must be managed from Credits & payouts.');
+
+        $data = $request->validate(['rejection_reason' => 'nullable|string|max:500']);
+        $reason = filled($data['rejection_reason'] ?? null)
+            ? $data['rejection_reason']
+            : ($feeReceipt->status === 'approved' ? 'Approved payment reversed by Sahodaya admin' : 'Payment proof rejected by Sahodaya admin');
+        $previousStatus = $feeReceipt->status;
+
+        DB::transaction(function () use ($request, $reason, $feeReceipt, $schoolEventFee) {
+            $lockedFee = FestSchoolEventFee::whereKey($schoolEventFee->id)->lockForUpdate()->firstOrFail();
+            $lockedReceipt = \App\Models\FeeReceipt::whereKey($feeReceipt->id)->lockForUpdate()->firstOrFail();
+
+            if ($lockedReceipt->status === 'approved') {
+                app(\App\Services\Ledger\FeeReceiptReversalService::class)
+                    ->reverse($lockedReceipt, $request->user(), $reason);
+            } elseif ($lockedReceipt->status === 'uploaded') {
+                $lockedReceipt->update([
+                    'status' => 'rejected',
+                    'rejection_reason' => $reason,
+                    'reviewed_by' => $request->user()->id,
+                    'reviewed_at' => now(),
+                ]);
+            } else {
+                abort(422, 'Only an awaiting-review proof or an approved receipt can be rejected/reversed.');
+            }
+
+            if ((int) $lockedFee->fee_receipt_id === (int) $lockedReceipt->id) {
+                $replacement = $lockedFee->receipts()
+                    ->whereKeyNot($lockedReceipt->id)
+                    ->whereIn('status', ['approved', 'uploaded'])
+                    ->orderByRaw("case when status = 'approved' then 0 else 1 end")
+                    ->latest('id')
+                    ->first();
+                $lockedFee->update(['fee_receipt_id' => $replacement?->id]);
+            }
+
+            $lockedFee->refresh();
+            $lockedFee->refreshPaidState();
+
+            if ($lockedFee->head_id === null && ! $lockedFee->fresh()->isFullyPaid()) {
+                FestEventInvoice::where('event_id', $lockedFee->event_id)
+                    ->where('school_id', $lockedFee->school_id)
+                    ->where('status', 'paid')
+                    ->update(['status' => 'issued']);
+            }
+        });
+
+        $audit->festEvent(
+            $event,
+            FestPageActivity::FEES,
+            $previousStatus === 'approved' ? 'fest.fee.receipt_reversed' : 'fest.fee.receipt_rejected',
+            $previousStatus === 'approved' ? 'Approved event fee receipt reversed' : 'Event fee proof rejected',
+            [
+                'school_id' => $schoolEventFee->school_id,
+                'fee_receipt_id' => $feeReceipt->id,
+                'amount' => (float) $feeReceipt->amount,
+                'reason' => $reason,
+            ],
+        );
+
+        return back()->with(
+            'success',
+            $previousStatus === 'approved'
+                ? 'Selected approved payment reversed and compensating ledger entries posted.'
+                : 'Selected payment proof rejected. The school can upload a replacement.',
+        );
+    }
+
     public function proof(string $tenantId, FestEvent $event, FestSchoolEventFee $schoolEventFee)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

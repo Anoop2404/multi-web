@@ -12,6 +12,7 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class BoardResultsControllerTest extends TestCase
@@ -57,6 +58,24 @@ class BoardResultsControllerTest extends TestCase
         $admin->assignRole('school_admin');
 
         return compact('sahodaya', 'school', 'year', 'admin');
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function topperRows(string $prefix, string $streamKey, int $count, int $maxMarks, int $startRoll = 1001): array
+    {
+        $rows = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $rows[] = [
+                'name' => "{$prefix} Student ".($i + 1),
+                'gender' => $i % 2 === 0 ? 'female' : 'male',
+                'roll_no' => (string) ($startRoll + $i),
+                'marks_obtained' => $maxMarks - $i,
+                'stream_key' => $streamKey,
+            ];
+        }
+
+        return $rows;
     }
 
     public function test_subject_wise_batch_updates_existing_topper_name_and_marks(): void
@@ -157,5 +176,147 @@ class BoardResultsControllerTest extends TestCase
 
         $response->assertSessionHasErrors('stream_key');
         $this->assertDatabaseCount('toppers', 0);
+    }
+
+    public function test_bulk_toppers_support_ten_rows_for_class_x_and_all_class_xii_streams(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['sahodaya' => $sahodaya, 'school' => $school, 'year' => $year, 'admin' => $admin] = $this->createSchoolContext();
+
+        $sahodayaAdmin = User::factory()->create([
+            'tenant_id' => $sahodaya->id,
+            'email_verified_at' => now(),
+        ]);
+        $sahodayaAdmin->assignRole('sahodaya_admin');
+
+        $streams = [
+            'science' => 'Science',
+            'commerce' => 'Commerce',
+            'humanities' => 'Humanities',
+        ];
+
+        foreach ($streams as $key => $label) {
+            \App\Models\ExamStream::create([
+                'sahodaya_id' => $sahodaya->id,
+                'code' => $key,
+                'label' => $label,
+                'examination_type' => BoardResult::EXAM_AISSCE,
+                'sort_order' => match ($key) {
+                    'science' => 1,
+                    'commerce' => 2,
+                    default => 3,
+                },
+                'is_active' => true,
+                'default_subjects' => ['English core'],
+            ]);
+
+            \App\Models\BoardResultMarksConfig::create([
+                'sahodaya_id' => $sahodaya->id,
+                'class' => 12,
+                'stream_id' => \App\Models\ExamStream::findByCode($key, $sahodaya->id)->id,
+                'total_marks' => 500,
+            ]);
+        }
+
+        $boardResult10 = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 10,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'examination_type' => BoardResult::EXAM_AISSE,
+            'status' => BoardResult::STATUS_DRAFT,
+        ]);
+
+        $boardResult12 = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 12,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'examination_type' => BoardResult::EXAM_AISSCE,
+            'status' => BoardResult::STATUS_DRAFT,
+        ]);
+
+        $classXRows = [];
+        for ($i = 1; $i <= 10; $i++) {
+            $classXRows[] = [
+                'name' => "Class X Student {$i}",
+                'gender' => $i % 2 === 0 ? 'female' : 'male',
+                'roll_no' => (string) (2000 + $i),
+                'marks_obtained' => 495 - $i,
+            ];
+        }
+
+        $this->actingAs($admin)->post("/school-admin/{$school->id}/board-results/{$boardResult10->id}/toppers/batch", [
+            'toppers' => $classXRows,
+        ])->assertRedirect();
+
+        $classXiiRows = array_merge(
+            $this->topperRows('Science', 'science', 10, 500, 3001),
+            $this->topperRows('Commerce', 'commerce', 10, 480, 4001),
+            $this->topperRows('Humanities', 'humanities', 10, 470, 5001),
+        );
+
+        $this->actingAs($admin)->post("/school-admin/{$school->id}/board-results/{$boardResult12->id}/toppers/batch", [
+            'toppers' => $classXiiRows,
+        ])->assertRedirect();
+
+        $subjectRows = [];
+        for ($i = 1; $i <= 10; $i++) {
+            $subjectRows[] = [
+                'name' => "Physics Student {$i}",
+                'gender' => $i % 2 === 0 ? 'female' : 'male',
+                'roll_no' => (string) (6000 + $i),
+                'marks' => 100 - $i,
+            ];
+        }
+
+        $this->actingAs($admin)->post("/school-admin/{$school->id}/board-results/{$boardResult12->id}/subject-toppers/batch", [
+            'subject' => 'Physics',
+            'rows' => $subjectRows,
+        ])->assertRedirect();
+
+        $this->assertSame(40, Topper::where('board_result_id', $boardResult12->id)->count());
+        $this->assertSame(10, TopperSubjectMark::whereIn('topper_id', Topper::where('board_result_id', $boardResult12->id)->pluck('id'))->count());
+
+        $this->assertSame(10, Topper::where('board_result_id', $boardResult10->id)->count());
+        $this->assertSame(40, Topper::where('board_result_id', $boardResult12->id)->count());
+        $this->assertSame(10, Topper::where('board_result_id', $boardResult12->id)->where('stream', 'Science')->count());
+        $this->assertSame(10, Topper::where('board_result_id', $boardResult12->id)->where('stream', 'Commerce')->count());
+        $this->assertSame(10, Topper::where('board_result_id', $boardResult12->id)->where('stream', 'Humanities')->count());
+
+        $boardResult12->update(['status' => BoardResult::STATUS_APPROVED]);
+
+        $this->actingAs($admin)
+            ->get("/school-admin/{$school->id}/board-results/{$boardResult10->id}/toppers")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('School/BoardResults/Toppers', false)
+                ->where('topperCount', 10)
+                ->where('isClass12', false));
+
+        $this->actingAs($admin)
+            ->get("/school-admin/{$school->id}/board-results/{$boardResult12->id}/toppers")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('School/BoardResults/Toppers', false)
+                ->where('topperCount', 40)
+                ->where('isClass12', true));
+
+        $this->actingAs($sahodayaAdmin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/board-results/reports/subject-merit?academic_year={$year->label}&class=12")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Sahodaya/BoardResults/SubjectMeritRegister', false)
+                ->where('rows', fn ($rows) => count($rows) === 10)
+                ->where('rows.0.subject', 'Physics')
+                ->where('rows.0.class', 12));
+
+        $this->actingAs($sahodayaAdmin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/board-results/verification?status=all")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Sahodaya/BoardResults/Verification', false)
+                ->where('results.total', 2)
+                ->where('schoolNames.'.$school->id, 'Test School'));
     }
 }
