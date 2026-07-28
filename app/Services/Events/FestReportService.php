@@ -651,12 +651,14 @@ class FestReportService
         $audience = $this->reportAudience($request);
         $isPreview = $this->preview;
 
-        // Build photo map using photoUrl() (returns public HTTP/S3 URLs).
+        // Build photo map using a route reachable by whoever is viewing this report
+        // (Student::photoUrl() always points at the school-admin panel route, which
+        // 403s when a Sahodaya admin's session views it — see resolveParticipantPhotoUrl()).
         $photoMap = [];
         foreach ($participants as $p) {
             $sid = $p->student_id;
-            if ($sid && ! isset($photoMap[$sid]) && method_exists($p->student ?? null, 'photoUrl')) {
-                $photoMap[$sid] = $p->student->photoUrl();
+            if ($sid && ! isset($photoMap[$sid]) && $p->student) {
+                $photoMap[$sid] = $this->resolveParticipantPhotoUrl($p->student, $request);
             }
         }
 
@@ -702,13 +704,23 @@ class FestReportService
 
         $sahodaya = Tenant::find($this->event->tenant_id);
 
+        // Single-item filter → header can name the item; combined report → just the event name.
+        $singleItemName = $rowsByItem->count() === 1
+            ? str_replace('_', ' ', $rowsByItem->keys()->first())
+            : null;
+
         $bladeData = [
-            'event'      => $this->event,
-            'sahodaya'   => $sahodaya,
-            'logo'       => $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null,
-            'rowsByItem' => $rowsByItem,
-            'audience'   => $audience,
-            'isPreview'  => $isPreview,
+            'event'          => $this->event,
+            'sahodaya'       => $sahodaya,
+            'logo'           => $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null,
+            'rowsByItem'     => $rowsByItem,
+            'audience'       => $audience,
+            'isPreview'      => $isPreview,
+            'singleItemName' => $singleItemName,
+            // dompdf supports literal {PAGE_NUM}/{PAGE_COUNT} substitution; an external
+            // Chromium-based converter (PDF_CONVERTER_URL) does not, so avoid printing
+            // unresolved placeholder text on that path.
+            'isDomPdf'       => empty(env('PDF_CONVERTER_URL')),
         ];
 
         // Preview mode: return raw HTML (browser handles S3 images, proper page layout)
@@ -718,6 +730,40 @@ class FestReportService
         }
 
         return $this->renderPdf('fest.reports.attendance-sheet', $bladeData, $this->slug().'-attendance.pdf');
+    }
+
+    /**
+     * Resolve a photo URL this specific viewer can actually load.
+     *
+     * Student::photoUrl() always builds a `school.students.photo` link, which is
+     * gated by EnsureSchoolAdmin's `$user->tenant_id === route tenantId` check. That
+     * works when a school admin views their own school's report, but 403s for a
+     * Sahodaya admin (their tenant_id is the Sahodaya org, not the school) — which is
+     * exactly the "attendance-sheet" export reached via /sahodaya-admin/.../reports/export.
+     * When this report is being viewed from the sahodaya-admin panel, build the
+     * sahodaya-scoped photo route instead, which authorizes on the student's school
+     * being a member of that Sahodaya rather than an exact tenant match.
+     */
+    private function resolveParticipantPhotoUrl(Student $student, Request $request): ?string
+    {
+        if (! $student->photo || ! $student->tenant_id) {
+            return null;
+        }
+
+        if (str_starts_with($student->photo, 'http://') || str_starts_with($student->photo, 'https://')) {
+            return $student->photo;
+        }
+
+        if ($request->routeIs('sahodaya.*')) {
+            $version = $student->updated_at?->timestamp ?? 0;
+
+            return url(route('sahodaya.students.photo', [
+                'tenantId' => $this->event->tenant_id,
+                'student'  => $student->id,
+            ], absolute: false)).($version ? '?v='.$version : '');
+        }
+
+        return $student->photoUrl();
     }
 
     private function attendanceSheetSchoolPdf(Request $request): \Symfony\Component\HttpFoundation\Response

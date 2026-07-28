@@ -226,8 +226,9 @@ class LegacyStorageMigrationService
             Testimonial::class, NewsArticle::class, GalleryItem::class, Circular::class => $query->where(function ($q) use ($sahodayaId, $schoolIds) {
                 $q->where('tenant_id', $sahodayaId)->orWhereIn('tenant_id', $schoolIds);
             }),
-            SchoolDocument::class, MembershipPayment::class, SubmissionStudent::class,
+            SchoolDocument::class, MembershipPayment::class,
             StudentEditChangeRequest::class => $query->whereIn('school_id', $schoolIds),
+            SubmissionStudent::class => $query->whereHas('submission', fn ($q) => $q->whereIn('school_id', $schoolIds)),
             UploadedFileBackup::class => $query->where(function ($q) use ($sahodayaId, $schoolIds) {
                 $q->whereIn('school_id', $schoolIds)->orWhereNull('school_id');
             }),

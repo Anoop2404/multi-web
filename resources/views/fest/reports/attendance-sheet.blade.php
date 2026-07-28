@@ -5,8 +5,8 @@
     <title>Attendance Sheet — {{ $event->title }}</title>
     <style>
         @page {
-            margin-top: 35mm;
-            margin-bottom: 16mm;
+            margin-top: 40mm;
+            margin-bottom: 20mm;
             margin-left: 10mm;
             margin-right: 10mm;
         }
@@ -17,21 +17,53 @@
             margin: 0;
             padding: 0;
         }
+        /* Fixed-position header/footer repeat on every printed page (both dompdf and
+           Chromium-based print engines honor position:fixed for pagination). The
+           negative top/bottom offsets pull them into the @page margin box reserved
+           above, so table content never has to share space with them. */
         .report-header {
+            position: fixed;
+            top: -40mm;
+            left: 0;
+            right: 0;
             border-bottom: 2px solid #0f172a;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
+            padding-bottom: 6px;
+        }
+        .event-context-bar {
+            display: table;
+            width: 100%;
+            font-size: 9px;
+            color: #334155;
+            margin-top: 2px;
+        }
+        .event-context-bar .event-name {
+            font-weight: bold;
+            color: #0f172a;
+        }
+        .event-context-bar .sep {
+            color: #94a3b8;
+            padding: 0 4px;
         }
         .footer-container {
             position: fixed;
-            bottom: -10mm;
+            bottom: -14mm;
             left: 0;
             right: 0;
+            display: table;
+            width: 100%;
             border-top: 1px solid #cbd5e1;
             padding-top: 4px;
             font-size: 8px;
             color: #64748b;
-            text-align: center;
+        }
+        .footer-container .footer-left {
+            display: table-cell;
+            text-align: left;
+        }
+        .footer-container .footer-right {
+            display: table-cell;
+            text-align: right;
+            white-space: nowrap;
         }
         main {
             width: 100%;
@@ -144,6 +176,8 @@
             padding: 2px 8px;
             border-radius: 10px;
             font-weight: normal;
+            text-transform: none;
+            letter-spacing: normal;
         }
     </style>
 </head>
@@ -155,21 +189,56 @@
         'logoSrc' => $logo ?? null,
         'docTitle' => 'ATTENDANCE SHEET',
     ])
+    <div class="event-context-bar">
+        <span class="event-name">{{ $event->title }}</span>
+        @if(!empty($singleItemName))
+            <span class="sep">&bull;</span>
+            <span>{{ $singleItemName }}</span>
+        @endif
+    </div>
 </div>
 
 <div class="footer-container">
-    Generated on {{ now()->format('d M Y, h:i A') }} &bull; Page {PAGE_NUM} of {PAGE_COUNT}
+    <span class="footer-left">{{ $sahodaya->name ?? 'SAHODAYA' }} &bull; {{ $event->title }} &bull; Generated {{ now()->format('d M Y, h:i A') }}</span>
+    <span class="footer-right">
+        @if(($isDomPdf ?? true) && empty($isPreview))
+            Page {PAGE_NUM} of {PAGE_COUNT}
+        @endif
+    </span>
 </div>
 
 <main>
 @forelse($rowsByItem as $itemName => $rows)
     @php
         $cleanTitle = str_replace('_', ' ', $itemName);
+
+        // Team-based items (chess, quiz, group items, sports team events, etc.) group
+        // several members under one chest/registration; count teams for those instead
+        // of raw row count so the badge reads "56 Teams" rather than "223 Participants".
+        $teamKeys = collect($rows)->map(function ($r) {
+            if (!empty($r['group_id'])) {
+                return 'g_'.$r['group_id'];
+            }
+            if (!empty($r['team_name'])) {
+                return 't_'.$r['team_name'].'_'.($r['school'] ?? '');
+            }
+            return null;
+        })->filter()->unique();
+        $teamCount = $teamKeys->count();
+        $individualCount = collect($rows)->filter(fn ($r) => empty($r['group_id']) && empty($r['team_name']))->count();
+
+        if ($teamCount > 0 && $individualCount === 0) {
+            $countLabel = $teamCount.' '.($teamCount === 1 ? 'Team' : 'Teams');
+        } elseif ($teamCount > 0) {
+            $countLabel = $teamCount.' '.($teamCount === 1 ? 'Team' : 'Teams').' &middot; '.count($rows).' '.(count($rows) === 1 ? 'Participant' : 'Participants');
+        } else {
+            $countLabel = count($rows).' '.(count($rows) === 1 ? 'Participant' : 'Participants');
+        }
     @endphp
     <div style="margin-bottom: 16px;">
         <div class="item-heading-bar">
             {{ $cleanTitle }}
-            <span class="count-badge">{{ count($rows) }} {{ count($rows) === 1 ? 'Participant' : 'Participants' }}</span>
+            <span class="count-badge">{!! $countLabel !!}</span>
         </div>
         <table>
             <thead>
