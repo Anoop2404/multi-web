@@ -20,8 +20,12 @@ class FestAttendanceController extends SahodayaAdminController
 
         $event->load('items');
 
+        // For sports season events (parent hub), registrations live under
+        // child events — filtering by event_id alone returns nothing.
+        $eventIds = $event->reportableEventIds();
+
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $eventIds)
             ->whereNotIn('status', ['rejected', 'withdrawn']))
             // Exclude unfilled standby slots and any row with no actual person
             // attached (student_id/teacher_id both null) — these aren't real
@@ -31,7 +35,7 @@ class FestAttendanceController extends SahodayaAdminController
             ->with(['registration.item', 'registration.school', 'student', 'teacher', 'group'])
             ->get();
 
-        $attendance = FestAttendance::where('event_id', $event->id)
+        $attendance = FestAttendance::whereIn('event_id', $eventIds)
             ->get()
             ->keyBy(fn ($a) => $a->item_id.'-'.$a->participant_id);
 
@@ -46,8 +50,10 @@ class FestAttendanceController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $eventIds = $event->reportableEventIds();
+
         if ($request->boolean('bulk')) {
-            return $this->bulkStore($request, $event, $audit);
+            return $this->bulkStore($request, $event, $eventIds, $audit);
         }
 
         $data = $request->validate([
@@ -56,9 +62,10 @@ class FestAttendanceController extends SahodayaAdminController
             'status'         => 'required|in:present,absent',
         ]);
 
-        // Cross-scope validation: verify the participant belongs to this event and item.
+        // Cross-scope validation: verify the participant belongs to this event (or
+        // one of its child events for a sports season hub) and item.
         $participant = FestParticipant::with('registration')->findOrFail($data['participant_id']);
-        abort_if($participant->registration->event_id !== $event->id, 422, 'Participant does not belong to this event.');
+        abort_if(! in_array($participant->registration->event_id, $eventIds, true), 422, 'Participant does not belong to this event.');
         abort_if($participant->registration->item_id !== (int) $data['item_id'], 422, 'Participant does not belong to this item.');
 
         $participantIds = $this->expandToTeam($event, $data['item_id'], $data['participant_id']);
@@ -103,12 +110,12 @@ class FestAttendanceController extends SahodayaAdminController
         }
 
         return FestParticipant::where('group_id', $participant->group_id)
-            ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('item_id', $itemId))
+            ->whereHas('registration', fn ($q) => $q->whereIn('event_id', $event->reportableEventIds())->where('item_id', $itemId))
             ->pluck('id')
             ->all();
     }
 
-    private function bulkStore(Request $request, FestEvent $event, PlatformAuditLogger $audit)
+    private function bulkStore(Request $request, FestEvent $event, array $eventIds, PlatformAuditLogger $audit)
     {
         $data = $request->validate([
             'item_id'         => 'required|exists:fest_event_items,id',
@@ -117,10 +124,10 @@ class FestAttendanceController extends SahodayaAdminController
             'status'          => 'required|in:present,absent',
         ]);
 
-        // Cross-scope validation for bulk: verify all participants belong to this event and item.
+        // Cross-scope validation for bulk: verify all participants belong to this event (or child events) and item.
         $mismatch = FestParticipant::whereIn('id', $data['participant_ids'])
             ->whereHas('registration', fn ($q) => $q
-                ->where('event_id', '!=', $event->id)
+                ->whereNotIn('event_id', $eventIds)
                 ->orWhere('item_id', '!=', (int) $data['item_id']))
             ->exists();
         abort_if($mismatch, 422, 'One or more participants do not belong to this event or item.');

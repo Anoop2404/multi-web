@@ -75,6 +75,7 @@
                     <thead class="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold">
                         <tr>
                             <th class="p-3.5 w-12 text-center">Sl No</th>
+                            <th class="p-3.5 w-12"></th>
                             <th class="p-3.5 w-20 text-center">Chest #</th>
                             <th class="p-3.5">Participant / Team</th>
                             <th class="p-3.5">School</th>
@@ -86,6 +87,12 @@
                         <tr v-for="(row, idx) in displayRows" :key="row.key" class="hover:bg-slate-50/70 transition items-center">
                             <td class="p-3.5 text-center text-slate-500">
                                 {{ idx + 1 }}
+                            </td>
+                            <td class="p-3.5">
+                                <div class="w-9 h-9 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0">
+                                    <img v-if="row.photo_url" :src="row.photo_url" :alt="row.name" class="w-full h-full object-cover">
+                                    <span v-else class="text-xs text-slate-400 font-semibold">{{ initials(row.name) }}</span>
+                                </div>
                             </td>
                             <td class="p-3.5 font-mono text-center font-bold text-slate-700">
                                 {{ row.chest_no ?? '—' }}
@@ -129,7 +136,7 @@
                             </td>
                         </tr>
                         <tr v-if="!displayRows.length">
-                            <td colspan="5" class="p-12 text-center text-slate-400">
+                            <td colspan="7" class="p-12 text-center text-slate-400">
                                 <p class="text-sm font-medium">No participants match your filter or search.</p>
                             </td>
                         </tr>
@@ -237,6 +244,7 @@ const displayRows = computed(() => {
                 item_title: item.title,
                 status: statusFor(p),
                 representative: p,
+                photo_url: p.student?.photo_url ?? null,
             };
 
             if (q) {
@@ -260,6 +268,7 @@ const displayRows = computed(() => {
             item_title: item?.title,
             status: statusFor(p),
             representative: p,
+            photo_url: p.student?.photo_url ?? null,
         };
 
         if (q) {
@@ -323,5 +332,10 @@ function submitImport() {
             showImportModal.value = false;
         },
     });
+}
+
+function initials(name) {
+    if (!name) return '?';
+    return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 </script>
