@@ -118,6 +118,16 @@ class FestRegistrationEligibilityServiceTest extends TestCase
         $this->assertSame([], $this->service->validateStudent($student, $event, $item));
     }
 
+    public function test_english_fest_accepts_legacy_roman_category_alias(): void
+    {
+        $event = new FestEvent(['event_type' => 'english_fest']);
+        $item = new FestEventItem(['class_group' => 'CATEGORY__II', 'gender' => 'open']);
+        $student = new Student(['name' => 'Meera', 'gender' => 'female']);
+        $student->setRelation('schoolClass', (object) ['name' => 'Class 6']);
+
+        $this->assertSame([], $this->service->validateStudent($student, $event, $item));
+    }
+
     public function test_custom_event_ignores_class_group_when_item_is_open(): void
     {
         $event = new FestEvent(['event_type' => 'custom']);

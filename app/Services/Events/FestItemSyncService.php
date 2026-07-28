@@ -117,26 +117,53 @@ class FestItemSyncService
         $count = 0;
 
         foreach ($hub->items as $item) {
-            if (! $this->itemEnabledForPartition($hub, $item, $partitionRole)) {
-                continue;
+            if ($this->copyItemToPartition($hub, $item, $child, $partitionRole)) {
+                $count++;
             }
-
-            FestEventItem::updateOrCreate(
-                [
-                    'event_id'               => $child->id,
-                    'inherited_from_item_id' => $item->id,
-                ],
-                array_merge($this->attributesFromItem($item), [
-                    'owner_level'            => $item->owner_level,
-                    'state_program_item_id'  => $item->state_program_item_id,
-                    'inherited_from_item_id' => $item->id,
-                    'max_per_school'         => $this->maxPerSchoolForPartition($item, $partitionRole),
-                ])
-            );
-            $count++;
         }
 
         return $count;
+    }
+
+    public function copyItemToPartition(
+        FestEvent $hub,
+        FestEventItem $item,
+        FestEvent $child,
+        string $partitionRole,
+    ): ?FestEventItem {
+        if (! $this->itemEnabledForPartition($hub, $item, $partitionRole)) {
+            return null;
+        }
+
+        $target = FestEventItem::where('event_id', $child->id)
+            ->where('inherited_from_item_id', $item->id)
+            ->first();
+
+        // Older partition copies may predate inherited_from_item_id. Reuse the
+        // matching item code so registration cannot pick a stale duplicate.
+        if (! $target && filled($item->item_code)) {
+            $target = FestEventItem::where('event_id', $child->id)
+                ->where('item_code', $item->item_code)
+                ->first();
+        }
+
+        $attributes = array_merge($this->attributesFromItem($item), [
+            'owner_level'            => $item->owner_level,
+            'state_program_item_id'  => $item->state_program_item_id,
+            'inherited_from_item_id' => $item->id,
+            'max_per_school'         => $this->maxPerSchoolForPartition($item, $partitionRole),
+        ]);
+
+        if ($target) {
+            $target->update($attributes);
+
+            return $target->refresh();
+        }
+
+        return FestEventItem::create(array_merge(
+            ['event_id' => $child->id],
+            $attributes,
+        ));
     }
 
     private function itemEnabledForPartition(

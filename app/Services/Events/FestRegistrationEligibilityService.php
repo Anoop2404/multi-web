@@ -241,10 +241,13 @@ class FestRegistrationEligibilityService
             return null;
         }
 
-        if ($studentGroup !== $itemGroup) {
+        $canonicalStudentGroup = FestClassGroupScheme::canonicalKey($studentGroup);
+        $canonicalItemGroup = FestClassGroupScheme::canonicalKey($itemGroup);
+
+        if ($canonicalStudentGroup !== $canonicalItemGroup) {
             $labels = FestClassGroupScheme::labels(null, $event ?? $item->event);
-            $expected = $labels[$itemGroup] ?? strtoupper($itemGroup);
-            $actual = $labels[$studentGroup] ?? strtoupper($studentGroup);
+            $expected = $labels[$canonicalItemGroup] ?? $labels[$itemGroup] ?? strtoupper($itemGroup);
+            $actual = $labels[$canonicalStudentGroup] ?? $labels[$studentGroup] ?? strtoupper($studentGroup);
 
             return "belongs to {$actual}, but this item is for {$expected}.";
         }

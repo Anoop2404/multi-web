@@ -48,28 +48,14 @@ class FestRegistrationCreateService
             app(FestRegionPartitionService::class)
                 ->inheritRegistrationLifecycle($event, $targetEvent);
 
-            $targetItem = FestEventItem::where('event_id', $targetEvent->id)
-                ->where(function ($q) use ($item) {
-                    $q->where('inherited_from_item_id', $item->id)
-                        ->orWhere('item_code', $item->item_code);
-                })
-                ->first();
-
-            // Heal regional children created before their hub catalogue was complete.
-            // A missing inherited item used to escape as a generic 404/Inertia modal.
-            if (! $targetItem) {
-                app(FestItemSyncService::class)->copyItemsToPartition(
-                    $event,
-                    $targetEvent,
-                    $targetEvent->partition_role ?? 'region',
-                );
-                $targetItem = FestEventItem::where('event_id', $targetEvent->id)
-                    ->where(function ($q) use ($item) {
-                        $q->where('inherited_from_item_id', $item->id)
-                            ->orWhere('item_code', $item->item_code);
-                    })
-                    ->first();
-            }
+            // Refresh the regional copy from the hub before validating it. Legacy
+            // copies can carry old category keys such as CATEGORY__II.
+            $targetItem = app(FestItemSyncService::class)->copyItemToPartition(
+                $event,
+                $item,
+                $targetEvent,
+                $targetEvent->partition_role ?? 'region',
+            );
 
             if (! $targetItem) {
                 throw ValidationException::withMessages([

@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestEventSchoolPartition;
 use App\Models\Tenant;
+use App\Services\Events\FestItemSyncService;
 use App\Services\Events\FestPartitionService;
 use App\Services\Events\FestRegionPartitionService;
 use App\Services\Events\FestRegistrationRouterService;
@@ -128,6 +129,7 @@ class FestPartitionServiceTest extends TestCase
             'item_code' => 'EF104',
             'stage_type' => 'on_stage',
             'participant_type' => 'group',
+            'class_group' => 'up',
             'min_group_size' => 10,
             'max_group_size' => 12,
             'max_per_school' => 1,
@@ -151,6 +153,13 @@ class FestPartitionServiceTest extends TestCase
             'inherited_from_item_id' => $item->id,
             'item_code' => 'EF104',
         ]);
+        $regionItem = FestEventItem::where('event_id', $region->id)
+            ->where('inherited_from_item_id', $item->id)
+            ->firstOrFail();
+        $regionItem->update(['class_group' => 'CATEGORY__II']);
+        $syncedItem = app(FestItemSyncService::class)
+            ->copyItemToPartition($hub, $item->fresh(), $region, 'region');
+        $this->assertSame('up', $syncedItem?->class_group);
         $this->assertSame('draft', $region->status);
         app(FestRegionPartitionService::class)->inheritRegistrationLifecycle($hub, $region);
         $this->assertSame('registration_open', $region->fresh()->status);

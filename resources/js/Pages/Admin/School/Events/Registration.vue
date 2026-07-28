@@ -960,16 +960,20 @@ function requireVerifiedForEvent(event) {
 }
 
 const GROUP_ALIASES = {
-    lp: ['lp', 'category1', 'category_1', 'cat1', 'category 1', 'cat 1'],
-    up: ['up', 'category2', 'category_2', 'cat2', 'category 2', 'cat 2'],
-    hs: ['hs', 'category3', 'category_3', 'cat3', 'category 3', 'cat 3'],
-    hss: ['hss', 'category4', 'category_4', 'cat4', 'category 4', 'cat 4'],
+    lp: ['lp', 'category1', 'categoryi', 'cat1', 'cati'],
+    up: ['up', 'category2', 'categoryii', 'cat2', 'catii'],
+    hs: ['hs', 'category3', 'categoryiii', 'cat3', 'catiii'],
+    hss: ['hss', 'category4', 'categoryiv', 'cat4', 'cativ'],
 };
+
+function normalizedClassGroup(value) {
+    return String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
 
 function matchesClassGroup(studentGrpRaw, itemGrpRaw) {
     if (!itemGrpRaw || itemGrpRaw === 'open') return true;
-    const studentGrp = String(studentGrpRaw ?? '').toLowerCase().trim();
-    const itemGrp = String(itemGrpRaw ?? '').toLowerCase().trim();
+    const studentGrp = normalizedClassGroup(studentGrpRaw);
+    const itemGrp = normalizedClassGroup(itemGrpRaw);
     if (studentGrp === itemGrp) return true;
 
     for (const [, aliases] of Object.entries(GROUP_ALIASES)) {
@@ -1068,7 +1072,7 @@ function studentIneligibilityReason(student, event, item) {
 
     if (props.eventType === 'kalolsavam') {
         if (!student.eligible_kalolsav) return 'Not eligible for Kalotsav (Classes 3–12)';
-        if (item.class_group && item.class_group !== 'open' && student.kalolsav_class_group !== item.class_group) {
+        if (item.class_group && item.class_group !== 'open' && !matchesClassGroup(student.kalolsav_class_group, item.class_group)) {
             return classGroupMismatchReason(student, item, event);
         }
     }
@@ -1076,7 +1080,7 @@ function studentIneligibilityReason(student, event, item) {
     if (['custom', 'english_fest', 'science_fest'].includes(props.eventType)) {
         if (item.class_group && item.class_group !== 'open') {
             if (!student.kalolsav_class_group) return 'Class is not assigned to a membership category';
-            if (student.kalolsav_class_group !== item.class_group) {
+            if (!matchesClassGroup(student.kalolsav_class_group, item.class_group)) {
                 return classGroupMismatchReason(student, item, event);
             }
         }

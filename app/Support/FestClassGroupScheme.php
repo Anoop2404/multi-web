@@ -14,6 +14,29 @@ class FestClassGroupScheme
     public const KEYS = ['lp', 'up', 'hs', 'hss', 'open'];
 
     /**
+     * Convert legacy/imported category spellings to the built-in machine keys.
+     * Unknown keys are preserved for custom and named class-group schemes.
+     */
+    public static function canonicalKey(?string $key): ?string
+    {
+        if ($key === null) {
+            return null;
+        }
+
+        $trimmed = trim($key);
+        $compact = strtolower((string) preg_replace('/[^a-z0-9]+/i', '', $trimmed));
+
+        return match ($compact) {
+            'lp', 'category1', 'categoryi', 'cat1', 'cati' => 'lp',
+            'up', 'category2', 'categoryii', 'cat2', 'catii' => 'up',
+            'hs', 'category3', 'categoryiii', 'cat3', 'catiii' => 'hs',
+            'hss', 'category4', 'categoryiv', 'cat4', 'cativ' => 'hss',
+            'open' => 'open',
+            default => $trimmed,
+        };
+    }
+
+    /**
      * Cached per tenant per request. resolve() is called once per student inside
      * FestRegistrationEligibilityService::annotateStudents()'s per-student loop
      * (and again per student in validateStudent()); without this cache the
