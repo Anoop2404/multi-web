@@ -662,7 +662,9 @@ class FestReportService
 
         $sahodaya = Tenant::find($this->event->tenant_id);
 
-        // Enrich rows with photo data URIs and DOB (sports only).
+        // Enrich rows with photo absolute paths and DOB (sports only).
+        // We use local absolute paths instead of Base64 Data URIs to prevent
+        // the HTML payload from causing a 128MB memory exhaustion (OOM).
         $photoMap = [];
         $dobMap = [];
         foreach ($participants as $p) {
@@ -671,7 +673,7 @@ class FestReportService
                 continue;
             }
             if (! isset($photoMap[$sid]) && $p->student?->photo) {
-                $photoMap[$sid] = \App\Support\TenantStorage::photoDataUri($sahodaya, $p->student->photo);
+                $photoMap[$sid] = \App\Support\TenantStorage::localAbsolutePath($sahodaya, $p->student->photo);
             }
             if ($this->event->event_type === 'sports' && ! isset($dobMap[$sid])) {
                 $dobMap[$sid] = $p->student?->dob?->format('d M Y');

@@ -5,7 +5,7 @@
     <title>Attendance Sheet — {{ $event->title }}</title>
     <style>
         @page {
-            margin-top: 10mm;
+            margin-top: 35mm;
             margin-bottom: 16mm;
             margin-left: 10mm;
             margin-right: 10mm;
@@ -17,6 +17,16 @@
             margin: 0;
             padding: 0;
         }
+        
+        /* Proper DomPDF repeating header technique */
+        header {
+            position: fixed;
+            top: -28mm;
+            left: 0px;
+            right: 0px;
+            height: 25mm;
+        }
+
         .footer-container {
             position: fixed;
             bottom: -10mm;
@@ -28,6 +38,11 @@
             color: #64748b;
             text-align: center;
         }
+        
+        main {
+            width: 100%;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -126,6 +141,7 @@
             text-transform: uppercase;
             letter-spacing: 0.03em;
             margin-bottom: 0;
+            page-break-after: avoid;
         }
         .item-heading-bar .count-badge {
             float: right;
@@ -140,16 +156,19 @@
 </head>
 <body>
 
+<header>
+    @include('partials.pdf-branding-header', [
+        'orgName' => $sahodaya->name ?? 'SAHODAYA',
+        'logoSrc' => $logo ?? null,
+        'docTitle' => 'ATTENDANCE SHEET',
+    ])
+</header>
+
 <div class="footer-container">
     Generated on {{ now()->format('d M Y, h:i A') }} &bull; Page {PAGE_NUM} of {PAGE_COUNT}
 </div>
 
-@include('partials.pdf-branding-header', [
-    'orgName' => $sahodaya->name ?? 'SAHODAYA',
-    'logoSrc' => $logo ?? null,
-    'docTitle' => 'ATTENDANCE SHEET',
-])
-
+<main>
 @forelse($rowsByItem as $itemName => $rows)
     @php
         $cleanTitle = str_replace('_', ' ', $itemName);
@@ -181,10 +200,9 @@
                     @php
                         $teamName = $row['team_name'] ?? null;
                         $school = $row['school'] ?? '';
-                        $groupId = $row['group_id'] ?? null;
-                        $currentTeamKey = $groupId
-                            ? 'g_'.$groupId
-                            : ($teamName ? 't_'.str_replace(' ', '_', $teamName).'_'.str_replace(' ', '_', $school) : null);
+                        // Fix for split tables: we ignore `group_id` entirely so mismatched database records
+                        // don't divide a team across multiple blocks. We group purely by "School + Team Name".
+                        $currentTeamKey = $teamName ? 't_'.md5($teamName.$school) : null;
                     @endphp
 
                     @if($currentTeamKey && $currentTeamKey !== $lastTeamKey)
@@ -228,6 +246,7 @@
 @empty
     <p style="text-align: center; margin-top: 40px; color: #64748b;">No participants to display.</p>
 @endforelse
+</main>
 
 </body>
 </html>
