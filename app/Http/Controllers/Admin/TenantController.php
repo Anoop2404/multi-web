@@ -137,6 +137,8 @@ class TenantController extends Controller
             $databaseReady = true;
         }
 
+        $loginLookup = $this->lookupPortalAccounts($tenant, $databaseReady);
+
         return inertia('Tenants/Show', [
             'tenant'           => $tenant,
             'tenantBaseDomain' => config('tenancy.tenant_base_domain'),
@@ -160,6 +162,7 @@ class TenantController extends Controller
                 ? $this->erasureBatches($tenant)
                 : [],
             'loginUrl'         => $this->portalLoginUrl($tenant),
+            'loginLookup'      => $loginLookup,
             'navManager'       => $tenant->type === 'sahodaya' ? [
                 'programs'  => SahodayaNavVisibility::programLabels(),
                 'menus'     => SahodayaNavVisibility::menuLabels(),
@@ -910,6 +913,77 @@ class TenantController extends Controller
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    /** @return array{query: string, matches: list<array<string, mixed>>, searched: bool, message: ?string} */
+    private function lookupPortalAccounts(Tenant $tenant, bool $databaseReady): array
+    {
+        $query = trim((string) request()->query('login_lookup', ''));
+
+        if ($query === '') {
+            return [
+                'query' => '',
+                'matches' => [],
+                'searched' => false,
+                'message' => null,
+            ];
+        }
+
+        if (! $databaseReady) {
+            return [
+                'query' => $query,
+                'matches' => [],
+                'searched' => true,
+                'message' => 'Login lookup is available after the Sahodaya database is ready.',
+            ];
+        }
+
+        $matches = TenantAuth::withTenantUsers($tenant, function () use ($query) {
+            if (! \Illuminate\Support\Facades\Schema::hasTable('users')) {
+                return [];
+            }
+
+            $needle = strtolower($query);
+
+            return User::query()
+                ->with('roles:id,name')
+                ->where(function ($q) use ($needle) {
+                    $q->whereRaw('LOWER(email) = ?', [$needle])
+                        ->orWhereRaw('LOWER(username) = ?', [$needle]);
+                })
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'username', 'created_at'])
+                ->map(function (User $user) use ($needle) {
+                    $matchedOn = [];
+                    if (strtolower((string) $user->email) === $needle) {
+                        $matchedOn[] = 'email';
+                    }
+                    if (strtolower((string) $user->username) === $needle) {
+                        $matchedOn[] = 'username';
+                    }
+
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'username' => $user->username,
+                        'roles' => $user->getRoleNames()->values()->all(),
+                        'matched_on' => $matchedOn,
+                        'created_at' => $user->created_at?->toIso8601String(),
+                    ];
+                })
+                ->values()
+                ->all();
+        }) ?? [];
+
+        return [
+            'query' => $query,
+            'matches' => $matches,
+            'searched' => true,
+            'message' => $matches === []
+                ? 'No existing login was found for that email or username.'
+                : null,
+        ];
     }
 
     /** @return list<array<string, mixed>> */

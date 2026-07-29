@@ -197,4 +197,52 @@ class TenantControllerTest extends TestCase
 
         $this->assertSame(1, User::where('tenant_id', $school->id)->count());
     }
+
+    public function test_superadmin_can_lookup_existing_school_login_by_email(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        config(['tenancy.database_per_sahodaya' => false]);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Test Sahodaya',
+            'is_active' => true,
+        ]);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Test School',
+            'parent_id' => $sahodaya->id,
+            'membership_status' => 'approved',
+            'is_active' => true,
+        ]);
+
+        $existing = User::factory()->create([
+            'tenant_id' => $school->id,
+            'name' => 'Existing Login',
+            'email' => 'existing@example.com',
+            'username' => 'contact@example.com',
+            'email_verified_at' => now(),
+        ]);
+        $existing->assignRole('school_admin');
+
+        $superadmin = User::factory()->create([
+            'tenant_id' => null,
+            'email_verified_at' => now(),
+        ]);
+        $superadmin->assignRole('superadmin');
+
+        $this->actingAs($superadmin)
+            ->get("/admin/tenants/{$school->id}?login_lookup=contact@example.com")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tenants/Show', false)
+                ->where('loginLookup.query', 'contact@example.com')
+                ->where('loginLookup.searched', true)
+                ->where('loginLookup.matches.0.email', 'existing@example.com')
+                ->where('loginLookup.matches.0.username', 'contact@example.com')
+            );
+    }
 }

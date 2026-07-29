@@ -399,6 +399,45 @@
                     </p>
                 </div>
 
+                <div class="mb-5 rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-3 max-w-2xl">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900">Find an existing login</p>
+                        <p class="text-xs text-slate-500">
+                            Search by email or username to see whether this account already exists before creating a new one.
+                        </p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input v-model="loginLookupQuery" type="text" class="field flex-1" placeholder="Type email or username">
+                        <button type="button" class="btn-primary text-sm" @click="searchLogin">
+                            Search
+                        </button>
+                    </div>
+                    <div v-if="loginLookup.searched" class="rounded-lg border p-3 text-sm"
+                         :class="loginLookup.matches.length ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'">
+                        <p class="font-semibold" :class="loginLookup.matches.length ? 'text-emerald-800' : 'text-amber-800'">
+                            {{ loginLookup.matches.length ? 'Existing login found' : 'No login found' }}
+                        </p>
+                        <p v-if="loginLookup.message" class="text-xs mt-1 text-amber-700">{{ loginLookup.message }}</p>
+                        <div v-if="loginLookup.matches.length" class="mt-3 space-y-2">
+                            <div v-for="match in loginLookup.matches" :key="match.id" class="rounded-lg bg-white border border-slate-200 p-3">
+                                <p class="font-medium text-slate-900">{{ match.name }}</p>
+                                <p class="text-xs text-slate-500 mt-1">
+                                    Email: <span class="font-mono">{{ match.email || '—' }}</span>
+                                </p>
+                                <p class="text-xs text-slate-500">
+                                    Username: <span class="font-mono">{{ match.username || '—' }}</span>
+                                </p>
+                                <p class="text-xs text-slate-500">
+                                    Roles: {{ (match.roles || []).join(', ') || '—' }}
+                                </p>
+                                <p v-if="match.matched_on?.length" class="text-xs text-emerald-700 mt-1">
+                                    Matched on {{ match.matched_on.join(' and ') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <form @submit.prevent="saveAdmin" class="space-y-4 max-w-lg">
                     <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">
                         {{ adminForm.user_id ? 'Update login' : 'Create login' }}
@@ -537,6 +576,7 @@ const props = defineProps({
         default: () => [],
     },
     loginUrl: { type: String, default: null },
+    loginLookup: { type: Object, default: () => ({ query: '', matches: [], searched: false, message: null }) },
     navManager: { type: Object, default: null },
     erasureBatches: { type: Array, default: () => [] },
 });
@@ -593,6 +633,7 @@ const adminForm = useForm({
     username: '',
     password: '',
 });
+const loginLookupQuery = ref(props.loginLookup?.query ?? '');
 const rejectForm = useForm({ reason: '' });
 const showEraseStudents = ref(false);
 const eraseStudentsForm = useForm({ confirm_school_name: '' });
@@ -702,6 +743,15 @@ function resetAdminForm() {
 function saveAdmin() {
     adminForm.post(`/admin/tenants/${props.tenant.id}/${portalAdminEndpoint.value}`, {
         onSuccess: () => resetAdminForm(),
+    });
+}
+
+function searchLogin() {
+    router.get(`/admin/tenants/${props.tenant.id}`, {
+        login_lookup: loginLookupQuery.value.trim(),
+    }, {
+        preserveScroll: true,
+        preserveState: true,
     });
 }
 
