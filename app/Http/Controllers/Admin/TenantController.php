@@ -873,7 +873,7 @@ class TenantController extends Controller
                         'id'         => $user->id,
                         'name'       => $user->name,
                         'email'      => $user->email,
-                        'username'   => $user->email ?: ($user->username ?? ''),
+                        'username'   => $user->username ?: ($user->email ?? ''),
                         'password'   => $hasPlain ? ($user->plain_password ?: null) : null,
                         'created_at' => $user->created_at?->toIso8601String(),
                     ])
