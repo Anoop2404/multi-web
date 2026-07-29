@@ -28,12 +28,6 @@ class BoardResult extends Model
 
     public const STATUS_PUBLISHED = 'published';
 
-    /**
-     * Number of hours after submission during which the school can still edit
-     * and resubmit a board result before it locks for Sahodaya review.
-     */
-    public const RESUBMIT_WINDOW_HOURS = 24;
-
     protected $fillable = [
         'tenant_id',
         'class',
@@ -138,21 +132,18 @@ class BoardResult extends Model
 
     public function isEditable(): bool
     {
-        if (in_array($this->status, [self::STATUS_DRAFT, self::STATUS_REJECTED], true)) {
-            return true;
+        if (! in_array($this->status, [self::STATUS_DRAFT, self::STATUS_REJECTED, self::STATUS_SUBMITTED], true)) {
+            return false;
         }
 
-        // Recently-submitted results are editable within the resubmit window so schools
-        // can fix mistakes before a Sahodaya reviewer picks them up. Once a reviewer has
-        // started (reviewed_by_user_id is set), the result is locked until rejected.
-        if ($this->status === self::STATUS_SUBMITTED
-            && $this->submitted_at !== null
-            && $this->reviewed_by_user_id === null
-        ) {
-            return $this->submitted_at->diffInHours(now()) < self::RESUBMIT_WINDOW_HOURS;
+        // Once a Sahodaya reviewer starts handling a submitted result it remains
+        // locked until the reviewer rejects it for correction.
+        if ($this->status === self::STATUS_SUBMITTED && $this->reviewed_by_user_id !== null) {
+            return false;
         }
 
-        return false;
+        return app(\App\Services\BoardResults\BoardResultAcademicYearService::class)
+            ->isResultWindowOpen($this);
     }
 
     /**
@@ -172,14 +163,8 @@ class BoardResult extends Model
         if ($this->status === self::STATUS_SUBMITTED && $this->reviewed_by_user_id !== null) {
             return 'Sahodaya has started reviewing this result. Wait for rejection or approval.';
         }
-        if ($this->status === self::STATUS_SUBMITTED && $this->submitted_at !== null) {
-            $remaining = self::RESUBMIT_WINDOW_HOURS - $this->submitted_at->diffInHours(now());
-            if ($remaining <= 0) {
-                return 'The '.self::RESUBMIT_WINDOW_HOURS.'-hour editing window has closed. Contact Sahodaya admin to reopen.';
-            }
-        }
-
-        return null;
+        return app(\App\Services\BoardResults\BoardResultAcademicYearService::class)
+            ->resultWindowLockReason($this);
     }
 
     public function hasResultPdf(): bool

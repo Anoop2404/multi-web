@@ -5,6 +5,7 @@ namespace App\Services\BoardResults;
 use App\Models\AcademicYearRecord;
 use App\Models\BoardResult;
 use App\Models\SahodayaRegistrationWindow;
+use App\Models\Tenant;
 use Illuminate\Validation\ValidationException;
 
 class BoardResultAcademicYearService
@@ -150,5 +151,60 @@ class BoardResultAcademicYearService
     public function assertResultEditable(BoardResult $result): void
     {
         $this->assertEditableYear($result->academic_year_id, $result->academic_year);
+    }
+
+    /**
+     * Board-result drafts, rejected corrections, and unreviewed submissions remain
+     * editable for the full configured board-entry window.
+     */
+    public function isResultWindowOpen(BoardResult $result): bool
+    {
+        $window = $this->windowForResult($result);
+        if ($window && ($window->board_entry_starts_at || $window->board_entry_ends_at)) {
+            $now = now();
+
+            return ! ($window->board_entry_starts_at && $now->lt($window->board_entry_starts_at->copy()->startOfDay()))
+                && ! ($window->board_entry_ends_at && $now->gt($window->board_entry_ends_at->copy()->endOfDay()));
+        }
+
+        $record = $result->academic_year_id
+            ? AcademicYearRecord::find($result->academic_year_id)
+            : AcademicYearRecord::query()->where('label', $result->academic_year)->first();
+
+        return ! $record?->isClosed();
+    }
+
+    public function resultWindowLockReason(BoardResult $result): ?string
+    {
+        $window = $this->windowForResult($result);
+        $now = now();
+
+        if ($window?->board_entry_starts_at && $now->lt($window->board_entry_starts_at->copy()->startOfDay())) {
+            return 'Board result editing opens on '.$window->board_entry_starts_at->format('d M Y').'.';
+        }
+        if ($window?->board_entry_ends_at && $now->gt($window->board_entry_ends_at->copy()->endOfDay())) {
+            return 'Board result editing closed on '.$window->board_entry_ends_at->format('d M Y').'. Contact Sahodaya admin to reopen.';
+        }
+
+        $record = $result->academic_year_id
+            ? AcademicYearRecord::find($result->academic_year_id)
+            : AcademicYearRecord::query()->where('label', $result->academic_year)->first();
+
+        return $record?->isClosed()
+            ? "Academic year {$record->label} is closed for board-result editing."
+            : null;
+    }
+
+    private function windowForResult(BoardResult $result): ?SahodayaRegistrationWindow
+    {
+        $school = Tenant::query()->find($result->tenant_id);
+        if (! $school?->parent_id) {
+            return null;
+        }
+
+        return SahodayaRegistrationWindow::query()
+            ->where('sahodaya_id', $school->parent_id)
+            ->where('academic_year', $result->academic_year)
+            ->first();
     }
 }

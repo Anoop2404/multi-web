@@ -162,6 +162,71 @@ class BoardResultsControllerTest extends TestCase
         ]);
     }
 
+    public function test_submitted_result_remains_editable_until_board_entry_window_ends(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['sahodaya' => $sahodaya, 'school' => $school, 'year' => $year, 'admin' => $admin] = $this->createSchoolContext();
+
+        SahodayaRegistrationWindow::create([
+            'sahodaya_id' => $sahodaya->id,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'board_entry_starts_at' => now()->subWeek()->toDateString(),
+            'board_entry_ends_at' => now()->addWeek()->toDateString(),
+        ]);
+
+        $boardResult = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 10,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'examination_type' => BoardResult::EXAM_AISSE,
+            'status' => BoardResult::STATUS_SUBMITTED,
+            'submitted_at' => now()->subDays(3),
+        ]);
+
+        $this->assertTrue($boardResult->isEditable());
+        $this->assertNull($boardResult->editLockReason());
+
+        $this->actingAs($admin)
+            ->get("/school-admin/{$school->id}/board-results/{$boardResult->id}/toppers")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('canEdit', true)
+                ->where('editLockReason', null));
+    }
+
+    public function test_overall_topper_percentage_is_always_derived_from_marks(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        ['school' => $school, 'year' => $year] = $this->createSchoolContext();
+
+        $boardResult = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 10,
+            'academic_year' => $year->label,
+            'academic_year_id' => $year->id,
+            'examination_type' => BoardResult::EXAM_AISSE,
+            'status' => BoardResult::STATUS_DRAFT,
+        ]);
+
+        $topper = Topper::create([
+            'board_result_id' => $boardResult->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_OVERALL,
+            'name' => 'Percentage Check',
+            'percentage' => 96.8,
+            'marks_obtained' => 402,
+            'total_marks' => 500,
+            'rank' => 1,
+        ]);
+
+        $this->assertSame(80.4, (float) $topper->fresh()->percentage);
+
+        $topper->update(['marks_obtained' => 484]);
+        $this->assertSame(96.8, (float) $topper->fresh()->percentage);
+    }
+
     public function test_subject_wise_batch_updates_existing_topper_name_and_marks(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);

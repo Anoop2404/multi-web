@@ -77,6 +77,22 @@ class Topper extends Model
         return $query->where('entry_type', self::ENTRY_SUBJECT);
     }
 
+    protected static function booted(): void
+    {
+        static::saving(function (Topper $topper) {
+            if (
+                $topper->entry_type !== self::ENTRY_SUBJECT
+                && $topper->marks_obtained !== null
+                && (float) $topper->total_marks > 0
+            ) {
+                $topper->percentage = round(
+                    ((float) $topper->marks_obtained / (float) $topper->total_marks) * 100,
+                    2,
+                );
+            }
+        });
+    }
+
     /**
      * Virtual subject_marks map sourced from topper_subject_marks (#138).
      *
