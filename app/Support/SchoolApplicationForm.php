@@ -509,21 +509,26 @@ class SchoolApplicationForm
 
 
     /** @return array<string, mixed> */
-    public static function schoolProfileValidationRulesForSection(Tenant $school, array $fields, string $section): array
+    public static function schoolProfileValidationRulesForSection(Tenant $school, array $fields, string $section, ?User $currentUser = null): array
     {
         $allowed = self::profileSectionFieldKeys()[$section] ?? [];
-        $all = self::schoolProfileValidationRules($school, $fields);
+        $all = self::schoolProfileValidationRules($school, $fields, $currentUser);
 
         return array_intersect_key($all, array_flip($allowed));
     }
 
     /** @return array<string, mixed> */
-    public static function schoolProfileValidationRules(Tenant $school, array $fields): array
+    public static function schoolProfileValidationRules(Tenant $school, array $fields, ?User $currentUser = null): array
     {
         $rules = [];
 
         foreach (self::editableFieldKeys() as $key) {
             if (! ($fields[$key]['enabled'] ?? false)) {
+                continue;
+            }
+
+            if ($key === 'school_name') {
+                $rules[$key] = 'nullable|string|max:255';
                 continue;
             }
 
@@ -598,6 +603,63 @@ class SchoolApplicationForm
             };
         }
 
+        foreach (['principal_email', 'vice_principal_email', 'event_coordinator_email'] as $attribute) {
+            if (! array_key_exists($attribute, $rules)) {
+                continue;
+            }
+
+            $rules[$attribute] = is_array($rules[$attribute]) ? $rules[$attribute] : explode('|', $rules[$attribute]);
+            $rules[$attribute][] = function (string $field, mixed $value, \Closure $fail) use ($school, $attribute, $currentUser): void {
+                $email = self::normalizeEmail($value);
+
+                if ($email === null) {
+                    return;
+                }
+
+                $payload = $school->application_payload ?? [];
+                $requestData = request()->only([
+                    'principal_email',
+                    'vice_principal_email',
+                    'event_coordinator_email',
+                ]);
+
+                $sources = self::schoolContactEmailSources($payload, $requestData, $currentUser);
+
+                foreach ($sources as $sourceKey => $sourceEmail) {
+                    if ($sourceKey === $attribute || $sourceEmail === null) {
+                        continue;
+                    }
+
+                    if ($attribute === 'principal_email'
+                        && $sourceKey === 'login_email'
+                        && $currentUser?->hasRole('school_principal')
+                    ) {
+                        continue;
+                    }
+
+                    if ($sourceEmail !== $email) {
+                        continue;
+                    }
+
+                    $fail(self::duplicateEmailMessage($attribute, $sourceKey));
+
+                    return;
+                }
+
+                if ($attribute === 'principal_email') {
+                    $principalUser = self::schoolPrincipalUser($school);
+                    $collision = User::query()
+                        ->where('email', $email)
+                        ->when($principalUser, fn ($query) => $query->where('id', '!=', $principalUser->id))
+                        ->exists();
+
+                    if ($collision) {
+                        $fail('This email is already used by another account.');
+                    }
+                }
+            };
+        }
+
         return $rules;
     }
 
@@ -645,24 +707,99 @@ class SchoolApplicationForm
     /** @return array<string, mixed> */
     public static function accountValidationRules(?User $user): array
     {
+        $school = $user?->tenant_id ? Tenant::query()->find($user->tenant_id) : null;
+
         return [
             'name' => 'nullable|string|max:255',
             'email' => [
                 'required',
                 'email',
                 'max:255',
-                function (string $attribute, mixed $value, \Closure $fail) use ($user): void {
-                    if (! is_string($value) || ! $user) {
+                function (string $attribute, mixed $value, \Closure $fail) use ($user, $school): void {
+                    $email = self::normalizeEmail($value);
+
+                    if ($email === null || ! $user) {
                         return;
                     }
-                    if (User::where('email', strtolower(trim($value)))->where('id', '!=', $user->id)->exists()) {
+
+                    if (self::normalizeEmail($user->email) === $email) {
+                        return;
+                    }
+
+                    if (User::where('email', $email)->where('id', '!=', $user->id)->exists()) {
                         $fail('An account with this email address already exists.');
+                        return;
+                    }
+
+                    if ($school instanceof Tenant) {
+                        $payload = $school->application_payload ?? [];
+                        $sources = self::schoolContactEmailSources($payload);
+
+                        foreach ($sources as $sourceKey => $sourceEmail) {
+                            if ($sourceEmail === null || $sourceEmail !== $email) {
+                                continue;
+                            }
+
+                            $fail(self::duplicateEmailMessage('login_email', $sourceKey));
+
+                            return;
+                        }
                     }
                 },
             ],
             'current_password' => 'required_with:password|nullable|current_password',
             'password'         => 'nullable|string|min:8|confirmed',
         ];
+    }
+
+    private static function normalizeEmail(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $email = strtolower(trim($value));
+
+        return $email !== '' ? $email : null;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $requestData
+     * @return array<string, string|null>
+     */
+    private static function schoolContactEmailSources(array $payload, array $requestData = [], ?User $currentUser = null): array
+    {
+        return [
+            'principal_email' => self::normalizeEmail($requestData['principal_email'] ?? $payload['principal_email'] ?? null),
+            'vice_principal_email' => self::normalizeEmail($requestData['vice_principal_email'] ?? $payload['vice_principal_email'] ?? null),
+            'event_coordinator_email' => self::normalizeEmail($requestData['event_coordinator_email'] ?? $payload['event_coordinator_email'] ?? null),
+            'login_email' => self::normalizeEmail($currentUser?->email),
+        ];
+    }
+
+    private static function schoolPrincipalUser(Tenant $school): ?User
+    {
+        return User::query()
+            ->where('tenant_id', $school->id)
+            ->whereHas('roles', fn ($query) => $query->where('name', 'school_principal'))
+            ->orderBy('id')
+            ->first();
+    }
+
+    private static function duplicateEmailMessage(string $attribute, string $conflictKey): string
+    {
+        $labels = [
+            'login_email' => 'school login email',
+            'principal_email' => 'principal email',
+            'vice_principal_email' => 'vice principal email',
+            'event_coordinator_email' => 'events coordinator email',
+        ];
+
+        $attributeLabel = $labels[$attribute] ?? str_replace('_', ' ', $attribute);
+        $conflictLabel = $labels[$conflictKey] ?? str_replace('_', ' ', $conflictKey);
+
+        return ucfirst($attributeLabel).' must be different from the '.$conflictLabel.'.';
     }
 
     /** @return list<string> */

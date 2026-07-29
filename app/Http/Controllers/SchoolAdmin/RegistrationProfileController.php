@@ -6,6 +6,7 @@ use App\Models\Registration;
 use App\Models\SahodayaProfile;
 use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
+use App\Services\Auth\SchoolPrincipalLoginSyncService;
 use App\Services\Mail\SahodayaMailer;
 use App\Support\AcademicYear;
 use App\Support\SchoolApplicationForm;
@@ -104,8 +105,9 @@ class RegistrationProfileController extends SchoolAdminController
         ]);
     }
 
-    public function updateProfile(Request $request)
+    public function updateProfile(Request $request, SchoolPrincipalLoginSyncService $principalSync)
     {
+        $user = $request->user();
         $sahodaya = $this->school->parent;
         abort_unless($sahodaya, 422);
 
@@ -117,7 +119,7 @@ class RegistrationProfileController extends SchoolAdminController
         ])['section'];
 
         $data = $request->validate(
-            SchoolApplicationForm::schoolProfileValidationRulesForSection($this->school, $fields, $section)
+            SchoolApplicationForm::schoolProfileValidationRulesForSection($this->school, $fields, $section, $user)
         );
 
         $before = $this->school->application_payload ?? [];
@@ -136,6 +138,10 @@ class RegistrationProfileController extends SchoolAdminController
         }
 
         $this->school->update($updates);
+
+        if ($section === 'principal' && array_key_exists('principal_email', $data)) {
+            $principalSync->syncEmail($this->school, $data['principal_email'] ?? null);
+        }
 
         $labels = [
             'school'     => 'School contact details',

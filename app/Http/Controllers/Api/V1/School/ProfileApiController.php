@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\School;
 use App\Models\SahodayaProfile;
 use App\Models\User;
 use App\Services\Audit\DataChangeLogger;
+use App\Services\Auth\SchoolPrincipalLoginSyncService;
 use App\Services\Mail\SahodayaMailer;
 use App\Support\SchoolApplicationForm;
 use Illuminate\Http\Request;
@@ -69,15 +70,27 @@ class ProfileApiController extends SchoolApiController
         ]);
     }
 
-    public function updateProfile(Request $request)
+    private function profileFieldHint(string $key): ?string
     {
+        return match ($key) {
+            'school_prefix' => $this->school->prefixes_locked && filled($this->school->school_prefix)
+                ? 'Locked because student registration numbers already use this code.'
+                : 'Used as the short school code in student registration numbers.',
+            'cbse_affiliation' => 'Edit if the school affiliation number is corrected or updated.',
+            default => null,
+        };
+    }
+
+    public function updateProfile(Request $request, SchoolPrincipalLoginSyncService $principalSync)
+    {
+        $user = $request->user();
         $sahodaya = $this->school->parent;
         abort_unless($sahodaya, 422);
 
         $profile = SahodayaProfile::where('tenant_id', $sahodaya->id)->first();
         $fields = SchoolApplicationForm::resolve($profile);
 
-        $data = $request->validate(SchoolApplicationForm::schoolProfileValidationRules($this->school, $fields));
+        $data = $request->validate(SchoolApplicationForm::schoolProfileValidationRules($this->school, $fields, $user));
 
         $before = $this->school->application_payload ?? [];
         $payload = SchoolApplicationForm::mergeProfileUpdate($before, $data, $fields);
@@ -93,6 +106,10 @@ class ProfileApiController extends SchoolApiController
 
         $this->school->update($updates);
 
+        if (array_key_exists('principal_email', $data)) {
+            $principalSync->syncEmail($this->school, $data['principal_email'] ?? null);
+        }
+
         app(DataChangeLogger::class)->updated(
             $this->school,
             'School registration details updated',
@@ -102,17 +119,6 @@ class ProfileApiController extends SchoolApiController
         );
 
         return $this->message('Registration details saved.');
-    }
-
-    private function profileFieldHint(string $key): ?string
-    {
-        return match ($key) {
-            'school_prefix' => $this->school->prefixes_locked && filled($this->school->school_prefix)
-                ? 'Locked because student registration numbers already use this code.'
-                : 'Used as the short school code in student registration numbers.',
-            'cbse_affiliation' => 'Edit if the school affiliation number is corrected or updated.',
-            default => null,
-        };
     }
 
     public function updateAccount(Request $request)

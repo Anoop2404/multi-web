@@ -43,6 +43,9 @@ class SchoolRegistrationProfileTest extends TestCase
                 'phone'            => '9876543210',
                 'cbse_affiliation' => '930319',
                 'highest_class'    => 'Class 12',
+                'principal_email'  => 'principal@demo.school',
+                'vice_principal_email' => 'vice@demo.school',
+                'event_coordinator_email' => 'events@demo.school',
             ],
         ]);
 
@@ -54,7 +57,16 @@ class SchoolRegistrationProfileTest extends TestCase
         ]);
         $admin->assignRole('school_admin');
 
-        return compact('sahodaya', 'school', 'admin');
+        $principal = User::factory()->create([
+            'tenant_id'         => $school->id,
+            'name'              => 'BEENA M B',
+            'email'             => 'principal@demo.school',
+            'email_verified_at' => now(),
+            'password'          => Hash::make('principal-password'),
+        ]);
+        $principal->assignRole('school_principal');
+
+        return compact('sahodaya', 'school', 'admin', 'principal');
     }
 
     public function test_school_can_view_registration_profile_page(): void
@@ -94,7 +106,9 @@ class SchoolRegistrationProfileTest extends TestCase
 
     public function test_school_can_update_principal_section_only(): void
     {
-        ['school' => $school, 'admin' => $admin] = $this->schoolAdmin();
+        Notification::fake();
+
+        ['school' => $school, 'admin' => $admin, 'principal' => $principal] = $this->schoolAdmin();
 
         $response = $this->actingAs($admin)->put("/school-admin/{$school->id}/registration/profile", [
             'section'         => 'principal',
@@ -109,6 +123,46 @@ class SchoolRegistrationProfileTest extends TestCase
         $payload = $school->fresh()->application_payload;
         $this->assertSame('Dr. Jane Principal', $payload['principal_name']);
         $this->assertSame('9876543210', $payload['phone']);
+        $this->assertSame('principal@school.edu', $principal->fresh()->email);
+        $this->assertNull($principal->fresh()->email_verified_at);
+
+        Notification::assertSentTo($principal->fresh(), PortalVerifyEmail::class);
+    }
+
+    public function test_school_can_sync_principal_login_email_from_profile_update(): void
+    {
+        Notification::fake();
+
+        ['school' => $school, 'admin' => $admin, 'principal' => $principal] = $this->schoolAdmin();
+
+        $response = $this->actingAs($admin)->put("/school-admin/{$school->id}/registration/profile", [
+            'section'         => 'principal',
+            'principal_name'  => 'Dr. Jane Principal',
+            'principal_email' => 'new.principal@demo.school',
+            'principal_phone' => '9876500001',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $this->assertSame('new.principal@demo.school', $school->fresh()->application_payload['principal_email']);
+        $this->assertSame('new.principal@demo.school', $principal->fresh()->email);
+        $this->assertNull($principal->fresh()->email_verified_at);
+
+        Notification::assertSentTo($principal->fresh(), PortalVerifyEmail::class);
+    }
+
+    public function test_school_cannot_duplicate_principal_email_with_vice_principal_email(): void
+    {
+        ['school' => $school, 'admin' => $admin] = $this->schoolAdmin();
+
+        $response = $this->actingAs($admin)->put("/school-admin/{$school->id}/registration/profile", [
+            'section'         => 'principal',
+            'principal_name'  => 'Dr. Jane Principal',
+            'principal_email' => 'vice@demo.school',
+        ]);
+
+        $response->assertSessionHasErrors('principal_email');
     }
 
     public function test_profile_update_requires_section(): void
@@ -159,6 +213,18 @@ class SchoolRegistrationProfileTest extends TestCase
         $this->assertSame('new.demo.school@gmail.com', $school->fresh()->application_payload['school_email']);
 
         Notification::assertSentTo($admin->fresh(), PortalVerifyEmail::class);
+    }
+
+    public function test_school_login_email_cannot_match_existing_principal_email(): void
+    {
+        ['school' => $school, 'admin' => $admin] = $this->schoolAdmin();
+
+        $response = $this->actingAs($admin)->put("/school-admin/{$school->id}/registration/account", [
+            'name'  => 'Demo School',
+            'email' => 'principal@demo.school',
+        ]);
+
+        $response->assertSessionHasErrors('email');
     }
 
     public function test_invalid_login_email_format_rejected(): void
