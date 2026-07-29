@@ -19,7 +19,9 @@ use App\Models\SahodayaProfile;
 use App\Services\Events\FestInvoiceService;
 use App\Services\Events\FestItemFeeResolver;
 use App\Services\Events\FestLevelRegistrationService;
+use App\Services\Events\FestPartitionService;
 use App\Services\Events\FestParticipationLimitService;
+use App\Services\Events\FestSchoolPartitionService;
 use App\Services\Events\FestRegistrationEligibilityService;
 use App\Services\Events\FestSchoolEventFeeService;
 use App\Services\Events\FestRegistrationService;
@@ -87,6 +89,7 @@ class FestRegistrationController extends SchoolAdminController
             ->get()
             ->pipe(fn ($events) => app(\App\Services\School\SchoolUserScopeService::class)
                 ->filterFestEventsForUser($request->user(), $this->school->id, $program, $events))
+            ->pipe(fn ($events) => $this->filterPartitionedEventsForSchool($events, $eventType))
             ->map(fn (FestEvent $event) => $this->hydrateEventForSchoolRegistration($event, $feeService));
 
         if ($view === 'results') {
@@ -296,6 +299,10 @@ class FestRegistrationController extends SchoolAdminController
         $meta = SchoolFestProgram::meta($program);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
+        if ($redirect = $this->redirectHubToSchoolPartition($request, $event, $tenantId, $meta['slug'], 'overview')) {
+            return $redirect;
+        }
+
         $event = $this->resolveSchoolFestEvent($request, $event, $meta['slug']);
 
         return $this->inertia('School/Events/EventOverview', array_merge(
@@ -308,6 +315,10 @@ class FestRegistrationController extends SchoolAdminController
     {
         $meta = SchoolFestProgram::meta($program);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        if ($redirect = $this->redirectHubToSchoolPartition($request, $event, $tenantId, $meta['slug'], 'registration')) {
+            return $redirect;
+        }
 
         $event = $this->resolveSchoolFestEvent($request, $event, $meta['slug']);
         $feeService = app(FestSchoolEventFeeService::class);
@@ -393,6 +404,40 @@ class FestRegistrationController extends SchoolAdminController
         return $events->count() === 1 ? $events->first() : null;
     }
 
+    /**
+     * A partitioned hub (English Fest, or Kalotsav/Kids Fest once regions are configured)
+     * carries no items or registrations of its own — real registration, items, and billing
+     * all live on the school's assigned region child (see FestSchoolEventFeeService::
+     * recalculate(): "Regional registrations live on a partition child, while the fee
+     * schedule and the school's single invoice live on the parent hub"). Before this,
+     * a school landing directly on the hub's own event URL (bookmark, stale link, or the
+     * hub appearing as its own entry in "Open Sahodaya events" — see index()'s filtering
+     * below) got a fully separate, independently billable registration/overview page for
+     * the empty hub itself, on top of their real region's page. Redirects to the resolved
+     * child's equivalent page when one exists; returns null (render normally) otherwise —
+     * e.g. no region assigned yet, so the caller's existing region-required validation
+     * (FestRegionPartitionService::assertRegionSelected()) surfaces the right error instead
+     * of a silent redirect loop.
+     */
+    protected function redirectHubToSchoolPartition(Request $request, FestEvent $event, string $tenantId, string $programSlug, string $suffix): ?\Illuminate\Http\RedirectResponse
+    {
+        if (! app(FestPartitionService::class)->isPartitionedHub($event)) {
+            return null;
+        }
+
+        $key = app(FestSchoolPartitionService::class)->resolvePartitionKey($event, $this->school->id);
+        $child = $key ? app(FestPartitionService::class)->partitionByKey($event, $key) : null;
+
+        if (! $child) {
+            return null;
+        }
+
+        $prefix = ProgramRouteMap::prefixFromSlug($programSlug);
+        $query = $request->getQueryString();
+
+        return redirect("/school-admin/{$tenantId}/{$prefix}/events/{$child->id}/{$suffix}".($query ? "?{$query}" : ''));
+    }
+
     protected function resolveSchoolFestEvent(Request $request, FestEvent $event, string $programSlug): FestEvent
     {
         $meta = SchoolFestProgram::meta($programSlug);
@@ -410,6 +455,29 @@ class FestRegistrationController extends SchoolAdminController
         abort_if($allowed->isEmpty(), 403);
 
         return $resolved;
+    }
+
+    /**
+     * For non-sports partitioned fests (English Fest, Kalotsav/Kids Fest with regions, …),
+     * `listedForSchool()` alone returns the hub AND every one of its region children as
+     * separate rows — each got its own fully independent registration + billing card on
+     * the school's page, showing every school every other region's (irrelevant) entry on
+     * top of the empty hub. Sports already excludes its season hub above via
+     * whereNotExists(); this is the equivalent fix for every other partitioned fest type:
+     * drop the hub itself (nothing to register there — see redirectHubToSchoolPartition()),
+     * and drop any region child that isn't this school's own assigned partition.
+     *
+     * Deliberately falls back to returning $events unfiltered if filtering would leave
+     * nothing — e.g. no region assigned yet — so the caller's normal "no events" / region-
+     * required messaging still has something to work with rather than a silently empty list.
+     */
+    private function filterPartitionedEventsForSchool($events, string $eventType)
+    {
+        if ($eventType === 'sports') {
+            return $events;
+        }
+
+        return app(FestSchoolPartitionService::class)->filterVisibleToSchool($events, $this->school->id);
     }
 
     private function registrationEventIdsForSchoolView($events)

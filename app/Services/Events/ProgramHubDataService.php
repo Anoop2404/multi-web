@@ -34,6 +34,17 @@ class ProgramHubDataService
             ->orderByDesc('event_start')
             ->get();
 
+        // Non-sports partitioned fests (English Fest, Kalotsav/Kids Fest with regions, …):
+        // listedForSchool() alone returns the hub AND every region child as separate rows,
+        // so without this every school's hub dashboard showed the empty hub plus every
+        // other school's (irrelevant) region as its own "Open Sahodaya events" entry. See
+        // FestSchoolPartitionService::filterVisibleToSchool() and
+        // FestRegistrationController::filterPartitionedEventsForSchool() for the identical
+        // fix on the registration listing page.
+        if ($meta['eventType'] !== 'sports') {
+            $sahodayaEvents = app(FestSchoolPartitionService::class)->filterVisibleToSchool($sahodayaEvents, $school->id);
+        }
+
         $schoolEvents = FestEvent::where('tenant_id', $sahodayaId)
             ->ofType($meta['eventType'])
             ->where('level_round', 'school')

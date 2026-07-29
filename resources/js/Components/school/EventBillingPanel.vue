@@ -57,10 +57,14 @@
 
         <!-- Single-invoice path (non sports_composite) -->
         <div v-else class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm">
-            <ul v-if="itemFeeLines.length || schoolRegFee > 0" class="text-xs text-indigo-900 space-y-1">
+            <ul v-if="itemFeeLines.length || schoolRegFee > 0 || studentRegLine" class="text-xs text-indigo-900 space-y-1">
                 <li v-if="schoolRegFee > 0" class="flex justify-between gap-4">
                     <span>School registration fee</span>
                     <span class="font-semibold shrink-0">₹{{ formatMoney(schoolRegFee) }}</span>
+                </li>
+                <li v-if="studentRegLine" class="flex justify-between gap-4">
+                    <span>{{ studentRegLine.label }}</span>
+                    <span class="font-semibold shrink-0">₹{{ formatMoney(studentRegLine.amount) }}</span>
                 </li>
                 <li v-for="(line, i) in itemFeeLines" :key="i" class="flex justify-between gap-4">
                     <span>{{ line.label }}</span>
@@ -70,7 +74,7 @@
             <p v-else class="text-xs text-indigo-800">Register items above to see item fees here.</p>
             <p v-if="itemFeeLines.length" class="text-xs text-indigo-700 mt-1">
                 Item fees: ₹{{ formatMoney(itemFeesDue) }}
-                ({{ itemFeeLines.length }} item{{ itemFeeLines.length === 1 ? '' : 's' }})
+                <template v-if="itemUnitCount > 0">({{ itemUnitCount }} item{{ itemUnitCount === 1 ? '' : 's' }})</template>
             </p>
             <p class="font-semibold text-indigo-900 mt-2 pt-2 border-t border-indigo-100">
                 Total fees due: ₹{{ formatMoney(totalDue) }}
@@ -173,6 +177,8 @@ const props = defineProps({
     paymentDetails: String,
     itemFeeLines: { type: Array, default: () => [] },
     itemFeesDue: { type: Number, default: 0 },
+    itemUnitCount: { type: Number, default: 0 },
+    studentRegLine: { type: Object, default: null },
     isMinFeeApplied: { type: Boolean, default: false },
     eventPaymentRef: { type: String, default: '' },
     eventPaymentBank: { type: String, default: '' },

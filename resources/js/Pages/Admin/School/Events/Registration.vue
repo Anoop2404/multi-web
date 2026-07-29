@@ -431,6 +431,8 @@
                     :payment-details="paymentDetails"
                     :item-fee-lines="itemFeeLines(event)"
                     :item-fees-due="itemFeesDue(event)"
+                    :item-unit-count="itemUnitCount(event)"
+                    :student-reg-line="studentRegLine(event)"
                     :is-min-fee-applied="isMinFeeApplied(event)"
                     :event-payment-ref="eventPaymentRefs[event.id] ?? ''"
                     :event-payment-bank="eventPaymentBanks[event.id] ?? ''"
@@ -1093,19 +1095,18 @@ function studentIneligibilityReason(student, event, item) {
     return 'Not eligible for this item';
 }
 
-// Deliberately excludes the school registration AND student registration summary lines —
-// those are once-per-school / once-per-student costs, not per-item ones, and
-// EventBillingPanel.vue already shows them separately as their own <li> rows (school reg
-// reads event.school_fee.school_registration_fee directly; student reg is one of the
-// breakdown lines rendered above this summary). Previously this only filtered out the
-// school-registration line by label and NOT the student-registration line, so for
-// sports_composite-billed events (FestSportsCompositeFeeService::calculate()) the
-// "Item fees: ₹X (N items)" summary re-added the student registration total on top of
-// the real per-item fees — e.g. a student with a ₹300 student-reg fee already shown above
-// plus one ₹50 extra item beyond the free quota displayed as "Item fees: ₹350 (2 items)",
-// even though true item fees were only ₹50 and "2" was actually the student count, not an
-// item count. Filtering by line_type is the reliable check (set for sports_composite);
-// the label check remains as a fallback for fee models that don't set line_type.
+// FestSchoolEventFeeService::breakdown() now tags every line with a line_type for every
+// fee model (previously only sports_composite did, forcing this file to guess a line's
+// category from its label text — the exact fragility that produced two bugs in a row:
+// the student registration fee getting silently double-counted into "Item fees", then
+// silently disappearing from the breakdown entirely). line_type is now the single source
+// of truth; no label matching needed here anymore.
+//
+// Deliberately excludes school_reg and student_reg — those are once-per-school /
+// once-per-student costs, not per-item ones, and EventBillingPanel.vue shows them
+// separately as their own <li> rows (school reg reads event.school_fee.
+// school_registration_fee directly; student reg via studentRegLine() below).
+//
 // This function/itemFeesDue() is only the item-level subtotal shown under "Item fees due"
 // — do NOT use itemFeesDue() as "what the school owes" for gating upload forms or invoice
 // links; use event.school_fee.total_due / .outstanding for that instead, since a school
@@ -1114,15 +1115,40 @@ function itemFeeLines(event) {
     const lines = event.school_fee?.breakdown?.items ?? [];
     return lines.filter(line => {
         const type = String(line.line_type || '').toLowerCase();
-        if (type === 'school_reg' || type === 'student_reg') return false;
-        const label = String(line.label || '').toLowerCase();
-        if (label.includes('school registration') || label.includes('student registration')) return false;
-        return true;
+        return type !== 'school_reg' && type !== 'student_reg';
     });
 }
 
 function itemFeesDue(event) {
     return itemFeeLines(event).reduce((sum, line) => sum + Number(line.amount || 0), 0);
+}
+
+// How many billable units (items) the "Item fees" caption should report — summed from
+// each line's own quantity rather than counting lines (one line can cover several units,
+// e.g. cksc_tiered's "Additional items" line is a single row covering count-1 items) and
+// restricted to genuinely per-item line types. flat_school's single flat charge and any
+// team_fee lines are deliberately excluded — "(1 item)"/"(1 item)" would misreport a flat
+// fee or a team entry as an item, which is the same class of bug this whole pass fixed.
+// Returns 0 when nothing here is item-shaped (e.g. a pure flat_school or team-only fee),
+// which the caller uses to hide the count/caption entirely rather than show "(0 items)".
+function itemUnitCount(event) {
+    const itemLineTypes = ['item_fee', 'item_fee_waived', 'extra_item'];
+
+    return itemFeeLines(event)
+        .filter(line => itemLineTypes.includes(String(line.line_type || '').toLowerCase()))
+        .reduce((sum, line) => sum + Number(line.quantity ?? 1), 0);
+}
+
+// The one line itemFeeLines() deliberately excludes but that still needs its own visible
+// row (same treatment as the school registration fee) — otherwise it silently vanishes
+// from the breakdown while still being folded into Total fees due, which is exactly the
+// "amount shown doesn't add up to the total" bug this introduced. Found by inspection when
+// a school with no items beyond one extra saw School reg + item extra fee sum to less than
+// Total fees due, with the ₹300/student line nowhere on screen.
+function studentRegLine(event) {
+    const lines = event.school_fee?.breakdown?.items ?? [];
+
+    return lines.find(line => String(line.line_type || '').toLowerCase() === 'student_reg') ?? null;
 }
 
 function canRegister(event) {

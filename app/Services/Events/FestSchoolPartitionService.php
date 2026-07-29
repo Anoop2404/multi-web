@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestEventSchoolPartition;
 use App\Models\Tenant;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class FestSchoolPartitionService
@@ -13,6 +14,51 @@ class FestSchoolPartitionService
     public function __construct(
         private FestPartitionService $partitions,
     ) {}
+
+    /**
+     * Filter a set of possibly-mixed hub + partition-child FestEvent rows down to what a
+     * school should actually see: never the hub itself once it has configured partitions
+     * (nothing to register there — see FestRegistrationController::
+     * redirectHubToSchoolPartition()), and only the school's own assigned region among any
+     * partition children, never a sibling region's. Without this, every school sees the
+     * empty hub AND every region as separate, independently-billable "open event" entries
+     * (school dashboard, registration listing, nav) instead of just their own.
+     *
+     * Falls back to returning $events unfiltered if filtering would leave nothing (e.g. no
+     * region assigned to this school yet), so existing "no events" / region-required
+     * messaging still has something to work with rather than a silently empty list. A no-op
+     * for events with no partitions at all — the overwhelming majority of fest events.
+     *
+     * @param  Collection<int, FestEvent>  $events
+     * @return Collection<int, FestEvent>
+     */
+    public function filterVisibleToSchool(Collection $events, string $schoolId): Collection
+    {
+        $resolvedChildIdByHub = [];
+
+        $filtered = $events->reject(function (FestEvent $event) use ($schoolId, &$resolvedChildIdByHub) {
+            if ($this->partitions->isPartitionedHub($event)) {
+                return true;
+            }
+
+            if ($event->parent_event_id && $this->partitions->partitionKey($event) !== null) {
+                $hubId = $event->parent_event_id;
+
+                if (! array_key_exists($hubId, $resolvedChildIdByHub)) {
+                    $hub = FestEvent::find($hubId);
+                    $key = $hub ? $this->resolvePartitionKey($hub, $schoolId) : null;
+                    $child = ($hub && $key) ? $this->partitions->partitionByKey($hub, $key) : null;
+                    $resolvedChildIdByHub[$hubId] = $child?->id;
+                }
+
+                return $resolvedChildIdByHub[$hubId] !== $event->id;
+            }
+
+            return false;
+        })->values();
+
+        return $filtered->isEmpty() ? $events : $filtered;
+    }
 
     public function resolvePartitionKey(FestEvent $hub, string $schoolId): ?string
     {

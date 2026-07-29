@@ -723,19 +723,20 @@ class FestSchoolEventFeeService
                         'label' => $line->label,
                         'amount' => (float) $line->amount,
                         'line_type' => $line->line_type,
+                        'quantity' => $line->quantity ?? 1,
                     ];
                 }
             }
 
             if ($items === [] && $fee->total_due > 0) {
                 if ($fee->school_registration_fee > 0) {
-                    $items[] = ['label' => 'School registration fee ('.$event->title.')', 'amount' => (float) $fee->school_registration_fee, 'line_type' => 'school_reg'];
+                    $items[] = ['label' => 'School registration fee ('.$event->title.')', 'amount' => (float) $fee->school_registration_fee, 'line_type' => 'school_reg', 'quantity' => 1];
                 }
                 if ($this->supportsSportsCompositeSchema() && $fee->student_registration_fee > 0) {
-                    $items[] = ['label' => 'Student registration fee ('.$event->title.')', 'amount' => (float) $fee->student_registration_fee, 'line_type' => 'student_reg'];
+                    $items[] = ['label' => 'Student registration fee ('.$event->title.')', 'amount' => (float) $fee->student_registration_fee, 'line_type' => 'student_reg', 'quantity' => $fee->participation_item_count ?: 1];
                 }
                 if ($this->supportsSportsCompositeSchema() && $fee->extra_item_fee > 0) {
-                    $items[] = ['label' => 'Extra item fees', 'amount' => (float) $fee->extra_item_fee, 'line_type' => 'extra_item'];
+                    $items[] = ['label' => 'Extra item fees', 'amount' => (float) $fee->extra_item_fee, 'line_type' => 'extra_item', 'quantity' => 1];
                 }
             }
 
@@ -748,6 +749,17 @@ class FestSchoolEventFeeService
             ];
         }
 
+        // Every branch below now tags each line with a line_type (and, where the line
+        // represents more than one billable unit, a quantity) — previously only
+        // sports_composite did this, so the frontend had to guess a line's category by
+        // matching its label text. That fragility is exactly what produced the "student
+        // registration fee silently double-counted, then silently disappeared" bugs (see
+        // itemFeeLines()/studentRegLine() in Registration.vue): item_catalog, cksc_tiered,
+        // per_student, and flat_school/per_item never told the frontend what a line WAS,
+        // only what it said. line_type is now the single source of truth every fee model
+        // provides, and quantity lets the UI show an accurate "(N items)"/"(N students)"
+        // count instead of counting lines (one line can represent several billed units —
+        // e.g. cksc_tiered's "Additional items" line covers count-1 items in one row).
         if ($feeModel === 'item_catalog' && $fee->participation_item_count > 0) {
             $catalog = $this->itemFeeResolver->participationBreakdown($event, $fee->school_id, $schedule);
             foreach ($catalog['lines'] as $line) {
@@ -756,6 +768,8 @@ class FestSchoolEventFeeService
                     'amount' => (float) $line['amount'],
                     'item_title' => $line['item_title'] ?? null,
                     'head_name' => $line['head_name'] ?? null,
+                    'line_type' => 'item_fee',
+                    'quantity' => 1,
                 ];
             }
         } elseif ($fee->participation_item_count > 0 && $feeModel === 'cksc_tiered') {
@@ -764,12 +778,14 @@ class FestSchoolEventFeeService
             $count = $fee->participation_item_count;
 
             if ($count >= 1) {
-                $items[] = ['label' => 'First item', 'amount' => $first];
+                $items[] = ['label' => 'First item', 'amount' => $first, 'line_type' => 'item_fee', 'quantity' => 1];
             }
             if ($count > 1) {
                 $items[] = [
                     'label' => 'Additional items ('.($count - 1).' × ₹'.$additional.')',
                     'amount' => ($count - 1) * $additional,
+                    'line_type' => 'item_fee',
+                    'quantity' => $count - 1,
                 ];
             }
         } elseif ($feeModel === 'per_student' && $fee->participation_fee > 0) {
@@ -778,6 +794,12 @@ class FestSchoolEventFeeService
             $items[] = [
                 'label' => "Participating students ({$studentCount} × ₹{$rate})",
                 'amount' => (float) $fee->participation_fee,
+                // Not an item_fee — this is the per-student registration charge itself (the
+                // same role sports_composite's dedicated student_reg line plays), so the
+                // frontend can show it alongside School registration fee instead of folding
+                // it into an "Item fees" count where "N items" would misreport N students.
+                'line_type' => 'student_reg',
+                'quantity' => $studentCount,
             ];
         } elseif ($fee->participation_fee > 0) {
             $label = match ($feeModel) {
@@ -788,6 +810,10 @@ class FestSchoolEventFeeService
             $items[] = [
                 'label' => $label,
                 'amount' => (float) $fee->participation_fee,
+                // flat_school is one indivisible charge, not N billable items — kept as its
+                // own line_type so the UI never reports it as "(1 item)".
+                'line_type' => $feeModel === 'flat_school' ? 'flat_fee' : 'item_fee',
+                'quantity' => $feeModel === 'flat_school' ? 1 : $fee->participation_item_count,
             ];
         }
 
