@@ -103,4 +103,96 @@ class TenantControllerTest extends TestCase
 
         $this->assertSame('testschool1', $created->username);
     }
+
+    public function test_superadmin_defaults_blank_school_login_username_to_email(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        config(['tenancy.database_per_sahodaya' => false]);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Test Sahodaya',
+            'is_active' => true,
+        ]);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Test School',
+            'parent_id' => $sahodaya->id,
+            'membership_status' => 'approved',
+            'is_active' => true,
+        ]);
+
+        $superadmin = User::factory()->create([
+            'tenant_id' => null,
+            'email_verified_at' => now(),
+        ]);
+        $superadmin->assignRole('superadmin');
+
+        $this->actingAs($superadmin)
+            ->post("/admin/tenants/{$school->id}/school-admin", [
+                'name' => 'School Admin',
+                'email' => 'contact@example.com',
+                'username' => '',
+                'password' => 'Password123!',
+            ])
+            ->assertRedirect();
+
+        $created = User::query()
+            ->where('tenant_id', $school->id)
+            ->where('email', 'contact@example.com')
+            ->firstOrFail();
+
+        $this->assertSame('contact@example.com', $created->username);
+    }
+
+    public function test_superadmin_cannot_create_school_login_when_email_is_already_used_as_another_username(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        config(['tenancy.database_per_sahodaya' => false]);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Test Sahodaya',
+            'is_active' => true,
+        ]);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Test School',
+            'parent_id' => $sahodaya->id,
+            'membership_status' => 'approved',
+            'is_active' => true,
+        ]);
+
+        $existing = User::factory()->create([
+            'tenant_id' => $school->id,
+            'name' => 'Existing Login',
+            'email' => 'existing@example.com',
+            'username' => 'contact@example.com',
+            'email_verified_at' => now(),
+        ]);
+        $existing->assignRole('school_admin');
+
+        $superadmin = User::factory()->create([
+            'tenant_id' => null,
+            'email_verified_at' => now(),
+        ]);
+        $superadmin->assignRole('superadmin');
+
+        $this->actingAs($superadmin)
+            ->post("/admin/tenants/{$school->id}/school-admin", [
+                'name' => 'New School Admin',
+                'email' => 'contact@example.com',
+                'username' => '',
+                'password' => 'Password123!',
+            ])
+            ->assertSessionHasErrors('email');
+
+        $this->assertSame(1, User::where('tenant_id', $school->id)->count());
+    }
 }

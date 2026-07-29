@@ -601,7 +601,7 @@ class TenantController extends Controller
                 'user_id'  => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', $tenant->id)],
                 'name'     => ['required', 'string', 'max:255'],
                 'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($existingId)],
-                'username' => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9_.-]+$/', Rule::unique('users', 'username')->ignore($existingId)],
+                'username' => ['nullable', 'string', 'max:255', Rule::unique('users', 'username')->ignore($existingId)],
                 'password' => [$existingId ? 'nullable' : 'required', 'string', 'min:8'],
             ]);
 
@@ -609,9 +609,32 @@ class TenantController extends Controller
                 ? User::query()->where('tenant_id', $tenant->id)->findOrFail($existingId)
                 : new User(['tenant_id' => $tenant->id]);
 
+            $email = strtolower(trim($data['email']));
+            $username = array_key_exists('username', $data) ? trim((string) $data['username']) : '';
+            if ($username === '') {
+                $username = $email;
+            }
+
+            $collision = User::query()
+                ->where('tenant_id', $tenant->id)
+                ->when($existingId, fn ($q) => $q->where('id', '!=', $existingId))
+                ->where(function ($q) use ($email, $username) {
+                    $q->where('email', $email)
+                        ->orWhere('username', $email)
+                        ->orWhere('email', $username)
+                        ->orWhere('username', $username);
+                })
+                ->exists();
+
+            if ($collision) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'email' => 'That email or username is already used by an existing login.',
+                ]);
+            }
+
             $payload = [
                 'name'              => $data['name'],
-                'email'             => $data['email'],
+                'email'             => $email,
                 'email_verified_at' => now(),
             ];
 
@@ -624,8 +647,8 @@ class TenantController extends Controller
                 $user->save();
             }
 
-            if (array_key_exists('username', $data) && filled($data['username']) && $data['username'] !== $user->username) {
-                $user->forceFill(['username' => $data['username']])->save();
+            if ($username !== $user->username) {
+                $user->forceFill(['username' => $username])->save();
             }
 
             $user->syncRoles([$role]);

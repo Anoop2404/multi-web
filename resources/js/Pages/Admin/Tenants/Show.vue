@@ -420,7 +420,7 @@
                         <input v-model="adminForm.username" type="text" autocomplete="off"
                                class="field focus:ring-indigo-300" placeholder="e.g. testschool1">
                         <p class="text-xs text-gray-400 mt-1">
-                            Leave blank to keep the current username or auto-generate one for a new login.
+                            Leave blank to use the email as the login username.
                         </p>
                         <p v-if="adminForm.errors.username" class="text-xs text-red-500 mt-1">{{ adminForm.errors.username }}</p>
                     </div>
