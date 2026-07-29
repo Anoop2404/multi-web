@@ -600,8 +600,8 @@ class TenantController extends Controller
             $data = $request->validate([
                 'user_id'  => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', $tenant->id)],
                 'name'     => ['required', 'string', 'max:255'],
-                'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($existingId)],
-                'username' => ['nullable', 'string', 'max:255', Rule::unique('users', 'username')->ignore($existingId)],
+                'email'    => ['required', 'email', 'max:255'],
+                'username' => ['nullable', 'string', 'max:255'],
                 'password' => [$existingId ? 'nullable' : 'required', 'string', 'min:8'],
             ]);
 
@@ -628,7 +628,7 @@ class TenantController extends Controller
 
             if ($collision) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'email' => 'That email or username is already used by an existing login.',
+                    'email' => 'That email or login is already used by an existing account.',
                 ]);
             }
 

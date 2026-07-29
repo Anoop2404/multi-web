@@ -191,7 +191,9 @@ class TenantControllerTest extends TestCase
                 'username' => '',
                 'password' => 'Password123!',
             ])
-            ->assertSessionHasErrors('email');
+            ->assertSessionHasErrors([
+                'email' => 'That email or login is already used by an existing account.',
+            ]);
 
         $this->assertSame(1, User::where('tenant_id', $school->id)->count());
     }
