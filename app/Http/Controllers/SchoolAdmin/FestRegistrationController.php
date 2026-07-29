@@ -723,9 +723,15 @@ class FestRegistrationController extends SchoolAdminController
                 'headsForFilter'  => [],
                 'hasItemHeads'    => false,
             ]);
-            $schedule = $feeService->resolveSchedule($event);
-            $event->setAttribute('student_event_reg_fee', (float) ($schedule['per_student_amount'] ?? 0));
         }
+        // Per-student event registration fee hint on the Event Registration panel — was
+        // sports-only, but any fest using a per-student composite/per_student billing
+        // model (e.g. English Fest) has the exact same "₹X per student" line item, and
+        // that panel now renders for every event type (see Registration.vue). Reuses the
+        // $schedule already resolved above (which itself resolves through to the parent
+        // hub for a partitioned child), so this works the same whether $event is the hub
+        // or a school's region child.
+        $event->setAttribute('student_event_reg_fee', (float) ($schedule['per_student_amount'] ?? 0));
         $event->setAttribute('academic_year_label', $event->academicYear?->label);
         $verification = FestSchoolVerification::where('event_id', $event->id)
             ->where('school_id', $this->school->id)

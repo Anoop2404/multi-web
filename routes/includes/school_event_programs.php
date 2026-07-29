@@ -82,6 +82,10 @@ foreach ($festPrograms as $cfg) {
         Route::post('/events/{event}/register-students', [\App\Http\Controllers\SchoolAdmin\FestEventStudentRegistrationController::class, 'store'])
             ->defaults('program', $slug)
             ->name('event.register-students');
+        Route::delete('/events/{event}/register-students/{student}', [\App\Http\Controllers\SchoolAdmin\FestEventStudentRegistrationController::class, 'destroy'])
+            ->defaults('program', $slug)
+            ->whereNumber('student')
+            ->name('event.register-students.destroy');
         Route::post('/events/{event}/bulk-assign', [\App\Http\Controllers\SchoolAdmin\FestEventStudentRegistrationController::class, 'bulkAssign'])
             ->defaults('program', $slug)
             ->name('event.bulk-assign');

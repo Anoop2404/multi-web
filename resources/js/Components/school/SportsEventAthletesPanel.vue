@@ -2,7 +2,7 @@
     <section class="rounded-xl border border-indigo-100 bg-indigo-50/40 overflow-hidden mb-4">
         <div class="px-4 py-3 border-b border-indigo-100 flex flex-wrap items-center justify-between gap-2">
             <div>
-                <h4 class="text-sm font-bold text-indigo-950">Event athletes</h4>
+                <h4 class="text-sm font-bold text-indigo-950">{{ isSportsEvent ? 'Event athletes' : 'Event registration' }}</h4>
                 <p class="text-xs text-indigo-800/80 mt-0.5">
                     Register students for <strong>{{ event.title }}</strong> first — then assign them to items below.
                     <span v-if="studentEventRegFee > 0" class="block mt-1">
@@ -92,6 +92,11 @@
                                   class="text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
                                 Registered
                             </span>
+                            <button v-if="row.registered" type="button"
+                                    class="ml-1.5 text-[10px] text-red-600 font-semibold hover:underline"
+                                    @click="unregisterStudent(row.id)">
+                                Cancel
+                            </button>
                             <span v-else-if="!row.hasDob"
                                   class="text-[10px] text-amber-700" title="Add date of birth on student profile">
                                 DOB required
@@ -111,7 +116,7 @@
         </div>
 
         <p v-if="registeredCount" class="px-4 py-2 text-xs text-slate-600 border-t border-indigo-50 bg-white/60">
-            <strong>{{ registeredCount }}</strong> athlete{{ registeredCount === 1 ? '' : 's' }} registered for this event.
+            <strong>{{ registeredCount }}</strong> {{ isSportsEvent ? 'athlete' : 'student' }}{{ registeredCount === 1 ? '' : 's' }} registered for this event.
         </p>
         <p v-if="requireVerified && unregisteredVisibleCount && selectableVisibleCount < unregisteredVisibleCount"
            class="px-4 py-2 text-xs text-amber-800 border-t border-indigo-50 bg-amber-50/60">
@@ -147,6 +152,7 @@ const selectAllRef = ref(null);
 const form = useForm({ student_ids: [] });
 
 const requireVerified = computed(() => props.event?.require_verified_students !== false);
+const isSportsEvent = computed(() => props.event?.event_type === 'sports');
 
 function normalizeId(id) {
     return Number(id);
@@ -381,6 +387,18 @@ function submit() {
             selectedIds.value = [];
             router.reload({ only: ['events', 'studentsByEvent', 'students'] });
         },
+    });
+}
+
+// Explicit, user-initiated removal of a student's event-level registration — the
+// counterpart to registering them above. Backend rejects this (with a flash error) while
+// the student still has an active item registration under this event; cancel those first.
+// See FestEventRegistrationService::withdrawStudent().
+function unregisterStudent(studentId) {
+    if (!confirm("Remove this student's event registration?")) return;
+    router.delete(`${props.registerUrl}/${studentId}`, {
+        preserveScroll: true,
+        onSuccess: () => router.reload({ only: ['events', 'studentsByEvent', 'students'] }),
     });
 }
 </script>

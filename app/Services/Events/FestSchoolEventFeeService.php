@@ -6,6 +6,7 @@ use App\Models\FeeReceipt;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestItemHead;
+use App\Models\FestLevelRegistration;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
@@ -41,6 +42,26 @@ class FestSchoolEventFeeService
     /** @return array<string, mixed> */
     public function resolveSchedule(FestEvent $event): array
     {
+        // Regional registrations live on a partition child, while the fee schedule and the
+        // school's single invoice live on the parent hub — recalculate() below has always
+        // redirected fee CALCULATION to the hub for a partitioned child, but nothing here
+        // did the same for fee CONFIGURATION lookup. A child event's own fee_settings
+        // column is normally empty (fee settings are only ever configured on the hub via
+        // Settings → Fee settings), so resolveSchedule($child) fell through to fee_model
+        // 'none' and feeRequired($child) reported false — even though the hub had a fully
+        // configured schedule. That silently hid the Billing & Payment tab (and the item
+        // fee column) for any school looking at their region child event directly, which
+        // is the normal/only way schools reach their event once redirected off the hub
+        // (see FestRegistrationController::redirectHubToSchoolPartition()). Mirror the
+        // exact same redirect recalculate() already does so schedule resolution and actual
+        // billing always agree.
+        if ($event->parent_event_id) {
+            $hub = FestEvent::find($event->parent_event_id);
+            if ($hub && ($hub->conduct_mode ?? 'standard') === 'partitioned') {
+                return $this->resolveSchedule($hub);
+            }
+        }
+
         $schedule = null;
 
         if ($event->state_program_id) {
@@ -555,9 +576,18 @@ class FestSchoolEventFeeService
         $studentCount = $this->billableStudentCount($event, $schoolId);
         $feeModel = $schedule['fee_model'] ?? 'none';
 
+        // A school with no event-level (Step 1) registration and no items registered at
+        // all should not be charged the school registration fee. flat_school is exempt —
+        // it's a fixed per-event fee not tied to participation by design.
+        $hasEventRegistration = FestLevelRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->where('school_id', $schoolId)
+            ->where('status', 'active')
+            ->exists();
+        $hasAnyRegistration = $hasEventRegistration || $itemCount > 0 || $studentCount > 0;
+
         $schoolRegFee = match ($feeModel) {
             'sports_composite' => $this->sportsCompositeFeeService->schoolRegistrationAmount($school, $schedule),
-            'cksc_tiered', 'item_catalog' => $this->schoolRegistrationAmount($school, $schedule),
+            'cksc_tiered', 'item_catalog' => $hasAnyRegistration ? $this->schoolRegistrationAmount($school, $schedule) : 0.0,
             default => 0,
         };
 
@@ -577,7 +607,7 @@ class FestSchoolEventFeeService
         } else {
             if ($feeModel === 'sports_composite') {
                 $feeModel = 'item_catalog';
-                $schoolRegFee = $this->schoolRegistrationAmount($school, $schedule);
+                $schoolRegFee = $hasAnyRegistration ? $this->schoolRegistrationAmount($school, $schedule) : 0.0;
             }
 
             $participationFee = match ($feeModel) {

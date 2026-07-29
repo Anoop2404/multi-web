@@ -206,20 +206,20 @@
 
                 <!-- In-card navigation tabs (Option 2) -->
                 <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-2.5 flex flex-wrap gap-2 text-xs font-semibold">
-                    <button v-if="isSports" type="button" @click="setTab(event.id, 'athletes')"
+                    <button type="button" @click="setTab(event.id, 'athletes')"
                             class="px-3.5 py-1.5 rounded-lg transition"
                             :class="getTab(event.id) === 'athletes' ? 'bg-[#0f3d7a] text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'">
-                        Step 1: Event Athletes ({{ (event.event_registrations || []).length }})
+                        {{ isSports ? 'Step 1: Event Athletes' : 'Step 1: Event Registration' }} ({{ (event.event_registrations || []).length }})
                     </button>
                     <button type="button" @click="setTab(event.id, 'items')"
                             class="px-3.5 py-1.5 rounded-lg transition"
                             :class="getTab(event.id) === 'items' ? 'bg-[#0f3d7a] text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'">
-                        {{ isSports ? 'Step 2: Item Registration' : 'Item Registration' }}
+                        Step 2: Item Registration
                     </button>
                     <button v-if="event.fee_required" type="button" @click="setTab(event.id, 'payment')"
                             class="px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5"
                             :class="getTab(event.id) === 'payment' ? 'bg-[#0f3d7a] text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'">
-                        <span>{{ isSports ? 'Step 3: Billing & Payment' : 'Billing & Payment' }}</span>
+                        <span>Step 3: Billing & Payment</span>
                         <span v-if="event.school_fee?.status" class="text-[10px] px-1.5 py-0.5 rounded-full uppercase font-mono"
                               :class="event.school_fee.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'">
                             {{ event.school_fee.status }}
@@ -247,6 +247,23 @@
                 <div v-if="!canRegister(event)" class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
                     {{ registrationClosedMessage(event) }}
                 </div>
+
+                <!-- ── Non-sports fests: Step 1 · Event Registration (independent of the
+                     items-table branching below, which is unchanged) — sports already
+                     renders this panel inside its own branch further down. -->
+                <SportsEventAthletesPanel
+                    v-if="canRegister(event) && !isSports"
+                    v-show="getTab(event.id) === 'athletes'"
+                    :event="event"
+                    :students="studentsForEvent(event.id)"
+                    :event-registrations="event.event_registrations ?? []"
+                    :register-url="`${programBase}/events/${event.id}/register-students`"
+                    :items-url="`#item-registration-${event.id}`"
+                    :reports-href="`${programBase}/reports/${event.id}`"
+                    :student-event-reg-fee="Number(event.student_event_reg_fee ?? 0)"
+                    :school-classes="schoolClasses"
+                    class="mb-4"
+                />
 
                 <!-- ── SPORTS: event athletes + head/age filters ── -->
                 <div v-else-if="isSports" class="space-y-4">
@@ -362,8 +379,8 @@
                     </div>
                 </div>
 
-                <!-- ── KALOTSAV / KIDS FEST / TEACHER FEST: generic flat table ── -->
-                <form v-else v-show="getTab(event.id) === 'items'" class="mt-4 space-y-4" @submit.prevent>
+                <!-- ── KALOTSAV / KIDS FEST / TEACHER FEST / ENGLISH FEST / SCIENCE FEST: generic flat table ── -->
+                <form v-else v-show="getTab(event.id) === 'items'" :id="`item-registration-${event.id}`" class="mt-4 space-y-4" @submit.prevent>
                     <div class="rounded-xl border border-gray-100 overflow-hidden">
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
@@ -519,16 +536,16 @@ function getTab(eventId) {
         const tabParam = urlParams ? urlParams.get('tab') : null;
 
         if (tabParam === 'event-reg' || tabParam === 'athletes' || tabParam === 'student-reg') {
-            // Non-sports events have no separate event-reg step — fall back to items.
-            activeTabMap[eventId] = (props.eventType === 'sports' || isSports.value) ? 'athletes' : 'items';
+            activeTabMap[eventId] = 'athletes';
         } else if (tabParam === 'item-reg' || tabParam === 'items') {
             activeTabMap[eventId] = 'items';
         } else if (tabParam === 'payment' || tabParam === 'billing' || tabParam === 'fees') {
             activeTabMap[eventId] = 'payment';
-        } else if (props.eventType === 'sports' || isSports.value) {
-            activeTabMap[eventId] = 'athletes';
         } else {
-            activeTabMap[eventId] = 'items';
+            // Every fest type now has an Event Registration step (see
+            // SportsEventAthletesPanel usage above) — default to it first, matching the
+            // intended event-reg → item-reg → payment flow.
+            activeTabMap[eventId] = 'athletes';
         }
     }
     return activeTabMap[eventId];

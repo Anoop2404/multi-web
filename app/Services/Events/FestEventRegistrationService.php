@@ -5,6 +5,7 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestLevelRegistration;
+use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\Student;
 use App\Models\Tenant;
@@ -96,6 +97,50 @@ class FestEventRegistrationService
         app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
 
         return $record;
+    }
+
+    /**
+     * Remove a student's event-level registration — the explicit, user-initiated
+     * counterpart to FestLevelRegistrationService::deactivateIfNoActiveItems() (which only
+     * fires as a side effect of cancelling that student's last item). Schools asked for a
+     * direct way to cancel a student's whole event registration from the Event Registration
+     * step itself, rather than only implicitly by cancelling every one of their items one at
+     * a time.
+     *
+     * Blocked while the student still has an active (submitted/approved) item registration
+     * under this event — unregistering them at the event level while they're still entered
+     * in an item would leave a dangling item registration for a student who, per this
+     * event's own numbering, is no longer registered. Cancel the items first.
+     */
+    public function withdrawStudent(FestEvent $event, Tenant $school, int $studentId): void
+    {
+        $registration = FestLevelRegistration::where('event_id', $event->id)
+            ->where('student_id', $studentId)
+            ->where('school_id', $school->id)
+            ->where('status', 'active')
+            ->first();
+
+        if (! $registration) {
+            return;
+        }
+
+        $hasActiveItems = FestParticipant::query()
+            ->whereHas('registration', fn ($q) => $q
+                ->whereIn('event_id', $event->reportableEventIds())
+                ->whereIn('status', ['submitted', 'approved']))
+            ->where('participant_role', '!=', 'standby')
+            ->where('student_id', $studentId)
+            ->exists();
+
+        abort_if(
+            $hasActiveItems,
+            422,
+            'This student still has active item registrations for this event — cancel those first, then remove the event registration.'
+        );
+
+        $registration->update(['status' => 'withdrawn']);
+
+        app(FestSchoolEventFeeService::class)->recalculate($event, $school->id);
     }
 
     /** @param  list<int>  $studentIds */

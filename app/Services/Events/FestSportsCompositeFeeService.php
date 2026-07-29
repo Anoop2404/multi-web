@@ -64,19 +64,18 @@ class FestSportsCompositeFeeService
         $lines = [];
         $studentsBilledBase = [];
 
-        // Count all registered event athletes for this event (Step 1: Event Athletes)
-        $eventAthleteIds = FestLevelRegistration::where('event_id', $event->id)
+        // Event-level registration (Step 1: Event Athletes) alone does not incur the
+        // per-student registration fee — only students who go on to register for at
+        // least one item (Step 2) are billed. Track event-athlete presence separately
+        // so the school registration fee below can still tell "nothing registered at
+        // all" apart from "registered for the event, but no items yet".
+        $hasEventRegistration = FestLevelRegistration::where('event_id', $event->id)
             ->where('school_id', $schoolId)
             ->where('status', 'active')
-            ->pluck('student_id')
-            ->filter()
-            ->all();
+            ->exists();
 
-        foreach ($eventAthleteIds as $sid) {
-            $studentsBilledBase[$sid] = true;
-        }
-
-        // Also collect any students registered directly in items
+        // Students billed for the per-student registration fee: only those with at
+        // least one actual item registration (individual or team).
         foreach ($registrations as $registration) {
             foreach ($registration->participants as $participant) {
                 if ($participant->participant_role !== 'standby' && $participant->student_id) {
@@ -197,6 +196,13 @@ class FestSportsCompositeFeeService
 
         $studentCount = count($studentsBilledBase);
         $studentRegTotal = round($studentCount * $studentRegRate, 2);
+
+        // No school registration fee if the school hasn't registered anything at all
+        // for this event — neither an event-level (Step 1) registration nor any item.
+        $hasAnyParticipation = $hasEventRegistration || $studentCount > 0 || $registrations->isNotEmpty();
+        if (! $hasAnyParticipation) {
+            $schoolReg = 0.0;
+        }
 
         $summaryLines = [];
         if ($schoolReg > 0) {
@@ -453,6 +459,11 @@ class FestSportsCompositeFeeService
         $studentCount = count($studentsBilledBase);
         $studentRegTotal = round($studentCount * $studentRegRate, 2);
 
+        // No school registration fee if nothing was actually registered under this head.
+        if (! ($studentCount > 0 || $registrations->isNotEmpty())) {
+            $schoolReg = 0.0;
+        }
+
         $summaryLines = [];
         if ($schoolReg > 0) {
             $summaryLines[] = [
@@ -508,27 +519,28 @@ class FestSportsCompositeFeeService
 
         $eventIds = $event->reportableEventIds();
 
-        $studentIds = FestLevelRegistration::whereIn('event_id', $eventIds)
+        // Per-student registration fee only applies to students who actually registered
+        // for at least one item — an event-level-only (Step 1) registration with no
+        // items must not be billed. (This previously counted every active event-level
+        // registration outright, whether or not the student ever registered an item.)
+        $studentIds = FestRegistration::whereIn('event_id', $eventIds)
             ->where('school_id', $schoolId)
-            ->where('status', 'active')
-            ->pluck('student_id')
+            ->whereIn('status', ['submitted', 'approved'])
+            ->with('participants')
+            ->get()
+            ->flatMap(fn (FestRegistration $r) => $r->participants
+                ->where('participant_role', '!=', 'standby')
+                ->pluck('student_id'))
             ->unique()
             ->filter()
             ->values();
 
-        if ($studentIds->isEmpty()) {
-            $studentIds = FestRegistration::whereIn('event_id', $eventIds)
-                ->where('school_id', $schoolId)
-                ->whereIn('status', ['submitted', 'approved'])
-                ->with('participants')
-                ->get()
-                ->flatMap(fn (FestRegistration $r) => $r->participants
-                    ->where('participant_role', '!=', 'standby')
-                    ->pluck('student_id'))
-                ->unique()
-                ->filter()
-                ->values();
-        }
+        // Tracked only to decide whether the school registration fee still applies below
+        // when the school has an event-level registration but no items yet.
+        $hasEventRegistration = FestLevelRegistration::whereIn('event_id', $eventIds)
+            ->where('school_id', $schoolId)
+            ->where('status', 'active')
+            ->exists();
 
         $studentCount = $studentIds->count();
         $studentReg = round($studentCount * $perStudent, 2);
@@ -596,6 +608,12 @@ class FestSportsCompositeFeeService
                 ];
                 $extraTotal += $amount;
             }
+        }
+
+        // No school registration fee if the school hasn't registered anything at all
+        // for this event — neither an event-level registration nor any item.
+        if (! $hasEventRegistration && $studentCount === 0 && empty($extraLines)) {
+            $schoolReg = 0.0;
         }
 
         $lines = [];

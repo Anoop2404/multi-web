@@ -98,20 +98,17 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
         { label: 'Event overview', href: `${eventBase}/overview`, icon: 'grid', exact: true },
     ];
 
-    if (isSports) {
-        workflowItems.push(
-            { label: 'Step 1 · Event Athletes', href: `${eventBase}/registration?tab=student-reg`, icon: 'clipboard', matchQuery: { tab: 'student-reg' } },
-            { label: 'Step 2 · Item Registration', href: `${eventBase}/registration?tab=item-reg`, icon: 'layers', matchQuery: { tab: 'item-reg' } },
-            { label: 'Step 3 · Billing & Payment', href: `${eventBase}/registration?tab=fees`, icon: 'credit-card', matchQuery: { tab: 'fees' } },
-        );
-    } else {
-        // Non-sports events (English Fest, Science Fest, etc.) have no separate event-reg step —
-        // students are registered directly against items, so only show 2 steps.
-        workflowItems.push(
-            { label: 'Item Registration', href: `${eventBase}/registration?tab=item-reg`, icon: 'layers', matchQuery: { tab: 'item-reg' } },
-            { label: 'Billing & Payment', href: `${eventBase}/registration?tab=fees`, icon: 'credit-card', matchQuery: { tab: 'fees' } },
-        );
-    }
+    // Every fest type gets the same 3-step flow now — Event Registration (issues the
+    // student's event-level Fest ID, feeds the per-student billing line) → Item
+    // Registration → Billing & Payment. Previously only sports had step 1, so a school
+    // could only register students directly against items with no event-level roster or
+    // way to cancel a student's event registration as a whole; see Registration.vue's
+    // SportsEventAthletesPanel usage, which now renders for every event type.
+    workflowItems.push(
+        { label: isSports ? 'Step 1 · Event Athletes' : 'Step 1 · Event Registration', href: `${eventBase}/registration?tab=student-reg`, icon: 'clipboard', matchQuery: { tab: 'student-reg' } },
+        { label: 'Step 2 · Item Registration', href: `${eventBase}/registration?tab=item-reg`, icon: 'layers', matchQuery: { tab: 'item-reg' } },
+        { label: 'Step 3 · Billing & Payment', href: `${eventBase}/registration?tab=fees`, icon: 'credit-card', matchQuery: { tab: 'fees' } },
+    );
 
     workflowItems.push(
         { label: 'Reports', href: reportsBase, icon: 'file-text', exact: true },
