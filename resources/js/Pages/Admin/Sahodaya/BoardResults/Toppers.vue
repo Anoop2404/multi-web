@@ -174,7 +174,7 @@
                 </p>
             </Link>
 
-            <Link v-if="selectedClass === 12" :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/subject-wise?academic_year=${filters.academic_year}&stream=${selectedStreamCode}`"
+            <Link v-if="selectedClass === 12" :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/subject-wise?academic_year=${filters.academic_year}`"
                   class="card p-5 hover:shadow-md transition block">
                 <p class="text-2xl mb-2">🎯</p>
                 <h3 class="font-bold text-slate-800">Subject-Wise Top Scorers</h3>

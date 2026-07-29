@@ -103,7 +103,9 @@ class BoardResultController extends SchoolAdminController
         return view('school.board-results.rank-report', [
             'school'       => $this->school,
             'result'       => $result,
-            'toppers'      => $result->toppers,
+            'toppers'      => $result->toppers
+                ->where('entry_type', Topper::ENTRY_OVERALL)
+                ->values(),
             'academicYear' => $academicYear,
             'class'        => $class,
             'isClass12'    => $class === 12,
@@ -351,7 +353,7 @@ class BoardResultController extends SchoolAdminController
             // and update in place — prevents duplicate toppers on every save.
             $existingToppers = Topper::where('board_result_id', $boardResult->id)
                 ->get(['id', 'name', 'roll_no', 'admission_no', 'gender', 'stream', 'stream_id',
-                       'total_marks', 'marks_obtained', 'percentage', 'rank', 'photo']);
+                       'entry_type', 'total_marks', 'marks_obtained', 'percentage', 'rank', 'photo']);
 
             // Schools can enter as many student toppers/achievers as needed.
             // Sahodaya Top-N config filters reports at the Sahodaya level.
@@ -435,6 +437,7 @@ class BoardResultController extends SchoolAdminController
 
                 if ($matched) {
                     $matched->update([
+                        'entry_type' => Topper::ENTRY_OVERALL,
                         'name' => $row['name'],
                         'roll_no' => $row['roll_no'] ?? $matched->roll_no,
                         'admission_no' => $row['admission_no'] ?? $matched->admission_no,
@@ -451,6 +454,7 @@ class BoardResultController extends SchoolAdminController
                     Topper::create([
                         'board_result_id' => $boardResult->id,
                         'tenant_id' => $this->school->id,
+                        'entry_type' => Topper::ENTRY_OVERALL,
                         'name' => $row['name'],
                         'roll_no' => $row['roll_no'] ?? null,
                         'admission_no' => $row['admission_no'] ?? null,
@@ -646,7 +650,9 @@ class BoardResultController extends SchoolAdminController
             'canEdit' => $boardResult->isEditable(),
             'editLockReason' => $boardResult->isEditable() ? null : $boardResult->editLockReason(),
             'topperCap' => app(TopperCountService::class)->resolveCap($sahodayaId, (int) $boardResult->class),
-            'topperCount' => $boardResult->toppers->count(),
+            'topperCount' => $boardResult->toppers
+                ->where('entry_type', Topper::ENTRY_OVERALL)
+                ->count(),
             'marksConfig' => $this->marksConfigFor((int) $boardResult->class, $streamOptions, $sahodayaId),
         ];
     }
@@ -679,6 +685,20 @@ class BoardResultController extends SchoolAdminController
         abort_if($topper->board_result_id !== $boardResult->id, 403);
         abort_unless($boardResult->isEditable(), 422, 'Toppers are locked for this result.');
         app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
+
+        // Removing the final subject mark from a subject-only row removes that wrapper
+        // topper too. Overall toppers remain in place when one of their subject marks is
+        // removed because they still carry a genuine aggregate result.
+        if (
+            $topper->isSubjectOnly()
+            && $request->has('subject_marks')
+            && empty(array_filter((array) $request->input('subject_marks'), fn ($mark) => $mark !== null && $mark !== ''))
+        ) {
+            $topper->delete();
+            app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
+
+            return back()->with('success', 'Subject topper entry removed.');
+        }
 
         $before = $topper->only(['name', 'percentage', 'rank', 'stream', 'stream_id', 'admission_no', 'roll_no']);
         $data = $this->validateTopper($request, $boardResult, (int) $boardResult->class === 12, $topper);
@@ -758,6 +778,7 @@ class BoardResultController extends SchoolAdminController
 
         $data['board_result_id'] = $boardResult->id;
         $data['tenant_id'] = $this->school->id;
+        $data['entry_type'] = Topper::ENTRY_OVERALL;
 
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store(
@@ -797,6 +818,8 @@ class BoardResultController extends SchoolAdminController
         $data = $request->validate([
             'subject' => 'required|string|max:100',
             'rows' => 'required|array|min:1',
+            'rows.*.topper_id' => 'nullable|integer',
+            'rows.*.original_subject' => 'nullable|string|max:100',
             'rows.*.name' => 'required|string|max:255',
             'rows.*.gender' => 'required|string|in:male,female,other',
             'rows.*.roll_no' => 'nullable|string|max:64',
@@ -836,14 +859,20 @@ class BoardResultController extends SchoolAdminController
                 $name = trim($row['name']);
                 // Match by admission_no first (most reliable), then roll_no, then name
                 // as last resort — prevents duplicate-name collisions.
-                $topper = $workingToppers->first(
-                    fn (Topper $t) => (filled($row['admission_no'] ?? null) && $t->admission_no === $row['admission_no'])
+                $topper = filled($row['topper_id'] ?? null)
+                    ? $workingToppers->firstWhere('id', (int) $row['topper_id'])
+                    : $workingToppers->first(
+                        fn (Topper $t) => (filled($row['admission_no'] ?? null) && $t->admission_no === $row['admission_no'])
                         || (filled($row['roll_no'] ?? null) && $t->roll_no === $row['roll_no'])
                         || strtolower($t->name) === strtolower($name)
-                );
+                    );
 
                 if ($topper) {
                     $subjectMarks = $topper->subject_marks;
+                    $originalSubject = trim((string) ($row['original_subject'] ?? ''));
+                    if ($originalSubject !== '' && strcasecmp($originalSubject, $subject) !== 0) {
+                        unset($subjectMarks[$originalSubject]);
+                    }
                     $subjectMarks[$subject] = $row['marks'];
 
                     $topper->update([
@@ -854,17 +883,16 @@ class BoardResultController extends SchoolAdminController
                     app(TopperSubjectMarkService::class)->sync($topper, $subjectMarks);
                     $updated++;
                 } else {
-                    $totalMarks = 100;
-
                     $topper = Topper::create([
                         'board_result_id' => $boardResult->id,
                         'tenant_id' => $this->school->id,
+                        'entry_type' => Topper::ENTRY_SUBJECT,
                         'name' => $name,
                         'gender' => $row['gender'],
                         'roll_no' => $row['roll_no'] ?? null,
-                        'percentage' => round((float) $row['marks'], 2),
-                        'marks_obtained' => $row['marks'],
-                        'total_marks' => $totalMarks,
+                        'percentage' => null,
+                        'marks_obtained' => null,
+                        'total_marks' => null,
                         'rank' => $nextRank++,
                     ]);
                     app(TopperSubjectMarkService::class)->sync($topper, [$subject => $row['marks']]);

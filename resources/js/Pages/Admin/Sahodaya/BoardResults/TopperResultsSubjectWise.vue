@@ -2,9 +2,7 @@
     <SahodayaAdminLayout title="Subject-Wise Top Scorers" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader title="Subject-Wise Top Scorers" eyebrow="Academic Results · Class XII"
-                    :description="selectedStreamLabel
-                        ? `Highest scorer per subject for ${selectedStreamLabel} stream, pooled across every member school.`
-                        : 'Highest scorer per subject, pooled across every member school.'">
+                    description="Highest scorer per subject, pooled across every member school and all streams.">
             <template #actions>
                 <button type="button" @click="printReport" class="btn-secondary text-sm font-bold flex items-center gap-1.5 print:hidden">
                     <span>🖨</span> Print
@@ -19,8 +17,8 @@
                 <p class="text-lg font-bold text-slate-900 mt-1">{{ sahodaya.name }}</p>
             </div>
             <div class="card !p-4">
-                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Class / Stream</p>
-                <p class="text-lg font-bold text-[#0f3d7a] mt-1">Class 12{{ selectedStreamLabel ? ` · ${selectedStreamLabel}` : '' }}</p>
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Class</p>
+                <p class="text-lg font-bold text-[#0f3d7a] mt-1">Class 12</p>
             </div>
             <div class="card !p-4">
                 <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Report</p>
@@ -34,10 +32,10 @@
 
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4 print:hidden">
             <div class="flex flex-wrap gap-2">
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=12&academic_year=${filters.academic_year}${selectedStream ? `&stream=${selectedStream}` : ''}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/overall?class=12&academic_year=${filters.academic_year}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
                     ← Overall Result
                 </Link>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/achievers?class=12&academic_year=${filters.academic_year}${selectedStream ? `&stream=${selectedStream}` : ''}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/achievers?class=12&academic_year=${filters.academic_year}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
                     90%+ Achievers →
                 </Link>
                 <span class="text-xs text-slate-300 mx-1">|</span>
@@ -46,17 +44,6 @@
                         {{ ay.label }}
                     </option>
                 </select>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <Link
-                    v-for="[code, label] in streamEntries"
-                    :key="code"
-                    :href="streamHref(code)"
-                    class="px-3 py-1.5 rounded-lg text-sm font-semibold border"
-                    :class="selectedStream === code ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]' : 'border-slate-200 text-slate-600'"
-                >
-                    {{ label }}
-                </Link>
             </div>
         </div>
 
@@ -74,7 +61,6 @@
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('subject')">Subject{{ sortArrow('subject') }}</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('student_name')">Student{{ sortArrow('student_name') }}</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('school_name')">School{{ sortArrow('school_name') }}</th>
-                        <th class="p-3">Stream</th>
                         <th class="p-3">Roll No</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('marks')">Marks{{ sortArrow('marks') }}</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('percentage')">Percentage{{ sortArrow('percentage') }}</th>
@@ -89,7 +75,6 @@
                         </td>
                         <td class="p-3 font-semibold text-gray-900">{{ row.student_name }}</td>
                         <td class="p-3 text-gray-600">{{ row.school_name }}</td>
-                        <td class="p-3 text-gray-600">{{ row.stream || '—' }}</td>
                         <td class="p-3 text-xs text-gray-500">{{ row.roll_no || '—' }}</td>
                         <td class="p-3 font-semibold text-emerald-600">{{ row.marks }} / 100</td>
                         <td class="p-3 font-semibold text-[#0f3d7a]">{{ row.percentage != null ? `${row.percentage}%` : '—' }}</td>
@@ -116,14 +101,10 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     academicYearOptions: { type: Array, default: () => [] },
     subjectLeaders: { type: Array, default: () => [] },
-    streamOptions: { type: Object, default: () => ({}) },
-    selectedStream: { type: String, default: null },
-    selectedStreamLabel: { type: String, default: null },
 });
 
 function switchYear(year) {
-    const stream = props.selectedStream ? `&stream=${props.selectedStream}` : '';
-    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/subject-wise?academic_year=${year}${stream}`;
+    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/subject-wise?academic_year=${year}`;
 }
 
 function printReport() {
@@ -133,12 +114,6 @@ function printReport() {
 const search = ref('');
 const sortKey = ref('subject');
 const sortDir = ref('asc');
-
-const streamEntries = computed(() => Object.entries(props.streamOptions ?? {}));
-
-function streamHref(code) {
-    return `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/subject-wise?academic_year=${props.filters.academic_year}&stream=${code}`;
-}
 
 function toggleSort(key) {
     if (sortKey.value === key) {

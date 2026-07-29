@@ -78,7 +78,12 @@ class SubjectMeritRegisterService
             ->join('board_results as br', 'br.id', '=', 't.board_result_id')
             ->whereIn('br.tenant_id', $schoolIds)
             ->where('br.academic_year', $academicYear)
-            ->whereIn('br.status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED])
+            ->whereIn('br.status', [
+                BoardResult::STATUS_SUBMITTED,
+                BoardResult::STATUS_VERIFIED,
+                BoardResult::STATUS_APPROVED,
+                BoardResult::STATUS_PUBLISHED,
+            ])
             ->select([
                 'tsm.marks',
                 'tsm.subject_id',

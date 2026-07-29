@@ -11,9 +11,14 @@ class Topper extends Model
 {
     use BelongsToCentralTenant;
 
+    public const ENTRY_OVERALL = 'overall';
+
+    public const ENTRY_SUBJECT = 'subject';
+
     protected $fillable = [
         'board_result_id',
         'tenant_id',
+        'entry_type',
         'name',
         'admission_no',
         'roll_no',
@@ -55,6 +60,21 @@ class Topper extends Model
     public function subjectMarks(): HasMany
     {
         return $this->hasMany(TopperSubjectMark::class);
+    }
+
+    public function isSubjectOnly(): bool
+    {
+        return $this->entry_type === self::ENTRY_SUBJECT;
+    }
+
+    public function scopeOverallEntries($query)
+    {
+        return $query->where('entry_type', self::ENTRY_OVERALL);
+    }
+
+    public function scopeSubjectEntries($query)
+    {
+        return $query->where('entry_type', self::ENTRY_SUBJECT);
     }
 
     /**

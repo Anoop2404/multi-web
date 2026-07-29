@@ -50,6 +50,7 @@ class TopperCountService
         $cap = $this->resolveCap($sahodayaId, (int) $boardResult->class);
         $count = Topper::query()
             ->where('board_result_id', $boardResult->id)
+            ->overallEntries()
             ->when($updating, fn ($q) => $q->where('id', '!=', $updating->id))
             ->count();
 

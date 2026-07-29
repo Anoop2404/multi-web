@@ -105,7 +105,9 @@ class DashboardController extends SchoolAdminController
                 ->whereIn('status', [BoardResult::STATUS_DRAFT, BoardResult::STATUS_REJECTED, BoardResult::STATUS_SUBMITTED])
                 ->count(),
             'ranks' => $ranks,
-            'toppers' => $published->flatMap(fn (BoardResult $r) => $r->toppers->map(fn (Topper $t) => [
+            'toppers' => $published->flatMap(fn (BoardResult $r) => $r->toppers
+                ->where('entry_type', Topper::ENTRY_OVERALL)
+                ->map(fn (Topper $t) => [
                 'name' => $t->name,
                 'percentage' => $t->percentage,
                 'rank' => $t->rank,

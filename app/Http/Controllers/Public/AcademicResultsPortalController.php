@@ -48,6 +48,7 @@ class AcademicResultsPortalController extends Controller
         $schoolNames = Tenant::whereIn('id', $rankings->pluck('entity_id'))->pluck('name', 'id');
 
         $toppers = Topper::query()
+            ->overallEntries()
             ->whereHas('boardResult', fn ($query) => $query
                 ->whereIn('tenant_id', $schoolIds->values())
                 ->where('academic_year', $year)
@@ -108,6 +109,7 @@ class AcademicResultsPortalController extends Controller
             ->pluck('id');
 
         $toppers = Topper::query()
+            ->overallEntries()
             ->whereHas('boardResult', function ($query) use ($schoolIds, $year, $class) {
                 $query->whereIn('tenant_id', $schoolIds)
                     ->where('academic_year', $year)

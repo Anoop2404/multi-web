@@ -1889,6 +1889,7 @@ trait QueriesExtendedReports
         $names = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
 
         return Topper::query()
+            ->overallEntries()
             ->whereHas('boardResult', fn ($q) => $q
                 ->whereIn('tenant_id', $schoolIds)
                 ->where('academic_year', $year)
@@ -1917,6 +1918,7 @@ trait QueriesExtendedReports
         $names = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
 
         return Topper::query()
+            ->overallEntries()
             ->whereHas('boardResult', fn ($q) => $q
                 ->whereIn('tenant_id', $schoolIds)
                 ->where('academic_year', $year)

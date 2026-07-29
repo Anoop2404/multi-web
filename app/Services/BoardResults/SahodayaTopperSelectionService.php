@@ -133,6 +133,7 @@ class SahodayaTopperSelectionService
 
         return Topper::query()
             ->with('examStream')
+            ->overallEntries()
             ->whereHas('boardResult', function ($q) use ($schoolIds, $academicYear, $class) {
                 $q->whereIn('tenant_id', $schoolIds)
                     ->where('academic_year', $academicYear)
@@ -230,6 +231,22 @@ class SahodayaTopperSelectionService
      */
     private function cutAndHydrate(array $rows, string $sahodayaId, int $class, string $configScope, ?int $streamId): array
     {
+        if ($rows === []) {
+            return [];
+        }
+
+        // Ranking rows are cached. Defensively discard any stale row that now points
+        // to a subject-only topper (the migration also clears these cached scopes).
+        $eligibleIds = Topper::query()
+            ->overallEntries()
+            ->whereIn('id', array_column($rows, 'entity_id'))
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->flip();
+        $rows = array_values(array_filter(
+            $rows,
+            fn (array $row) => $eligibleIds->has((string) $row['entity_id']),
+        ));
         if ($rows === []) {
             return [];
         }

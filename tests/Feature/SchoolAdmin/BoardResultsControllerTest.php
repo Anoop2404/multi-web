@@ -228,9 +228,35 @@ class BoardResultsControllerTest extends TestCase
 
         $this->assertNotNull($created);
         $this->assertSame('New Subject Leader', $created->name);
-        $this->assertSame(96.0, (float) $created->percentage);
-        $this->assertSame(100, (int) $created->total_marks);
+        $this->assertSame(Topper::ENTRY_SUBJECT, $created->entry_type);
+        $this->assertNull($created->percentage);
+        $this->assertNull($created->total_marks);
+        $this->assertNull($created->stream);
         $this->assertSame(96.0, (float) $created->subject_marks['Physics']);
+
+        $this->actingAs($admin)->post("/school-admin/{$school->id}/board-results/{$boardResult->id}/subject-toppers/batch", [
+            'subject' => 'Physics',
+            'rows' => [[
+                'topper_id' => $created->id,
+                'original_subject' => 'Physics',
+                'name' => 'Revised Subject Leader',
+                'gender' => 'female',
+                'roll_no' => '1002',
+                'marks' => 99,
+            ]],
+        ])->assertRedirect();
+
+        $created->refresh();
+        $this->assertSame('Revised Subject Leader', $created->name);
+        $this->assertSame(99.0, (float) $created->subject_marks['Physics']);
+        $this->assertSame(2, Topper::where('board_result_id', $boardResult->id)->count());
+
+        $this->actingAs($admin)->put(
+            "/school-admin/{$school->id}/board-results/{$boardResult->id}/toppers/{$created->id}",
+            ['subject_marks' => []],
+        )->assertRedirect();
+
+        $this->assertDatabaseMissing('toppers', ['id' => $created->id]);
     }
 
     public function test_class_xii_overall_topper_rejects_invalid_stream_key(): void
@@ -364,11 +390,17 @@ class BoardResultsControllerTest extends TestCase
 
         $this->assertSame(10, Topper::where('board_result_id', $boardResult10->id)->count());
         $this->assertSame(40, Topper::where('board_result_id', $boardResult12->id)->count());
-        $this->assertSame(10, Topper::where('board_result_id', $boardResult12->id)->where('stream', 'Science')->count());
+        $this->assertSame(10, Topper::where('board_result_id', $boardResult12->id)
+            ->where('entry_type', Topper::ENTRY_OVERALL)
+            ->where('stream', 'Science')
+            ->count());
+        $this->assertSame(10, Topper::where('board_result_id', $boardResult12->id)
+            ->where('entry_type', Topper::ENTRY_SUBJECT)
+            ->count());
         $this->assertSame(10, Topper::where('board_result_id', $boardResult12->id)->where('stream', 'Commerce')->count());
         $this->assertSame(10, Topper::where('board_result_id', $boardResult12->id)->where('stream', 'Humanities')->count());
 
-        $boardResult12->update(['status' => BoardResult::STATUS_APPROVED]);
+        $boardResult12->update(['status' => BoardResult::STATUS_SUBMITTED]);
 
         $this->actingAs($admin)
             ->get("/school-admin/{$school->id}/board-results/{$boardResult10->id}/toppers")
@@ -383,8 +415,26 @@ class BoardResultsControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('School/BoardResults/Toppers', false)
-                ->where('topperCount', 40)
+                ->where('topperCount', 30)
                 ->where('isClass12', true));
+
+        $this->actingAs($sahodayaAdmin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/board-results/toppers/overall?class=12&academic_year={$year->label}&stream=science")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Sahodaya/BoardResults/TopperResultsOverall', false)
+                ->has('rows', 10)
+                ->where('rows.0.student_name', 'Science Student 1'));
+
+        $this->actingAs($sahodayaAdmin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/board-results/toppers/subject-wise?academic_year={$year->label}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Sahodaya/BoardResults/TopperResultsSubjectWise', false)
+                ->has('subjectLeaders', 10)
+                ->where('subjectLeaders.0.subject', 'Physics'));
+
+        $boardResult12->update(['status' => BoardResult::STATUS_APPROVED]);
 
         $this->actingAs($sahodayaAdmin)
             ->get("/sahodaya-admin/{$sahodaya->id}/board-results/reports/subject-merit?academic_year={$year->label}&class=12")

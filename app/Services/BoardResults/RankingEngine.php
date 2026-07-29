@@ -184,7 +184,7 @@ class RankingEngine
         foreach ([10, 12] as $class) {
             $toppers = $results->where('class', $class)
                 ->flatMap->toppers
-                ->filter(fn (Topper $t) => $t->percentage !== null)
+                ->filter(fn (Topper $t) => ! $t->isSubjectOnly() && $t->percentage !== null)
                 ->values();
 
             if ($toppers->isEmpty()) {
@@ -207,7 +207,7 @@ class RankingEngine
     {
         $toppers = $results->where('class', 12)
             ->flatMap->toppers
-            ->filter(fn (Topper $t) => $t->percentage !== null)
+            ->filter(fn (Topper $t) => ! $t->isSubjectOnly() && $t->percentage !== null)
             ->values();
 
         $grouped = $toppers->groupBy(fn (Topper $t) => $t->stream_id ?: ($t->stream ?: 'unknown'));
@@ -369,7 +369,9 @@ class RankingEngine
 
         foreach ($results->where('class', 12) as $result) {
             /** @var BoardResult $result */
-            $grouped = $result->toppers->groupBy(fn (Topper $t) => $t->stream_id ?: ($t->stream ?: 'unknown'));
+            $grouped = $result->toppers
+                ->reject(fn (Topper $topper) => $topper->isSubjectOnly())
+                ->groupBy(fn (Topper $t) => $t->stream_id ?: ($t->stream ?: 'unknown'));
             foreach ($grouped as $streamKey => $toppers) {
                 $pcts = $toppers->pluck('percentage')->filter(fn ($p) => $p !== null)->all();
                 if ($pcts === []) {

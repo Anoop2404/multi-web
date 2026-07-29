@@ -97,23 +97,13 @@ class SahodayaTopperController extends SahodayaAdminController
     {
         $year = $request->string('academic_year')->toString()
             ?: AcademicYear::forSahodaya($this->sahodaya->id);
-        $streams = $this->streamOptions();
-        $selectedStream = $this->resolveSelectedStreamCode($request, $streams);
-        $selectedStreamLabel = $selectedStream ? ($streams[$selectedStream] ?? null) : null;
 
         $subjectLeaders = app(\App\Services\BoardResults\SubjectMeritRegisterService::class)
             ->register($this->sahodaya->id, $year, 12);
 
-        if ($selectedStreamLabel) {
-            $subjectLeaders = array_values(array_filter($subjectLeaders, fn ($row) => ($row['stream'] ?? null) === $selectedStreamLabel));
-        }
-
         return $this->inertia('Sahodaya/BoardResults/TopperResultsSubjectWise', [
-            'filters' => ['academic_year' => $year, 'stream' => $selectedStream],
+            'filters' => ['academic_year' => $year],
             'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
-            'streamOptions' => $streams,
-            'selectedStream' => $selectedStream,
-            'selectedStreamLabel' => $selectedStreamLabel,
             'subjectLeaders' => $subjectLeaders,
         ]);
     }

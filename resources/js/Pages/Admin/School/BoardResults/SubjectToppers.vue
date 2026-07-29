@@ -510,7 +510,7 @@ const activeSubjectName = computed(() => {
 });
 
 function blankRow() {
-    return { name: '', gender: '', roll_no: '', marks: '', _touched: false };
+    return { topper_id: null, original_subject: null, name: '', gender: '', roll_no: '', marks: '', _touched: false };
 }
 
 const rows = ref([blankRow()]);
@@ -545,6 +545,8 @@ watch([selectedSubjectOption, customSubjectInput], () => {
 
     if (existingForSubject.length) {
         rows.value = existingForSubject.map(item => ({
+            topper_id: item.topper_id,
+            original_subject: item.subject,
             name: item.name || '',
             gender: item.gender || '',
             roll_no: item.roll_no || '',
@@ -590,6 +592,8 @@ function saveAllRows() {
     router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/subject-toppers/batch`, {
         subject: subj,
         rows: validRows.map(r => ({
+            topper_id: r.topper_id,
+            original_subject: r.original_subject,
             name: r.name.trim(),
             gender: r.gender,
             roll_no: r.roll_no?.trim() || null,

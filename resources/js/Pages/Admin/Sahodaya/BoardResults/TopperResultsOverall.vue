@@ -52,7 +52,7 @@
                 </select>
             </div>
             <div class="flex flex-wrap gap-2">
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/subject-wise?academic_year=${filters.academic_year}${selectedClass === 12 && selectedStream ? `&stream=${selectedStream}` : ''}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/subject-wise?academic_year=${filters.academic_year}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">
                     Subject-Wise Top Scorers →
                 </Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/achievers?class=${selectedClass}&academic_year=${filters.academic_year}${selectedClass === 12 && selectedStream ? `&stream=${selectedStream}` : ''}`" class="text-sm font-semibold text-[#0f3d7a] hover:underline">

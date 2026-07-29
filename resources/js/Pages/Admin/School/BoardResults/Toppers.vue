@@ -258,7 +258,7 @@
                     <div class="p-5 flex items-center justify-between">
                         <div>
                             <h3 class="font-bold text-gray-900 text-sm uppercase tracking-wide">
-                                Overall Toppers List ({{ boardResult.toppers?.length ?? 0 }}{{ topperCap ? ` / ${topperCap}` : '' }})
+                                Overall Toppers List ({{ overallTopperCount }}{{ topperCap ? ` / ${topperCap}` : '' }})
                             </h3>
                             <p class="text-xs text-gray-500 mt-0.5">Ranked list of toppers for Class {{ boardResult.class }}.</p>
                         </div>
@@ -591,7 +591,9 @@ function urlEncode(val) {
 }
 
 const sortedToppers = computed(() =>
-    [...(props.boardResult.toppers ?? [])].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)),
+    (props.boardResult.toppers ?? [])
+        .filter((topper) => (topper.entry_type ?? 'overall') === 'overall')
+        .sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)),
 );
 
 /**
@@ -617,7 +619,7 @@ const sortedToppersByStream = computed(() => {
 });
 
 const achievers90 = computed(() =>
-    (props.boardResult.toppers ?? [])
+    sortedToppers.value
         .filter((t) => t.percentage != null && Number(t.percentage) >= 90)
         .sort((a, b) => Number(b.percentage) - Number(a.percentage)),
 );
@@ -780,44 +782,20 @@ function submitSubjectTopper() {
 
     if (!finalSubject || !subjectForm.name || !subjectForm.gender || subjectForm.marks === '') return;
 
-    const existing = editingSubjectRow.value
-        ? (props.boardResult.toppers ?? []).find((t) => t.id === editingSubjectRow.value.topper_id)
-        : (props.boardResult.toppers ?? []).find((t) =>
-            (subjectForm.roll_no && t.roll_no === subjectForm.roll_no)
-            || t.name.toLowerCase() === subjectForm.name.toLowerCase()
-        );
-
-    if (existing) {
-        const currentSubjectMarks = { ...(existing.subject_marks ?? {}) };
-        currentSubjectMarks[finalSubject] = subjectForm.marks;
-
-        router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${existing.id}`, {
-            ...existing,
-            _method: 'put',
-            gender: subjectForm.gender || existing.gender,
-            roll_no: subjectForm.roll_no || existing.roll_no,
-            subject_marks: currentSubjectMarks,
-        }, {
-            preserveScroll: true,
-            onSuccess: () => cancelSubjectEdit(),
-        });
-    } else {
-        const subjectMarks = {};
-        subjectMarks[finalSubject] = subjectForm.marks;
-
-        router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/single`, {
+    router.post(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/subject-toppers/batch`, {
+        subject: finalSubject,
+        rows: [{
+            topper_id: editingSubjectRow.value?.topper_id ?? null,
+            original_subject: editingSubjectRow.value?.subject ?? null,
             name: subjectForm.name,
             gender: subjectForm.gender,
-            roll_no: subjectForm.roll_no,
-            percentage: subjectForm.marks,
-            marks_obtained: subjectForm.marks,
-            total_marks: 100,
-            subject_marks: subjectMarks,
-        }, {
-            preserveScroll: true,
-            onSuccess: () => cancelSubjectEdit(),
-        });
-    }
+            roll_no: subjectForm.roll_no || null,
+            marks: subjectForm.marks,
+        }],
+    }, {
+        preserveScroll: true,
+        onSuccess: () => cancelSubjectEdit(),
+    });
 }
 
 function removeSubjectTopper(row) {
