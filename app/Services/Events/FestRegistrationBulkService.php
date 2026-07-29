@@ -71,7 +71,7 @@ class FestRegistrationBulkService
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->when($itemId, fn ($q) => $q->whereIn('item_id', $event->reportableItemIds([$itemId])));
 
-        foreach ($query->get() as $registration) {
+        foreach ($query->with('participants')->get() as $registration) {
             // Only the DB-mutating snapshot/update/credit critical section is locked and
             // transactional — notifier/audit calls happen after commit, outside the lock, so a
             // slow mail/notification dispatch never holds the row lock open. See
@@ -101,6 +101,15 @@ class FestRegistrationBulkService
                     'rejected_at'          => now(),
                     'rejected_by_user_id'  => auth()->id(),
                 ]);
+
+                // Free up the per-student registration fee if this was the student's last
+                // active item — must run BEFORE recalculate() so the composite fee model sees
+                // it. See FestLevelRegistrationService::deactivateIfNoActiveItems().
+                $levelService = app(FestLevelRegistrationService::class);
+                foreach ($registration->participants->pluck('student_id')->filter()->unique() as $studentId) {
+                    $levelService->deactivateIfNoActiveItems($event, $studentId);
+                }
+
                 $feeAfter = $feeService->recalculate($event, $registration->school_id);
 
                 // If the school had already paid something and this rejection freed up part of

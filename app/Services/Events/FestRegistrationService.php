@@ -23,10 +23,11 @@ class FestRegistrationService
             'This registration\'s fee has already been paid and approved — it can no longer be cancelled.',
         );
 
-        $registration->loadMissing('item');
+        $registration->loadMissing('item', 'participants');
         $headId = $registration->item?->head_id;
+        $studentIds = $registration->participants->pluck('student_id')->filter()->unique();
 
-        DB::transaction(function () use ($event, $registration) {
+        DB::transaction(function () use ($event, $registration, $studentIds) {
             // Lock the school's aggregate fee record for the duration of the status flip +
             // recalculate, so a concurrent cancel/reject on the same school can't interleave.
             // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4.
@@ -37,6 +38,15 @@ class FestRegistrationService
                 ->first();
 
             $registration->update(['status' => 'withdrawn']);
+
+            // Free up the per-student registration fee if this was the student's last active
+            // item — must run BEFORE recalculate() so the composite fee model sees the
+            // deactivation. See FestLevelRegistrationService::deactivateIfNoActiveItems().
+            $levelService = app(FestLevelRegistrationService::class);
+            foreach ($studentIds as $studentId) {
+                $levelService->deactivateIfNoActiveItems($event, $studentId);
+            }
+
             app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
         });
 
@@ -104,7 +114,9 @@ class FestRegistrationService
         // credit critical section, so a concurrent cancel/reject on the same school can't
         // interleave and produce a wrong delta or a duplicate credit. Notifier/audit calls
         // stay outside, after commit. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4.
-        $creditAmount = DB::transaction(function () use ($event, $registration, $feeService, $reason, $participantIds) {
+        $studentIds = $registration->participants->pluck('student_id')->filter()->unique();
+
+        $creditAmount = DB::transaction(function () use ($event, $registration, $feeService, $reason, $participantIds, $studentIds) {
             FestSchoolEventFee::where('event_id', $event->id)
                 ->where('school_id', $registration->school_id)
                 ->whereNull('head_id')
@@ -123,6 +135,14 @@ class FestRegistrationService
             if ($participantIds->isNotEmpty()) {
                 FestMark::whereIn('participant_id', $participantIds)->delete();
                 FestParticipant::whereIn('id', $participantIds)->update(['chest_no' => null]);
+            }
+
+            // Free up the per-student registration fee if this was the student's last active
+            // item — must run BEFORE recalculate() so the composite fee model sees it. See
+            // FestLevelRegistrationService::deactivateIfNoActiveItems().
+            $levelService = app(FestLevelRegistrationService::class);
+            foreach ($studentIds as $studentId) {
+                $levelService->deactivateIfNoActiveItems($event, $studentId);
             }
 
             $feeAfter = $feeService->recalculate($event, $registration->school_id);

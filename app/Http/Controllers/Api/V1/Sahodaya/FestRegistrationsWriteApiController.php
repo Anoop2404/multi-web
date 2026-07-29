@@ -40,10 +40,19 @@ class FestRegistrationsWriteApiController extends SahodayaApiController
 
         EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
 
-        $registration->loadMissing('item');
+        $registration->loadMissing('item', 'participants');
         $headId = $registration->item?->head_id;
 
         $registration->update(['status' => 'rejected']);
+
+        // Free up the per-student registration fee if this was the student's last active
+        // item — must run BEFORE recalculate() so the composite fee model sees it. See
+        // FestLevelRegistrationService::deactivateIfNoActiveItems().
+        $levelService = app(\App\Services\Events\FestLevelRegistrationService::class);
+        foreach ($registration->participants->pluck('student_id')->filter()->unique() as $studentId) {
+            $levelService->deactivateIfNoActiveItems($event, $studentId);
+        }
+
         app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
 
         if ($headId) {

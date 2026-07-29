@@ -1093,17 +1093,32 @@ function studentIneligibilityReason(student, event, item) {
     return 'Not eligible for this item';
 }
 
-// Deliberately excludes the school registration fee line — that's a one-time per-school
-// cost, not a per-item one, and EventBillingPanel.vue shows it separately (reading
-// event.school_fee.school_registration_fee directly) alongside the real grand total
-// (event.school_fee.total_due). This function/itemFeesDue() is only the item-level
-// subtotal shown under "Item fees due" — do NOT use itemFeesDue() as "what the school
-// owes" for gating upload forms or invoice links; use event.school_fee.total_due /
-// .outstanding for that instead, since a school can owe money (school fee) with zero
-// item fees.
+// Deliberately excludes the school registration AND student registration summary lines —
+// those are once-per-school / once-per-student costs, not per-item ones, and
+// EventBillingPanel.vue already shows them separately as their own <li> rows (school reg
+// reads event.school_fee.school_registration_fee directly; student reg is one of the
+// breakdown lines rendered above this summary). Previously this only filtered out the
+// school-registration line by label and NOT the student-registration line, so for
+// sports_composite-billed events (FestSportsCompositeFeeService::calculate()) the
+// "Item fees: ₹X (N items)" summary re-added the student registration total on top of
+// the real per-item fees — e.g. a student with a ₹300 student-reg fee already shown above
+// plus one ₹50 extra item beyond the free quota displayed as "Item fees: ₹350 (2 items)",
+// even though true item fees were only ₹50 and "2" was actually the student count, not an
+// item count. Filtering by line_type is the reliable check (set for sports_composite);
+// the label check remains as a fallback for fee models that don't set line_type.
+// This function/itemFeesDue() is only the item-level subtotal shown under "Item fees due"
+// — do NOT use itemFeesDue() as "what the school owes" for gating upload forms or invoice
+// links; use event.school_fee.total_due / .outstanding for that instead, since a school
+// can owe money (school fee) with zero item fees.
 function itemFeeLines(event) {
     const lines = event.school_fee?.breakdown?.items ?? [];
-    return lines.filter(line => !String(line.label).toLowerCase().includes('school registration'));
+    return lines.filter(line => {
+        const type = String(line.line_type || '').toLowerCase();
+        if (type === 'school_reg' || type === 'student_reg') return false;
+        const label = String(line.label || '').toLowerCase();
+        if (label.includes('school registration') || label.includes('student registration')) return false;
+        return true;
+    });
 }
 
 function itemFeesDue(event) {

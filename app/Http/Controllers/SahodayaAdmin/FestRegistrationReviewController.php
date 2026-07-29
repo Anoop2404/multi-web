@@ -322,7 +322,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $data = $request->validate(['rejection_reason' => 'required|string|max:500']);
         $reason = $data['rejection_reason'];
 
-        $registration->loadMissing('item');
+        $registration->loadMissing('item', 'participants');
         $headId = $registration->item?->head_id;
 
         $registration->update([
@@ -331,6 +331,17 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'rejected_at'         => now(),
             'rejected_by_user_id' => $request->user()->id,
         ]);
+
+        // Free up the per-student registration fee if this was the student's last active
+        // item — must run BEFORE recalculate() so the composite fee model sees it. See
+        // FestLevelRegistrationService::deactivateIfNoActiveItems(). Mirrors the same fix in
+        // FestRegistrationBulkService::rejectMany(), needed here too since this single-item
+        // reject path doesn't go through that service.
+        $levelService = app(\App\Services\Events\FestLevelRegistrationService::class);
+        foreach ($registration->participants->pluck('student_id')->filter()->unique() as $studentId) {
+            $levelService->deactivateIfNoActiveItems($event, $studentId);
+        }
+
         app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
 
         if ($headId) {

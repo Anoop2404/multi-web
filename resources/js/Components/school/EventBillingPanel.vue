@@ -68,9 +68,9 @@
                 </li>
             </ul>
             <p v-else class="text-xs text-indigo-800">Register items above to see item fees here.</p>
-            <p v-if="event.school_fee?.participation_item_count" class="text-xs text-indigo-700 mt-1">
+            <p v-if="itemFeeLines.length" class="text-xs text-indigo-700 mt-1">
                 Item fees: ₹{{ formatMoney(itemFeesDue) }}
-                ({{ event.school_fee.participation_item_count }} item{{ event.school_fee.participation_item_count === 1 ? '' : 's' }})
+                ({{ itemFeeLines.length }} item{{ itemFeeLines.length === 1 ? '' : 's' }})
             </p>
             <p class="font-semibold text-indigo-900 mt-2 pt-2 border-t border-indigo-100">
                 Total fees due: ₹{{ formatMoney(totalDue) }}
