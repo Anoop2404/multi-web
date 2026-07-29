@@ -416,6 +416,15 @@
                         <p v-if="adminForm.errors.email" class="text-xs text-red-500 mt-1">{{ adminForm.errors.email }}</p>
                     </div>
                     <div>
+                        <label class="form-label mb-1.5">Username <span class="font-normal text-gray-400">(optional)</span></label>
+                        <input v-model="adminForm.username" type="text" autocomplete="off"
+                               class="field focus:ring-indigo-300" placeholder="e.g. testschool1">
+                        <p class="text-xs text-gray-400 mt-1">
+                            Leave blank to keep the current username or auto-generate one for a new login.
+                        </p>
+                        <p v-if="adminForm.errors.username" class="text-xs text-red-500 mt-1">{{ adminForm.errors.username }}</p>
+                    </div>
+                    <div>
                         <label class="form-label mb-1.5">Password</label>
                         <input v-model="adminForm.password" type="text" :required="!adminForm.user_id" autocomplete="off"
                                class="field font-mono focus:ring-indigo-300">
@@ -581,6 +590,7 @@ const adminForm = useForm({
     user_id: null,
     name: '',
     email: '',
+    username: '',
     password: '',
 });
 const rejectForm = useForm({ reason: '' });
@@ -679,6 +689,7 @@ function editAdmin(admin) {
     adminForm.user_id = admin.id;
     adminForm.name = admin.name;
     adminForm.email = admin.email;
+    adminForm.username = admin.username || '';
     adminForm.password = '';
     adminForm.clearErrors();
 }

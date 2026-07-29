@@ -601,6 +601,7 @@ class TenantController extends Controller
                 'user_id'  => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', $tenant->id)],
                 'name'     => ['required', 'string', 'max:255'],
                 'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($existingId)],
+                'username' => ['nullable', 'string', 'max:255', 'regex:/^[a-zA-Z0-9_.-]+$/', Rule::unique('users', 'username')->ignore($existingId)],
                 'password' => [$existingId ? 'nullable' : 'required', 'string', 'min:8'],
             ]);
 
@@ -621,6 +622,10 @@ class TenantController extends Controller
                 app(UserCredentialService::class)->storePassword($user, $data['password'], mustChange: false);
             } else {
                 $user->save();
+            }
+
+            if (array_key_exists('username', $data) && filled($data['username']) && $data['username'] !== $user->username) {
+                $user->forceFill(['username' => $data['username']])->save();
             }
 
             $user->syncRoles([$role]);

@@ -59,4 +59,48 @@ class TenantControllerTest extends TestCase
                 ->where('schoolAdmins.0.username', 'testschool1')
             );
     }
+
+    public function test_superadmin_can_save_a_separate_school_login_username(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        config(['tenancy.database_per_sahodaya' => false]);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Test Sahodaya',
+            'is_active' => true,
+        ]);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Test School',
+            'parent_id' => $sahodaya->id,
+            'membership_status' => 'approved',
+            'is_active' => true,
+        ]);
+
+        $superadmin = User::factory()->create([
+            'tenant_id' => null,
+            'email_verified_at' => now(),
+        ]);
+        $superadmin->assignRole('superadmin');
+
+        $this->actingAs($superadmin)
+            ->post("/admin/tenants/{$school->id}/school-admin", [
+                'name' => 'School Admin',
+                'email' => 'contact@example.com',
+                'username' => 'testschool1',
+                'password' => 'Password123!',
+            ])
+            ->assertRedirect();
+
+        $created = User::query()
+            ->where('tenant_id', $school->id)
+            ->where('email', 'contact@example.com')
+            ->firstOrFail();
+
+        $this->assertSame('testschool1', $created->username);
+    }
 }
