@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\Subject;
 use App\Services\BoardResults\AcademicExcellenceReportService;
+use App\Services\BoardResults\FullA1AchieversReportService;
 use App\Services\BoardResults\SubjectMeritRegisterService;
 use App\Support\AcademicYear;
 use Illuminate\Http\Request;
@@ -84,6 +85,12 @@ class BoardResultReportController extends SahodayaAdminController
                     'href' => "{$base}/board-results/reports/subject-merit?academic_year={$yearQ}&class=12",
                 ],
                 [
+                    'key' => 'full-a1-achievers',
+                    'title' => 'Full A1 Achievers — Class X & XII',
+                    'description' => 'Students who scored A1 (91-100) in every subject entered, all streams.',
+                    'href' => "{$base}/board-results/reports/full-a1-achievers?academic_year={$yearQ}",
+                ],
+                [
                     'key' => 'excellence',
                     'title' => 'Academic Excellence + Historical Comparison',
                     'description' => 'Awards and year-over-year pass % trends (all classes).',
@@ -134,6 +141,30 @@ class BoardResultReportController extends SahodayaAdminController
             'classOptions' => [10, 12],
             'schoolOptions' => $schoolOptions,
             'subjectOptions' => $subjectOptions,
+            'academicYearOptions' => $academicYearOptions,
+        ]);
+    }
+
+    public function fullA1Achievers(Request $request, FullA1AchieversReportService $service)
+    {
+        $year = $request->string('academic_year')->toString()
+            ?: AcademicYear::forSahodaya($this->sahodaya->id);
+        $class = $request->filled('class') ? $request->integer('class') : null;
+        $stream = $request->filled('stream') ? $request->string('stream')->toString() : null;
+
+        $rows = $service->list($this->sahodaya->id, $year, $class, $stream);
+
+        $academicYearOptions = \App\Models\AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label']);
+
+        return $this->inertia('Sahodaya/BoardResults/FullA1Achievers', [
+            'rows' => $rows,
+            'filters' => [
+                'academic_year' => $year,
+                'class' => $class,
+                'stream' => $stream,
+            ],
+            'classOptions' => [10, 12],
+            'streamOptions' => ['Science', 'Commerce', 'Humanities'],
             'academicYearOptions' => $academicYearOptions,
         ]);
     }

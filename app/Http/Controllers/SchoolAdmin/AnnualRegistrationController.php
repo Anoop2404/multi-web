@@ -206,6 +206,12 @@ class AnnualRegistrationController extends SchoolAdminController
             ],
         );
 
+        // Route the school into its region's partition on every already-partitioned
+        // fest hub, so Sahodaya admins don't have to re-click "Sync Partitions"
+        // every time a school newly picks its region.
+        app(\App\Services\Events\FestRegionPartitionService::class)
+            ->syncSchoolAcrossHubs($sahodayaId, $this->school->id);
+
         return back()->with('success', 'Region saved.');
     }
 

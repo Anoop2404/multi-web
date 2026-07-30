@@ -825,6 +825,16 @@ class FestReportService
 
     private function attendanceSheetSchoolPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
+        // Safety net for large schools: photo embedding below decodes every student's
+        // image via GD (see TenantStorage::shrinkImageForEmbed). That was blowing the
+        // default 128M limit — imagecreatefromstring on a handful of full-resolution
+        // uploads is enough on its own, and this route had neither the memory bump nor
+        // the result caching that the sibling attendanceSheetPdf() (admin combined
+        // report) already uses. Mirrors the bump idCardsPreview() applies for the same
+        // reason.
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
+
         $request->validate(['school_id' => 'required|string']);
         $school = Tenant::findOrFail($request->input('school_id'));
 
@@ -849,11 +859,27 @@ class FestReportService
             fn ($item) => filled($item->class_group) && $item->class_group !== 'open',
         );
 
+        // Cache each student's resized thumbnail (keyed on their own updated_at), same
+        // pattern as attendanceSheetPdf() — otherwise every school download/preview
+        // re-decodes every photo from scratch via GD, which is what was exhausting
+        // memory. An edited photo busts its own cache key since updated_at changes.
         foreach ($studentRows as $id => $row) {
             $student = $row['student'];
-            $studentRows[$id]['photo_url'] = $student->photo
-                ? \App\Support\TenantStorage::photoBase64DataUri($student->tenant, $student->photo)
-                : null;
+
+            if (! $student->photo) {
+                $studentRows[$id]['photo_url'] = null;
+                $studentRows[$id]['dob'] = $student->dob?->format('d M Y');
+                $studentRows[$id]['class'] = $student->schoolClass?->name;
+
+                continue;
+            }
+
+            $cacheKey = 'student-photo-thumb:'.$id.':'.($student->updated_at?->timestamp ?? 0);
+            $studentRows[$id]['photo_url'] = \Illuminate\Support\Facades\Cache::remember(
+                $cacheKey,
+                now()->addDays(30),
+                fn () => \App\Support\TenantStorage::photoBase64DataUri($student->tenant, $student->photo),
+            );
             $studentRows[$id]['dob'] = $student->dob?->format('d M Y');
             $studentRows[$id]['class'] = $student->schoolClass?->name;
         }

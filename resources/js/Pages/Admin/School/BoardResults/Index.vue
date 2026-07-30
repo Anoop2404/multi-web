@@ -249,6 +249,10 @@
                                 <h3 class="font-bold text-gray-800 text-sm">School Toppers</h3>
                             </div>
                             <div class="flex items-center gap-2">
+                                <Link :href="`/school-admin/${school.id}/board-results/full-a1-achievers?class=${selectedClass ?? searchClass}`"
+                                      class="btn-secondary text-xs px-3.5 py-1.5 font-bold flex items-center gap-1.5 shadow-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200">
+                                    <span>🏅</span> Full A1 Achievers →
+                                </Link>
                                 <Link v-if="(selectedClass ?? searchClass) == 12" :href="`/school-admin/${school.id}/board-results/subject-toppers`"
                                       class="btn-primary text-xs px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 shadow-sm border-none">
                                     <span>🎯</span> Open Subject-Wise Toppers Page →

@@ -15,6 +15,9 @@ class Topper extends Model
 
     public const ENTRY_SUBJECT = 'subject';
 
+    /** A student entered on the Full A1 Achievers page — every subject_marks row must be >= 91. */
+    public const ENTRY_FULL_A1 = 'full_a1';
+
     protected $fillable = [
         'board_result_id',
         'tenant_id',
@@ -67,6 +70,11 @@ class Topper extends Model
         return $this->entry_type === self::ENTRY_SUBJECT;
     }
 
+    public function isFullA1Entry(): bool
+    {
+        return $this->entry_type === self::ENTRY_FULL_A1;
+    }
+
     public function scopeOverallEntries($query)
     {
         return $query->where('entry_type', self::ENTRY_OVERALL);
@@ -75,6 +83,11 @@ class Topper extends Model
     public function scopeSubjectEntries($query)
     {
         return $query->where('entry_type', self::ENTRY_SUBJECT);
+    }
+
+    public function scopeFullA1Entries($query)
+    {
+        return $query->where('entry_type', self::ENTRY_FULL_A1);
     }
 
     protected static function booted(): void

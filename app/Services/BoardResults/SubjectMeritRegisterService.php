@@ -89,7 +89,6 @@ class SubjectMeritRegisterService
                 'tsm.subject_id',
                 'tsm.subject_label as subject',
                 't.name as student_name',
-                't.percentage',
                 't.stream',
                 't.admission_no',
                 't.roll_no',
@@ -110,7 +109,11 @@ class SubjectMeritRegisterService
                 'school_id' => (string) $row->school_id,
                 'school_name' => $names[$row->school_id] ?? (string) $row->school_id,
                 'marks' => is_numeric($row->marks) ? (float) $row->marks : $row->marks,
-                'percentage' => $row->percentage !== null ? (float) $row->percentage : null,
+                // Subject marks are always recorded out of 100, so the percentage IS the
+                // marks value — previously this selected the topper's overall aggregate
+                // percentage (t.percentage), which showed a nonsensical number next to a
+                // single subject's score (#161).
+                'percentage' => is_numeric($row->marks) ? (float) $row->marks : null,
                 'stream' => $row->stream,
                 'class' => $row->class !== null ? (int) $row->class : null,
                 'academic_year' => (string) $row->academic_year,

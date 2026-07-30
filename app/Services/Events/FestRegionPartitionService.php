@@ -179,4 +179,49 @@ class FestRegionPartitionService
 
         return ['partitions_created' => $created, 'schools_assigned' => $assigned];
     }
+
+    /**
+     * Route a single school to its region's partition on every already-partitioned
+     * hub for this Sahodaya, right when the school's membership region changes.
+     * This is what "Sync Partitions from Sahodaya Regions" does for one school —
+     * running it here means the admin no longer has to re-click that button every
+     * time a school newly picks (or changes) its region.
+     *
+     * Only assigns into partitions that already exist; it never creates a partition
+     * (that stays an explicit admin action via the Sync button / event settings).
+     *
+     * @return int number of hub events the school was (re)assigned on
+     */
+    public function syncSchoolAcrossHubs(string $sahodayaId, string $schoolId): int
+    {
+        self::flushCache();
+
+        $region = $this->schoolRegion($sahodayaId, $schoolId);
+        if (! $region) {
+            return 0;
+        }
+
+        $key = $this->partitionKeyForRegion($region);
+
+        $hubs = FestEvent::where('tenant_id', $sahodayaId)
+            ->whereNull('parent_event_id')
+            ->where('conduct_mode', 'partitioned')
+            ->get();
+
+        $updated = 0;
+        foreach ($hubs as $hub) {
+            $partition = $this->partitions->partitionByKey($hub, $key);
+            if (! $partition) {
+                continue;
+            }
+
+            FestEventSchoolPartition::updateOrCreate(
+                ['event_id' => $hub->id, 'school_id' => $schoolId],
+                ['partition_key' => $key, 'assigned_at' => now()],
+            );
+            $updated++;
+        }
+
+        return $updated;
+    }
 }

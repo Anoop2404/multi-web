@@ -829,6 +829,8 @@ class FestEventController extends SahodayaAdminController
             'item_id' => $item->id,
         ], $item);
 
+        $this->syncItemToExistingPartitions($event);
+
         return back()->with('success', 'Item added.');
     }
 
@@ -906,6 +908,8 @@ class FestEventController extends SahodayaAdminController
             'item_id' => $item->id,
         ], $item);
 
+        $this->syncItemToExistingPartitions($event);
+
         return back()->with('success', 'Item updated.');
     }
 
@@ -944,7 +948,30 @@ class FestEventController extends SahodayaAdminController
             'count' => $count,
         ]);
 
+        $this->syncItemToExistingPartitions($event);
+
         return back()->with('success', "{$count} standard item(s) imported.");
+    }
+
+    /**
+     * Push item catalog changes into every region/cluster partition that already
+     * exists under this hub, so admins don't have to re-click "Sync Partitions"
+     * after every item add/edit/import. Never creates partitions — only keeps
+     * catalogs of existing partition children current.
+     */
+    private function syncItemToExistingPartitions(FestEvent $event): void
+    {
+        $partitions = app(\App\Services\Events\FestPartitionService::class);
+
+        if (! $partitions->isPartitionedHub($event)) {
+            return;
+        }
+
+        $sync = app(\App\Services\Events\FestItemSyncService::class);
+        foreach ($partitions->partitions($event) as $child) {
+            $role = $partitions->partitionRole($child) ?? 'region';
+            $sync->copyItemsToPartition($event, $child, $role);
+        }
     }
 
     /** @return array<string, mixed> */

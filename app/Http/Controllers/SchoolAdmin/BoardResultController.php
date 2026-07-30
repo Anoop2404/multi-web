@@ -414,7 +414,6 @@ class BoardResultController extends SchoolAdminController
                 }
             }
 
-            $nextRank = (int) ($existingToppers->max('rank') ?? 0) + 1;
             $created = 0;
             $updated = 0;
 
@@ -464,17 +463,53 @@ class BoardResultController extends SchoolAdminController
                         'total_marks' => $totalMarks,
                         'marks_obtained' => $marksObtained,
                         'percentage' => $percentage,
-                        'rank' => $nextRank++,
                         'photo' => $photoPath,
                     ]);
                     $created++;
                 }
             }
 
+            $this->recomputeOverallRanks($boardResult);
             app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
 
             return $created;
         });
+    }
+
+    /**
+     * Rank is never hand-typed or set once at creation anymore — it's always
+     * recomputed here from percentage (competition ranking: ties share a rank,
+     * the next distinct score skips ahead), so a school can never end up with a
+     * lower-scoring student ranked ahead of a higher-scoring one (#161).
+     */
+    private function recomputeOverallRanks(BoardResult $boardResult): void
+    {
+        $toppers = Topper::query()
+            ->where('board_result_id', $boardResult->id)
+            ->where('entry_type', Topper::ENTRY_OVERALL)
+            ->orderByDesc('percentage')
+            ->orderByDesc('marks_obtained')
+            ->orderBy('id')
+            ->get(['id', 'percentage', 'marks_obtained', 'rank']);
+
+        $lastScore = null;
+        $lastRank = 0;
+
+        foreach ($toppers as $index => $topper) {
+            $score = (float) $topper->percentage;
+            $position = $index + 1;
+
+            $rank = ($lastScore === null || abs($score - $lastScore) > 0.0001)
+                ? $position
+                : $lastRank;
+
+            if ((int) $topper->rank !== $rank) {
+                Topper::whereKey($topper->id)->update(['rank' => $rank]);
+            }
+
+            $lastScore = $score;
+            $lastRank = $rank;
+        }
     }
 
     public function submit(Request $request, string $tenantId, BoardResult $boardResult)
@@ -621,6 +656,182 @@ class BoardResultController extends SchoolAdminController
         ], $this->topperContext($boardResult)));
     }
 
+    /**
+     * Full A1 Achievers (#161): a dedicated page where a school enters one
+     * student's marks for every subject in a single form. Every subject mark
+     * must be 91-100 or the whole submission is rejected server-side — see
+     * storeFullA1AchieversBatch(). Separate from Subject-Wise Toppers so this
+     * list is always exactly "students confirmed Full A1", nothing else.
+     */
+    public function fullA1Achievers(Request $request, string $tenantId)
+    {
+        $class = $request->filled('class') ? (int) $request->input('class') : 10;
+        abort_unless(in_array($class, [10, 12], true), 404);
+
+        $academicYear = $request->string('academic_year')->trim()->toString();
+        $yearService = app(BoardResultAcademicYearService::class);
+        $academicYearOptions = $yearService->entryYearOptions((string) $this->school->parent_id);
+        if ($academicYear === '') {
+            $configuredOpenYear = collect($academicYearOptions)
+                ->first(fn (array $year) => $year['entry_configured'] && $year['entry_status'] === 'open');
+            $openYear = $configuredOpenYear
+                ?? collect($academicYearOptions)->firstWhere('entry_status', 'open');
+            $academicYear = $openYear['label'] ?? ((date('Y') - 1).'-'.substr((string) date('Y'), 2));
+        }
+
+        $yearService->assertEditableYear($yearService->resolveId($academicYear), $academicYear);
+
+        $sahodayaId = (string) $this->school->parent_id;
+        $marksConfigService = app(BoardResultMarksConfigService::class);
+        $totalMarks = $class === 10 ? $marksConfigService->resolve($sahodayaId, 10, null) : null;
+
+        $boardResult = BoardResult::firstOrCreate(
+            [
+                'tenant_id' => $this->school->id,
+                'class' => $class,
+                'academic_year' => $academicYear,
+            ],
+            [
+                'examination_type' => BoardResult::examinationTypeForClass($class),
+                'status' => BoardResult::STATUS_DRAFT,
+                'total_marks' => $totalMarks,
+            ]
+        );
+
+        $boardResult->load(['toppers' => function ($q) {
+            $q->fullA1Entries()->with('subjectMarks');
+        }, 'uploads']);
+
+        return $this->inertia('School/BoardResults/FullA1Achievers', [
+            'boardResult' => $boardResult,
+            'academicYear' => $academicYear,
+            'academicYearOptions' => $academicYearOptions,
+            'standardSubjects' => BoardExamSubjects::standardBoardSubjects($sahodayaId),
+            'streamOptions' => $class === 12 ? BoardExamSubjects::class12StreamLabels($sahodayaId) : [],
+            'canEdit' => $boardResult->isEditable(),
+            'editLockReason' => $boardResult->isEditable() ? null : $boardResult->editLockReason(),
+        ]);
+    }
+
+    /**
+     * Save one or more students' full subject-mark sets from the Full A1
+     * Achievers form. Rejects the entire submission (no partial save) if any
+     * entered mark is below 91, naming exactly which student/subject failed.
+     */
+    public function storeFullA1AchieversBatch(Request $request, string $tenantId, BoardResult $boardResult)
+    {
+        abort_if($boardResult->tenant_id !== $this->school->id, 403);
+        abort_unless($boardResult->isEditable(), 422, 'Achievers are locked for this result.');
+        app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
+
+        $isClass12 = (int) $boardResult->class === 12;
+
+        $data = $request->validate([
+            'rows' => 'required|array|min:1',
+            'rows.*.topper_id' => 'nullable|integer',
+            'rows.*.name' => 'required|string|max:255',
+            'rows.*.gender' => 'required|string|in:male,female,other',
+            'rows.*.roll_no' => 'nullable|string|max:64',
+            'rows.*.stream' => 'nullable|string|max:100',
+            'rows.*.subject_marks' => 'required|array|min:1',
+            'rows.*.subject_marks.*' => 'required|numeric|min:0|max:100',
+        ]);
+
+        // Enforce the A1 rule here, server-side — the frontend already blocks
+        // this, but the server is the real gate. Reject the whole batch (not a
+        // partial save) so a school can't end up with a half-saved achiever.
+        $failures = [];
+        foreach ($data['rows'] as $i => $row) {
+            if ($isClass12 && blank($row['stream'] ?? null)) {
+                $failures[] = 'Row '.($i + 1).": select a stream for {$row['name']}.";
+
+                continue;
+            }
+            foreach ($row['subject_marks'] as $subject => $marks) {
+                if ((float) $marks < 91) {
+                    $failures[] = 'Row '.($i + 1).": {$row['name']} scored {$marks} in {$subject} — Full A1 requires 91-100 in every subject.";
+                }
+            }
+        }
+        if ($failures !== []) {
+            throw ValidationException::withMessages(['rows' => $failures]);
+        }
+
+        // Roll_no uniqueness within this board result, same rule as the other entry forms.
+        $submittedRollNos = [];
+        foreach ($data['rows'] as $i => $row) {
+            $rollNo = $row['roll_no'] ?? null;
+            if (blank($rollNo)) {
+                continue;
+            }
+            if (isset($submittedRollNos[$rollNo])) {
+                throw ValidationException::withMessages([
+                    "rows.{$i}.roll_no" => "Duplicate CBSE Roll No '{$rollNo}' within the same submission.",
+                ]);
+            }
+            $submittedRollNos[$rollNo] = true;
+        }
+
+        return DB::transaction(function () use ($data, $boardResult, $isClass12) {
+            BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
+
+            $existing = Topper::where('board_result_id', $boardResult->id)
+                ->fullA1Entries()
+                ->get(['id', 'name', 'roll_no']);
+
+            $created = 0;
+            $updated = 0;
+
+            foreach ($data['rows'] as $row) {
+                $name = trim($row['name']);
+                $topper = filled($row['topper_id'] ?? null)
+                    ? $existing->firstWhere('id', (int) $row['topper_id'])
+                    : $existing->first(
+                        fn (Topper $t) => (filled($row['roll_no'] ?? null) && $t->roll_no === $row['roll_no'])
+                            || strtolower($t->name) === strtolower($name)
+                    );
+
+                $attrs = [
+                    'name' => $name,
+                    'gender' => $row['gender'],
+                    'roll_no' => $row['roll_no'] ?? null,
+                    'stream' => $isClass12 ? ($row['stream'] ?? null) : null,
+                ];
+
+                if ($topper) {
+                    $topper->update($attrs);
+                    $updated++;
+                } else {
+                    $topper = Topper::create(array_merge($attrs, [
+                        'board_result_id' => $boardResult->id,
+                        'tenant_id' => $this->school->id,
+                        'entry_type' => Topper::ENTRY_FULL_A1,
+                    ]));
+                    $existing->push($topper);
+                    $created++;
+                }
+
+                app(TopperSubjectMarkService::class)->sync($topper, $row['subject_marks']);
+            }
+
+            app(DataChangeLogger::class)->event(
+                'created',
+                "{$created} added, {$updated} updated (Full A1 Achievers)",
+                $this->school->id,
+                'topper',
+                $boardResult,
+                ['created' => $created, 'updated' => $updated],
+            );
+
+            $parts = array_filter([
+                $created ? "{$created} added" : null,
+                $updated ? "{$updated} updated" : null,
+            ]);
+
+            return back()->with('success', implode(', ', $parts).' as Full A1 Achievers.');
+        });
+    }
+
     public function toppers(string $tenantId, BoardResult $boardResult)
     {
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
@@ -716,6 +927,9 @@ class BoardResultController extends SchoolAdminController
         if (is_array($subjectMarks)) {
             app(TopperSubjectMarkService::class)->sync($topper, $subjectMarks);
         }
+        if ($topper->entry_type === Topper::ENTRY_OVERALL) {
+            $this->recomputeOverallRanks($boardResult);
+        }
         app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
 
         app(DataChangeLogger::class)->updated(
@@ -791,6 +1005,7 @@ class BoardResultController extends SchoolAdminController
         if (is_array($subjectMarks)) {
             app(TopperSubjectMarkService::class)->sync($topper, $subjectMarks);
         }
+        $this->recomputeOverallRanks($boardResult);
         app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
 
         app(DataChangeLogger::class)->created(
@@ -938,7 +1153,6 @@ class BoardResultController extends SchoolAdminController
             'marks_obtained' => 'nullable|numeric|min:0',
             'stream' => 'nullable|string|max:100',
             'stream_id' => 'nullable|integer',
-            'rank' => 'nullable|integer|min:1',
             'is_perfect_scorer' => 'boolean',
             'photo' => 'nullable|image|max:4096',
         ];
@@ -950,19 +1164,9 @@ class BoardResultController extends SchoolAdminController
         }
 
         $data = $request->validate($rules);
-        $data = PersistDefaults::coalesce($data, ['rank' => 1]);
 
-        $rank = (int) ($data['rank'] ?? 1);
-        $duplicate = Topper::query()
-            ->where('board_result_id', $boardResult->id)
-            ->where('rank', $rank)
-            ->when($exclude, fn ($q) => $q->where('id', '!=', $exclude->id))
-            ->exists();
-        if ($duplicate) {
-            throw ValidationException::withMessages([
-                'rank' => "Rank {$rank} is already assigned to another topper for this result.",
-            ]);
-        }
+        // Rank is never accepted from the client — recomputeOverallRanks() derives it
+        // from percentage right after this topper is saved (#161).
 
         // Validate roll_no uniqueness within this board result.
         if (filled($data['roll_no'] ?? null)) {
@@ -1041,7 +1245,11 @@ class BoardResultController extends SchoolAdminController
             $topper->only(['name', 'percentage', 'rank']),
         );
 
+        $wasOverall = $topper->entry_type === Topper::ENTRY_OVERALL;
         $topper->delete();
+        if ($wasOverall) {
+            $this->recomputeOverallRanks($boardResult);
+        }
         app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
 
         return back()->with('success', 'Topper removed.');

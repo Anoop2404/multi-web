@@ -535,6 +535,8 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/board-results',                                   [BoardResultController::class, 'index'])->name('board-results.index');
     Route::get('/board-results/rank-report',                       [BoardResultController::class, 'rankReport'])->name('board-results.rank-report');
     Route::get('/board-results/subject-toppers',                   [BoardResultController::class, 'subjectToppers'])->name('board-results.subject-toppers');
+    Route::get('/board-results/full-a1-achievers',                 [BoardResultController::class, 'fullA1Achievers'])->name('board-results.full-a1-achievers');
+    Route::post('/board-results/{boardResult}/full-a1-achievers/batch', [BoardResultController::class, 'storeFullA1AchieversBatch'])->name('board-results.full-a1-achievers.batch');
     Route::post('/board-results',                                  [BoardResultController::class, 'store'])->name('board-results.store');
     Route::put('/board-results/{boardResult}',                     [BoardResultController::class, 'update'])->name('board-results.update');
     Route::post('/board-results/{boardResult}/submit',             [BoardResultController::class, 'submit'])->name('board-results.submit');
@@ -878,6 +880,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::put('/masters/marks-config', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'updateMarksConfig'])->name('masters.marks-config');
             Route::get('/reports', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'index'])->name('reports');
             Route::get('/reports/subject-merit', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'subjectMerit'])->name('reports.subject-merit');
+            Route::get('/reports/full-a1-achievers', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'fullA1Achievers'])->name('reports.full-a1-achievers');
             Route::get('/reports/excellence', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'excellence'])->name('reports.excellence');
             Route::post('/topper-cap', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'updateTopperCap'])->name('topper-cap');
             Route::get('/toppers', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'index'])->name('toppers');
