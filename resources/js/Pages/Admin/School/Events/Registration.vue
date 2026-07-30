@@ -244,13 +244,14 @@
                     </div>
                 </div>
 
-                <div v-if="!canRegister(event)" class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
-                    {{ registrationClosedMessage(event) }}
-                </div>
-
-                <!-- ── Non-sports fests: Step 1 · Event Registration (independent of the
-                     items-table branching below, which is unchanged) — sports already
-                     renders this panel inside its own branch further down. -->
+                <!-- ── Non-sports fests: Step 1 · Event Registration (deliberately NOT part
+                     of the v-if/v-else-if/v-else chain below — an element with its own
+                     v-if placed between that chain's branches would hijack it: Vue
+                     attaches a v-else-if/v-else to whatever sibling immediately precedes
+                     it in the template, not to the "logically intended" branch. Having
+                     this here previously swallowed the generic items form and the sports
+                     block entirely for every non-sports event. Sports already renders the
+                     equivalent panel inside its own branch further down. -->
                 <SportsEventAthletesPanel
                     v-if="canRegister(event) && !isSports"
                     v-show="getTab(event.id) === 'athletes'"
@@ -264,6 +265,10 @@
                     :school-classes="schoolClasses"
                     class="mb-4"
                 />
+
+                <div v-if="!canRegister(event)" class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
+                    {{ registrationClosedMessage(event) }}
+                </div>
 
                 <!-- ── SPORTS: event athletes + head/age filters ── -->
                 <div v-else-if="isSports" class="space-y-4">
