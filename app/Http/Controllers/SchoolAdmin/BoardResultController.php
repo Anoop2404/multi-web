@@ -702,11 +702,28 @@ class BoardResultController extends SchoolAdminController
             $q->fullA1Entries()->with('subjectMarks');
         }, 'uploads']);
 
+        $standardSubjects = $class === 10
+            ? (BoardExamSubjects::subjectsForClass10($sahodayaId) ?: BoardExamSubjects::standardBoardSubjects($sahodayaId))
+            : BoardExamSubjects::standardBoardSubjects($sahodayaId);
+
+        // Official CBSE code per subject, purely for display next to each option —
+        // not written anywhere, so there's no risk of the Class X/XII code collision
+        // described in CbseSubjectCodes (e.g. Sanskrit: 122 at Class X, 322 at XII).
+        $subjectCodes = collect($standardSubjects)
+            ->mapWithKeys(fn ($label) => [
+                $label => $class === 10
+                    ? \App\Support\CbseSubjectCodes::forClass10Label($label)
+                    : \App\Support\CbseSubjectCodes::forClass12Label($label),
+            ])
+            ->filter()
+            ->all();
+
         return $this->inertia('School/BoardResults/FullA1Achievers', [
             'boardResult' => $boardResult,
             'academicYear' => $academicYear,
             'academicYearOptions' => $academicYearOptions,
-            'standardSubjects' => BoardExamSubjects::standardBoardSubjects($sahodayaId),
+            'standardSubjects' => $standardSubjects,
+            'subjectCodes' => $subjectCodes,
             'streamOptions' => $class === 12 ? BoardExamSubjects::class12StreamLabels($sahodayaId) : [],
             'canEdit' => $boardResult->isEditable(),
             'editLockReason' => $boardResult->isEditable() ? null : $boardResult->editLockReason(),
@@ -850,10 +867,18 @@ class BoardResultController extends SchoolAdminController
         $sahodayaId = (string) $this->school->parent_id;
         $streamOptions = $isClass12 ? BoardExamSubjects::class12StreamLabels($sahodayaId) : [];
 
+        // Class X has its own admin-editable subject list now (a global "class_10"
+        // pseudo-stream row) — prefer it over the generic 23-subject fallback when
+        // it's been populated; fall back to the flat list otherwise (e.g. fresh
+        // Sahodaya that hasn't customized it yet).
+        $standardSubjects = ! $isClass12
+            ? (BoardExamSubjects::subjectsForClass10($sahodayaId) ?: BoardExamSubjects::standardBoardSubjects($sahodayaId))
+            : BoardExamSubjects::standardBoardSubjects($sahodayaId);
+
         return [
             'isClass12' => $isClass12,
             'streamOptions' => $streamOptions,
-            'standardSubjects' => BoardExamSubjects::standardBoardSubjects($sahodayaId),
+            'standardSubjects' => $standardSubjects,
             'subjectsByStream' => $isClass12 ? collect($streamOptions)
                 ->mapWithKeys(fn ($label, $key) => [$key => BoardExamSubjects::subjectsForStream($key, $sahodayaId)])
                 ->all() : [],

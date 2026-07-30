@@ -9,6 +9,7 @@ use App\Models\Subject;
 use App\Models\Topper;
 use App\Models\TopperCountConfig;
 use App\Services\BoardResults\BoardResultMarksConfigService;
+use App\Support\CbseSubjectCodes;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -101,7 +102,12 @@ class BoardResultMastersController extends SahodayaAdminController
             'category' => 'nullable|string|max:40',
         ]);
 
-        $code = strtoupper(trim($data['code'] ?? preg_replace('/[^A-Za-z0-9]/', '', $data['label'])));
+        // Prefer the real official CBSE code for a known Class XII subject over an
+        // arbitrary auto-derived slug, so schools see the code they actually recognize.
+        $code = $data['code']
+            ?? CbseSubjectCodes::forClass12Label($data['label'])
+            ?? preg_replace('/[^A-Za-z0-9]/', '', $data['label']);
+        $code = strtoupper(trim($code));
 
         $hasCategory = \Illuminate\Support\Facades\Schema::hasColumn('subjects', 'category');
 
@@ -164,7 +170,10 @@ class BoardResultMastersController extends SahodayaAdminController
         $hasCategory = \Illuminate\Support\Facades\Schema::hasColumn('subjects', 'category');
 
         foreach ($standards as $index => $label) {
-            $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $label), 0, 10));
+            // Real CBSE code when we have one on file (Class XII), otherwise fall back
+            // to the old auto-derived slug for anything not in that list.
+            $code = CbseSubjectCodes::forClass12Label($label)
+                ?? strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $label), 0, 10));
             $defaults = [
                 'code' => $code,
                 'is_active' => true,

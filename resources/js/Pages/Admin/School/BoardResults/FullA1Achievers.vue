@@ -103,7 +103,7 @@
                                         <td class="py-2 px-3">
                                             <select v-model="row.subject" class="field text-xs py-1.5 bg-white" :disabled="!canEdit">
                                                 <option value="" disabled>-- Select Subject --</option>
-                                                <option v-for="s in standardSubjects" :key="s" :value="s">{{ s }}</option>
+                                                <option v-for="s in standardSubjects" :key="s" :value="s">{{ subjectCodes[s] ? `${s} (${subjectCodes[s]})` : s }}</option>
                                                 <option value="__custom__">+ Custom subject...</option>
                                             </select>
                                             <input
@@ -199,6 +199,7 @@ const props = defineProps({
     academicYear: String,
     academicYearOptions: { type: Array, default: () => [] },
     standardSubjects: { type: Array, default: () => [] },
+    subjectCodes: { type: Object, default: () => ({}) },
     streamOptions: { type: Object, default: () => ({}) },
     canEdit: { type: Boolean, default: true },
     editLockReason: { type: String, default: null },

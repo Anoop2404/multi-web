@@ -84,6 +84,29 @@ class BoardExamSubjects
         return is_array($row->default_subjects) ? array_values($row->default_subjects) : [];
     }
 
+    /**
+     * Class X (AISSE) has no streams, so its subject list lives on a single
+     * global "class_10" pseudo-stream row (seeded by
+     * 2026_08_20_000002_seed_class_10_exam_stream.php) reusing the same
+     * exam_streams.default_subjects mechanism as a real Class XII stream —
+     * editable on the same Masters page, no separate UI needed.
+     *
+     * @return list<string>
+     */
+    public static function subjectsForClass10(?string $sahodayaId = null): array
+    {
+        if (! self::streamsTableReady()) {
+            return [];
+        }
+
+        $row = ExamStream::findByCode('class_10', $sahodayaId);
+        if (! $row) {
+            return [];
+        }
+
+        return is_array($row->default_subjects) ? array_values($row->default_subjects) : [];
+    }
+
     public static function normalizeStream(?string $stream, ?string $sahodayaId = null): ?string
     {
         if ($stream === null || $stream === '') {
