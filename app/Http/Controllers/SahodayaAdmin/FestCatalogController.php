@@ -328,6 +328,10 @@ class FestCatalogController extends SahodayaAdminController
             'sport_discipline'   => 'nullable|string|max:40',
             'competition_format' => 'nullable|string|max:30',
             'head_key'           => $this->catalogHeadKeyRule($meta['eventType']),
+            'min_group_size'     => 'nullable|integer|min:1',
+            'max_group_size'     => 'nullable|integer|min:1',
+            'standbys'           => 'nullable|integer|min:0',
+            'duration_minutes'   => 'nullable|integer|min:1',
         ]);
 
         foreach (['gender', 'participant_type', 'age_group', 'class_group', 'kids_band', 'stage_type', 'venue_type', 'sport_discipline', 'competition_format', 'head_key'] as $field) {
@@ -354,6 +358,24 @@ class FestCatalogController extends SahodayaAdminController
         }
         if (array_key_exists('max_per_school', $data)) {
             $item->max_per_school = $data['max_per_school'];
+        }
+        if (array_key_exists('min_group_size', $data)) {
+            $item->min_group_size = $data['min_group_size'];
+        }
+        if (array_key_exists('max_group_size', $data)) {
+            $item->max_group_size = $data['max_group_size'];
+        }
+        if (array_key_exists('standbys', $data)) {
+            $criteria = $item->criteria_json ?? [];
+            if ($data['standbys'] !== null) {
+                $criteria['standbys'] = $data['standbys'];
+            } else {
+                unset($criteria['standbys']);
+            }
+            $item->criteria_json = $criteria;
+        }
+        if (array_key_exists('duration_minutes', $data)) {
+            $item->duration_minutes = $data['duration_minutes'];
         }
 
         $item->save();
