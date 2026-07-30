@@ -32,6 +32,10 @@
                             <input v-model="showIneligible" type="checkbox" class="rounded">
                             Show ineligible
                         </label>
+                        <label v-if="hasEventRegistrationData" class="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap cursor-pointer select-none">
+                            <input v-model="eventRegisteredOnly" type="checkbox" class="rounded">
+                            Event registered only
+                        </label>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 text-xs">
                         <span class="text-slate-500 font-medium">
@@ -88,7 +92,7 @@
                                 <span class="min-w-0 flex-1">
                                     <span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                         <span class="font-mono text-xs font-semibold text-[#0f3d7a] shrink-0">
-                                            {{ entry.regNo || '—' }}
+                                            {{ entry.regNo || '—' }}<span v-if="entry.admissionNo" class="font-normal text-slate-400">&nbsp;({{ entry.admissionNo }})</span>
                                         </span>
                                         <span class="font-medium text-sm text-gray-900">{{ entry.displayName || entry.name }}</span>
                                     </span>
@@ -180,6 +184,7 @@ const emit = defineEmits([
 
 const search = ref('');
 const showIneligible = ref(false);
+const eventRegisteredOnly = ref(false);
 const localSelected = ref([]);
 const localTeamName = ref('');
 const localCoachName = ref('');
@@ -191,18 +196,29 @@ const searchInput = ref(null);
 const ineligibleCount = computed(() => props.entries.filter(e => !e.eligible).length);
 const hasIneligible = computed(() => ineligibleCount.value > 0);
 
+// Only show the "Event registered only" toggle when at least one entry actually carries
+// event-registration data — for events with no Step 1 (event-level registration) concept,
+// every entry.eventRegistered is undefined/false and the filter would just be dead UI.
+const hasEventRegistrationData = computed(() => props.entries.some(e => e.eventRegistered));
+
 const filteredEligible = computed(() => props.entries.filter(e => e.eligible));
 
 const visibleEntries = computed(() => {
     const q = search.value.trim().toLowerCase();
     let pool = showIneligible.value ? props.entries : props.entries.filter(e => e.eligible);
 
+    if (eventRegisteredOnly.value) {
+        pool = pool.filter(e => e.eventRegistered);
+    }
+
     if (!q) return pool;
 
     return pool.filter((entry) => {
         const haystack = [
             entry.name,
+            entry.displayName,
             entry.regNo,
+            entry.admissionNo,
             entry.meta,
             entry.reason,
         ].filter(Boolean).join(' ').toLowerCase();
@@ -246,6 +262,7 @@ watch(() => props.modelValue, (open) => {
         localManagerPhone.value = props.managerPhone ?? '';
         search.value = '';
         showIneligible.value = false;
+        eventRegisteredOnly.value = false;
         nextTick(() => searchInput.value?.focus());
     }
 });

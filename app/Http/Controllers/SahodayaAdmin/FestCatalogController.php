@@ -365,13 +365,35 @@ class FestCatalogController extends SahodayaAdminController
         if (array_key_exists('max_group_size', $data)) {
             $item->max_group_size = $data['max_group_size'];
         }
-        if (array_key_exists('standbys', $data)) {
+
+        // FestTeamSquadRules::fromItem() reads criteria_json['min_squad']/['max_squad']
+        // in preference to the min_group_size/max_group_size columns, so the squad-rules
+        // summary won't reflect an edit unless we keep these two in sync.
+        if (array_key_exists('min_group_size', $data) || array_key_exists('max_group_size', $data) || array_key_exists('standbys', $data)) {
             $criteria = $item->criteria_json ?? [];
-            if ($data['standbys'] !== null) {
-                $criteria['standbys'] = $data['standbys'];
-            } else {
-                unset($criteria['standbys']);
+
+            if (array_key_exists('min_group_size', $data)) {
+                if ($data['min_group_size'] !== null) {
+                    $criteria['min_squad'] = $data['min_group_size'];
+                } else {
+                    unset($criteria['min_squad']);
+                }
             }
+            if (array_key_exists('max_group_size', $data)) {
+                if ($data['max_group_size'] !== null) {
+                    $criteria['max_squad'] = $data['max_group_size'];
+                } else {
+                    unset($criteria['max_squad']);
+                }
+            }
+            if (array_key_exists('standbys', $data)) {
+                if ($data['standbys'] !== null) {
+                    $criteria['standbys'] = $data['standbys'];
+                } else {
+                    unset($criteria['standbys']);
+                }
+            }
+
             $item->criteria_json = $criteria;
         }
         if (array_key_exists('duration_minutes', $data)) {

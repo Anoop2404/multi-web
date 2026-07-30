@@ -334,7 +334,10 @@ const standbyEntries = computed(() => {
             id: student.id,
             name: student.name,
             displayName: studentDisplayName(student),
-            regNo: student.admission_number || student.reg_no || '',
+            regNo: student.reg_no || '',
+            // School-entered admission number — shown alongside reg_no (in parens), not
+            // instead of it, so both identifiers stay visible when a school has set one.
+            admissionNo: student.admission_number || null,
             meta: props.studentLabel(student),
             eligible,
             reason: eligible ? null : (props.studentIneligibilityReason?.(student) ?? 'Not eligible'),
@@ -356,7 +359,8 @@ const rosterEntries = computed(() => {
             id: student.id,
             name: student.name,
             displayName: studentDisplayName(student),
-            regNo: student.admission_number || student.reg_no || '',
+            regNo: student.reg_no || '',
+            admissionNo: student.admission_number || null,
             meta: props.studentLabel(student),
             eligible,
             reason,
