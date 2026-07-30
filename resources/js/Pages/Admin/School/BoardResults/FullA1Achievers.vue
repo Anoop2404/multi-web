@@ -69,8 +69,8 @@
                             </select>
                         </div>
                         <div>
-                            <label class="form-label mb-1 text-xs text-gray-600">CBSE Roll No</label>
-                            <input v-model="form.roll_no" type="text" class="field text-sm" placeholder="Optional" :disabled="!canEdit">
+                            <label class="form-label mb-1 text-xs text-gray-600">CBSE Roll No *</label>
+                            <input v-model="form.roll_no" type="text" required class="field text-sm" placeholder="Required" :disabled="!canEdit">
                         </div>
                         <div v-if="boardResult.class === 12">
                             <label class="form-label mb-1 text-xs text-gray-600">Stream *</label>
@@ -99,11 +99,16 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 bg-white">
-                                    <tr v-for="(row, i) in form.subjects" :key="i">
+                                    <tr v-for="(row, i) in form.subjects" :key="i" :class="{ 'bg-red-50': isDuplicateRow(i) }">
                                         <td class="py-2 px-3">
                                             <select v-model="row.subject" class="field text-xs py-1.5 bg-white" :disabled="!canEdit">
                                                 <option value="" disabled>-- Select Subject --</option>
-                                                <option v-for="s in standardSubjects" :key="s" :value="s">{{ subjectCodes[s] ? `${s} (${subjectCodes[s]})` : s }}</option>
+                                                <option
+                                                    v-for="s in standardSubjects"
+                                                    :key="s"
+                                                    :value="s"
+                                                    :disabled="isSubjectUsedElsewhere(i, s)"
+                                                >{{ subjectCodes[s] ? `${s} (${subjectCodes[s]})` : s }}{{ isSubjectUsedElsewhere(i, s) ? ' — already added' : '' }}</option>
                                                 <option value="__custom__">+ Custom subject...</option>
                                             </select>
                                             <input
@@ -114,6 +119,9 @@
                                                 placeholder="Subject name"
                                                 :disabled="!canEdit"
                                             >
+                                            <p v-if="isDuplicateRow(i)" class="text-[11px] text-red-600 font-semibold mt-1">
+                                                ⚠️ Duplicate subject — already entered in another row.
+                                            </p>
                                         </td>
                                         <td class="py-2 px-3">
                                             <input
@@ -262,6 +270,27 @@ function removeSubjectRow(i) {
     if (form.value.subjects.length > 1) form.value.subjects.splice(i, 1);
 }
 
+// The resolved label for a subject row — the picked standard subject, or the
+// typed custom subject name when "+ Custom subject..." is selected.
+function resolvedSubjectLabel(row) {
+    const label = row.subject === '__custom__' ? (row.customSubject || '') : (row.subject || '');
+    return label.trim();
+}
+
+// True if this row's subject is also picked in another row (case-insensitive) —
+// used to grey out the option elsewhere and flag the row so a student can't
+// silently lose one subject's marks by picking it twice.
+function isSubjectUsedElsewhere(rowIndex, subject) {
+    const key = subject.trim().toLowerCase();
+    return form.value.subjects.some((row, i) => i !== rowIndex && resolvedSubjectLabel(row).toLowerCase() === key);
+}
+
+function isDuplicateRow(rowIndex) {
+    const label = resolvedSubjectLabel(form.value.subjects[rowIndex]);
+    if (!label) return false;
+    return isSubjectUsedElsewhere(rowIndex, label);
+}
+
 function markClass(marks) {
     if (marks === '' || marks === null || marks === undefined) return 'text-gray-600';
     return Number(marks) >= 91 ? 'text-emerald-700' : 'text-red-600 border-red-400';
@@ -310,27 +339,47 @@ function saveStudent() {
         formError.value = 'Student name and gender are required.';
         return;
     }
+    if (!form.value.roll_no?.trim()) {
+        formError.value = 'CBSE Roll No is required.';
+        return;
+    }
     if (props.boardResult.class === 12 && !form.value.stream) {
         formError.value = 'Select a stream for this Class XII student.';
         return;
     }
 
-    const subjectMarks = {};
+    // Build as an ordered list (not a {label: marks} object) so a subject picked
+    // twice is caught explicitly here instead of silently overwriting itself.
+    const subjectMarks = [];
+    const seen = new Set();
+    const duplicates = new Set();
     for (const row of form.value.subjects) {
-        const label = row.subject === '__custom__' ? row.customSubject.trim() : row.subject;
+        const label = resolvedSubjectLabel(row);
         if (!label || row.marks === '' || row.marks === null) continue;
-        subjectMarks[label] = Number(row.marks);
+
+        const key = label.toLowerCase();
+        if (seen.has(key)) {
+            duplicates.add(label);
+            continue;
+        }
+        seen.add(key);
+        subjectMarks.push({ subject: label, marks: Number(row.marks) });
     }
 
-    if (Object.keys(subjectMarks).length === 0) {
+    if (duplicates.size) {
+        formError.value = [...duplicates].map((s) => `"${s}" was entered more than once — remove the duplicate row.`).join('\n');
+        return;
+    }
+
+    if (subjectMarks.length === 0) {
         formError.value = 'Add at least one subject with marks.';
         return;
     }
 
-    const belowA1 = Object.entries(subjectMarks).filter(([, marks]) => marks < 91 || marks > 100);
+    const belowA1 = subjectMarks.filter(({ marks }) => marks < 91 || marks > 100);
     if (belowA1.length) {
         formError.value = belowA1
-            .map(([subject, marks]) => `${subject}: ${marks} — Full A1 requires 91-100.`)
+            .map(({ subject, marks }) => `${subject}: ${marks} — Full A1 requires 91-100.`)
             .join('\n');
         return;
     }
@@ -342,7 +391,7 @@ function saveStudent() {
             topper_id: editingId.value,
             name: form.value.name.trim(),
             gender: form.value.gender,
-            roll_no: form.value.roll_no?.trim() || null,
+            roll_no: form.value.roll_no.trim(),
             stream: props.boardResult.class === 12 ? form.value.stream : null,
             subject_marks: subjectMarks,
         }],

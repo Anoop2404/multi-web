@@ -171,7 +171,13 @@ class AwardsEngine
             return 0;
         }
 
+        // Scoped to entry_type=subject — otherwise a Full A1 Achiever (who by
+        // definition has marks recorded in every subject, but was never nominated as
+        // a subject topper) or an Overall topper's incidental subject breakdown would
+        // count toward "Most Subject Toppers" and can inflate/fabricate a school's win
+        // (#161 follow-up).
         $counts = Topper::query()
+            ->subjectEntries()
             ->whereHas('boardResult', function ($q) use ($schoolIds, $academicYear) {
                 $q->whereIn('tenant_id', $schoolIds)
                     ->where('academic_year', $academicYear)
@@ -189,6 +195,7 @@ class AwardsEngine
 
         // Collect ALL tied schools at the top count.
         $allTied = Topper::query()
+            ->subjectEntries()
             ->whereHas('boardResult', function ($q) use ($schoolIds, $academicYear) {
                 $q->whereIn('tenant_id', $schoolIds)
                     ->where('academic_year', $academicYear)
@@ -379,7 +386,11 @@ class AwardsEngine
             ->where('academic_year', $academicYear)
             ->where('class', 12)
             ->whereIn('status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED])
-            ->with(['toppers' => fn ($q) => $q->whereIn('stream_id', $streamIds)])
+            // entry_type=overall explicitly (not just relying on stream_id/percentage
+            // happening to be null for subject/full_a1 rows today) — "Best Stream
+            // School" is a ranked-average concept that only makes sense for Overall
+            // entries (#161 follow-up).
+            ->with(['toppers' => fn ($q) => $q->overallEntries()->whereIn('stream_id', $streamIds)])
             ->get();
 
         foreach ($results as $result) {

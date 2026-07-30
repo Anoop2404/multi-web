@@ -350,8 +350,13 @@ class BoardResultController extends SchoolAdminController
             BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
 
             // Pre-load existing toppers for this result so we can match rows to them
-            // and update in place — prevents duplicate toppers on every save.
+            // and update in place — prevents duplicate toppers on every save. Scoped to
+            // entry_type=overall only: a student can legitimately also have a
+            // subject-wise or Full A1 row with the same roll_no/name in this same
+            // board_result, and matching against those would silently reclassify that
+            // other row to 'overall' and overwrite it (#161 follow-up).
             $existingToppers = Topper::where('board_result_id', $boardResult->id)
+                ->overallEntries()
                 ->get(['id', 'name', 'roll_no', 'admission_no', 'gender', 'stream', 'stream_id',
                        'entry_type', 'total_marks', 'marks_obtained', 'percentage', 'rank', 'photo']);
 
@@ -402,14 +407,17 @@ class BoardResultController extends SchoolAdminController
                     continue;
                 }
                 $matched = $this->matchTopper($existingToppers, $row);
+                // Scoped to overall entries — the same roll_no is expected to also exist
+                // on that student's subject-wise/Full A1 rows, which isn't a conflict.
                 $conflict = Topper::query()
                     ->where('board_result_id', $boardResult->id)
+                    ->overallEntries()
                     ->where('roll_no', $row['roll_no'])
                     ->when($matched, fn ($q) => $q->where('id', '!=', $matched->id))
                     ->exists();
                 if ($conflict) {
                     throw ValidationException::withMessages([
-                        "toppers.{$i}.roll_no" => "CBSE Roll No '{$row['roll_no']}' is already assigned to another topper in this result.",
+                        "toppers.{$i}.roll_no" => "CBSE Roll No '{$row['roll_no']}' is already assigned to another Overall topper in this result.",
                     ]);
                 }
             }
@@ -743,44 +751,65 @@ class BoardResultController extends SchoolAdminController
 
         $isClass12 = (int) $boardResult->class === 12;
 
+        // subject_marks travels as an ordered list of {subject, marks} pairs (not a
+        // label => marks map) specifically so a student picking the same subject
+        // twice can be detected server-side — a plain JSON object would have already
+        // silently collapsed the duplicate down to one key before it got here.
         $data = $request->validate([
             'rows' => 'required|array|min:1',
             'rows.*.topper_id' => 'nullable|integer',
             'rows.*.name' => 'required|string|max:255',
             'rows.*.gender' => 'required|string|in:male,female,other',
-            'rows.*.roll_no' => 'nullable|string|max:64',
+            'rows.*.roll_no' => 'required|string|max:64',
             'rows.*.stream' => 'nullable|string|max:100',
             'rows.*.subject_marks' => 'required|array|min:1',
-            'rows.*.subject_marks.*' => 'required|numeric|min:0|max:100',
+            'rows.*.subject_marks.*.subject' => 'required|string|max:120',
+            'rows.*.subject_marks.*.marks' => 'required|numeric|min:0|max:100',
         ]);
 
-        // Enforce the A1 rule here, server-side — the frontend already blocks
-        // this, but the server is the real gate. Reject the whole batch (not a
-        // partial save) so a school can't end up with a half-saved achiever.
+        // Enforce the A1 rule and duplicate-subject rule here, server-side — the
+        // frontend already blocks both, but the server is the real gate. Reject the
+        // whole batch (not a partial save) so a school can't end up half-saved.
         $failures = [];
+        $normalizedSubjectMarks = [];
         foreach ($data['rows'] as $i => $row) {
             if ($isClass12 && blank($row['stream'] ?? null)) {
                 $failures[] = 'Row '.($i + 1).": select a stream for {$row['name']}.";
 
                 continue;
             }
-            foreach ($row['subject_marks'] as $subject => $marks) {
-                if ((float) $marks < 91) {
-                    $failures[] = 'Row '.($i + 1).": {$row['name']} scored {$marks} in {$subject} — Full A1 requires 91-100 in every subject.";
+
+            $seenSubjects = [];
+            $subjectMap = [];
+            foreach ($row['subject_marks'] as $entry) {
+                $label = trim((string) $entry['subject']);
+                $key = mb_strtolower($label);
+
+                if (isset($seenSubjects[$key])) {
+                    $failures[] = 'Row '.($i + 1).": {$row['name']} has \"{$label}\" entered more than once — remove the duplicate before saving.";
+
+                    continue;
                 }
+                $seenSubjects[$key] = true;
+
+                $marks = (float) $entry['marks'];
+                if ($marks < 91) {
+                    $failures[] = 'Row '.($i + 1).": {$row['name']} scored {$marks} in {$label} — Full A1 requires 91-100 in every subject.";
+                }
+                $subjectMap[$label] = $marks;
             }
+
+            $normalizedSubjectMarks[$i] = $subjectMap;
         }
         if ($failures !== []) {
             throw ValidationException::withMessages(['rows' => $failures]);
         }
 
-        // Roll_no uniqueness within this board result, same rule as the other entry forms.
+        // Roll_no is required for Full A1 Achievers (unlike the other topper entry
+        // forms, where it's optional) and must be unique within this submission.
         $submittedRollNos = [];
         foreach ($data['rows'] as $i => $row) {
-            $rollNo = $row['roll_no'] ?? null;
-            if (blank($rollNo)) {
-                continue;
-            }
+            $rollNo = trim((string) $row['roll_no']);
             if (isset($submittedRollNos[$rollNo])) {
                 throw ValidationException::withMessages([
                     "rows.{$i}.roll_no" => "Duplicate CBSE Roll No '{$rollNo}' within the same submission.",
@@ -789,7 +818,7 @@ class BoardResultController extends SchoolAdminController
             $submittedRollNos[$rollNo] = true;
         }
 
-        return DB::transaction(function () use ($data, $boardResult, $isClass12) {
+        return DB::transaction(function () use ($data, $boardResult, $isClass12, $normalizedSubjectMarks) {
             BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
 
             $existing = Topper::where('board_result_id', $boardResult->id)
@@ -799,7 +828,7 @@ class BoardResultController extends SchoolAdminController
             $created = 0;
             $updated = 0;
 
-            foreach ($data['rows'] as $row) {
+            foreach ($data['rows'] as $i => $row) {
                 $name = trim($row['name']);
                 $topper = filled($row['topper_id'] ?? null)
                     ? $existing->firstWhere('id', (int) $row['topper_id'])
@@ -811,8 +840,17 @@ class BoardResultController extends SchoolAdminController
                 $attrs = [
                     'name' => $name,
                     'gender' => $row['gender'],
-                    'roll_no' => $row['roll_no'] ?? null,
+                    'roll_no' => trim($row['roll_no']),
                     'stream' => $isClass12 ? ($row['stream'] ?? null) : null,
+                    // Full A1 Achievers aren't ranked against each other — it's a
+                    // qualifying list, not a leaderboard. rank must stay NULL (not the
+                    // schema default of 1), because toppers_board_result_rank_unique is
+                    // a partial unique index on (board_result_id, rank) WHERE rank IS
+                    // NOT NULL that spans every entry_type for this board_result. Any
+                    // non-null rank here collides with whatever already holds that rank
+                    // (typically the Overall topper) — see the 23505 unique-violation
+                    // this caused when rank was omitted and fell back to the DB default.
+                    'rank' => null,
                 ];
 
                 if ($topper) {
@@ -828,7 +866,7 @@ class BoardResultController extends SchoolAdminController
                     $created++;
                 }
 
-                app(TopperSubjectMarkService::class)->sync($topper, $row['subject_marks']);
+                app(TopperSubjectMarkService::class)->sync($topper, $normalizedSubjectMarks[$i]);
             }
 
             app(DataChangeLogger::class)->event(
@@ -1068,7 +1106,6 @@ class BoardResultController extends SchoolAdminController
 
         $subject = $data['subject'];
         $sahodayaId = (string) $this->school->parent_id;
-        $boardResult->load(['toppers.subjectMarks']);
 
         return DB::transaction(function () use ($data, $boardResult, $sahodayaId, $subject) {
             BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
@@ -1076,7 +1113,14 @@ class BoardResultController extends SchoolAdminController
             $nextRank = (int) (Topper::where('board_result_id', $boardResult->id)->max('rank') ?? 0) + 1;
             $created = 0;
             $updated = 0;
-            $workingToppers = $boardResult->toppers;
+            // Scoped to subject-only entries — matching against $boardResult->toppers
+            // (unscoped, all entry types) could otherwise attach these subject marks
+            // onto an existing 'overall' or 'full_a1' row for the same student instead
+            // of creating/updating its own distinct 'subject' row (#161 follow-up).
+            $workingToppers = Topper::where('board_result_id', $boardResult->id)
+                ->subjectEntries()
+                ->with('subjectMarks')
+                ->get();
 
             // Validate roll_no uniqueness across all rows submitted AND existing toppers.
             $submittedRollNos = [];
@@ -1193,16 +1237,21 @@ class BoardResultController extends SchoolAdminController
         // Rank is never accepted from the client — recomputeOverallRanks() derives it
         // from percentage right after this topper is saved (#161).
 
-        // Validate roll_no uniqueness within this board result.
+        // Validate roll_no uniqueness within this board result — scoped to Overall
+        // entries only (this method is only ever used for that entry_type). The same
+        // roll_no legitimately also appearing on that student's subject-wise/Full A1
+        // rows isn't a conflict, so an unscoped check here would wrongly block adding
+        // a genuine Overall topper who already has one of those other entries.
         if (filled($data['roll_no'] ?? null)) {
             $rollNoTaken = Topper::query()
                 ->where('board_result_id', $boardResult->id)
+                ->overallEntries()
                 ->where('roll_no', $data['roll_no'])
                 ->when($exclude, fn ($q) => $q->where('id', '!=', $exclude->id))
                 ->exists();
             if ($rollNoTaken) {
                 throw ValidationException::withMessages([
-                    'roll_no' => "CBSE Roll No '{$data['roll_no']}' is already assigned to another topper in this result.",
+                    'roll_no' => "CBSE Roll No '{$data['roll_no']}' is already assigned to another Overall topper in this result.",
                 ]);
             }
         }

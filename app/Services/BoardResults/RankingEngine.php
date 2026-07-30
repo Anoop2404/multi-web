@@ -182,9 +182,13 @@ class RankingEngine
         $rows = collect();
 
         foreach ([10, 12] as $class) {
+            // Explicit entry_type check (not just "not subject-only + percentage
+            // present") — Full A1 rows also have entry_type != subject but a null
+            // percentage by design, so they were only ever excluded here by
+            // incidental luck rather than intent (#161 follow-up).
             $toppers = $results->where('class', $class)
                 ->flatMap->toppers
-                ->filter(fn (Topper $t) => ! $t->isSubjectOnly() && $t->percentage !== null)
+                ->filter(fn (Topper $t) => $t->entry_type === Topper::ENTRY_OVERALL && $t->percentage !== null)
                 ->values();
 
             if ($toppers->isEmpty()) {
@@ -207,7 +211,7 @@ class RankingEngine
     {
         $toppers = $results->where('class', 12)
             ->flatMap->toppers
-            ->filter(fn (Topper $t) => ! $t->isSubjectOnly() && $t->percentage !== null)
+            ->filter(fn (Topper $t) => $t->entry_type === Topper::ENTRY_OVERALL && $t->percentage !== null)
             ->values();
 
         $grouped = $toppers->groupBy(fn (Topper $t) => $t->stream_id ?: ($t->stream ?: 'unknown'));
@@ -370,7 +374,7 @@ class RankingEngine
         foreach ($results->where('class', 12) as $result) {
             /** @var BoardResult $result */
             $grouped = $result->toppers
-                ->reject(fn (Topper $topper) => $topper->isSubjectOnly())
+                ->filter(fn (Topper $topper) => $topper->entry_type === Topper::ENTRY_OVERALL)
                 ->groupBy(fn (Topper $t) => $t->stream_id ?: ($t->stream ?: 'unknown'));
             foreach ($grouped as $streamKey => $toppers) {
                 $pcts = $toppers->pluck('percentage')->filter(fn ($p) => $p !== null)->all();
@@ -442,7 +446,14 @@ class RankingEngine
      */
     public function rankBySubject(Collection $results): Collection
     {
-        $topperIds = $results->flatMap->toppers->pluck('id')->filter()->all();
+        // Scoped to entry_type=subject, same reasoning as SubjectMeritRegisterService —
+        // this is a per-subject leaderboard of nominated subject toppers, not "anyone
+        // who happens to have a mark recorded in this subject". Without this, Full A1
+        // achievers (91-100 in every subject, by definition) would crowd out real
+        // subject-topper nominees at the top of every subject's ranking (#161 follow-up).
+        $topperIds = $results->flatMap->toppers
+            ->filter(fn (Topper $t) => $t->entry_type === Topper::ENTRY_SUBJECT)
+            ->pluck('id')->filter()->all();
         if ($topperIds === []) {
             return collect();
         }

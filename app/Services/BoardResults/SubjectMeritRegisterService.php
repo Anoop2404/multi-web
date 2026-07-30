@@ -4,6 +4,7 @@ namespace App\Services\BoardResults;
 
 use App\Models\BoardResult;
 use App\Models\Tenant;
+use App\Models\Topper;
 use App\Models\TopperCountConfig;
 use App\Support\TenancyDatabase;
 use Illuminate\Support\Collection;
@@ -76,6 +77,13 @@ class SubjectMeritRegisterService
         $query = DB::table('topper_subject_marks as tsm')
             ->join('toppers as t', 't.id', '=', 'tsm.topper_id')
             ->join('board_results as br', 'br.id', '=', 't.board_result_id')
+            // Genuine subject-wise topper nominations only. Without this, an 'overall'
+            // topper's or a Full A1 achiever's incidental subject marks would also be
+            // pulled in here and ranked as if they'd been nominated per-subject — Full
+            // A1 achievers in particular score 91-100 in every subject, so they'd
+            // systematically crowd out real subject toppers at the top of every
+            // subject's ranking (#161 follow-up).
+            ->where('t.entry_type', Topper::ENTRY_SUBJECT)
             ->whereIn('br.tenant_id', $schoolIds)
             ->where('br.academic_year', $academicYear)
             ->whereIn('br.status', [
