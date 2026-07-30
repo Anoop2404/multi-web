@@ -889,6 +889,23 @@ class FestEventController extends SahodayaAdminController
             } elseif ($request->has('min_group_size') || $request->has('max_group_size')) {
                 $data['min_group_size'] = $request->input('min_group_size');
                 $data['max_group_size'] = $request->input('max_group_size');
+
+                // criteria_json['min_squad']/['max_squad'] take precedence over the
+                // min_group_size/max_group_size columns in FestTeamSquadRules::fromItem(),
+                // so an edit here has to keep both in sync or the squad-rules summary
+                // (and "register N–M students" text) silently keeps the stale values.
+                $criteria = $item->criteria_json ?? [];
+                if ($data['min_group_size'] !== null) {
+                    $criteria['min_squad'] = (int) $data['min_group_size'];
+                } else {
+                    unset($criteria['min_squad']);
+                }
+                if ($data['max_group_size'] !== null) {
+                    $criteria['max_squad'] = (int) $data['max_group_size'];
+                } else {
+                    unset($criteria['max_squad']);
+                }
+                $data['criteria_json'] = $criteria;
             } else {
                 $fixed = FestTeamSquadRules::defaultSizeFor($participantType);
                 if ($fixed && empty($data['min_group_size']) && empty($item->min_group_size)) {
