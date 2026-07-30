@@ -1,61 +1,91 @@
 <template>
-    <SahodayaAdminLayout title="Board result reports" :sahodaya="sahodaya" :publicUrl="publicUrl"
+    <SahodayaAdminLayout title="Board Result Reports Hub" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader title="Board result reports" eyebrow="Academic Results"
-                    description="Merit registers, rankings, pass %, excellence awards, and historical comparisons." />
+        <PageHeader title="Board Result Reports Hub" eyebrow="Academic Results"
+                    description="Merit registers, rankings, pass %, Full A1 achievers, excellence awards, and student history lookup.">
+            <template #actions>
+                <div class="flex items-center gap-2 print:hidden">
+                    <button type="button" @click="showHistoryModal = true" class="btn-primary text-xs flex items-center gap-1.5 font-bold shadow-xs">
+                        <span>📜</span> Student History Lookup
+                    </button>
+                </div>
+            </template>
+        </PageHeader>
 
-        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-            <div class="card !p-4">
-                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Reports</p>
-                <p class="text-2xl font-bold text-[#0f3d7a] mt-1">{{ reports.length }}</p>
-                <p class="text-xs text-slate-500 mt-1">Available board-result reports</p>
+        <!-- KPI OVERVIEW CARDS -->
+        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Available Reports</p>
+                <p class="text-3xl font-extrabold text-[#0f3d7a] mt-1">{{ reports.length }}</p>
+                <p class="text-xs text-slate-500 mt-1">Official Sahodaya board reports</p>
             </div>
-            <div class="card !p-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
                 <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">School Summaries</p>
-                <p class="text-2xl font-bold text-emerald-600 mt-1">{{ reportSections.school.items.length }}</p>
+                <p class="text-3xl font-extrabold text-emerald-600 mt-1">{{ reportSections.school.items.length }}</p>
                 <p class="text-xs text-slate-500 mt-1">Result summaries by class</p>
             </div>
-            <div class="card !p-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
                 <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Merit & Rankings</p>
-                <p class="text-2xl font-bold text-violet-600 mt-1">{{ reportSections.merit.items.length }}</p>
+                <p class="text-3xl font-extrabold text-violet-600 mt-1">{{ reportSections.merit.items.length }}</p>
                 <p class="text-xs text-slate-500 mt-1">Rank and topper registers</p>
             </div>
-            <div class="card !p-4">
-                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Year</p>
-                <p class="text-sm font-bold text-slate-900 mt-1">{{ filters.academic_year }}</p>
-                <p class="text-xs text-slate-500 mt-1">Active reporting year</p>
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Active Year</p>
+                <p class="text-lg font-bold text-slate-900 mt-1.5 font-mono">{{ filters.academic_year }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">Academic session</p>
             </div>
         </div>
 
-        <div class="space-y-6">
-            <section v-for="section in reportSections" :key="section.key" class="space-y-3">
-                <div class="flex items-center justify-between gap-3">
+        <!-- REPORT CATEGORY SECTIONS -->
+        <div class="space-y-8">
+            <section v-for="section in reportSections" :key="section.key" class="space-y-4">
+                <div class="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
                     <div>
-                        <h3 class="text-sm font-bold text-slate-900">{{ section.title }}</h3>
-                        <p class="text-xs text-slate-500">{{ section.description }}</p>
+                        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <span>📂</span> {{ section.title }}
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">{{ section.description }}</p>
                     </div>
-                    <span class="text-xs font-semibold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">
+                    <span class="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
                         {{ section.items.length }} report(s)
                     </span>
                 </div>
 
-                <div class="grid sm:grid-cols-2 gap-4">
-                    <Link v-for="r in section.items" :key="r.key" :href="r.href" class="card !p-5 hover:border-[#0f3d7a] transition">
-                        <p class="font-semibold text-[#0f3d7a]">{{ r.title }}</p>
-                        <p v-if="r.description" class="text-xs text-slate-500 mt-1">{{ r.description }}</p>
-                        <p class="text-xs text-slate-400 mt-2">Academic year {{ filters.academic_year }}</p>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Link v-for="r in section.items" :key="r.key" :href="r.href"
+                          class="group bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs hover:shadow-md hover:border-indigo-500 transition-all flex flex-col justify-between space-y-3">
+                        <div>
+                            <div class="flex items-center justify-between gap-2 mb-1.5">
+                                <p class="font-extrabold text-slate-900 group-hover:text-indigo-600 transition text-sm">{{ r.title }}</p>
+                                <span class="text-slate-400 group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                            <p v-if="r.description" class="text-xs text-slate-500 leading-relaxed">{{ r.description }}</p>
+                        </div>
+                        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                            <span>Year {{ filters.academic_year }}</span>
+                            <span class="font-bold text-indigo-600">View Report</span>
+                        </div>
                     </Link>
                 </div>
             </section>
         </div>
+
+        <!-- STUDENT HISTORY MODAL -->
+        <StudentHistoryModal
+            :show="showHistoryModal"
+            :initialStudent="null"
+            :sahodayaId="sahodaya.id"
+            @close="showHistoryModal = false"
+        />
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -65,24 +95,26 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
 });
 
+const showHistoryModal = ref(false);
+
 const reportSections = computed(() => {
     const sections = {
         school: {
             key: 'school',
-            title: 'School Performance',
-            description: 'Class-wise result summaries by member school.',
+            title: 'School Performance & Summaries',
+            description: 'Class-wise result summaries and pass rates by member school.',
             items: [],
         },
         merit: {
             key: 'merit',
-            title: 'Merit and Rankings',
-            description: 'Overall rankings, pass rate reports, and topper registers.',
+            title: 'Merit Registers & Toppers',
+            description: 'Overall rankings, Full A1 achievers, and subject topper registers.',
             items: [],
         },
         excellence: {
             key: 'excellence',
-            title: 'Excellence and Comparison',
-            description: 'Awards and historical pass-percentage comparison.',
+            title: 'Excellence & Historical Trends',
+            description: 'Awards, school recognitions, and historical pass-percentage comparisons.',
             items: [],
         },
     };

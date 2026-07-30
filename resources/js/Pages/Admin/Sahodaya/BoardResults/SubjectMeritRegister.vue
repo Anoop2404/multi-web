@@ -1,10 +1,27 @@
 <template>
     <SahodayaAdminLayout title="Subject-wise Merit Register" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <!-- PRINT HEADER -->
+        <div class="hidden print:block mb-6 border-b border-slate-300 pb-4 text-center">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-xl font-bold uppercase tracking-wider text-slate-900">{{ sahodaya?.name || 'Sahodaya Complex' }}</h1>
+                    <p class="text-xs text-slate-600 font-semibold">Official Subject-Wise Merit Register Report</p>
+                </div>
+                <div class="text-right text-xs text-slate-500">
+                    <p>Academic Year: <strong>{{ selectedYear }}</strong></p>
+                    <p>Generated: {{ new Date().toLocaleDateString() }}</p>
+                </div>
+            </div>
+        </div>
+
         <PageHeader title="Subject-wise Merit Register" eyebrow="Academic Results"
                     description="Comprehensive rank-based subject toppers report collected across member schools.">
             <template #actions>
                 <div class="flex items-center gap-2 print:hidden">
+                    <button type="button" @click="openHistorySearch" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
+                        <span>📜</span> Student History
+                    </button>
                     <button type="button" @click="printReport" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
                         <span>🖨</span> Print Register
                     </button>
@@ -421,6 +438,14 @@
                 </section>
             </template>
         </div>
+
+        <!-- STUDENT HISTORY MODAL -->
+        <StudentHistoryModal
+            :show="showHistoryModal"
+            :initialStudent="historyStudent"
+            :sahodayaId="sahodaya.id"
+            @close="showHistoryModal = false"
+        />
     </SahodayaAdminLayout>
 </template>
 
@@ -429,6 +454,24 @@ import { computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
+
+const showHistoryModal = ref(false);
+const historyStudent = ref(null);
+
+function openHistorySearch() {
+    historyStudent.value = null;
+    showHistoryModal.value = true;
+}
+
+function viewStudentHistory(row) {
+    historyStudent.value = {
+        student_name: row.student_name,
+        roll_no: row.roll_no,
+        admission_no: row.admission_no,
+    };
+    showHistoryModal.value = true;
+}
 
 const props = defineProps({
     sahodaya: Object,

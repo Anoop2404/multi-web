@@ -111,20 +111,42 @@ class FullA1AchieversReportService
                 ->keyBy('topper_id')
             : collect();
 
-        return $toppers->map(function ($row) use ($names, $subjectStats) {
+        $subjectMarksList = ($topperIds !== [] && Schema::hasTable('topper_subject_marks'))
+            ? DB::table('topper_subject_marks')
+                ->whereIn('topper_id', $topperIds)
+                ->orderBy('subject_label')
+                ->get()
+                ->groupBy('topper_id')
+            : collect();
+
+        return $toppers->map(function ($row) use ($names, $subjectStats, $subjectMarksList) {
             $stats = $subjectStats->get($row->id);
+            $marks = $subjectMarksList->get($row->id, collect())->map(function ($m) use ($row) {
+                $code = ((int) $row->class) === 10
+                    ? \App\Support\CbseSubjectCodes::forClass10Label($m->subject_label)
+                    : \App\Support\CbseSubjectCodes::forClass12Label($m->subject_label);
+
+                return [
+                    'subject_label' => (string) $m->subject_label,
+                    'subject_code' => $code,
+                    'marks' => (float) $m->marks,
+                    'grade' => $m->marks >= 91 ? 'A1' : ($m->marks >= 81 ? 'A2' : ($m->marks >= 71 ? 'B1' : 'B2')),
+                ];
+            })->values()->all();
 
             return [
+                'id' => (int) $row->id,
                 'student_name' => (string) $row->student_name,
                 'school_id' => (string) $row->school_id,
                 'school_name' => $names[$row->school_id] ?? (string) $row->school_id,
                 'class' => (int) $row->class,
                 'stream' => $row->stream,
-                'subjects_count' => $stats ? (int) $stats->subjects_count : 0,
+                'subjects_count' => $stats ? (int) $stats->subjects_count : count($marks),
                 'lowest_mark' => $stats && $stats->lowest_mark !== null ? (float) $stats->lowest_mark : null,
                 'admission_no' => $row->admission_no,
                 'roll_no' => $row->roll_no,
                 'academic_year' => (string) $row->academic_year,
+                'subject_marks' => $marks,
             ];
         })->values()->all();
     }

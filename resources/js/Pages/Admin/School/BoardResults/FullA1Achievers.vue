@@ -1,6 +1,24 @@
 <template>
     <SchoolAdminLayout title="Full A1 Achievers" :school="school" :show-header-title="false">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <!-- PRINT HEADER -->
+        <div class="hidden print:block mb-6 border-b border-slate-300 pb-4 text-center">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-xl font-bold uppercase tracking-wider text-slate-900">{{ school?.name }}</h1>
+                    <p class="text-xs text-slate-600 font-semibold">School Board Result Report — Full A1 Achievers (Class {{ boardResult.class }})</p>
+                </div>
+                <div class="text-right text-xs text-slate-500">
+                    <p>Academic Year: <strong>{{ selectedYear }}</strong></p>
+                    <p>Generated: {{ new Date().toLocaleDateString() }}</p>
+                </div>
+            </div>
+            <div class="mt-3 text-xs text-slate-700 font-medium bg-slate-100 py-1.5 px-3 rounded flex justify-between">
+                <span>Class {{ boardResult.class }} ({{ boardResult.class === 10 ? 'AISSE' : 'AISSCE' }})</span>
+                <span>Total Achievers: <strong>{{ achievers.length }}</strong></span>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 print:hidden">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 tracking-tight">
                     Full A1 Achievers
@@ -11,7 +29,7 @@
                 </p>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <button
                     v-for="c in [10, 12]"
                     :key="c"
@@ -22,16 +40,24 @@
                 >
                     Class {{ c === 10 ? 'X (AISSE)' : 'XII (AISSCE)' }}
                 </button>
+
+                <button type="button" @click="openHistorySearch" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
+                    <span>📜</span> Student History
+                </button>
+
+                <button type="button" @click="printReport" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
+                    <span>🖨</span> Print
+                </button>
             </div>
         </div>
 
-        <div v-if="!canEdit" class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs font-semibold text-amber-800 mb-6">
+        <div v-if="!canEdit" class="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs font-semibold text-amber-800 mb-6 print:hidden">
             ⚠️ Entry is locked for this result{{ editLockReason ? `: ${editLockReason}` : '.' }}
         </div>
 
         <div class="max-w-5xl space-y-6">
             <!-- ACADEMIC YEAR -->
-            <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+            <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm print:hidden">
                 <label class="form-label mb-1 font-semibold text-xs text-gray-700">Academic Year</label>
                 <select v-model="selectedYear" class="field text-sm font-semibold bg-white max-w-xs" @change="onYearChange">
                     <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">
@@ -41,7 +67,7 @@
             </div>
 
             <!-- ADD / EDIT STUDENT FORM -->
-            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4 print:hidden">
                 <div class="border-b border-gray-100 pb-3">
                     <h3 class="font-bold text-gray-900 text-base">
                         {{ editingId ? 'Edit Achiever' : 'Add a Full A1 Achiever' }}
@@ -161,13 +187,13 @@
             </div>
 
             <!-- SAVED ACHIEVERS LIST -->
-            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 print:border-0 print:shadow-none print:p-0">
                 <div class="border-b border-gray-100 pb-3 mb-4 flex items-center justify-between">
                     <div>
                         <h3 class="font-bold text-gray-900 text-sm uppercase tracking-wide">Saved Full A1 Achievers</h3>
                         <p class="text-xs text-gray-500 mt-0.5">For Class {{ boardResult.class }}, {{ selectedYear }}.</p>
                     </div>
-                    <span class="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">{{ achievers.length }} achiever(s)</span>
+                    <span class="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full print:hidden">{{ achievers.length }} achiever(s)</span>
                 </div>
 
                 <div v-if="!achievers.length" class="p-10 text-center text-gray-400 text-xs">
@@ -175,29 +201,58 @@
                 </div>
 
                 <div v-else class="divide-y divide-gray-100">
-                    <div v-for="t in achievers" :key="t.id" class="py-3 flex items-center gap-4">
-                        <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    <div v-for="t in achievers" :key="t.id" class="py-3 flex items-center gap-4 hover:bg-slate-50/50 p-2 rounded-xl transition">
+                        <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0 print:hidden">
                             <img v-if="t.photo" :src="t.photo" class="w-full h-full object-cover" alt="">
                             <span v-else class="text-gray-400 text-xs">👤</span>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <p class="font-bold text-gray-900 text-sm truncate">{{ t.name }}</p>
+                            <div class="flex items-center gap-2">
+                                <p class="font-bold text-gray-900 text-sm truncate">{{ t.name }}</p>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-extrabold">A1</span>
+                            </div>
                             <p class="text-[11px] text-gray-500">
-                                {{ t.roll_no || 'No roll no' }} · {{ Object.keys(t.subject_marks || {}).length }} subject(s) at A1
+                                {{ t.roll_no ? `Roll: ${t.roll_no}` : 'No roll no' }} · {{ subjectCountForTopper(t) }} subject(s) at A1
                                 <span v-if="t.stream"> · {{ t.stream }}</span>
                             </p>
                         </div>
-                        <button type="button" class="text-xs font-bold text-indigo-600 hover:text-indigo-800" @click="editStudent(t)">Edit</button>
-                        <button type="button" class="text-xs font-bold text-red-500 hover:text-red-700" @click="removeStudent(t)">Remove</button>
+                        <div class="flex items-center gap-2 print:hidden">
+                            <button type="button" class="text-xs font-bold px-2 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition" @click="previewMarks(t)">
+                                Preview Marks 👁
+                            </button>
+                            <button type="button" class="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 transition" @click="viewHistory(t)">
+                                History
+                            </button>
+                            <button type="button" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 ml-1" @click="editStudent(t)">Edit</button>
+                            <button type="button" class="text-xs font-bold text-red-500 hover:text-red-700" @click="removeStudent(t)">Remove</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- SUBJECT MARKS PREVIEW MODAL -->
+        <SubjectMarksPreviewModal
+            :show="showSubjectModal"
+            :student="selectedStudent"
+            @close="showSubjectModal = false"
+            @viewHistory="onModalViewHistory"
+        />
+
+        <!-- STUDENT HISTORY MODAL -->
+        <StudentHistoryModal
+            :show="showHistoryModal"
+            :initialStudent="historyStudent"
+            :schoolId="school.id"
+            @close="showHistoryModal = false"
+        />
     </SchoolAdminLayout>
 </template>
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import SubjectMarksPreviewModal from '@/Components/BoardResults/SubjectMarksPreviewModal.vue';
+import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 
@@ -217,6 +272,12 @@ const selectedYear = ref(props.academicYear);
 const isSubmitting = ref(false);
 const formError = ref('');
 const editingId = ref(null);
+
+const showSubjectModal = ref(false);
+const selectedStudent = ref(null);
+
+const showHistoryModal = ref(false);
+const historyStudent = ref(null);
 
 function academicYearOptionLabel(year) {
     if (year.entry_status === 'open') return `${year.label} (Entry Open)`;
@@ -242,9 +303,62 @@ function onClassChange(c) {
     navigate({ class: c });
 }
 
-// Every saved Full A1 achiever for this board result (already scoped to
-// entry_type=full_a1 server-side).
 const achievers = computed(() => props.boardResult.toppers ?? []);
+
+function subjectCountForTopper(t) {
+    if (Array.isArray(t.subject_marks)) return t.subject_marks.length;
+    if (t.subject_marks && typeof t.subject_marks === 'object') return Object.keys(t.subject_marks).length;
+    return 0;
+}
+
+function previewMarks(t) {
+    let formattedMarks = [];
+    if (Array.isArray(t.subject_marks)) {
+        formattedMarks = t.subject_marks;
+    } else if (t.subject_marks && typeof t.subject_marks === 'object') {
+        formattedMarks = Object.entries(t.subject_marks).map(([subject_label, marks]) => ({
+            subject_label,
+            subject_code: props.subjectCodes[subject_label] || null,
+            marks: Number(marks),
+            grade: 'A1',
+        }));
+    }
+
+    selectedStudent.value = {
+        student_name: t.name,
+        roll_no: t.roll_no,
+        admission_no: t.admission_no,
+        school_name: props.school.name,
+        class: props.boardResult.class,
+        stream: t.stream,
+        academic_year: selectedYear.value,
+        subject_marks: formattedMarks,
+    };
+    showSubjectModal.value = true;
+}
+
+function viewHistory(t) {
+    historyStudent.value = {
+        student_name: t.name,
+        roll_no: t.roll_no,
+        admission_no: t.admission_no,
+    };
+    showHistoryModal.value = true;
+}
+
+function openHistorySearch() {
+    historyStudent.value = null;
+    showHistoryModal.value = true;
+}
+
+function onModalViewHistory(student) {
+    showSubjectModal.value = false;
+    viewHistory(student);
+}
+
+function printReport() {
+    window.print();
+}
 
 function blankSubjectRow() {
     return { subject: '', customSubject: '', marks: '' };
@@ -270,16 +384,11 @@ function removeSubjectRow(i) {
     if (form.value.subjects.length > 1) form.value.subjects.splice(i, 1);
 }
 
-// The resolved label for a subject row — the picked standard subject, or the
-// typed custom subject name when "+ Custom subject..." is selected.
 function resolvedSubjectLabel(row) {
     const label = row.subject === '__custom__' ? (row.customSubject || '') : (row.subject || '');
     return label.trim();
 }
 
-// True if this row's subject is also picked in another row (case-insensitive) —
-// used to grey out the option elsewhere and flag the row so a student can't
-// silently lose one subject's marks by picking it twice.
 function isSubjectUsedElsewhere(rowIndex, subject) {
     const key = subject.trim().toLowerCase();
     return form.value.subjects.some((row, i) => i !== rowIndex && resolvedSubjectLabel(row).toLowerCase() === key);
@@ -316,7 +425,11 @@ function editStudent(t) {
     editingId.value = t.id;
     formError.value = '';
     const subjectMarks = t.subject_marks || {};
-    const rows = Object.entries(subjectMarks).map(([subject, marks]) => {
+    const entries = Array.isArray(subjectMarks)
+        ? subjectMarks.map(s => [s.subject_label || s.subject, s.marks])
+        : Object.entries(subjectMarks);
+
+    const rows = entries.map(([subject, marks]) => {
         const known = props.standardSubjects.includes(subject);
         return known
             ? { subject, customSubject: '', marks }
@@ -348,8 +461,6 @@ function saveStudent() {
         return;
     }
 
-    // Build as an ordered list (not a {label: marks} object) so a subject picked
-    // twice is caught explicitly here instead of silently overwriting itself.
     const subjectMarks = [];
     const seen = new Set();
     const duplicates = new Set();
