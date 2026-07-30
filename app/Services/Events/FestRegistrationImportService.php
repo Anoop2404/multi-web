@@ -98,7 +98,7 @@ class FestRegistrationImportService
                     continue;
                 }
 
-                FestRegistration::create([
+                $teacherRegistration = FestRegistration::create([
                     'event_id'     => $event->id,
                     'item_id'      => $item->id,
                     'school_id'    => $school->id,
@@ -114,6 +114,17 @@ class FestRegistrationImportService
                         ]);
                     }
                 });
+
+                // Bulk CSV import previously skipped the same post-create wiring the normal
+                // register-one-item form does (FestRegistrationCreateService::createForSchool()),
+                // so imported rows never got an event-level FestLevelRegistration and never got
+                // item/chest registration numbers assigned — imported students silently showed
+                // as "not registered" on the Step 1 Event Registration page despite having a
+                // real item registration.
+                app(FestLevelRegistrationService::class)->syncRegistration($teacherRegistration->fresh(['participants']));
+                foreach ($teacherRegistration->fresh(['participants'])->participants as $participant) {
+                    app(FestNumberingService::class)->assignParticipantNumbers($participant);
+                }
 
                 $imported++;
 
@@ -222,6 +233,15 @@ class FestRegistrationImportService
                     'participant_type' => 'student',
                     'participant_role' => 'standby',
                 ]);
+            }
+
+            // Same post-create wiring as FestRegistrationCreateService::createForSchool() —
+            // without this, imported students never get an event-level FestLevelRegistration
+            // (or item/chest registration numbers), so they show as "not registered" on the
+            // Step 1 Event Registration page despite having a real item registration.
+            app(FestLevelRegistrationService::class)->syncRegistration($registration->fresh(['participants']));
+            foreach ($registration->fresh(['participants'])->participants as $participant) {
+                app(FestNumberingService::class)->assignParticipantNumbers($participant);
             }
 
             $imported++;
