@@ -62,6 +62,24 @@ class McqPrintableDocumentService
         return $pdf->download($this->slug($exam).'-result-sheet.pdf');
     }
 
+    public function classWiseCountsPdf(McqExam $exam, ?string $schoolId = null, ?Tenant $sahodaya = null): Response
+    {
+        $matrix = app(McqReportService::class)->classWiseCountMatrix($exam, $schoolId);
+        $sahodaya ??= Tenant::find($exam->tenant_id);
+
+        $pdf = Pdf::loadView('mcq.class-wise-counts', [
+            'exam'        => $exam,
+            'matrix'      => $matrix,
+            'orgName'     => $sahodaya?->name ?? 'Sahodaya',
+            'logoSrc'     => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
+            'generatedAt' => $this->generatedAt(),
+        ])->setPaper('a4', count($matrix['classes']) > 6 ? 'landscape' : 'portrait');
+
+        $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+
+        return $pdf->download($this->slug($exam).'-class-wise-counts'.$suffix.'.pdf');
+    }
+
     /**
      * @return list<array<string, mixed>>
      */

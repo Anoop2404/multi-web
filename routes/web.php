@@ -1219,6 +1219,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/reports/school-performance/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportSchoolPerformance'])->name('reports.school-performance.export');
             Route::get('/{exam}/reports/malpractice/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportMalpractice'])->name('reports.malpractice.export');
             Route::get('/{exam}/reports/class-wise-counts/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportClassWiseCounts'])->name('reports.class-wise-counts.export');
+            Route::get('/{exam}/reports/class-wise-counts/pdf', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportClassWiseCountsPdf'])->name('reports.class-wise-counts.pdf');
             Route::get('/{exam}/attendance', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'attendance'])->name('attendance');
             Route::post('/{exam}/attendance', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'storeAttendance'])->name('attendance.store');
             Route::post('/{exam}/attendance/import', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'importAttendance'])->name('attendance.import');

@@ -287,6 +287,7 @@ Route::prefix('mcq')->name('mcq.')->group(function () {
     Route::get('/{exam}/reports/attendance/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportAttendance'])->name('reports.attendance.export');
     Route::get('/{exam}/reports/toppers/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportToppers'])->name('reports.toppers.export');
     Route::get('/{exam}/reports/class-wise-counts/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportClassWiseCounts'])->name('reports.class-wise-counts.export');
+    Route::get('/{exam}/reports/class-wise-counts/pdf', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportClassWiseCountsPdf'])->name('reports.class-wise-counts.pdf');
     Route::get('/{exam}/eligible-students', [McqController::class, 'eligibleStudents'])->name('eligible-students');
     Route::get('/{exam}/{tab?}', [McqController::class, 'exam'])->name('exam')->where('tab', 'register|students|hall-tickets|fee|results|toppers|reports|attendance');
     Route::post('/{exam}/attendance', [McqController::class, 'storeAttendance'])->name('attendance.store');

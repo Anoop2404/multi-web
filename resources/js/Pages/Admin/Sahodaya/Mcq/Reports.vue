@@ -32,7 +32,10 @@
             <div class="card">
                 <h3 class="section-title">Class-wise registration counts</h3>
                 <p class="section-desc">School-wise and class-wise breakdown matrix of registered students.</p>
-                <a :href="exportBase + '/class-wise-counts/export'" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
+                <div class="flex flex-wrap gap-2 mt-3">
+                    <a :href="exportBase + '/class-wise-counts/export'" class="btn-secondary text-sm">Export Excel ↓</a>
+                    <a :href="exportBase + '/class-wise-counts/pdf'" class="btn-secondary text-sm" target="_blank">Download PDF ↓</a>
+                </div>
             </div>
             <div class="card">
                 <h3 class="section-title">Fee summary</h3>
@@ -123,7 +126,10 @@
                     <h3 class="section-title !mb-0">School & Class-wise Registration Counts</h3>
                     <p class="section-desc">Class-by-class student counts per school and event totals.</p>
                 </div>
-                <a :href="exportBase + '/class-wise-counts/export'" class="btn-secondary text-sm">Export Excel ↓</a>
+                <div class="flex flex-wrap gap-2">
+                    <a :href="exportBase + '/class-wise-counts/export'" class="btn-secondary text-sm">Export Excel ↓</a>
+                    <a :href="exportBase + '/class-wise-counts/pdf'" class="btn-secondary text-sm" target="_blank">Download PDF ↓</a>
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
