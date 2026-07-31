@@ -117,8 +117,13 @@
                                                     AY {{ rec.academic_year }}
                                                 </span>
                                             </div>
-                                            <p class="text-xs text-slate-500 mt-0.5">
-                                                Examination: {{ rec.examination_type || `Class ${rec.class} Board Exam` }}
+                                            <p class="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-1.5">
+                                                <span>Examination: {{ rec.examination_type || `Class ${rec.class} Board Exam` }}</span>
+                                                <span class="text-slate-300">•</span>
+                                                <span class="font-medium text-slate-700">🏫 {{ rec.school_name || activeMatch.school_name }}</span>
+                                                <span v-if="rec.school_name && activeMatch.school_name && rec.school_name !== activeMatch.school_name" class="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-bold border border-amber-200">
+                                                    Other School
+                                                </span>
                                             </p>
                                         </div>
 

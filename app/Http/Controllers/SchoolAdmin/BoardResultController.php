@@ -307,7 +307,7 @@ class BoardResultController extends SchoolAdminController
         if ($rollNos->count() !== $rollNos->unique()->count()) {
             $dupes = $rollNos->duplicates()->unique()->values()->implode(', ');
             throw ValidationException::withMessages([
-                'toppers' => "Duplicate CBSE Roll No(s) in the form: {$dupes}. Each roll number must be unique.",
+                'toppers' => "Duplicate CBSE Roll No(s) in the form for {$this->school->name}: {$dupes}. Each roll number must be unique.",
             ]);
         }
 
@@ -500,6 +500,16 @@ class BoardResultController extends SchoolAdminController
             ->orderBy('id')
             ->get(['id', 'percentage', 'marks_obtained', 'rank']);
 
+        if ($toppers->isEmpty()) {
+            return;
+        }
+
+        // Temporarily null out ranks for overall toppers of this board_result to prevent
+        // intermediate rank collision exceptions when row-by-row updating.
+        Topper::query()
+            ->whereIn('id', $toppers->pluck('id'))
+            ->update(['rank' => null]);
+
         $lastScore = null;
         $lastRank = 0;
 
@@ -511,9 +521,7 @@ class BoardResultController extends SchoolAdminController
                 ? $position
                 : $lastRank;
 
-            if ((int) $topper->rank !== $rank) {
-                Topper::whereKey($topper->id)->update(['rank' => $rank]);
-            }
+            Topper::whereKey($topper->id)->update(['rank' => $rank]);
 
             $lastScore = $score;
             $lastRank = $rank;
@@ -812,7 +820,7 @@ class BoardResultController extends SchoolAdminController
             $rollNo = trim((string) $row['roll_no']);
             if (isset($submittedRollNos[$rollNo])) {
                 throw ValidationException::withMessages([
-                    "rows.{$i}.roll_no" => "Duplicate CBSE Roll No '{$rollNo}' within the same submission.",
+                    "rows.{$i}.roll_no" => "Duplicate CBSE Roll No '{$rollNo}' for school '{$this->school->name}' within the same submission.",
                 ]);
             }
             $submittedRollNos[$rollNo] = true;
@@ -1132,7 +1140,7 @@ class BoardResultController extends SchoolAdminController
                 // Check for duplicate within the submitted rows themselves.
                 if (isset($submittedRollNos[$rollNo])) {
                     throw ValidationException::withMessages([
-                        "rows.{$i}.roll_no" => "Duplicate CBSE Roll No '{$rollNo}' within the same submission. Each roll number must be unique.",
+                        "rows.{$i}.roll_no" => "Duplicate CBSE Roll No '{$rollNo}' for school '{$this->school->name}' within the same submission. Each roll number must be unique.",
                     ]);
                 }
                 $submittedRollNos[$rollNo] = true;

@@ -127,6 +127,8 @@ class BoardResultStudentHistoryService
                     'academic_year' => $br ? $br->academic_year : null,
                     'class' => $br ? (int) $br->class : null,
                     'examination_type' => $br ? $br->examination_type : null,
+                    'school_id' => (string) $rep->tenant_id,
+                    'school_name' => $schoolNames[$rep->tenant_id] ?? (string) $rep->tenant_id,
                     'stream' => $rep->stream,
                     'total_marks' => $rep->total_marks ? (float) $rep->total_marks : ($br ? (float) $br->total_marks : null),
                     'marks_obtained' => $rep->marks_obtained ? (float) $rep->marks_obtained : null,

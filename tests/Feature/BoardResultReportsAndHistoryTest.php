@@ -224,4 +224,78 @@ class BoardResultReportsAndHistoryTest extends TestCase
         $res2->assertOk();
         $res2->assertJsonPath('matches.0.roll_no', '30003');
     }
+
+    public function test_full_a1_achiever_can_be_saved_when_student_already_exists_in_overall_toppers()
+    {
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'name' => 'Test Sahodaya',
+            'type' => 'sahodaya',
+        ]);
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'name' => 'Test School',
+            'type' => 'school',
+            'parent_id' => $sahodaya->id,
+        ]);
+
+        \Spatie\Permission\Models\Role::findOrCreate('school_admin');
+
+        $schoolAdmin = User::create([
+            'id' => (string) Str::uuid(),
+            'name' => 'School Admin User',
+            'email' => 'school_admin_test@example.com',
+            'password' => bcrypt('password'),
+            'tenant_id' => $school->id,
+            'email_verified_at' => now(),
+        ]);
+        $schoolAdmin->assignRole('school_admin');
+
+        $br = BoardResult::create([
+            'tenant_id' => $school->id,
+            'class' => 10,
+            'academic_year' => '2025-26',
+            'examination_type' => 'AISSE',
+            'status' => BoardResult::STATUS_DRAFT,
+        ]);
+
+        // Student registered as OVERALL Topper first
+        Topper::create([
+            'board_result_id' => $br->id,
+            'tenant_id' => $school->id,
+            'entry_type' => Topper::ENTRY_OVERALL,
+            'name' => 'Ronith Joy K',
+            'roll_no' => '24162991',
+            'admission_no' => 'ADM241',
+            'gender' => 'male',
+            'rank' => 1,
+            'percentage' => 98.2,
+        ]);
+
+        // Now save the same student in Full A1 Achievers batch
+        $response = $this->actingAs($schoolAdmin)
+            ->post("/school-admin/{$school->id}/board-results/{$br->id}/full-a1-achievers/batch", [
+                'rows' => [
+                    [
+                        'name' => 'Ronith Joy K',
+                        'gender' => 'male',
+                        'roll_no' => '24162991',
+                        'subject_marks' => [
+                            ['subject' => 'English', 'marks' => 95],
+                            ['subject' => 'Mathematics', 'marks' => 99],
+                        ],
+                    ],
+                ],
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHasNoErrors();
+
+        // Verify Full A1 topper record was created alongside overall topper record
+        $this->assertDatabaseHas('toppers', [
+            'board_result_id' => $br->id,
+            'roll_no' => '24162991',
+            'entry_type' => Topper::ENTRY_FULL_A1,
+        ]);
+    }
 }
