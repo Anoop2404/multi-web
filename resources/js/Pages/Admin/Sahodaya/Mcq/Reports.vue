@@ -30,6 +30,11 @@
                 <a :href="exportBase + '/registration/export'" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
             </div>
             <div class="card">
+                <h3 class="section-title">Class-wise registration counts</h3>
+                <p class="section-desc">School-wise and class-wise breakdown matrix of registered students.</p>
+                <a :href="exportBase + '/class-wise-counts/export'" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
+            </div>
+            <div class="card">
                 <h3 class="section-title">Fee summary</h3>
                 <p class="section-desc">Per-school batch fees and payment status.</p>
                 <a :href="exportBase + '/fees/export'" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
@@ -112,6 +117,47 @@
             </table>
         </section>
 
+        <section v-if="classWiseCounts?.schools?.length" class="card card--flush overflow-hidden mb-6">
+            <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="section-title !mb-0">School & Class-wise Registration Counts</h3>
+                    <p class="section-desc">Class-by-class student counts per school and event totals.</p>
+                </div>
+                <a :href="exportBase + '/class-wise-counts/export'" class="btn-secondary text-sm">Export Excel ↓</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="w-12 text-center">Sl No</th>
+                            <th>School Name</th>
+                            <th v-for="cls in classWiseCounts.classes" :key="cls" class="text-center">{{ cls }}</th>
+                            <th class="text-center font-bold">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(school, i) in classWiseCounts.schools" :key="school.school_id">
+                            <td class="text-center text-xs text-slate-500">{{ i + 1 }}</td>
+                            <td class="font-medium text-slate-800">{{ (school.school_name || '').toUpperCase() }}</td>
+                            <td v-for="cls in classWiseCounts.classes" :key="cls" class="text-center text-slate-600">
+                                {{ school.counts[cls] || 0 }}
+                            </td>
+                            <td class="text-center font-bold text-slate-900 bg-slate-50">{{ school.total }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-slate-100 font-bold border-t-2 border-slate-300">
+                            <td colspan="2" class="text-right uppercase px-4 py-2 text-xs text-slate-700">Total All Schools</td>
+                            <td v-for="cls in classWiseCounts.classes" :key="cls" class="text-center py-2 text-slate-900">
+                                {{ classWiseCounts.totals[cls] || 0 }}
+                            </td>
+                            <td class="text-center py-2 text-emerald-800 bg-emerald-100 text-sm font-extrabold">{{ classWiseCounts.grand_total }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
+
         <section class="card card--flush overflow-hidden mb-6">
             <div class="p-4 border-b border-slate-100">
                 <h3 class="section-title !mb-0">Fee summary preview</h3>
@@ -166,6 +212,7 @@ const props = defineProps({
     exam: Object,
     registrations: { type: Array, default: () => [] },
     feeSummary: { type: Array, default: () => [] },
+    classWiseCounts: { type: Object, default: () => ({ classes: [], schools: [], totals: {}, grand_total: 0 }) },
     resultAnalysis: { type: Object, default: null },
     schoolPerformance: { type: Array, default: () => [] },
     stats: { type: Object, default: () => ({}) },

@@ -19,6 +19,7 @@ class McqReportController extends SahodayaAdminController
             'exam'         => $exam->only('id', 'title', 'exam_level', 'status', 'results_published', 'delivery_mode'),
             'registrations'=> $reports->registrationRows($exam),
             'feeSummary'   => $feeSummary,
+            'classWiseCounts' => $reports->classWiseCountMatrix($exam),
             'resultAnalysis' => $exam->results_published ? $reports->resultAnalysis($exam) : null,
             'schoolPerformance' => $exam->results_published ? $reports->schoolPerformanceRows($exam) : [],
             'stats'        => [
@@ -29,6 +30,13 @@ class McqReportController extends SahodayaAdminController
                 'fee_pending'   => collect($feeSummary)->whereIn('status', ['proof_uploaded', 'pending'])->sum('total_due'),
             ],
         ]);
+    }
+
+    public function exportClassWiseCounts(string $tenantId, McqExam $exam, McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportClassWiseCounts($exam);
     }
 
     public function exportRegistration(string $tenantId, McqExam $exam, McqReportService $reports)

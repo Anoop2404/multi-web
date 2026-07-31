@@ -501,6 +501,126 @@ class McqReportService
         );
     }
 
+    /**
+     * Build a school-wise & class-wise registration matrix for a Talent Search exam.
+     *
+     * @return array{
+     *   classes: list<string>,
+     *   schools: list<array{school_id: string, school_name: string, counts: array<string, int>, total: int}>,
+     *   totals: array<string, int>,
+     *   grand_total: int
+     * }
+     */
+    public function classWiseCountMatrix(McqExam $exam, ?string $schoolId = null): array
+    {
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
+            ->with(['student.schoolClass', 'teacher', 'school']);
+
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
+
+        $registrations = $query->get();
+
+        $allClassNames = [];
+        $regData = [];
+
+        foreach ($registrations as $reg) {
+            $className = $reg->student?->schoolClass?->name;
+            if (! $className) {
+                $className = $reg->isTeacherRegistration() ? 'Teacher' : 'Unassigned';
+            }
+            $allClassNames[$className] = true;
+
+            $sId = (string) $reg->school_id;
+            $sName = $reg->school?->name ?? 'Unknown School';
+
+            if (! isset($regData[$sId])) {
+                $regData[$sId] = [
+                    'school_id'   => $sId,
+                    'school_name' => $sName,
+                    'counts'      => [],
+                    'total'       => 0,
+                ];
+            }
+
+            $regData[$sId]['counts'][$className] = ($regData[$sId]['counts'][$className] ?? 0) + 1;
+            $regData[$sId]['total']++;
+        }
+
+        $classes = array_keys($allClassNames);
+        usort($classes, function ($a, $b) {
+            $numA = (int) filter_var($a, FILTER_SANITIZE_NUMBER_INT);
+            $numB = (int) filter_var($b, FILTER_SANITIZE_NUMBER_INT);
+
+            if ($numA > 0 && $numB > 0 && $numA !== $numB) {
+                return $numA <=> $numB;
+            }
+
+            return strnatcasecmp($a, $b);
+        });
+
+        $classTotals = array_fill_keys($classes, 0);
+        $grandTotal = 0;
+
+        $schools = collect($regData)->sortBy('school_name')->values()->map(function ($s) use ($classes, &$classTotals, &$grandTotal) {
+            $counts = [];
+            foreach ($classes as $c) {
+                $val = $s['counts'][$c] ?? 0;
+                $counts[$c] = $val;
+                $classTotals[$c] += $val;
+            }
+            $grandTotal += $s['total'];
+
+            return [
+                'school_id'   => $s['school_id'],
+                'school_name' => $s['school_name'],
+                'counts'      => $counts,
+                'total'       => $s['total'],
+            ];
+        })->all();
+
+        return [
+            'classes'     => $classes,
+            'schools'     => $schools,
+            'totals'      => $classTotals,
+            'grand_total' => $grandTotal,
+        ];
+    }
+
+    public function exportClassWiseCounts(McqExam $exam, ?string $schoolId = null): StreamedResponse
+    {
+        $matrix = $this->classWiseCountMatrix($exam, $schoolId);
+        $classes = $matrix['classes'];
+        $headers = array_merge(['Sl No', 'School Name'], $classes, ['Total']);
+
+        $dataRows = [];
+        foreach ($matrix['schools'] as $i => $school) {
+            $row = [$i + 1, $school['school_name']];
+            foreach ($classes as $c) {
+                $row[] = $school['counts'][$c] ?? 0;
+            }
+            $row[] = $school['total'];
+            $dataRows[] = $row;
+        }
+
+        $footerRow = ['', 'TOTAL'];
+        foreach ($classes as $c) {
+            $footerRow[] = $matrix['totals'][$c] ?? 0;
+        }
+        $footerRow[] = $matrix['grand_total'];
+        $dataRows[] = $footerRow;
+
+        $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+
+        return ExcelExport::download(
+            'mcq-class-wise-counts-'.$exam->id.$suffix,
+            $headers,
+            collect($dataRows),
+        );
+    }
+
     /** @param  list<float>  $sortedScores */
     private function percentile(array $sortedScores, int $percentile): float
     {

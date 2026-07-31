@@ -28,4 +28,11 @@ class McqReportController extends SchoolAdminController
 
         return $reports->exportToppers($exam, $this->school->id);
     }
+
+    public function exportClassWiseCounts(string $tenantId, McqExam $exam, McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+
+        return $reports->exportClassWiseCounts($exam, $this->school->id);
+    }
 }
