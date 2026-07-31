@@ -99,6 +99,7 @@ class McqPrintableDocumentService
             ->map(function (McqRegistration $reg, int $index) use ($withMarks) {
                 $row = [
                     'sl'             => $index + 1,
+                    'photo_url'      => $reg->student?->sahodayaPhotoUrl($exam->tenant_id) ?? $reg->student?->photoUrl(),
                     'hall_ticket_no' => $reg->hall_ticket_no ?: '—',
                     'name'           => $reg->participantName() ?: '—',
                     'school'         => $reg->school?->name ?: '—',

@@ -20,13 +20,9 @@
         table.sheet th { background: #0f2744; color: #fff; text-align: left; padding: 8px 6px; font-size: 8px; text-transform: uppercase; }
         table.sheet td { padding: 8px 6px; border: 1px solid #cbd5e1; vertical-align: middle; }
         table.sheet tr:nth-child(even) td { background: #f8fafc; }
-        .sl { width: 36px; text-align: center; }
-        .mark { text-align: center; width: 72px; }
-        .box { display: inline-block; width: 22px; height: 22px; border: 2px solid #0f2744; vertical-align: middle; }
-        .empty { text-align: center; color: #94a3b8; padding: 24px 0; }
-        .footer { margin-top: 14px; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
-        .sign-line { margin-top: 28px; width: 100%; }
-        .sign-line td { width: 33%; padding-top: 36px; font-size: 9px; color: #475569; border-top: 1px solid #94a3b8; text-align: center; }
+        .photo-cell { width: 30px; text-align: center; }
+        .photo-cell img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+        .initials-avatar { display: inline-block; width: 24px; height: 24px; line-height: 24px; border-radius: 50%; background: #e2e8f0; color: #475569; font-weight: bold; font-size: 10px; text-align: center; }
     </style>
 </head>
 <body>
@@ -60,6 +56,7 @@
             <thead>
                 <tr>
                     <th class="sl">Sl</th>
+                    <th class="photo-cell">Photo</th>
                     <th>Reg. no.</th>
                     <th>Name</th>
                     <th>Class</th>
@@ -73,6 +70,13 @@
                 @foreach($rows as $row)
                     <tr>
                         <td class="sl">{{ $row['sl'] }}</td>
+                        <td class="photo-cell">
+                            @if(!empty($row['photo_url']))
+                                <img src="{{ $row['photo_url'] }}" alt="">
+                            @else
+                                <span class="initials-avatar">{{ strtoupper(substr($row['name'] ?? '?', 0, 1)) }}</span>
+                            @endif
+                        </td>
                         <td>{{ $row['hall_ticket_no'] }}</td>
                         <td>{{ $row['name'] }}</td>
                         <td>{{ $row['class'] }}</td>
