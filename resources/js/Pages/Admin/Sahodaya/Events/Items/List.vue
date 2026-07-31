@@ -120,6 +120,7 @@
                             <th class="w-12 text-center">On</th>
                             <th class="w-14 text-center">Type</th>
                             <th class="min-w-[10rem]">Item</th>
+                            <th class="whitespace-nowrap">Level</th>
                             <th class="whitespace-nowrap">Category</th>
                             <th class="whitespace-nowrap">{{ event.event_type === 'kids_fest' ? 'Band' : 'Class' }}</th>
                             <th class="whitespace-nowrap">Gender</th>
@@ -143,6 +144,11 @@
                                 <p class="font-medium text-slate-900">{{ item.title }}</p>
                                 <p v-if="item.item_code" class="text-xs text-slate-400 font-mono mt-0.5">{{ item.item_code }}</p>
                                 <p v-if="squadSummary(item)" class="text-xs text-slate-500 mt-0.5">{{ squadSummary(item) }}</p>
+                            </td>
+                            <td>
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" :class="ownerLevelBadgeClass(item.owner_level)">
+                                    {{ ownerLevelLabel(item.owner_level) }}
+                                </span>
                             </td>
                             <td class="text-slate-600">{{ artsCategoryLabel(item) }}</td>
                             <td class="text-slate-600">{{ categoryLabel(item) }}</td>
@@ -462,6 +468,16 @@ function clearFilters() {
 
 function canEdit(item) {
     return item.owner_level !== 'state';
+}
+
+function ownerLevelLabel(level) {
+    return props.ownerLevelLabels?.[level] ?? (level ? level.charAt(0).toUpperCase() + level.slice(1) : 'Sahodaya');
+}
+
+function ownerLevelBadgeClass(level) {
+    if (level === 'state') return 'bg-amber-100 text-amber-800';
+    if (level === 'school') return 'bg-sky-100 text-sky-800';
+    return 'bg-slate-200 text-slate-700';
 }
 
 function venueLabel(value) {

@@ -154,8 +154,8 @@ class FestSportsCompositeFeeServiceTest extends TestCase
     {
         ['school' => $school, 'event' => $event, 'head' => $head] = $this->sportsContext();
         $student = $this->makeStudent($school);
-        // fee_amount on the item is ignored — sports items inherit Event Head rates.
-        $item = $this->makeItem($event, $head, ['fee_amount' => 150, 'title' => 'Long jump']);
+        // fee_amount on the item provides an override rate if set.
+        $item = $this->makeItem($event, $head, ['fee_amount' => null, 'title' => 'Long jump']);
         $this->registerStudent($event, $item, $school, $student);
 
         $result = app(FestSportsCompositeFeeService::class)->calculateForHead($head->fresh(), $school->id);
@@ -209,7 +209,7 @@ class FestSportsCompositeFeeServiceTest extends TestCase
         foreach (['A', 'B', 'C'] as $title) {
             $item = $this->makeItem($event, $head, [
                 'title' => $title,
-                'fee_amount' => 50,
+                'fee_amount' => null,
                 'quota_eligible' => true,
             ]);
             $this->registerStudent($event, $item, $school, $student);

@@ -256,7 +256,7 @@ class FestSchoolEventFeeService
     {
         $count = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
-            ->whereIn('status', ['submitted', 'approved'])
+            ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
             ->count();
 
@@ -268,7 +268,7 @@ class FestSchoolEventFeeService
             ->whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $schoolId)
-                ->whereIn('status', ['submitted', 'approved']))
+                ->whereIn('status', ['submitted', 'approved', 'pending_approval']))
             ->where('participant_role', 'standby')
             ->count();
 
@@ -281,7 +281,7 @@ class FestSchoolEventFeeService
             ->whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $schoolId)
-                ->whereIn('status', ['submitted', 'approved']))
+                ->whereIn('status', ['submitted', 'approved', 'pending_approval']))
             ->where('participant_role', 'standby')
             ->count();
     }
@@ -292,7 +292,7 @@ class FestSchoolEventFeeService
             ->whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $schoolId)
-                ->whereIn('status', ['submitted', 'approved']))
+                ->whereIn('status', ['submitted', 'approved', 'pending_approval']))
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->get(['student_id', 'teacher_id'])
@@ -411,7 +411,7 @@ class FestSchoolEventFeeService
             ->filter(function (FestItemHead $head) use ($event, $schoolId) {
                 $hasRegistrations = FestRegistration::where('event_id', $event->id)
                     ->where('school_id', $schoolId)
-                    ->whereIn('status', ['submitted', 'approved'])
+                    ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
                     ->whereHas('item', fn ($q) => $q->where('head_id', $head->id))
                     ->exists();
 
@@ -1225,7 +1225,7 @@ class FestSchoolEventFeeService
 
         $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
-            ->whereIn('status', ['submitted', 'approved'])
+            ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             ->with('item')
             ->orderBy('submitted_at')
             ->orderBy('id')

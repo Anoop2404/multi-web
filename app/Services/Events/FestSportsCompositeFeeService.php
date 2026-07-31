@@ -53,7 +53,7 @@ class FestSportsCompositeFeeService
 
         $registrations = FestRegistration::where('event_id', $event->id)
             ->where('school_id', $schoolId)
-            ->whereIn('status', ['submitted', 'approved'])
+            ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             // A withdrawn/disabled/deleted item should never keep billing a school —
             // whoever turned the item off is telling us it's no longer offered.
             ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
@@ -336,7 +336,7 @@ class FestSportsCompositeFeeService
 
         $registrations = FestRegistration::where('event_id', $head->event_id)
             ->where('school_id', $schoolId)
-            ->whereIn('status', ['submitted', 'approved'])
+            ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             ->whereHas('item', fn ($q) => $q->where('head_id', $head->id)->where('is_enabled', true))
             ->with(['item', 'participants'])
             ->orderBy('id')
@@ -525,7 +525,7 @@ class FestSportsCompositeFeeService
         // registration outright, whether or not the student ever registered an item.)
         $studentIds = FestRegistration::whereIn('event_id', $eventIds)
             ->where('school_id', $schoolId)
-            ->whereIn('status', ['submitted', 'approved'])
+            ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             ->with('participants')
             ->get()
             ->flatMap(fn (FestRegistration $r) => $r->participants
@@ -550,7 +550,7 @@ class FestSportsCompositeFeeService
 
         $registrations = FestRegistration::whereIn('event_id', $eventIds)
             ->where('school_id', $schoolId)
-            ->whereIn('status', ['submitted', 'approved'])
+            ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             ->whereHas('item', fn ($q) => $q->where('is_enabled', true))
             ->with(['item', 'participants'])
             ->get();

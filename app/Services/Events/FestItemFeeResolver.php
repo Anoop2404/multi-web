@@ -115,7 +115,7 @@ class FestItemFeeResolver
     {
         return FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
-            ->whereIn('status', ['submitted', 'approved'])
+            ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             ->with(['item.head:id,name'])
             ->get();
     }
@@ -148,7 +148,7 @@ class FestItemFeeResolver
                 ->whereHas('registration', fn ($q) => $q
                     ->whereIn('event_id', $event->reportableEventIds())
                     ->where('school_id', $schoolId)
-                    ->whereIn('status', ['submitted', 'approved']))
+                    ->whereIn('status', ['submitted', 'approved', 'pending_approval']))
                 ->where('participant_role', 'standby')
                 ->with(['student:id,name', 'registration.item'])
                 ->get();
