@@ -242,7 +242,11 @@ class BoardResultReportController extends SahodayaAdminController
             'noRank'        => $counts->isNoRankMode($this->sahodaya->id),
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download("subject-merit-register-{$year}.pdf");
+        if ($request->boolean('download')) {
+            return $pdf->download("subject-merit-register-{$year}.pdf");
+        }
+
+        return $pdf->stream("subject-merit-register-{$year}.pdf");
     }
 
     public function fullA1AchieversPdf(Request $request, FullA1AchieversReportService $service)
@@ -264,7 +268,11 @@ class BoardResultReportController extends SahodayaAdminController
             'generatedAt'    => now()->format('d M Y · h:i A'),
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download("full-a1-achievers-{$year}.pdf");
+        if ($request->boolean('download')) {
+            return $pdf->download("full-a1-achievers-{$year}.pdf");
+        }
+
+        return $pdf->stream("full-a1-achievers-{$year}.pdf");
     }
 
     public function toppersPdf(Request $request, SahodayaTopperSelectionService $topperService, TopperCountService $counts)
@@ -287,7 +295,11 @@ class BoardResultReportController extends SahodayaAdminController
             'noRank'          => $counts->isNoRankMode($this->sahodaya->id),
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download("board-results-toppers-{$year}.pdf");
+        if ($request->boolean('download')) {
+            return $pdf->download("board-results-toppers-{$year}.pdf");
+        }
+
+        return $pdf->stream("board-results-toppers-{$year}.pdf");
     }
 
     /** PDF export for the Toppers-hub "90%+ Achievers" report (no existing PDF previously). */
@@ -316,6 +328,10 @@ class BoardResultReportController extends SahodayaAdminController
             'noRank'        => $counts->isNoRankMode($this->sahodaya->id),
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download("achievers-class-{$class}-{$year}.pdf");
+        if ($request->boolean('download')) {
+            return $pdf->download("achievers-class-{$class}-{$year}.pdf");
+        }
+
+        return $pdf->stream("achievers-class-{$class}-{$year}.pdf");
     }
 }

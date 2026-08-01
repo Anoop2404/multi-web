@@ -41,6 +41,31 @@ class ErpReportController extends SahodayaAdminController
         abort_unless($runner->authorize($request->user(), $reportId), 403);
 
         $filters = $this->validatedFilters($request, $runner, $reportId);
+        $format = strtolower($request->string('format')->toString());
+
+        if ($format === 'pdf' || $request->has('pdf')) {
+            $definition = $runner->find($this->sahodaya->id, $reportId);
+            $meta = $runner->meta($reportId);
+            $queryService = app(\App\Services\Reports\ErpReportQueryService::class);
+            $rows = $queryService->rows($this->sahodaya->id, $reportId, $filters);
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.generic-pdf', [
+                'title'         => $definition['title'] ?? $reportId,
+                'columns'       => $meta['columns'] ?? [],
+                'rows'          => $rows,
+                'academicYear'  => $filters['academic_year'] ?? null,
+                'selectedClass' => $filters['class'] ?? null,
+                'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
+                'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+                'generatedAt'   => now()->format('d M Y · h:i A'),
+            ])->setPaper('a4', 'portrait');
+
+            if ($request->boolean('download')) {
+                return $pdf->download(strtolower($reportId).'-'.now()->format('Y-m-d').'.pdf');
+            }
+
+            return $pdf->stream(strtolower($reportId).'-'.now()->format('Y-m-d').'.pdf');
+        }
 
         return $runner->export($request->user(), $this->sahodaya->id, $reportId, $filters);
     }
