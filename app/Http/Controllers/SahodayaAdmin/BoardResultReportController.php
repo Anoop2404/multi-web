@@ -5,12 +5,27 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Models\Subject;
 use App\Services\BoardResults\AcademicExcellenceReportService;
 use App\Services\BoardResults\FullA1AchieversReportService;
+use App\Services\BoardResults\SahodayaTopperSelectionService;
 use App\Services\BoardResults\SubjectMeritRegisterService;
+use App\Services\BoardResults\TopperCountService;
 use App\Support\AcademicYear;
 use Illuminate\Http\Request;
 
 class BoardResultReportController extends SahodayaAdminController
 {
+    /**
+     * Apply a one-off "view=rank|percentage" override (query string) on top of the persisted
+     * no_rank setting, so a single PDF download can match whatever mode the report page was
+     * showing at the time, without touching the saved sahodaya-wide setting.
+     */
+    private function applyViewOverride(Request $request): void
+    {
+        $view = $request->string('view')->toString();
+        if (in_array($view, ['rank', 'percentage'], true)) {
+            app(TopperCountService::class)->setNoRankOverride($this->sahodaya->id, $view === 'percentage');
+        }
+    }
+
     public function index(Request $request)
     {
         $year = $request->string('academic_year')->toString()
@@ -180,8 +195,10 @@ class BoardResultReportController extends SahodayaAdminController
         ]);
     }
 
-    public function subjectMeritPdf(Request $request, SubjectMeritRegisterService $service)
+    public function subjectMeritPdf(Request $request, SubjectMeritRegisterService $service, TopperCountService $counts)
     {
+        $this->applyViewOverride($request);
+
         $year = $request->string('academic_year')->toString()
             ?: AcademicYear::forSahodaya($this->sahodaya->id);
         $class = $request->filled('class') ? $request->integer('class') : null;
@@ -195,6 +212,7 @@ class BoardResultReportController extends SahodayaAdminController
             'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
             'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
             'generatedAt'   => now()->format('d M Y · h:i A'),
+            'noRank'        => $counts->isNoRankMode($this->sahodaya->id),
         ])->setPaper('a4', 'portrait');
 
         return $pdf->download("subject-merit-register-{$year}.pdf");
@@ -222,8 +240,10 @@ class BoardResultReportController extends SahodayaAdminController
         return $pdf->download("full-a1-achievers-{$year}.pdf");
     }
 
-    public function toppersPdf(Request $request, \App\Services\BoardResults\SahodayaTopperSelectionService $topperService)
+    public function toppersPdf(Request $request, SahodayaTopperSelectionService $topperService, TopperCountService $counts)
     {
+        $this->applyViewOverride($request);
+
         $year = $request->string('academic_year')->toString()
             ?: AcademicYear::forSahodaya($this->sahodaya->id);
 
@@ -237,8 +257,38 @@ class BoardResultReportController extends SahodayaAdminController
             'orgName'         => $this->sahodaya->name ?? 'Sahodaya',
             'logoSrc'         => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
             'generatedAt'     => now()->format('d M Y · h:i A'),
+            'noRank'          => $counts->isNoRankMode($this->sahodaya->id),
         ])->setPaper('a4', 'portrait');
 
         return $pdf->download("board-results-toppers-{$year}.pdf");
+    }
+
+    /** PDF export for the Toppers-hub "90%+ Achievers" report (no existing PDF previously). */
+    public function achieversPdf(Request $request, SahodayaTopperSelectionService $selection, TopperCountService $counts)
+    {
+        $this->applyViewOverride($request);
+
+        $year = $request->string('academic_year')->toString()
+            ?: AcademicYear::forSahodaya($this->sahodaya->id);
+        $class = $request->integer('class') ?: 10;
+        abort_unless(in_array($class, [10, 12], true), 404);
+        $threshold = $request->filled('threshold') ? (float) $request->input('threshold') : 90.0;
+
+        $overall = $class === 10 ? $selection->achieversForClassX($this->sahodaya->id, $year, $threshold) : [];
+        $byStream = $class === 12 ? $selection->achieversByStreamForClassXII($this->sahodaya->id, $year, $threshold) : [];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('board-results.pdf.topper-achievers', [
+            'overall'       => $overall,
+            'byStream'      => $byStream,
+            'selectedClass' => $class,
+            'threshold'     => $threshold,
+            'academicYear'  => $year,
+            'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
+            'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'generatedAt'   => now()->format('d M Y · h:i A'),
+            'noRank'        => $counts->isNoRankMode($this->sahodaya->id),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download("achievers-class-{$class}-{$year}.pdf");
     }
 }

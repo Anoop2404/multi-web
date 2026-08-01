@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use App\Models\PersonalAccessToken;
 use App\Observers\FeeReceiptObserver;
 use App\Observers\TenantObserver;
+use App\Services\BoardResults\TopperCountService;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -19,7 +20,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Singleton so a per-request "view=percentage" override (set once from the
+        // controller) is visible to every other place that resolves this service —
+        // SahodayaTopperSelectionService, SubjectMeritRegisterService, etc. — without
+        // threading an extra parameter through every method signature.
+        $this->app->singleton(TopperCountService::class);
     }
 
     /**

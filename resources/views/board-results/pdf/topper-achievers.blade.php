@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Overall & Stream Toppers — {{ $academicYear }}</title>
+    <title>{{ $threshold }}%+ Achievers — {{ $academicYear }}</title>
     <style>
         @page {
             margin: 15mm 12mm 15mm 12mm;
@@ -72,7 +72,7 @@
             color: #64748b;
             margin-bottom: 14px;
         }
-        
+
         .section-banner {
             background: #0f3d7a;
             color: #ffffff;
@@ -148,14 +148,15 @@
                 <td style="vertical-align: middle;">
                     <div class="org">{{ $orgName }}</div>
                     <div class="exam-title">
-                        CBSE Class X (AISSE) & Class XII (AISSCE) Board Examinations {{ $academicYear }}
+                        CBSE Class {{ $selectedClass }} ({{ $selectedClass == 10 ? 'AISSE' : 'AISSCE' }}) Board Examination {{ $academicYear }}
                     </div>
-                    <div class="tag">Academic Board Results · Class X & Class XII Stream-Wise Toppers Official Register</div>
+                    <div class="tag">Academic Board Results · {{ rtrim(rtrim(number_format($threshold, 2), '0'), '.') }}%+ Achievers</div>
                 </td>
                 <td style="text-align: right; vertical-align: middle; width: 210px;">
                     <div class="meta-box">
                         <div><strong>Academic Year:</strong> {{ $academicYear }}</div>
-                        <div><strong>Classes:</strong> Class X & Class XII</div>
+                        <div><strong>Class:</strong> Class {{ $selectedClass }}</div>
+                        <div><strong>Threshold:</strong> {{ rtrim(rtrim(number_format($threshold, 2), '0'), '.') }}%+</div>
                         <div><strong>Generated:</strong> {{ $generatedAt }}</div>
                     </div>
                 </td>
@@ -163,53 +164,15 @@
         </table>
     </div>
 
-    <div class="report-title">Sahodaya Board Result Toppers Register</div>
+    <div class="report-title">Sahodaya {{ rtrim(rtrim(number_format($threshold, 2), '0'), '.') }}%+ Achievers Register</div>
     <div class="meta-line">
-        Official Top-N toppers auto-computed across all member schools for Academic Year {{ $academicYear }}.
+        Every student scoring at/above {{ rtrim(rtrim(number_format($threshold, 2), '0'), '.') }}% across all member schools — not capped to Top-N.
     </div>
 
-    <!-- CLASS X TOPPERS -->
-    <div class="section-banner">Class X AISSE Overall Toppers</div>
-    @if(empty($classXToppers))
-        <p style="color: #64748b; margin: 10px 0;">No Class X toppers available.</p>
-    @else
-        <table class="report-table">
-            <thead>
-                <tr>
-                    @unless($noRank ?? false)
-                        <th class="rank-col">Rank</th>
-                    @endunless
-                    <th>Student Name</th>
-                    <th>Roll No.</th>
-                    <th>Member School</th>
-                    <th style="width: 70px; text-align: center;">Total Marks</th>
-                    <th style="width: 60px; text-align: center;">%</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($classXToppers as $i => $row)
-                    <tr>
-                        @unless($noRank ?? false)
-                            <td class="rank-col">#{{ $row['rank'] ?? ($i + 1) }}</td>
-                        @endunless
-                        <td class="student-name">{{ $row['name'] ?? ($row['student_name'] ?? '—') }}</td>
-                        <td class="roll-no">{{ $row['roll_no'] ?? ($row['cbse_roll_no'] ?? '—') }}</td>
-                        <td class="school-name">{{ strtoupper($row['school_name'] ?? '') }}</td>
-                        <td class="marks-col">{{ $row['total_marks'] ?? ($row['marks'] ?? '—') }}</td>
-                        <td style="text-align: center; font-weight: bold; color: #4338ca;">{{ $row['percentage'] ? number_format($row['percentage'], 1).'%' : '—' }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-    @endif
-
-    <!-- CLASS XII STREAM TOPPERS -->
-    <div class="section-banner">Class XII AISSCE Stream-Wise Toppers</div>
-    @if(empty($classXIIToppers))
-        <p style="color: #64748b; margin: 10px 0;">No Class XII stream toppers available.</p>
-    @else
-        @foreach($classXIIToppers as $streamLabel => $streamRows)
-            <div style="font-size: 9.5px; font-weight: bold; color: #1e1b4b; margin-top: 8px; margin-bottom: 4px;">Stream: {{ $streamLabel }}</div>
+    @if($selectedClass == 10)
+        @if(empty($overall))
+            <p style="color: #64748b; margin: 10px 0;">No achievers found for the selected criteria.</p>
+        @else
             <table class="report-table">
                 <thead>
                     <tr>
@@ -224,21 +187,57 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($streamRows as $i => $row)
+                    @foreach($overall as $i => $row)
                         <tr>
                             @unless($noRank ?? false)
                                 <td class="rank-col">#{{ $row['rank'] ?? ($i + 1) }}</td>
                             @endunless
-                            <td class="student-name">{{ $row['name'] ?? ($row['student_name'] ?? '—') }}</td>
-                            <td class="roll-no">{{ $row['roll_no'] ?? ($row['cbse_roll_no'] ?? '—') }}</td>
+                            <td class="student-name">{{ $row['student_name'] ?? '—' }}</td>
+                            <td class="roll-no">{{ $row['roll_no'] ?? '—' }}</td>
                             <td class="school-name">{{ strtoupper($row['school_name'] ?? '') }}</td>
-                            <td class="marks-col">{{ $row['total_marks'] ?? ($row['marks'] ?? '—') }}</td>
+                            <td class="marks-col">{{ $row['total_marks'] ?? ($row['marks_obtained'] ?? '—') }}</td>
                             <td style="text-align: center; font-weight: bold; color: #4338ca;">{{ $row['percentage'] ? number_format($row['percentage'], 1).'%' : '—' }}</td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
-        @endforeach
+        @endif
+    @else
+        @if(empty($byStream))
+            <p style="color: #64748b; margin: 10px 0;">No achievers found for the selected criteria.</p>
+        @else
+            @foreach($byStream as $streamLabel => $streamRows)
+                <div class="section-banner">Stream: {{ $streamLabel }}</div>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            @unless($noRank ?? false)
+                                <th class="rank-col">Rank</th>
+                            @endunless
+                            <th>Student Name</th>
+                            <th>Roll No.</th>
+                            <th>Member School</th>
+                            <th style="width: 70px; text-align: center;">Total Marks</th>
+                            <th style="width: 60px; text-align: center;">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($streamRows as $i => $row)
+                            <tr>
+                                @unless($noRank ?? false)
+                                    <td class="rank-col">#{{ $row['rank'] ?? ($i + 1) }}</td>
+                                @endunless
+                                <td class="student-name">{{ $row['student_name'] ?? '—' }}</td>
+                                <td class="roll-no">{{ $row['roll_no'] ?? '—' }}</td>
+                                <td class="school-name">{{ strtoupper($row['school_name'] ?? '') }}</td>
+                                <td class="marks-col">{{ $row['total_marks'] ?? ($row['marks_obtained'] ?? '—') }}</td>
+                                <td style="text-align: center; font-weight: bold; color: #4338ca;">{{ $row['percentage'] ? number_format($row['percentage'], 1).'%' : '—' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endforeach
+        @endif
     @endif
 
 </body>

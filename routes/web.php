@@ -885,10 +885,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/reports/full-a1-achievers', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'fullA1Achievers'])->name('reports.full-a1-achievers');
             Route::get('/reports/full-a1-achievers/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'fullA1AchieversPdf'])->name('reports.full-a1-achievers.pdf');
             Route::get('/reports/toppers/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'toppersPdf'])->name('reports.toppers.pdf');
+            Route::get('/reports/toppers/achievers/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'achieversPdf'])->name('reports.toppers.achievers.pdf');
             Route::get('/reports/excellence', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'excellence'])->name('reports.excellence');
             Route::get('/student-history', [\App\Http\Controllers\BoardResultStudentHistoryController::class, 'sahodayaHistory'])->name('student-history');
             Route::post('/topper-cap', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'updateTopperCap'])->name('topper-cap');
             Route::get('/toppers', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'index'])->name('toppers');
+            Route::get('/toppers/reports-menu', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'reportsMenu'])->name('toppers.reports-menu');
+            Route::put('/toppers/ranking-settings', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'updateRankingSettings'])->name('toppers.ranking-settings');
             Route::get('/toppers/overall', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'overall'])->name('toppers.overall');
             Route::get('/toppers/subject-wise', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'subjectWise'])->name('toppers.subject-wise');
             Route::get('/toppers/achievers', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'achievers'])->name('toppers.achievers');

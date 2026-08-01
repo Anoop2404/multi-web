@@ -6,6 +6,13 @@
                         ? `Auto-computed ranking for ${selectedStreamLabel} stream from every school's submitted toppers.`
                         : 'Auto-computed Sahodaya-wide ranking from every school\'s submitted toppers.'">
             <template #actions>
+                <div class="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold print:hidden">
+                    <button type="button" @click="setView('rank')" class="px-3 py-1.5" :class="!noRank ? 'bg-[#0f3d7a] text-white' : 'bg-white text-slate-600'">Rank</button>
+                    <button type="button" @click="setView('percentage')" class="px-3 py-1.5" :class="noRank ? 'bg-[#0f3d7a] text-white' : 'bg-white text-slate-600'">Percentage</button>
+                </div>
+                <a :href="pdfHref" class="btn-primary text-xs flex items-center gap-1.5 font-bold print:hidden">
+                    <span>📥</span> Download PDF Report
+                </a>
                 <button type="button" @click="printReport" class="btn-secondary text-sm font-bold flex items-center gap-1.5 print:hidden">
                     <span>🖨</span> Print
                 </button>
@@ -85,7 +92,7 @@
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
                         <th class="p-3 w-16">S.No</th>
-                        <th class="p-3 cursor-pointer select-none w-20" @click="toggleSort('rank')">Rank{{ sortArrow('rank') }}</th>
+                        <th v-if="!noRank" class="p-3 cursor-pointer select-none w-20" @click="toggleSort('rank')">Rank{{ sortArrow('rank') }}</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('student_name')">Student{{ sortArrow('student_name') }}</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('school_name')">School{{ sortArrow('school_name') }}</th>
                         <th v-if="selectedClass === 12" class="p-3 cursor-pointer select-none" @click="toggleSort('stream')">Stream{{ sortArrow('stream') }}</th>
@@ -97,7 +104,7 @@
                 <tbody>
                     <tr v-for="(r, i) in filteredRows" :key="(r.stream ?? '') + '-' + (r.topper_id ?? r.rank)" class="border-t hover:bg-slate-50/60">
                         <td class="p-3 text-slate-400 font-semibold">{{ i + 1 }}</td>
-                        <td class="p-3 font-semibold text-[#0f3d7a]">#{{ r.rank }}</td>
+                        <td v-if="!noRank" class="p-3 font-semibold text-[#0f3d7a]">#{{ r.rank }}</td>
                         <td class="p-3">{{ r.student_name ?? '—' }}</td>
                         <td class="p-3 text-gray-600">{{ r.school_name ?? '—' }}</td>
                         <td v-if="selectedClass === 12" class="p-3 text-gray-600">{{ r.stream }}</td>
@@ -115,8 +122,8 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 
@@ -133,6 +140,7 @@ const props = defineProps({
     overall: { type: Array, default: () => [] },
     byStream: { type: Object, default: () => ({}) },
     rows: { type: Array, default: () => [] },
+    noRank: { type: Boolean, default: false },
 });
 
 const pageTitle = computed(() => props.selectedClass === 12 ? 'Class XII Overall Result' : 'Class X Overall Result');
@@ -167,9 +175,27 @@ function printReport() {
     window.print();
 }
 
+const pdfHref = computed(() => {
+    const view = props.noRank ? 'percentage' : 'rank';
+    return `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/toppers/pdf?academic_year=${encodeURIComponent(props.filters.academic_year || '')}&view=${view}`;
+});
+
+// Preview the other mode for this one request — see TopperCountService::setNoRankOverride.
+// Doesn't touch the persisted sahodaya-wide no_rank setting on the Toppers settings hub.
+function setView(mode) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', mode);
+    router.get(url.pathname + url.search, {}, { preserveScroll: true, preserveState: true });
+}
+
 const search = ref('');
-const sortKey = ref('rank');
-const sortDir = ref('asc');
+const sortKey = ref(props.noRank ? 'percentage' : 'rank');
+const sortDir = ref(props.noRank ? 'desc' : 'asc');
+
+watch(() => props.noRank, (noRank) => {
+    sortKey.value = noRank ? 'percentage' : 'rank';
+    sortDir.value = noRank ? 'desc' : 'asc';
+});
 
 function toggleSort(key) {
     if (sortKey.value === key) {

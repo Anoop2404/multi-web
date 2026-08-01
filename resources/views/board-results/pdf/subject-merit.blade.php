@@ -238,7 +238,9 @@
                 <table class="report-table">
                     <thead>
                         <tr>
-                            <th class="rank-col">Rank</th>
+                            @unless($noRank ?? false)
+                                <th class="rank-col">Rank</th>
+                            @endunless
                             <th>Student Name</th>
                             <th>Roll No.</th>
                             <th>Member School</th>
@@ -248,7 +250,9 @@
                     <tbody>
                         @foreach($subjectRows as $i => $row)
                             <tr>
-                                <td class="rank-col">#{{ $row['rank'] ?? ($i + 1) }}</td>
+                                @unless($noRank ?? false)
+                                    <td class="rank-col">#{{ $row['rank'] ?? ($i + 1) }}</td>
+                                @endunless
                                 <td class="student-name">{{ $row['name'] ?? ($row['student_name'] ?? '—') }}</td>
                                 <td class="roll-no">{{ $row['roll_no'] ?? ($row['cbse_roll_no'] ?? '—') }}</td>
                                 <td class="school-name">{{ strtoupper($row['school_name'] ?? '') }}</td>

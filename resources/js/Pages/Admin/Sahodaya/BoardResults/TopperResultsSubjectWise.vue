@@ -4,6 +4,13 @@
         <PageHeader title="Subject-Wise Top Scorers" eyebrow="Academic Results · Class XII"
                     description="Highest scorer per subject, pooled across every member school and all streams.">
             <template #actions>
+                <div class="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold print:hidden">
+                    <button type="button" @click="setView('rank')" class="px-3 py-1.5" :class="!noRank ? 'bg-[#0f3d7a] text-white' : 'bg-white text-slate-600'">Rank</button>
+                    <button type="button" @click="setView('percentage')" class="px-3 py-1.5" :class="noRank ? 'bg-[#0f3d7a] text-white' : 'bg-white text-slate-600'">Percentage</button>
+                </div>
+                <a :href="pdfHref" class="btn-primary text-xs flex items-center gap-1.5 font-bold print:hidden">
+                    <span>📥</span> Download PDF Report
+                </a>
                 <button type="button" @click="printReport" class="btn-secondary text-sm font-bold flex items-center gap-1.5 print:hidden">
                     <span>🖨</span> Print
                 </button>
@@ -52,7 +59,44 @@
             <input v-model="search" type="text" placeholder="Search subject, student, school…" class="field text-xs py-1.5 w-64">
         </div>
 
-        <div class="card card--flush overflow-x-auto">
+        <!-- No-rank mode: each subject rendered as its own section (page-break on print), ordered by percentage. -->
+        <div v-if="noRank && groupedBySubject.length" class="space-y-6">
+            <div v-for="group in groupedBySubject" :key="group.subject" class="subject-print-page">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded">{{ group.subject }}</span>
+                    <span class="text-xs text-slate-500">{{ group.rows.length }} student(s) · ordered by percentage</span>
+                </div>
+                <div class="card card--flush overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                            <tr>
+                                <th class="p-3 w-16">S.No</th>
+                                <th class="p-3">Student</th>
+                                <th class="p-3">School</th>
+                                <th class="p-3">Roll No</th>
+                                <th class="p-3">Marks</th>
+                                <th class="p-3">Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, i) in group.rows" :key="group.subject + '-' + row.student_name + '-' + i" class="border-t hover:bg-slate-50/60">
+                                <td class="p-3 text-slate-400 font-semibold">{{ i + 1 }}</td>
+                                <td class="p-3 font-semibold text-gray-900">{{ row.student_name }}</td>
+                                <td class="p-3 text-gray-600">{{ row.school_name }}</td>
+                                <td class="p-3 text-xs text-gray-500">{{ row.roll_no || '—' }}</td>
+                                <td class="p-3 font-semibold text-emerald-600">{{ row.marks }} / 100</td>
+                                <td class="p-3 font-semibold text-[#0f3d7a]">{{ row.percentage != null ? `${row.percentage}%` : '—' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <p v-else-if="noRank" class="card p-10 text-center text-gray-400 text-sm">
+            No subject-wise toppers recorded across member schools yet for Class XII (Academic year {{ filters.academic_year }}).
+        </p>
+
+        <div v-else class="card card--flush overflow-x-auto">
             <table v-if="filteredRows.length" class="w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
@@ -89,8 +133,8 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 
@@ -101,10 +145,24 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     academicYearOptions: { type: Array, default: () => [] },
     subjectLeaders: { type: Array, default: () => [] },
+    noRank: { type: Boolean, default: false },
 });
 
+const pdfHref = computed(() => {
+    const view = props.noRank ? 'percentage' : 'rank';
+    return `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/subject-merit/pdf?class=12&academic_year=${encodeURIComponent(props.filters.academic_year || '')}&view=${view}`;
+});
+
+// Preview the other mode for this one request — see TopperCountService::setNoRankOverride.
+function setView(mode) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', mode);
+    router.get(url.pathname + url.search, {}, { preserveScroll: true, preserveState: true });
+}
+
 function switchYear(year) {
-    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/subject-wise?academic_year=${year}`;
+    const view = props.noRank ? '&view=percentage' : '';
+    window.location.href = `/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/subject-wise?academic_year=${year}${view}`;
 }
 
 function printReport() {
@@ -112,8 +170,13 @@ function printReport() {
 }
 
 const search = ref('');
-const sortKey = ref('subject');
-const sortDir = ref('asc');
+const sortKey = ref(props.noRank ? 'percentage' : 'subject');
+const sortDir = ref(props.noRank ? 'desc' : 'asc');
+
+watch(() => props.noRank, (noRank) => {
+    sortKey.value = noRank ? 'percentage' : 'subject';
+    sortDir.value = noRank ? 'desc' : 'asc';
+});
 
 function toggleSort(key) {
     if (sortKey.value === key) {
@@ -153,6 +216,19 @@ const filteredRows = computed(() => {
         return (av - bv) * dir;
     });
 });
+
+const groupedBySubject = computed(() => {
+    const groups = new Map();
+    for (const row of filteredRows.value) {
+        const key = row.subject ?? 'Subject';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+    }
+    return Array.from(groups.entries()).map(([subject, rows]) => ({
+        subject,
+        rows: [...rows].sort((a, b) => (b.percentage ?? b.marks ?? 0) - (a.percentage ?? a.marks ?? 0)),
+    }));
+});
 </script>
 
 <style scoped>
@@ -182,6 +258,13 @@ const filteredRows = computed(() => {
     :deep(td) {
         padding-top: 0.3rem !important;
         padding-bottom: 0.3rem !important;
+    }
+
+    .subject-print-page {
+        page-break-after: always;
+    }
+    .subject-print-page:last-child {
+        page-break-after: avoid;
     }
 }
 </style>

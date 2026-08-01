@@ -7,6 +7,7 @@
                 <a :href="`/sahodaya-admin/${sahodaya.id}/board-results/reports/toppers/pdf?academic_year=${encodeURIComponent(filters.academic_year || '')}`" class="btn-primary text-xs flex items-center gap-1.5 font-bold">
                     <span>📥</span> Download PDF Report
                 </a>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/toppers/reports-menu`" class="btn-secondary text-sm">📋 All Topper Reports</Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/masters`" class="btn-secondary text-sm">📚 Subject Master</Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification`" class="btn-secondary text-sm">Verification</Link>
                 <button type="button" class="btn-secondary text-sm" @click="recompute">Recompute now</button>
@@ -36,8 +37,25 @@
         </div>
 
         <div class="card !p-4 mb-6">
+            <h3 class="text-sm font-semibold text-slate-800 mb-2">Ranking mode</h3>
+            <p class="text-xs text-slate-500 mb-3">
+                Common ranking applies one shared Top-N / tie handling / rank style everywhere — overall, every stream, and every subject — instead of the separate per-scope settings below. No-rank mode drops rank numbers from every report and PDF entirely and just lists students ordered by percentage, highest first.
+            </p>
+            <div class="flex flex-wrap gap-6">
+                <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input type="checkbox" v-model="rankingSettingsForm.use_common_ranking" @change="saveRankingSettings">
+                    Use one common ranking for everything
+                </label>
+                <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input type="checkbox" v-model="rankingSettingsForm.no_rank" @change="saveRankingSettings">
+                    No rank — order by percentage only
+                </label>
+            </div>
+        </div>
+
+        <div class="card !p-4 mb-6">
             <h3 class="text-sm font-semibold text-slate-800 mb-2">
-                {{ selectedClass === 12 ? `${selectedStreamLabel || 'Selected stream'} Top-N settings` : 'Overall Top-N settings' }}
+                {{ rankingSettingsForm.use_common_ranking ? 'Common ranking settings (applies to overall, every stream & subject)' : (selectedClass === 12 ? `${selectedStreamLabel || 'Selected stream'} Top-N settings` : 'Overall Top-N settings') }}
             </h3>
             <p class="text-xs text-slate-500 mb-3">
                 Top-N is a target, not a hard count — "Include rank cutoff" keeps every student whose rank is within the Top-N cutoff (list may exceed Top-N); "Hard cap" always truncates to exactly Top-N rows. Rank style controls whether tied scores appear as competition, dense, or sequential ranks.
@@ -65,7 +83,11 @@
                 <button type="submit" class="btn-secondary text-xs">Save settings</button>
             </form>
 
-            <div v-if="selectedClass === 12" class="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <p v-if="rankingSettingsForm.use_common_ranking" class="mt-3 text-xs text-slate-500">
+                Common ranking is on — this single config now applies to every stream and subject for Class {{ selectedClass === 12 ? 'XII' : 'X' }}. Per-stream / per-subject overrides below are hidden while it's active.
+            </p>
+
+            <div v-if="selectedClass === 12 && !rankingSettingsForm.use_common_ranking" class="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <button
                     v-for="[code, label] in streamEntries"
                     :key="code"
@@ -82,7 +104,7 @@
             </div>
         </div>
 
-        <div class="card !p-4 mb-6" v-if="subjectEntries.length">
+        <div class="card !p-4 mb-6" v-if="subjectEntries.length && !rankingSettingsForm.use_common_ranking">
             <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div>
                     <h3 class="text-sm font-semibold text-slate-800 mb-1">
@@ -223,6 +245,10 @@ const props = defineProps({
     subjectOptions: { type: Array, default: () => [] },
     selectedStream: { type: String, default: null },
     selectedSubjectId: { type: [String, Number], default: null },
+    rankingSettings: {
+        type: Object,
+        default: () => ({ use_common_ranking: false, no_rank: false }),
+    },
 });
 
 const pageTitle = computed(() => props.selectedClass === 12 ? 'Class XII Sahodaya Toppers' : 'Class X Sahodaya Toppers');
@@ -276,16 +302,31 @@ const filteredSubjectEntries = computed(() => {
     return subjectEntries.value.filter(subject => subject.label.toLowerCase().includes(q));
 });
 
+const rankingSettingsForm = reactive({
+    use_common_ranking: !!props.rankingSettings?.use_common_ranking,
+    no_rank: !!props.rankingSettings?.no_rank,
+});
+
+function saveRankingSettings() {
+    router.put(`/sahodaya-admin/${props.sahodaya.id}/board-results/toppers/ranking-settings`, {
+        use_common_ranking: rankingSettingsForm.use_common_ranking,
+        no_rank: rankingSettingsForm.no_rank,
+    }, { preserveScroll: true });
+}
+
+function scopedSettings() {
+    if (rankingSettingsForm.use_common_ranking) {
+        return props.settings.overall ?? {};
+    }
+    return props.selectedClass === 12
+        ? (streamSettings.value[selectedStreamCode.value || ''] ?? {})
+        : (props.settings[scopeKey.value] ?? {});
+}
+
 const settingsForm = reactive({
-    top_n: props.selectedClass === 12
-        ? (streamSettings.value[selectedStreamCode.value || '']?.top_n ?? 5)
-        : (props.settings[scopeKey.value]?.top_n ?? 5),
-    tie_mode: props.selectedClass === 12
-        ? (streamSettings.value[selectedStreamCode.value || '']?.tie_mode ?? 'include_group')
-    : (props.settings[scopeKey.value]?.tie_mode ?? 'include_group'),
-    rank_style: props.selectedClass === 12
-        ? (streamSettings.value[selectedStreamCode.value || '']?.rank_style ?? 'competition')
-        : (props.settings[scopeKey.value]?.rank_style ?? 'competition'),
+    top_n: scopedSettings().top_n ?? 5,
+    tie_mode: scopedSettings().tie_mode ?? 'include_group',
+    rank_style: scopedSettings().rank_style ?? 'competition',
 });
 
 const subjectSettingsForm = reactive({
@@ -307,16 +348,11 @@ watch(subjectEntries, () => {
     selectedSubjectKey.value = next;
 }, { immediate: true });
 
-watch([() => props.selectedClass, selectedStreamCode], () => {
-    settingsForm.top_n = props.selectedClass === 12
-        ? (streamSettings.value[selectedStreamCode.value || '']?.top_n ?? 5)
-        : (props.settings[scopeKey.value]?.top_n ?? 5);
-    settingsForm.tie_mode = props.selectedClass === 12
-        ? (streamSettings.value[selectedStreamCode.value || '']?.tie_mode ?? 'include_group')
-        : (props.settings[scopeKey.value]?.tie_mode ?? 'include_group');
-    settingsForm.rank_style = props.selectedClass === 12
-        ? (streamSettings.value[selectedStreamCode.value || '']?.rank_style ?? 'competition')
-        : (props.settings[scopeKey.value]?.rank_style ?? 'competition');
+watch([() => props.selectedClass, selectedStreamCode, () => rankingSettingsForm.use_common_ranking], () => {
+    const scoped = scopedSettings();
+    settingsForm.top_n = scoped.top_n ?? 5;
+    settingsForm.tie_mode = scoped.tie_mode ?? 'include_group';
+    settingsForm.rank_style = scoped.rank_style ?? 'competition';
 });
 
 watch(selectedSubjectKey, () => {
@@ -331,10 +367,13 @@ watch(() => props.subjectOptions, () => {
 }, { immediate: true });
 
 function saveSettings() {
+    const common = rankingSettingsForm.use_common_ranking;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/board-results/topper-cap`, {
         class: props.selectedClass,
-        scope: scopeKey.value,
-        stream_id: props.selectedClass === 12 && selectedStreamCode.value
+        // Common ranking mode always writes the shared "overall" scope row for this
+        // class — every stream/subject resolves from it (see TopperCountService).
+        scope: common ? 'overall' : scopeKey.value,
+        stream_id: !common && props.selectedClass === 12 && selectedStreamCode.value
             ? (streamSettings.value[selectedStreamCode.value]?.stream_id ?? null)
             : null,
         top_n: settingsForm.top_n,

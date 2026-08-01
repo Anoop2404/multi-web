@@ -6,6 +6,13 @@
                         ? `Every student at or above ${filters.threshold}% in ${selectedStreamLabel} stream — not capped to Top-N.`
                         : `Every student at or above ${filters.threshold}% — not capped to Top-N.`">
             <template #actions>
+                <div class="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold print:hidden">
+                    <button type="button" @click="setView('rank')" class="px-3 py-1.5" :class="!noRank ? 'bg-[#0f3d7a] text-white' : 'bg-white text-slate-600'">Rank</button>
+                    <button type="button" @click="setView('percentage')" class="px-3 py-1.5" :class="noRank ? 'bg-[#0f3d7a] text-white' : 'bg-white text-slate-600'">Percentage</button>
+                </div>
+                <a :href="pdfHref" class="btn-primary text-xs flex items-center gap-1.5 font-bold print:hidden">
+                    <span>📥</span> Download PDF Report
+                </a>
                 <button type="button" @click="printReport" class="btn-secondary text-sm font-bold flex items-center gap-1.5 print:hidden">
                     <span>🖨</span> Print
                 </button>
@@ -86,7 +93,7 @@
                     <tr>
                         <th class="p-3 w-16">S.No</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('percentage')">Percentage{{ sortArrow('percentage') }}</th>
-                        <th class="p-3 cursor-pointer select-none" @click="toggleSort('rank')">Rank{{ sortArrow('rank') }}</th>
+                        <th v-if="!noRank" class="p-3 cursor-pointer select-none" @click="toggleSort('rank')">Rank{{ sortArrow('rank') }}</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('student_name')">Student{{ sortArrow('student_name') }}</th>
                         <th class="p-3 cursor-pointer select-none" @click="toggleSort('school_name')">School{{ sortArrow('school_name') }}</th>
                         <th v-if="selectedClass === 12" class="p-3 cursor-pointer select-none" @click="toggleSort('stream')">Stream{{ sortArrow('stream') }}</th>
@@ -98,7 +105,7 @@
                     <tr v-for="(r, i) in filteredRows" :key="(r.stream ?? '') + '-' + (r.topper_id ?? r.rank)" class="border-t hover:bg-slate-50/60">
                         <td class="p-3 text-slate-400 font-semibold">{{ i + 1 }}</td>
                         <td class="p-3 font-semibold text-emerald-600">{{ r.percentage != null ? `${r.percentage}%` : '—' }}</td>
-                        <td class="p-3 font-semibold text-[#0f3d7a]">#{{ r.rank }}</td>
+                        <td v-if="!noRank" class="p-3 font-semibold text-[#0f3d7a]">#{{ r.rank }}</td>
                         <td class="p-3">{{ r.student_name ?? '—' }}</td>
                         <td class="p-3 text-gray-600">{{ r.school_name ?? '—' }}</td>
                         <td v-if="selectedClass === 12" class="p-3 text-gray-600">{{ r.stream }}</td>
@@ -115,7 +122,7 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
@@ -133,9 +140,24 @@ const props = defineProps({
     achieversOverall: { type: Array, default: () => [] },
     achieversByStream: { type: Object, default: () => ({}) },
     rows: { type: Array, default: () => [] },
+    noRank: { type: Boolean, default: false },
 });
 
 const pageTitle = computed(() => props.selectedClass === 12 ? 'Class XII Achievers' : 'Class X Achievers');
+
+const pdfHref = computed(() => {
+    const stream = props.selectedClass === 12 && props.selectedStream ? `&stream=${props.selectedStream}` : '';
+    const threshold = props.filters.threshold ? `&threshold=${props.filters.threshold}` : '';
+    const view = props.noRank ? 'percentage' : 'rank';
+    return `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/toppers/achievers/pdf?class=${props.selectedClass}&academic_year=${encodeURIComponent(props.filters.academic_year || '')}${threshold}${stream}&view=${view}`;
+});
+
+// Preview the other mode for this one request — see TopperCountService::setNoRankOverride.
+function setView(mode) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', mode);
+    router.get(url.pathname + url.search, {}, { preserveScroll: true, preserveState: true });
+}
 
 function normalizeStreamKey(value) {
     return String(value ?? '').trim().toLowerCase();

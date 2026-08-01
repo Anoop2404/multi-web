@@ -15,9 +15,29 @@ class TopperCountService
     /** @var array<string, TopperRankingSetting> per-request memoization, keyed by sahodaya_id */
     private array $rankingSettingsCache = [];
 
+    /**
+     * @var array<string, bool> per-request "view=rank|percentage" override, keyed by sahodaya_id.
+     *      Lets a single report request preview the other mode without touching the persisted
+     *      TopperRankingSetting row. This service is bound as a singleton (AppServiceProvider) so
+     *      the override set once by the controller is visible everywhere else it's resolved.
+     */
+    private array $noRankOverride = [];
+
     private function rankingSettings(string $sahodayaId): TopperRankingSetting
     {
         return $this->rankingSettingsCache[$sahodayaId] ??= TopperRankingSetting::forSahodaya($sahodayaId);
+    }
+
+    /** Set (or clear, with null) a per-request no-rank override for this sahodaya, independent of the saved setting. */
+    public function setNoRankOverride(string $sahodayaId, ?bool $noRank): void
+    {
+        if ($noRank === null) {
+            unset($this->noRankOverride[$sahodayaId]);
+
+            return;
+        }
+
+        $this->noRankOverride[$sahodayaId] = $noRank;
     }
 
     /** When true, every scope (stream/subject) resolves from the single "overall" config instead of its own override. */
@@ -29,6 +49,10 @@ class TopperCountService
     /** When true, reports should drop rank numbers and just order by percentage descending. */
     public function isNoRankMode(string $sahodayaId): bool
     {
+        if (array_key_exists($sahodayaId, $this->noRankOverride)) {
+            return $this->noRankOverride[$sahodayaId];
+        }
+
         return (bool) $this->rankingSettings($sahodayaId)->no_rank;
     }
 
