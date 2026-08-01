@@ -210,12 +210,13 @@ class BoardResultReportController extends SahodayaAdminController
         $rows = $service->list($this->sahodaya->id, $year, $class, $stream);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('board-results.pdf.full-a1-achievers', [
-            'rows'          => $rows,
-            'academicYear'  => $year,
-            'selectedClass' => $class,
-            'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
-            'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
-            'generatedAt'   => now()->format('d M Y · h:i A'),
+            'rows'           => $rows,
+            'academicYear'   => $year,
+            'selectedClass'  => $class,
+            'selectedStream' => $stream,
+            'orgName'        => $this->sahodaya->name ?? 'Sahodaya',
+            'logoSrc'        => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'generatedAt'    => now()->format('d M Y · h:i A'),
         ])->setPaper('a4', 'portrait');
 
         return $pdf->download("full-a1-achievers-{$year}.pdf");
