@@ -5,11 +5,46 @@ namespace App\Services\BoardResults;
 use App\Models\BoardResult;
 use App\Models\Topper;
 use App\Models\TopperCountConfig;
+use App\Models\TopperRankingSetting;
 use Illuminate\Validation\ValidationException;
 
 class TopperCountService
 {
     public const DEFAULT_TOP_N = 500;
+
+    /** @var array<string, TopperRankingSetting> per-request memoization, keyed by sahodaya_id */
+    private array $rankingSettingsCache = [];
+
+    private function rankingSettings(string $sahodayaId): TopperRankingSetting
+    {
+        return $this->rankingSettingsCache[$sahodayaId] ??= TopperRankingSetting::forSahodaya($sahodayaId);
+    }
+
+    /** When true, every scope (stream/subject) resolves from the single "overall" config instead of its own override. */
+    public function usesCommonRanking(string $sahodayaId): bool
+    {
+        return (bool) $this->rankingSettings($sahodayaId)->use_common_ranking;
+    }
+
+    /** When true, reports should drop rank numbers and just order by percentage descending. */
+    public function isNoRankMode(string $sahodayaId): bool
+    {
+        return (bool) $this->rankingSettings($sahodayaId)->no_rank;
+    }
+
+    /**
+     * @param  array{0: string, 1: ?int, 2: ?int}  $args  [scope, streamId, subjectId], overridden to
+     *                                                     the shared "overall" config when common ranking is on.
+     * @return array{0: string, 1: ?int, 2: ?int}
+     */
+    private function effectiveScope(string $sahodayaId, string $scope, ?int $streamId, ?int $subjectId): array
+    {
+        if ($this->usesCommonRanking($sahodayaId)) {
+            return [TopperCountConfig::SCOPE_OVERALL, null, null];
+        }
+
+        return [$scope, $streamId, $subjectId];
+    }
 
     public function resolveCap(
         string $sahodayaId,
@@ -19,6 +54,8 @@ class TopperCountService
         ?int $subjectId = null,
     ): int
     {
+        [$scope, $streamId, $subjectId] = $this->effectiveScope($sahodayaId, $scope, $streamId, $subjectId);
+
         $query = TopperCountConfig::query()
             ->where('sahodaya_id', $sahodayaId)
             ->where('scope', $scope)
@@ -105,6 +142,8 @@ class TopperCountService
         ?int $subjectId = null,
     ): string
     {
+        [$scope, $streamId, $subjectId] = $this->effectiveScope($sahodayaId, $scope, $streamId, $subjectId);
+
         $query = TopperCountConfig::query()
             ->where('sahodaya_id', $sahodayaId)
             ->where('scope', $scope)
@@ -140,6 +179,8 @@ class TopperCountService
         ?int $subjectId = null,
     ): string
     {
+        [$scope, $streamId, $subjectId] = $this->effectiveScope($sahodayaId, $scope, $streamId, $subjectId);
+
         $query = TopperCountConfig::query()
             ->where('sahodaya_id', $sahodayaId)
             ->where('scope', $scope)

@@ -89,7 +89,7 @@ class SahodayaTopperSelectionService
 
         $rankStyle = $this->counts->resolveRankStyle($sahodayaId, 10, TopperCountConfig::SCOPE_OVERALL, null, null);
 
-        return $this->hydrateAchievers($toppers, $rankStyle);
+        return $this->hydrateAchievers($toppers, $rankStyle, $this->counts->isNoRankMode($sahodayaId));
     }
 
     /**
@@ -114,11 +114,12 @@ class SahodayaTopperSelectionService
             return ucfirst($st);
         });
 
+        $noRank = $this->counts->isNoRankMode($sahodayaId);
         $out = [];
         foreach ($grouped as $streamLabel => $group) {
             $streamId = $group->first()?->stream_id;
             $rankStyle = $this->counts->resolveRankStyle($sahodayaId, 12, TopperCountConfig::SCOPE_STREAM, is_numeric($streamId) ? (int) $streamId : null, null);
-            $out[$streamLabel] = $this->hydrateAchievers($group, $rankStyle);
+            $out[$streamLabel] = $this->hydrateAchievers($group, $rankStyle, $noRank);
         }
 
         return $out;
@@ -151,10 +152,26 @@ class SahodayaTopperSelectionService
      * @param  Collection<int, Topper>  $toppers
      * @return list<array<string, mixed>>
      */
-    private function hydrateAchievers(Collection $toppers, string $rankStyle = RankStyleService::STYLE_COMPETITION): array
+    private function hydrateAchievers(Collection $toppers, string $rankStyle = RankStyleService::STYLE_COMPETITION, bool $noRank = false): array
     {
         $sorted = $toppers->sortByDesc('percentage')->values();
         $schoolNames = Tenant::whereIn('id', $sorted->pluck('tenant_id')->unique())->pluck('name', 'id');
+
+        if ($noRank) {
+            return $sorted->map(fn (Topper $t) => [
+                'rank' => null,
+                'percentage' => (float) $t->percentage,
+                'student_name' => $t->name,
+                'school_id' => $t->tenant_id,
+                'school_name' => $schoolNames[$t->tenant_id] ?? $t->tenant_id,
+                'admission_no' => $t->admission_no,
+                'roll_no' => $t->roll_no,
+                'marks_obtained' => $t->marks_obtained,
+                'total_marks' => $t->total_marks,
+                'photo' => $t->photo,
+                'topper_id' => $t->id,
+            ])->values()->all();
+        }
 
         $rankStyle = $this->rankStyles->normalize($rankStyle);
         $rank = 0;
@@ -252,22 +269,34 @@ class SahodayaTopperSelectionService
         }
 
         $topN = $this->counts->resolveCap($sahodayaId, $class, $configScope, $streamId);
-        $tieMode = $this->counts->resolveTieMode($sahodayaId, $class, $configScope, $streamId);
-        $rankStyle = $this->counts->resolveRankStyle($sahodayaId, $class, $configScope, $streamId);
-        $rows = $this->rankStyles->assign($rows, $rankStyle, fn (array $row) => $row['score'] ?? null);
 
-        $selected = [];
-        foreach ($rows as $row) {
-            if ($tieMode === TopperCountConfig::TIE_HARD_CAP) {
-                if (count($selected) >= $topN) {
+        if ($this->counts->isNoRankMode($sahodayaId)) {
+            // No-rank mode: drop tie/rank-style handling entirely, just take the
+            // top_n rows ordered by percentage descending, with no rank number.
+            $rows = collect($rows)->sortByDesc(fn (array $row) => $row['score'] ?? -INF)->values()->all();
+            $selected = array_map(function (array $row) {
+                $row['rank'] = null;
+
+                return $row;
+            }, array_slice($rows, 0, $topN));
+        } else {
+            $tieMode = $this->counts->resolveTieMode($sahodayaId, $class, $configScope, $streamId);
+            $rankStyle = $this->counts->resolveRankStyle($sahodayaId, $class, $configScope, $streamId);
+            $rows = $this->rankStyles->assign($rows, $rankStyle, fn (array $row) => $row['score'] ?? null);
+
+            $selected = [];
+            foreach ($rows as $row) {
+                if ($tieMode === TopperCountConfig::TIE_HARD_CAP) {
+                    if (count($selected) >= $topN) {
+                        break;
+                    }
+                } elseif ($row['rank'] > $topN) {
+                    // Rank-cutoff mode: include every row whose rank is within Top-N.
                     break;
                 }
-            } elseif ($row['rank'] > $topN) {
-                // Rank-cutoff mode: include every row whose rank is within Top-N.
-                break;
-            }
 
-            $selected[] = $row;
+                $selected[] = $row;
+            }
         }
 
         $topperIds = array_column($selected, 'entity_id');

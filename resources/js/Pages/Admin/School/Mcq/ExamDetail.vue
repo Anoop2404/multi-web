@@ -638,232 +638,324 @@
 
         <!-- Reports tab -->
         <div v-else-if="tab === 'reports'" class="space-y-6">
-            <!-- Filter Bar for Class selection -->
-            <div class="card bg-slate-50 border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
-                <div>
-                    <h3 class="font-bold text-slate-900 text-sm">Class Filter & Report Options</h3>
-                    <p class="text-xs text-slate-500">Filter PDF/Excel reports by a specific class or generate for all classes.</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <label class="text-xs font-semibold text-slate-700">Select Class:</label>
-                    <select v-model="reportClassFilter" class="field text-xs min-w-[170px] bg-white font-semibold text-slate-800">
-                        <option value="">All Classes</option>
-                        <option v-for="c in classOptions" :key="c.id" :value="c.name">Class {{ c.name }}</option>
-                    </select>
-                    <button v-if="reportClassFilter" type="button" @click="reportClassFilter = ''" class="text-xs text-slate-500 hover:text-slate-800 underline ml-1">Clear</button>
-                </div>
-            </div>
+            <!-- Hero Executive Header Banner -->
+            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 shadow-xl border border-slate-800">
+                <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -left-10 -top-10 w-60 h-60 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-            <!-- 4 Main Report Action Cards -->
-            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- 1. Registration Register -->
-                <div class="card flex flex-col justify-between" :class="{'ring-2 ring-indigo-500 bg-indigo-50/20': activeReportPreviewTab === 'registration'}">
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <h3 class="section-title !mb-0">Registration register</h3>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">PDF & Excel</span>
+                <div class="relative z-10 flex flex-wrap items-center justify-between gap-6">
+                    <div class="space-y-1.5 max-w-xl">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold uppercase tracking-wider">
+                            <span>📊 Official Exam Reports</span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
                         </div>
-                        <p class="section-desc">Your school's registrations with photos, hall tickets, and approval status.</p>
+                        <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Reports & Analytics Command Center</h2>
+                        <p class="text-sm text-slate-300">Generate, preview, and export official PDF/Excel reports, hall ticket rosters, attendance sheets, and class-wise fee summaries for {{ school?.name || 'your school' }}.</p>
                     </div>
-                    <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
-                        <div class="flex items-center gap-1.5">
-                            <a :href="reportUrlWithClass(reportExports.registration)" class="btn-secondary text-xs flex-1 justify-center">
-                                <span>Export Excel ↓</span>
-                            </a>
-                            <a v-if="reportExports.registrationPdf" :href="reportUrlWithClass(reportExports.registrationPdf)" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
-                                <span>Export PDF ↓</span>
-                            </a>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <button type="button" v-if="reportExports.registrationPdf" @click="openPdfPreview(reportExports.registrationPdf)" class="btn-secondary text-xs flex-1 justify-center text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100">
-                                👁 Preview PDF
-                            </button>
-                            <button type="button" @click="setReportPreview('registration')" class="btn-secondary text-xs flex-1 justify-center text-slate-700 hover:bg-slate-100" :class="{'!bg-slate-800 !text-white': activeReportPreviewTab === 'registration'}">
-                                📊 Preview Data
-                            </button>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- 2. Attendance Sheet -->
-                <div class="card flex flex-col justify-between" :class="{'ring-2 ring-indigo-500 bg-indigo-50/20': activeReportPreviewTab === 'attendance'}">
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <h3 class="section-title !mb-0">Attendance sheet</h3>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">PDF & Excel</span>
+                    <!-- 4 Live Executive Quick Metrics -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+                        <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3.5 text-center">
+                            <span class="text-xs text-slate-400 font-medium block">Total Candidates</span>
+                            <span class="text-xl font-black text-white font-mono">{{ reportRows.length }}</span>
                         </div>
-                        <p class="section-desc">Hall ticket list & attendance checklist for exam day.</p>
-                    </div>
-                    <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
-                        <div class="flex items-center gap-1.5">
-                            <a :href="reportUrlWithClass(reportExports.attendance)" class="btn-secondary text-xs flex-1 justify-center">
-                                <span>Export Excel ↓</span>
-                            </a>
-                            <a v-if="reportExports.attendancePdf" :href="reportUrlWithClass(reportExports.attendancePdf)" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
-                                <span>Export PDF ↓</span>
-                            </a>
+                        <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3.5 text-center">
+                            <span class="text-xs text-slate-400 font-medium block">Active Classes</span>
+                            <span class="text-xl font-black text-indigo-300 font-mono">{{ classOptions.length }}</span>
                         </div>
-                        <div class="flex items-center gap-1.5">
-                            <button type="button" v-if="reportExports.attendancePdf" @click="openPdfPreview(reportExports.attendancePdf)" class="btn-secondary text-xs flex-1 justify-center text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100">
-                                👁 Preview PDF
-                            </button>
-                            <button type="button" @click="setReportPreview('attendance')" class="btn-secondary text-xs flex-1 justify-center text-slate-700 hover:bg-slate-100" :class="{'!bg-slate-800 !text-white': activeReportPreviewTab === 'attendance'}">
-                                📊 Preview Data
-                            </button>
+                        <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3.5 text-center">
+                            <span class="text-xs text-slate-400 font-medium block">Total Fee Value</span>
+                            <span class="text-xl font-black text-emerald-400 font-mono">₹{{ Number(feeDueMatrix.grand_total_fee || 0).toLocaleString() }}</span>
                         </div>
-                    </div>
-                </div>
-
-                <!-- 3. Class-Wise Count Report -->
-                <div class="card flex flex-col justify-between" :class="{'ring-2 ring-indigo-500 bg-indigo-50/20': activeReportPreviewTab === 'counts'}">
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <h3 class="section-title !mb-0">Class-wise count report</h3>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800">PDF & Excel</span>
-                        </div>
-                        <p class="section-desc">Class-wise student registration count matrix for your school.</p>
-                    </div>
-                    <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
-                        <div class="flex items-center gap-1.5">
-                            <a :href="reportUrlWithClass(reportExports.classWiseCounts)" class="btn-secondary text-xs flex-1 justify-center">
-                                <span>Export Excel ↓</span>
-                            </a>
-                            <a v-if="reportExports.classWiseCountsPdf" :href="reportUrlWithClass(reportExports.classWiseCountsPdf)" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
-                                <span>Export PDF ↓</span>
-                            </a>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <button type="button" v-if="reportExports.classWiseCountsPdf" @click="openPdfPreview(reportExports.classWiseCountsPdf)" class="btn-secondary text-xs flex-1 justify-center text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100">
-                                👁 Preview PDF
-                            </button>
-                            <button type="button" @click="setReportPreview('counts')" class="btn-secondary text-xs flex-1 justify-center text-slate-700 hover:bg-slate-100" :class="{'!bg-slate-800 !text-white': activeReportPreviewTab === 'counts'}">
-                                📊 Preview Data
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4. Class-Wise Fee Due Report -->
-                <div class="card flex flex-col justify-between" :class="{'ring-2 ring-indigo-500 bg-indigo-50/20': activeReportPreviewTab === 'feeDue'}">
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <h3 class="section-title !mb-0">Class-wise Fee Due Report</h3>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">PDF & Excel</span>
-                        </div>
-                        <p class="section-desc">Class-wise fee breakdown, paid amount, and pending due for your school.</p>
-                    </div>
-                    <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
-                        <div class="flex items-center gap-1.5">
-                            <a v-if="reportExports.feeDue" :href="reportUrlWithClass(reportExports.feeDue)" class="btn-secondary text-xs flex-1 justify-center">
-                                <span>Export Excel ↓</span>
-                            </a>
-                            <a v-if="reportExports.feeDuePdf" :href="reportUrlWithClass(reportExports.feeDuePdf)" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
-                                <span>Export PDF ↓</span>
-                            </a>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <button type="button" v-if="reportExports.feeDuePdf" @click="openPdfPreview(reportExports.feeDuePdf)" class="btn-secondary text-xs flex-1 justify-center text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100">
-                                👁 Preview PDF
-                            </button>
-                            <button type="button" @click="setReportPreview('feeDue')" class="btn-secondary text-xs flex-1 justify-center text-slate-700 hover:bg-slate-100" :class="{'!bg-slate-800 !text-white': activeReportPreviewTab === 'feeDue'}">
-                                📊 Preview Data
-                            </button>
+                        <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3.5 text-center">
+                            <span class="text-xs text-slate-400 font-medium block">Pending Fee Due</span>
+                            <span class="text-xl font-black font-mono" :class="Number(feeDueMatrix.grand_due || 0) > 0 ? 'text-amber-400' : 'text-slate-300'">
+                                ₹{{ Number(feeDueMatrix.grand_due || 0).toLocaleString() }}
+                            </span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Report Data Preview Section -->
-            <div class="card card--flush overflow-hidden border border-slate-200 shadow-sm">
-                <!-- Preview Header Bar & Tabs -->
-                <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h3 class="font-bold text-slate-900 text-base">Report Preview</h3>
-                        <p class="text-xs text-slate-500">Live preview of selected report data for {{ school?.name }}</p>
+            <!-- Class Filter Toolbar -->
+            <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
+                        🎓
                     </div>
-                    <div class="inline-flex rounded-lg border border-slate-200 bg-white p-1 text-xs shadow-sm">
-                        <button type="button" class="px-3 py-1.5 rounded-md font-medium transition"
-                                :class="activeReportPreviewTab === 'registration' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                    <div>
+                        <h4 class="font-bold text-slate-900 text-sm">Class Filter Toolbar</h4>
+                        <p class="text-xs text-slate-500">Filter reports by class or select "All Classes" for full school report.</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="relative">
+                        <select v-model="reportClassFilter" class="field text-xs min-w-[200px] bg-slate-50 font-bold text-slate-800 border-slate-300 focus:bg-white pr-8 py-2 rounded-lg">
+                            <option value="">All Classes (Full School)</option>
+                            <option v-for="c in classOptions" :key="c.id" :value="c.name">Class {{ c.name }}</option>
+                        </select>
+                    </div>
+                    <button v-if="reportClassFilter" type="button" @click="reportClassFilter = ''" class="btn-secondary text-xs py-2 px-3 text-rose-600 border-rose-200 bg-rose-50 hover:bg-rose-100 font-medium">
+                        ✕ Clear Filter
+                    </button>
+                    <span v-if="reportClassFilter" class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg">
+                        Showing Class {{ reportClassFilter }} ({{ filteredReportRows.length }} candidates)
+                    </span>
+                </div>
+            </div>
+
+            <!-- 4 Executive Report Action Cards Grid -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+                <!-- 1. Registration Register Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden relative group"
+                     :class="{'ring-2 ring-indigo-600 bg-indigo-50/10': activeReportPreviewTab === 'registration'}">
+                    <div class="h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+                    <div class="p-5 flex-1 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shadow-sm">
+                                    📋
+                                </div>
+                                <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 uppercase tracking-wider">PDF & Excel</span>
+                            </div>
+                            <h3 class="font-bold text-slate-900 text-base mb-1 group-hover:text-indigo-600 transition-colors">Registration Register</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">Full candidate directory with student photos, hall tickets, admission numbers, and approval status.</p>
+                        </div>
+                        <div class="space-y-2 mt-6 pt-4 border-t border-slate-100">
+                            <div class="grid grid-cols-2 gap-2">
+                                <a :href="reportUrlWithClass(reportExports.registration)" class="btn-secondary text-xs justify-center py-2 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-semibold">
+                                    📊 Excel ↓
+                                </a>
+                                <a v-if="reportExports.registrationPdf" :href="reportUrlWithClass(reportExports.registrationPdf)" target="_blank" class="btn-secondary text-xs justify-center py-2 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 font-semibold">
+                                    📄 PDF ↓
+                                </a>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button type="button" v-if="reportExports.registrationPdf" @click="openPdfPreview(reportExports.registrationPdf)" class="btn-secondary text-xs justify-center py-2 text-indigo-800 bg-indigo-100/70 border-indigo-300 hover:bg-indigo-200 font-bold">
+                                    👁 Preview PDF
+                                </button>
+                                <button type="button" @click="setReportPreview('registration')" class="btn-secondary text-xs justify-center py-2 text-slate-700 hover:bg-slate-100 font-semibold" :class="{'!bg-slate-900 !text-white': activeReportPreviewTab === 'registration'}">
+                                    🔍 Live Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Attendance Sheet Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden relative group"
+                     :class="{'ring-2 ring-emerald-600 bg-emerald-50/10': activeReportPreviewTab === 'attendance'}">
+                    <div class="h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600"></div>
+                    <div class="p-5 flex-1 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shadow-sm">
+                                    ✍️
+                                </div>
+                                <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider">PDF & Excel</span>
+                            </div>
+                            <h3 class="font-bold text-slate-900 text-base mb-1 group-hover:text-emerald-600 transition-colors">Attendance Sheet</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">Invigilator checklist & hall ticket verification sheet for exam day physical attendance marking.</p>
+                        </div>
+                        <div class="space-y-2 mt-6 pt-4 border-t border-slate-100">
+                            <div class="grid grid-cols-2 gap-2">
+                                <a :href="reportUrlWithClass(reportExports.attendance)" class="btn-secondary text-xs justify-center py-2 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-semibold">
+                                    📊 Excel ↓
+                                </a>
+                                <a v-if="reportExports.attendancePdf" :href="reportUrlWithClass(reportExports.attendancePdf)" target="_blank" class="btn-secondary text-xs justify-center py-2 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 font-semibold">
+                                    📄 PDF ↓
+                                </a>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button type="button" v-if="reportExports.attendancePdf" @click="openPdfPreview(reportExports.attendancePdf)" class="btn-secondary text-xs justify-center py-2 text-indigo-800 bg-indigo-100/70 border-indigo-300 hover:bg-indigo-200 font-bold">
+                                    👁 Preview PDF
+                                </button>
+                                <button type="button" @click="setReportPreview('attendance')" class="btn-secondary text-xs justify-center py-2 text-slate-700 hover:bg-slate-100 font-semibold" :class="{'!bg-slate-900 !text-white': activeReportPreviewTab === 'attendance'}">
+                                    🔍 Live Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Class-Wise Count Matrix Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden relative group"
+                     :class="{'ring-2 ring-purple-600 bg-purple-50/10': activeReportPreviewTab === 'counts'}">
+                    <div class="h-1.5 bg-gradient-to-r from-purple-500 to-violet-600"></div>
+                    <div class="p-5 flex-1 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl shadow-sm">
+                                    📈
+                                </div>
+                                <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 uppercase tracking-wider">PDF & Excel</span>
+                            </div>
+                            <h3 class="font-bold text-slate-900 text-base mb-1 group-hover:text-purple-600 transition-colors">Class-Wise Count Report</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">Roster breakdown of total registered candidates per class for seating allocation & paper distribution.</p>
+                        </div>
+                        <div class="space-y-2 mt-6 pt-4 border-t border-slate-100">
+                            <div class="grid grid-cols-2 gap-2">
+                                <a :href="reportUrlWithClass(reportExports.classWiseCounts)" class="btn-secondary text-xs justify-center py-2 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-semibold">
+                                    📊 Excel ↓
+                                </a>
+                                <a v-if="reportExports.classWiseCountsPdf" :href="reportUrlWithClass(reportExports.classWiseCountsPdf)" target="_blank" class="btn-secondary text-xs justify-center py-2 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 font-semibold">
+                                    📄 PDF ↓
+                                </a>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button type="button" v-if="reportExports.classWiseCountsPdf" @click="openPdfPreview(reportExports.classWiseCountsPdf)" class="btn-secondary text-xs justify-center py-2 text-indigo-800 bg-indigo-100/70 border-indigo-300 hover:bg-indigo-200 font-bold">
+                                    👁 Preview PDF
+                                </button>
+                                <button type="button" @click="setReportPreview('counts')" class="btn-secondary text-xs justify-center py-2 text-slate-700 hover:bg-slate-100 font-semibold" :class="{'!bg-slate-900 !text-white': activeReportPreviewTab === 'counts'}">
+                                    🔍 Live Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Class-Wise Fee Due Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden relative group"
+                     :class="{'ring-2 ring-amber-600 bg-amber-50/10': activeReportPreviewTab === 'feeDue'}">
+                    <div class="h-1.5 bg-gradient-to-r from-amber-500 to-orange-600"></div>
+                    <div class="p-5 flex-1 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl shadow-sm">
+                                    💰
+                                </div>
+                                <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 uppercase tracking-wider">PDF & Excel</span>
+                            </div>
+                            <h3 class="font-bold text-slate-900 text-base mb-1 group-hover:text-amber-600 transition-colors">Class-Wise Fee Due Report</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">Financial summary detailing class fee rates, collected amounts, and pending balances for your school.</p>
+                        </div>
+                        <div class="space-y-2 mt-6 pt-4 border-t border-slate-100">
+                            <div class="grid grid-cols-2 gap-2">
+                                <a v-if="reportExports.feeDue" :href="reportUrlWithClass(reportExports.feeDue)" class="btn-secondary text-xs justify-center py-2 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-semibold">
+                                    📊 Excel ↓
+                                </a>
+                                <a v-if="reportExports.feeDuePdf" :href="reportUrlWithClass(reportExports.feeDuePdf)" target="_blank" class="btn-secondary text-xs justify-center py-2 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 font-semibold">
+                                    📄 PDF ↓
+                                </a>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button type="button" v-if="reportExports.feeDuePdf" @click="openPdfPreview(reportExports.feeDuePdf)" class="btn-secondary text-xs justify-center py-2 text-indigo-800 bg-indigo-100/70 border-indigo-300 hover:bg-indigo-200 font-bold">
+                                    👁 Preview PDF
+                                </button>
+                                <button type="button" @click="setReportPreview('feeDue')" class="btn-secondary text-xs justify-center py-2 text-slate-700 hover:bg-slate-100 font-semibold" :class="{'!bg-slate-900 !text-white': activeReportPreviewTab === 'feeDue'}">
+                                    🔍 Live Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Live Interactive Data Preview Container -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+                <!-- Preview Header & Tab Selector Bar -->
+                <div class="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-lg">
+                            📊
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-white text-base">Live Interactive Data Preview</h3>
+                            <p class="text-xs text-indigo-200">
+                                {{ school?.name }} · <span v-if="reportClassFilter" class="font-bold text-white">Class {{ reportClassFilter }}</span><span v-else>All Classes</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Switcher Tabs -->
+                    <div class="inline-flex rounded-xl bg-slate-800/80 p-1.5 text-xs font-semibold border border-slate-700">
+                        <button type="button" class="px-3.5 py-1.5 rounded-lg transition-all"
+                                :class="activeReportPreviewTab === 'registration' ? 'bg-indigo-600 text-white shadow-md font-bold' : 'text-slate-300 hover:text-white'"
                                 @click="activeReportPreviewTab = 'registration'">
-                            Registration Register ({{ reportRows.length }})
+                            Registration Register ({{ filteredReportRows.length }})
                         </button>
-                        <button type="button" class="px-3 py-1.5 rounded-md font-medium transition"
-                                :class="activeReportPreviewTab === 'attendance' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                        <button type="button" class="px-3.5 py-1.5 rounded-lg transition-all"
+                                :class="activeReportPreviewTab === 'attendance' ? 'bg-indigo-600 text-white shadow-md font-bold' : 'text-slate-300 hover:text-white'"
                                 @click="activeReportPreviewTab = 'attendance'">
                             Attendance Sheet
                         </button>
-                        <button type="button" class="px-3 py-1.5 rounded-md font-medium transition"
-                                :class="activeReportPreviewTab === 'counts' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                        <button type="button" class="px-3.5 py-1.5 rounded-lg transition-all"
+                                :class="activeReportPreviewTab === 'counts' ? 'bg-indigo-600 text-white shadow-md font-bold' : 'text-slate-300 hover:text-white'"
                                 @click="activeReportPreviewTab = 'counts'">
                             Class-wise Counts
                         </button>
-                        <button type="button" class="px-3 py-1.5 rounded-md font-medium transition"
-                                :class="activeReportPreviewTab === 'feeDue' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                        <button type="button" class="px-3.5 py-1.5 rounded-lg transition-all"
+                                :class="activeReportPreviewTab === 'feeDue' ? 'bg-indigo-600 text-white shadow-md font-bold' : 'text-slate-300 hover:text-white'"
                                 @click="activeReportPreviewTab = 'feeDue'">
                             Class-wise Fee Due
                         </button>
                     </div>
                 </div>
 
-                <!-- 1. Registration Register Preview -->
-                <div v-if="activeReportPreviewTab === 'registration'">
-                    <table class="data-table">
-                        <thead>
+                <!-- 1. Registration Register Preview Table -->
+                <div v-if="activeReportPreviewTab === 'registration'" class="overflow-x-auto">
+                    <table class="data-table w-full">
+                        <thead class="bg-slate-100 border-b border-slate-200">
                             <tr>
-                                <th>Hall ticket</th>
-                                <th>Student</th>
-                                <th>Reg No</th>
-                                <th>Class</th>
-                                <th>Approval</th>
-                                <th>Attendance</th>
-                                <th>Fee Status</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Hall Ticket</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Student Name</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Reg No</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Class</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Approval</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Attendance</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Fee Status</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr v-for="(row, i) in filteredReportRows.slice(0, 100)" :key="i">
-                                <td class="font-mono text-xs font-semibold text-slate-800">{{ row.hall_ticket_no || '—' }}</td>
-                                <td class="font-medium text-slate-900">{{ row.student_name }}</td>
-                                <td class="font-mono text-xs text-slate-500">{{ row.reg_no || '—' }}</td>
-                                <td class="text-xs font-semibold text-indigo-700">{{ row.class_name || '—' }}</td>
-                                <td class="text-xs">
-                                    <span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold capitalize"
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(row, i) in filteredReportRows.slice(0, 100)" :key="i" class="hover:bg-slate-50 transition-colors">
+                                <td class="py-3 px-4 font-mono text-xs font-bold text-indigo-700">{{ row.hall_ticket_no || '—' }}</td>
+                                <td class="py-3 px-4 font-bold text-slate-900 text-sm">{{ row.student_name }}</td>
+                                <td class="py-3 px-4 font-mono text-xs text-slate-500">{{ row.reg_no || '—' }}</td>
+                                <td class="py-3 px-4 text-xs font-bold text-slate-800">
+                                    <span class="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">Class {{ row.class_name || '—' }}</span>
+                                </td>
+                                <td class="py-3 px-4 text-xs">
+                                    <span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-extrabold capitalize"
                                           :class="{
-                                              'bg-emerald-100 text-emerald-800': row.approval_status === 'approved',
-                                              'bg-amber-100 text-amber-800': row.approval_status === 'pending' || row.approval_status === 'pending_payment',
-                                              'bg-rose-100 text-rose-800': row.approval_status === 'rejected',
+                                              'bg-emerald-100 text-emerald-800 border border-emerald-200': row.approval_status === 'approved',
+                                              'bg-amber-100 text-amber-800 border border-amber-200': row.approval_status === 'pending' || row.approval_status === 'pending_payment',
+                                              'bg-rose-100 text-rose-800 border border-rose-200': row.approval_status === 'rejected',
                                           }">
                                         {{ row.approval_status?.replace('_', ' ') }}
                                     </span>
                                 </td>
-                                <td class="text-xs capitalize">{{ row.attendance_status || 'pending' }}</td>
-                                <td class="text-xs capitalize">{{ row.fee_status || '—' }}</td>
+                                <td class="py-3 px-4 text-xs font-medium capitalize text-slate-700">{{ row.attendance_status || 'pending' }}</td>
+                                <td class="py-3 px-4 text-xs font-medium capitalize text-slate-700">{{ row.fee_status || '—' }}</td>
                             </tr>
                         </tbody>
                     </table>
-                    <div v-if="!filteredReportRows.length" class="p-8 text-center text-slate-500">
-                        No registrations found to preview.
+                    <div v-if="!filteredReportRows.length" class="p-12 text-center text-slate-500">
+                        <span class="text-3xl block mb-2">🔍</span>
+                        No candidate registrations found matching your filter selection.
                     </div>
                 </div>
 
-                <!-- 2. Attendance Sheet Preview -->
-                <div v-else-if="activeReportPreviewTab === 'attendance'">
-                    <table class="data-table">
-                        <thead>
+                <!-- 2. Attendance Sheet Preview Table -->
+                <div v-else-if="activeReportPreviewTab === 'attendance'" class="overflow-x-auto">
+                    <table class="data-table w-full">
+                        <thead class="bg-slate-100 border-b border-slate-200">
                             <tr>
-                                <th>#</th>
-                                <th>Hall ticket</th>
-                                <th>Student Name</th>
-                                <th>Class</th>
-                                <th>Attendance Status</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700 w-12">#</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Hall Ticket</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Student Name</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Class</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Attendance Status</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr v-for="(row, i) in filteredReportRows" :key="i">
-                                <td class="text-xs text-slate-400 font-bold">{{ i + 1 }}</td>
-                                <td class="font-mono text-xs font-semibold">{{ row.hall_ticket_no || '—' }}</td>
-                                <td class="font-medium text-slate-900">{{ row.student_name }}</td>
-                                <td class="text-xs font-semibold text-indigo-700">{{ row.class_name || '—' }}</td>
-                                <td class="text-xs font-bold capitalize"
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(row, i) in filteredReportRows" :key="i" class="hover:bg-slate-50 transition-colors">
+                                <td class="py-3 px-4 text-xs text-slate-400 font-bold">{{ i + 1 }}</td>
+                                <td class="py-3 px-4 font-mono text-xs font-bold text-indigo-700">{{ row.hall_ticket_no || '—' }}</td>
+                                <td class="py-3 px-4 font-bold text-slate-900 text-sm">{{ row.student_name }}</td>
+                                <td class="py-3 px-4 text-xs font-bold text-slate-800">
+                                    <span class="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">Class {{ row.class_name || '—' }}</span>
+                                </td>
+                                <td class="py-3 px-4 text-xs font-extrabold capitalize"
                                     :class="{
                                         'text-emerald-700': row.attendance_status === 'present',
                                         'text-rose-700': row.attendance_status === 'absent',
@@ -875,89 +967,90 @@
                             </tr>
                         </tbody>
                     </table>
-                    <div v-if="!filteredReportRows.length" class="p-8 text-center text-slate-500">
-                        No attendance records found to preview.
+                    <div v-if="!filteredReportRows.length" class="p-12 text-center text-slate-500">
+                        <span class="text-3xl block mb-2">📋</span>
+                        No attendance records available for preview.
                     </div>
                 </div>
 
-                <!-- 3. Class-Wise Count Matrix Preview -->
-                <div v-else-if="activeReportPreviewTab === 'counts'">
-                    <div class="overflow-x-auto">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>School Name</th>
-                                    <th v-for="cls in classWiseCountMatrix.classes" :key="cls" class="text-center">{{ cls }}</th>
-                                    <th class="text-center font-bold">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="(sch, i) in classWiseCountMatrix.schools" :key="sch.school_id">
-                                    <td class="text-xs font-bold text-slate-400">{{ i + 1 }}</td>
-                                    <td class="font-bold text-slate-800">{{ sch.school_name }}</td>
-                                    <td v-for="cls in classWiseCountMatrix.classes" :key="cls" class="text-center font-mono">
-                                        {{ sch.counts[cls] || 0 }}
-                                    </td>
-                                    <td class="text-center font-bold text-indigo-700">{{ sch.total }}</td>
-                                </tr>
-                            </tbody>
-                            <tfoot v-if="classWiseCountMatrix.schools?.length" class="bg-slate-100 font-bold border-t-2 border-slate-300">
-                                <tr>
-                                    <td colspan="2" class="text-right uppercase text-xs">Total All Classes</td>
-                                    <td v-for="cls in classWiseCountMatrix.classes" :key="cls" class="text-center font-mono text-slate-900">
-                                        {{ classWiseCountMatrix.totals[cls] || 0 }}
-                                    </td>
-                                    <td class="text-center font-mono text-emerald-800 bg-emerald-100 text-sm">{{ classWiseCountMatrix.grand_total }}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                    <div v-if="!classWiseCountMatrix.schools?.length" class="p-8 text-center text-slate-500">
-                        No class-wise count data available to preview.
-                    </div>
-                </div>
-
-                <!-- 4. Class-Wise Fee Due Report Preview -->
-                <div v-else-if="activeReportPreviewTab === 'feeDue'">
-                    <table class="data-table">
-                        <thead>
+                <!-- 3. Class-Wise Count Matrix Preview Table -->
+                <div v-else-if="activeReportPreviewTab === 'counts'" class="overflow-x-auto">
+                    <table class="data-table w-full">
+                        <thead class="bg-slate-100 border-b border-slate-200">
                             <tr>
-                                <th>#</th>
-                                <th>Class / Roster</th>
-                                <th class="text-center">Registered Students</th>
-                                <th class="text-right">Fee Rate (₹)</th>
-                                <th class="text-right">Total Amount (₹)</th>
-                                <th class="text-right">Paid Amount (₹)</th>
-                                <th class="text-right">Pending Fee Due (₹)</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700 w-12">#</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">School Name</th>
+                                <th v-for="cls in classWiseCountMatrix.classes" :key="cls" class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700 text-center">Class {{ cls }}</th>
+                                <th class="py-3 px-4 text-xs font-extrabold uppercase tracking-wider text-indigo-900 text-center">Total Candidates</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr v-for="(row, i) in feeDueMatrix.rows" :key="i">
-                                <td class="text-xs text-slate-400 font-bold">{{ i + 1 }}</td>
-                                <td class="font-bold text-indigo-900">{{ row.class_name }}</td>
-                                <td class="text-center font-bold text-slate-800">{{ row.count }}</td>
-                                <td class="text-right font-mono">₹{{ Number(row.fee_rate).toFixed(2) }}</td>
-                                <td class="text-right font-mono font-bold text-slate-900">₹{{ Number(row.total_fee).toFixed(2) }}</td>
-                                <td class="text-right font-mono font-bold text-emerald-700">₹{{ Number(row.paid).toFixed(2) }}</td>
-                                <td class="text-right font-mono font-bold" :class="Number(row.due) > 0 ? 'text-rose-700' : 'text-slate-400'">
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(sch, i) in classWiseCountMatrix.schools" :key="sch.school_id" class="hover:bg-slate-50 transition-colors">
+                                <td class="py-3 px-4 text-xs font-bold text-slate-400">{{ i + 1 }}</td>
+                                <td class="py-3 px-4 font-extrabold text-slate-900 text-sm">{{ sch.school_name }}</td>
+                                <td v-for="cls in classWiseCountMatrix.classes" :key="cls" class="py-3 px-4 text-center font-mono font-bold text-slate-700">
+                                    {{ sch.counts[cls] || 0 }}
+                                </td>
+                                <td class="py-3 px-4 text-center font-mono font-black text-indigo-700 text-sm bg-indigo-50/50">{{ sch.total }}</td>
+                            </tr>
+                        </tbody>
+                        <tfoot v-if="classWiseCountMatrix.schools?.length" class="bg-slate-900 text-white font-bold border-t-2 border-slate-800">
+                            <tr>
+                                <td colspan="2" class="py-3.5 px-4 text-right uppercase text-xs tracking-wider text-slate-300 font-extrabold">Total Across All Classes</td>
+                                <td v-for="cls in classWiseCountMatrix.classes" :key="cls" class="py-3.5 px-4 text-center font-mono font-bold text-slate-200">
+                                    {{ classWiseCountMatrix.totals[cls] || 0 }}
+                                </td>
+                                <td class="py-3.5 px-4 text-center font-mono font-black text-emerald-400 bg-slate-950 text-base">{{ classWiseCountMatrix.grand_total }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <div v-if="!classWiseCountMatrix.schools?.length" class="p-12 text-center text-slate-500">
+                        <span class="text-3xl block mb-2">📊</span>
+                        No class-wise count matrix available for preview.
+                    </div>
+                </div>
+
+                <!-- 4. Class-Wise Fee Due Report Preview Table -->
+                <div v-else-if="activeReportPreviewTab === 'feeDue'" class="overflow-x-auto">
+                    <table class="data-table w-full">
+                        <thead class="bg-slate-100 border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700 w-12">#</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Class / Roster</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700 text-center">Registered Candidates</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700 text-right">Fee Rate (₹)</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700 text-right">Total Amount (₹)</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700 text-right">Paid Amount (₹)</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700 text-right">Pending Fee Due (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(row, i) in feeDueMatrix.rows" :key="i" class="hover:bg-slate-50 transition-colors">
+                                <td class="py-3 px-4 text-xs font-bold text-slate-400">{{ i + 1 }}</td>
+                                <td class="py-3 px-4 font-extrabold text-indigo-950 text-sm">{{ row.class_name }}</td>
+                                <td class="py-3 px-4 text-center font-bold text-slate-800">{{ row.count }}</td>
+                                <td class="py-3 px-4 text-right font-mono font-medium text-slate-700">₹{{ Number(row.fee_rate).toFixed(2) }}</td>
+                                <td class="py-3 px-4 text-right font-mono font-bold text-slate-900">₹{{ Number(row.total_fee).toFixed(2) }}</td>
+                                <td class="py-3 px-4 text-right font-mono font-bold text-emerald-700">₹{{ Number(row.paid).toFixed(2) }}</td>
+                                <td class="py-3 px-4 text-right font-mono font-black" :class="Number(row.due) > 0 ? 'text-rose-600 bg-rose-50/50' : 'text-slate-400'">
                                     ₹{{ Number(row.due).toFixed(2) }}
                                 </td>
                             </tr>
                         </tbody>
-                        <tfoot v-if="feeDueMatrix.rows?.length" class="bg-slate-100 font-bold border-t-2 border-slate-300">
+                        <tfoot v-if="feeDueMatrix.rows?.length" class="bg-slate-900 text-white font-bold border-t-2 border-slate-800">
                             <tr>
-                                <td colspan="2" class="text-right uppercase text-xs">Grand Total</td>
-                                <td class="text-center font-bold text-slate-900">{{ feeDueMatrix.grand_count }}</td>
-                                <td class="text-right font-mono">₹{{ Number(feeDueMatrix.fee_rate).toFixed(2) }}</td>
-                                <td class="text-right font-mono text-slate-900 text-sm">₹{{ Number(feeDueMatrix.grand_total_fee).toFixed(2) }}</td>
-                                <td class="text-right font-mono text-emerald-700 text-sm">₹{{ Number(feeDueMatrix.grand_paid).toFixed(2) }}</td>
-                                <td class="text-right font-mono text-rose-700 bg-rose-50 text-sm">₹{{ Number(feeDueMatrix.grand_due).toFixed(2) }}</td>
+                                <td colspan="2" class="py-3.5 px-4 text-right uppercase text-xs tracking-wider text-slate-300 font-extrabold">Grand Total Summary</td>
+                                <td class="py-3.5 px-4 text-center font-bold text-white">{{ feeDueMatrix.grand_count }}</td>
+                                <td class="py-3.5 px-4 text-right font-mono text-slate-300">₹{{ Number(feeDueMatrix.fee_rate).toFixed(2) }}</td>
+                                <td class="py-3.5 px-4 text-right font-mono text-white text-base">₹{{ Number(feeDueMatrix.grand_total_fee).toFixed(2) }}</td>
+                                <td class="py-3.5 px-4 text-right font-mono text-emerald-400 text-base">₹{{ Number(feeDueMatrix.grand_paid).toFixed(2) }}</td>
+                                <td class="py-3.5 px-4 text-right font-mono text-rose-300 bg-slate-950 text-base font-black">₹{{ Number(feeDueMatrix.grand_due).toFixed(2) }}</td>
                             </tr>
                         </tfoot>
                     </table>
-                    <div v-if="!feeDueMatrix.rows?.length" class="p-8 text-center text-slate-500">
-                        No fee due records available to preview.
+                    <div v-if="!feeDueMatrix.rows?.length" class="p-12 text-center text-slate-500">
+                        <span class="text-3xl block mb-2">💰</span>
+                        No class-wise fee due records available for preview.
                     </div>
                 </div>
             </div>

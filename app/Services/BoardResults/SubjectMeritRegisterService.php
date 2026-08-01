@@ -151,22 +151,34 @@ class SubjectMeritRegisterService
             if ($class !== null) {
                 $subjectId = is_numeric($subjectKey) ? (int) $subjectKey : ($sorted->first()['subject_id'] ?? null);
                 $topN = $counts->resolveCap($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
-                $tieMode = $counts->resolveTieMode($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
-                $rankStyle = $counts->resolveRankStyle($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
-                $sorted = collect($this->rankStyles->assign($sorted->all(), $rankStyle, fn (array $row) => $row['marks'] ?? null));
 
-                $selected = [];
-                foreach ($sorted as $row) {
-                    if ($tieMode === TopperCountConfig::TIE_HARD_CAP) {
-                        if (count($selected) >= $topN) {
+                if ($counts->isNoRankMode($sahodayaId)) {
+                    // No-rank mode: drop tie/rank-style handling, just take the top_n
+                    // rows ordered by percentage (marks) descending, with no rank number.
+                    $sorted = $sorted->sortByDesc('marks')->values();
+                    $selected = array_map(function (array $row) {
+                        $row['rank'] = null;
+
+                        return $row;
+                    }, $sorted->take($topN)->all());
+                } else {
+                    $tieMode = $counts->resolveTieMode($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
+                    $rankStyle = $counts->resolveRankStyle($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
+                    $sorted = collect($this->rankStyles->assign($sorted->all(), $rankStyle, fn (array $row) => $row['marks'] ?? null));
+
+                    $selected = [];
+                    foreach ($sorted as $row) {
+                        if ($tieMode === TopperCountConfig::TIE_HARD_CAP) {
+                            if (count($selected) >= $topN) {
+                                break;
+                            }
+                        } elseif ($row['rank'] > $topN) {
+                            // Rank-cutoff mode: include every row whose rank is within Top-N.
                             break;
                         }
-                    } elseif ($row['rank'] > $topN) {
-                        // Rank-cutoff mode: include every row whose rank is within Top-N.
-                        break;
-                    }
 
-                    $selected[] = $row;
+                        $selected[] = $row;
+                    }
                 }
             } else {
                 $selected = $sorted->all();
