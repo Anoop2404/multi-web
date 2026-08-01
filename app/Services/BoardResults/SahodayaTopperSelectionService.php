@@ -199,12 +199,7 @@ class SahodayaTopperSelectionService
                 $q->whereIn('tenant_id', $schoolIds)
                     ->where('academic_year', $academicYear)
                     ->where('class', $class)
-                    ->whereIn('status', [
-                        BoardResult::STATUS_SUBMITTED,
-                        BoardResult::STATUS_VERIFIED,
-                        BoardResult::STATUS_APPROVED,
-                        BoardResult::STATUS_PUBLISHED,
-                    ]);
+                    ->where('status', '!=', BoardResult::STATUS_REJECTED);
             });
     }
 

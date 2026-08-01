@@ -75,12 +75,7 @@ class FullA1AchieversReportService
             ->where('t.entry_type', Topper::ENTRY_FULL_A1)
             ->whereIn('br.tenant_id', $schoolIds)
             ->where('br.academic_year', $academicYear)
-            ->whereIn('br.status', [
-                BoardResult::STATUS_SUBMITTED,
-                BoardResult::STATUS_VERIFIED,
-                BoardResult::STATUS_APPROVED,
-                BoardResult::STATUS_PUBLISHED,
-            ])
+            ->where('br.status', '!=', BoardResult::STATUS_REJECTED)
             ->select([
                 't.id',
                 't.name as student_name',

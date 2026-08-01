@@ -86,12 +86,7 @@ class SubjectMeritRegisterService
             ->where('t.entry_type', Topper::ENTRY_SUBJECT)
             ->whereIn('br.tenant_id', $schoolIds)
             ->where('br.academic_year', $academicYear)
-            ->whereIn('br.status', [
-                BoardResult::STATUS_SUBMITTED,
-                BoardResult::STATUS_VERIFIED,
-                BoardResult::STATUS_APPROVED,
-                BoardResult::STATUS_PUBLISHED,
-            ])
+            ->where('br.status', '!=', BoardResult::STATUS_REJECTED)
             ->select([
                 'tsm.marks',
                 'tsm.subject_id',

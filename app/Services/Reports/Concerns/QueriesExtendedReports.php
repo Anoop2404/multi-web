@@ -1864,12 +1864,7 @@ trait QueriesExtendedReports
                 ->whereIn('tenant_id', $schoolIds)
                 ->where('academic_year', $year)
                 ->when($filters['class'] ?? null, fn ($q, $class) => $q->where('class', (int) $class))
-                ->whereIn('status', [
-                    BoardResult::STATUS_SUBMITTED,
-                    BoardResult::STATUS_VERIFIED,
-                    BoardResult::STATUS_APPROVED,
-                    BoardResult::STATUS_PUBLISHED,
-                ])
+                ->where('status', '!=', BoardResult::STATUS_REJECTED)
                 ->orderByDesc('pass_percent')
                 ->get();
 
@@ -1905,12 +1900,7 @@ trait QueriesExtendedReports
         return BoardResult::query()
             ->whereIn('tenant_id', $schoolIds)
             ->where('academic_year', $year)
-            ->whereIn('status', [
-                BoardResult::STATUS_SUBMITTED,
-                BoardResult::STATUS_VERIFIED,
-                BoardResult::STATUS_APPROVED,
-                BoardResult::STATUS_PUBLISHED,
-            ])
+            ->where('status', '!=', BoardResult::STATUS_REJECTED)
             ->when($filters['class'] ?? null, fn ($q, $class) => $q->where('class', (int) $class))
             ->orderByDesc('pass_percent')
             ->get()
@@ -1938,12 +1928,7 @@ trait QueriesExtendedReports
                 ->whereIn('tenant_id', $schoolIds)
                 ->where('academic_year', $year)
                 ->where('class', 10)
-                ->whereIn('status', [
-                    BoardResult::STATUS_SUBMITTED,
-                    BoardResult::STATUS_VERIFIED,
-                    BoardResult::STATUS_APPROVED,
-                    BoardResult::STATUS_PUBLISHED,
-                ]))
+                ->where('status', '!=', BoardResult::STATUS_REJECTED))
             ->orderByDesc('percentage')
             ->orderBy('rank')
             ->get()
@@ -1972,12 +1957,7 @@ trait QueriesExtendedReports
                 ->whereIn('tenant_id', $schoolIds)
                 ->where('academic_year', $year)
                 ->where('class', 12)
-                ->whereIn('status', [
-                    BoardResult::STATUS_SUBMITTED,
-                    BoardResult::STATUS_VERIFIED,
-                    BoardResult::STATUS_APPROVED,
-                    BoardResult::STATUS_PUBLISHED,
-                ]))
+                ->where('status', '!=', BoardResult::STATUS_REJECTED))
             ->with('examStream')
             ->orderBy('stream')
             ->orderByDesc('percentage')
