@@ -55,7 +55,12 @@ class RankingEngine
         $results = BoardResult::query()
             ->whereIn('tenant_id', $schoolIds)
             ->where('academic_year', $academicYear)
-            ->whereIn('status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED])
+            ->whereIn('status', [
+                BoardResult::STATUS_SUBMITTED,
+                BoardResult::STATUS_VERIFIED,
+                BoardResult::STATUS_APPROVED,
+                BoardResult::STATUS_PUBLISHED,
+            ])
             ->with(['toppers.subjectMarks', 'toppers.examStream'])
             ->get();
 

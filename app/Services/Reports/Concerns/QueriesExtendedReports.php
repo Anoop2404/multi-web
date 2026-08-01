@@ -1835,25 +1835,64 @@ trait QueriesExtendedReports
     protected function rptBoardOverallRanking(string $sahodayaId, array $filters): Collection
     {
         $year = $filters['academic_year'] ?? AcademicYear::forSahodaya($sahodayaId);
-        $names = Tenant::where('parent_id', $sahodayaId)->where('type', 'school')->pluck('name', 'id');
+        $schoolIds = $this->schoolIds($sahodayaId);
+        $names = Tenant::whereIn('id', $schoolIds)->pluck('name', 'id');
 
-        return BoardResultRanking::query()
+        $rows = BoardResultRanking::query()
             ->where('sahodaya_id', $sahodayaId)
             ->where('academic_year', $year)
             ->whereIn('scope', [RankingEngine::SCOPE_OVERALL, RankingEngine::SCOPE_OVERALL_PASS_PERCENT])
             ->when($filters['class'] ?? null, fn ($q, $class) => $q->where('class', (int) $class))
             ->orderBy('scope')
             ->orderBy('rank')
-            ->get()
-            ->map(fn (BoardResultRanking $r) => [
-                'rank' => $r->rank,
-                'school' => $names[$r->entity_id] ?? $r->entity_id,
-                'class' => $r->class,
+            ->get();
+
+        if ($rows->isEmpty()) {
+            app(RankingEngine::class)->recompute($sahodayaId, $year);
+            $rows = BoardResultRanking::query()
+                ->where('sahodaya_id', $sahodayaId)
+                ->where('academic_year', $year)
+                ->whereIn('scope', [RankingEngine::SCOPE_OVERALL, RankingEngine::SCOPE_OVERALL_PASS_PERCENT])
+                ->when($filters['class'] ?? null, fn ($q, $class) => $q->where('class', (int) $class))
+                ->orderBy('scope')
+                ->orderBy('rank')
+                ->get();
+        }
+
+        if ($rows->isEmpty()) {
+            $boardResults = BoardResult::query()
+                ->whereIn('tenant_id', $schoolIds)
+                ->where('academic_year', $year)
+                ->when($filters['class'] ?? null, fn ($q, $class) => $q->where('class', (int) $class))
+                ->whereIn('status', [
+                    BoardResult::STATUS_SUBMITTED,
+                    BoardResult::STATUS_VERIFIED,
+                    BoardResult::STATUS_APPROVED,
+                    BoardResult::STATUS_PUBLISHED,
+                ])
+                ->orderByDesc('pass_percent')
+                ->get();
+
+            return $boardResults->map(fn (BoardResult $r, int $idx) => [
+                'rank'             => $idx + 1,
+                'school'           => $names[$r->tenant_id] ?? $r->tenant_id,
+                'class'            => $r->class,
                 'examination_type' => $r->examination_type,
-                'score' => $r->score,
-                'pass_percent' => $r->meta['pass_percent'] ?? null,
-                'scope' => $r->scope,
+                'score'            => $r->pass_percent,
+                'pass_percent'     => $r->pass_percent,
+                'scope'            => RankingEngine::SCOPE_OVERALL_PASS_PERCENT,
             ]);
+        }
+
+        return $rows->map(fn (BoardResultRanking $r) => [
+            'rank' => $r->rank,
+            'school' => $names[$r->entity_id] ?? $r->entity_id,
+            'class' => $r->class,
+            'examination_type' => $r->examination_type,
+            'score' => $r->score,
+            'pass_percent' => $r->meta['pass_percent'] ?? null,
+            'scope' => $r->scope,
+        ]);
     }
 
     /** @param  array<string, mixed>  $filters */
@@ -1866,7 +1905,12 @@ trait QueriesExtendedReports
         return BoardResult::query()
             ->whereIn('tenant_id', $schoolIds)
             ->where('academic_year', $year)
-            ->whereIn('status', [BoardResult::STATUS_APPROVED, BoardResult::STATUS_PUBLISHED])
+            ->whereIn('status', [
+                BoardResult::STATUS_SUBMITTED,
+                BoardResult::STATUS_VERIFIED,
+                BoardResult::STATUS_APPROVED,
+                BoardResult::STATUS_PUBLISHED,
+            ])
             ->when($filters['class'] ?? null, fn ($q, $class) => $q->where('class', (int) $class))
             ->orderByDesc('pass_percent')
             ->get()
@@ -1894,7 +1938,12 @@ trait QueriesExtendedReports
                 ->whereIn('tenant_id', $schoolIds)
                 ->where('academic_year', $year)
                 ->where('class', 10)
-                ->published())
+                ->whereIn('status', [
+                    BoardResult::STATUS_SUBMITTED,
+                    BoardResult::STATUS_VERIFIED,
+                    BoardResult::STATUS_APPROVED,
+                    BoardResult::STATUS_PUBLISHED,
+                ]))
             ->orderByDesc('percentage')
             ->orderBy('rank')
             ->get()
@@ -1923,7 +1972,12 @@ trait QueriesExtendedReports
                 ->whereIn('tenant_id', $schoolIds)
                 ->where('academic_year', $year)
                 ->where('class', 12)
-                ->published())
+                ->whereIn('status', [
+                    BoardResult::STATUS_SUBMITTED,
+                    BoardResult::STATUS_VERIFIED,
+                    BoardResult::STATUS_APPROVED,
+                    BoardResult::STATUS_PUBLISHED,
+                ]))
             ->with('examStream')
             ->orderBy('stream')
             ->orderByDesc('percentage')
