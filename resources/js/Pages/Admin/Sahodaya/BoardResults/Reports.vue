@@ -78,6 +78,11 @@
                                    class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition flex items-center gap-1">
                                     📄 PDF
                                 </a>
+                                <a v-if="r.pdfUrlNoRank" :href="r.pdfUrlNoRank" target="_blank"
+                                   class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition flex items-center gap-1"
+                                   title="Download Mark-wise order without ranks">
+                                    📄 Marks-Wise
+                                </a>
                                 <a v-if="r.excelUrl" :href="r.excelUrl" target="_blank"
                                    class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition flex items-center gap-1">
                                     📊 Excel

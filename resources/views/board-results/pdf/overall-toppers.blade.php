@@ -14,6 +14,9 @@
             background: #fff;
         }
 
+        .stream-page { page-break-after: always; }
+        .stream-page:last-child { page-break-after: avoid; }
+
         .page-header {
             width: 100%;
             background: #0b2558;
@@ -115,9 +118,7 @@
             font-size: 10px;
             font-weight: 700;
             border-radius: 4px;
-            margin-top: 10px;
-            margin-bottom: 6px;
-            page-break-inside: avoid;
+            margin-bottom: 8px;
         }
 
         table.report-table {
@@ -168,93 +169,57 @@
 </head>
 <body>
 
-    <div class="page-header">
-        <table class="hdr-top">
-            <tr>
-                @if(!empty($logoSrc))
-                <td class="hdr-logo-cell"><img src="{{ $logoSrc }}" alt=""></td>
-                @endif
-                <td class="hdr-org-cell">
-                    <span class="org-name">{{ $orgName ?? 'Sahodaya' }}</span>
-                    <span class="org-sub">Academic Board Results &nbsp;&middot;&nbsp; Overall & Stream Merit Register</span>
-                </td>
-            </tr>
-        </table>
-        <hr class="hdr-divider">
-        <table class="hdr-info-bar">
-            <tr>
-                <td class="info-cell">
-                    <span class="info-lbl">Report Title</span>
-                    <span class="info-val-lg">Overall & Stream Toppers</span>
-                </td>
-                <td class="info-cell" style="width:100px;">
-                    <span class="info-lbl">Academic Year</span>
-                    <span class="info-val">{{ $academicYear }}</span>
-                </td>
-                <td class="info-cell" style="width:120px;">
-                    <span class="info-lbl">Generated At</span>
-                    <span class="info-val">{{ $generatedAt }}</span>
-                </td>
-            </tr>
-        </table>
-    </div>
-    <div class="header-stripe"></div>
-
-    <div class="content-wrap">
-        {{-- Class X --}}
-        <div class="section-banner">CLASS X (AISSE) — OVERALL TOPPERS</div>
-
-        @if(empty($classXToppers) || count($classXToppers) === 0)
-            <p style="color: #64748b; font-size: 8.5px; margin: 6px 0 14px;">No Class X toppers published for {{ $academicYear }}.</p>
-        @else
-            @php
-                $sortedX = collect($classXToppers)->sortByDesc(fn($r) => (float)($r['percentage'] ?? ($r['score'] ?? 0)))->values();
-            @endphp
-            <table class="report-table">
-                <thead>
+    {{-- Class X --}}
+    @if(!empty($classXToppers) && count($classXToppers) > 0)
+        <div class="stream-page">
+            <div class="page-header">
+                <table class="hdr-top">
                     <tr>
-                        @unless($noRank ?? false)
-                            <th class="rank-col">Rank</th>
-                        @endunless
-                        <th>Student Name</th>
-                        <th>Roll No.</th>
-                        <th>Member School</th>
-                        <th style="width: 75px; text-align: center;">Marks / %</th>
+                        @if(!empty($logoSrc))
+                        <td class="hdr-logo-cell"><img src="{{ $logoSrc }}" alt=""></td>
+                        @endif
+                        <td class="hdr-org-cell">
+                            <span class="org-name">{{ $orgName ?? 'Sahodaya' }}</span>
+                            <span class="org-sub">Academic Board Results &nbsp;&middot;&nbsp; Class X Overall Merit Register</span>
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    @foreach($sortedX as $i => $row)
-                        <tr>
-                            @unless($noRank ?? false)
-                                <td class="rank-col">#{{ $row['rank'] ?? ($i + 1) }}</td>
-                            @endunless
-                            <td><span class="student-name">{{ $row['name'] ?? ($row['student_name'] ?? '—') }}</span></td>
-                            <td><span class="roll-no">{{ $row['roll_no'] ?? '—' }}</span></td>
-                            <td><span class="school-name">{{ strtoupper($row['school_name'] ?? '') }}</span></td>
-                            <td class="score-col">
-                                {{ isset($row['percentage']) ? number_format((float)$row['percentage'], 2).'%' : (isset($row['score']) ? number_format((float)$row['score'], 2) : '—') }}
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        @endif
+                </table>
+                <hr class="hdr-divider">
+                <table class="hdr-info-bar">
+                    <tr>
+                        <td class="info-cell">
+                            <span class="info-lbl">Report Title</span>
+                            <span class="info-val-lg">Class X (AISSE) Overall Toppers</span>
+                        </td>
+                        <td class="info-cell" style="width:100px;">
+                            <span class="info-lbl">Academic Year</span>
+                            <span class="info-val">{{ $academicYear }}</span>
+                        </td>
+                        <td class="info-cell" style="width:80px;">
+                            <span class="info-lbl">Class</span>
+                            <span class="info-val">Class 10 (AISSE)</span>
+                        </td>
+                        <td class="info-cell" style="width:120px;">
+                            <span class="info-lbl">Generated At</span>
+                            <span class="info-val">{{ $generatedAt }}</span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="header-stripe"></div>
 
-        {{-- Class XII --}}
-        @if(empty($classXIIToppers) || count($classXIIToppers) === 0)
-            <div class="section-banner">CLASS XII (AISSCE) — STREAM TOPPERS</div>
-            <p style="color: #64748b; font-size: 8.5px; margin: 6px 0 14px;">No Class XII stream toppers published for {{ $academicYear }}.</p>
-        @else
-            @foreach($classXIIToppers as $streamName => $toppers)
+            <div class="content-wrap">
+                <div class="section-banner">CLASS X (AISSE) — OVERALL TOPPERS {{ ($noRank ?? false) ? '(MARKS ORDER)' : '' }}</div>
                 @php
-                    $sortedXII = collect($toppers)->sortByDesc(fn($r) => (float)($r['percentage'] ?? ($r['score'] ?? 0)))->values();
+                    $sortedX = collect($classXToppers)->sortByDesc(fn($r) => (float)($r['percentage'] ?? ($r['score'] ?? 0)))->values();
                 @endphp
-                <div class="section-banner">CLASS XII — {{ strtoupper($streamName) }} STREAM TOPPERS</div>
                 <table class="report-table">
                     <thead>
                         <tr>
                             @unless($noRank ?? false)
                                 <th class="rank-col">Rank</th>
+                            @else
+                                <th style="width: 30px; text-align: center;">#</th>
                             @endunless
                             <th>Student Name</th>
                             <th>Roll No.</th>
@@ -263,10 +228,12 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($sortedXII as $i => $row)
+                        @foreach($sortedX as $i => $row)
                             <tr>
                                 @unless($noRank ?? false)
                                     <td class="rank-col">#{{ $row['rank'] ?? ($i + 1) }}</td>
+                                @else
+                                    <td style="text-align: center; font-weight: 700; color: #6b7a9e;">{{ $i + 1 }}</td>
                                 @endunless
                                 <td><span class="student-name">{{ $row['name'] ?? ($row['student_name'] ?? '—') }}</span></td>
                                 <td><span class="roll-no">{{ $row['roll_no'] ?? '—' }}</span></td>
@@ -278,14 +245,101 @@
                         @endforeach
                     </tbody>
                 </table>
-            @endforeach
-        @endif
 
-        <div class="page-footer">
-            <div class="footer-left">Overall & Stream Toppers &mdash; {{ $orgName }}</div>
-            <div class="footer-right">Generated: {{ $generatedAt }}</div>
+                <div class="page-footer">
+                    <div class="footer-left">Class X Overall Toppers &mdash; {{ $orgName }}</div>
+                    <div class="footer-right">Generated: {{ $generatedAt }}</div>
+                </div>
+            </div>
         </div>
-    </div>
+    @endif
+
+    {{-- Class XII Streams (Each Stream on its own page!) --}}
+    @if(!empty($classXIIToppers) && count($classXIIToppers) > 0)
+        @foreach($classXIIToppers as $streamName => $toppers)
+            @php
+                $sortedXII = collect($toppers)->sortByDesc(fn($r) => (float)($r['percentage'] ?? ($r['score'] ?? 0)))->values();
+            @endphp
+            <div class="stream-page">
+                <div class="page-header">
+                    <table class="hdr-top">
+                        <tr>
+                            @if(!empty($logoSrc))
+                            <td class="hdr-logo-cell"><img src="{{ $logoSrc }}" alt=""></td>
+                            @endif
+                            <td class="hdr-org-cell">
+                                <span class="org-name">{{ $orgName ?? 'Sahodaya' }}</span>
+                                <span class="org-sub">Academic Board Results &nbsp;&middot;&nbsp; Class XII {{ strtoupper($streamName) }} Stream Merit Register</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <hr class="hdr-divider">
+                    <table class="hdr-info-bar">
+                        <tr>
+                            <td class="info-cell">
+                                <span class="info-lbl">Stream</span>
+                                <span class="info-val-lg">{{ strtoupper($streamName) }} STREAM</span>
+                            </td>
+                            <td class="info-cell" style="width:100px;">
+                                <span class="info-lbl">Academic Year</span>
+                                <span class="info-val">{{ $academicYear }}</span>
+                            </td>
+                            <td class="info-cell" style="width:80px;">
+                                <span class="info-lbl">Class</span>
+                                <span class="info-val">Class 12 (AISSCE)</span>
+                            </td>
+                            <td class="info-cell" style="width:120px;">
+                                <span class="info-lbl">Generated At</span>
+                                <span class="info-val">{{ $generatedAt }}</span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="header-stripe"></div>
+
+                <div class="content-wrap">
+                    <div class="section-banner">CLASS XII — {{ strtoupper($streamName) }} STREAM TOPPERS {{ ($noRank ?? false) ? '(MARKS ORDER)' : '' }}</div>
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                @unless($noRank ?? false)
+                                    <th class="rank-col">Rank</th>
+                                @else
+                                    <th style="width: 30px; text-align: center;">#</th>
+                                @endunless
+                                <th>Student Name</th>
+                                <th>Roll No.</th>
+                                <th>Member School</th>
+                                <th style="width: 75px; text-align: center;">Marks / %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($sortedXII as $i => $row)
+                                <tr>
+                                    @unless($noRank ?? false)
+                                        <td class="rank-col">#{{ $row['rank'] ?? ($i + 1) }}</td>
+                                    @else
+                                        <td style="text-align: center; font-weight: 700; color: #6b7a9e;">{{ $i + 1 }}</td>
+                                    @endunless
+                                    <td><span class="student-name">{{ $row['name'] ?? ($row['student_name'] ?? '—') }}</span></td>
+                                    <td><span class="roll-no">{{ $row['roll_no'] ?? '—' }}</span></td>
+                                    <td><span class="school-name">{{ strtoupper($row['school_name'] ?? '') }}</span></td>
+                                    <td class="score-col">
+                                        {{ isset($row['percentage']) ? number_format((float)$row['percentage'], 2).'%' : (isset($row['score']) ? number_format((float)$row['score'], 2) : '—') }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+
+                    <div class="page-footer">
+                        <div class="footer-left">Class XII {{ strtoupper($streamName) }} Stream &mdash; {{ $orgName }}</div>
+                        <div class="footer-right">Generated: {{ $generatedAt }}</div>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    @endif
 
 </body>
 </html>

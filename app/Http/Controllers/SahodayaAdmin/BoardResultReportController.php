@@ -96,6 +96,7 @@ class BoardResultReportController extends SahodayaAdminController
                     'description' => 'AISSE toppers across member schools.',
                     'href' => "{$base}/reports/RPT-BRD-004?academic_year={$yearQ}",
                     'pdfUrl' => "{$base}/board-results/reports/toppers/pdf?academic_year={$yearQ}&class=10",
+                    'pdfUrlNoRank' => "{$base}/board-results/reports/toppers/pdf?academic_year={$yearQ}&class=10&view=percentage",
                     'excelUrl' => "{$base}/reports/RPT-BRD-004/export?academic_year={$yearQ}&format=xlsx",
                 ],
                 [
@@ -104,6 +105,7 @@ class BoardResultReportController extends SahodayaAdminController
                     'description' => 'AISSCE toppers by stream.',
                     'href' => "{$base}/reports/RPT-BRD-005?academic_year={$yearQ}",
                     'pdfUrl' => "{$base}/board-results/reports/toppers/pdf?academic_year={$yearQ}&class=12",
+                    'pdfUrlNoRank' => "{$base}/board-results/reports/toppers/pdf?academic_year={$yearQ}&class=12&view=percentage",
                     'excelUrl' => "{$base}/reports/RPT-BRD-005/export?academic_year={$yearQ}&format=xlsx",
                 ],
                 [
@@ -112,6 +114,7 @@ class BoardResultReportController extends SahodayaAdminController
                     'description' => 'Highest scorers per subject from normalized topper marks (AISSE).',
                     'href' => "{$base}/board-results/reports/subject-merit?academic_year={$yearQ}&class=10",
                     'pdfUrl' => "{$base}/board-results/reports/subject-merit/pdf?academic_year={$yearQ}&class=10",
+                    'pdfUrlNoRank' => "{$base}/board-results/reports/subject-merit/pdf?academic_year={$yearQ}&class=10&view=percentage",
                     'excelUrl' => "{$base}/reports/RPT-BRD-004/export?academic_year={$yearQ}&class=10&format=xlsx",
                 ],
                 [
@@ -120,6 +123,7 @@ class BoardResultReportController extends SahodayaAdminController
                     'description' => 'Highest scorers per subject from normalized topper marks (AISSCE).',
                     'href' => "{$base}/board-results/reports/subject-merit?academic_year={$yearQ}&class=12",
                     'pdfUrl' => "{$base}/board-results/reports/subject-merit/pdf?academic_year={$yearQ}&class=12",
+                    'pdfUrlNoRank' => "{$base}/board-results/reports/subject-merit/pdf?academic_year={$yearQ}&class=12&view=percentage",
                     'excelUrl' => "{$base}/reports/RPT-BRD-005/export?academic_year={$yearQ}&class=12&format=xlsx",
                 ],
                 [
@@ -281,13 +285,15 @@ class BoardResultReportController extends SahodayaAdminController
 
         $year = $request->string('academic_year')->toString()
             ?: AcademicYear::forSahodaya($this->sahodaya->id);
+        $class = $request->filled('class') ? $request->integer('class') : null;
 
-        $classXToppers = $topperService->overallForClassX($this->sahodaya->id, $year);
-        $classXIIToppers = $topperService->byStreamForClassXII($this->sahodaya->id, $year);
+        $classXToppers = ($class === null || $class === 10) ? $topperService->overallForClassX($this->sahodaya->id, $year) : [];
+        $classXIIToppers = ($class === null || $class === 12) ? $topperService->byStreamForClassXII($this->sahodaya->id, $year) : [];
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('board-results.pdf.overall-toppers', [
             'classXToppers'   => $classXToppers,
             'classXIIToppers' => $classXIIToppers,
+            'selectedClass'   => $class,
             'academicYear'    => $year,
             'orgName'         => $this->sahodaya->name ?? 'Sahodaya',
             'logoSrc'         => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
@@ -295,11 +301,13 @@ class BoardResultReportController extends SahodayaAdminController
             'noRank'          => $counts->isNoRankMode($this->sahodaya->id),
         ])->setPaper('a4', 'portrait');
 
+        $filename = $class ? "toppers-class-{$class}-{$year}.pdf" : "board-results-toppers-{$year}.pdf";
+
         if ($request->boolean('download')) {
-            return $pdf->download("board-results-toppers-{$year}.pdf");
+            return $pdf->download($filename);
         }
 
-        return $pdf->stream("board-results-toppers-{$year}.pdf");
+        return $pdf->stream($filename);
     }
 
     /** PDF export for the Toppers-hub "90%+ Achievers" report (no existing PDF previously). */
