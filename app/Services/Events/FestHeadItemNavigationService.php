@@ -340,7 +340,7 @@ class FestHeadItemNavigationService
             ->select([
                 'fest_registrations.item_id',
                 DB::raw('COUNT(*) as participant_count'),
-                DB::raw('SUM(CASE WHEN fest_participants.chest_no IS NOT NULL OR fest_groups.chest_no IS NOT NULL THEN 1 ELSE 0 END) as chest_assigned'),
+                DB::raw('SUM(CASE WHEN fest_participants.chest_no IS NOT NULL OR fest_groups.chest_no IS NOT NULL OR EXISTS (SELECT 1 FROM fest_participants fp2 WHERE fp2.event_id = fest_registrations.event_id AND fp2.student_id = fest_participants.student_id AND fp2.student_id IS NOT NULL AND fp2.chest_no IS NOT NULL) THEN 1 ELSE 0 END) as chest_assigned'),
                 DB::raw('SUM(CASE WHEN fest_participants.item_registration_number IS NOT NULL THEN 1 ELSE 0 END) as item_reg_assigned'),
             ])
             ->get();

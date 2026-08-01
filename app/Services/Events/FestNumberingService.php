@@ -316,6 +316,20 @@ class FestNumberingService
                 }
 
                 $item = $p->registration->item;
+                $headScope = $this->chestHeadScope($event, $item);
+                $existing = $this->existingChestNumber($event, $item, $p);
+
+                if ($existing !== null) {
+                    $p->update([
+                        'event_id'      => $event->id,
+                        'chest_head_id' => $headScope,
+                        'chest_no'      => $existing,
+                    ]);
+                    $count++;
+
+                    return;
+                }
+
                 ['chest' => $chest, 'persist' => $persist, 'chest_head_id' => $chestHeadId] = $this->resolveChestAssignment(
                     $event,
                     $item,
