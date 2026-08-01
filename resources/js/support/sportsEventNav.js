@@ -88,8 +88,8 @@ export function sportsEventSidebarNav(base, caps) {
         items: [
             { label: 'Venue schedule', href: `${base}/schedule`, icon: 'calendar', permissions: FEST_SCHEDULE },
             { label: 'Reports', href: `${base}/reports`, icon: 'file-text', permissions: FEST_VIEW },
-            { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permissions: FEST_CERTIFICATES },
             { label: 'ID cards', href: `${base}/id-cards`, icon: 'credit-card', permissions: FEST_VIEW },
+            { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permissions: FEST_CERTIFICATES },
         ],
     });
 
