@@ -4,160 +4,127 @@
     <meta charset="UTF-8">
     <title>Registration Register — {{ $exam->title }}</title>
     <style>
-        /* DomPDF: zero @page margins → header is naturally full-bleed.
-           All spacing is handled manually via padding on .content-wrap */
-        @page {
-            margin: 0;
-        }
+        @page { margin: 0; }
         * { box-sizing: border-box; }
         html, body {
             font-family: DejaVu Sans, Arial, sans-serif;
             color: #1a2236;
             font-size: 8.5px;
-            margin: 0;
-            padding: 0;
+            margin: 0; padding: 0;
             background: #fff;
         }
 
-        /* ── PAGE BREAK ── */
-        .class-page         { page-break-after: always; }
+        .class-page { page-break-after: always; }
         .class-page:last-child { page-break-after: avoid; }
 
-        /* ════════════════════════════════════════
-           FULL-BLEED HEADER
-        ════════════════════════════════════════ */
+        /* ════════════════════════════════════════════
+           HEADER — centered official document style
+        ════════════════════════════════════════════ */
         .page-header {
             width: 100%;
             background: #0b2558;
+            padding: 14px 20px 0 20px;
         }
-        table.header-table {
+
+        /* Row 1: logo + sahodaya name (centered together) */
+        .hdr-top {
             width: 100%;
             border-collapse: collapse;
+            margin-bottom: 8px;
         }
-        .hcell-logo {
-            width: 76px;
-            padding: 11px 0 11px 14px;
+        .hdr-logo-cell {
+            width: 62px;
             vertical-align: middle;
-            background: #0b2558;
+            text-align: right;
+            padding-right: 10px;
         }
-        .hcell-logo img {
+        .hdr-logo-cell img {
             width: 52px;
             height: 52px;
             object-fit: contain;
-            display: block;
+            display: inline-block;
         }
-        .hcell-org {
-            padding: 11px 8px;
+        .hdr-org-cell {
             vertical-align: middle;
-            background: #0b2558;
+            text-align: left;
         }
         .org-name {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 700;
-            color: #fff;
+            color: #ffffff;
             letter-spacing: 0.3px;
-            line-height: 1.15;
+            line-height: 1.1;
+            display: block;
         }
         .org-sub {
             font-size: 7px;
             color: rgba(255,255,255,0.5);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 4px;
+            letter-spacing: 1.2px;
+            margin-top: 3px;
+            display: block;
         }
-        /* vertical divider between org and meta */
-        .hcell-div {
-            width: 2px;
-            background: rgba(255,255,255,0.15);
-            padding: 0;
+
+        /* Horizontal divider inside header */
+        .hdr-divider {
+            border: none;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            margin: 0 0 0 0;
         }
-        .hcell-meta {
-            width: 195px;
-            padding: 0;
-            vertical-align: middle;
-            background: #091c42;
+
+        /* Row 2: exam name | school | class — info row */
+        .hdr-info-bar {
+            width: 100%;
+            border-collapse: collapse;
+            padding: 6px 0 10px 0;
         }
-        .meta-inner {
-            padding: 9px 14px 9px 12px;
+        .info-cell {
             text-align: center;
+            vertical-align: middle;
+            padding: 0 8px;
+            border-right: 1px solid rgba(255,255,255,0.12);
         }
-        .meta-block {
-            margin-bottom: 4px;
-        }
-        .meta-block:last-child { margin-bottom: 0; }
-        .meta-lbl {
+        .info-cell:last-child { border-right: none; }
+        .info-lbl {
             font-size: 6.5px;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            letter-spacing: 0.9px;
             color: rgba(255,255,255,0.4);
             display: block;
+            margin-bottom: 2px;
         }
-        .meta-val {
-            font-size: 8.5px;
+        .info-val {
+            font-size: 9px;
             font-weight: 700;
-            color: #fff;
+            color: #ffffff;
             display: block;
         }
-        /* blue accent stripe below header */
+        .info-val-lg {
+            font-size: 9.5px;
+            font-weight: 700;
+            color: #7eb3ff;
+            display: block;
+        }
+
+        /* Blue accent stripe */
         .header-stripe {
             width: 100%;
             height: 3px;
             background: #2563eb;
-            margin: 0;
-            padding: 0;
         }
 
-        /* ════════════════════════════════════════
-           CONTENT — padded area below header
-        ════════════════════════════════════════ */
+        /* ── CONTENT ── */
         .content-wrap {
             padding: 10px 14px 14px 14px;
         }
 
-        /* ── EXAM BANNER ── */
-        .exam-banner {
-            background: #1e3a6e;
-            border-radius: 5px 5px 0 0;
-            padding: 8px 12px;
-            width: 100%;
-        }
-        table.banner-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .exam-title-text {
-            font-size: 12px;
-            font-weight: 700;
-            color: #fff;
-            line-height: 1.2;
-        }
-        .exam-code-lbl {
-            font-size: 8px;
-            color: #a8c0e8;
-            font-weight: 400;
-            margin-left: 4px;
-        }
-        .exam-meta {
-            font-size: 7.5px;
-            color: #a8c0e8;
-            margin-top: 2px;
-        }
-        .stat-box {
-            display: inline-block;
-            background: rgba(255,255,255,0.12);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 4px;
-            padding: 4px 10px;
-            text-align: center;
-        }
-        .stat-num   { font-size: 16px; font-weight: 700; color: #fff; line-height: 1; display: block; }
-        .stat-lbl   { font-size: 7px; color: #a8c0e8; text-transform: uppercase; letter-spacing: 0.4px; display: block; }
-
-        /* ── CLASS ROW ── */
+        /* ── CLASS SUB-HEADER ── */
         .class-sub {
-            background: #162d58;
-            padding: 4px 12px 5px;
-            border-radius: 0 0 4px 4px;
+            background: #0f2d5e;
+            border: 1px solid #1e3a6e;
+            border-radius: 4px;
+            padding: 5px 12px;
+            margin-bottom: 8px;
         }
         .cls-name  { font-size: 10px; font-weight: 700; color: #fff; }
         .cls-count { font-size: 8px; color: #a8c0e8; }
@@ -166,7 +133,6 @@
         table.report-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 8px;
         }
         table.report-table thead tr { background: #0b2558; }
         table.report-table th {
@@ -198,7 +164,6 @@
         .col-status{ width: 85px; }
         .col-att   { width: 55px; }
 
-        /* ── PHOTO ── */
         .photo-img {
             width: 30px; height: 30px;
             border-radius: 50%; object-fit: cover;
@@ -217,7 +182,6 @@
         .mono         { font-family: 'Courier New', monospace; font-size: 8px; color: #334155; }
         .ticket-val   { font-family: 'Courier New', monospace; font-size: 8.5px; font-weight: 700; color: #1e40af; }
 
-        /* ── BADGES ── */
         .badge {
             display: inline-block;
             padding: 2px 7px;
@@ -234,7 +198,6 @@
         .att-absent  { color: #991b1b; font-weight: 700; }
         .att-pending { color: #6b7280; }
 
-        /* ── FOOTER ── */
         .page-footer {
             margin-top: 8px;
             padding-top: 5px;
@@ -250,32 +213,35 @@
 </head>
 <body>
 
+    {{-- ════════════════════════════════════════════
+         MACRO: header — reused for each page
+    ════════════════════════════════════════════ --}}
+
     @if(empty($groupedRows))
-        {{-- EMPTY --}}
         <div class="page-header">
-            <table class="header-table">
+            <table class="hdr-top">
                 <tr>
-                    <td class="hcell-logo">
-                        @if(!empty($logoSrc))<img src="{{ $logoSrc }}" alt="">@endif
+                    @if(!empty($logoSrc))
+                    <td class="hdr-logo-cell"><img src="{{ $logoSrc }}" alt=""></td>
+                    @endif
+                    <td class="hdr-org-cell">
+                        <span class="org-name">{{ $orgName }}</span>
+                        <span class="org-sub">Talent Search Exams &nbsp;&middot;&nbsp; Registration Register &nbsp;&middot;&nbsp; Official Report</span>
                     </td>
-                    <td class="hcell-org">
-                        <div class="org-name">{{ $orgName }}</div>
-                        <div class="org-sub">Talent Search Exams &nbsp;&middot;&nbsp; Registration Register — Official Report</div>
+                </tr>
+            </table>
+            <hr class="hdr-divider">
+            <table class="hdr-info-bar">
+                <tr>
+                    @if($school)
+                    <td class="info-cell">
+                        <span class="info-lbl">School</span>
+                        <span class="info-val">{{ $school->name }}</span>
                     </td>
-                    <td class="hcell-div"></td>
-                    <td class="hcell-meta">
-                        <div class="meta-inner">
-                            @if($school)
-                                <div class="meta-block">
-                                    <span class="meta-lbl">School</span>
-                                    <span class="meta-val">{{ $school->name }}</span>
-                                </div>
-                            @endif
-                            <div class="meta-block">
-                                <span class="meta-lbl">Generated</span>
-                                <span class="meta-val">{{ $generatedAt }}</span>
-                            </div>
-                        </div>
+                    @endif
+                    <td class="info-cell">
+                        <span class="info-lbl">Generated</span>
+                        <span class="info-val">{{ $generatedAt }}</span>
                     </td>
                 </tr>
             </table>
@@ -291,35 +257,43 @@
 
             {{-- ══ FULL-BLEED HEADER ══ --}}
             <div class="page-header">
-                <table class="header-table">
+                {{-- Row 1: Logo + Sahodaya Name --}}
+                <table class="hdr-top">
                     <tr>
-                        <td class="hcell-logo">
-                            @if(!empty($logoSrc))
-                                <img src="{{ $logoSrc }}" alt="">
-                            @endif
+                        @if(!empty($logoSrc))
+                        <td class="hdr-logo-cell"><img src="{{ $logoSrc }}" alt=""></td>
+                        @endif
+                        <td class="hdr-org-cell">
+                            <span class="org-name">{{ $orgName }}</span>
+                            <span class="org-sub">Talent Search Exams &nbsp;&middot;&nbsp; Registration Register &nbsp;&middot;&nbsp; Official Report</span>
                         </td>
-                        <td class="hcell-org">
-                            <div class="org-name">{{ $orgName }}</div>
-                            <div class="org-sub">Talent Search Exams &nbsp;&middot;&nbsp; Registration Register — Official Report</div>
+                    </tr>
+                </table>
+
+                <hr class="hdr-divider">
+
+                {{-- Row 2: Exam · School · Class · Generated --}}
+                <table class="hdr-info-bar">
+                    <tr>
+                        <td class="info-cell">
+                            <span class="info-lbl">Exam</span>
+                            <span class="info-val-lg">
+                                {{ $exam->title }}@if($exam->code) ({{ $exam->code }})@endif
+                            </span>
                         </td>
-                        <td class="hcell-div"></td>
-                        <td class="hcell-meta">
-                            <div class="meta-inner">
-                                @if($school)
-                                    <div class="meta-block">
-                                        <span class="meta-lbl">School</span>
-                                        <span class="meta-val">{{ $school->name }}</span>
-                                    </div>
-                                @endif
-                                <div class="meta-block">
-                                    <span class="meta-lbl">Class</span>
-                                    <span class="meta-val">{{ $className }}</span>
-                                </div>
-                                <div class="meta-block">
-                                    <span class="meta-lbl">Generated</span>
-                                    <span class="meta-val">{{ $generatedAt }}</span>
-                                </div>
-                            </div>
+                        @if($school)
+                        <td class="info-cell">
+                            <span class="info-lbl">School</span>
+                            <span class="info-val">{{ $school->name }}</span>
+                        </td>
+                        @endif
+                        <td class="info-cell" style="width:60px;">
+                            <span class="info-lbl">Class</span>
+                            <span class="info-val">{{ $className }}</span>
+                        </td>
+                        <td class="info-cell" style="width:110px;">
+                            <span class="info-lbl">Generated</span>
+                            <span class="info-val">{{ $generatedAt }}</span>
                         </td>
                     </tr>
                 </table>
@@ -328,30 +302,6 @@
 
             {{-- ══ CONTENT ══ --}}
             <div class="content-wrap">
-
-                {{-- Exam Banner --}}
-                <div class="exam-banner">
-                    <table class="banner-table">
-                        <tr>
-                            <td style="vertical-align:middle;">
-                                <div class="exam-title-text">
-                                    {{ $exam->title }}
-                                    @if($exam->code)<span class="exam-code-lbl">({{ $exam->code }})</span>@endif
-                                </div>
-                                <div class="exam-meta">
-                                    @if($exam->scheduled_at)Scheduled: {{ $exam->scheduled_at->format('d M Y') }} &nbsp;&middot;&nbsp; @endif
-                                    Class: <strong style="color:#fff;">{{ $className }}</strong>
-                                </div>
-                            </td>
-                            <td style="width:90px; text-align:right; vertical-align:middle;">
-                                <div class="stat-box">
-                                    <span class="stat-num">{{ count($students) }}</span>
-                                    <span class="stat-lbl">{{ count($students) === 1 ? 'Candidate' : 'Candidates' }}</span>
-                                </div>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
 
                 {{-- Class sub-header --}}
                 <div class="class-sub">
@@ -418,10 +368,10 @@
 
                 {{-- Footer --}}
                 <div class="page-footer">
-                    <div class="footer-left">{{ $exam->title }} — Registration Register</div>
+                    <div class="footer-left">{{ $exam->title }} &mdash; Registration Register &mdash; {{ $orgName }}</div>
                     <div class="footer-right">
-                        @if($school){{ $school->name }} &nbsp;|&nbsp;@endif
-                        Generated: {{ $generatedAt }}
+                        @if($school){{ $school->name }} &nbsp;|&nbsp; Class {{ $className }} &nbsp;|&nbsp; @endif
+                        {{ $generatedAt }}
                     </div>
                 </div>
 
