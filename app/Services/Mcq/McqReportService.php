@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class McqReportService
 {
     /** @return list<array<string, mixed>> */
-    public function registrationRows(McqExam $exam, ?string $schoolId = null): array
+    public function registrationRows(McqExam $exam, ?string $schoolId = null, ?string $selectedClass = null): array
     {
         $query = McqRegistration::where('exam_id', $exam->id)
             ->with(['student.schoolClass', 'teacher', 'school', 'mark', 'feeReceipt']);
@@ -21,9 +21,21 @@ class McqReportService
             $query->where('school_id', $schoolId);
         }
 
-        return $query->orderBy('hall_ticket_no')
+        $registrations = $query->orderBy('hall_ticket_no')
             ->orderBy('id')
-            ->get()
+            ->get();
+
+        if ($selectedClass && filled($selectedClass) && strtolower(trim((string) $selectedClass)) !== 'all') {
+            $cleanFilter = strtolower(trim(str_ireplace('class', '', (string) $selectedClass)));
+            $registrations = $registrations->filter(function ($reg) use ($cleanFilter) {
+                $cName = strtolower(trim(str_ireplace('class', '', (string) ($reg->student?->schoolClass?->name ?? ''))));
+
+                return $cName === $cleanFilter;
+            });
+        }
+
+        return $registrations
+            ->values()
             ->map(fn (McqRegistration $reg) => [
                 'hall_ticket_no'   => $reg->hall_ticket_no,
                 'student_name'     => $reg->participantName(),
@@ -89,10 +101,13 @@ class McqReportService
             ->all();
     }
 
-    public function exportRegistrationRegister(McqExam $exam, ?string $schoolId = null): StreamedResponse
+    public function exportRegistrationRegister(McqExam $exam, ?string $schoolId = null, ?string $selectedClass = null): StreamedResponse
     {
-        $rows = $this->registrationRows($exam, $schoolId);
+        $rows = $this->registrationRows($exam, $schoolId, $selectedClass);
         $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+        if ($selectedClass) {
+            $suffix .= '-class-'.$selectedClass;
+        }
 
         return ExcelExport::download(
             'mcq-registration-register-'.$exam->id.$suffix,
@@ -132,10 +147,13 @@ class McqReportService
         );
     }
 
-    public function exportAttendance(McqExam $exam, ?string $schoolId = null): StreamedResponse
+    public function exportAttendance(McqExam $exam, ?string $schoolId = null, ?string $selectedClass = null): StreamedResponse
     {
-        $rows = $this->registrationRows($exam, $schoolId);
+        $rows = $this->registrationRows($exam, $schoolId, $selectedClass);
         $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+        if ($selectedClass) {
+            $suffix .= '-class-'.$selectedClass;
+        }
 
         return ExcelExport::download(
             'mcq-attendance-'.$exam->id.$suffix,

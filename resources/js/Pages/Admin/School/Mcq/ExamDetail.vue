@@ -638,6 +638,22 @@
 
         <!-- Reports tab -->
         <div v-else-if="tab === 'reports'" class="space-y-6">
+            <!-- Filter Bar for Class selection -->
+            <div class="card bg-slate-50 border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-sm">Class Filter & Report Options</h3>
+                    <p class="text-xs text-slate-500">Filter PDF/Excel reports by a specific class or generate for all classes.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-xs font-semibold text-slate-700">Select Class:</label>
+                    <select v-model="reportClassFilter" class="field text-xs min-w-[170px] bg-white font-semibold text-slate-800">
+                        <option value="">All Classes</option>
+                        <option v-for="c in classOptions" :key="c.id" :value="c.name">Class {{ c.name }}</option>
+                    </select>
+                    <button v-if="reportClassFilter" type="button" @click="reportClassFilter = ''" class="text-xs text-slate-500 hover:text-slate-800 underline ml-1">Clear</button>
+                </div>
+            </div>
+
             <!-- 4 Main Report Action Cards -->
             <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <!-- 1. Registration Register -->
@@ -651,10 +667,10 @@
                     </div>
                     <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
                         <div class="flex items-center gap-1.5">
-                            <a :href="reportExports.registration" class="btn-secondary text-xs flex-1 justify-center">
+                            <a :href="reportUrlWithClass(reportExports.registration)" class="btn-secondary text-xs flex-1 justify-center">
                                 <span>Export Excel ↓</span>
                             </a>
-                            <a v-if="reportExports.registrationPdf" :href="reportExports.registrationPdf" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
+                            <a v-if="reportExports.registrationPdf" :href="reportUrlWithClass(reportExports.registrationPdf)" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
                                 <span>Export PDF ↓</span>
                             </a>
                         </div>
@@ -680,10 +696,10 @@
                     </div>
                     <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
                         <div class="flex items-center gap-1.5">
-                            <a :href="reportExports.attendance" class="btn-secondary text-xs flex-1 justify-center">
+                            <a :href="reportUrlWithClass(reportExports.attendance)" class="btn-secondary text-xs flex-1 justify-center">
                                 <span>Export Excel ↓</span>
                             </a>
-                            <a v-if="reportExports.attendancePdf" :href="reportExports.attendancePdf" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
+                            <a v-if="reportExports.attendancePdf" :href="reportUrlWithClass(reportExports.attendancePdf)" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
                                 <span>Export PDF ↓</span>
                             </a>
                         </div>
@@ -709,10 +725,10 @@
                     </div>
                     <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
                         <div class="flex items-center gap-1.5">
-                            <a :href="reportExports.classWiseCounts" class="btn-secondary text-xs flex-1 justify-center">
+                            <a :href="reportUrlWithClass(reportExports.classWiseCounts)" class="btn-secondary text-xs flex-1 justify-center">
                                 <span>Export Excel ↓</span>
                             </a>
-                            <a v-if="reportExports.classWiseCountsPdf" :href="reportExports.classWiseCountsPdf" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
+                            <a v-if="reportExports.classWiseCountsPdf" :href="reportUrlWithClass(reportExports.classWiseCountsPdf)" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
                                 <span>Export PDF ↓</span>
                             </a>
                         </div>
@@ -738,10 +754,10 @@
                     </div>
                     <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
                         <div class="flex items-center gap-1.5">
-                            <a v-if="reportExports.feeDue" :href="reportExports.feeDue" class="btn-secondary text-xs flex-1 justify-center">
+                            <a v-if="reportExports.feeDue" :href="reportUrlWithClass(reportExports.feeDue)" class="btn-secondary text-xs flex-1 justify-center">
                                 <span>Export Excel ↓</span>
                             </a>
-                            <a v-if="reportExports.feeDuePdf" :href="reportExports.feeDuePdf" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
+                            <a v-if="reportExports.feeDuePdf" :href="reportUrlWithClass(reportExports.feeDuePdf)" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
                                 <span>Export PDF ↓</span>
                             </a>
                         </div>
@@ -804,7 +820,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(row, i) in reportRows.slice(0, 100)" :key="i">
+                            <tr v-for="(row, i) in filteredReportRows.slice(0, 100)" :key="i">
                                 <td class="font-mono text-xs font-semibold text-slate-800">{{ row.hall_ticket_no || '—' }}</td>
                                 <td class="font-medium text-slate-900">{{ row.student_name }}</td>
                                 <td class="font-mono text-xs text-slate-500">{{ row.reg_no || '—' }}</td>
@@ -824,7 +840,7 @@
                             </tr>
                         </tbody>
                     </table>
-                    <div v-if="!reportRows.length" class="p-8 text-center text-slate-500">
+                    <div v-if="!filteredReportRows.length" class="p-8 text-center text-slate-500">
                         No registrations found to preview.
                     </div>
                 </div>
@@ -842,7 +858,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(row, i) in reportRows" :key="i">
+                            <tr v-for="(row, i) in filteredReportRows" :key="i">
                                 <td class="text-xs text-slate-400 font-bold">{{ i + 1 }}</td>
                                 <td class="font-mono text-xs font-semibold">{{ row.hall_ticket_no || '—' }}</td>
                                 <td class="font-medium text-slate-900">{{ row.student_name }}</td>
@@ -859,7 +875,7 @@
                             </tr>
                         </tbody>
                     </table>
-                    <div v-if="!reportRows.length" class="p-8 text-center text-slate-500">
+                    <div v-if="!filteredReportRows.length" class="p-8 text-center text-slate-500">
                         No attendance records found to preview.
                     </div>
                 </div>
@@ -988,13 +1004,42 @@ const props = defineProps({
 });
 
 const activeReportPreviewTab = ref('registration');
+const reportClassFilter = ref('');
+
+const filteredReportRows = computed(() => {
+    if (!reportClassFilter.value) {
+        return props.reportRows;
+    }
+    const clean = String(reportClassFilter.value).toLowerCase().replace('class', '').trim();
+    return props.reportRows.filter(r => {
+        const cName = String(r.class_name || '').toLowerCase().replace('class', '').trim();
+        return cName === clean;
+    });
+});
+
+function reportUrlWithClass(baseUrl, inline = false) {
+    if (!baseUrl) return '#';
+    let url = baseUrl;
+    const params = [];
+    if (inline) {
+        params.push('inline=1');
+    }
+    if (reportClassFilter.value) {
+        params.push('class=' + encodeURIComponent(reportClassFilter.value));
+    }
+    if (params.length) {
+        url += (url.includes('?') ? '&' : '?') + params.join('&');
+    }
+    return url;
+}
 
 function setReportPreview(tabKey) {
     activeReportPreviewTab.value = tabKey;
 }
 
-function openPdfPreview(url) {
-    if (!url) return;
+function openPdfPreview(baseUrl) {
+    const url = reportUrlWithClass(baseUrl, true);
+    if (!url || url === '#') return;
     window.open(url, '_blank');
 }
 
