@@ -58,23 +58,27 @@ class FestRegistrationApprovalService
      */
     public function promoteNextWaitlisted(FestEvent $event, ?int $headId): ?FestRegistration
     {
-        if (! $headId) {
-            return null;
-        }
-
         $next = FestRegistration::query()
             ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'waitlisted')
-            ->whereHas('item', fn ($q) => $q->where('head_id', $headId))
-            ->with(['item.head'])
+            ->when($headId, fn ($q) => $q->whereHas('item', fn ($qi) => $qi->where('head_id', $headId)))
+            ->with(['item.head', 'event'])
             ->orderBy('id')
             ->first();
 
-        if (! $next) {
+        if (! $next || ! $next->item) {
             return null;
         }
 
-        $status = $next->item?->head?->requiresManualApproval() ? 'pending_approval' : 'submitted';
+        $limitService = new FestParticipationLimitService($event);
+        if ($limitService->isHeadAtCapacity($next->item, $next->school_id)) {
+            return null;
+        }
+
+        $status = ($next->item->head?->requiresManualApproval() || $event->requiresManualApproval())
+            ? 'pending_approval'
+            : 'submitted';
+
         $next->update([
             'status' => $status,
             'submitted_at' => $next->submitted_at ?? now(),
@@ -87,6 +91,46 @@ class FestRegistrationApprovalService
         app(FestSchoolEventFeeService::class)->recalculate($event, $next->school_id);
 
         return $next;
+    }
+
+    /** Promote all waitlisted registrations for an event whose quotas are now open. */
+    public function promoteAllEligibleWaitlisted(FestEvent $event): int
+    {
+        $waitlistedRegs = FestRegistration::query()
+            ->whereIn('event_id', $event->reportableEventIds())
+            ->where('status', 'waitlisted')
+            ->with(['item.head', 'event'])
+            ->orderBy('id')
+            ->get();
+
+        $promotedCount = 0;
+        foreach ($waitlistedRegs as $reg) {
+            if (! $reg->item) {
+                continue;
+            }
+
+            $limitService = new FestParticipationLimitService($event);
+            if (! $limitService->isHeadAtCapacity($reg->item, $reg->school_id)) {
+                $status = ($reg->item->head?->requiresManualApproval() || $event->requiresManualApproval())
+                    ? 'pending_approval'
+                    : 'submitted';
+
+                $reg->update([
+                    'status'       => $status,
+                    'submitted_at' => $reg->submitted_at ?? now(),
+                ]);
+
+                $reg->loadMissing('participants');
+                foreach ($reg->participants as $participant) {
+                    app(FestNumberingService::class)->assignParticipantNumbers($participant);
+                }
+                app(FestSchoolEventFeeService::class)->recalculate($event, $reg->school_id);
+
+                $promotedCount++;
+            }
+        }
+
+        return $promotedCount;
     }
 
     public function approve(FestRegistration $registration): void

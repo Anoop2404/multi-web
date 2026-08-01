@@ -108,6 +108,11 @@ class FestRegistrationController extends SchoolAdminController
 
         $registrationEventIds = $this->registrationEventIdsForSchoolView($events);
 
+        $approvalService = app(\App\Services\Events\FestRegistrationApprovalService::class);
+        foreach ($events as $eventToPromote) {
+            $approvalService->promoteAllEligibleWaitlisted($eventToPromote);
+        }
+
         $registrations = FestRegistration::where('school_id', $this->school->id)
             ->whereIn('event_id', $registrationEventIds)
             ->with(['event', 'item', 'participants.student', 'participants.group'])
