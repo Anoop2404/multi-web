@@ -67,14 +67,13 @@ class SahodayaTopperSelectionService
     public function byStreamForClassXII(string $sahodayaId, string $academicYear): array
     {
         $rows = $this->rankedRows($sahodayaId, $academicYear, RankingEngine::SCOPE_STUDENT_STREAM, 12);
-
         $grouped = collect($rows)->groupBy(function ($row) {
             $st = $row['meta']['stream'] ?? null;
-            if (blank($st) || strtolower($st) === 'unknown' || strtolower($st) === 'unknown stream') {
-                return 'General / All Streams';
+            if (blank($st) || in_array(strtolower(trim($st)), ['unknown', 'unknown stream', 'general', 'general / all streams'], true)) {
+                return null;
             }
             return ucfirst($st);
-        });
+        })->filter(fn ($v, $k) => !blank($k));
 
         $out = [];
         foreach ($grouped as $streamLabel => $streamRows) {
@@ -98,11 +97,11 @@ class SahodayaTopperSelectionService
 
             $fallbackGrouped = $toppers->groupBy(function (Topper $t) {
                 $st = $t->examStream?->label ?? $t->stream;
-                if (blank($st) || strtolower($st) === 'unknown' || strtolower($st) === 'unknown stream') {
-                    return 'General / All Streams';
+                if (blank($st) || in_array(strtolower(trim($st)), ['unknown', 'unknown stream', 'general', 'general / all streams'], true)) {
+                    return null;
                 }
                 return ucfirst($st);
-            });
+            })->filter(fn ($v, $k) => !blank($k));
 
             foreach ($fallbackGrouped as $streamLabel => $streamToppers) {
                 $sorted = $streamToppers->sortByDesc(fn (Topper $t) => (float) $t->percentage)->values();
@@ -168,11 +167,11 @@ class SahodayaTopperSelectionService
 
         $grouped = $toppers->groupBy(function (Topper $t) {
             $st = $t->examStream?->label ?? $t->stream;
-            if (blank($st) || strtolower($st) === 'unknown' || strtolower($st) === 'unknown stream') {
-                return 'General / All Streams';
+            if (blank($st) || in_array(strtolower(trim($st)), ['unknown', 'unknown stream', 'general', 'general / all streams'], true)) {
+                return null;
             }
             return ucfirst($st);
-        });
+        })->filter(fn ($v, $k) => !blank($k));
 
         $noRank = $this->counts->isNoRankMode($sahodayaId);
         $out = [];

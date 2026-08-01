@@ -1962,6 +1962,7 @@ trait QueriesExtendedReports
             ->orderBy('stream')
             ->orderByDesc('percentage')
             ->get()
+            ->filter(fn (Topper $t) => !blank($t->examStream?->label ?? $t->stream) && !in_array(strtolower(trim($t->examStream?->label ?? $t->stream)), ['unknown', 'unknown stream', 'general', 'general / all streams'], true))
             ->map(fn (Topper $t) => [
                 'stream' => $t->examStream?->label ?? $t->stream,
                 'rank' => $t->rank,
