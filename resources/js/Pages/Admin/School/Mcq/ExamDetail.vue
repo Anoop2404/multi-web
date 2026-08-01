@@ -899,7 +899,7 @@
                             <tr>
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Hall Ticket</th>
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Student Name</th>
-                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Reg No</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">School Adm. No.</th>
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Class</th>
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Approval</th>
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-slate-700">Attendance</th>
@@ -910,7 +910,7 @@
                             <tr v-for="(row, i) in filteredReportRows.slice(0, 100)" :key="i" class="hover:bg-slate-50 transition-colors">
                                 <td class="py-3 px-4 font-mono text-xs font-bold text-indigo-700">{{ row.hall_ticket_no || '—' }}</td>
                                 <td class="py-3 px-4 font-bold text-slate-900 text-sm">{{ row.student_name }}</td>
-                                <td class="py-3 px-4 font-mono text-xs text-slate-500">{{ row.reg_no || '—' }}</td>
+                                <td class="py-3 px-4 font-mono text-xs text-slate-600 font-semibold">{{ row.admission_number || '—' }}</td>
                                 <td class="py-3 px-4 text-xs font-bold text-slate-800">
                                     <span class="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">Class {{ row.class_name || '—' }}</span>
                                 </td>

@@ -39,6 +39,7 @@ class McqReportService
             ->map(fn (McqRegistration $reg) => [
                 'hall_ticket_no'   => $reg->hall_ticket_no,
                 'student_name'     => $reg->participantName(),
+                'admission_number' => $reg->student?->admission_number,
                 'reg_no'           => $reg->student?->reg_no ?? $reg->teacher?->employee_code ?? $reg->teacher?->reg_no,
                 'class_name'       => $reg->student?->schoolClass?->name,
                 'school_name'      => $reg->school?->name,
