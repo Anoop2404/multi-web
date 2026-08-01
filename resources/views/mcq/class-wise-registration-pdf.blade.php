@@ -79,7 +79,7 @@
         }
         .meta-inner {
             padding: 9px 14px 9px 12px;
-            text-align: right;
+            text-align: center;
         }
         .meta-block {
             margin-bottom: 4px;
