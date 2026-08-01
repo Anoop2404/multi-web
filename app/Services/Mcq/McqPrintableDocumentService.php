@@ -12,9 +12,9 @@ use Illuminate\Http\Response;
 /** Printable attendance / mark / result sheets for Talent Search exams. */
 class McqPrintableDocumentService
 {
-    public function attendanceSheetPdf(McqExam $exam, ?Tenant $sahodaya = null): Response
+    public function attendanceSheetPdf(McqExam $exam, ?string $schoolId = null, ?Tenant $sahodaya = null): Response
     {
-        $rows = $this->registrationRows($exam);
+        $rows = $this->registrationRows($exam, schoolId: $schoolId);
         $sahodaya ??= Tenant::find($exam->tenant_id);
 
         $pdf = Pdf::loadView('mcq.attendance-sheet', [
@@ -25,7 +25,9 @@ class McqPrintableDocumentService
             'generatedAt' => $this->generatedAt(),
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download($this->slug($exam).'-attendance-sheet.pdf');
+        $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+
+        return $pdf->download($this->slug($exam).'-attendance-sheet'.$suffix.'.pdf');
     }
 
     public function markSheetPdf(McqExam $exam, ?Tenant $sahodaya = null): Response
@@ -150,6 +152,26 @@ class McqPrintableDocumentService
         return $pdf->download($this->slug($exam).'-class-wise-registration-report'.$suffix.'.pdf');
     }
 
+    public function classWiseFeeDuePdf(McqExam $exam, ?string $schoolId = null, ?Tenant $sahodaya = null): Response
+    {
+        $matrix = app(McqReportService::class)->classWiseFeeDueMatrix($exam, $schoolId);
+        $sahodaya ??= Tenant::find($exam->tenant_id);
+        $school = $schoolId ? Tenant::find($schoolId) : null;
+
+        $pdf = Pdf::loadView('mcq.class-wise-fee-due', [
+            'exam'        => $exam,
+            'school'      => $school,
+            'matrix'      => $matrix,
+            'orgName'     => $sahodaya?->name ?? 'Sahodaya',
+            'logoSrc'     => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
+            'generatedAt' => $this->generatedAt(),
+        ])->setPaper('a4', 'portrait');
+
+        $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+
+        return $pdf->download($this->slug($exam).'-class-wise-fee-due-report'.$suffix.'.pdf');
+    }
+
     private function studentPhotoSrc(?\App\Models\Student $student): string
     {
         if ($student && $student->photo) {
@@ -179,12 +201,16 @@ class McqPrintableDocumentService
     /**
      * @return list<array<string, mixed>>
      */
-    private function registrationRows(McqExam $exam, bool $presentOnly = false, bool $withMarks = false): array
+    private function registrationRows(McqExam $exam, bool $presentOnly = false, bool $withMarks = false, ?string $schoolId = null): array
     {
         $query = McqRegistration::where('exam_id', $exam->id)
             ->with(['student.schoolClass', 'teacher', 'school', 'mark'])
             ->orderBy('hall_ticket_no')
             ->orderBy('id');
+
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
 
         if ($presentOnly) {
             $query->where('attendance_status', 'present');

@@ -637,54 +637,313 @@
         </div>
 
         <!-- Reports tab -->
-        <div v-else-if="tab === 'reports'" class="space-y-4">
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div class="card">
-                    <h3 class="section-title">Registration register</h3>
-                    <p class="section-desc">Your school's registrations with photos, hall tickets, and approval status.</p>
-                    <div class="flex flex-wrap gap-2 mt-3">
-                        <a :href="reportExports.registration" class="btn-secondary text-sm">Export Excel ↓</a>
-                        <a v-if="reportExports.registrationPdf" :href="reportExports.registrationPdf" target="_blank" class="btn-secondary text-sm">Export PDF ↓</a>
+        <div v-else-if="tab === 'reports'" class="space-y-6">
+            <!-- 4 Main Report Action Cards -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 1. Registration Register -->
+                <div class="card flex flex-col justify-between" :class="{'ring-2 ring-indigo-500 bg-indigo-50/20': activeReportPreviewTab === 'registration'}">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <h3 class="section-title !mb-0">Registration register</h3>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">PDF & Excel</span>
+                        </div>
+                        <p class="section-desc">Your school's registrations with photos, hall tickets, and approval status.</p>
+                    </div>
+                    <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
+                        <div class="flex items-center gap-1.5">
+                            <a :href="reportExports.registration" class="btn-secondary text-xs flex-1 justify-center">
+                                <span>Export Excel ↓</span>
+                            </a>
+                            <a v-if="reportExports.registrationPdf" :href="reportExports.registrationPdf" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
+                                <span>Export PDF ↓</span>
+                            </a>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" v-if="reportExports.registrationPdf" @click="openPdfPreview(reportExports.registrationPdf)" class="btn-secondary text-xs flex-1 justify-center text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100">
+                                👁 Preview PDF
+                            </button>
+                            <button type="button" @click="setReportPreview('registration')" class="btn-secondary text-xs flex-1 justify-center text-slate-700 hover:bg-slate-100" :class="{'!bg-slate-800 !text-white': activeReportPreviewTab === 'registration'}">
+                                📊 Preview Data
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div class="card">
-                    <h3 class="section-title">Attendance sheet</h3>
-                    <p class="section-desc">Hall ticket list for exam-day attendance.</p>
-                    <a :href="reportExports.attendance" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
-                </div>
-                <div v-if="reportExports.classWiseCounts" class="card">
-                    <h3 class="section-title">Class-wise count report</h3>
-                    <p class="section-desc">Class-wise student registration count matrix for your school.</p>
-                    <div class="flex flex-wrap gap-2 mt-3">
-                        <a :href="reportExports.classWiseCounts" class="btn-secondary text-sm">Export Excel ↓</a>
-                        <a v-if="reportExports.classWiseCountsPdf" :href="reportExports.classWiseCountsPdf" target="_blank" class="btn-secondary text-sm">Export PDF ↓</a>
+
+                <!-- 2. Attendance Sheet -->
+                <div class="card flex flex-col justify-between" :class="{'ring-2 ring-indigo-500 bg-indigo-50/20': activeReportPreviewTab === 'attendance'}">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <h3 class="section-title !mb-0">Attendance sheet</h3>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">PDF & Excel</span>
+                        </div>
+                        <p class="section-desc">Hall ticket list & attendance checklist for exam day.</p>
+                    </div>
+                    <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
+                        <div class="flex items-center gap-1.5">
+                            <a :href="reportExports.attendance" class="btn-secondary text-xs flex-1 justify-center">
+                                <span>Export Excel ↓</span>
+                            </a>
+                            <a v-if="reportExports.attendancePdf" :href="reportExports.attendancePdf" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
+                                <span>Export PDF ↓</span>
+                            </a>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" v-if="reportExports.attendancePdf" @click="openPdfPreview(reportExports.attendancePdf)" class="btn-secondary text-xs flex-1 justify-center text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100">
+                                👁 Preview PDF
+                            </button>
+                            <button type="button" @click="setReportPreview('attendance')" class="btn-secondary text-xs flex-1 justify-center text-slate-700 hover:bg-slate-100" :class="{'!bg-slate-800 !text-white': activeReportPreviewTab === 'attendance'}">
+                                📊 Preview Data
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div v-if="exam.results_published && reportExports.toppers" class="card">
-                    <h3 class="section-title">School toppers</h3>
-                    <p class="section-desc">Top performers from your school after results are published.</p>
-                    <a :href="reportExports.toppers" class="btn-secondary text-sm mt-3 inline-block">Export toppers ↓</a>
+
+                <!-- 3. Class-Wise Count Report -->
+                <div class="card flex flex-col justify-between" :class="{'ring-2 ring-indigo-500 bg-indigo-50/20': activeReportPreviewTab === 'counts'}">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <h3 class="section-title !mb-0">Class-wise count report</h3>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800">PDF & Excel</span>
+                        </div>
+                        <p class="section-desc">Class-wise student registration count matrix for your school.</p>
+                    </div>
+                    <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
+                        <div class="flex items-center gap-1.5">
+                            <a :href="reportExports.classWiseCounts" class="btn-secondary text-xs flex-1 justify-center">
+                                <span>Export Excel ↓</span>
+                            </a>
+                            <a v-if="reportExports.classWiseCountsPdf" :href="reportExports.classWiseCountsPdf" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
+                                <span>Export PDF ↓</span>
+                            </a>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" v-if="reportExports.classWiseCountsPdf" @click="openPdfPreview(reportExports.classWiseCountsPdf)" class="btn-secondary text-xs flex-1 justify-center text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100">
+                                👁 Preview PDF
+                            </button>
+                            <button type="button" @click="setReportPreview('counts')" class="btn-secondary text-xs flex-1 justify-center text-slate-700 hover:bg-slate-100" :class="{'!bg-slate-800 !text-white': activeReportPreviewTab === 'counts'}">
+                                📊 Preview Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Class-Wise Fee Due Report -->
+                <div class="card flex flex-col justify-between" :class="{'ring-2 ring-indigo-500 bg-indigo-50/20': activeReportPreviewTab === 'feeDue'}">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <h3 class="section-title !mb-0">Class-wise Fee Due Report</h3>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">PDF & Excel</span>
+                        </div>
+                        <p class="section-desc">Class-wise fee breakdown, paid amount, and pending due for your school.</p>
+                    </div>
+                    <div class="space-y-2 mt-4 pt-3 border-t border-slate-100">
+                        <div class="flex items-center gap-1.5">
+                            <a v-if="reportExports.feeDue" :href="reportExports.feeDue" class="btn-secondary text-xs flex-1 justify-center">
+                                <span>Export Excel ↓</span>
+                            </a>
+                            <a v-if="reportExports.feeDuePdf" :href="reportExports.feeDuePdf" target="_blank" class="btn-secondary text-xs flex-1 justify-center">
+                                <span>Export PDF ↓</span>
+                            </a>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" v-if="reportExports.feeDuePdf" @click="openPdfPreview(reportExports.feeDuePdf)" class="btn-secondary text-xs flex-1 justify-center text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100">
+                                👁 Preview PDF
+                            </button>
+                            <button type="button" @click="setReportPreview('feeDue')" class="btn-secondary text-xs flex-1 justify-center text-slate-700 hover:bg-slate-100" :class="{'!bg-slate-800 !text-white': activeReportPreviewTab === 'feeDue'}">
+                                📊 Preview Data
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="card card--flush overflow-hidden">
-                <div class="p-4 border-b border-slate-100">
-                    <h3 class="section-title !mb-0">Preview ({{ reportRows.length }})</h3>
+
+            <!-- Report Data Preview Section -->
+            <div class="card card--flush overflow-hidden border border-slate-200 shadow-sm">
+                <!-- Preview Header Bar & Tabs -->
+                <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">Report Preview</h3>
+                        <p class="text-xs text-slate-500">Live preview of selected report data for {{ school?.name }}</p>
+                    </div>
+                    <div class="inline-flex rounded-lg border border-slate-200 bg-white p-1 text-xs shadow-sm">
+                        <button type="button" class="px-3 py-1.5 rounded-md font-medium transition"
+                                :class="activeReportPreviewTab === 'registration' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                                @click="activeReportPreviewTab = 'registration'">
+                            Registration Register ({{ reportRows.length }})
+                        </button>
+                        <button type="button" class="px-3 py-1.5 rounded-md font-medium transition"
+                                :class="activeReportPreviewTab === 'attendance' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                                @click="activeReportPreviewTab = 'attendance'">
+                            Attendance Sheet
+                        </button>
+                        <button type="button" class="px-3 py-1.5 rounded-md font-medium transition"
+                                :class="activeReportPreviewTab === 'counts' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                                @click="activeReportPreviewTab = 'counts'">
+                            Class-wise Counts
+                        </button>
+                        <button type="button" class="px-3 py-1.5 rounded-md font-medium transition"
+                                :class="activeReportPreviewTab === 'feeDue' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                                @click="activeReportPreviewTab = 'feeDue'">
+                            Class-wise Fee Due
+                        </button>
+                    </div>
                 </div>
-                <table class="data-table">
-                    <thead><tr><th>Hall ticket</th><th>Student</th><th>Class</th><th>Approval</th><th>Attendance</th></tr></thead>
-                    <tbody>
-                        <tr v-for="(row, i) in reportRows.slice(0, 50)" :key="i">
-                            <td>{{ row.hall_ticket_no || '—' }}</td>
-                            <td>{{ row.student_name }}</td>
-                            <td class="text-xs">{{ row.class_name || '—' }}</td>
-                            <td class="text-xs">
-                                {{ row.approval_status }}
-                                <div v-if="row.approval_status === 'rejected' && row.rejection_reason" class="text-[10px] text-red-600 mt-0.5 truncate max-w-[150px]" :title="row.rejection_reason">{{ row.rejection_reason }}</div>
-                            </td>
-                            <td class="text-xs">{{ row.attendance_status || '—' }}</td>
-                        </tr>
-                    </tbody>
-                </table>
+
+                <!-- 1. Registration Register Preview -->
+                <div v-if="activeReportPreviewTab === 'registration'">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Hall ticket</th>
+                                <th>Student</th>
+                                <th>Reg No</th>
+                                <th>Class</th>
+                                <th>Approval</th>
+                                <th>Attendance</th>
+                                <th>Fee Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, i) in reportRows.slice(0, 100)" :key="i">
+                                <td class="font-mono text-xs font-semibold text-slate-800">{{ row.hall_ticket_no || '—' }}</td>
+                                <td class="font-medium text-slate-900">{{ row.student_name }}</td>
+                                <td class="font-mono text-xs text-slate-500">{{ row.reg_no || '—' }}</td>
+                                <td class="text-xs font-semibold text-indigo-700">{{ row.class_name || '—' }}</td>
+                                <td class="text-xs">
+                                    <span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold capitalize"
+                                          :class="{
+                                              'bg-emerald-100 text-emerald-800': row.approval_status === 'approved',
+                                              'bg-amber-100 text-amber-800': row.approval_status === 'pending' || row.approval_status === 'pending_payment',
+                                              'bg-rose-100 text-rose-800': row.approval_status === 'rejected',
+                                          }">
+                                        {{ row.approval_status?.replace('_', ' ') }}
+                                    </span>
+                                </td>
+                                <td class="text-xs capitalize">{{ row.attendance_status || 'pending' }}</td>
+                                <td class="text-xs capitalize">{{ row.fee_status || '—' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div v-if="!reportRows.length" class="p-8 text-center text-slate-500">
+                        No registrations found to preview.
+                    </div>
+                </div>
+
+                <!-- 2. Attendance Sheet Preview -->
+                <div v-else-if="activeReportPreviewTab === 'attendance'">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Hall ticket</th>
+                                <th>Student Name</th>
+                                <th>Class</th>
+                                <th>Attendance Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, i) in reportRows" :key="i">
+                                <td class="text-xs text-slate-400 font-bold">{{ i + 1 }}</td>
+                                <td class="font-mono text-xs font-semibold">{{ row.hall_ticket_no || '—' }}</td>
+                                <td class="font-medium text-slate-900">{{ row.student_name }}</td>
+                                <td class="text-xs font-semibold text-indigo-700">{{ row.class_name || '—' }}</td>
+                                <td class="text-xs font-bold capitalize"
+                                    :class="{
+                                        'text-emerald-700': row.attendance_status === 'present',
+                                        'text-rose-700': row.attendance_status === 'absent',
+                                        'text-amber-700': ['malpractice', 'withheld'].includes(row.attendance_status),
+                                        'text-slate-400': !row.attendance_status || row.attendance_status === 'pending'
+                                    }">
+                                    {{ row.attendance_status || 'pending' }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div v-if="!reportRows.length" class="p-8 text-center text-slate-500">
+                        No attendance records found to preview.
+                    </div>
+                </div>
+
+                <!-- 3. Class-Wise Count Matrix Preview -->
+                <div v-else-if="activeReportPreviewTab === 'counts'">
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>School Name</th>
+                                    <th v-for="cls in classWiseCountMatrix.classes" :key="cls" class="text-center">{{ cls }}</th>
+                                    <th class="text-center font-bold">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(sch, i) in classWiseCountMatrix.schools" :key="sch.school_id">
+                                    <td class="text-xs font-bold text-slate-400">{{ i + 1 }}</td>
+                                    <td class="font-bold text-slate-800">{{ sch.school_name }}</td>
+                                    <td v-for="cls in classWiseCountMatrix.classes" :key="cls" class="text-center font-mono">
+                                        {{ sch.counts[cls] || 0 }}
+                                    </td>
+                                    <td class="text-center font-bold text-indigo-700">{{ sch.total }}</td>
+                                </tr>
+                            </tbody>
+                            <tfoot v-if="classWiseCountMatrix.schools?.length" class="bg-slate-100 font-bold border-t-2 border-slate-300">
+                                <tr>
+                                    <td colspan="2" class="text-right uppercase text-xs">Total All Classes</td>
+                                    <td v-for="cls in classWiseCountMatrix.classes" :key="cls" class="text-center font-mono text-slate-900">
+                                        {{ classWiseCountMatrix.totals[cls] || 0 }}
+                                    </td>
+                                    <td class="text-center font-mono text-emerald-800 bg-emerald-100 text-sm">{{ classWiseCountMatrix.grand_total }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div v-if="!classWiseCountMatrix.schools?.length" class="p-8 text-center text-slate-500">
+                        No class-wise count data available to preview.
+                    </div>
+                </div>
+
+                <!-- 4. Class-Wise Fee Due Report Preview -->
+                <div v-else-if="activeReportPreviewTab === 'feeDue'">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Class / Roster</th>
+                                <th class="text-center">Registered Students</th>
+                                <th class="text-right">Fee Rate (₹)</th>
+                                <th class="text-right">Total Amount (₹)</th>
+                                <th class="text-right">Paid Amount (₹)</th>
+                                <th class="text-right">Pending Fee Due (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, i) in feeDueMatrix.rows" :key="i">
+                                <td class="text-xs text-slate-400 font-bold">{{ i + 1 }}</td>
+                                <td class="font-bold text-indigo-900">{{ row.class_name }}</td>
+                                <td class="text-center font-bold text-slate-800">{{ row.count }}</td>
+                                <td class="text-right font-mono">₹{{ Number(row.fee_rate).toFixed(2) }}</td>
+                                <td class="text-right font-mono font-bold text-slate-900">₹{{ Number(row.total_fee).toFixed(2) }}</td>
+                                <td class="text-right font-mono font-bold text-emerald-700">₹{{ Number(row.paid).toFixed(2) }}</td>
+                                <td class="text-right font-mono font-bold" :class="Number(row.due) > 0 ? 'text-rose-700' : 'text-slate-400'">
+                                    ₹{{ Number(row.due).toFixed(2) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot v-if="feeDueMatrix.rows?.length" class="bg-slate-100 font-bold border-t-2 border-slate-300">
+                            <tr>
+                                <td colspan="2" class="text-right uppercase text-xs">Grand Total</td>
+                                <td class="text-center font-bold text-slate-900">{{ feeDueMatrix.grand_count }}</td>
+                                <td class="text-right font-mono">₹{{ Number(feeDueMatrix.fee_rate).toFixed(2) }}</td>
+                                <td class="text-right font-mono text-slate-900 text-sm">₹{{ Number(feeDueMatrix.grand_total_fee).toFixed(2) }}</td>
+                                <td class="text-right font-mono text-emerald-700 text-sm">₹{{ Number(feeDueMatrix.grand_paid).toFixed(2) }}</td>
+                                <td class="text-right font-mono text-rose-700 bg-rose-50 text-sm">₹{{ Number(feeDueMatrix.grand_due).toFixed(2) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <div v-if="!feeDueMatrix.rows?.length" class="p-8 text-center text-slate-500">
+                        No fee due records available to preview.
+                    </div>
+                </div>
             </div>
         </div>
     </SchoolAdminLayout>
@@ -718,6 +977,8 @@ const props = defineProps({
     portalLoginUrl: { type: String, default: '/portal/login' },
     credentialsExportUrl: { type: String, default: '' },
     reportRows: { type: Array, default: () => [] },
+    classWiseCountMatrix: { type: Object, default: () => ({ classes: [], schools: [], totals: [], grand_total: 0 }) },
+    feeDueMatrix: { type: Object, default: () => ({ rows: [], grand_count: 0, grand_total_fee: 0, grand_paid: 0, grand_due: 0 }) },
     toppers: { type: Array, default: () => [] },
     attendanceRows: { type: Array, default: () => [] },
     attendanceGate: { type: Object, default: () => ({ can_mark: false }) },
@@ -725,6 +986,17 @@ const props = defineProps({
     lazyLoadStudents: { type: Boolean, default: false },
     studentCount: { type: Number, default: 0 },
 });
+
+const activeReportPreviewTab = ref('registration');
+
+function setReportPreview(tabKey) {
+    activeReportPreviewTab.value = tabKey;
+}
+
+function openPdfPreview(url) {
+    if (!url) return;
+    window.open(url, '_blank');
+}
 
 const page = usePage();
 const newCredentials = computed(() => page.props.flash?.mcqNewCredentials ?? []);

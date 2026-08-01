@@ -588,7 +588,6 @@ class McqReportService
             'grand_total' => $grandTotal,
         ];
     }
-
     public function exportClassWiseCounts(McqExam $exam, ?string $schoolId = null): StreamedResponse
     {
         $matrix = $this->classWiseCountMatrix($exam, $schoolId);
@@ -639,5 +638,128 @@ class McqReportService
         $weight = $rank - $low;
 
         return round($sortedScores[$low] * (1 - $weight) + $sortedScores[$high] * $weight, 2);
+    }
+
+    /** @return array<string, mixed> */
+    public function classWiseFeeDueMatrix(McqExam $exam, ?string $schoolId = null): array
+    {
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
+            ->with(['student.schoolClass', 'teacher', 'school']);
+
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
+
+        $registrations = $query->get();
+        $feeRate = (float) $exam->schoolPayablePerStudent();
+
+        $byClass = [];
+        foreach ($registrations as $reg) {
+            $className = $reg->student?->schoolClass?->name;
+            if (! $className) {
+                $className = $reg->isTeacherRegistration() ? 'Teacher' : 'Unassigned';
+            }
+
+            if (! isset($byClass[$className])) {
+                $byClass[$className] = [
+                    'class_name' => $className,
+                    'count'      => 0,
+                ];
+            }
+
+            $byClass[$className]['count']++;
+        }
+
+        $classNames = array_keys($byClass);
+        usort($classNames, function ($a, $b) {
+            $numA = (int) filter_var($a, FILTER_SANITIZE_NUMBER_INT);
+            $numB = (int) filter_var($b, FILTER_SANITIZE_NUMBER_INT);
+
+            if ($numA > 0 && $numB > 0 && $numA !== $numB) {
+                return $numA <=> $numB;
+            }
+
+            return strnatcasecmp($a, $b);
+        });
+
+        $schoolFees = McqSchoolFee::where('exam_id', $exam->id)
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->get()
+            ->keyBy('school_id');
+
+        $rows = [];
+        $grandCount = 0;
+        $grandTotalFee = 0;
+        $grandPaid = 0;
+        $grandDue = 0;
+
+        foreach ($classNames as $cName) {
+            $cCount = $byClass[$cName]['count'];
+            $cTotalFee = $cCount * $feeRate;
+
+            $schoolFee = $schoolId ? $schoolFees->get($schoolId) : null;
+            $isPaid = $schoolFee?->status === 'approved';
+            $paidProportion = $isPaid ? 1.0 : 0.0;
+
+            if ($schoolFee && ! $isPaid && (float) ($schoolFee->total_due + ($schoolFee->amount_paid ?: 0)) > 0) {
+                $paidRatio = min(1.0, (float) ($schoolFee->amount_paid ?: 0) / (float) ($schoolFee->total_due + ($schoolFee->amount_paid ?: 0)));
+                $paidProportion = $paidRatio;
+            }
+
+            $cPaid = round($cTotalFee * $paidProportion, 2);
+            $cDue = round($cTotalFee - $cPaid, 2);
+
+            $rows[] = [
+                'class_name' => $cName,
+                'count'      => $cCount,
+                'fee_rate'   => $feeRate,
+                'total_fee'  => $cTotalFee,
+                'paid'       => $cPaid,
+                'due'        => $cDue,
+            ];
+
+            $grandCount += $cCount;
+            $grandTotalFee += $cTotalFee;
+            $grandPaid += $cPaid;
+            $grandDue += $cDue;
+        }
+
+        return [
+            'rows'             => $rows,
+            'grand_count'      => $grandCount,
+            'fee_rate'         => $feeRate,
+            'grand_total_fee'  => $grandTotalFee,
+            'grand_paid'       => $grandPaid,
+            'grand_due'        => $grandDue,
+        ];
+    }
+
+    public function exportClassWiseFeeDue(McqExam $exam, ?string $schoolId = null): StreamedResponse
+    {
+        $matrix = $this->classWiseFeeDueMatrix($exam, $schoolId);
+        $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+
+        return ExcelExport::download(
+            'mcq-class-wise-fee-due-'.$exam->id.$suffix,
+            ['Sl No', 'Class / Roster', 'Registered Students', 'Fee Rate (₹)', 'Total Amount (₹)', 'Paid Amount (₹)', 'Pending Due Amount (₹)'],
+            collect($matrix['rows'])->map(fn ($r, $i) => [
+                $i + 1,
+                $r['class_name'],
+                $r['count'],
+                $r['fee_rate'],
+                $r['total_fee'],
+                $r['paid'],
+                $r['due'],
+            ])->push([
+                '',
+                'GRAND TOTAL',
+                $matrix['grand_count'],
+                $matrix['fee_rate'],
+                $matrix['grand_total_fee'],
+                $matrix['grand_paid'],
+                $matrix['grand_due'],
+            ]),
+        );
     }
 }

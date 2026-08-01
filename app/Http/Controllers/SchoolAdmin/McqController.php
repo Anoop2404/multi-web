@@ -236,6 +236,8 @@ class McqController extends SchoolAdminController
 
         $reportService = app(McqReportService::class);
         $reportRows = in_array($tab, ['reports'], true) ? $reportService->registrationRows($exam, $this->school->id) : [];
+        $classWiseCountMatrix = in_array($tab, ['reports'], true) ? $reportService->classWiseCountMatrix($exam, $this->school->id) : ['classes' => [], 'schools' => [], 'totals' => [], 'grand_total' => 0];
+        $feeDueMatrix = in_array($tab, ['reports'], true) ? $reportService->classWiseFeeDueMatrix($exam, $this->school->id) : ['rows' => [], 'grand_count' => 0, 'grand_total_fee' => 0, 'grand_paid' => 0, 'grand_due' => 0];
         $toppers = in_array($tab, ['toppers', 'results'], true) && $exam->results_published
             ? $reportService->schoolToppers($exam, $this->school->id)
             : [];
@@ -331,6 +333,8 @@ class McqController extends SchoolAdminController
             'portalLoginUrl'         => url('/portal/login'),
             'credentialsExportUrl'   => "/school-admin/{$this->school->id}/mcq/{$exam->id}/credentials/export",
             'reportRows'             => $reportRows,
+            'classWiseCountMatrix'   => $classWiseCountMatrix,
+            'feeDueMatrix'           => $feeDueMatrix,
             'toppers'                => $toppers,
             'attendanceRows'         => $attendanceRows,
             'attendanceGate'         => $attendanceGate,
@@ -338,9 +342,12 @@ class McqController extends SchoolAdminController
                 'registration'       => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/registration/export",
                 'registrationPdf'    => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/registration/pdf",
                 'attendance'         => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/attendance/export",
+                'attendancePdf'      => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/attendance/pdf",
                 'toppers'            => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/toppers/export",
                 'classWiseCounts'    => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/class-wise-counts/export",
                 'classWiseCountsPdf' => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/class-wise-counts/pdf",
+                'feeDue'             => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/fee-due/export",
+                'feeDuePdf'          => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/fee-due/pdf",
             ],
         ]);
     }
