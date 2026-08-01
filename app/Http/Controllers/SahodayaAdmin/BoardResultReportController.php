@@ -38,6 +38,7 @@ class BoardResultReportController extends SahodayaAdminController
                 'academic_year' => $year,
                 'class' => $request->integer('class') ?: null,
             ],
+            'availableYears' => AcademicYear::recordOptions(),
             'reports' => [
                 [
                     'key' => 'RPT-BRD-001-X10',

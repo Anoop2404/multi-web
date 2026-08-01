@@ -31,10 +31,16 @@
                 <p class="text-3xl font-extrabold text-violet-600 mt-1">{{ reportSections.merit.items.length }}</p>
                 <p class="text-xs text-slate-500 mt-1">Rank and topper registers</p>
             </div>
-            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
-                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Active Year</p>
-                <p class="text-lg font-bold text-slate-900 mt-1.5 font-mono">{{ filters.academic_year }}</p>
-                <p class="text-xs text-slate-500 mt-0.5">Academic session</p>
+            <div class="bg-white rounded-2xl border border-indigo-200 p-5 shadow-2xs ring-1 ring-indigo-100">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Academic Year</p>
+                <select
+                    :value="filters.academic_year"
+                    @change="changeYear($event.target.value)"
+                    class="w-full text-sm font-bold text-slate-900 font-mono bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+                >
+                    <option v-for="yr in availableYears" :key="yr" :value="yr">{{ yr }}</option>
+                </select>
+                <p class="text-xs text-slate-400 mt-1.5">Switch academic session</p>
             </div>
         </div>
 
@@ -84,7 +90,7 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
@@ -96,9 +102,18 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     reports: { type: Array, default: () => [] },
     filters: { type: Object, default: () => ({}) },
+    availableYears: { type: Array, default: () => [] },
 });
 
 const showHistoryModal = ref(false);
+
+function changeYear(year) {
+    router.visit(window.location.pathname, {
+        data: { academic_year: year },
+        preserveScroll: true,
+        replace: true,
+    });
+}
 
 const reportSections = computed(() => {
     const sections = {
