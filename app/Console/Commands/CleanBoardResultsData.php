@@ -125,9 +125,21 @@ class CleanBoardResultsData extends Command
                                     ]);
                                     $totalMergedResults++;
                                 } else {
-                                    Topper::where('board_result_id', $oldResult->id)->update([
-                                        'board_result_id' => $targetResult->id,
-                                    ]);
+                                    $existingKeys = Topper::where('board_result_id', $targetResult->id)
+                                        ->get(['roll_no', 'entry_type'])
+                                        ->mapWithKeys(fn ($t) => [$t->roll_no.'|'.$t->entry_type => true]);
+
+                                    $oldToppers = Topper::where('board_result_id', $oldResult->id)->get();
+                                    foreach ($oldToppers as $oldTopper) {
+                                        $key = $oldTopper->roll_no.'|'.$oldTopper->entry_type;
+                                        if ($existingKeys->has($key)) {
+                                            TopperSubjectMark::where('topper_id', $oldTopper->id)->delete();
+                                            $oldTopper->delete();
+                                        } else {
+                                            $oldTopper->update(['board_result_id' => $targetResult->id]);
+                                            $existingKeys->put($key, true);
+                                        }
+                                    }
 
                                     $maxVersion = (int) BoardResultUpload::where('board_result_id', $targetResult->id)->max('version') ?: 0;
                                     foreach (BoardResultUpload::where('board_result_id', $oldResult->id)->get() as $upload) {
