@@ -30,8 +30,33 @@ class SahodayaTopperSelectionService
     public function overallForClassX(string $sahodayaId, string $academicYear): array
     {
         $rows = $this->rankedRows($sahodayaId, $academicYear, RankingEngine::SCOPE_STUDENT_OVERALL, 10);
+        $hydrated = $this->cutAndHydrate($rows, $sahodayaId, 10, TopperCountConfig::SCOPE_OVERALL, null);
 
-        return $this->cutAndHydrate($rows, $sahodayaId, 10, TopperCountConfig::SCOPE_OVERALL, null);
+        if (empty($hydrated)) {
+            $schoolNames = Tenant::where('parent_id', $sahodayaId)->where('type', 'school')->pluck('name', 'id');
+            $toppers = $this->eligibleToppersQuery($sahodayaId, $academicYear, 10)
+                ->whereNotNull('percentage')
+                ->orderByDesc('percentage')
+                ->get();
+
+            return $toppers->map(function (Topper $t, int $idx) use ($schoolNames) {
+                return [
+                    'rank'           => $t->rank ?? ($idx + 1),
+                    'student_name'   => $t->name,
+                    'name'           => $t->name,
+                    'school_id'      => $t->tenant_id,
+                    'school_name'    => $schoolNames[$t->tenant_id] ?? $t->tenant_id,
+                    'admission_no'   => $t->admission_no,
+                    'roll_no'        => $t->roll_no,
+                    'percentage'     => (float) $t->percentage,
+                    'marks_obtained' => $t->marks_obtained,
+                    'total_marks'    => $t->total_marks,
+                    'class'          => 10,
+                ];
+            })->all();
+        }
+
+        return $hydrated;
     }
 
     /**
@@ -63,6 +88,41 @@ class SahodayaTopperSelectionService
                 TopperCountConfig::SCOPE_STREAM,
                 $streamId,
             );
+        }
+
+        if (empty($out)) {
+            $schoolNames = Tenant::where('parent_id', $sahodayaId)->where('type', 'school')->pluck('name', 'id');
+            $toppers = $this->eligibleToppersQuery($sahodayaId, $academicYear, 12)
+                ->whereNotNull('percentage')
+                ->get();
+
+            $fallbackGrouped = $toppers->groupBy(function (Topper $t) {
+                $st = $t->examStream?->label ?? $t->stream;
+                if (blank($st) || strtolower($st) === 'unknown' || strtolower($st) === 'unknown stream') {
+                    return 'General / All Streams';
+                }
+                return ucfirst($st);
+            });
+
+            foreach ($fallbackGrouped as $streamLabel => $streamToppers) {
+                $sorted = $streamToppers->sortByDesc(fn (Topper $t) => (float) $t->percentage)->values();
+                $out[$streamLabel] = $sorted->map(function (Topper $t, int $idx) use ($schoolNames) {
+                    return [
+                        'rank'           => $t->rank ?? ($idx + 1),
+                        'student_name'   => $t->name,
+                        'name'           => $t->name,
+                        'school_id'      => $t->tenant_id,
+                        'school_name'    => $schoolNames[$t->tenant_id] ?? $t->tenant_id,
+                        'admission_no'   => $t->admission_no,
+                        'roll_no'        => $t->roll_no,
+                        'percentage'     => (float) $t->percentage,
+                        'marks_obtained' => $t->marks_obtained,
+                        'total_marks'    => $t->total_marks,
+                        'stream'         => $t->examStream?->label ?? $t->stream,
+                        'class'          => 12,
+                    ];
+                })->all();
+            }
         }
 
         return $out;
