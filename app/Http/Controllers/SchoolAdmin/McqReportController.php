@@ -15,6 +15,13 @@ class McqReportController extends SchoolAdminController
         return $reports->exportRegistrationRegister($exam, $this->school->id);
     }
 
+    public function exportRegistrationPdf(string $tenantId, McqExam $exam, McqPrintableDocumentService $printable)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+
+        return $printable->classWiseRegistrationPdf($exam, $this->school->id);
+    }
+
     public function exportAttendance(string $tenantId, McqExam $exam, McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->school->parent_id, 403);
