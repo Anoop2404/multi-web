@@ -128,8 +128,8 @@ class FestParticipationLimitService
      */
     private function validateHeadCapacity(FestEventItem $item, array $policy, string $schoolId, ?int $excludeRegistrationId = null): array
     {
-        // Sports Head = Event: enforce caps on the FestEvent when head_id is absent.
-        if ($this->event->event_type === 'sports' && ! $item->head_id) {
+        // Sports events: enforce max_teams and max_participants per-school and per-item.
+        if ($this->event->event_type === 'sports') {
             return $this->validateEventCapacity($item, $policy, $schoolId, $excludeRegistrationId);
         }
 
@@ -163,11 +163,6 @@ class FestParticipationLimitService
                 ->count();
 
             if ($teamCount >= $maxTeams) {
-                // Sports Event Heads: allow waitlist instead of hard reject (FRD-04 v2).
-                if ($this->event->event_type === 'sports') {
-                    return [];
-                }
-
                 return ["{$head->name} has reached its team cap ({$maxTeams})."];
             }
 
@@ -191,10 +186,6 @@ class FestParticipationLimitService
             ->count();
 
         if ($participantCount >= $maxParticipants) {
-            if ($this->event->event_type === 'sports') {
-                return [];
-            }
-
             return ["{$head->name} has reached its participant cap ({$maxParticipants})."];
         }
 
@@ -208,16 +199,12 @@ class FestParticipationLimitService
      */
     private function validateEventCapacity(FestEventItem $item, array $policy, string $schoolId, ?int $excludeRegistrationId = null): array
     {
-        // max_teams / max_participants on a unified sports event are a per-school,
-        // per-item quota — each team/individual item (e.g. U17_TEAM_BOYS vs
-        // U19_TEAM_BOYS) draws from its own budget, not a pool shared across every
-        // item in the event. Scoped to school_id + this item's equivalent ids.
         $statuses = $this->countableStatuses($policy);
         $isTeam = $item->isTeamItem();
         $itemIds = $this->equivalentItemIds($item);
 
         if ($isTeam) {
-            $maxTeams = (int) ($this->event->max_teams ?? 0);
+            $maxTeams = (int) ($item->head?->max_teams ?? $this->event->max_teams ?? 0);
             if ($maxTeams <= 0) {
                 return [];
             }
@@ -229,15 +216,14 @@ class FestParticipationLimitService
                 ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
                 ->count();
 
-            // Sports: allow waitlist instead of hard reject.
             if ($teamCount >= $maxTeams) {
-                return [];
+                return ["Team cap reached for this category ({$maxTeams})."];
             }
 
             return [];
         }
 
-        $maxParticipants = (int) ($this->event->max_participants ?? 0);
+        $maxParticipants = (int) ($item->head?->max_participants ?? $this->event->max_participants ?? 0);
         if ($maxParticipants <= 0) {
             return [];
         }
@@ -250,7 +236,7 @@ class FestParticipationLimitService
             ->count();
 
         if ($participantCount >= $maxParticipants) {
-            return []; // waitlist
+            return ["Participant cap reached for this category ({$maxParticipants})."];
         }
 
         return [];
@@ -259,11 +245,11 @@ class FestParticipationLimitService
     /** Whether this item's Event Head is at capacity (active regs only — excludes waitlisted). */
     public function isHeadAtCapacity(FestEventItem $item, ?string $schoolId = null): bool
     {
-        if ($this->event->event_type === 'sports' && ! $item->head_id) {
+        if ($this->event->event_type === 'sports') {
             return $this->isEventAtCapacity($item, $schoolId);
         }
 
-        if ($this->event->event_type !== 'sports' || ! $item->head_id) {
+        if (! $item->head_id) {
             return false;
         }
 
@@ -320,7 +306,7 @@ class FestParticipationLimitService
         $itemIds = $this->equivalentItemIds($item);
 
         if ($isTeam) {
-            $maxTeams = (int) ($this->event->max_teams ?? 0);
+            $maxTeams = (int) ($item->head?->max_teams ?? $this->event->max_teams ?? 0);
             if ($maxTeams <= 0) {
                 return false;
             }
@@ -334,7 +320,7 @@ class FestParticipationLimitService
             return $teamCount >= $maxTeams;
         }
 
-        $maxParticipants = (int) ($this->event->max_participants ?? 0);
+        $maxParticipants = (int) ($item->head?->max_participants ?? $this->event->max_participants ?? 0);
         if ($maxParticipants <= 0) {
             return false;
         }
