@@ -60,20 +60,31 @@
                 </div>
 
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <Link v-for="r in section.items" :key="r.key" :href="r.href"
-                          class="group bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs hover:shadow-md hover:border-indigo-500 transition-all flex flex-col justify-between space-y-3">
+                    <div v-for="r in section.items" :key="r.key"
+                         class="group bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all flex flex-col justify-between space-y-4">
                         <div>
                             <div class="flex items-center justify-between gap-2 mb-1.5">
-                                <p class="font-extrabold text-slate-900 group-hover:text-indigo-600 transition text-sm">{{ r.title }}</p>
-                                <span class="text-slate-400 group-hover:translate-x-1 transition-transform">→</span>
+                                <p class="font-extrabold text-slate-900 text-sm">{{ r.title }}</p>
+                                <span class="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{{ filters.academic_year }}</span>
                             </div>
                             <p v-if="r.description" class="text-xs text-slate-500 leading-relaxed">{{ r.description }}</p>
                         </div>
-                        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                            <span>Year {{ filters.academic_year }}</span>
-                            <span class="font-bold text-indigo-600">View Report</span>
+                        <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <Link :href="r.href" class="font-bold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1">
+                                🔍 View Report
+                            </Link>
+                            <div class="flex items-center gap-1.5">
+                                <a v-if="r.pdfUrl" :href="r.pdfUrl" target="_blank"
+                                   class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition flex items-center gap-1">
+                                    📄 PDF
+                                </a>
+                                <a v-if="r.excelUrl" :href="r.excelUrl" target="_blank"
+                                   class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition flex items-center gap-1">
+                                    📊 Excel
+                                </a>
+                            </div>
                         </div>
-                    </Link>
+                    </div>
                 </div>
             </section>
         </div>

@@ -33,84 +33,110 @@ class BoardResultReportController extends SahodayaAdminController
         $base = "/sahodaya-admin/{$this->sahodaya->id}";
         $yearQ = urlencode($year);
 
+        $availableYears = AcademicYear::options();
+
         return $this->inertia('Sahodaya/BoardResults/Reports', [
             'filters' => [
                 'academic_year' => $year,
                 'class' => $request->integer('class') ?: null,
             ],
-            'availableYears' => AcademicYear::recordOptions(),
+            'availableYears' => $availableYears,
             'reports' => [
                 [
                     'key' => 'RPT-BRD-001-X10',
                     'title' => 'School Result Summary — Class X',
                     'description' => 'Appeared, passed, pass %, distinctions, highest mark by school (AISSE).',
                     'href' => "{$base}/reports/RPT-BRD-001?academic_year={$yearQ}&class=10",
+                    'pdfUrl' => "{$base}/reports/RPT-BRD-001/export?academic_year={$yearQ}&class=10&format=pdf",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-001/export?academic_year={$yearQ}&class=10&format=xlsx",
                 ],
                 [
                     'key' => 'RPT-BRD-001-X12',
                     'title' => 'School Result Summary — Class XII',
                     'description' => 'Appeared, passed, pass %, distinctions, highest mark by school (AISSCE).',
                     'href' => "{$base}/reports/RPT-BRD-001?academic_year={$yearQ}&class=12",
+                    'pdfUrl' => "{$base}/reports/RPT-BRD-001/export?academic_year={$yearQ}&class=12&format=pdf",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-001/export?academic_year={$yearQ}&class=12&format=xlsx",
                 ],
                 [
                     'key' => 'RPT-BRD-002-X10',
                     'title' => 'Overall Ranking — Class X',
                     'description' => 'Sahodaya-wide school rankings from the Ranking Engine (AISSE).',
                     'href' => "{$base}/reports/RPT-BRD-002?academic_year={$yearQ}&class=10",
+                    'pdfUrl' => "{$base}/reports/RPT-BRD-002/export?academic_year={$yearQ}&class=10&format=pdf",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-002/export?academic_year={$yearQ}&class=10&format=xlsx",
                 ],
                 [
                     'key' => 'RPT-BRD-002-X12',
                     'title' => 'Overall Ranking — Class XII',
                     'description' => 'Sahodaya-wide school rankings from the Ranking Engine (AISSCE).',
                     'href' => "{$base}/reports/RPT-BRD-002?academic_year={$yearQ}&class=12",
+                    'pdfUrl' => "{$base}/reports/RPT-BRD-002/export?academic_year={$yearQ}&class=12&format=pdf",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-002/export?academic_year={$yearQ}&class=12&format=xlsx",
                 ],
                 [
                     'key' => 'RPT-BRD-003-X10',
                     'title' => 'Pass % Report — Class X',
                     'description' => 'Approved/published Class X results ordered by pass percentage.',
                     'href' => "{$base}/reports/RPT-BRD-003?academic_year={$yearQ}&class=10",
+                    'pdfUrl' => "{$base}/reports/RPT-BRD-003/export?academic_year={$yearQ}&class=10&format=pdf",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-003/export?academic_year={$yearQ}&class=10&format=xlsx",
                 ],
                 [
                     'key' => 'RPT-BRD-003-X12',
                     'title' => 'Pass % Report — Class XII',
                     'description' => 'Approved/published Class XII results ordered by pass percentage.',
                     'href' => "{$base}/reports/RPT-BRD-003?academic_year={$yearQ}&class=12",
+                    'pdfUrl' => "{$base}/reports/RPT-BRD-003/export?academic_year={$yearQ}&class=12&format=pdf",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-003/export?academic_year={$yearQ}&class=12&format=xlsx",
                 ],
                 [
                     'key' => 'RPT-BRD-004',
                     'title' => 'Class X Merit Register',
                     'description' => 'AISSE toppers across member schools.',
                     'href' => "{$base}/reports/RPT-BRD-004?academic_year={$yearQ}",
+                    'pdfUrl' => "{$base}/board-results/reports/toppers/pdf?academic_year={$yearQ}&class=10",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-004/export?academic_year={$yearQ}&format=xlsx",
                 ],
                 [
                     'key' => 'RPT-BRD-005',
                     'title' => 'Stream Merit Register — Class XII',
                     'description' => 'AISSCE toppers by stream.',
                     'href' => "{$base}/reports/RPT-BRD-005?academic_year={$yearQ}",
+                    'pdfUrl' => "{$base}/board-results/reports/toppers/pdf?academic_year={$yearQ}&class=12",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-005/export?academic_year={$yearQ}&format=xlsx",
                 ],
                 [
                     'key' => 'subject-merit-x10',
                     'title' => 'Subject-wise Merit Register — Class X',
                     'description' => 'Highest scorers per subject from normalized topper marks (AISSE).',
                     'href' => "{$base}/board-results/reports/subject-merit?academic_year={$yearQ}&class=10",
+                    'pdfUrl' => "{$base}/board-results/reports/subject-merit/pdf?academic_year={$yearQ}&class=10",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-004/export?academic_year={$yearQ}&class=10&format=xlsx",
                 ],
                 [
                     'key' => 'subject-merit-x12',
                     'title' => 'Subject-wise Merit Register — Class XII',
                     'description' => 'Highest scorers per subject from normalized topper marks (AISSCE).',
                     'href' => "{$base}/board-results/reports/subject-merit?academic_year={$yearQ}&class=12",
+                    'pdfUrl' => "{$base}/board-results/reports/subject-merit/pdf?academic_year={$yearQ}&class=12",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-005/export?academic_year={$yearQ}&class=12&format=xlsx",
                 ],
                 [
                     'key' => 'full-a1-achievers',
                     'title' => 'Full A1 Achievers — Class X & XII',
                     'description' => 'Students who scored A1 (91-100) in every subject entered, all streams.',
                     'href' => "{$base}/board-results/reports/full-a1-achievers?academic_year={$yearQ}",
+                    'pdfUrl' => "{$base}/board-results/reports/full-a1-achievers/pdf?academic_year={$yearQ}",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-004/export?academic_year={$yearQ}&format=xlsx",
                 ],
                 [
                     'key' => 'excellence',
                     'title' => 'Academic Excellence + Historical Comparison',
                     'description' => 'Awards and year-over-year pass % trends (all classes).',
                     'href' => "{$base}/board-results/reports/excellence?academic_year={$yearQ}",
+                    'pdfUrl' => "{$base}/board-results/reports/toppers/pdf?academic_year={$yearQ}",
+                    'excelUrl' => "{$base}/reports/RPT-BRD-001/export?academic_year={$yearQ}&format=xlsx",
                 ],
             ],
         ]);
