@@ -4,100 +4,128 @@
     <meta charset="UTF-8">
     <title>Subject-Wise Merit Register — {{ $academicYear }}</title>
     <style>
-        @page {
-            margin: 15mm 12mm 15mm 12mm;
-        }
-        * {
-            box-sizing: border-box;
-        }
+        @page { margin: 0; }
+        * { box-sizing: border-box; }
         html, body {
-            font-family: DejaVu Sans, sans-serif;
-            color: #0f2744;
-            font-size: 9px;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .subject-page {
-            page-break-after: always;
-        }
-        .subject-page:last-child {
-            page-break-after: avoid;
+            font-family: DejaVu Sans, Arial, sans-serif;
+            color: #1a2236;
+            font-size: 8.5px;
+            margin: 0; padding: 0;
+            background: #fff;
         }
 
-        .header {
-            border-bottom: 2.5px solid #0f3d7a;
-            padding-bottom: 10px;
-            margin-bottom: 12px;
+        .subject-page { page-break-after: always; }
+        .subject-page:last-child { page-break-after: avoid; }
+
+        .page-header {
+            width: 100%;
+            background: #0b2558;
+            padding: 14px 20px 0 20px;
         }
-        .header table {
+
+        .hdr-top {
             width: 100%;
             border-collapse: collapse;
+            margin-bottom: 8px;
         }
-        .logo {
-            width: 48px;
-            height: 48px;
+        .hdr-logo-cell {
+            width: 62px;
+            vertical-align: middle;
+            text-align: right;
+            padding-right: 10px;
+        }
+        .hdr-logo-cell img {
+            width: 52px;
+            height: 52px;
             object-fit: contain;
+            display: inline-block;
         }
-        .org {
-            font-size: 15px;
+        .hdr-org-cell {
+            vertical-align: middle;
+            text-align: left;
+        }
+        .org-name {
+            font-size: 18px;
             font-weight: 700;
-            color: #0f3d7a;
+            color: #ffffff;
             letter-spacing: 0.3px;
+            line-height: 1.1;
+            display: block;
         }
-        .exam-title {
-            font-size: 10.5px;
-            font-weight: 700;
-            color: #1e293b;
-            margin-top: 3px;
-        }
-        .tag {
-            font-size: 8px;
-            color: #64748b;
+        .org-sub {
+            font-size: 7px;
+            color: rgba(255,255,255,0.5);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-top: 2px;
-        }
-        .meta-box {
-            background: #f8fafc;
-            border: 1px solid #cbd5e1;
-            border-radius: 4px;
-            padding: 5px 8px;
-            font-size: 8.5px;
-            line-height: 1.4;
-        }
-        .meta-box strong {
-            color: #0f3d7a;
+            letter-spacing: 1.2px;
+            margin-top: 3px;
+            display: block;
         }
 
-        .subject-header-banner {
-            background: #0f3d7a;
-            color: #ffffff;
-            padding: 8px 12px;
-            border-radius: 4px;
-            margin-bottom: 10px;
+        .hdr-divider {
+            border: none;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            margin: 0;
         }
-        .subject-header-banner table {
+
+        .hdr-info-bar {
             width: 100%;
+            border-collapse: collapse;
+            padding: 6px 0 10px 0;
         }
-        .subj-title {
-            font-size: 13px;
-            font-weight: 700;
+        .info-cell {
+            text-align: center;
+            vertical-align: middle;
+            padding: 0 8px;
+            border-right: 1px solid rgba(255,255,255,0.12);
+        }
+        .info-cell:last-child { border-right: none; }
+        .info-lbl {
+            font-size: 6.5px;
             text-transform: uppercase;
-            color: #ffffff;
+            letter-spacing: 0.9px;
+            color: rgba(255,255,255,0.4);
+            display: block;
+            margin-bottom: 2px;
         }
-        .subj-meta {
+        .info-val {
             font-size: 9px;
-            color: #e2e8f0;
-            text-align: right;
+            font-weight: 700;
+            color: #ffffff;
+            display: block;
         }
+        .info-val-lg {
+            font-size: 9.5px;
+            font-weight: 700;
+            color: #7eb3ff;
+            display: block;
+        }
+
+        .header-stripe {
+            width: 100%;
+            height: 3px;
+            background: #2563eb;
+        }
+
+        .content-wrap {
+            padding: 10px 14px 14px 14px;
+        }
+
+        .subject-sub {
+            background: #0f2d5e;
+            border: 1px solid #1e3a6e;
+            border-radius: 4px;
+            padding: 6px 12px;
+            margin-bottom: 8px;
+        }
+        .subj-name  { font-size: 11px; font-weight: 700; color: #fff; text-transform: uppercase; }
+        .subj-meta  { font-size: 8px; color: #a8c0e8; float: right; }
 
         .summary-bar {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 4px;
-            padding: 6px 10px;
-            margin-bottom: 10px;
+            padding: 5px 10px;
+            margin-bottom: 8px;
             font-size: 8.5px;
             color: #475569;
         }
@@ -105,51 +133,48 @@
         table.report-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 4px;
         }
+        table.report-table thead tr { background: #0b2558; }
         table.report-table th {
-            background: #1e293b;
-            color: #ffffff;
+            color: #c8d9f5;
             text-align: left;
-            padding: 6px;
-            font-size: 8px;
+            padding: 5px 6px;
+            font-size: 7.5px;
             text-transform: uppercase;
-            border: 1px solid #1e293b;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+            border-right: 1px solid rgba(255,255,255,0.08);
         }
+        table.report-table th:last-child { border-right: none; }
         table.report-table td {
-            padding: 6px;
-            border: 1px solid #cbd5e1;
+            padding: 5px 6px;
+            border-bottom: 1px solid #e8edf5;
+            border-right: 1px solid #eef1f8;
             vertical-align: middle;
+            font-size: 8.5px;
         }
-        table.report-table tr:nth-child(even) td {
-            background: #f8fafc;
-        }
+        table.report-table td:last-child { border-right: none; }
+        table.report-table tbody tr:nth-child(odd)  td { background: #fff; }
+        table.report-table tbody tr:nth-child(even) td { background: #f7f9fd; }
+        table.report-table tbody tr:last-child      td { border-bottom: 2px solid #0b2558; }
 
-        .rank-col {
-            width: 35px;
-            text-align: center;
-            font-weight: bold;
+        .rank-col { width: 35px; text-align: center; font-weight: 700; color: #1e40af; }
+        .student-name { font-weight: 700; color: #0b2236; font-size: 9px; }
+        .roll-no { font-family: 'Courier New', monospace; font-size: 8px; color: #334155; }
+        .school-name { font-size: 8px; color: #334155; }
+        .marks-col { font-weight: 700; color: #166534; text-align: center; font-size: 10px; }
+
+        .page-footer {
+            margin-top: 8px;
+            padding-top: 5px;
+            border-top: 1px solid #d0daf0;
+            font-size: 7.5px; color: #8898b4;
+            width: 100%; display: table;
         }
-        .student-name {
-            font-weight: bold;
-            color: #0f172a;
-            font-size: 9.5px;
-        }
-        .roll-no {
-            font-family: monospace;
-            font-size: 8.5px;
-            color: #334155;
-        }
-        .school-name {
-            font-size: 8.5px;
-            color: #334155;
-        }
-        .marks-col {
-            font-weight: bold;
-            color: #166534;
-            text-align: center;
-            font-size: 10.5px;
-        }
+        .footer-left  { display: table-cell; text-align: left; }
+        .footer-right { display: table-cell; text-align: right; }
+
+        .empty-state { text-align: center; color: #8898b4; padding: 40px 20px; font-size: 10px; }
     </style>
 </head>
 <body>
@@ -163,104 +188,121 @@
     @endphp
 
     @if($grouped->isEmpty())
-        <div class="header">
-            <table>
+        <div class="page-header">
+            <table class="hdr-top">
                 <tr>
                     @if(!empty($logoSrc))
-                        <td style="width: 56px; vertical-align: middle;"><img class="logo" src="{{ $logoSrc }}" alt="Logo"></td>
+                    <td class="hdr-logo-cell"><img src="{{ $logoSrc }}" alt=""></td>
                     @endif
-                    <td style="vertical-align: middle;">
-                        <div class="org">{{ $orgName }}</div>
-                        <div class="exam-title">
-                            @if(!empty($selectedClass))
-                                CBSE Class {{ $selectedClass }} ({{ $selectedClass == 10 ? 'AISSE' : 'AISSCE' }}) Board Examination {{ $academicYear }}
-                            @else
-                                CBSE Board Examinations {{ $academicYear }} (Class X AISSE & Class XII AISSCE)
-                            @endif
-                        </div>
-                        <div class="tag">Academic Results · Subject-Wise Merit Register</div>
+                    <td class="hdr-org-cell">
+                        <span class="org-name">{{ $orgName ?? 'Sahodaya' }}</span>
+                        <span class="org-sub">Talent Search & Board Results &nbsp;&middot;&nbsp; Subject-Wise Merit Register</span>
                     </td>
-                    <td style="text-align: right; vertical-align: middle; width: 210px;">
-                        <div class="meta-box">
-                            <div><strong>Academic Year:</strong> {{ $academicYear }}</div>
-                            <div><strong>Class:</strong> {{ !empty($selectedClass) ? 'Class '.$selectedClass.' ('.($selectedClass == 10 ? 'AISSE' : 'AISSCE').')' : 'Class X & Class XII' }}</div>
-                        </div>
+                </tr>
+            </table>
+            <hr class="hdr-divider">
+            <table class="hdr-info-bar">
+                <tr>
+                    <td class="info-cell">
+                        <span class="info-lbl">Academic Year</span>
+                        <span class="info-val">{{ $academicYear }}</span>
+                    </td>
+                    <td class="info-cell">
+                        <span class="info-lbl">Class</span>
+                        <span class="info-val">{{ !empty($selectedClass) ? 'Class '.$selectedClass : 'All Classes' }}</span>
                     </td>
                 </tr>
             </table>
         </div>
-        <p style="text-align: center; color: #64748b; margin-top: 30px;">No subject toppers found for the selected criteria.</p>
+        <div class="header-stripe"></div>
+        <div class="content-wrap">
+            <div class="empty-state">No subject toppers found for the selected criteria.</div>
+        </div>
     @else
         @foreach($grouped as $subjectLabel => $subjectRows)
+            @php
+                // Ensure rows are strictly sorted descending by marks float
+                $sortedSubjectRows = collect($subjectRows)->sortByDesc(fn($r) => (float)($r['marks'] ?? 0))->values();
+            @endphp
             <div class="subject-page">
-                <!-- PAGE HEADER -->
-                <div class="header">
-                    <table>
+                <div class="page-header">
+                    <table class="hdr-top">
                         <tr>
                             @if(!empty($logoSrc))
-                                <td style="width: 56px; vertical-align: middle;"><img class="logo" src="{{ $logoSrc }}" alt="Logo"></td>
+                            <td class="hdr-logo-cell"><img src="{{ $logoSrc }}" alt=""></td>
                             @endif
-                            <td style="vertical-align: middle;">
-                                <div class="org">{{ $orgName }}</div>
-                                <div class="exam-title">
-                                    @if(!empty($selectedClass))
-                                        CBSE Class {{ $selectedClass }} ({{ $selectedClass == 10 ? 'AISSE' : 'AISSCE' }}) Board Examination {{ $academicYear }}
-                                    @else
-                                        CBSE Board Examinations {{ $academicYear }} (Class X AISSE & Class XII AISSCE)
-                                    @endif
-                                </div>
-                                <div class="tag">Academic Board Results · Subject-Wise Merit Register</div>
+                            <td class="hdr-org-cell">
+                                <span class="org-name">{{ $orgName ?? 'Sahodaya' }}</span>
+                                <span class="org-sub">Academic Board Results &nbsp;&middot;&nbsp; Subject-Wise Merit Register</span>
                             </td>
-                            <td style="text-align: right; vertical-align: middle; width: 210px;">
-                                <div class="meta-box">
-                                    <div><strong>Academic Year:</strong> {{ $academicYear }}</div>
-                                    <div><strong>Class:</strong> {{ !empty($selectedClass) ? 'Class '.$selectedClass.' ('.($selectedClass == 10 ? 'AISSE' : 'AISSCE').')' : 'Class X & Class XII' }}</div>
-                                </div>
+                        </tr>
+                    </table>
+                    <hr class="hdr-divider">
+                    <table class="hdr-info-bar">
+                        <tr>
+                            <td class="info-cell">
+                                <span class="info-lbl">Subject</span>
+                                <span class="info-val-lg">{{ $subjectLabel }}</span>
+                            </td>
+                            <td class="info-cell" style="width:100px;">
+                                <span class="info-lbl">Academic Year</span>
+                                <span class="info-val">{{ $academicYear }}</span>
+                            </td>
+                            <td class="info-cell" style="width:90px;">
+                                <span class="info-lbl">Class</span>
+                                <span class="info-val">{{ !empty($selectedClass) ? 'Class '.$selectedClass : 'Class X & XII' }}</span>
+                            </td>
+                            <td class="info-cell" style="width:120px;">
+                                <span class="info-lbl">Generated</span>
+                                <span class="info-val">{{ $generatedAt }}</span>
                             </td>
                         </tr>
                     </table>
                 </div>
+                <div class="header-stripe"></div>
 
-                <!-- SUBJECT TITLE BANNER -->
-                <div class="subject-header-banner">
-                    <table>
-                        <tr>
-                            <td class="subj-title">{{ $subjectLabel }}</td>
-                            <td class="subj-meta">Generated: {{ $generatedAt }}</td>
-                        </tr>
-                    </table>
-                </div>
+                <div class="content-wrap">
+                    <div class="subject-sub">
+                        <span class="subj-name">{{ $subjectLabel }}</span>
+                        <span class="subj-meta">Generated: {{ $generatedAt }}</span>
+                    </div>
 
-                <div class="summary-bar">
-                    Highest Mark: <strong>{{ $subjectRows->max('marks') ?? '—' }}</strong> · Total Toppers: <strong>{{ $subjectRows->count() }}</strong>
-                </div>
+                    <div class="summary-bar">
+                        Highest Mark: <strong>{{ $sortedSubjectRows->max(fn($r) => (float)($r['marks'] ?? 0)) }}</strong> &nbsp;&middot;&nbsp; Total Toppers: <strong>{{ $sortedSubjectRows->count() }}</strong>
+                    </div>
 
-                <table class="report-table">
-                    <thead>
-                        <tr>
-                            @unless($noRank ?? false)
-                                <th class="rank-col">Rank</th>
-                            @endunless
-                            <th>Student Name</th>
-                            <th>Roll No.</th>
-                            <th>Member School</th>
-                            <th style="width: 70px; text-align: center;">Marks</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($subjectRows as $i => $row)
+                    <table class="report-table">
+                        <thead>
                             <tr>
                                 @unless($noRank ?? false)
-                                    <td class="rank-col">#{{ $row['rank'] ?? ($i + 1) }}</td>
+                                    <th class="rank-col">Rank</th>
                                 @endunless
-                                <td class="student-name">{{ $row['name'] ?? ($row['student_name'] ?? '—') }}</td>
-                                <td class="roll-no">{{ $row['roll_no'] ?? ($row['cbse_roll_no'] ?? '—') }}</td>
-                                <td class="school-name">{{ strtoupper($row['school_name'] ?? '') }}</td>
-                                <td class="marks-col">{{ $row['marks'] ?? '—' }}</td>
+                                <th>Student Name</th>
+                                <th>Roll No.</th>
+                                <th>Member School</th>
+                                <th style="width: 70px; text-align: center;">Marks</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @foreach($sortedSubjectRows as $i => $row)
+                                <tr>
+                                    @unless($noRank ?? false)
+                                        <td class="rank-col">#{{ $row['rank'] ?? ($i + 1) }}</td>
+                                    @endunless
+                                    <td><span class="student-name">{{ $row['name'] ?? ($row['student_name'] ?? '—') }}</span></td>
+                                    <td><span class="roll-no">{{ $row['roll_no'] ?? ($row['cbse_roll_no'] ?? '—') }}</span></td>
+                                    <td><span class="school-name">{{ strtoupper($row['school_name'] ?? '') }}</span></td>
+                                    <td class="marks-col">{{ $row['marks'] ?? '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+
+                    <div class="page-footer">
+                        <div class="footer-left">{{ $subjectLabel }} &mdash; Subject-Wise Merit Register &mdash; {{ $orgName }}</div>
+                        <div class="footer-right">{{ $generatedAt }}</div>
+                    </div>
+                </div>
             </div>
         @endforeach
     @endif

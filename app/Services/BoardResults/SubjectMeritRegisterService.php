@@ -134,12 +134,12 @@ class SubjectMeritRegisterService
         $counts = app(TopperCountService::class);
 
         foreach ($grouped as $subjectKey => $subjectItems) {
-            $sorted = $subjectItems->sortByDesc('marks')->values();
+            $sorted = $subjectItems->sortByDesc(fn ($r) => (float) ($r['marks'] ?? 0))->values();
             $currentRank = 1;
             $prevMarks = null;
 
             foreach ($sorted as $idx => $row) {
-                $marks = $row['marks'];
+                $marks = (float) ($row['marks'] ?? 0);
                 if ($prevMarks !== null && $marks < $prevMarks) {
                     $currentRank = $idx + 1;
                 }
@@ -155,7 +155,7 @@ class SubjectMeritRegisterService
                 if ($counts->isNoRankMode($sahodayaId)) {
                     // No-rank mode: drop tie/rank-style handling, just take the top_n
                     // rows ordered by percentage (marks) descending, with no rank number.
-                    $sorted = $sorted->sortByDesc('marks')->values();
+                    $sorted = $sorted->sortByDesc(fn ($r) => (float) ($r['marks'] ?? 0))->values();
                     $selected = array_map(function (array $row) {
                         $row['rank'] = null;
 
