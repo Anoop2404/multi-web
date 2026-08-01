@@ -179,4 +179,65 @@ class BoardResultReportController extends SahodayaAdminController
             'filters' => ['academic_year' => $year],
         ]);
     }
+
+    public function subjectMeritPdf(Request $request, SubjectMeritRegisterService $service)
+    {
+        $year = $request->string('academic_year')->toString()
+            ?: AcademicYear::forSahodaya($this->sahodaya->id);
+        $class = $request->filled('class') ? $request->integer('class') : null;
+
+        $rows = $service->register($this->sahodaya->id, $year, $class);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('board-results.pdf.subject-merit', [
+            'rows'          => $rows,
+            'academicYear'  => $year,
+            'selectedClass' => $class,
+            'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
+            'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'generatedAt'   => now()->format('d M Y · h:i A'),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download("subject-merit-register-{$year}.pdf");
+    }
+
+    public function fullA1AchieversPdf(Request $request, FullA1AchieversReportService $service)
+    {
+        $year = $request->string('academic_year')->toString()
+            ?: AcademicYear::forSahodaya($this->sahodaya->id);
+        $class = $request->filled('class') ? $request->integer('class') : null;
+        $stream = $request->filled('stream') ? $request->string('stream')->toString() : null;
+
+        $rows = $service->list($this->sahodaya->id, $year, $class, $stream);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('board-results.pdf.full-a1-achievers', [
+            'rows'          => $rows,
+            'academicYear'  => $year,
+            'selectedClass' => $class,
+            'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
+            'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'generatedAt'   => now()->format('d M Y · h:i A'),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download("full-a1-achievers-{$year}.pdf");
+    }
+
+    public function toppersPdf(Request $request, \App\Services\BoardResults\SahodayaTopperSelectionService $topperService)
+    {
+        $year = $request->string('academic_year')->toString()
+            ?: AcademicYear::forSahodaya($this->sahodaya->id);
+
+        $classXToppers = $topperService->overallForClassX($this->sahodaya->id, $year);
+        $classXIIToppers = $topperService->byStreamForClassXII($this->sahodaya->id, $year);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('board-results.pdf.overall-toppers', [
+            'classXToppers'   => $classXToppers,
+            'classXIIToppers' => $classXIIToppers,
+            'academicYear'    => $year,
+            'orgName'         => $this->sahodaya->name ?? 'Sahodaya',
+            'logoSrc'         => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'generatedAt'     => now()->format('d M Y · h:i A'),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download("board-results-toppers-{$year}.pdf");
+    }
 }

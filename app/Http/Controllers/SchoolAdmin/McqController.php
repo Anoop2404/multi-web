@@ -335,9 +335,12 @@ class McqController extends SchoolAdminController
             'attendanceRows'         => $attendanceRows,
             'attendanceGate'         => $attendanceGate,
             'reportExports'          => [
-                'registration' => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/registration/export",
-                'attendance'   => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/attendance/export",
-                'toppers'      => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/toppers/export",
+                'registration'       => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/registration/export",
+                'registrationPdf'    => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/registration/pdf",
+                'attendance'         => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/attendance/export",
+                'toppers'            => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/toppers/export",
+                'classWiseCounts'    => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/class-wise-counts/export",
+                'classWiseCountsPdf' => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/class-wise-counts/pdf",
             ],
         ]);
     }

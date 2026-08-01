@@ -12,6 +12,8 @@
             </template>
         </PageHeader>
 
+        <BoardResultsReportSubNav :sahodayaId="sahodaya.id" active="reports-hub" />
+
         <!-- KPI OVERVIEW CARDS -->
         <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
@@ -86,6 +88,7 @@ import { Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
+import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
 
 const props = defineProps({
     sahodaya: Object,

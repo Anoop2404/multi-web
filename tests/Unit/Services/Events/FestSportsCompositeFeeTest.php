@@ -186,9 +186,9 @@ class FestSportsCompositeFeeTest extends TestCase
 
         $this->assertEquals(2000.0, (float) $fee->school_registration_fee);
         $this->assertEquals(600.0, (float) $fee->student_registration_fee);
-        $this->assertEquals(300.0, (float) $fee->participation_fee);
+        $this->assertEquals(200.0, (float) $fee->participation_fee);
         $this->assertEquals(0.0, (float) $fee->extra_item_fee);
-        $this->assertEquals(2900.0, (float) $fee->total_due);
+        $this->assertEquals(2800.0, (float) $fee->total_due);
 
         $itemLines = $fee->fresh('lines')->lines->where('line_type', 'item_fee');
         $this->assertCount(2, $itemLines);

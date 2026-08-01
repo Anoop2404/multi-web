@@ -881,7 +881,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::put('/masters/marks-config', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'updateMarksConfig'])->name('masters.marks-config');
             Route::get('/reports', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'index'])->name('reports');
             Route::get('/reports/subject-merit', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'subjectMerit'])->name('reports.subject-merit');
+            Route::get('/reports/subject-merit/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'subjectMeritPdf'])->name('reports.subject-merit.pdf');
             Route::get('/reports/full-a1-achievers', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'fullA1Achievers'])->name('reports.full-a1-achievers');
+            Route::get('/reports/full-a1-achievers/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'fullA1AchieversPdf'])->name('reports.full-a1-achievers.pdf');
+            Route::get('/reports/toppers/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'toppersPdf'])->name('reports.toppers.pdf');
             Route::get('/reports/excellence', [\App\Http\Controllers\SahodayaAdmin\BoardResultReportController::class, 'excellence'])->name('reports.excellence');
             Route::get('/student-history', [\App\Http\Controllers\BoardResultStudentHistoryController::class, 'sahodayaHistory'])->name('student-history');
             Route::post('/topper-cap', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'updateTopperCap'])->name('topper-cap');
@@ -1205,6 +1208,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{exam}/payments/{schoolFee}/reject', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'rejectForExam'])->name('payments.reject');
             Route::get('/{exam}/reports', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'show'])->name('reports');
             Route::get('/{exam}/reports/registration/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRegistration'])->name('reports.registration.export');
+            Route::get('/{exam}/reports/registration/pdf', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRegistrationPdf'])->name('reports.registration.pdf');
             Route::get('/{exam}/reports/fees/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportFees'])->name('reports.fees.export');
             Route::get('/{exam}/reports/attendance/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportAttendance'])->name('reports.attendance.export');
             Route::get('/{exam}/reports/toppers/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportToppers'])->name('reports.toppers.export');

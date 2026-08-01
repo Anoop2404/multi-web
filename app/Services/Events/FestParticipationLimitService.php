@@ -208,12 +208,13 @@ class FestParticipationLimitService
      */
     private function validateEventCapacity(FestEventItem $item, array $policy, string $schoolId, ?int $excludeRegistrationId = null): array
     {
-        // max_teams / max_participants on a unified sports event are documented
-        // (see FeesTab.vue "Max teams"/"Max participants" hints) as a per-school
-        // budget across every team/individual item on this event — not a global
-        // cap shared across every school. Must be scoped to school_id here.
+        // max_teams / max_participants on a unified sports event are a per-school,
+        // per-item quota — each team/individual item (e.g. U17_TEAM_BOYS vs
+        // U19_TEAM_BOYS) draws from its own budget, not a pool shared across every
+        // item in the event. Scoped to school_id + this item's equivalent ids.
         $statuses = $this->countableStatuses($policy);
         $isTeam = $item->isTeamItem();
+        $itemIds = $this->equivalentItemIds($item);
 
         if ($isTeam) {
             $maxTeams = (int) ($this->event->max_teams ?? 0);
@@ -223,8 +224,8 @@ class FestParticipationLimitService
 
             $teamCount = FestRegistration::where('event_id', $this->event->id)
                 ->where('school_id', $schoolId)
+                ->whereIn('item_id', $itemIds)
                 ->whereIn('status', $statuses)
-                ->whereHas('item', fn ($q) => $q->whereIn('participant_type', ['team', 'group']))
                 ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
                 ->count();
 
@@ -243,12 +244,8 @@ class FestParticipationLimitService
 
         $participantCount = FestRegistration::where('event_id', $this->event->id)
             ->where('school_id', $schoolId)
+            ->whereIn('item_id', $itemIds)
             ->whereIn('status', $statuses)
-            ->whereHas('item', fn ($q) => $q
-                ->where(function ($q) {
-                    $q->whereNull('participant_type')
-                        ->orWhereNotIn('participant_type', ['team', 'group']);
-                }))
             ->when($excludeRegistrationId, fn ($q) => $q->where('id', '!=', $excludeRegistrationId))
             ->count();
 
@@ -320,6 +317,7 @@ class FestParticipationLimitService
 
         $statuses = ['submitted', 'pending_approval', 'approved'];
         $isTeam = $item->isTeamItem();
+        $itemIds = $this->equivalentItemIds($item);
 
         if ($isTeam) {
             $maxTeams = (int) ($this->event->max_teams ?? 0);
@@ -329,8 +327,8 @@ class FestParticipationLimitService
 
             $teamCount = FestRegistration::where('event_id', $this->event->id)
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+                ->whereIn('item_id', $itemIds)
                 ->whereIn('status', $statuses)
-                ->whereHas('item', fn ($q) => $q->whereIn('participant_type', ['team', 'group']))
                 ->count();
 
             return $teamCount >= $maxTeams;
@@ -343,12 +341,8 @@ class FestParticipationLimitService
 
         $participantCount = FestRegistration::where('event_id', $this->event->id)
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->whereIn('item_id', $itemIds)
             ->whereIn('status', $statuses)
-            ->whereHas('item', fn ($q) => $q
-                ->where(function ($q) {
-                    $q->whereNull('participant_type')
-                        ->orWhereNotIn('participant_type', ['team', 'group']);
-                }))
             ->count();
 
         return $participantCount >= $maxParticipants;

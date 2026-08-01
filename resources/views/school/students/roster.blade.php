@@ -14,12 +14,13 @@ th{background:#f1f5f9;font-size:8px;text-transform:uppercase}
 <p class="meta">Student roster — generated {{ now()->format('d M Y') }}</p>
 <table>
 <thead><tr>
-    <th>Name</th><th>Student ID</th><th>Class</th><th>Gender</th><th>DOB</th><th>Email</th><th>Status</th><th>Verification</th>
+    <th>Name</th><th>Admission No</th><th>Student ID</th><th>Class</th><th>Gender</th><th>DOB</th><th>Email</th><th>Status</th><th>Verification</th>
 </tr></thead>
 <tbody>
 @forelse($rows as $row)
 <tr>
     <td>{{ $row['name'] }}</td>
+    <td>{{ $row['admission_number'] }}</td>
     <td>{{ $row['reg_no'] }}</td>
     <td>{{ $row['class'] }}</td>
     <td>{{ $row['gender'] }}</td>

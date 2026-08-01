@@ -284,6 +284,7 @@ Route::prefix('sports')->name('sports.')->group(function () {
 Route::prefix('mcq')->name('mcq.')->group(function () {
     Route::get('/', [McqController::class, 'hub'])->name('index');
     Route::get('/{exam}/reports/registration/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportRegistration'])->name('reports.registration.export');
+    Route::get('/{exam}/reports/registration/pdf', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportRegistrationPdf'])->name('reports.registration.pdf');
     Route::get('/{exam}/reports/attendance/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportAttendance'])->name('reports.attendance.export');
     Route::get('/{exam}/reports/toppers/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportToppers'])->name('reports.toppers.export');
     Route::get('/{exam}/reports/class-wise-counts/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportClassWiseCounts'])->name('reports.class-wise-counts.export');

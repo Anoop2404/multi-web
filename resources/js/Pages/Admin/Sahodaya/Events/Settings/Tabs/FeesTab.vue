@@ -342,12 +342,12 @@
                             </select>
                         </template>
                     </FormField>
-                    <FormField label="Max participants" hint="Maximum total participants allowed per school (leave blank for no limit).">
+                    <FormField label="Max participants" hint="Maximum individual entries allowed per school, per item (each item like U17_BOYS/U19_BOYS gets its own quota — leave blank for no limit).">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.max_participants" type="number" min="0" class="field" placeholder="Leave blank for no cap">
                         </template>
                     </FormField>
-                    <FormField label="Max teams" hint="Maximum total team entries allowed per school (leave blank for no limit).">
+                    <FormField label="Max teams" hint="Maximum team entries allowed per school, per item (each item like U17_TEAM_BOYS/U19_TEAM_BOYS gets its own quota — leave blank for no limit).">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.max_teams" type="number" min="0" class="field" placeholder="Leave blank for no cap">
                         </template>

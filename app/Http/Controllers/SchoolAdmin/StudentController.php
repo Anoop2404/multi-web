@@ -657,14 +657,15 @@ class StudentController extends SchoolAdminController
             ->get();
 
         $rows = $students->map(fn (Student $s) => [
-            'name'         => $s->name,
-            'reg_no'       => $s->reg_no ?? '—',
-            'class'        => $s->schoolClass?->name ?? '—',
-            'gender'       => $s->gender ? ucfirst($s->gender) : '—',
-            'dob'          => $s->dob?->format('d M Y') ?? '—',
-            'parent_email' => $s->parent_email ?? $s->email ?? '—',
-            'status'       => ucfirst($s->status),
-            'verification' => $s->isVerified() ? 'Verified' : 'Pending',
+            'name'             => $s->name,
+            'reg_no'           => $s->reg_no ?? '—',
+            'admission_number' => $s->admission_number ?? '—',
+            'class'            => $s->schoolClass?->name ?? '—',
+            'gender'           => $s->gender ? ucfirst($s->gender) : '—',
+            'dob'              => $s->dob?->format('d M Y') ?? '—',
+            'parent_email'     => $s->parent_email ?? $s->email ?? '—',
+            'status'           => ucfirst($s->status),
+            'verification'     => $s->isVerified() ? 'Verified' : 'Pending',
         ])->all();
 
         $prefix = $this->school->school_prefix ?: 'school';

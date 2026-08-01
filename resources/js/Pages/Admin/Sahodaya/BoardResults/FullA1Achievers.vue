@@ -30,10 +30,14 @@
                     <button type="button" @click="printReport" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
                         <span>🖨</span> Print Report
                     </button>
-                    <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/reports`" class="btn-secondary text-xs">← Reports Hub</Link>
+                    <a :href="pdfDownloadUrl" class="btn-primary text-xs flex items-center gap-1.5 font-bold">
+                        <span>📥</span> Download PDF Report
+                    </a>
                 </div>
             </template>
         </PageHeader>
+
+        <BoardResultsReportSubNav :sahodayaId="sahodaya.id" active="full-a1" />
 
         <!-- FILTER CONTROLS -->
         <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-6 space-y-4 print:hidden">
@@ -218,6 +222,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import SubjectMarksPreviewModal from '@/Components/BoardResults/SubjectMarksPreviewModal.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
+import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
@@ -234,8 +239,20 @@ const props = defineProps({
 
 const searchQuery = ref('');
 const selectedYear = ref(props.filters.academic_year);
-const selectedClass = ref(props.filters.class ?? null);
-const selectedStream = ref(props.filters.stream ?? null);
+const selectedClass = ref(props.filters.class || '');
+const selectedStream = ref(props.filters.stream || '');
+
+const pdfDownloadUrl = computed(() => {
+    let url = `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/full-a1-achievers/pdf?academic_year=${encodeURIComponent(selectedYear.value || '')}`;
+    if (selectedClass.value) {
+        url += `&class=${selectedClass.value}`;
+    }
+    if (selectedStream.value) {
+        url += `&stream=${encodeURIComponent(selectedStream.value)}`;
+    }
+    return url;
+});
+
 const includeSubjectMarksInPrint = ref(true);
 
 const showSubjectModal = ref(false);

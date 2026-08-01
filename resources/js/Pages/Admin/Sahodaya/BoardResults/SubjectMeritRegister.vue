@@ -18,17 +18,21 @@
         <PageHeader title="Subject-wise Merit Register" eyebrow="Academic Results"
                     description="Comprehensive rank-based subject toppers report collected across member schools.">
             <template #actions>
-                <div class="flex items-center gap-2 print:hidden">
+                <div class="flex flex-wrap items-center gap-2 print:hidden">
                     <button type="button" @click="openHistorySearch" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
                         <span>📜</span> Student History
                     </button>
                     <button type="button" @click="printReport" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
                         <span>🖨</span> Print Register
                     </button>
-                    <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/reports`" class="btn-secondary text-xs">← Reports Hub</Link>
+                    <a :href="pdfDownloadUrl" class="btn-primary text-xs flex items-center gap-1.5 font-bold">
+                        <span>📥</span> Download PDF Report
+                    </a>
                 </div>
             </template>
         </PageHeader>
+
+        <BoardResultsReportSubNav :sahodayaId="sahodaya.id" active="subject-merit" />
 
         <!-- ADVANCED FILTER CONTROLS -->
         <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-6 space-y-4 print:hidden">
@@ -455,6 +459,7 @@ import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
+import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
 
 const showHistoryModal = ref(false);
 const historyStudent = ref(null);
@@ -495,6 +500,14 @@ const selectedStream = ref('');
 const selectedRankCap = ref(0);
 const searchQuery = ref('');
 const previewMode = ref('single');
+
+const pdfDownloadUrl = computed(() => {
+    let url = `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/subject-merit/pdf?academic_year=${encodeURIComponent(selectedYear.value)}`;
+    if (selectedClass.value) {
+        url += `&class=${selectedClass.value}`;
+    }
+    return url;
+});
 
 const availableSubjects = computed(() => {
     const set = new Set();

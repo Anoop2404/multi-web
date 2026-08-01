@@ -4,11 +4,16 @@
         <PageHeader :title="pageTitle" eyebrow="Academic Results"
                     description="Auto-computed from every school's submitted toppers — no manual curation. Adjust Top-N / tie handling below, then open a report to view the results.">
             <template #actions>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/board-results/reports/toppers/pdf?academic_year=${encodeURIComponent(filters.academic_year || '')}`" class="btn-primary text-xs flex items-center gap-1.5 font-bold">
+                    <span>📥</span> Download PDF Report
+                </a>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/masters`" class="btn-secondary text-sm">📚 Subject Master</Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification`" class="btn-secondary text-sm">Verification</Link>
-                <button type="button" class="btn-primary text-sm" @click="recompute">Recompute now</button>
+                <button type="button" class="btn-secondary text-sm" @click="recompute">Recompute now</button>
             </template>
         </PageHeader>
+
+        <BoardResultsReportSubNav :sahodayaId="sahodaya.id" active="toppers" />
 
         <div class="flex flex-wrap items-center gap-3 mb-4">
             <Link :href="classHref(10)" class="px-3 py-1.5 rounded-lg text-sm font-semibold border"
@@ -201,6 +206,7 @@ import { Link, router } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
 
 const props = defineProps({
     sahodaya: Object,

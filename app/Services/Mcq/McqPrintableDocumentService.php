@@ -80,6 +80,102 @@ class McqPrintableDocumentService
         return $pdf->download($this->slug($exam).'-class-wise-counts'.$suffix.'.pdf');
     }
 
+    public function classWiseRegistrationPdf(McqExam $exam, ?string $schoolId = null, ?Tenant $sahodaya = null): Response
+    {
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
+            ->with(['student.schoolClass', 'teacher', 'school', 'feeReceipt']);
+
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
+
+        $registrations = $query->get();
+
+        $grouped = [];
+        foreach ($registrations as $reg) {
+            $className = $reg->student?->schoolClass?->name;
+            if (! $className) {
+                $className = $reg->isTeacherRegistration() ? 'Teachers' : 'Unassigned Class';
+            }
+
+            if (! isset($grouped[$className])) {
+                $grouped[$className] = [];
+            }
+
+            $grouped[$className][] = [
+                'photo_src'        => $this->studentPhotoSrc($reg->student),
+                'student_name'     => $reg->participantName(),
+                'admission_number' => $reg->student?->admission_number ?: ($reg->student?->reg_no ?: '—'),
+                'reg_no'           => $reg->student?->reg_no ?: '—',
+                'hall_ticket_no'   => $reg->hall_ticket_no ?: '—',
+                'class_name'       => $className,
+                'school_name'      => $reg->school?->name ?: '—',
+                'approval_status'  => ucfirst(str_replace('_', ' ', $reg->approval_status ?? 'pending')),
+                'attendance_status'=> ucfirst($reg->attendance_status ?? 'pending'),
+            ];
+        }
+
+        $classNames = array_keys($grouped);
+        usort($classNames, function ($a, $b) {
+            $numA = (int) filter_var($a, FILTER_SANITIZE_NUMBER_INT);
+            $numB = (int) filter_var($b, FILTER_SANITIZE_NUMBER_INT);
+            if ($numA > 0 && $numB > 0 && $numA !== $numB) {
+                return $numA <=> $numB;
+            }
+
+            return strnatcasecmp($a, $b);
+        });
+
+        $sortedGrouped = [];
+        foreach ($classNames as $cName) {
+            $sortedGrouped[$cName] = $grouped[$cName];
+        }
+
+        $sahodaya ??= Tenant::find($exam->tenant_id);
+        $school = $schoolId ? Tenant::find($schoolId) : null;
+
+        $pdf = Pdf::loadView('mcq.class-wise-registration-pdf', [
+            'exam'        => $exam,
+            'school'      => $school,
+            'groupedRows' => $sortedGrouped,
+            'totalCount'  => $registrations->count(),
+            'orgName'     => $sahodaya?->name ?? 'Sahodaya',
+            'logoSrc'     => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
+            'generatedAt' => $this->generatedAt(),
+        ])->setPaper('a4', 'portrait');
+
+        $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+
+        return $pdf->download($this->slug($exam).'-class-wise-registration-report'.$suffix.'.pdf');
+    }
+
+    private function studentPhotoSrc(?\App\Models\Student $student): string
+    {
+        if ($student && $student->photo) {
+            try {
+                if (\Illuminate\Support\Facades\Storage::disk('public')->exists($student->photo)) {
+                    $content = \Illuminate\Support\Facades\Storage::disk('public')->get($student->photo);
+                    $mime = \Illuminate\Support\Facades\Storage::disk('public')->mimeType($student->photo) ?: 'image/jpeg';
+
+                    return 'data:'.$mime.';base64,'.base64_encode($content);
+                }
+                if (\Illuminate\Support\Facades\Storage::exists($student->photo)) {
+                    $content = \Illuminate\Support\Facades\Storage::get($student->photo);
+                    $mime = \Illuminate\Support\Facades\Storage::mimeType($student->photo) ?: 'image/jpeg';
+
+                    return 'data:'.$mime.';base64,'.base64_encode($content);
+                }
+            } catch (\Throwable $e) {
+                // Ignore failure, fall back to avatar
+            }
+        }
+
+        $gender = strtolower($student?->gender ?? '');
+
+        return app(\App\Services\Events\FestIdCardService::class)->defaultAvatarDataUri($gender);
+    }
+
     /**
      * @return list<array<string, mixed>>
      */

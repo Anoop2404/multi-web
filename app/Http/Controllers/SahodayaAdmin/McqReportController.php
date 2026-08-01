@@ -53,6 +53,13 @@ class McqReportController extends SahodayaAdminController
         return $reports->exportRegistrationRegister($exam);
     }
 
+    public function exportRegistrationPdf(string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $printable)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $printable->classWiseRegistrationPdf($exam);
+    }
+
     public function exportFees(string $tenantId, McqExam $exam, McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);

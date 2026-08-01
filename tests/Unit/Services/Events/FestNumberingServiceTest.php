@@ -51,11 +51,12 @@ class FestNumberingServiceTest extends TestCase
         ]);
 
         $event = FestEvent::create([
-            'tenant_id'   => $sahodaya->id,
-            'title'       => 'Sports Fest',
-            'event_type'  => 'sports',
-            'level_round' => 'sahodaya',
-            'status'      => 'registration_open',
+            'tenant_id'          => $sahodaya->id,
+            'title'              => 'Sports Fest',
+            'event_type'         => 'sports',
+            'level_round'        => 'sahodaya',
+            'status'             => 'registration_open',
+            'numbering_settings' => ['chest_no_start' => 1],
         ]);
 
         $headA = FestItemHead::create([

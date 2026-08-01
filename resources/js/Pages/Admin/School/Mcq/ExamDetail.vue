@@ -638,16 +638,27 @@
 
         <!-- Reports tab -->
         <div v-else-if="tab === 'reports'" class="space-y-4">
-            <div class="grid md:grid-cols-2 gap-4">
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div class="card">
                     <h3 class="section-title">Registration register</h3>
-                    <p class="section-desc">Your school's registrations with hall tickets and approval status.</p>
-                    <a :href="reportExports.registration" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
+                    <p class="section-desc">Your school's registrations with photos, hall tickets, and approval status.</p>
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        <a :href="reportExports.registration" class="btn-secondary text-sm">Export Excel ↓</a>
+                        <a v-if="reportExports.registrationPdf" :href="reportExports.registrationPdf" target="_blank" class="btn-secondary text-sm">Export PDF ↓</a>
+                    </div>
                 </div>
                 <div class="card">
                     <h3 class="section-title">Attendance sheet</h3>
                     <p class="section-desc">Hall ticket list for exam-day attendance.</p>
                     <a :href="reportExports.attendance" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
+                </div>
+                <div v-if="reportExports.classWiseCounts" class="card">
+                    <h3 class="section-title">Class-wise count report</h3>
+                    <p class="section-desc">Class-wise student registration count matrix for your school.</p>
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        <a :href="reportExports.classWiseCounts" class="btn-secondary text-sm">Export Excel ↓</a>
+                        <a v-if="reportExports.classWiseCountsPdf" :href="reportExports.classWiseCountsPdf" target="_blank" class="btn-secondary text-sm">Export PDF ↓</a>
+                    </div>
                 </div>
                 <div v-if="exam.results_published && reportExports.toppers" class="card">
                     <h3 class="section-title">School toppers</h3>
