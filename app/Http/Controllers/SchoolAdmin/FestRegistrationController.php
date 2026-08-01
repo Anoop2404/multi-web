@@ -349,6 +349,8 @@ class FestRegistrationController extends SchoolAdminController
             $students = $eligibilityService->annotateStudents($studentRows, $event, $this->school->id)->values();
         }
 
+        app(\App\Services\Events\FestRegistrationApprovalService::class)->promoteAllEligibleWaitlisted($event);
+
         $registrations = FestRegistration::where('school_id', $this->school->id)
             ->whereIn('event_id', $this->registrationEventIdsForSchoolView(collect([$event])))
             ->with(['event', 'item', 'participants.student', 'participants.group'])
