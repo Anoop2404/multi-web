@@ -43,6 +43,10 @@ export const EXPORT_PREVIEW_MAP = {
     results: 'overall-ranking',
     'head-wise-participants': 'head-wise-participants',
     'area-wise-participants': 'area-wise-participants',
+    'attendance-sheet': 'attendance',
+    'attendance-sheet-school': 'attendance',
+    'id-cards-by-head': 'id-cards',
+    'admit-cards': 'id-cards',
 };
 
 /** Interactive page id → category */
@@ -66,6 +70,8 @@ export const INTERACTIVE_CATEGORY_MAP = {
     'fee-collection': 'finance',
     'student-wise': 'competition',
     'item-wise': 'competition',
+    'attendance': 'schedule',
+    'id-cards': 'ops',
 };
 
 export function previewHrefForExport(exportId, reportsBase) {
@@ -220,6 +226,8 @@ export const INTERACTIVE_REPORT_META = {
     'fee-collection': { icon: '💳', hint: 'Fee payment status by school' },
     'student-wise': { icon: '🎓', hint: 'Browse each student\'s items and marks' },
     'item-wise': { icon: '📝', hint: 'Pick an item to view all participants' },
+    'attendance': { icon: '✅', hint: 'Students with photos — filter by head/item, print attendance sheet' },
+    'id-cards': { icon: '🪪', hint: 'Print student & teacher ID cards by head or item' },
 };
 
 export const REPORT_PHASES = [

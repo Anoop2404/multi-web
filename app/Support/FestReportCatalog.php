@@ -102,6 +102,8 @@ class FestReportCatalog
             ['id' => 'fee-collection', 'label' => 'Fee Collection', 'href' => "{$base}/fee-collection"],
             ['id' => 'student-wise', 'label' => 'Student-wise browser', 'href' => "{$base}/student-wise"],
             ['id' => 'item-wise', 'label' => 'Item-wise browser', 'href' => "{$base}/item-wise"],
+            ['id' => 'attendance', 'label' => 'Attendance Register', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/attendance"],
+            ['id' => 'id-cards', 'label' => 'Participant ID Cards', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/id-cards"],
         ];
 
         if ($eventType === 'sports') {
@@ -137,6 +139,8 @@ class FestReportCatalog
             'assignment-completeness' => 'assignment-completeness',
             'numbering-register' => 'numbering-register',
             'pending-approvals' => 'pending-approvals',
+            'attendance-sheet', 'attendance-sheet-school' => 'attendance',
+            'id-cards-by-head', 'admit-cards' => 'id-cards',
             default => null,
         };
     }
