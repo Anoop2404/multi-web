@@ -116,7 +116,7 @@
         table.report-table th {
             color: #c8d9f5;
             text-align: left;
-            padding: 6px 8px;
+            padding: 8px 10px;
             font-size: 8px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -125,11 +125,12 @@
         }
         table.report-table th:last-child { border-right: none; }
         table.report-table td {
-            padding: 6px 8px;
+            padding: 9px 10px;
             border-bottom: 1px solid #e8edf5;
             border-right: 1px solid #eef1f8;
             vertical-align: middle;
-            font-size: 8.5px;
+            font-size: 9px;
+            line-height: 1.35;
         }
         table.report-table td:last-child { border-right: none; }
         table.report-table tbody tr:nth-child(odd)  td { background: #fff; }
