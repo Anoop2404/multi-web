@@ -194,6 +194,7 @@ export function programEventSidebarGroups(sahodayaId, events, options = {}) {
             { label: 'Venue & schedule', href: `${base}/events/${ev.id}/schedule/items`, icon: 'calendar', permissions: FEST_VIEW },
             { label: 'Fees', href: `${base}/events/${ev.id}/fees`, icon: 'credit-card', permissions: FEST_FINANCE },
             { label: 'Reports', href: `${base}/events/${ev.id}/reports`, icon: 'bar-chart', permissions: FEST_VIEW },
+            { label: 'ID cards', href: `${base}/events/${ev.id}/id-cards`, icon: 'credit-card', permissions: FEST_VIEW },
         ],
     }));
 

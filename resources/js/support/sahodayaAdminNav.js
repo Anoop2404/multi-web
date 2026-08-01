@@ -427,7 +427,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
             menuOn('certificate_templates') ? { label: 'Certificate templates', href: `${base}/certificate-templates`, icon: 'award' } : null,
             menuOn('id_card_templates') ? { label: 'ID card templates', href: `${base}/id-card-templates`, icon: 'credit-card' } : null,
             { label: 'Find certificate', href: `${base}/events/certificates/search`, icon: 'file-text' },
-            programOn('custom') ? { label: 'Custom events', href: `${base}/programs/custom`, icon: 'layers', hidden: true } : null,
+            programOn('custom') ? { label: 'Custom events', href: `${base}/programs/custom`, icon: 'layers' } : null,
         ].filter(Boolean);
 
         // Dynamic competition types (non-system) from Inertia shared props.
