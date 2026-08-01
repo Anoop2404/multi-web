@@ -137,7 +137,7 @@ class FestRegistrationCreateService
                 $initialStatus = match (true) {
                     $waitlisted => 'waitlisted',
                     $item->head?->requiresManualApproval() || $event->requiresManualApproval() => 'pending_approval',
-                    default => 'submitted',
+                    default => 'approved',
                 };
                 $eventRegService = app(FestEventRegistrationService::class);
                 foreach (array_merge($performerIds, $standbyIds) as $studentId) {
@@ -470,7 +470,7 @@ class FestRegistrationCreateService
                     'event_id'     => $event->id,
                     'item_id'      => $item->id,
                     'school_id'    => $school->id,
-                    'status'       => 'submitted',
+                    'status'       => 'approved',
                     'submitted_at' => now(),
                 ]);
 
