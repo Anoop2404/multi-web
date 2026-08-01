@@ -15,18 +15,24 @@ class CleanBoardResultsData extends Command
 {
     protected $signature = 'board-results:clean-data
                             {--remove-missing-roll-no : Remove toppers/records missing CBSE roll_no}
+                            {--dedupe : Deduplicate entries by roll_no, keeping only the most recent entry}
                             {--target-academic-year=2025-26 : Target academic year to merge data into}
                             {--tenant= : Optional Sahodaya tenant ID}
                             {--dry-run : Preview changes without deleting or modifying}';
 
-    protected $description = 'Clean board results data missing CBSE roll_no and merge academic year records into target year (e.g. 2025-26)';
+    protected $description = 'Clean board results data missing CBSE roll_no, deduplicate keeping recent entries, and merge academic year records into target year (e.g. 2025-26)';
 
     public function handle(): int
     {
         $removeMissingRollNo = $this->option('remove-missing-roll-no') || $this->confirm('Remove topper entries missing CBSE roll_no?', true);
+        $dedupe = $this->option('dedupe') || $this->confirm('Deduplicate records by CBSE roll_no keeping only the most recent entry?', true);
         $targetYear = $this->option('target-academic-year') ?: '2025-26';
         $tenantId = $this->option('tenant');
         $dryRun = $this->option('dry-run');
+
+        if ($dryRun) {
+            $this->warn('*** DRY RUN MODE: No data will be modified or deleted ***');
+        }
 
         $sahodayas = Tenant::query()
             ->where('type', 'sahodaya')
@@ -34,10 +40,11 @@ class CleanBoardResultsData extends Command
             ->get();
 
         $totalRemovedToppers = 0;
+        $totalDeduplicatedToppers = 0;
         $totalMergedResults = 0;
 
         foreach ($sahodayas as $sahodaya) {
-            TenancyDatabase::withTenantDatabase($sahodaya, function () use ($sahodaya, $removeMissingRollNo, $targetYear, $dryRun, &$totalRemovedToppers, &$totalMergedResults) {
+            TenancyDatabase::withTenantDatabase($sahodaya, function () use ($sahodaya, $removeMissingRollNo, $dedupe, $targetYear, $dryRun, &$totalRemovedToppers, &$totalDeduplicatedToppers, &$totalMergedResults) {
                 // 1. Clean missing CBSE roll_no
                 if ($removeMissingRollNo) {
                     $invalidToppersQuery = Topper::query()
@@ -50,20 +57,55 @@ class CleanBoardResultsData extends Command
                     $count = $invalidToppersQuery->count();
                     if ($count > 0) {
                         $this->info("{$sahodaya->name}: Found {$count} topper(s) missing CBSE roll_no.");
+                        $topperIds = $invalidToppersQuery->pluck('id')->all();
+                        $totalRemovedToppers += count($topperIds);
                         if (! $dryRun) {
-                            $topperIds = $invalidToppersQuery->pluck('id')->all();
                             TopperSubjectMark::whereIn('topper_id', $topperIds)->delete();
                             $deleted = Topper::whereIn('id', $topperIds)->delete();
-                            $totalRemovedToppers += $deleted;
                             $this->info("  -> Deleted {$deleted} invalid topper record(s).");
                         }
                     }
                 }
 
-                // 2. Merge Academic Years to targetYear (e.g., '2025-26')
+                // 2. Deduplicate entries by roll_no (keeping most recent id)
+                if ($dedupe) {
+                    $duplicateGroups = Topper::query()
+                        ->whereNotNull('roll_no')
+                        ->whereRaw("TRIM(roll_no) != ''")
+                        ->select('board_result_id', 'entry_type', 'roll_no')
+                        ->selectRaw('COUNT(*) as cnt, MAX(id) as max_id')
+                        ->groupBy('board_result_id', 'entry_type', 'roll_no')
+                        ->havingRaw('COUNT(*) > 1')
+                        ->get();
+
+                    $toppersToDelete = [];
+                    foreach ($duplicateGroups as $group) {
+                        $ids = Topper::query()
+                            ->where('board_result_id', $group->board_result_id)
+                            ->where('entry_type', $group->entry_type)
+                            ->where('roll_no', $group->roll_no)
+                            ->where('id', '!=', $group->max_id)
+                            ->pluck('id')
+                            ->all();
+
+                        $toppersToDelete = array_merge($toppersToDelete, $ids);
+                    }
+
+                    if (! empty($toppersToDelete)) {
+                        $dupCount = count($toppersToDelete);
+                        $this->info("{$sahodaya->name}: Found {$dupCount} duplicate topper record(s) (keeping most recent).");
+                        $totalDeduplicatedToppers += $dupCount;
+                        if (! $dryRun) {
+                            TopperSubjectMark::whereIn('topper_id', $toppersToDelete)->delete();
+                            $deletedDups = Topper::whereIn('id', $toppersToDelete)->delete();
+                            $this->info("  -> Deleted {$deletedDups} duplicate topper record(s).");
+                        }
+                    }
+                }
+
+                // 3. Merge Academic Years to targetYear (e.g., '2025-26')
                 if ($targetYear) {
                     $targetYearRecord = AcademicYearRecord::where('label', $targetYear)->first();
-
                     $otherResults = BoardResult::query()->where('academic_year', '!=', $targetYear)->get();
 
                     if ($otherResults->isNotEmpty()) {
@@ -108,9 +150,9 @@ class CleanBoardResultsData extends Command
         }
 
         if ($dryRun) {
-            $this->warn('Dry run completed. No data was modified.');
+            $this->warn("Dry run completed. Found {$totalRemovedToppers} record(s) without roll_no, {$totalDeduplicatedToppers} duplicate(s), and {$totalMergedResults} result batch(es) to merge into '{$targetYear}'. No data was modified.");
         } else {
-            $this->info("Completed: Removed {$totalRemovedToppers} invalid topper(s) and merged {$totalMergedResults} result batch(es) to '{$targetYear}'.");
+            $this->info("Completed: Removed {$totalRemovedToppers} record(s) without roll_no, deduplicated {$totalDeduplicatedToppers} duplicate(s), and merged {$totalMergedResults} result batch(es) into '{$targetYear}'.");
         }
 
         return self::SUCCESS;
