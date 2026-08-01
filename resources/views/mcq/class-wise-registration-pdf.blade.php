@@ -316,7 +316,7 @@
                             <th class="col-sl">#</th>
                             <th class="col-photo">Photo</th>
                             <th>Student Name</th>
-                            <th class="col-adm">Admission No.</th>
+                            <th class="col-adm">School Adm. No.</th>
                             <th class="col-ticket">Hall Ticket No.</th>
                             @if(!$school)<th style="min-width:90px;">School</th>@endif
                             <th class="col-status">Approval Status</th>
@@ -335,7 +335,9 @@
                                 @endif
                             </td>
                             <td><span class="student-name">{{ $row['student_name'] }}</span></td>
-                            <td><span class="mono">{{ $row['admission_number'] }}</span></td>
+                            <td>
+                                <span class="mono">{{ $row['admission_number'] }}</span>
+                            </td>
                             <td><span class="{{ $row['hall_ticket_no'] !== '—' ? 'ticket-val' : 'mono' }}">{{ $row['hall_ticket_no'] }}</span></td>
                             @if(!$school)<td style="font-size:8px;">{{ $row['school_name'] }}</td>@endif
                             <td>
