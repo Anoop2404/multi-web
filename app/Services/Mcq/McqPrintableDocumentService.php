@@ -19,6 +19,8 @@ class McqPrintableDocumentService
         bool $inline = false,
         ?Tenant $sahodaya = null
     ): Response {
+        @ini_set('memory_limit', '1024M');
+        @ini_set('max_execution_time', '300');
         $rows = $this->registrationRows($exam, schoolId: $schoolId, selectedClass: $selectedClass);
         $sahodaya ??= Tenant::find($exam->tenant_id);
         $school = $schoolId ? Tenant::find($schoolId) : null;
@@ -41,6 +43,8 @@ class McqPrintableDocumentService
 
     public function markSheetPdf(McqExam $exam, ?Tenant $sahodaya = null): Response
     {
+        @ini_set('memory_limit', '1024M');
+        @ini_set('max_execution_time', '300');
         $rows = $this->registrationRows($exam, presentOnly: true);
         $sahodaya ??= Tenant::find($exam->tenant_id);
 
@@ -58,6 +62,8 @@ class McqPrintableDocumentService
 
     public function resultSheetPdf(McqExam $exam, ?Tenant $sahodaya = null): Response
     {
+        @ini_set('memory_limit', '1024M');
+        @ini_set('max_execution_time', '300');
         $rows = $this->registrationRows($exam, withMarks: true);
         $sahodaya ??= Tenant::find($exam->tenant_id);
 
@@ -79,6 +85,8 @@ class McqPrintableDocumentService
         bool $inline = false,
         ?Tenant $sahodaya = null
     ): Response {
+        @ini_set('memory_limit', '1024M');
+        @ini_set('max_execution_time', '300');
         $matrix = app(McqReportService::class)->classWiseCountMatrix($exam, $schoolId);
         $sahodaya ??= Tenant::find($exam->tenant_id);
 
@@ -103,6 +111,8 @@ class McqPrintableDocumentService
         bool $inline = false,
         ?Tenant $sahodaya = null
     ): Response {
+        @ini_set('memory_limit', '1024M');
+        @ini_set('max_execution_time', '300');
         $query = McqRegistration::where('exam_id', $exam->id)
             ->active()
             ->with(['student.schoolClass', 'teacher', 'school', 'feeReceipt']);
@@ -190,14 +200,93 @@ class McqPrintableDocumentService
         bool $inline = false,
         ?Tenant $sahodaya = null
     ): Response {
-        $matrix = app(McqReportService::class)->classWiseFeeDueMatrix($exam, $schoolId, $selectedClass);
+        @ini_set('memory_limit', '1024M');
+        @ini_set('max_execution_time', '300');
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
+            ->with(['student.schoolClass', 'teacher', 'school', 'feeReceipt']);
+
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
+
+        $registrations = $query->get();
+
+        $grouped = [];
+        foreach ($registrations as $reg) {
+            $className = $reg->student?->schoolClass?->name;
+            if (! $className) {
+                $className = $reg->isTeacherRegistration() ? 'Teachers' : 'Unassigned Class';
+            }
+
+            if ($selectedClass && filled($selectedClass) && strtolower(trim((string) $selectedClass)) !== 'all') {
+                $cleanFilter = strtolower(trim(str_ireplace('class', '', (string) $selectedClass)));
+                $cleanClass = strtolower(trim(str_ireplace('class', '', (string) $className)));
+                if ($cleanClass !== $cleanFilter) {
+                    continue;
+                }
+            }
+
+            if (! isset($grouped[$className])) {
+                $grouped[$className] = [];
+            }
+
+            $amount = (float) ($reg->registration_fee ?: ($exam->fee_per_student ?: 0));
+            $isPaid = $reg->feeReceipt && strtolower($reg->feeReceipt->payment_status) === 'paid';
+
+            $grouped[$className][] = [
+                'student_name'     => $reg->participantName(),
+                'admission_number' => $reg->student?->admission_number ?: ($reg->student?->reg_no ?: '—'),
+                'reg_no'           => $reg->student?->reg_no ?: '—',
+                'class_name'       => $className,
+                'school_name'      => $reg->school?->name ?: '—',
+                'fee_amount'       => $amount,
+                'payment_status'   => $isPaid ? 'Paid' : 'Unpaid',
+                'receipt_no'       => $reg->feeReceipt?->receipt_number ?: '—',
+            ];
+        }
+
+        $classNames = array_keys($grouped);
+        usort($classNames, function ($a, $b) {
+            $numA = (int) filter_var($a, FILTER_SANITIZE_NUMBER_INT);
+            $numB = (int) filter_var($b, FILTER_SANITIZE_NUMBER_INT);
+            if ($numA > 0 && $numB > 0 && $numA !== $numB) {
+                return $numA <=> $numB;
+            }
+
+            return strnatcasecmp($a, $b);
+        });
+
+        $sortedGrouped = [];
+        $totalCount = 0;
+        $totalFee = 0;
+        $totalPaid = 0;
+        $totalUnpaid = 0;
+
+        foreach ($classNames as $cName) {
+            $sortedGrouped[$cName] = $grouped[$cName];
+            foreach ($grouped[$cName] as $row) {
+                $totalCount++;
+                $totalFee += $row['fee_amount'];
+                if ($row['payment_status'] === 'Paid') {
+                    $totalPaid += $row['fee_amount'];
+                } else {
+                    $totalUnpaid += $row['fee_amount'];
+                }
+            }
+        }
+
         $sahodaya ??= Tenant::find($exam->tenant_id);
         $school = $schoolId ? Tenant::find($schoolId) : null;
 
-        $pdf = Pdf::loadView('mcq.class-wise-fee-due', [
+        $pdf = Pdf::loadView('mcq.class-wise-fee-due-pdf', [
             'exam'          => $exam,
             'school'        => $school,
-            'matrix'        => $matrix,
+            'groupedRows'   => $sortedGrouped,
+            'totalCount'    => $totalCount,
+            'totalFee'      => $totalFee,
+            'totalPaid'     => $totalPaid,
+            'totalUnpaid'   => $totalUnpaid,
             'selectedClass' => $selectedClass,
             'orgName'       => $sahodaya?->name ?? 'Sahodaya',
             'logoSrc'       => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
@@ -215,16 +304,16 @@ class McqPrintableDocumentService
         if ($student && $student->photo) {
             try {
                 if (\Illuminate\Support\Facades\Storage::disk('public')->exists($student->photo)) {
-                    $content = \Illuminate\Support\Facades\Storage::disk('public')->get($student->photo);
-                    $mime = \Illuminate\Support\Facades\Storage::disk('public')->mimeType($student->photo) ?: 'image/jpeg';
-
-                    return 'data:'.$mime.';base64,'.base64_encode($content);
+                    $absPath = \Illuminate\Support\Facades\Storage::disk('public')->path($student->photo);
+                    if (file_exists($absPath)) {
+                        return $absPath;
+                    }
                 }
                 if (\Illuminate\Support\Facades\Storage::exists($student->photo)) {
-                    $content = \Illuminate\Support\Facades\Storage::get($student->photo);
-                    $mime = \Illuminate\Support\Facades\Storage::mimeType($student->photo) ?: 'image/jpeg';
-
-                    return 'data:'.$mime.';base64,'.base64_encode($content);
+                    $absPath = \Illuminate\Support\Facades\Storage::path($student->photo);
+                    if (file_exists($absPath)) {
+                        return $absPath;
+                    }
                 }
             } catch (\Throwable $e) {
                 // Ignore failure, fall back to avatar
