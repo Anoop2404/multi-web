@@ -113,89 +113,137 @@
                                 </label>
                             </div>
 
-                            <FormField label="Recipient name — top %" hint="Vertical position on canvas (0–100)">
-                                <template #default="{ id }">
-                                    <input :id="id" v-model.number="form.layout_json.recipient_name.top" type="number" min="0" max="100" class="field"
-                                           :disabled="!isTruthy(form.layout_json.show_recipient_name)">
-                                </template>
-                            </FormField>
-                            <FormField label="Recipient — font size (px)">
-                                <template #default="{ id }">
-                                    <input :id="id" v-model.number="form.layout_json.recipient_name.font_size" type="number" min="6" max="96" class="field"
-                                           :disabled="!isTruthy(form.layout_json.show_recipient_name)">
-                                </template>
-                            </FormField>
-                            <FormField label="Recipient — font family">
-                                <template #default="{ id }">
-                                    <select :id="id" v-model="form.layout_json.recipient_name.font_family" class="field"
-                                            :disabled="!isTruthy(form.layout_json.show_recipient_name)">
-                                        <option v-for="font in fontFamilies" :key="font" :value="font">{{ font }}</option>
-                                    </select>
-                                </template>
-                            </FormField>
-                            <FormField label="Recipient — style">
-                                <template #default="{ id }">
-                                    <div :id="id" class="flex flex-wrap gap-4 pt-2 text-sm">
-                                        <label class="flex items-center gap-2">
-                                            <input v-model="form.layout_json.recipient_name.font_weight" type="checkbox"
-                                                   true-value="bold" false-value="normal"
-                                                   :disabled="!isTruthy(form.layout_json.show_recipient_name)">
-                                            Bold
-                                        </label>
-                                        <label class="flex items-center gap-2">
-                                            <input v-model="form.layout_json.recipient_name.font_style" type="checkbox"
-                                                   true-value="italic" false-value="normal"
-                                                   :disabled="!isTruthy(form.layout_json.show_recipient_name)">
-                                            Italic
-                                        </label>
-                                    </div>
-                                </template>
-                            </FormField>
+                            <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                                <p class="sm:col-span-2 md:col-span-4 font-bold text-slate-800 text-xs uppercase tracking-wider">Recipient Name Position &amp; Alignment</p>
+                                <FormField label="Top %">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.recipient_name.top" type="number" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                    </template>
+                                </FormField>
+                                <FormField label="Left %">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.recipient_name.left" type="number" min="0" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                    </template>
+                                </FormField>
+                                <FormField label="Width %">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.recipient_name.width" type="number" min="10" max="100" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                    </template>
+                                </FormField>
+                                <FormField label="Text Align">
+                                    <template #default="{ id }">
+                                        <select :id="id" v-model="form.layout_json.recipient_name.align" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                            <option value="center">Center</option>
+                                            <option value="left">Left</option>
+                                            <option value="right">Right</option>
+                                        </select>
+                                    </template>
+                                </FormField>
+                                <FormField label="Font size (px)">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.recipient_name.font_size" type="number" min="6" max="96" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                    </template>
+                                </FormField>
+                                <FormField label="Font family">
+                                    <template #default="{ id }">
+                                        <select :id="id" v-model="form.layout_json.recipient_name.font_family" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                            <option v-for="font in fontFamilies" :key="font" :value="font">{{ font }}</option>
+                                        </select>
+                                    </template>
+                                </FormField>
+                                <FormField label="Style" class-extra="sm:col-span-2">
+                                    <template #default="{ id }">
+                                        <div :id="id" class="flex flex-wrap gap-4 pt-2 text-sm">
+                                            <label class="flex items-center gap-2">
+                                                <input v-model="form.layout_json.recipient_name.font_weight" type="checkbox" true-value="bold" false-value="normal" :disabled="!isTruthy(form.layout_json.show_recipient_name)"> Bold
+                                            </label>
+                                            <label class="flex items-center gap-2">
+                                                <input v-model="form.layout_json.recipient_name.font_style" type="checkbox" true-value="italic" false-value="normal" :disabled="!isTruthy(form.layout_json.show_recipient_name)"> Italic
+                                            </label>
+                                        </div>
+                                    </template>
+                                </FormField>
+                            </div>
 
-                            <FormField label="Body text — top %">
-                                <template #default="{ id }">
-                                    <input :id="id" v-model.number="form.layout_json.body.top" type="number" min="0" max="100" class="field">
-                                </template>
-                            </FormField>
-                            <FormField label="Body — font size (px)">
-                                <template #default="{ id }">
-                                    <input :id="id" v-model.number="form.layout_json.body.font_size" type="number" min="6" max="96" class="field">
-                                </template>
-                            </FormField>
-                            <FormField label="Body — font family">
-                                <template #default="{ id }">
-                                    <select :id="id" v-model="form.layout_json.body.font_family" class="field">
-                                        <option v-for="font in fontFamilies" :key="font" :value="font">{{ font }}</option>
-                                    </select>
-                                </template>
-                            </FormField>
-                            <FormField label="Body — style">
-                                <template #default="{ id }">
-                                    <div :id="id" class="flex flex-wrap gap-4 pt-2 text-sm">
-                                        <label class="flex items-center gap-2">
-                                            <input v-model="form.layout_json.body.font_weight" type="checkbox"
-                                                   true-value="bold" false-value="normal">
-                                            Bold
-                                        </label>
-                                        <label class="flex items-center gap-2">
-                                            <input v-model="form.layout_json.body.font_style" type="checkbox"
-                                                   true-value="italic" false-value="normal">
-                                            Italic
-                                        </label>
-                                    </div>
-                                </template>
-                            </FormField>
+                            <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                                <p class="sm:col-span-2 md:col-span-4 font-bold text-slate-800 text-xs uppercase tracking-wider">Body Text Position &amp; Alignment</p>
+                                <FormField label="Top %">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.body.top" type="number" min="0" max="100" class="field">
+                                    </template>
+                                </FormField>
+                                <FormField label="Left %">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.body.left" type="number" min="0" max="100" class="field">
+                                    </template>
+                                </FormField>
+                                <FormField label="Width %">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.body.width" type="number" min="10" max="100" class="field">
+                                    </template>
+                                </FormField>
+                                <FormField label="Text Align">
+                                    <template #default="{ id }">
+                                        <select :id="id" v-model="form.layout_json.body.align" class="field">
+                                            <option value="center">Center</option>
+                                            <option value="left">Left</option>
+                                            <option value="right">Right</option>
+                                        </select>
+                                    </template>
+                                </FormField>
+                                <FormField label="Font size (px)">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.body.font_size" type="number" min="6" max="96" class="field">
+                                    </template>
+                                </FormField>
+                                <FormField label="Font family">
+                                    <template #default="{ id }">
+                                        <select :id="id" v-model="form.layout_json.body.font_family" class="field">
+                                            <option v-for="font in fontFamilies" :key="font" :value="font">{{ font }}</option>
+                                        </select>
+                                    </template>
+                                </FormField>
+                                <FormField label="Style" class-extra="sm:col-span-2">
+                                    <template #default="{ id }">
+                                        <div :id="id" class="flex flex-wrap gap-4 pt-2 text-sm">
+                                            <label class="flex items-center gap-2">
+                                                <input v-model="form.layout_json.body.font_weight" type="checkbox" true-value="bold" false-value="normal"> Bold
+                                            </label>
+                                            <label class="flex items-center gap-2">
+                                                <input v-model="form.layout_json.body.font_style" type="checkbox" true-value="italic" false-value="normal"> Italic
+                                            </label>
+                                        </div>
+                                    </template>
+                                </FormField>
+                            </div>
 
-                            <FormField label="Date — top %">
-                                <template #default="{ id }">
-                                    <input :id="id" v-model.number="form.layout_json.certificate_date.top" type="number" min="0" max="100" class="field">
-                                </template>
-                            </FormField>
-                            <FormField label="Date — left %" hint="Side position">
-                                <template #default="{ id }">
-                                    <input :id="id" v-model.number="form.layout_json.certificate_date.left" type="number" min="0" max="100" class="field">
-                                </template>
-                            </FormField>
+                            <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                                <p class="sm:col-span-2 md:col-span-4 font-bold text-slate-800 text-xs uppercase tracking-wider">Date Position &amp; Alignment</p>
+                                <FormField label="Top %">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.certificate_date.top" type="number" min="0" max="100" class="field">
+                                    </template>
+                                </FormField>
+                                <FormField label="Left %">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.certificate_date.left" type="number" min="0" max="100" class="field">
+                                    </template>
+                                </FormField>
+                                <FormField label="Width %">
+                                    <template #default="{ id }">
+                                        <input :id="id" v-model.number="form.layout_json.certificate_date.width" type="number" min="10" max="100" class="field">
+                                    </template>
+                                </FormField>
+                                <FormField label="Text Align">
+                                    <template #default="{ id }">
+                                        <select :id="id" v-model="form.layout_json.certificate_date.align" class="field">
+                                            <option value="left">Left</option>
+                                            <option value="center">Center</option>
+                                            <option value="right">Right</option>
+                                        </select>
+                                    </template>
+                                </FormField>
+                            </div>
                         </template>
 
                         <FormField label="Body text" class-extra="sm:col-span-2">
