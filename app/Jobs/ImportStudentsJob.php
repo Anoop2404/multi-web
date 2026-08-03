@@ -55,6 +55,16 @@ class ImportStudentsJob implements ShouldQueue
 
                 return $result;
             });
+        } catch (\Throwable $e) {
+            if ($this->backupId) {
+                UploadedFileBackup::whereKey($this->backupId)->update([
+                    'status'      => UploadedFileBackup::STATUS_FAILED,
+                    'error_count' => 1,
+                    'errors'      => [['row' => 0, 'message' => 'Job execution error: '.$e->getMessage()]],
+                ]);
+            }
+
+            throw $e;
         } finally {
             if ($tmp && str_starts_with($tmp, sys_get_temp_dir())) {
                 @unlink($tmp);
