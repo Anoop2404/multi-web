@@ -813,7 +813,7 @@ class StudentController extends SchoolAdminController
         );
 
         if ($rowCount > $threshold) {
-            ImportStudentsJob::dispatch(
+            ImportStudentsJob::dispatchSync(
                 $this->school->id,
                 $backup->storage_path,
                 $request->user()->id,
@@ -823,7 +823,7 @@ class StudentController extends SchoolAdminController
 
             return back()->with(
                 'success',
-                "Import queued ({$rowCount} rows). You will be notified when it completes.",
+                "Import completed ({$rowCount} rows).",
             );
         }
 
