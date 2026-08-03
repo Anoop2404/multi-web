@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 class StudentRecordCreator
 {
     /** @param  array<string, mixed>  $fields */
-    public function create(Tenant $school, array $fields, ?UploadedFile $photo = null): Student
+    public function create(Tenant $school, array $fields, ?UploadedFile $photo = null, bool $notify = true): Student
     {
         $academicYearId = StudentRecordHelper::activeAcademicYearIdForSchool($school);
 
@@ -56,7 +56,7 @@ class StudentRecordCreator
             ['school_class_id' => $student->school_class_id],
         );
 
-        if ($school->parent_id) {
+        if ($notify && $school->parent_id) {
             app(\App\Services\Notifications\SahodayaAdminNotifier::class)->notifyAdmins(
                 $school->parent_id,
                 'student.verification.pending',

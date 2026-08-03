@@ -83,6 +83,9 @@ class StudentCsvImporter
         }
 
         try {
+            @ini_set('memory_limit', '1024M');
+            @ini_set('max_execution_time', '600');
+
             $imported = DB::transaction(function () use ($validation) {
                 $creator = app(StudentRecordCreator::class);
                 $count = 0;
@@ -103,12 +106,21 @@ class StudentCsvImporter
                         $fields['parent_email'] = $row['email'];
                     }
 
-                    $creator->create($this->school, $fields);
+                    $creator->create($this->school, $fields, photo: null, notify: false);
                     $count++;
                 }
 
                 return $count;
             });
+
+            if ($this->school->parent_id && $imported > 0) {
+                app(\App\Services\Notifications\SahodayaAdminNotifier::class)->notifyAdmins(
+                    $this->school->parent_id,
+                    'student.verification.pending',
+                    ['student_name' => "{$imported} student(s) from {$this->school->name}"],
+                    "/sahodaya-admin/{$this->school->parent_id}/students/verification",
+                );
+            }
         } catch (\Throwable $e) {
             return [
                 'imported' => 0,

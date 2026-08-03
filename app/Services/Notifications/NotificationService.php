@@ -51,20 +51,56 @@ class NotificationService
     public function notifyFromTemplate(User $user, string $slug, array $replacements = [], ?string $actionUrl = null): ?InAppNotification
     {
         $template = NotificationTemplate::where('slug', $slug)->where('is_active', true)->first();
+
+        $title = $template?->title;
+        $body = $template?->body_template;
+
         if (! $template) {
-            Log::warning("Notification template missing: {$slug}");
+            $fallback = $this->fallbackTemplate($slug);
+            if ($fallback) {
+                $title = $fallback['title'];
+                $body = $fallback['body_template'];
+            } else {
+                Log::warning("Notification template missing: {$slug}");
 
-            return null;
+                return null;
+            }
         }
 
-        $body = $template->body_template;
-        foreach ($replacements as $key => $value) {
-            $body = str_replace('{{'.$key.'}}', (string) $value, $body);
+        foreach ($replacements as $key => $val) {
+            $title = str_replace('{{'.$key.'}}', (string) $val, $title ?? '');
+            $body = str_replace('{{'.$key.'}}', (string) $val, $body ?? '');
         }
 
-        $channels = $template->channels_json ?? ['in_app'];
+        return $this->notify($user, $title, $body, $actionUrl, $template?->channels_json ?? ['in_app'], $slug);
+    }
 
-        return $this->notify($user, $template->title, $body, $actionUrl, $channels, $slug);
+    private function fallbackTemplate(string $slug): ?array
+    {
+        return match ($slug) {
+            'student.verification.pending' => [
+                'title' => 'Student Verification Pending',
+                'body_template' => 'Student {{student_name}} is pending verification.',
+            ],
+            'student.verification.approved' => [
+                'title' => 'Student Verification Approved',
+                'body_template' => 'Student {{student_name}} has been verified.',
+            ],
+            'student.verification.rejected' => [
+                'title' => 'Student Verification Rejected',
+                'body_template' => 'Student {{student_name}} verification was rejected.',
+            ],
+            'mcq.registration.submitted' => [
+                'title' => 'MCQ Registration Submitted',
+                'body_template' => 'Registration for {{student_name}} in {{exam_title}} has been submitted.',
+            ],
+            'mcq.registration.confirmed' => [
+                'title' => 'MCQ Registration Confirmed',
+                'body_template' => 'Registration for {{student_name}} in {{exam_title}} is confirmed.',
+            ],
+            default => null,
+        };
+    }
     }
 
     public function unreadCount(User $user): int
