@@ -137,7 +137,7 @@ function overlayStyle(field = {}, fallback = {}) {
     const fontStyle = (field.font_style ?? fallback.font_style ?? 'normal') === 'italic' ? 'italic' : 'normal';
     const align = field.align ?? fallback.align ?? 'center';
 
-    return {
+    const style = {
         top: `${field.top ?? fallback.top ?? 0}%`,
         left: `${field.left ?? fallback.left ?? 10}%`,
         width: `${field.width ?? fallback.width ?? 80}%`,
@@ -145,8 +145,13 @@ function overlayStyle(field = {}, fallback = {}) {
         fontFamily,
         fontWeight,
         fontStyle,
-        textAlign: align,
     };
+
+    if (align && ['left', 'right', 'center', 'justify'].includes(align)) {
+        style.textAlign = align;
+    }
+
+    return style;
 }
 
 const sampleRecipientName = computed(() => {

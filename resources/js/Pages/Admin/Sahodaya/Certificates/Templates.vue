@@ -133,6 +133,7 @@
                                 <FormField label="Text Align">
                                     <template #default="{ id }">
                                         <select :id="id" v-model="form.layout_json.recipient_name.align" class="field" :disabled="!isTruthy(form.layout_json.show_recipient_name)">
+                                            <option value="none">Default / None (Disabled alignment)</option>
                                             <option value="center">Center</option>
                                             <option value="left">Left</option>
                                             <option value="right">Right</option>
@@ -185,7 +186,9 @@
                                 <FormField label="Text Align">
                                     <template #default="{ id }">
                                         <select :id="id" v-model="form.layout_json.body.align" class="field">
+                                            <option value="none">Default / None (Disabled alignment)</option>
                                             <option value="center">Center</option>
+                                            <option value="justify">Justify (Full Width)</option>
                                             <option value="left">Left</option>
                                             <option value="right">Right</option>
                                         </select>
@@ -237,6 +240,7 @@
                                 <FormField label="Text Align">
                                     <template #default="{ id }">
                                         <select :id="id" v-model="form.layout_json.certificate_date.align" class="field">
+                                            <option value="none">Default / None (Disabled alignment)</option>
                                             <option value="left">Left</option>
                                             <option value="center">Center</option>
                                             <option value="right">Right</option>

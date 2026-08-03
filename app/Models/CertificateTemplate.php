@@ -154,7 +154,7 @@ class CertificateTemplate extends Model
         ];
 
         $align = $field['align'] ?? $fallback['align'] ?? null;
-        if (in_array($align, ['left', 'right', 'center'], true)) {
+        if (in_array($align, ['left', 'right', 'center', 'justify'], true)) {
             $parts[] = 'text-align:'.$align;
         }
 
