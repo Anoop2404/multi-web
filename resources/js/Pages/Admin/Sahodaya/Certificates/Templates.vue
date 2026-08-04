@@ -520,6 +520,7 @@ function textFieldDefaults(src = {}, def = {}, fallback = {}) {
         font_family: src.font_family ?? def.font_family ?? fallback.font_family ?? 'Times New Roman',
         font_weight: src.font_weight ?? def.font_weight ?? fallback.font_weight ?? 'normal',
         font_style: src.font_style ?? def.font_style ?? fallback.font_style ?? 'normal',
+        align: src.align ?? def.align ?? fallback.align ?? 'center',
     };
 }
 
@@ -532,17 +533,14 @@ function layoutDefaults(from = null) {
         bold_variables: src.bold_variables ?? d.bold_variables ?? true,
         show_certificate_date: src.show_certificate_date ?? d.show_certificate_date ?? true,
         recipient_name: textFieldDefaults(src.recipient_name, d.recipient_name, {
-            top: 38, left: 10, width: 80, font_size: 24, font_family: 'Montserrat', font_weight: 'bold',
+            top: 38, left: 10, width: 80, font_size: 24, font_family: 'Montserrat', font_weight: 'bold', align: 'center',
         }),
         body: textFieldDefaults(src.body, d.body, {
-            top: 48, left: 12, width: 76, font_size: 12.5, font_family: 'Montserrat',
+            top: 48, left: 12, width: 76, font_size: 12.5, font_family: 'Montserrat', align: 'center',
         }),
-        certificate_date: {
-            ...textFieldDefaults(src.certificate_date, d.certificate_date, {
-                top: 72, left: 8, width: 42, font_size: 12, font_family: 'Montserrat',
-            }),
-            align: src.certificate_date?.align ?? d.certificate_date?.align ?? 'left',
-        },
+        certificate_date: textFieldDefaults(src.certificate_date, d.certificate_date, {
+            top: 72, left: 8, width: 42, font_size: 12, font_family: 'Montserrat', align: 'left',
+        }),
         participation_label_cover: {
             top: src.participation_label_cover?.top ?? d.participation_label_cover?.top ?? 28,
             height: src.participation_label_cover?.height ?? d.participation_label_cover?.height ?? 7,
