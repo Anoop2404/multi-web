@@ -50,6 +50,11 @@ class FestEvent extends Model
         'schedule_mode', 'competition_time',
         'notification_settings',
         'strict_item_payment_gating',
+        'food_payee_type', 'food_host_school_id',
+    ];
+
+    protected $attributes = [
+        'approval_policy' => 'auto',
     ];
 
     protected $casts = [
@@ -200,6 +205,12 @@ class FestEvent extends Model
     public function conductingSchool(): BelongsTo
     {
         return $this->belongsToCentralTenant('conducting_school_id');
+    }
+
+    /** The school food payments are payable to when food_payee_type is 'host_school'. */
+    public function foodHostSchool(): BelongsTo
+    {
+        return $this->belongsToCentralTenant('food_host_school_id');
     }
 
     public function scopeForTenant($q, string $tenantId)

@@ -40,6 +40,10 @@ class FestItemHead extends Model
         'notification_settings',
     ];
 
+    protected $attributes = [
+        'approval_policy' => 'auto',
+    ];
+
     protected $casts = [
         'is_team_heading' => 'boolean',
         'default_item_fee' => 'decimal:2',

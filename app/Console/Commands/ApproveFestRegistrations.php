@@ -2,9 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Models\FestCompetitionArea;
 use App\Models\FestEvent;
+use App\Models\FestItemHead;
 use App\Models\FestRegistration;
 use App\Models\Tenant;
+use App\Services\Events\FestLevelRegistrationService;
+use App\Services\Events\FestNumberingService;
+use App\Services\Events\FestSchoolEventFeeService;
 use Illuminate\Console\Command;
 
 class ApproveFestRegistrations extends Command
@@ -16,7 +21,7 @@ class ApproveFestRegistrations extends Command
                             {--all : Approve registrations for all active events}
                             {--force : Skip confirmation prompt}';
 
-    protected $description = 'Auto-approve pending student registrations for a fest, sports, or all active events';
+    protected $description = 'Auto-approve pending student registrations and update event settings to auto-approval';
 
     public function handle(): int
     {
@@ -36,11 +41,27 @@ class ApproveFestRegistrations extends Command
         }
 
         $totalApproved = 0;
+        $totalSettingsUpdated = 0;
 
         foreach ($sahodayas as $sahodaya) {
-            $sahodaya->run(function () use ($eventIdOrSlug, $schoolOpt, $allOption, $sahodaya, &$totalApproved) {
+            $sahodaya->run(function () use ($eventIdOrSlug, $schoolOpt, $allOption, $sahodaya, &$totalApproved, &$totalSettingsUpdated) {
+                // 1. Update all Event, ItemHead, and CompetitionArea settings to auto approval policy
+                $updatedEvents = FestEvent::where('approval_policy', '!=', 'auto')
+                    ->orWhereNull('approval_policy')
+                    ->update(['approval_policy' => 'auto']);
+
+                $updatedHeads = FestItemHead::where('approval_policy', '!=', 'auto')
+                    ->orWhereNull('approval_policy')
+                    ->update(['approval_policy' => 'auto']);
+
+                $updatedAreas = FestCompetitionArea::where('approval_policy', '!=', 'auto')
+                    ->orWhereNull('approval_policy')
+                    ->update(['approval_policy' => 'auto']);
+
+                $totalSettingsUpdated += ($updatedEvents + $updatedHeads + $updatedAreas);
+
                 if ($allOption) {
-                    $events = FestEvent::whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])->get();
+                    $events = FestEvent::get();
                 } else {
                     $event = is_numeric($eventIdOrSlug)
                         ? FestEvent::find($eventIdOrSlug)
@@ -56,28 +77,45 @@ class ApproveFestRegistrations extends Command
                     $eventIds = $event->reportableEventIds();
 
                     $query = FestRegistration::whereIn('event_id', $eventIds)
-                        ->whereIn('status', ['pending_approval', 'submitted']);
+                        ->whereIn('status', ['pending_approval', 'submitted', 'draft']);
 
                     if ($schoolOpt) {
                         $query->where('school_id', $schoolOpt);
                     }
 
-                    $count = $query->count();
-                    if ($count > 0) {
-                        $updated = $query->update(['status' => 'approved']);
-                        $totalApproved += $updated;
-                        $this->info("Approved {$updated} registration(s) for '{$event->title}' (ID: {$event->id}) in {$sahodaya->name}.");
+                    $registrations = $query->with(['participants'])->get();
+                    if ($registrations->isNotEmpty()) {
+                        foreach ($registrations as $reg) {
+                            $reg->update([
+                                'status'       => 'approved',
+                                'submitted_at' => $reg->submitted_at ?? now(),
+                            ]);
+                            $totalApproved++;
+
+                            foreach ($reg->participants as $participant) {
+                                app(FestNumberingService::class)->assignParticipantNumbers($participant);
+                            }
+                            app(FestLevelRegistrationService::class)->syncRegistration($reg);
+                        }
+
+                        // Recalculate school event fees for updated schools
+                        $schoolIds = $registrations->pluck('school_id')->unique();
+                        foreach ($schoolIds as $sId) {
+                            try {
+                                app(FestSchoolEventFeeService::class)->recalculate($event, $sId);
+                            } catch (\Throwable) {
+                                // Ignore fee exceptions
+                            }
+                        }
+
+                        $this->info("Approved {$registrations->count()} registration(s) for '{$event->title}' (ID: {$event->id}) in {$sahodaya->name}.");
                     }
                 }
             });
         }
 
-        if ($totalApproved === 0) {
-            $targetDesc = $allOption ? 'all active events' : "matching event '{$eventIdOrSlug}'";
-            $this->info("No pending registrations were found for {$targetDesc}.");
-        } else {
-            $this->info("Completed: Approved total of {$totalApproved} registration(s).");
-        }
+        $this->info("Completed: Updated {$totalSettingsUpdated} event/head/area setting(s) to 'auto' approval policy.");
+        $this->info("Completed: Approved total of {$totalApproved} registration(s).");
 
         return self::SUCCESS;
     }

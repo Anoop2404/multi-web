@@ -17,6 +17,10 @@ class FestCompetitionArea extends Model
         'verification_policy', 'approval_policy', 'max_participants', 'max_teams', 'venue',
     ];
 
+    protected $attributes = [
+        'approval_policy' => 'auto',
+    ];
+
     protected $casts = [
         'is_active' => 'boolean',
         'reg_start' => 'date',
