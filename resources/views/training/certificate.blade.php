@@ -171,6 +171,25 @@
         </div>
     </div>
 @else
+    @php
+        $b = $layout['body'] ?? [];
+        $bAlign = $b['align'] ?? 'center';
+        $bStyle = '';
+        if (!empty($b['font_size'])) $bStyle .= 'font-size:' . $b['font_size'] . 'px;';
+        if (!empty($b['font_family'])) $bStyle .= 'font-family:"' . $b['font_family'] . '", serif;';
+        if (!empty($b['font_weight']) && $b['font_weight'] === 'bold') $bStyle .= 'font-weight:bold;';
+        if (!empty($b['font_style']) && $b['font_style'] === 'italic') $bStyle .= 'font-style:italic;';
+        if ($bAlign && $bAlign !== 'none') $bStyle .= 'text-align:' . $bAlign . ';';
+
+        $d = $layout['certificate_date'] ?? [];
+        $dAlign = $d['align'] ?? 'left';
+        $dStyle = '';
+        if (!empty($d['font_size'])) $dStyle .= 'font-size:' . $d['font_size'] . 'px;';
+        if (!empty($d['font_family'])) $dStyle .= 'font-family:"' . $d['font_family'] . '", serif;';
+        if (!empty($d['font_weight']) && $d['font_weight'] === 'bold') $dStyle .= 'font-weight:bold;';
+        if (!empty($d['font_style']) && $d['font_style'] === 'italic') $dStyle .= 'font-style:italic;';
+        if ($dAlign && $dAlign !== 'none') $dStyle .= 'text-align:' . $dAlign . ';';
+    @endphp
     <div class="page">
         <div class="corner corner-tl"></div>
         <div class="corner corner-tr"></div>
@@ -189,7 +208,7 @@
 
         <div class="cert-title">{{ $title }}</div>
 
-        <div class="body-text">
+        <div class="body-text" style="{{ $bStyle }}">
             @foreach($paragraphs as $paragraph)
                 <p>{!! nl2br($paragraph) !!}</p>
             @endforeach
@@ -197,7 +216,7 @@
                 <p class="date-line"><strong>Days attended:</strong> {{ $fieldValues['days_attended'] }} of {{ $fieldValues['total_days'] ?? $fieldValues['days_attended'] }}</p>
             @endif
             @if($showCertificateDate)
-                <p class="date-line"><strong>Date:</strong> {{ $fieldValues['certificate_date'] ?? now()->format('j F Y') }}</p>
+                <p class="date-line" style="{{ $dStyle }}"><strong>Date:</strong> {{ $fieldValues['certificate_date'] ?? now()->format('j F Y') }}</p>
             @endif
         </div>
 
