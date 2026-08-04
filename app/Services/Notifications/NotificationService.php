@@ -101,7 +101,6 @@ class NotificationService
             default => null,
         };
     }
-    }
 
     public function unreadCount(User $user): int
     {
