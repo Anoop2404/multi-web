@@ -178,7 +178,7 @@ class CertificateTemplate extends Model
             }
         }
 
-        $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style'];
+        $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style', 'align'];
 
         foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover'] as $key) {
             if (! isset($custom[$key]) || ! is_array($custom[$key])) {
@@ -186,7 +186,6 @@ class CertificateTemplate extends Model
             }
             $allowed = match ($key) {
                 'participation_label_cover' => ['top', 'left', 'width', 'height'],
-                'certificate_date' => [...$textKeys, 'align'],
                 default => $textKeys,
             };
             $defaults[$key] = array_merge(

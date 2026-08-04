@@ -6,6 +6,7 @@ use App\Models\CertificateTemplate;
 use App\Models\FestEvent;
 use App\Services\Certificates\CertificateBackgroundConverter;
 use App\Services\Training\TrainingCertificateService;
+use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -63,11 +64,35 @@ class CertificateTemplateController extends SahodayaAdminController
     {
         abort_if($template->tenant_id !== $this->sahodaya->id, 403);
 
-        if ($template->event_type === 'training') {
-            $render = app(TrainingCertificateService::class)
-                ->sampleRenderContextForTemplate($template, $this->sahodaya);
+        if ($template->event_type === 'fest') {
+            $render = [
+                'template'      => $template,
+                'title'         => $template->title ?: 'Certificate of Participation',
+                'fieldValues'   => [
+                    'recipient_name'   => 'Sample Student Name',
+                    'school_name'      => 'Sample Model School',
+                    'event_title'      => 'Annual Kalotsav 2026',
+                    'item_title'       => 'Classical Music (Solo)',
+                    'event_dates'      => '12-14 October 2026',
+                    'achievement_line' => 'First Prize with A Grade',
+                    'sahodaya_name'    => strtoupper($this->sahodaya->name),
+                    'certificate_date' => now()->format('j F Y'),
+                ],
+                'logoUrl'       => $template->logo_path ? TenantStorage::logoUrl($this->sahodaya, $template->logo_path) : TenantBranding::logoUrl($this->sahodaya),
+                'sealUrl'       => $template->seal_path ? TenantStorage::logoUrl($this->sahodaya, $template->seal_path) : null,
+                'backgroundUrl' => $template->background_path ? TenantStorage::logoUrl($this->sahodaya, $template->background_path) : null,
+                'overlayLayout' => $template->overlayLayout(),
+                'signatories'   => collect($template->signatories ?? CertificateTemplate::defaultTrainingSignatories())
+                    ->map(fn ($s) => [
+                        'name'          => $s['name'] ?? '',
+                        'designation'   => $s['designation'] ?? '',
+                        'signature_url' => ! empty($s['signature_path']) ? TenantStorage::logoUrl($this->sahodaya, $s['signature_path']) : null,
+                    ])->values()->all(),
+                'certificate'   => (object) ['verification_uuid' => 'SAMPLE-FEST-0000'],
+                'qr_src'        => null,
+            ];
 
-            return view('training.certificate', array_merge($render, [
+            return view('fest.certificate-print', array_merge($render, [
                 'registration' => null,
                 'sahodaya'     => $this->sahodaya,
                 'isSample'     => true,
