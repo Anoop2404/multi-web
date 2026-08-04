@@ -1348,6 +1348,131 @@ class TrainingProgramController extends SahodayaAdminController
         ]));
     }
 
+    public function certificatesHub(string $tenantId, TrainingProgram $program)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        $program->loadCount(['registrations as confirmed_count' => fn ($q) => $q->where('status', 'confirmed')]);
+
+        $registrations = TrainingRegistration::where('program_id', $program->id)
+            ->where('status', 'confirmed')
+            ->with(['teacher:id,name,email,designation,tenant_id', 'school:id,name'])
+            ->get();
+
+        $certMap = Certificate::where('entity_type', TrainingRegistration::class)
+            ->whereIn('entity_id', $registrations->pluck('id'))
+            ->get()
+            ->keyBy('entity_id');
+
+        $certService = app(TrainingCertificateService::class);
+        $reqPresent = $certService->requiredPresentDays($program);
+
+        $rows = $registrations->map(function (TrainingRegistration $r) use ($certMap, $certService, $reqPresent) {
+            $cert = $certMap->get($r->id);
+            $present = $certService->presentDaysCount($r);
+            $isEligible = $present >= $reqPresent;
+
+            return [
+                'id'                  => $r->id,
+                'teacher_name'        => $r->teacher?->name ?? 'Participant',
+                'teacher_email'       => $r->teacher?->email ?? '',
+                'teacher_designation' => $r->teacher?->designation ?? 'Teacher',
+                'school_name'         => $r->school?->name ?? 'School',
+                'present_days'        => $present,
+                'is_eligible'         => $isEligible,
+                'certificate_id'      => $cert?->id,
+                'verification_uuid'   => $cert?->verification_uuid,
+                'generated_at'        => $cert?->generated_at?->format('Y-m-d H:i'),
+                'email_sent_at'       => $cert?->email_sent_at?->format('Y-m-d H:i'),
+                'email_status'        => $cert?->email_sent_at ? 'sent' : ($cert ? 'pending' : 'not_issued'),
+            ];
+        });
+
+        return $this->inertia('Sahodaya/Training/CertificatesHub', [
+            'program' => [
+                'id'              => $program->id,
+                'title'           => $program->title,
+                'status'          => $program->status,
+                'start_date'      => $program->start_date,
+                'end_date'        => $program->end_date,
+                'venue'           => $program->venue,
+                'confirmed_count' => $program->confirmed_count,
+            ],
+            'rows'  => $rows,
+            'stats' => [
+                'total'    => $rows->count(),
+                'eligible' => $rows->where('is_eligible', true)->count(),
+                'issued'   => $rows->whereNotNull('certificate_id')->count(),
+                'emailed'  => $rows->where('email_status', 'sent')->count(),
+            ],
+        ]);
+    }
+
+    public function sendTestCertificateEmail(Request $request, string $tenantId, TrainingProgram $program)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'test_email' => 'required|email|max:255',
+        ]);
+
+        $sent = app(TrainingCertificateService::class)->sendTestCertificateEmail(
+            $program,
+            $this->sahodaya,
+            $data['test_email']
+        );
+
+        abort_unless($sent, 422, 'Could not send test email.');
+
+        return back()->with('success', "Test certificate email successfully sent to {$data['test_email']}.");
+    }
+
+    public function bulkSendCertificatesEmail(Request $request, string $tenantId, TrainingProgram $program)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+
+        $selectedIds = $request->input('registration_ids');
+        $query = TrainingRegistration::where('program_id', $program->id)
+            ->where('status', 'confirmed');
+
+        if (is_array($selectedIds) && count($selectedIds)) {
+            $query->whereIn('id', $selectedIds);
+        }
+
+        $registrations = $query->with(['teacher', 'school'])->get();
+        abort_if($registrations->isEmpty(), 422, 'No eligible registrations found to send.');
+
+        $certService = app(TrainingCertificateService::class);
+        $sentCount = 0;
+
+        foreach ($registrations as $r) {
+            if ($certService->sendCertificateEmailToRegistration($r, $this->sahodaya)) {
+                $sentCount++;
+            }
+        }
+
+        return back()->with('success', "Certificates emailed successfully to {$sentCount} teacher(s).");
+    }
+
+    public function sendSingleCertificateEmail(Request $request, string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->program_id !== $program->id, 403);
+
+        $sent = app(TrainingCertificateService::class)->sendCertificateEmailToRegistration($registration, $this->sahodaya);
+        abort_unless($sent, 422, 'Could not send email to teacher.');
+
+        return back()->with('success', "Certificate email sent to {$registration->teacher?->name}.");
+    }
+
+    public function downloadSingleCertificatePdf(string $tenantId, TrainingProgram $program, TrainingRegistration $registration)
+    {
+        abort_if($program->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->program_id !== $program->id, 403);
+
+        return app(TrainingCertificateService::class)->downloadPdfResponse($registration, $this->sahodaya);
+    }
+
     public function exportCertificatesZip(string $tenantId, TrainingProgram $program)
     {
         abort_if($program->tenant_id !== $this->sahodaya->id, 403);
@@ -1372,20 +1497,24 @@ class TrainingProgramController extends SahodayaAdminController
                 ->first();
 
             if (! $certificate) {
-                $certificate = $service->issue($registration);
+                try {
+                    $certificate = $service->issue($registration);
+                } catch (\Throwable $e) {
+                    continue;
+                }
             }
 
             $render = $service->renderContext($registration, $this->sahodaya);
 
-            $html = view('training.certificate', array_merge($render, [
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
                 'registration' => $registration,
                 'certificate'  => $certificate,
                 'sahodaya'     => $this->sahodaya,
                 'fieldValues'  => $service->resolveFieldValues($registration, $this->sahodaya),
-            ]))->render();
+            ]))->setPaper('a4', 'landscape');
 
-            $filename = str($registration->teacher?->name ?? 'teacher-'.$registration->id)->slug().'.html';
-            $zip->addFromString($filename, $html);
+            $filename = str($registration->teacher?->name ?? 'teacher-'.$registration->id)->slug().'-certificate.pdf';
+            $zip->addFromString($filename, $pdf->output());
         }
 
         $zip->close();

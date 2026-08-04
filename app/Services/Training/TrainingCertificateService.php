@@ -428,10 +428,130 @@ class TrainingCertificateService
         // Always also email the teacher directly at their registered email —
         // this is the path that actually reaches most training participants,
         // since QR self-registered teachers rarely have a portal account. Uses
-        // the public, no-login certificate print link so it works regardless.
         if ($teacher->email) {
             $this->emailCertificatePdf($registration, $certificate, $programTitle, $printUrl);
         }
+    }
+
+    public function downloadPdfResponse(TrainingRegistration $registration, Tenant $sahodaya)
+    {
+        $registration->loadMissing(['program', 'teacher', 'school']);
+        $certificate = Certificate::where('entity_type', TrainingRegistration::class)
+            ->where('entity_id', $registration->id)
+            ->first();
+
+        if (! $certificate) {
+            $certificate = $this->issue($registration);
+        }
+
+        $render = $this->renderContext($registration, $sahodaya);
+        $fieldValues = $this->resolveFieldValues($registration, $sahodaya);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
+            'registration' => $registration,
+            'certificate'  => $certificate,
+            'sahodaya'     => $sahodaya,
+            'fieldValues'  => $fieldValues,
+        ]))->setPaper('a4', 'landscape');
+
+        $filename = Str::slug($registration->teacher?->name ?? 'certificate').'-training-certificate.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    public function sendCertificateEmailToRegistration(TrainingRegistration $registration, Tenant $sahodaya, ?string $overrideEmail = null): bool
+    {
+        $registration->loadMissing(['program', 'teacher', 'school']);
+        $targetEmail = $overrideEmail ?: $registration->teacher?->email;
+
+        if (! $targetEmail) {
+            return false;
+        }
+
+        $certificate = Certificate::where('entity_type', TrainingRegistration::class)
+            ->where('entity_id', $registration->id)
+            ->first();
+
+        if (! $certificate) {
+            try {
+                $certificate = $this->issue($registration);
+            } catch (\Throwable $e) {
+                return false;
+            }
+        }
+
+        $programTitle = $registration->program?->title ?? 'Training Program';
+        $printUrl = url("/certificates/verify/{$certificate->verification_uuid}");
+        $render = $this->renderContext($registration, $sahodaya);
+        $fieldValues = $this->resolveFieldValues($registration, $sahodaya);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
+            'registration' => $registration,
+            'certificate'  => $certificate,
+            'sahodaya'     => $sahodaya,
+            'fieldValues'  => $fieldValues,
+        ]))->setPaper('a4', 'landscape');
+
+        $isTest = ! empty($overrideEmail);
+        $recipientName = $registration->teacher?->name ?? 'Participant';
+        $subjectPrefix = $isTest ? '[TEST CERTIFICATE EMAIL] ' : '';
+        $subject = "{$subjectPrefix}Your Certificate for {$programTitle}";
+        $body = "Dear {$recipientName},\n\nYour official training certificate for \"{$programTitle}\" is attached to this email as a PDF.\n\nYou can also view or verify your certificate online anytime here: {$printUrl}\n\nVerification Code: {$certificate->verification_uuid}";
+
+        $attachmentName = Str::slug($recipientName).'-certificate.pdf';
+        $attachment = [
+            'content' => $pdf->output(),
+            'name'    => $attachmentName,
+            'mime'    => 'application/pdf',
+        ];
+
+        $mailer = \App\Services\Mail\SahodayaMailer::for($sahodaya->id);
+        if ($mailer->isConfigured()) {
+            $mailer->sendViewWithAttachments(
+                $targetEmail,
+                $subject,
+                'emails.notification-plain',
+                ['title' => $subject, 'body' => $body],
+                [$attachment],
+            );
+        } else {
+            \Illuminate\Support\Facades\Mail::raw($body, function ($message) use ($targetEmail, $subject, $attachment) {
+                $message->to($targetEmail)->subject($subject)
+                    ->attachData($attachment['content'], $attachment['name'], ['mime' => $attachment['mime']]);
+            });
+        }
+
+        if (! $isTest && $certificate) {
+            $certificate->update(['email_sent_at' => now()]);
+        }
+
+        return true;
+    }
+
+    public function sendTestCertificateEmail(TrainingProgram $program, Tenant $sahodaya, string $testEmail): bool
+    {
+        $sampleRegistration = TrainingRegistration::where('program_id', $program->id)
+            ->where('status', 'confirmed')
+            ->with(['teacher', 'school'])
+            ->first();
+
+        if (! $sampleRegistration) {
+            $sampleRegistration = new TrainingRegistration([
+                'program_id' => $program->id,
+                'status' => 'confirmed',
+            ]);
+            $sampleRegistration->setRelation('program', $program);
+            $sampleRegistration->setRelation('teacher', (object) [
+                'name' => 'Sample Teacher Name',
+                'email' => $testEmail,
+                'designation' => 'Senior Teacher',
+            ]);
+            $sampleRegistration->setRelation('school', (object) [
+                'name' => 'Sample Model School',
+            ]);
+        }
+
+        return $this->sendCertificateEmailToRegistration($sampleRegistration, $sahodaya, $testEmail);
     }
 
     /**
@@ -441,58 +561,9 @@ class TrainingCertificateService
      */
     private function emailCertificatePdf(TrainingRegistration $registration, Certificate $certificate, string $programTitle, string $printUrl): void
     {
-        $teacher = $registration->teacher;
-        $sahodayaId = $registration->program?->tenant_id;
-        if (! $teacher?->email || ! $sahodayaId) {
-            return;
-        }
-
-        try {
-            $sahodaya = Tenant::find($sahodayaId);
-            if (! $sahodaya) {
-                return;
-            }
-
-            $render = $this->renderContext($registration, $sahodaya);
-            $fieldValues = $this->resolveFieldValues($registration, $sahodaya);
-
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
-                'registration' => $registration,
-                'certificate'  => $certificate,
-                'sahodaya'     => $sahodaya,
-                'fieldValues'  => $fieldValues,
-            ]))->setPaper('a4', 'landscape');
-
-            $subject = "Your certificate for {$programTitle} is ready";
-            $body = "Dear {$teacher->name},\n\nYour certificate for \"{$programTitle}\" is attached as a PDF.\n\nYou can also view or reprint it anytime here: {$printUrl}";
-            $attachment = [
-                'content' => $pdf->output(),
-                'name'    => 'certificate.pdf',
-                'mime'    => 'application/pdf',
-            ];
-
-            $mailer = \App\Services\Mail\SahodayaMailer::for($sahodayaId);
-            if ($mailer->isConfigured()) {
-                $mailer->sendViewWithAttachments(
-                    $teacher->email,
-                    $subject,
-                    'emails.notification-plain',
-                    ['title' => $subject, 'body' => $body],
-                    [$attachment],
-                );
-
-                return;
-            }
-
-            \Illuminate\Support\Facades\Mail::raw($body, function ($message) use ($teacher, $subject, $attachment) {
-                $message->to($teacher->email)->subject($subject)
-                    ->attachData($attachment['content'], $attachment['name'], ['mime' => $attachment['mime']]);
-            });
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Certificate PDF email failed', [
-                'registration_id' => $registration->id,
-                'error'           => $e->getMessage(),
-            ]);
+        $sahodaya = Tenant::find($registration->program?->tenant_id);
+        if ($sahodaya) {
+            $this->sendCertificateEmailToRegistration($registration, $sahodaya);
         }
     }
 

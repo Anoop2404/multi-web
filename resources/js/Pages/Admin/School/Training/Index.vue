@@ -34,6 +34,10 @@
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <a v-if="registrations[program.id]?.length"
+                           :href="`/school-admin/${school.id}/training/${program.id}/certificates/export-zip`"
+                           target="_blank"
+                           class="btn-secondary text-sm font-bold text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100">📦 Certificates ZIP</a>
+                        <a v-if="registrations[program.id]?.length"
                            :href="`/school-admin/${school.id}/training/${program.id}/export`"
                            class="btn-secondary text-sm">Export (.xlsx)</a>
                         <a v-if="registrations[program.id]?.length"
@@ -101,6 +105,10 @@
                                    :href="`/school-admin/${school.id}/training/${r.id}/id-card`"
                                    target="_blank" rel="noopener"
                                    class="text-xs font-semibold text-slate-600 hover:underline">ID card ↓</a>
+                                <a v-if="!['cancelled','rejected'].includes(r.status)"
+                                   :href="`/school-admin/${school.id}/training/${r.id}/certificate/pdf`"
+                                   target="_blank" rel="noopener"
+                                   class="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">Certificate PDF 📄</a>
                                 <template v-if="program.fee_type === 'school' && program.fee_amount">
                                     <span class="text-xs text-indigo-700">Covered by school fee</span>
                                 </template>

@@ -329,6 +329,8 @@ Route::prefix('training')->name('training.')->group(function () {
     Route::get('/{program}/attendance', [TrainingRegistrationController::class, 'attendance'])->name('attendance');
     Route::post('/{program}/sessions/{session}/attendance', [TrainingRegistrationController::class, 'markAllPresent'])->name('sessions.attendance');
     Route::post('/{program}/sessions/{session}/attendance/{registration}', [TrainingRegistrationController::class, 'updateAttendance'])->name('sessions.attendance.update');
+    Route::get('/{program}/certificates/export-zip', [TrainingRegistrationController::class, 'exportSchoolCertificatesZip'])->name('certificates.export-zip');
+    Route::get('/{registration}/certificate/pdf', [TrainingRegistrationController::class, 'downloadTeacherCertificatePdf'])->name('certificate.pdf');
 });
 
 Route::get("/programs/{program}", function (string $tenantId, string $program) use ($festProgramSlugs) {

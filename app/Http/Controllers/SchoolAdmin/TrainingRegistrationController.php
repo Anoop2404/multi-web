@@ -654,4 +654,62 @@ class TrainingRegistrationController extends SchoolAdminController
 
         return back()->with('success', 'School batch fee proof uploaded.');
     }
+
+    public function downloadTeacherCertificatePdf(string $tenantId, TrainingRegistration $registration)
+    {
+        abort_if($registration->school_id !== $this->school->id, 403);
+
+        $sahodaya = Tenant::find($this->school->parent_id);
+
+        return app(TrainingCertificateService::class)->downloadPdfResponse($registration, $sahodaya);
+    }
+
+    public function exportSchoolCertificatesZip(string $tenantId, TrainingProgram $program)
+    {
+        $registrations = TrainingRegistration::where('program_id', $program->id)
+            ->where('school_id', $this->school->id)
+            ->where('status', 'confirmed')
+            ->with(['teacher', 'program'])
+            ->get();
+
+        abort_if($registrations->isEmpty(), 422, 'No confirmed teacher registrations for this training program.');
+
+        $sahodaya = Tenant::find($this->school->parent_id);
+        $service = app(TrainingCertificateService::class);
+        $zipPath = storage_path('app/tmp/school-training-certs-'.$this->school->id.'-'.time().'.zip');
+        @mkdir(dirname($zipPath), 0755, true);
+
+        $zip = new \ZipArchive;
+        $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+
+        foreach ($registrations as $registration) {
+            $certificate = Certificate::where('entity_type', TrainingRegistration::class)
+                ->where('entity_id', $registration->id)
+                ->first();
+
+            if (! $certificate) {
+                try {
+                    $certificate = $service->issue($registration);
+                } catch (\Throwable $e) {
+                    continue;
+                }
+            }
+
+            $render = $service->renderContext($registration, $sahodaya);
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('training.certificate', array_merge($render, [
+                'registration' => $registration,
+                'certificate'  => $certificate,
+                'sahodaya'     => $sahodaya,
+                'fieldValues'  => $service->resolveFieldValues($registration, $sahodaya),
+            ]))->setPaper('a4', 'landscape');
+
+            $filename = str($registration->teacher?->name ?? 'teacher-'.$registration->id)->slug().'-certificate.pdf';
+            $zip->addFromString($filename, $pdf->output());
+        }
+
+        $zip->close();
+
+        return response()->download($zipPath, str($program->title)->slug().'-certificates.zip')->deleteFileAfterSend();
+    }
 }
