@@ -46,17 +46,9 @@ class ApproveFestRegistrations extends Command
         foreach ($sahodayas as $sahodaya) {
             $sahodaya->run(function () use ($eventIdOrSlug, $schoolOpt, $allOption, $sahodaya, &$totalApproved, &$totalSettingsUpdated) {
                 // 1. Update all Event, ItemHead, and CompetitionArea settings to auto approval policy
-                $updatedEvents = FestEvent::where('approval_policy', '!=', 'auto')
-                    ->orWhereNull('approval_policy')
-                    ->update(['approval_policy' => 'auto']);
-
-                $updatedHeads = FestItemHead::where('approval_policy', '!=', 'auto')
-                    ->orWhereNull('approval_policy')
-                    ->update(['approval_policy' => 'auto']);
-
-                $updatedAreas = FestCompetitionArea::where('approval_policy', '!=', 'auto')
-                    ->orWhereNull('approval_policy')
-                    ->update(['approval_policy' => 'auto']);
+                $updatedEvents = FestEvent::query()->update(['approval_policy' => 'auto']);
+                $updatedHeads = FestItemHead::query()->update(['approval_policy' => 'auto']);
+                $updatedAreas = FestCompetitionArea::query()->update(['approval_policy' => 'auto']);
 
                 $totalSettingsUpdated += ($updatedEvents + $updatedHeads + $updatedAreas);
 
