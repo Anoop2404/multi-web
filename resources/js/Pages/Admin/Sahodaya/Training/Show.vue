@@ -3,6 +3,7 @@
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="program.title" eyebrow="Teacher training"
                     :description="`${program.registrations?.length ?? 0} registrations · ${program.status}`">
+            <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/training/${program.id}/certificates-hub`"
                       class="btn-primary text-sm font-bold">
                     📜 Certificates & Dispatch
