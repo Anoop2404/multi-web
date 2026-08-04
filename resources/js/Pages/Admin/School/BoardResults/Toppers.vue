@@ -309,9 +309,20 @@
                                             </span>
                                         </div>
 
-                                        <div v-if="canEdit" class="mt-3 flex items-center gap-3 text-xs">
-                                            <button type="button" class="text-indigo-600 font-semibold hover:underline" @click="startEdit(t)">Edit Details</button>
-                                            <button type="button" class="text-red-500 font-semibold hover:underline" @click="remove(t)">Remove</button>
+                                        <div class="mt-3 flex items-center gap-3 text-xs flex-wrap">
+                                            <a v-if="t.marksheet_url" :href="t.marksheet_url" target="_blank" class="font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                                📄 Marksheet ↗
+                                            </a>
+                                            <span v-if="t.verification_status === 'verified'" class="font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Verified ✅</span>
+                                            <span v-else-if="t.verification_status === 'rejected'" class="font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700" :title="t.rejection_reason">Rejected ❌ ({{ t.rejection_reason || 'See note' }})</span>
+                                            <span v-else-if="t.marksheet_url" class="font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Pending Verification ⏳</span>
+                                            <span v-else class="font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">No Marksheet Uploaded</span>
+                                            <label v-if="canEdit" class="cursor-pointer font-semibold px-2.5 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200">
+                                                📤 {{ t.marksheet_url ? 'Re-upload Marksheet' : 'Upload Marksheet' }}
+                                                <input type="file" class="hidden" accept="image/*,application/pdf" @change="uploadStudentMarksheet(t, $event)" />
+                                            </label>
+                                            <button v-if="canEdit" type="button" class="text-indigo-600 font-semibold hover:underline" @click="startEdit(t)">Edit Details</button>
+                                            <button v-if="canEdit" type="button" class="text-red-500 font-semibold hover:underline" @click="remove(t)">Remove</button>
                                         </div>
                                     </div>
                                 </div>
@@ -344,9 +355,20 @@
                                         </div>
                                     </div>
 
-                                    <div v-if="canEdit" class="mt-3 flex items-center gap-3 text-xs">
-                                        <button type="button" class="text-indigo-600 font-semibold hover:underline" @click="startEdit(t)">Edit Details</button>
-                                        <button type="button" class="text-red-500 font-semibold hover:underline" @click="remove(t)">Remove</button>
+                                    <div class="mt-3 flex items-center gap-3 text-xs flex-wrap">
+                                        <a v-if="t.marksheet_url" :href="t.marksheet_url" target="_blank" class="font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                            📄 Marksheet ↗
+                                        </a>
+                                        <span v-if="t.verification_status === 'verified'" class="font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Verified ✅</span>
+                                        <span v-else-if="t.verification_status === 'rejected'" class="font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700" :title="t.rejection_reason">Rejected ❌ ({{ t.rejection_reason || 'See note' }})</span>
+                                        <span v-else-if="t.marksheet_url" class="font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Pending Verification ⏳</span>
+                                        <span v-else class="font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">No Marksheet Uploaded</span>
+                                        <label v-if="canEdit" class="cursor-pointer font-semibold px-2.5 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200">
+                                            📤 {{ t.marksheet_url ? 'Re-upload Marksheet' : 'Upload Marksheet' }}
+                                            <input type="file" class="hidden" accept="image/*,application/pdf" @change="uploadStudentMarksheet(t, $event)" />
+                                        </label>
+                                        <button v-if="canEdit" type="button" class="text-indigo-600 font-semibold hover:underline" @click="startEdit(t)">Edit Details</button>
+                                        <button v-if="canEdit" type="button" class="text-red-500 font-semibold hover:underline" @click="remove(t)">Remove</button>
                                     </div>
                                 </div>
                             </div>
@@ -900,5 +922,24 @@ function submitEdit() {
 function remove(t) {
     if (!confirm(`Remove topper "${t.name}"?`)) return;
     router.delete(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${t.id}`);
+}
+
+function uploadStudentMarksheet(topper, event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('marksheet', file);
+
+    router.post(
+        `/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${topper.id}/marksheet`,
+        formData,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                event.target.value = '';
+            },
+        }
+    );
 }
 </script>

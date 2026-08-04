@@ -34,16 +34,33 @@ class Topper extends Model
         'stream',
         'stream_id',
         'rank',
+        'marksheet_path',
+        'marksheet_disk',
+        'verification_status',
+        'rejection_reason',
+        'verified_at',
+        'verified_by',
     ];
 
     protected $casts = [
         'is_perfect_scorer' => 'boolean',
         'percentage' => 'float',
+        'verified_at' => 'datetime',
     ];
 
     protected $appends = [
         'subject_marks',
+        'marksheet_url',
     ];
+
+    public function getMarksheetUrlAttribute(): ?string
+    {
+        if (! $this->marksheet_path) {
+            return null;
+        }
+
+        return \App\Support\TenantStorage::logoUrl($this->tenant, $this->marksheet_path);
+    }
 
     public function boardResult(): BelongsTo
     {

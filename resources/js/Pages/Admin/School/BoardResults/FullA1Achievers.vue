@@ -207,16 +207,27 @@
                             <span v-else class="text-gray-400 text-xs">👤</span>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <p class="font-bold text-gray-900 text-sm truncate">{{ t.name }}</p>
                                 <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-extrabold">A1</span>
+                                <span v-if="t.verification_status === 'verified'" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Verified ✅</span>
+                                <span v-else-if="t.verification_status === 'rejected'" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700" :title="t.rejection_reason">Rejected ❌ ({{ t.rejection_reason || 'See note' }})</span>
+                                <span v-else-if="t.marksheet_url" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Pending Verification ⏳</span>
+                                <span v-else class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">No Marksheet Uploaded</span>
                             </div>
-                            <p class="text-[11px] text-gray-500">
+                            <p class="text-[11px] text-gray-500 mt-0.5">
                                 {{ t.roll_no ? `Roll: ${t.roll_no}` : 'No roll no' }} · {{ subjectCountForTopper(t) }} subject(s) at A1
                                 <span v-if="t.stream"> · {{ t.stream }}</span>
                             </p>
                         </div>
-                        <div class="flex items-center gap-2 print:hidden">
+                        <div class="flex items-center gap-2 print:hidden flex-wrap justify-end">
+                            <a v-if="t.marksheet_url" :href="t.marksheet_url" target="_blank" class="text-xs font-bold px-2.5 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition border border-emerald-200">
+                                📄 Marksheet ↗
+                            </a>
+                            <label v-if="canEdit" class="cursor-pointer text-xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 transition border border-slate-200">
+                                📤 {{ t.marksheet_url ? 'Re-upload' : 'Upload Marksheet' }}
+                                <input type="file" class="hidden" accept="image/*,application/pdf" @change="uploadStudentMarksheet(t, $event)" />
+                            </label>
                             <button type="button" class="text-xs font-bold px-2 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition" @click="previewMarks(t)">
                                 Preview Marks 👁
                             </button>
@@ -522,5 +533,24 @@ function removeStudent(t) {
     router.delete(`/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${t.id}`, {
         preserveScroll: true,
     });
+}
+
+function uploadStudentMarksheet(topper, event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('marksheet', file);
+
+    router.post(
+        `/school-admin/${props.school.id}/board-results/${props.boardResult.id}/toppers/${topper.id}/marksheet`,
+        formData,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                event.target.value = '';
+            },
+        }
+    );
 }
 </script>

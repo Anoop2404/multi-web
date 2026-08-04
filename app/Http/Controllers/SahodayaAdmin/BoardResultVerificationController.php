@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\BoardResult;
 use App\Models\Tenant;
+use App\Models\Topper;
 use App\Models\TopperCountConfig;
 use App\Services\Audit\DataChangeLogger;
 use App\Services\BoardResults\BoardResultNotifier;
@@ -354,5 +355,39 @@ class BoardResultVerificationController extends SahodayaAdminController
     {
         $school = Tenant::find($boardResult->tenant_id);
         abort_unless($school && $school->parent_id === $this->sahodaya->id, 404);
+    }
+
+    public function verifyTopperMarksheet(Request $request, string $tenantId, BoardResult $boardResult, Topper $topper)
+    {
+        $this->assertInScope($boardResult);
+        abort_if($topper->board_result_id !== $boardResult->id, 404);
+
+        $topper->update([
+            'verification_status' => 'verified',
+            'verified_at'          => now(),
+            'verified_by'          => auth()->user()?->name ?? 'Sahodaya Admin',
+            'rejection_reason'     => null,
+        ]);
+
+        return back()->with('success', "Marksheet for {$topper->name} marked as verified.");
+    }
+
+    public function rejectTopperMarksheet(Request $request, string $tenantId, BoardResult $boardResult, Topper $topper)
+    {
+        $this->assertInScope($boardResult);
+        abort_if($topper->board_result_id !== $boardResult->id, 404);
+
+        $data = $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $topper->update([
+            'verification_status' => 'rejected',
+            'rejection_reason'     => $data['reason'] ?? 'Marksheet verification failed.',
+            'verified_at'          => now(),
+            'verified_by'          => auth()->user()?->name ?? 'Sahodaya Admin',
+        ]);
+
+        return back()->with('success', "Marksheet for {$topper->name} marked as rejected.");
     }
 }

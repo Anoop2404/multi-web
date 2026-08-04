@@ -1461,4 +1461,42 @@ class BoardResultController extends SchoolAdminController
             });
         }
     }
+
+    public function uploadTopperMarksheet(Request $request, string $tenantId, BoardResult $boardResult, Topper $topper)
+    {
+        abort_if($boardResult->tenant_id !== $this->school->id, 403);
+        abort_if($topper->board_result_id !== $boardResult->id, 403);
+
+        $data = $request->validate([
+            'marksheet' => 'required|file|mimes:jpeg,jpg,png,pdf,webp|max:10240',
+        ]);
+
+        $baseDir = 'sahodaya/'.$this->school->parent_id.'/board-results/marksheets';
+        $disk = TenantStorage::uploadDisk();
+        $path = $request->file('marksheet')->store($baseDir, $disk);
+
+        $topper->update([
+            'marksheet_path'      => $path,
+            'marksheet_disk'      => $disk,
+            'verification_status' => 'pending',
+            'rejection_reason'    => null,
+        ]);
+
+        return back()->with('success', "Marksheet uploaded for {$topper->name}.");
+    }
+
+    public function deleteTopperMarksheet(string $tenantId, BoardResult $boardResult, Topper $topper)
+    {
+        abort_if($boardResult->tenant_id !== $this->school->id, 403);
+        abort_if($topper->board_result_id !== $boardResult->id, 403);
+
+        $topper->update([
+            'marksheet_path'      => null,
+            'marksheet_disk'      => null,
+            'verification_status' => 'pending',
+            'rejection_reason'    => null,
+        ]);
+
+        return back()->with('success', 'Marksheet removed.');
+    }
 }
