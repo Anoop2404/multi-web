@@ -2,13 +2,35 @@
     <SchoolAdminLayout :title="`${event.title} — Fest Hub`" :school="school" :show-header-title="false">
         <PageHeader
             :title="event.title"
-            eyebrow="Fest"
-            :description="`Registration status: ${registrations.length} entries · ${programLabel}`"
+            eyebrow="Fest Hub"
+            :description="`Active event tools & entries · ${programLabel}`"
         >
             <template #actions>
                 <Link :href="registrationUrl" class="btn-primary">Open registration</Link>
             </template>
         </PageHeader>
+
+        <!-- Active Fests & Custom Events Switcher Bar -->
+        <div v-if="allEvents && allEvents.length > 1" class="mb-6 card bg-slate-50/80 border-slate-200 p-4">
+            <div class="flex items-center justify-between gap-2 mb-3">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <span>🏆</span> Active Fests & Custom Events ({{ allEvents.length }})
+                </h4>
+                <span class="text-xs text-slate-400 font-medium">Click an event to manage tools</span>
+            </div>
+            <div class="flex items-center gap-2 overflow-x-auto pb-1">
+                <Link
+                    v-for="ev in allEvents"
+                    :key="ev.id"
+                    :href="`/school-admin/${school.id}/fest/hub?event_id=${ev.id}`"
+                    class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 border"
+                    :class="ev.id === event.id ? 'bg-[#0f3d7a] text-white border-[#0f3d7a] shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-100'"
+                >
+                    <span>{{ eventIcon(ev.event_type) }}</span>
+                    <span>{{ ev.title }}</span>
+                </Link>
+            </div>
+        </div>
 
         <SchoolEventWorkflowStepper
             :school-id="school.id"
@@ -88,6 +110,7 @@ import { studentDisplayName } from '@/support/studentDisplay.js';
 const props = defineProps({
     school: Object,
     event: Object,
+    allEvents: { type: Array, default: () => [] },
     registrations: Array,
     appeals: { type: Array, default: () => [] },
     programSlug: { type: String, default: 'kalotsav' },
@@ -107,6 +130,17 @@ const programLabels = {
 const programLabel = computed(() => programLabels[props.programSlug] ?? 'Fest');
 const programPrefix = computed(() => SLUG_TO_PREFIX[props.programSlug] ?? props.programSlug);
 const resultsUrl = computed(() => schoolProgramHref(props.school.id, props.programSlug, 'results'));
+
+function eventIcon(type) {
+    return {
+        kalolsavam: '🏆',
+        sports: '🏅',
+        kids_fest: '🎈',
+        teacher_fest: '👩‍🏫',
+        english_fest: '📖',
+        science_fest: '🔬',
+    }[type] ?? '📅';
+}
 
 function participantName(appeal) {
     const p = appeal.participant;

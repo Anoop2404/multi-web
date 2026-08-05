@@ -132,17 +132,26 @@ class FestEventPortalController extends SchoolAdminController
         ]);
     }
 
-    /** @return \Illuminate\Http\RedirectResponse */
-    public function festHub(string $tenantId)
+    /** @return \Illuminate\Http\RedirectResponse|\Inertia\Response */
+    public function festHub(string $tenantId, Request $request)
     {
-        $event = FestEvent::where('tenant_id', $this->school->parent_id)
+        $allEvents = FestEvent::where('tenant_id', $this->school->parent_id)
             ->listedForSchool($this->school->id)
+            ->with(['parentEvent:id,title', 'parent:id,title'])
             ->orderByDesc('event_start')
-            ->first();
+            ->get()
+            ->pipe(fn ($events) => app(FestSchoolPartitionService::class)->filterVisibleToSchool($events, $this->school->id))
+            ->values();
 
-        if (! $event) {
+        if ($allEvents->isEmpty()) {
             return redirect("/school-admin/{$this->school->id}");
         }
+
+        $selectedId = $request->query('event_id');
+        $event = $allEvents->firstWhere('id', (int) $selectedId) ?? $allEvents->first();
+
+        // Ensure title is formatted nicely with parent title if partitioned
+        $event->title = $event->display_title;
 
         $programSlug = SchoolFestProgram::slugForEventType($event->event_type);
 
@@ -158,8 +167,18 @@ class FestEventPortalController extends SchoolAdminController
             ->limit(5)
             ->get();
 
+        $formattedAllEvents = $allEvents->map(fn ($e) => [
+            'id'               => $e->id,
+            'title'            => $e->display_title,
+            'event_type'       => $e->event_type,
+            'status'           => $e->status,
+            'program_slug'     => SchoolFestProgram::slugForEventType($e->event_type),
+            'registration_url' => ProgramRouteMap::schoolRegistrationUrl($this->school->id, SchoolFestProgram::slugForEventType($e->event_type)),
+        ]);
+
         return $this->inertia('School/Events/FestHub', [
             'event'           => $event,
+            'allEvents'       => $formattedAllEvents,
             'registrations'   => $registrations,
             'appeals'         => $appeals,
             'programSlug'     => $programSlug,
