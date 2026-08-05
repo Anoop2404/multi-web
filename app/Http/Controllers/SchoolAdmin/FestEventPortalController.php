@@ -186,8 +186,8 @@ class FestEventPortalController extends SchoolAdminController
                 'registration_close' => $e->registration_close?->toDateString(),
                 'registrations_count'=> $regCount,
                 'program_slug'       => $programSlug,
-                'registration_url'   => ProgramRouteMap::schoolRegistrationUrl($this->school->id, $programSlug, $e->id),
-                'results_url'        => schoolProgramHref($this->school->id, $programSlug, 'results'),
+                'registration_url'   => ProgramRouteMap::schoolRegistrationUrl($this->school->id, $programSlug),
+                'results_url'        => ProgramRouteMap::schoolBase($this->school->id, ProgramRouteMap::prefixFromSlug($programSlug)).'/results',
             ];
         });
 
