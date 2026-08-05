@@ -41,9 +41,7 @@ class ProgramHubDataService
         // FestSchoolPartitionService::filterVisibleToSchool() and
         // FestRegistrationController::filterPartitionedEventsForSchool() for the identical
         // fix on the registration listing page.
-        if ($meta['eventType'] !== 'sports') {
-            $sahodayaEvents = app(FestSchoolPartitionService::class)->filterVisibleToSchool($sahodayaEvents, $school->id);
-        }
+        $sahodayaEvents = app(FestSchoolPartitionService::class)->filterVisibleToSchool($sahodayaEvents, $school->id);
 
         $schoolEvents = FestEvent::where('tenant_id', $sahodayaId)
             ->ofType($meta['eventType'])
@@ -219,8 +217,9 @@ class ProgramHubDataService
                     ->whereIn('status', ['published', 'registration_open'])
                     ->where('registration_close', '>=', now())
                     ->orderBy('registration_close')
-                    ->limit(5)
-                    ->get(['id', 'title', 'event_type', 'registration_close'])
+                    ->get(['id', 'title', 'event_type', 'parent_event_id', 'conduct_mode', 'registration_close'])
+                    ->pipe(fn ($events) => app(FestSchoolPartitionService::class)->filterVisibleToSchool($events, $school->id))
+                    ->take(5)
                     ->map(fn ($e) => [
                         'type'  => 'fest',
                         'title' => $e->title,
@@ -253,8 +252,9 @@ class ProgramHubDataService
             'recentResults'   => FestEvent::where('tenant_id', $sahodayaId)
                 ->where('results_published', true)
                 ->orderByDesc('updated_at')
-                ->limit(5)
-                ->get(['id', 'title', 'event_type'])
+                ->get(['id', 'title', 'event_type', 'parent_event_id', 'conduct_mode'])
+                ->pipe(fn ($events) => app(FestSchoolPartitionService::class)->filterVisibleToSchool($events, $school->id))
+                ->take(5)
                 ->map(fn ($e) => ['title' => $e->title, 'type' => $e->event_type])
                 ->all(),
         ];
