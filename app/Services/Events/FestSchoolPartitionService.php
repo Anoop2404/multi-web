@@ -58,8 +58,8 @@ class FestSchoolPartitionService
                     return $resolvedChildIdByHub[$hubId] !== $event->id;
                 }
 
-                // If no region key resolved for this school, hide sibling region child events
-                return true;
+                // If no specific region key resolved for this school, keep partition child events so school can participate
+                return false;
             }
 
             return false;

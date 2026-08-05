@@ -16,10 +16,17 @@ class FestPartitionService
             return 'partitioned';
         }
 
-        if ($event->event_type === 'kids_fest' && ! $event->parent_event_id) {
-            return FestEvent::where('parent_event_id', $event->id)
-                ->whereNotNull('cluster_key')
-                ->exists() ? 'partitioned' : 'standard';
+        if (! $event->parent_event_id) {
+            $hasPartitions = FestEvent::where('parent_event_id', $event->id)
+                ->where(function ($q) {
+                    $q->whereNotNull('partition_key')
+                        ->orWhereNotNull('cluster_key');
+                })
+                ->exists();
+
+            if ($hasPartitions) {
+                return 'partitioned';
+            }
         }
 
         return 'standard';

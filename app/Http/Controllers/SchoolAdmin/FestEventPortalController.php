@@ -138,7 +138,7 @@ class FestEventPortalController extends SchoolAdminController
     {
         $allEvents = FestEvent::where('tenant_id', $this->school->parent_id)
             ->visibleToSchool($this->school->id)
-            ->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing', 'completed'])
+            ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])
             ->with(['parentEvent:id,title', 'parent:id,title'])
             ->orderByDesc('event_start')
             ->get()
