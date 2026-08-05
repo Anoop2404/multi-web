@@ -168,14 +168,28 @@ class FestEventPortalController extends SchoolAdminController
             ->limit(5)
             ->get();
 
-        $formattedAllEvents = $allEvents->map(fn ($e) => [
-            'id'               => $e->id,
-            'title'            => $e->display_title,
-            'event_type'       => $e->event_type,
-            'status'           => $e->status,
-            'program_slug'     => SchoolFestProgram::slugForEventType($e->event_type),
-            'registration_url' => ProgramRouteMap::schoolRegistrationUrl($this->school->id, SchoolFestProgram::slugForEventType($e->event_type)),
-        ]);
+        $formattedAllEvents = $allEvents->map(function ($e) {
+            $regCount = FestRegistration::whereIn('event_id', $e->reportableEventIds())
+                ->where('school_id', $this->school->id)
+                ->whereIn('status', FestRegistration::ACTIVE_STATUSES)
+                ->count();
+
+            $programSlug = SchoolFestProgram::slugForEventType($e->event_type);
+
+            return [
+                'id'                 => $e->id,
+                'title'              => $e->display_title,
+                'event_type'         => $e->event_type,
+                'status'             => $e->status,
+                'status_label'       => ucfirst(str_replace('_', ' ', $e->status)),
+                'level_round'        => $e->level_round,
+                'registration_close' => $e->registration_close?->toDateString(),
+                'registrations_count'=> $regCount,
+                'program_slug'       => $programSlug,
+                'registration_url'   => ProgramRouteMap::schoolRegistrationUrl($this->school->id, $programSlug, $e->id),
+                'results_url'        => schoolProgramHref($this->school->id, $programSlug, 'results'),
+            ];
+        });
 
         return $this->inertia('School/Events/FestHub', [
             'event'           => $event,
