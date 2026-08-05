@@ -158,11 +158,26 @@ class FestEvent extends Model
         return $this->belongsTo(FestItemHead::class, 'source_head_id');
     }
 
+    public function getDisplayTitleAttribute(): string
+    {
+        $parent = $this->parentEvent ?? $this->parent;
+        if ($this->parent_event_id && $parent && ! str_contains($this->title, $parent->title)) {
+            return "{$parent->title} — {$this->title}";
+        }
+
+        return $this->title;
+    }
+
     protected static function booted(): void
     {
         static::saving(function (self $event) {
             if ($event->fee_type === null) {
                 $event->fee_type = 'none';
+            }
+            if ($event->parent_event_id && $event->parentEvent) {
+                if (! str_contains($event->title, $event->parentEvent->title)) {
+                    $event->title = "{$event->parentEvent->title} — {$event->title}";
+                }
             }
         });
     }

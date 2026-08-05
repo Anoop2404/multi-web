@@ -36,28 +36,34 @@ class FestSchoolPartitionService
     {
         $resolvedChildIdByHub = [];
 
-        $filtered = $events->reject(function (FestEvent $event) use ($schoolId, &$resolvedChildIdByHub) {
+        return $events->reject(function (FestEvent $event) use ($schoolId, &$resolvedChildIdByHub) {
+            // Never show the main hub event itself to schools when it is partitioned
             if ($this->partitions->isPartitionedHub($event)) {
                 return true;
             }
 
+            // For partition child events, only keep the child event assigned to this school's region
             if ($event->parent_event_id && $this->partitions->partitionKey($event) !== null) {
                 $hubId = $event->parent_event_id;
 
                 if (! array_key_exists($hubId, $resolvedChildIdByHub)) {
-                    $hub = FestEvent::find($hubId);
+                    $hub = $event->parentEvent ?: FestEvent::find($hubId);
                     $key = $hub ? $this->resolvePartitionKey($hub, $schoolId) : null;
                     $child = ($hub && $key) ? $this->partitions->partitionByKey($hub, $key) : null;
-                    $resolvedChildIdByHub[$hubId] = $child?->id;
+                    $resolvedChildIdByHub[$hubId] = $child?->id ?? false;
                 }
 
-                return $resolvedChildIdByHub[$hubId] !== $event->id;
+                // If school belongs to a resolved region child, reject all sibling region children
+                if ($resolvedChildIdByHub[$hubId] !== false) {
+                    return $resolvedChildIdByHub[$hubId] !== $event->id;
+                }
+
+                // If no region key resolved for this school, hide sibling region child events
+                return true;
             }
 
             return false;
         })->values();
-
-        return $filtered->isEmpty() ? $events : $filtered;
     }
 
     public function resolvePartitionKey(FestEvent $hub, string $schoolId): ?string
@@ -74,13 +80,10 @@ class FestSchoolPartitionService
             return $explicit;
         }
 
-        // Fall back to the school's membership region so Kalotsav routing works without
-        // assigning partitions twice — as long as a matching partition child exists.
-        if (in_array($hub->event_type, ['kalolsavam', 'sports', 'english_fest', 'science_fest', 'kids_fest', 'teacher_fest'], true)) {
-            $key = app(FestRegionPartitionService::class)->partitionKeyForSchool($hub, $schoolId);
-            if ($key !== null && $this->partitions->partitionByKey($hub, $key)) {
-                return $key;
-            }
+        // Check the school's membership region for any partitioned hub event
+        $key = app(FestRegionPartitionService::class)->partitionKeyForSchool($hub, $schoolId);
+        if ($key !== null && $this->partitions->partitionByKey($hub, $key)) {
+            return $key;
         }
 
         return null;
