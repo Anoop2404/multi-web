@@ -115,7 +115,7 @@ class McqPrintableDocumentService
         @ini_set('max_execution_time', '300');
         $query = McqRegistration::where('exam_id', $exam->id)
             ->active()
-            ->with(['student.schoolClass', 'teacher', 'school', 'feeReceipt']);
+            ->with(['student.schoolClass', 'student.tenant', 'teacher', 'school', 'feeReceipt']);
 
         if ($schoolId) {
             $query->where('school_id', $schoolId);
@@ -299,24 +299,49 @@ class McqPrintableDocumentService
         return $inline ? $pdf->stream($filename, ['Attachment' => false]) : $pdf->download($filename);
     }
 
+    /**
+     * Embed the student's photo as a cached, downscaled base64 data URI instead of
+     * handing DomPDF an authenticated app URL (Student::photoUrl()/sahodayaPhotoUrl()).
+     * Those routes require a session DomPDF doesn't have, so it either fails to fetch
+     * the image at all or — worse — makes a real outbound HTTP request back into this
+     * app per candidate, serially, while the worker rendering the PDF blocks waiting.
+     * At Sahodaya-exam scale (thousands of candidates across every school) that's
+     * enough to exhaust the PHP-FPM worker pool, the same failure mode already fixed
+     * for the Fest attendance-sheet report (see FestReportService::attendanceSheetPdf()
+     * and TenantStorage::photoBase64DataUri()'s docblock). Caching per student (keyed
+     * on their own updated_at) means only the first report that touches a given
+     * student's photo pays the decode/downscale cost — an edited photo busts its own
+     * cache key since updated_at changes.
+     */
+    private function studentPhotoDataUri(?\App\Models\Student $student): ?string
+    {
+        if (! $student || ! $student->photo) {
+            return null;
+        }
+
+        if (str_starts_with($student->photo, 'http://') || str_starts_with($student->photo, 'https://')) {
+            return $student->photo;
+        }
+
+        $cacheKey = 'student-photo-thumb:'.$student->id.':'.($student->updated_at?->timestamp ?? 0);
+
+        return \Illuminate\Support\Facades\Cache::remember(
+            $cacheKey,
+            now()->addDays(30),
+            function () use ($student) {
+                $tenant = $student->relationLoaded('tenant') ? $student->tenant : \App\Models\Tenant::find($student->tenant_id);
+
+                return \App\Support\TenantStorage::photoBase64DataUri($tenant, $student->photo);
+            },
+        );
+    }
+
     private function studentPhotoSrc(?\App\Models\Student $student): string
     {
         if ($student && $student->photo) {
-            try {
-                if (\Illuminate\Support\Facades\Storage::disk('public')->exists($student->photo)) {
-                    $absPath = \Illuminate\Support\Facades\Storage::disk('public')->path($student->photo);
-                    if (file_exists($absPath)) {
-                        return $absPath;
-                    }
-                }
-                if (\Illuminate\Support\Facades\Storage::exists($student->photo)) {
-                    $absPath = \Illuminate\Support\Facades\Storage::path($student->photo);
-                    if (file_exists($absPath)) {
-                        return $absPath;
-                    }
-                }
-            } catch (\Throwable $e) {
-                // Ignore failure, fall back to avatar
+            $dataUri = $this->studentPhotoDataUri($student);
+            if ($dataUri) {
+                return $dataUri;
             }
         }
 
@@ -336,7 +361,7 @@ class McqPrintableDocumentService
         ?string $selectedClass = null
     ): array {
         $query = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student.schoolClass', 'teacher', 'school', 'mark'])
+            ->with(['student.schoolClass', 'student.tenant', 'teacher', 'school', 'mark'])
             ->orderBy('hall_ticket_no')
             ->orderBy('id');
 
@@ -364,7 +389,7 @@ class McqPrintableDocumentService
             ->map(function (McqRegistration $reg, int $index) use ($withMarks) {
                 $row = [
                     'sl'             => $index + 1,
-                    'photo_url'      => $reg->student?->sahodayaPhotoUrl($exam->tenant_id) ?? $reg->student?->photoUrl(),
+                    'photo_url'      => $this->studentPhotoDataUri($reg->student),
                     'hall_ticket_no' => $reg->hall_ticket_no ?: '—',
                     'name'           => $reg->participantName() ?: '—',
                     'school'         => $reg->school?->name ?: '—',
