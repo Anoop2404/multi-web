@@ -20,22 +20,53 @@
             </div>
         </div>
 
-        <PageHeader title="Full A1 Achievers" eyebrow="Academic Results"
-                    description="Students who scored A1 (91-100) in every subject they were entered for, across Class X and Class XII, all streams.">
-            <template #actions>
-                <div class="flex flex-wrap items-center gap-2 print:hidden">
-                    <button type="button" @click="openHistorySearch" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
-                        <span>📜</span> Student History Lookup
+        <!-- HERO BANNER (achievement-themed, distinct from other topper reports) -->
+        <div class="print:hidden relative overflow-hidden rounded-2xl mb-6 bg-gradient-to-br from-[#0b2558] via-[#123a7a] to-[#1e4d9e] text-white p-6 sm:p-8">
+            <div class="absolute -right-8 -top-8 text-[140px] opacity-10 leading-none select-none">🏅</div>
+            <div class="relative flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-widest text-amber-300 mb-1">Academic Results · Excellence Register</p>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold">Full A1 Achievers</h1>
+                    <p class="text-sm text-blue-100 mt-1.5 max-w-xl">
+                        Students who scored A1 (91–100) in <strong class="text-white">every subject</strong> they were entered for — Class X & Class XII, all streams.
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" @click="openHistorySearch" class="btn-secondary text-xs flex items-center gap-1.5 font-bold !bg-white/10 !border-white/20 !text-white hover:!bg-white/20">
+                        <span>📜</span> Student History
                     </button>
-                    <button type="button" @click="printReport" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
-                        <span>🖨</span> Print Report
+                    <button type="button" @click="printReport" class="btn-secondary text-xs flex items-center gap-1.5 font-bold !bg-white/10 !border-white/20 !text-white hover:!bg-white/20">
+                        <span>🖨</span> Print
                     </button>
-                    <a :href="pdfDownloadUrl" class="btn-primary text-xs flex items-center gap-1.5 font-bold">
-                        <span>📥</span> Download PDF Report
+                    <button type="button" @click="openPreview" class="btn-secondary text-xs flex items-center gap-1.5 font-bold !bg-white/10 !border-white/20 !text-white hover:!bg-white/20">
+                        <span>👁</span> Preview PDF
+                    </button>
+                    <a :href="pdfDownloadUrl" class="text-xs flex items-center gap-1.5 font-bold px-3 py-2 rounded-lg bg-amber-400 text-[#0b2558] hover:bg-amber-300 transition">
+                        <span>📥</span> Download PDF
                     </a>
                 </div>
-            </template>
-        </PageHeader>
+            </div>
+
+            <!-- STATS STRIP -->
+            <div class="relative mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm p-3.5">
+                    <p class="text-[10px] font-semibold text-blue-200 uppercase tracking-wide">Total Achievers</p>
+                    <p class="text-2xl font-extrabold text-amber-300 mt-1">{{ filteredRows.length }}</p>
+                </div>
+                <div class="rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm p-3.5">
+                    <p class="text-[10px] font-semibold text-blue-200 uppercase tracking-wide">Schools Represented</p>
+                    <p class="text-2xl font-extrabold text-white mt-1">{{ distinctSchoolCount }}</p>
+                </div>
+                <div class="rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm p-3.5">
+                    <p class="text-[10px] font-semibold text-blue-200 uppercase tracking-wide">Class 10</p>
+                    <p class="text-2xl font-extrabold text-white mt-1">{{ class10Count }}</p>
+                </div>
+                <div class="rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm p-3.5">
+                    <p class="text-[10px] font-semibold text-blue-200 uppercase tracking-wide">Class 12</p>
+                    <p class="text-2xl font-extrabold text-white mt-1">{{ class12Count }}</p>
+                </div>
+            </div>
+        </div>
 
         <BoardResultsReportSubNav :sahodayaId="sahodaya.id" active="full-a1" />
 
@@ -43,7 +74,7 @@
         <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-6 space-y-4 print:hidden">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
                 <div class="flex items-center gap-2">
-                    <span class="text-base font-bold text-gray-900">⚡ Filters & Achievers</span>
+                    <span class="text-base font-bold text-gray-900">⚡ Filters</span>
                     <span class="text-xs text-gray-500">({{ filteredRows.length }} achiever(s) found)</span>
                 </div>
 
@@ -93,27 +124,11 @@
             </div>
         </div>
 
-        <!-- STATS SUMMARY -->
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 print:hidden">
-            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs">
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Achievers</p>
-                <p class="text-2xl font-bold text-indigo-600 mt-1">{{ filteredRows.length }}</p>
-            </div>
-            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs">
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Schools Represented</p>
-                <p class="text-2xl font-bold text-violet-600 mt-1">{{ distinctSchoolCount }}</p>
-            </div>
-            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs">
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Class 10 / Class 12</p>
-                <p class="text-2xl font-bold text-emerald-600 mt-1">{{ class10Count }} / {{ class12Count }}</p>
-            </div>
-        </div>
-
         <!-- ACHIEVERS TABLE -->
         <div class="card !p-0 overflow-x-auto shadow-sm border border-gray-200 bg-white print:border-0 print:shadow-none">
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between print:hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between print:hidden bg-gradient-to-r from-amber-50 to-white">
                 <div>
-                    <h2 class="font-bold text-gray-900 text-base">Full A1 Achievers — Academic Year {{ selectedYear }}</h2>
+                    <h2 class="font-bold text-gray-900 text-base flex items-center gap-2">🏅 Full A1 Achievers — Academic Year {{ selectedYear }}</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Click any row or subject badge to preview subject-wise marks breakdown and student history.</p>
                 </div>
                 <span class="text-xs text-slate-400 font-medium">💡 Tip: Click subject count pill to inspect marks</span>
@@ -125,29 +140,32 @@
                         <th class="py-3 px-4">Student Name</th>
                         <th class="py-3 px-4">CBSE Roll No</th>
                         <th class="py-3 px-4">School Name</th>
-                        <th class="py-3 px-4 text-center">Class</th>
-                        <th class="py-3 px-4">Stream</th>
+                        <th class="py-3 px-4 text-center">Class / Stream</th>
                         <th class="py-3 px-4 text-center">Subjects (all A1)</th>
                         <th class="py-3 px-4 text-center">Lowest Mark</th>
+                        <th class="py-3 px-4 text-center">Marksheet</th>
+                        <th class="py-3 px-4 text-center">Status</th>
                         <th class="py-3 px-4 text-right print:hidden">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 text-xs print:divide-slate-200">
                     <template v-for="(row, i) in filteredRows" :key="i">
                         <tr
-                            class="hover:bg-indigo-50/30 transition-colors cursor-pointer"
+                            class="hover:bg-amber-50/40 transition-colors cursor-pointer"
                             @click="previewStudentMarks(row)"
                         >
                             <td class="py-2.5 px-4 font-bold text-gray-900">
                                 <div class="flex items-center gap-1.5">
                                     <span>{{ row.student_name }}</span>
-                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-extrabold print:hidden">A1</span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-extrabold border border-amber-200 print:hidden">🏅 A1</span>
                                 </div>
                             </td>
                             <td class="py-2.5 px-4 font-mono text-gray-600">{{ row.roll_no || '—' }}</td>
-                            <td class="py-2.5 px-4 text-gray-700">{{ row.school_name }}</td>
-                            <td class="py-2.5 px-4 text-center font-semibold">{{ row.class }}</td>
-                            <td class="py-2.5 px-4 text-gray-500">{{ row.stream || '—' }}</td>
+                            <td class="py-2.5 px-4 text-gray-700 font-medium">{{ row.school_name }}</td>
+                            <td class="py-2.5 px-4 text-center font-semibold">
+                                Class {{ row.class }}
+                                <span v-if="row.stream" class="text-slate-500 text-[11px] block">{{ row.stream }}</span>
+                            </td>
                             <td class="py-2.5 px-4 text-center">
                                 <button
                                     type="button"
@@ -158,14 +176,34 @@
                                 </button>
                             </td>
                             <td class="py-2.5 px-4 text-center font-bold text-emerald-600">{{ row.lowest_mark ?? '—' }}</td>
+                            <td class="py-2.5 px-4 text-center">
+                                <a v-if="row.marksheet_url" :href="row.marksheet_url" target="_blank" @click.stop class="font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200 inline-flex items-center gap-1">
+                                    📄 Marksheet ↗
+                                </a>
+                                <span v-else class="text-slate-400 text-[11px]">No PDF</span>
+                            </td>
+                            <td class="py-2.5 px-4 text-center">
+                                <span v-if="row.verification_status === 'verified'" class="font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px]">Verified ✅</span>
+                                <span v-else-if="row.verification_status === 'rejected'" class="font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[11px]" :title="row.rejection_reason">Rejected ❌</span>
+                                <span v-else class="font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px]">Pending ⏳</span>
+                            </td>
                             <td class="py-2.5 px-4 text-right print:hidden">
-                                <div class="flex items-center justify-end gap-1.5" @click.stop>
+                                <div class="flex items-center justify-end gap-1" @click.stop>
                                     <button
+                                        v-if="row.verification_status !== 'verified'"
                                         type="button"
-                                        class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition"
-                                        @click="previewStudentMarks(row)"
+                                        class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition"
+                                        @click="verifyStudent(row)"
                                     >
-                                        Subject Marks
+                                        Verify Marks
+                                    </button>
+                                    <button
+                                        v-if="row.verification_status !== 'rejected'"
+                                        type="button"
+                                        class="px-2 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 font-bold text-[11px] transition"
+                                        @click="rejectStudent(row)"
+                                    >
+                                        Reject
                                     </button>
                                     <button
                                         type="button"
@@ -214,12 +252,20 @@
             :sahodayaId="sahodaya.id"
             @close="showHistoryModal = false"
         />
+
+        <!-- PDF PREVIEW MODAL -->
+        <PdfPreviewModal
+            :show="showPdfPreview"
+            :pdf-url="pdfPreviewUrl"
+            title="Full A1 Achievers — PDF Preview"
+            @close="showPdfPreview = false"
+        />
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import PageHeader from '@/Components/ui/PageHeader.vue';
+import PdfPreviewModal from '@/Components/ui/PdfPreviewModal.vue';
 import SubjectMarksPreviewModal from '@/Components/BoardResults/SubjectMarksPreviewModal.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
 import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
@@ -242,7 +288,7 @@ const selectedYear = ref(props.filters.academic_year);
 const selectedClass = ref(props.filters.class || '');
 const selectedStream = ref(props.filters.stream || '');
 
-const pdfDownloadUrl = computed(() => {
+const pdfPreviewUrl = computed(() => {
     let url = `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/full-a1-achievers/pdf?academic_year=${encodeURIComponent(selectedYear.value || '')}`;
     if (selectedClass.value) {
         url += `&class=${selectedClass.value}`;
@@ -252,6 +298,15 @@ const pdfDownloadUrl = computed(() => {
     }
     return url;
 });
+
+// Explicit download — the same PDF endpoint streams inline for preview by default,
+// so the download link forces an actual attachment via &download=1.
+const pdfDownloadUrl = computed(() => `${pdfPreviewUrl.value}&download=1`);
+
+const showPdfPreview = ref(false);
+function openPreview() {
+    showPdfPreview.value = true;
+}
 
 const includeSubjectMarksInPrint = ref(true);
 
@@ -306,6 +361,27 @@ function openHistorySearch() {
 function onModalViewHistory(student) {
     showSubjectModal.value = false;
     viewStudentHistory(student);
+}
+
+function verifyStudent(row) {
+    if (!row.board_result_id) return;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/board-results/${row.board_result_id}/toppers/${row.id}/verify-marksheet`,
+        {},
+        { preserveScroll: true }
+    );
+}
+
+function rejectStudent(row) {
+    if (!row.board_result_id) return;
+    const reason = window.prompt(`Rejection reason for ${row.student_name}:`, row.rejection_reason || 'Marksheet mismatch or invalid document.');
+    if (reason === null) return;
+
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/board-results/${row.board_result_id}/toppers/${row.id}/reject-marksheet`,
+        { reason },
+        { preserveScroll: true }
+    );
 }
 
 function printReport() {

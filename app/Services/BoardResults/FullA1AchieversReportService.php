@@ -78,10 +78,14 @@ class FullA1AchieversReportService
             ->where('br.status', '!=', BoardResult::STATUS_REJECTED)
             ->select([
                 't.id',
+                't.board_result_id',
                 't.name as student_name',
                 't.admission_no',
                 't.roll_no',
                 't.stream',
+                't.verification_status',
+                't.rejection_reason',
+                't.marksheet_path',
                 't.tenant_id as school_id',
                 'br.class',
                 'br.academic_year',
@@ -129,8 +133,11 @@ class FullA1AchieversReportService
                 ];
             })->values()->all();
 
+            $marksheetUrl = $row->marksheet_path ? \App\Support\TenantStorage::url($row->marksheet_path) : null;
+
             return [
                 'id' => (int) $row->id,
+                'board_result_id' => (int) $row->board_result_id,
                 'student_name' => (string) $row->student_name,
                 'school_id' => (string) $row->school_id,
                 'school_name' => $names[$row->school_id] ?? (string) $row->school_id,
@@ -141,6 +148,9 @@ class FullA1AchieversReportService
                 'admission_no' => $row->admission_no,
                 'roll_no' => $row->roll_no,
                 'academic_year' => (string) $row->academic_year,
+                'verification_status' => $row->verification_status ?? 'pending',
+                'rejection_reason' => $row->rejection_reason,
+                'marksheet_url' => $marksheetUrl,
                 'subject_marks' => $marks,
             ];
         })->values()->all();

@@ -60,6 +60,20 @@
             </Link>
         </div>
 
+        <div class="card !p-4 mb-4 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-emerald-50/70 via-white to-white border-emerald-200">
+            <div>
+                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>🏅</span> Full A1 Achievers Register
+                </h3>
+                <p class="text-xs text-slate-600 mt-0.5">
+                    Review and verify all Full A1 Achievers (Class X & XII) on their dedicated report page with subject breakdown, marksheet PDFs, and verification actions.
+                </p>
+            </div>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/reports/full-a1-achievers${selectedClass ? '?class=' + selectedClass : ''}`" class="btn-primary text-xs font-bold shrink-0">
+                Review A1 Toppers Page →
+            </Link>
+        </div>
+
         <div class="card !p-4 mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h3 class="text-sm font-semibold text-slate-800">Sahodaya-wide toppers</h3>
@@ -95,6 +109,9 @@
                             <span class="font-bold text-violet-800 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
                                 <span>🏆</span> {{ topperCountOnly(r) }} Toppers
                             </span>
+                            <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/reports/full-a1-achievers?class=${r.class}`" class="text-indigo-600 font-bold hover:underline ml-1">
+                                Review A1 Toppers on Dedicated Page →
+                            </Link>
                         </p>
                         <p v-if="r.latest_proof_label" class="text-xs text-slate-500 mt-1">
                             Latest proof:
