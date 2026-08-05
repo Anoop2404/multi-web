@@ -29,15 +29,26 @@ class FestRegionPartitionService
     ) {}
 
     /** Regions are configured (active) for this Sahodaya. Memoized per request. */
-    public function regionsApply(string $sahodayaId): bool
+    public function regionsApply(?string $sahodayaId): bool
     {
+        if (! $sahodayaId) {
+            return false;
+        }
+
         return self::$regionsApplyCache[$sahodayaId] ??=
             Region::forTenant($sahodayaId)->active()->exists();
     }
 
     /** The membership region a school belongs to for the active year, or null. Memoized per request. */
-    public function schoolRegion(string $sahodayaId, string $schoolId): ?Region
+    public function schoolRegion(?string $sahodayaId, string $schoolId): ?Region
     {
+        if (! $sahodayaId) {
+            $sahodayaId = Tenant::find($schoolId)?->parent_id;
+            if (! $sahodayaId) {
+                return null;
+            }
+        }
+
         $key = $sahodayaId.':'.$schoolId;
         if (array_key_exists($key, self::$schoolRegionCache)) {
             return self::$schoolRegionCache[$key];
@@ -64,7 +75,12 @@ class FestRegionPartitionService
     /** Partition key derived from a school's membership region (slug of region code). */
     public function partitionKeyForSchool(FestEvent $hub, string $schoolId): ?string
     {
-        $region = $this->schoolRegion($hub->tenant_id, $schoolId);
+        $sahodayaId = $hub->tenant_id ?: Tenant::find($schoolId)?->parent_id;
+        if (! $sahodayaId) {
+            return null;
+        }
+
+        $region = $this->schoolRegion($sahodayaId, $schoolId);
 
         return $region ? $this->partitionKeyForRegion($region) : null;
     }
