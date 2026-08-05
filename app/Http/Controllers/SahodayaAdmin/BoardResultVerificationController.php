@@ -390,4 +390,63 @@ class BoardResultVerificationController extends SahodayaAdminController
 
         return back()->with('success', "Marksheet for {$topper->name} marked as rejected.");
     }
+
+    public function verifyAllA1Achievers(Request $request, string $tenantId, BoardResult $boardResult)
+    {
+        $this->assertInScope($boardResult);
+
+        $count = $boardResult->toppers()
+            ->where('entry_type', Topper::ENTRY_FULL_A1)
+            ->update([
+                'verification_status' => 'verified',
+                'rejection_reason'     => null,
+                'verified_at'          => now(),
+                'verified_by'          => auth()->user()?->name ?? 'Sahodaya Admin',
+            ]);
+
+        return back()->with('success', "Verified {$count} Full A1 Achievers.");
+    }
+
+    public function verifyAllToppers(Request $request, string $tenantId, BoardResult $boardResult)
+    {
+        $this->assertInScope($boardResult);
+
+        $count = $boardResult->toppers()
+            ->whereIn('entry_type', [Topper::ENTRY_OVERALL, Topper::ENTRY_SUBJECT])
+            ->update([
+                'verification_status' => 'verified',
+                'rejection_reason'     => null,
+                'verified_at'          => now(),
+                'verified_by'          => auth()->user()?->name ?? 'Sahodaya Admin',
+            ]);
+
+        return back()->with('success', "Verified {$count} toppers.");
+    }
+
+    public function verifyAll(Request $request, string $tenantId, BoardResult $boardResult)
+    {
+        $this->assertInScope($boardResult);
+
+        DB::transaction(function () use ($request, $boardResult) {
+            $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
+
+            $locked->update([
+                'status' => BoardResult::STATUS_VERIFIED,
+                'verified_by' => $request->user()->id,
+                'verified_at' => now(),
+                'reviewed_by_user_id' => $request->user()->id,
+                'reviewed_at' => now(),
+                'rejection_reason' => null,
+            ]);
+
+            $locked->toppers()->update([
+                'verification_status' => 'verified',
+                'rejection_reason'     => null,
+                'verified_at'          => now(),
+                'verified_by'          => auth()->user()?->name ?? 'Sahodaya Admin',
+            ]);
+        });
+
+        return back()->with('success', 'Board result and all student achievers marked as verified.');
+    }
 }

@@ -925,10 +925,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/toppers/achievers', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'achievers'])->name('toppers.achievers');
             Route::post('/toppers/recompute', [\App\Http\Controllers\SahodayaAdmin\SahodayaTopperController::class, 'recompute'])->name('toppers.recompute');
             Route::post('/{boardResult}/verify', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verify'])->name('verify');
+            Route::post('/{boardResult}/verify-all', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyAll'])->name('verify-all');
             Route::post('/{boardResult}/approve', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'approve'])->name('approve');
             Route::post('/{boardResult}/reject', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'reject'])->name('reject');
             Route::post('/{boardResult}/publish', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'publish'])->name('publish');
             Route::get('/{boardResult}/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'downloadPdf'])->name('pdf');
+            Route::post('/{boardResult}/toppers/verify-a1', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyAllA1Achievers'])->name('toppers.verify-a1');
+            Route::post('/{boardResult}/toppers/verify-all-toppers', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyAllToppers'])->name('toppers.verify-all-toppers');
             Route::post('/{boardResult}/toppers/{topper}/verify-marksheet', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyTopperMarksheet'])->name('toppers.verify-marksheet');
             Route::post('/{boardResult}/toppers/{topper}/reject-marksheet', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'rejectTopperMarksheet'])->name('toppers.reject-marksheet');
         });

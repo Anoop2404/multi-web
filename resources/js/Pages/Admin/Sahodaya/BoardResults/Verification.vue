@@ -88,6 +88,14 @@
                             <span v-if="r.highest_mark"> · high {{ r.highest_mark }}</span>
                             <span v-if="r.toppers?.length"> · {{ r.toppers.length }} toppers</span>
                         </p>
+                        <p v-if="r.toppers?.length" class="text-xs text-slate-500 mt-2 flex flex-wrap items-center gap-1.5">
+                            <span class="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                <span>⭐</span> {{ fullA1Count(r) }} Full A1 Achievers
+                            </span>
+                            <span class="font-bold text-violet-800 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                <span>🏆</span> {{ topperCountOnly(r) }} Toppers
+                            </span>
+                        </p>
                         <p v-if="r.latest_proof_label" class="text-xs text-slate-500 mt-1">
                             Latest proof:
                             <span class="font-medium text-slate-700">{{ r.latest_proof_label }}</span>
@@ -114,7 +122,12 @@
                             Preview proof
                         </button>
                         <template v-if="r.status === 'submitted'">
-                            <button type="button" class="btn-secondary text-xs" @click="act(r, 'verify')">Verify</button>
+                            <button type="button" class="btn-primary text-xs font-bold" @click="act(r, 'verify-all')" title="Verify overall result submission and all student achievers">
+                                Verify All (Result & A1)
+                            </button>
+                            <button type="button" class="btn-secondary text-xs" @click="act(r, 'verify')">
+                                Verify Result Only
+                            </button>
                             <button type="button" class="px-3 py-1.5 border border-red-300 text-red-700 text-xs font-semibold rounded-lg"
                                     @click="reject(r)">Reject</button>
                         </template>
@@ -132,9 +145,20 @@
                 </div>
 
                 <div v-if="r.toppers && r.toppers.length" class="mt-4 pt-3 border-t border-slate-100">
-                    <button type="button" @click="toggleToppers(r.id)" class="text-xs font-bold text-indigo-700 hover:text-indigo-900 flex items-center gap-1">
-                        <span>{{ expandedToppers[r.id] ? '▼ Hide Student Marksheets & A1 Achievers' : '▶ Review Student Marksheets & A1 Achievers' }} ({{ r.toppers.length }})</span>
-                    </button>
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <button type="button" @click="toggleToppers(r.id)" class="text-xs font-bold text-indigo-700 hover:text-indigo-900 flex items-center gap-1">
+                            <span>{{ expandedToppers[r.id] ? '▼ Hide Student Marksheets & A1 Achievers' : '▶ Review Student Marksheets & A1 Achievers' }} ({{ r.toppers.length }})</span>
+                        </button>
+
+                        <div v-if="expandedToppers[r.id]" class="flex items-center gap-2">
+                            <button v-if="fullA1Count(r) > 0" type="button" @click="act(r, 'toppers/verify-a1')" class="px-2.5 py-1 bg-emerald-700 text-white font-bold text-[11px] rounded-lg hover:bg-emerald-800 shadow-sm">
+                                Verify All A1 Achievers ({{ fullA1Count(r) }})
+                            </button>
+                            <button v-if="topperCountOnly(r) > 0" type="button" @click="act(r, 'toppers/verify-all-toppers')" class="px-2.5 py-1 bg-violet-700 text-white font-bold text-[11px] rounded-lg hover:bg-violet-800 shadow-sm">
+                                Verify All Toppers ({{ topperCountOnly(r) }})
+                            </button>
+                        </div>
+                    </div>
 
                     <div v-if="expandedToppers[r.id]" class="mt-3 overflow-x-auto border border-slate-200 rounded-xl">
                         <table class="w-full text-left text-xs">
@@ -152,7 +176,12 @@
                                 <tr v-for="t in r.toppers" :key="t.id" class="hover:bg-slate-50/50">
                                     <td class="py-2 px-3 font-bold text-slate-900">{{ t.name }}</td>
                                     <td class="py-2 px-3 text-slate-600">{{ t.roll_no || '—' }}</td>
-                                    <td class="py-2 px-3 text-slate-600 uppercase">{{ t.entry_type }} {{ t.stream ? `(${t.stream})` : '' }}</td>
+                                    <td class="py-2 px-3">
+                                        <span :class="entryTypeBadgeClass(t.entry_type)" class="font-bold text-[10px] uppercase px-2 py-0.5 rounded-full border inline-block">
+                                            {{ entryTypeLabel(t.entry_type) }}
+                                        </span>
+                                        <span v-if="t.stream" class="text-slate-500 text-[11px] block mt-0.5">{{ t.stream }}</span>
+                                    </td>
                                     <td class="py-2 px-3">
                                         <a v-if="t.marksheet_url" :href="t.marksheet_url" target="_blank" class="font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200 inline-flex items-center gap-1">
                                             📄 View Marksheet ↗
@@ -314,6 +343,32 @@ const expandedToppers = reactive({});
 
 function toggleToppers(id) {
     expandedToppers[id] = !expandedToppers[id];
+}
+
+function fullA1Count(result) {
+    return (result?.toppers || []).filter(t => t.entry_type === 'full_a1').length;
+}
+
+function topperCountOnly(result) {
+    return (result?.toppers || []).filter(t => t.entry_type !== 'full_a1').length;
+}
+
+function entryTypeLabel(type) {
+    const map = {
+        full_a1: 'Full A1 Achiever',
+        overall: 'Overall Topper',
+        subject: 'Subject Topper',
+    };
+    return map[type] ?? (type || 'Topper');
+}
+
+function entryTypeBadgeClass(type) {
+    const map = {
+        full_a1: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        overall: 'bg-violet-50 text-violet-800 border-violet-200',
+        subject: 'bg-blue-50 text-blue-800 border-blue-200',
+    };
+    return map[type] ?? 'bg-slate-100 text-slate-700 border-slate-200';
 }
 
 function verifyTopper(result, topper) {
