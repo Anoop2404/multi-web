@@ -41,6 +41,7 @@ class FestEventController extends SahodayaAdminController
         }
 
         $q = FestEvent::forTenant($this->sahodaya->id)
+            ->with(['parent:id,title'])
             ->withCount(['items', 'registrations'])
             ->orderByDesc('event_start');
 

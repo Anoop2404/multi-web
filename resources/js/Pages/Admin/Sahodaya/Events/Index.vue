@@ -75,6 +75,23 @@
                     </div>
                     <InputError :message="form.errors.conduct_levels" class="mt-2" />
                 </div>
+                <div class="border-t border-slate-200 pt-3">
+                    <p class="form-label mb-1">Food payments payable to</p>
+                    <p class="section-desc mb-2">Most events collect food payments centrally to the Sahodaya. Pick a host school instead if it runs its own catering and should be paid directly.</p>
+                    <div class="flex gap-4 text-sm mb-2">
+                        <label class="flex items-center gap-2">
+                            <input type="radio" value="sahodaya" v-model="form.food_payee_type"> Sahodaya
+                        </label>
+                        <label class="flex items-center gap-2">
+                            <input type="radio" value="host_school" v-model="form.food_payee_type"> A host school
+                        </label>
+                    </div>
+                    <select v-if="form.food_payee_type === 'host_school'" v-model="form.food_host_school_id" class="field">
+                        <option value="">— Select school —</option>
+                        <option v-for="s in schoolOptions" :key="s.id" :value="s.id">{{ s.name }}</option>
+                    </select>
+                    <InputError :message="form.errors.food_host_school_id" class="mt-2" />
+                </div>
                 <button type="submit" class="btn-primary" :disabled="form.processing">
                     {{ form.processing ? 'Creating…' : 'Create event' }}
                 </button>
@@ -108,8 +125,16 @@
                     <tbody>
                         <tr v-for="event in filteredEvents" :key="event.id">
                             <td class="font-medium text-slate-900">
-                                {{ event.title }}
-                                <span v-if="event.state_program_id" class="ml-1 text-xs text-amber-700">(state)</span>
+                                <div v-if="event.parent" class="text-xs text-indigo-700 font-semibold flex items-center gap-1 mb-0.5">
+                                    <span>↳ Region of {{ event.parent.title }}</span>
+                                </div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span>{{ event.title }}</span>
+                                    <span v-if="event.parent_event_id || event.parent" class="text-[10px] uppercase font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">
+                                        Region Partition
+                                    </span>
+                                    <span v-if="event.state_program_id" class="ml-1 text-xs text-amber-700">(state)</span>
+                                </div>
                             </td>
                             <td>{{ eventTypes[event.event_type] ?? event.event_type }}</td>
                             <td class="text-xs">{{ levelLabels[event.level_round] ?? event.level_round }}</td>
@@ -155,6 +180,7 @@ const props = defineProps({
     eventTypes: Object,
     levelLabels: Object,
     stats: { type: Object, default: () => ({ events: 0, active_events: 0, registrations: 0, items: 0 }) },
+    schoolOptions: { type: Array, default: () => [] },
 });
 
 const eventSearch = ref('');
@@ -189,6 +215,8 @@ const form = useForm({
     event_type: 'custom',
     level_round: 'sahodaya',
     conduct_levels: ['sahodaya'],
+    food_payee_type: 'sahodaya',
+    food_host_school_id: '',
 });
 
 function statusClass(status) {

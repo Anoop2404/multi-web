@@ -158,7 +158,15 @@
                         <div v-for="ev in activeEvents" :key="ev.id"
                              class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                             <div class="min-w-0">
-                                <p class="truncate text-sm font-semibold text-slate-900">{{ ev.title }}</p>
+                                <div v-if="ev.parent" class="text-[11px] font-semibold text-indigo-700 flex items-center gap-1 mb-0.5">
+                                    <span>↳ Region of {{ ev.parent.title }}</span>
+                                </div>
+                                <p class="truncate text-sm font-semibold text-slate-900 flex items-center gap-2">
+                                    <span>{{ ev.title }}</span>
+                                    <span v-if="ev.parent_event_id || ev.parent" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                                        Region Partition
+                                    </span>
+                                </p>
                                 <p class="mt-0.5 text-xs capitalize text-slate-500">
                                     {{ ev.event_type?.replace(/_/g, ' ') }} · {{ ev.status?.replace(/_/g, ' ') }}
                                     <span v-if="ev.registrations_count != null"> · {{ ev.registrations_count }} reg.</span>
