@@ -141,14 +141,20 @@ class FestRegionPartitionService
             $keyByRegionId[$region->id] = $key;
 
             $partition = $this->partitions->partitionByKey($hub, $key);
+            $expectedTitle = "{$hub->title} — {$region->name}";
+
             if (! $partition) {
                 $partition = $this->partitions->spawnPartition($hub, [
-                    'title'          => $region->name,
+                    'title'          => $expectedTitle,
                     'partition_key'  => $key,
                     'cluster_label'  => $region->name,
                     'partition_role' => 'region',
                 ]);
                 $created++;
+            } else {
+                if (! str_contains($partition->title, $hub->title)) {
+                    $partition->update(['title' => $expectedTitle]);
+                }
             }
 
             // Re-sync existing children too. This repairs partitions created before

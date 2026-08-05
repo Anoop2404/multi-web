@@ -126,12 +126,21 @@
                         <tr v-for="event in filteredEvents" :key="event.id">
                             <td class="font-medium text-slate-900">
                                 <div v-if="event.parent" class="text-xs text-indigo-700 font-semibold flex items-center gap-1 mb-0.5">
-                                    <span>↳ Region of {{ event.parent.title }}</span>
+                                    <span>↳ Sub-Event of {{ event.parent.title }}</span>
                                 </div>
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <span>{{ event.title }}</span>
-                                    <span v-if="event.parent_event_id || event.parent" class="text-[10px] uppercase font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">
+                                    <span v-if="event.parent_event_id && event.partition_role === 'phase'" class="text-[10px] uppercase font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100">
+                                        Phase Partition
+                                    </span>
+                                    <span v-else-if="event.parent_event_id && (event.partition_role === 'school' || event.level_round === 'school')" class="text-[10px] uppercase font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100">
+                                        School Round
+                                    </span>
+                                    <span v-else-if="event.parent_event_id || event.parent" class="text-[10px] uppercase font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">
                                         Region Partition
+                                    </span>
+                                    <span v-else-if="event.conduct_mode === 'partitioned'" class="text-[10px] uppercase font-bold bg-sky-50 text-sky-800 px-1.5 py-0.5 rounded border border-sky-100">
+                                        Main Hub (Region-wise)
                                     </span>
                                     <span v-if="event.state_program_id" class="ml-1 text-xs text-amber-700">(state)</span>
                                 </div>

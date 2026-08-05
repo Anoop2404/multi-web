@@ -159,12 +159,21 @@
                              class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                             <div class="min-w-0">
                                 <div v-if="ev.parent" class="text-[11px] font-semibold text-indigo-700 flex items-center gap-1 mb-0.5">
-                                    <span>↳ Region of {{ ev.parent.title }}</span>
+                                    <span>↳ Sub-Event of {{ ev.parent.title }}</span>
                                 </div>
                                 <p class="truncate text-sm font-semibold text-slate-900 flex items-center gap-2">
                                     <span>{{ ev.title }}</span>
-                                    <span v-if="ev.parent_event_id || ev.parent" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                                    <span v-if="ev.parent_event_id && ev.partition_role === 'phase'" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-100 shrink-0">
+                                        Phase Partition
+                                    </span>
+                                    <span v-else-if="ev.parent_event_id && (ev.partition_role === 'school' || ev.level_round === 'school')" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0">
+                                        School Round
+                                    </span>
+                                    <span v-else-if="ev.parent_event_id || ev.parent" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
                                         Region Partition
+                                    </span>
+                                    <span v-else-if="ev.conduct_mode === 'partitioned'" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-100 shrink-0">
+                                        Main Hub (Region-wise)
                                     </span>
                                 </p>
                                 <p class="mt-0.5 text-xs capitalize text-slate-500">
