@@ -10,6 +10,7 @@ use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Services\Events\EventContext;
 use App\Services\Events\FestCertificateService;
+use App\Services\Events\FestSchoolPartitionService;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
 use Illuminate\Http\Request;
