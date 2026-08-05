@@ -435,6 +435,12 @@ class FestRegistrationController extends SchoolAdminController
         $key = app(FestSchoolPartitionService::class)->resolvePartitionKey($event, $this->school->id);
         $child = $key ? app(FestPartitionService::class)->partitionByKey($event, $key) : null;
 
+        if (! $child && app(FestRegionPartitionService::class)->regionsApply($event->tenant_id)) {
+            app(FestRegionPartitionService::class)->syncPartitionsFromRegions($event);
+            $key = app(FestSchoolPartitionService::class)->resolvePartitionKey($event, $this->school->id);
+            $child = $key ? app(FestPartitionService::class)->partitionByKey($event, $key) : null;
+        }
+
         if (! $child) {
             return null;
         }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Support\AcademicYear;
+use Illuminate\Validation\Rule;
 use App\Models\FestEvent;
 use App\Models\FestVenue;
 use App\Models\FestCompetitionArea;
@@ -60,6 +61,10 @@ class FestEventController extends SahodayaAdminController
                 'registrations' => (int) $events->sum('registrations_count'),
                 'items'         => (int) $events->sum('items_count'),
             ],
+            'schoolOptions' => \App\Models\Tenant::where('parent_id', $this->sahodaya->id)
+                ->where('type', 'school')
+                ->orderBy('name')
+                ->get(['id', 'name']),
         ]);
     }
 
@@ -133,6 +138,10 @@ class FestEventController extends SahodayaAdminController
             'catalogSummary' => $catalogService->summary($this->sahodaya->id, $eventType),
             'catalogSections' => FestCatalogSections::summaries($this->sahodaya->id, $eventType),
             'activityLogs' => $this->programActivityLogs($program),
+            'schoolOptions' => \App\Models\Tenant::where('parent_id', $this->sahodaya->id)
+                ->where('type', 'school')
+                ->orderBy('name')
+                ->get(['id', 'name']),
         ]);
     }
 
@@ -157,7 +166,16 @@ class FestEventController extends SahodayaAdminController
             'max_onstage_per_student'  => 'nullable|integer|min:0',
             'max_offstage_per_student' => 'nullable|integer|min:0',
             'max_group_per_student'    => 'nullable|integer|min:0',
+            'food_payee_type'          => ['nullable', Rule::in(['sahodaya', 'host_school'])],
+            'food_host_school_id'      => [
+                Rule::requiredIf(($request->input('food_payee_type') ?? 'sahodaya') === 'host_school'),
+                'nullable',
+                Rule::exists('tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
+            ],
         ]);
+
+        $data['food_payee_type'] = $data['food_payee_type'] ?? 'sahodaya';
+        $data['food_host_school_id'] = $data['food_payee_type'] === 'host_school' ? ($data['food_host_school_id'] ?? null) : null;
 
         // Participation limits (on-stage/off-stage/team caps per student) aren't
         // fest_events columns — they live on FestParticipationPolicy. Pull them out
@@ -466,6 +484,14 @@ class FestEventController extends SahodayaAdminController
         }
 
         $event->update($data);
+
+        if (in_array($newStatus, ['published', 'registration_open'], true) && app(\App\Services\Events\FestRegionPartitionService::class)->regionsApply($event->tenant_id)) {
+            try {
+                app(\App\Services\Events\FestRegionPartitionService::class)->syncPartitionsFromRegions($event->fresh());
+            } catch (\Throwable $e) {
+                // Ignore if no active regions yet
+            }
+        }
 
         // Season hub: keep child sport events in sync (open status + item placement).
         if ($event->event_type === 'sports' && $event->isSportsSeasonEvent()) {
