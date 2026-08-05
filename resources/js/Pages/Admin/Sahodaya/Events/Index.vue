@@ -125,8 +125,8 @@
                     <tbody>
                         <tr v-for="event in filteredEvents" :key="event.id">
                             <td class="font-medium text-slate-900">
-                                <div v-if="event.parent" class="text-xs text-indigo-700 font-semibold flex items-center gap-1 mb-0.5">
-                                    <span>↳ Sub-Event of {{ event.parent.title }}</span>
+                                <div v-if="event.parentEvent || event.parent" class="text-xs text-indigo-700 font-semibold flex items-center gap-1 mb-0.5">
+                                    <span>↳ Sub-Event of {{ (event.parentEvent || event.parent)?.title }}</span>
                                 </div>
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <span>{{ event.title }}</span>

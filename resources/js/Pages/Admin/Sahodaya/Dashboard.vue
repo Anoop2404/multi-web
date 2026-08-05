@@ -158,8 +158,8 @@
                         <div v-for="ev in activeEvents" :key="ev.id"
                              class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                             <div class="min-w-0">
-                                <div v-if="ev.parent" class="text-[11px] font-semibold text-indigo-700 flex items-center gap-1 mb-0.5">
-                                    <span>↳ Sub-Event of {{ ev.parent.title }}</span>
+                                <div v-if="ev.parentEvent || ev.parent" class="text-[11px] font-semibold text-indigo-700 flex items-center gap-1 mb-0.5">
+                                    <span>↳ Sub-Event of {{ (ev.parentEvent || ev.parent)?.title }}</span>
                                 </div>
                                 <p class="truncate text-sm font-semibold text-slate-900 flex items-center gap-2">
                                     <span>{{ ev.title }}</span>

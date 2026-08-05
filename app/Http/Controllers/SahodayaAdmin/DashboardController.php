@@ -141,7 +141,7 @@ class DashboardController extends SahodayaAdminController
 
         $activeEvents = FestEvent::where('tenant_id', $this->sahodaya->id)
             ->whereIn('status', $activeStatuses)
-            ->with(['parent:id,title'])
+            ->with(['parentEvent:id,title', 'parent:id,title'])
             ->withCount(['registrations' => fn ($q) => $q->whereIn('status', FestRegistration::ACTIVE_STATUSES)])
             ->orderByDesc('event_start')
             ->limit(10)

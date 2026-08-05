@@ -187,6 +187,11 @@ class FestEvent extends Model
         return $this->hasMany(FestResult::class, 'event_id');
     }
 
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(FestEvent::class, 'parent_event_id');
+    }
+
     public function parentEvent(): BelongsTo
     {
         return $this->belongsTo(FestEvent::class, 'parent_event_id');
