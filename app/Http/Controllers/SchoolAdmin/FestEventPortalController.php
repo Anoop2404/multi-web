@@ -137,7 +137,8 @@ class FestEventPortalController extends SchoolAdminController
     public function festHub(string $tenantId, Request $request)
     {
         $allEvents = FestEvent::where('tenant_id', $this->school->parent_id)
-            ->listedForSchool($this->school->id)
+            ->visibleToSchool($this->school->id)
+            ->whereIn('status', ['draft', 'published', 'registration_open', 'ongoing', 'completed'])
             ->with(['parentEvent:id,title', 'parent:id,title'])
             ->orderByDesc('event_start')
             ->get()
