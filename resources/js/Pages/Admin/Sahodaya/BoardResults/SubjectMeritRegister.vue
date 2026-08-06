@@ -15,23 +15,52 @@
             </div>
         </div>
 
-        <PageHeader title="Subject-wise Merit Register" eyebrow="Academic Results"
-                    description="Comprehensive rank-based subject toppers report collected across member schools.">
-            <template #actions>
-                <div class="flex flex-wrap items-center gap-2 print:hidden">
-                    <button type="button" @click="openHistorySearch" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
+        <!-- HERO BANNER -->
+        <div class="print:hidden relative overflow-hidden rounded-2xl mb-6 bg-gradient-to-br from-[#0b2558] via-[#123a7a] to-[#1e4d9e] text-white p-6 sm:p-8">
+            <div class="absolute -right-8 -top-8 text-[140px] opacity-10 leading-none select-none">⭐</div>
+            <div class="relative flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-widest text-amber-300 mb-1">Academic Results · Merit Register</p>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold">Subject-Wise Toppers</h1>
+                    <p class="text-sm text-blue-100 mt-1.5 max-w-xl">
+                        Comprehensive subject-wise merit register — highest scorers across member schools for Class X & Class XII subjects.
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" @click="openHistorySearch" class="btn-secondary text-xs flex items-center gap-1.5 font-bold !bg-white/10 !border-white/20 !text-white hover:!bg-white/20">
                         <span>📜</span> Student History
                     </button>
-                    <button type="button" @click="printReport" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
-                        <span>🖨</span> Print Register
+                    <button type="button" @click="printReport" class="btn-secondary text-xs flex items-center gap-1.5 font-bold !bg-white/10 !border-white/20 !text-white hover:!bg-white/20">
+                        <span>🖨</span> Print
                     </button>
-                    <a :href="pdfDownloadUrl" class="btn-primary text-xs flex items-center gap-1.5 font-bold">
-                        <span>📥</span> Download PDF Report
+                    <a :href="pdfDownloadUrl" class="text-xs flex items-center gap-1.5 font-bold px-3 py-2 rounded-lg bg-amber-400 text-[#0b2558] hover:bg-amber-300 transition">
+                        <span>📥</span> Download PDF
                     </a>
                 </div>
-            </template>
-        </PageHeader>
+            </div>
 
+            <!-- STATS STRIP -->
+            <div class="relative mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm p-3.5">
+                    <p class="text-[10px] font-semibold text-blue-200 uppercase tracking-wide">Total Subject Toppers</p>
+                    <p class="text-2xl font-extrabold text-amber-300 mt-1">{{ filteredRows.length }}</p>
+                </div>
+                <div class="rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm p-3.5">
+                    <p class="text-[10px] font-semibold text-blue-200 uppercase tracking-wide">Subjects Listed</p>
+                    <p class="text-2xl font-extrabold text-white mt-1">{{ distinctSubjectCount }}</p>
+                </div>
+                <div class="rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm p-3.5">
+                    <p class="text-[10px] font-semibold text-blue-200 uppercase tracking-wide">Schools Represented</p>
+                    <p class="text-2xl font-extrabold text-white mt-1">{{ distinctSchoolCount }}</p>
+                </div>
+                <div class="rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm p-3.5">
+                    <p class="text-[10px] font-semibold text-blue-200 uppercase tracking-wide">Perfect Scorers (100)</p>
+                    <p class="text-2xl font-extrabold text-emerald-300 mt-1">{{ perfectScorerCount }}</p>
+                </div>
+            </div>
+        </div>
+
+        <BoardResultsVerificationSubNav :sahodayaId="sahodaya.id" active="toppers" :currentClass="selectedClass" />
         <BoardResultsReportSubNav :sahodayaId="sahodaya.id" active="subject-merit" />
 
         <!-- ADVANCED FILTER CONTROLS -->
@@ -460,6 +489,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
 import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
+import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
 
 const showHistoryModal = ref(false);
 const historyStudent = ref(null);
@@ -500,6 +530,10 @@ const selectedStream = ref('');
 const selectedRankCap = ref(0);
 const searchQuery = ref('');
 const previewMode = ref('single');
+
+const distinctSubjectCount = computed(() => new Set(props.rows.map(r => r.subject || r.subject_label)).size);
+const distinctSchoolCount = computed(() => new Set(props.rows.map(r => r.school_id || r.school_name)).size);
+const perfectScorerCount = computed(() => props.rows.filter(r => r.marks === 100 || r.marks_obtained === 100).length);
 
 const pdfDownloadUrl = computed(() => {
     let url = `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/subject-merit/pdf?academic_year=${encodeURIComponent(selectedYear.value)}`;
@@ -631,18 +665,6 @@ const previewRows = computed(() => {
     if (!previewGroups.value.length) return [];
     const target = selectedSubject.value || previewGroups.value[0]?.subject;
     return previewGroups.value.find(group => group.subject?.toLowerCase() === target?.toLowerCase())?.rows || [];
-});
-
-const distinctSubjectCount = computed(() => {
-    const set = new Set();
-    filteredRows.value.forEach(r => { if (r.subject) set.add(r.subject); });
-    return set.size;
-});
-
-const distinctSchoolCount = computed(() => {
-    const set = new Set();
-    filteredRows.value.forEach(r => { if (r.school_id) set.add(r.school_id); });
-    return set.size;
 });
 
 const rankOneCount = computed(() => {

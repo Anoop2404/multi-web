@@ -34,13 +34,51 @@ class BoardResultReportController extends SahodayaAdminController
         $base = "/sahodaya-admin/{$this->sahodaya->id}";
         $yearQ = urlencode($year);
 
-        $availableYears = AcademicYear::options();
+        $schoolIds = \App\Models\Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->pluck('id')
+            ->all();
+
+        $fullA1Count = \App\Models\Topper::query()
+            ->join('board_results as br', 'br.id', '=', 'toppers.board_result_id')
+            ->whereIn('br.tenant_id', $schoolIds)
+            ->where('toppers.entry_type', \App\Models\Topper::ENTRY_FULL_A1)
+            ->where('br.academic_year', $year)
+            ->count();
+
+        $schoolTopperCount = \App\Models\BoardResult::query()
+            ->whereIn('tenant_id', $schoolIds)
+            ->where('academic_year', $year)
+            ->whereHas('toppers')
+            ->count();
+
+        $totalTopperCount = \App\Models\Topper::query()
+            ->join('board_results as br', 'br.id', '=', 'toppers.board_result_id')
+            ->whereIn('br.tenant_id', $schoolIds)
+            ->whereIn('toppers.entry_type', [\App\Models\Topper::ENTRY_OVERALL, \App\Models\Topper::ENTRY_SUBJECT])
+            ->where('br.academic_year', $year)
+            ->count();
+
+        $schoolsSubmittedCount = \App\Models\BoardResult::query()
+            ->whereIn('tenant_id', $schoolIds)
+            ->where('academic_year', $year)
+            ->whereIn('status', [\App\Models\BoardResult::STATUS_SUBMITTED, \App\Models\BoardResult::STATUS_VERIFIED, \App\Models\BoardResult::STATUS_APPROVED, \App\Models\BoardResult::STATUS_PUBLISHED])
+            ->count();
+
+        $counts = [
+            'full_a1' => $fullA1Count,
+            'school_toppers' => $schoolTopperCount,
+            'total_toppers' => $totalTopperCount,
+            'schools_submitted' => $schoolsSubmittedCount,
+        ];
 
         return $this->inertia('Sahodaya/BoardResults/Reports', [
             'filters' => [
                 'academic_year' => $year,
                 'class' => $request->integer('class') ?: null,
             ],
+            'counts' => $counts,
             'availableYears' => $availableYears,
             'reports' => [
                 [

@@ -12,7 +12,7 @@
             </template>
         </PageHeader>
 
-        <BoardResultsReportSubNav :sahodayaId="sahodaya.id" active="reports-hub" />
+        <BoardResultsReportSubNav :sahodayaId="sahodaya.id" active="reports-hub" :counts="counts" />
 
         <!-- KPI OVERVIEW CARDS -->
         <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -118,6 +118,7 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     reports: { type: Array, default: () => [] },
     filters: { type: Object, default: () => ({}) },
+    counts: { type: Object, default: () => ({}) },
     availableYears: { type: Array, default: () => [] },
 });
 
