@@ -294,11 +294,20 @@ class FestEvent extends Model
             return false;
         }
 
-        // Untagged top-level sports event: legacy hub if it has children,
-        // otherwise a standalone sport event from the new flow.
-        return $this->relationLoaded('childEvents')
-            ? $this->childEvents->isNotEmpty()
-            : self::where('parent_event_id', $this->id)->exists();
+        if ($this->conduct_mode === 'partitioned') {
+            return false;
+        }
+
+        // Untagged top-level sports event: legacy hub if it has discipline children (not regional partitions)
+        if ($this->relationLoaded('childEvents')) {
+            return $this->childEvents->contains(fn ($c) => ! in_array($c->partition_role, ['region', 'finale'], true));
+        }
+
+        return self::where('parent_event_id', $this->id)
+            ->where(function ($q) {
+                $q->whereNull('partition_role')
+                  ->orWhereNotIn('partition_role', ['region', 'finale']);
+            })->exists();
     }
 
     /**

@@ -37,11 +37,20 @@ trait BuildsSchoolFestEventContext
                 ->filterFestEventsForUser(request()->user(), $this->school->id, $meta['slug'], $rows));
 
         return [
-            'event' => $event->only([
-                'id', 'title', 'status', 'event_type', 'event_start', 'event_end',
-                'venue', 'results_published', 'level_round', 'registration_open', 'registration_close',
-                'food_payee_type', 'food_host_school_id',
-            ]),
+            'event' => array_merge(
+                $event->only([
+                    'id', 'title', 'status', 'event_type', 'event_start', 'event_end',
+                    'venue', 'results_published', 'level_round', 'registration_open', 'registration_close',
+                    'food_payee_type', 'food_host_school_id', 'parent_event_id',
+                ]),
+                [
+                    'parent_title' => $event->parent_event_id
+                        ? (\App\Models\FestEvent::find($event->parent_event_id)?->title)
+                        : null,
+                    'partition_role' => $event->partition_role,
+                    'cluster_label'  => $event->cluster_label,
+                ]
+            ),
             'program' => $meta['slug'],
             'programMeta' => $meta,
             'programPrefix' => $prefix,

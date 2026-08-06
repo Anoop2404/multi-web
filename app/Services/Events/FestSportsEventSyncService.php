@@ -39,21 +39,18 @@ class FestSportsEventSyncService
      */
     public function syncSeason(FestEvent $season, bool $createMissing = false): array
     {
-        if ($season->event_type !== 'sports' || $season->parent_event_id !== null) {
+        if ($season->conduct_mode === 'partitioned') {
             return ['created' => 0, 'updated' => 0];
         }
 
-        $hasChildren = FestEvent::where('parent_event_id', $season->id)->exists();
+        $hasChildren = FestEvent::where('parent_event_id', $season->id)
+            ->where(function ($q) {
+                $q->whereNull('partition_role')
+                  ->orWhereNotIn('partition_role', ['region', 'finale']);
+            })->exists();
 
         // A standalone sport event from the new flow is not a season hub — never
-        // tag it or seed catalog sports under it. A stray FestItemHead row with
-        // event_id = this event's own id (legacy catalog leftover) must NOT count
-        // as "having season heads" here — that previously caused standalone sport
-        // events to get mistakenly re-tagged sports_season on every passive sync
-        // (page visit), which then hid them from schools via
-        // hideSeasonHubIfChildrenExist() once a duplicate child got created. Only
-        // real children or an explicit "Add sport" action (createMissing=true)
-        // should ever promote an event to a season hub.
+        // tag it or seed catalog sports under it.
         if (! $hasChildren && $season->partition_role !== 'sports_season' && ! $createMissing) {
             return ['created' => 0, 'updated' => 0];
         }

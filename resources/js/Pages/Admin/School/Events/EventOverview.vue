@@ -1,7 +1,20 @@
 <template>
-    <SchoolAdminLayout :title="event.title" :school="school" :show-header-title="false">
-        <PageHeader :title="event.title" :eyebrow="programMeta.label"
-                    :description="`Your school's workspace for this Sahodaya ${programMeta.label} event.`">
+    <SchoolAdminLayout :title="displayTitle" :school="school" :show-header-title="false">
+        <PageHeader :title="displayTitle" :eyebrow="programMeta.label">
+            <template #description>
+                <p class="text-slate-500 text-sm">Your school's workspace for this Sahodaya {{ programMeta.label }} event.</p>
+                <!-- Region badge for partition child events -->
+                <div v-if="event.cluster_label || event.parent_title" class="mt-2 flex flex-wrap items-center gap-2">
+                    <span v-if="event.cluster_label"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                        📍 {{ event.cluster_label }}
+                    </span>
+                    <span v-if="event.parent_title"
+                          class="text-xs text-slate-400">
+                        Part of: {{ event.parent_title }}
+                    </span>
+                </div>
+            </template>
             <template #actions>
                 <Link :href="eventRegistrationHref" class="btn-primary text-sm">Register students →</Link>
             </template>
@@ -43,13 +56,9 @@
             <p class="mt-0.5">You can register students and submit entries until {{ formatDate(event.registration_close) }}.</p>
         </div>
 
-        <div v-if="schoolRegion?.applies" class="mb-5">
-            <div v-if="schoolRegion.region" class="notice-banner notice-banner--info text-sm">
-                <p>{{ programMeta.label }} region: <strong>{{ schoolRegion.region }}</strong>.
-                    <a :href="schoolRegion.set_url" class="link-brand font-semibold">Change →</a>
-                </p>
-            </div>
-            <div v-else class="notice-banner notice-banner--warning text-sm">
+        <!-- Region banner: only show change option if no region yet -->
+        <div v-if="schoolRegion?.applies && !schoolRegion.region" class="mb-5">
+            <div class="notice-banner notice-banner--warning text-sm">
                 <p class="font-semibold">Select your {{ programMeta.label }} region</p>
                 <p class="mt-1">Your Sahodaya runs {{ programMeta.label }} by region. Choose it in
                     <a :href="schoolRegion.set_url" class="link-brand font-semibold">annual registration →</a>

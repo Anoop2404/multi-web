@@ -315,7 +315,7 @@ class FestEventController extends SahodayaAdminController
      */
     private function mistakenSeasonIssue(FestEvent $event): ?array
     {
-        if ($event->event_type !== 'sports' || $event->parent_event_id !== null) {
+        if ($event->event_type !== 'sports' || $event->parent_event_id !== null || $event->conduct_mode === 'partitioned') {
             return null;
         }
 
