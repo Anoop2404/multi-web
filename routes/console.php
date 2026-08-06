@@ -23,3 +23,7 @@ Schedule::command('membership:send-reminders')->dailyAt('08:30')->withoutOverlap
 Schedule::command('erp:retry-failed-receipt-emails')->hourly()->withoutOverlapping();
 Schedule::command('erp:school-document-expiry-reminders')->dailyAt('08:00')->withoutOverlapping();
 Schedule::command('erp:mark-school-documents-expired')->dailyAt('02:30')->withoutOverlapping();
+
+// State Kalolsavam qualifier submissions (docs/STATE_LEVEL_KALOTSAV_ROLLOUT_PLAN.md §5) — retries
+// pending/failed Sahodaya-to-State outbox rows. Was never scheduled; nothing sent these otherwise.
+Schedule::command('fest:process-state-outbox')->everyFiveMinutes()->withoutOverlapping();

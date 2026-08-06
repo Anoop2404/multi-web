@@ -95,122 +95,7 @@
             <button type="button" class="btn-primary text-sm" @click="saveMarksConfig">Save marks settings</button>
         </section>
 
-        <!-- SECTION 3: TOPPER CAPS -->
-        <section class="card space-y-4 mb-6">
-            <div class="border-b border-gray-100 pb-3">
-                <h2 class="text-base font-bold text-gray-900 flex items-center gap-2"><span>🏆</span> Topper Caps &amp; Ranking Rules</h2>
-                <p class="text-xs text-gray-500 mt-0.5">Top-N, tie-break mode, and rank numbering style — per class, and optionally per stream/subject.</p>
-            </div>
 
-            <div v-if="topperConfigs.length" class="overflow-x-auto">
-                <table class="data-table w-full text-left text-xs">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-600 uppercase font-semibold">
-                            <th class="py-2 px-3">Class</th>
-                            <th class="py-2 px-3">Scope</th>
-                            <th class="py-2 px-3">Stream/Subject</th>
-                            <th class="py-2 px-3 text-center">Top-N</th>
-                            <th class="py-2 px-3">Tie mode</th>
-                            <th class="py-2 px-3">Rank style</th>
-                            <th class="py-2 px-3">Applies to</th>
-                            <th class="py-2 px-3"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        <tr v-for="c in topperConfigs" :key="c.id">
-                            <td class="py-2 px-3 font-semibold">{{ c.class ?? 'Both' }}</td>
-                            <td class="py-2 px-3 capitalize">{{ c.scope }}</td>
-                            <td class="py-2 px-3 text-gray-500">{{ c.stream_id ?? c.subject_id ?? '—' }}</td>
-                            <td class="py-2 px-3 text-center font-bold">{{ c.top_n }}</td>
-                            <td class="py-2 px-3">{{ c.tie_mode }}</td>
-                            <td class="py-2 px-3">{{ c.rank_style }}</td>
-                            <td class="py-2 px-3">
-                                <span v-if="c.academic_year" class="text-[10px] font-bold text-indigo-600 uppercase">{{ c.academic_year }} only</span>
-                                <span v-else class="text-[10px] font-bold text-gray-400 uppercase">All years</span>
-                            </td>
-                            <td class="py-2 px-3">
-                                <button type="button" class="text-indigo-600 hover:underline font-semibold" @click="editCap(c)">Edit</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <form class="bg-white rounded-xl border border-gray-200 p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end" @submit.prevent="saveCap">
-                <div>
-                    <label class="text-xs font-semibold text-slate-700">Class</label>
-                    <select v-model="capForm.class" class="field mt-1 text-sm">
-                        <option :value="null">Both</option>
-                        <option :value="10">Class X</option>
-                        <option :value="12">Class XII</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs font-semibold text-slate-700">Scope</label>
-                    <select v-model="capForm.scope" class="field mt-1 text-sm">
-                        <option value="overall">Overall</option>
-                        <option value="stream">Stream</option>
-                        <option value="subject">Subject</option>
-                    </select>
-                </div>
-                <div v-if="capForm.scope === 'stream'">
-                    <label class="text-xs font-semibold text-slate-700">Stream</label>
-                    <select v-model.number="capForm.stream_id" class="field mt-1 text-sm">
-                        <option :value="null">— select —</option>
-                        <option v-for="s in streams" :key="s.id" :value="s.id">{{ s.label }}</option>
-                    </select>
-                </div>
-                <div v-if="capForm.scope === 'subject'">
-                    <label class="text-xs font-semibold text-slate-700">Subject ID</label>
-                    <input v-model.number="capForm.subject_id" type="number" class="field mt-1 text-sm" placeholder="Subject ID">
-                </div>
-                <div>
-                    <label class="text-xs font-semibold text-slate-700">Top-N</label>
-                    <input v-model.number="capForm.top_n" type="number" min="1" max="50" required class="field mt-1 text-sm">
-                </div>
-                <div>
-                    <label class="text-xs font-semibold text-slate-700">Tie mode</label>
-                    <select v-model="capForm.tie_mode" class="field mt-1 text-sm">
-                        <option value="include_group">Include tied group</option>
-                        <option value="hard_cap">Hard cap</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-xs font-semibold text-slate-700">Rank style</label>
-                    <select v-model="capForm.rank_style" class="field mt-1 text-sm">
-                        <option value="competition">Competition (1,2,2,4)</option>
-                        <option value="dense">Dense (1,2,2,3)</option>
-                        <option value="sequential">Sequential (1,2,3,4)</option>
-                    </select>
-                </div>
-                <div class="lg:col-span-4 flex items-center justify-between gap-3">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" v-model="capForm.apply_to_all_years" class="rounded border-gray-300 text-indigo-600">
-                        <span class="text-xs font-semibold text-slate-700">Apply to all academic years instead of just {{ selectedYear }}</span>
-                    </label>
-                    <button type="submit" class="btn-primary text-sm shrink-0">Save topper cap</button>
-                </div>
-            </form>
-        </section>
-
-        <!-- SECTION 4: RANKING TOGGLES (GLOBAL) -->
-        <section class="card space-y-4 mb-6">
-            <div class="border-b border-gray-100 pb-3">
-                <h2 class="text-base font-bold text-gray-900 flex items-center gap-2"><span>⚙️</span> Ranking Rules (Sahodaya-wide)</h2>
-                <p class="text-xs text-gray-500 mt-0.5">
-                    These are structural, not per-year — they apply the same way across every academic year for this Sahodaya.
-                </p>
-            </div>
-            <label class="flex items-center gap-2.5 bg-white rounded-xl border border-gray-200 p-3.5 cursor-pointer">
-                <input type="checkbox" v-model="rankingForm.use_common_ranking" class="rounded border-gray-300 text-indigo-600 w-4 h-4">
-                <span class="text-sm font-semibold text-gray-800">Use one common ranking for every stream/subject (ignore per-stream/subject overrides)</span>
-            </label>
-            <label class="flex items-center gap-2.5 bg-white rounded-xl border border-gray-200 p-3.5 cursor-pointer">
-                <input type="checkbox" v-model="rankingForm.no_rank" class="rounded border-gray-300 text-indigo-600 w-4 h-4">
-                <span class="text-sm font-semibold text-gray-800">No-rank mode — reports drop rank numbers and just order by percentage</span>
-            </label>
-            <button type="button" class="btn-primary text-sm" @click="saveRankingSettings">Save ranking rules</button>
-        </section>
 
         <!-- SECTION 5: COPY FROM PREVIOUS YEAR -->
         <section class="card space-y-4">
@@ -253,12 +138,9 @@ const props = defineProps({
     academicYearOptions: { type: Array, default: () => [] },
     entryWindow: { type: Object, default: () => ({}) },
     streams: { type: Array, default: () => [] },
-    topperConfigs: { type: Array, default: () => [] },
-    defaultTopN: { type: Number, default: 500 },
     classXTotalMarks: { type: Number, default: 500 },
     classXIsYearSpecific: { type: Boolean, default: false },
     streamTotalMarks: { type: Object, default: () => ({}) },
-    rankingSettings: { type: Object, default: () => ({}) },
 });
 
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/board-results`);
@@ -323,52 +205,7 @@ function saveMarksConfig() {
     }, { preserveScroll: true });
 }
 
-// ── Topper caps ──────────────────────────────────────────────────────────
-const capForm = reactive({
-    class: null,
-    scope: 'overall',
-    stream_id: null,
-    subject_id: null,
-    top_n: props.defaultTopN ?? 500,
-    tie_mode: 'include_group',
-    rank_style: 'competition',
-    apply_to_all_years: false,
-});
 
-function editCap(c) {
-    capForm.class = c.class;
-    capForm.scope = c.scope;
-    capForm.stream_id = c.stream_id;
-    capForm.subject_id = c.subject_id;
-    capForm.top_n = c.top_n;
-    capForm.tie_mode = c.tie_mode;
-    capForm.rank_style = c.rank_style;
-    capForm.apply_to_all_years = !c.academic_year;
-}
-
-function saveCap() {
-    router.post(`${base.value}/settings/topper-cap`, {
-        academic_year: selectedYear.value,
-        apply_to_all_years: capForm.apply_to_all_years,
-        class: capForm.class,
-        scope: capForm.scope,
-        stream_id: capForm.scope === 'stream' ? capForm.stream_id : null,
-        subject_id: capForm.scope === 'subject' ? capForm.subject_id : null,
-        top_n: capForm.top_n,
-        tie_mode: capForm.tie_mode,
-        rank_style: capForm.rank_style,
-    }, { preserveScroll: true });
-}
-
-// ── Ranking toggles (global, existing endpoint) ─────────────────────────
-const rankingForm = reactive({
-    use_common_ranking: props.rankingSettings?.use_common_ranking ?? false,
-    no_rank: props.rankingSettings?.no_rank ?? false,
-});
-
-function saveRankingSettings() {
-    router.put(`${base.value}/toppers/ranking-settings`, { ...rankingForm }, { preserveScroll: true });
-}
 
 // ── Copy from previous year ──────────────────────────────────────────────
 const sortedYearLabels = computed(() => props.academicYearOptions.map(a => a.label));

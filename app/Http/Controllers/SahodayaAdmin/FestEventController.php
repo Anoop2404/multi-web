@@ -258,6 +258,11 @@ class FestEventController extends SahodayaAdminController
             "Event created: {$event->title}",
         );
 
+        // If regions are already configured for this Sahodaya, auto-create regional
+        // partition sub-events immediately — no manual "Sync regions" click needed.
+        app(\App\Services\Events\FestRegionPartitionService::class)
+            ->autoSyncIfApplicable($event);
+
         // Sports: a new top-level event is the season container — land the admin on
         // its Setup hub where "+ Add sport" lives (sports are added explicitly now).
         if ($event->event_type === 'sports' && $event->parent_event_id === null) {
@@ -486,12 +491,9 @@ class FestEventController extends SahodayaAdminController
 
         $event->update($data);
 
-        if (in_array($newStatus, ['published', 'registration_open'], true) && app(\App\Services\Events\FestRegionPartitionService::class)->regionsApply($event->tenant_id)) {
-            try {
-                app(\App\Services\Events\FestRegionPartitionService::class)->syncPartitionsFromRegions($event->fresh());
-            } catch (\Throwable $e) {
-                // Ignore if no active regions yet
-            }
+        if (in_array($newStatus, ['published', 'registration_open'], true)) {
+            app(\App\Services\Events\FestRegionPartitionService::class)
+                ->autoSyncIfApplicable($event->fresh());
         }
 
         // Season hub: keep child sport events in sync (open status + item placement).

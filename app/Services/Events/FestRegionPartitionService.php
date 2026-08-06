@@ -114,6 +114,35 @@ class FestRegionPartitionService
     }
 
     /**
+     * Convenience entry-point to auto-sync regional partitions for an event whenever
+     * the event is created or published. Safe to call at any time — a no-op when
+     * regions don't apply or the event is not partitioned. Swallows exceptions so
+     * it never blocks the calling action.
+     */
+    public function autoSyncIfApplicable(FestEvent $event): void
+    {
+        $hub = $event->parent_event_id
+            ? FestEvent::find($event->parent_event_id) ?? $event
+            : $event;
+
+        if (! $this->regionsApply($hub->tenant_id)) {
+            return;
+        }
+
+        try {
+            if ($this->partitions->conductMode($hub) !== 'partitioned') {
+                // Auto-enable partitioned mode for region-applicable events
+                $hub->update(['conduct_mode' => 'partitioned']);
+                $hub->refresh();
+            }
+
+            $this->syncPartitionsFromRegions($hub);
+        } catch (\Throwable) {
+            // Never block the creating/publishing action
+        }
+    }
+
+    /**
      * Auto-created regional children share the hub's school-registration lifecycle.
      * Preserve any child that an administrator has already moved beyond draft.
      */

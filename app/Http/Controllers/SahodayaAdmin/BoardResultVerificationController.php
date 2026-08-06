@@ -32,7 +32,7 @@ class BoardResultVerificationController extends SahodayaAdminController
             ->whereIn('tenant_id', $schoolIds)
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
             ->when($class, fn ($q) => $q->where('class', $class))
-            ->with(['toppers', 'uploads' => fn ($q) => $q->orderByDesc('version')->limit(5)])
+            ->with(['uploads' => fn ($q) => $q->orderByDesc('version')->limit(5)])
             ->orderByDesc('submitted_at')
             ->orderByDesc('updated_at')
             ->paginate(25)
@@ -40,11 +40,6 @@ class BoardResultVerificationController extends SahodayaAdminController
 
         $schoolNames = Tenant::whereIn('id', $results->pluck('tenant_id')->unique())
             ->pluck('name', 'id');
-
-        $topperConfigs = TopperCountConfig::query()
-            ->where('sahodaya_id', $this->sahodaya->id)
-            ->orderBy('class')
-            ->get();
 
         $results->getCollection()->transform(function (BoardResult $result) {
             $result->setAttribute('latest_proof_label', $this->proofLabelForResult($result));
@@ -67,11 +62,71 @@ class BoardResultVerificationController extends SahodayaAdminController
                 'draft' => 'Draft',
                 'all' => 'All',
             ],
-            'topperConfigs' => $topperConfigs,
-            'defaultTopN' => TopperCountService::DEFAULT_TOP_N,
             'selectedClass' => $class,
         ]);
     }
+
+    public function verifyOverall(Request $request)
+    {
+        return $this->renderTopperVerificationPage($request, Topper::ENTRY_OVERALL, 'VerifyOverallToppers');
+    }
+
+    public function verifySubjects(Request $request)
+    {
+        return $this->renderTopperVerificationPage($request, Topper::ENTRY_SUBJECT, 'VerifySubjectToppers');
+    }
+
+    public function verifyA1(Request $request)
+    {
+        return $this->renderTopperVerificationPage($request, Topper::ENTRY_FULL_A1, 'VerifyA1Achievers');
+    }
+
+    private function renderTopperVerificationPage(Request $request, string $entryType, string $component)
+    {
+        $status = $request->string('status')->toString() ?: 'pending';
+        $class = $request->filled('class') ? $request->integer('class') : 10;
+        abort_if(! in_array($class, [10, 12], true), 404);
+
+        $schoolIds = Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->pluck('id');
+
+        $toppers = Topper::query()
+            ->with(['boardResult', 'examStream', 'subjectMarks'])
+            ->whereHas('boardResult', function ($q) use ($schoolIds, $class) {
+                $q->whereIn('tenant_id', $schoolIds)
+                  ->where('class', $class);
+            })
+            ->where('entry_type', $entryType)
+            ->when($status !== 'all', function ($q) use ($status) {
+                if ($status === 'pending') {
+                    $q->where('verification_status', 'pending');
+                } else {
+                    $q->where('verification_status', $status);
+                }
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate(50)
+            ->withQueryString();
+
+        $schoolNames = Tenant::whereIn('id', $toppers->pluck('tenant_id')->unique())
+            ->pluck('name', 'id');
+
+        return $this->inertia('Sahodaya/BoardResults/' . $component, [
+            'toppers' => $toppers,
+            'schoolNames' => $schoolNames,
+            'filters' => ['status' => $status, 'class' => $class],
+            'selectedClass' => $class,
+            'statusOptions' => [
+                'pending' => 'Pending Verification',
+                'verified' => 'Verified',
+                'rejected' => 'Rejected',
+                'all' => 'All',
+            ],
+        ]);
+    }
+
 
     public function updateTopperCap(Request $request)
     {

@@ -10,9 +10,9 @@
                     </span>
                 </p>
             </div>
-            <div class="flex flex-wrap gap-2 shrink-0">
+            <div class="flex flex-wrap gap-2 shrink-0 items-center">
                 <a v-if="reportsHref" :href="reportsHref" class="btn-secondary text-xs !min-h-0">Event reports →</a>
-                <a v-if="itemsUrl && registeredCount" :href="itemsUrl" class="btn-secondary text-xs !min-h-0">
+                <a v-if="itemsUrl && registeredCount" :href="itemsUrl" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md shadow-sm text-white bg-rose-600 hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600 transition-colors">
                     Step 2 · Register items →
                 </a>
                 <button type="button" class="btn-primary text-xs !min-h-0"
@@ -117,9 +117,14 @@
             </table>
         </div>
 
-        <p v-if="registeredCount" class="px-4 py-2 text-xs text-slate-600 border-t border-indigo-50 bg-white/60">
-            <strong>{{ registeredCount }}</strong> {{ isSportsEvent ? 'athlete' : 'student' }}{{ registeredCount === 1 ? '' : 's' }} registered for this event.
-        </p>
+        <div v-if="registeredCount" class="px-4 py-3 text-xs border-t border-indigo-50 bg-rose-50/50 flex flex-col gap-1.5">
+            <p class="text-slate-800">
+                <strong>{{ registeredCount }}</strong> {{ isSportsEvent ? 'athlete' : 'student' }}{{ registeredCount === 1 ? '' : 's' }} registered for this event.
+            </p>
+            <p v-if="itemsUrl" class="text-rose-700 font-semibold">
+                IMPORTANT: You must now go to Step 2 to assign these {{ isSportsEvent ? 'athletes' : 'students' }} to specific items.
+            </p>
+        </div>
         <p v-if="requireVerified && unregisteredVisibleCount && selectableVisibleCount < unregisteredVisibleCount"
            class="px-4 py-2 text-xs text-amber-800 border-t border-indigo-50 bg-amber-50/60">
             {{ unregisteredVisibleCount - selectableVisibleCount }} student(s) need a date of birth and/or Sahodaya verification before they can be registered.
@@ -392,6 +397,12 @@ function submit() {
         onSuccess: () => {
             selectedIds.value = [];
             router.reload({ only: ['events', 'studentsByEvent', 'students'] });
+        },
+        onError: (errors) => {
+            const keys = Object.keys(errors);
+            if (keys.length) {
+                alert(errors[keys[0]]);
+            }
         },
     });
 }

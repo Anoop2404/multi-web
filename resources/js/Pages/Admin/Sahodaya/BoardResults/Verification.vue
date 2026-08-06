@@ -163,71 +163,15 @@
                     </div>
                 </div>
 
-                <div v-if="r.toppers && r.toppers.length" class="mt-4 pt-3 border-t border-slate-100">
-                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                        <button type="button" @click="toggleToppers(r.id)" class="text-xs font-bold text-indigo-700 hover:text-indigo-900 flex items-center gap-1">
-                            <span>{{ expandedToppers[r.id] ? '▼ Hide Student Marksheets & A1 Achievers' : '▶ Review Student Marksheets & A1 Achievers' }} ({{ r.toppers.length }})</span>
-                        </button>
-
-                        <div v-if="expandedToppers[r.id]" class="flex items-center gap-2">
-                            <button v-if="fullA1Count(r) > 0" type="button" @click="act(r, 'toppers/verify-a1')" class="px-2.5 py-1 bg-emerald-700 text-white font-bold text-[11px] rounded-lg hover:bg-emerald-800 shadow-sm">
-                                Verify All A1 Achievers ({{ fullA1Count(r) }})
-                            </button>
-                            <button v-if="topperCountOnly(r) > 0" type="button" @click="act(r, 'toppers/verify-all-toppers')" class="px-2.5 py-1 bg-violet-700 text-white font-bold text-[11px] rounded-lg hover:bg-violet-800 shadow-sm">
-                                Verify All Toppers ({{ topperCountOnly(r) }})
-                            </button>
+                        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                            <span class="text-xs text-slate-500 font-medium">Toppers / A1 included: <strong class="text-indigo-600">{{ r.toppers ? r.toppers.length : 0 }}</strong></span>
+                            <div class="flex items-center gap-2">
+                                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification/overall?class=${r.class}`" class="text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-md transition">
+                                    Verify Toppers →
+                                </Link>
+                            </div>
                         </div>
                     </div>
-
-                    <div v-if="expandedToppers[r.id]" class="mt-3 overflow-x-auto border border-slate-200 rounded-xl">
-                        <table class="w-full text-left text-xs">
-                            <thead class="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                                <tr>
-                                    <th class="py-2 px-3">Student Name</th>
-                                    <th class="py-2 px-3">Roll No</th>
-                                    <th class="py-2 px-3">Category / Stream</th>
-                                    <th class="py-2 px-3">Uploaded Marksheet</th>
-                                    <th class="py-2 px-3">Verification Status</th>
-                                    <th class="py-2 px-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100 bg-white">
-                                <tr v-for="t in r.toppers" :key="t.id" class="hover:bg-slate-50/50">
-                                    <td class="py-2 px-3 font-bold text-slate-900">{{ t.name }}</td>
-                                    <td class="py-2 px-3 text-slate-600">{{ t.roll_no || '—' }}</td>
-                                    <td class="py-2 px-3">
-                                        <span :class="entryTypeBadgeClass(t.entry_type)" class="font-bold text-[10px] uppercase px-2 py-0.5 rounded-full border inline-block">
-                                            {{ entryTypeLabel(t.entry_type) }}
-                                        </span>
-                                        <span v-if="t.stream" class="text-slate-500 text-[11px] block mt-0.5">{{ t.stream }}</span>
-                                    </td>
-                                    <td class="py-2 px-3">
-                                        <a v-if="t.marksheet_url" :href="t.marksheet_url" target="_blank" class="font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200 inline-flex items-center gap-1">
-                                            📄 View Marksheet ↗
-                                        </a>
-                                        <span v-else class="text-slate-400">No file uploaded</span>
-                                    </td>
-                                    <td class="py-2 px-3">
-                                        <span v-if="t.verification_status === 'verified'" class="font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Verified ✅</span>
-                                        <span v-else-if="t.verification_status === 'rejected'" class="font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700" :title="t.rejection_reason">Rejected ❌</span>
-                                        <span v-else class="font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Pending Verification ⏳</span>
-                                    </td>
-                                    <td class="py-2 px-3 text-right">
-                                        <div class="flex items-center justify-end gap-1">
-                                            <button v-if="t.verification_status !== 'verified'" type="button" @click="verifyTopper(r, t)" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-md">
-                                                Verify Marks
-                                            </button>
-                                            <button v-if="t.verification_status !== 'rejected'" type="button" @click="rejectTopper(r, t)" class="px-2.5 py-1 border border-red-300 text-red-700 hover:bg-red-50 font-bold text-[11px] rounded-md">
-                                                Reject
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
             <p v-if="!results.data.length" class="text-center text-slate-400 py-10">No board results in this queue.</p>
         </div>
 
@@ -359,54 +303,4 @@ function reject(r) {
     );
 }
 
-const expandedToppers = reactive({});
-
-function toggleToppers(id) {
-    expandedToppers[id] = !expandedToppers[id];
-}
-
-function fullA1Count(result) {
-    return (result?.toppers || []).filter(t => t.entry_type === 'full_a1').length;
-}
-
-function topperCountOnly(result) {
-    return (result?.toppers || []).filter(t => t.entry_type !== 'full_a1').length;
-}
-
-function entryTypeLabel(type) {
-    const map = {
-        full_a1: 'Full A1 Achiever',
-        overall: 'Overall Topper',
-        subject: 'Subject Topper',
-    };
-    return map[type] ?? (type || 'Topper');
-}
-
-function entryTypeBadgeClass(type) {
-    const map = {
-        full_a1: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-        overall: 'bg-violet-50 text-violet-800 border-violet-200',
-        subject: 'bg-blue-50 text-blue-800 border-blue-200',
-    };
-    return map[type] ?? 'bg-slate-100 text-slate-700 border-slate-200';
-}
-
-function verifyTopper(result, topper) {
-    router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/board-results/${result.id}/toppers/${topper.id}/verify-marksheet`,
-        {},
-        { preserveScroll: true }
-    );
-}
-
-function rejectTopper(result, topper) {
-    const reason = window.prompt(`Rejection reason for ${topper.name}:`, topper.rejection_reason || 'Marksheet mismatch or invalid document.');
-    if (reason === null) return;
-
-    router.post(
-        `/sahodaya-admin/${props.sahodaya.id}/board-results/${result.id}/toppers/${topper.id}/reject-marksheet`,
-        { reason },
-        { preserveScroll: true }
-    );
-}
 </script>

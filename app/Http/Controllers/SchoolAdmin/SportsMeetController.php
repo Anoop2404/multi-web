@@ -66,9 +66,11 @@ class SportsMeetController extends SchoolAdminController
                 'score'            => $m->score,
             ])->values());
 
+        // 'state' events are locked, read-only qualifier placeholders — never a real round
+        // to link a school's event under. Excluded 2026-07-31 (see FestProgramController fix).
         $parentEvents = FestEvent::where('tenant_id', $this->school->parent_id)
             ->where('event_type', 'sports')
-            ->whereIn('level_round', ['sahodaya', 'state'])
+            ->where('level_round', 'sahodaya')
             ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'level_round', 'status']);

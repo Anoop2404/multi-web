@@ -33,6 +33,8 @@ class FestPageActivity
     public const HOUSES = 'event.houses';
     public const CATERING = 'event.catering';
     public const FOOD_COUPONS = 'event.food-coupons';
+    public const FOOD_MENU = 'event.food-menu';
+    public const FOOD_BILLING = 'event.food-billing';
     public const REPORTS = 'event.reports';
     public const REPORTS_DOWNLOADS = 'event.reports.downloads';
 
@@ -84,6 +86,8 @@ class FestPageActivity
             self::HOUSES => 'Houses',
             self::CATERING => 'Catering',
             self::FOOD_COUPONS => 'Food coupons',
+            self::FOOD_MENU => 'Food menu',
+            self::FOOD_BILLING => 'Food billing',
             self::REPORTS => 'Reports',
             self::PROGRAM_OVERVIEW => 'Program overview',
             self::CATALOG_HUB => 'Catalog overview',

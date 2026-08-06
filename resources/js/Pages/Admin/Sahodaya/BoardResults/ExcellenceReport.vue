@@ -18,7 +18,10 @@
         <PageHeader title="Academic Excellence + Historical Comparison" eyebrow="Academic Results"
                     :description="`Source: ${report.source || 'Board Examination Engine'}. Award rankings and year-over-year pass percentage trends.`">
             <template #actions>
-                <div class="flex items-center gap-2 print:hidden">
+                <div class="flex items-center gap-3 print:hidden">
+                    <select v-model="year" @change="apply" class="field text-sm font-semibold pr-8 py-2 max-w-[150px]">
+                        <option v-for="ay in academicYearOptions" :key="ay.id" :value="ay.label">{{ ay.label }}</option>
+                    </select>
                     <button type="button" @click="openHistorySearch" class="btn-secondary text-xs flex items-center gap-1.5 font-bold">
                         <span>📜</span> Student History Lookup
                     </button>
@@ -29,19 +32,6 @@
                 </div>
             </template>
         </PageHeader>
-
-        <!-- FILTER CONTROLS -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-6 space-y-4 print:hidden">
-            <form class="flex flex-wrap items-center gap-3" @submit.prevent="apply">
-                <div class="w-full sm:w-64">
-                    <label class="form-label mb-1 text-[11px] font-bold text-slate-600 uppercase">Academic Year</label>
-                    <input v-model="year" class="field text-xs bg-gray-50 border-gray-200 focus:bg-white font-semibold" placeholder="e.g. 2025-26">
-                </div>
-                <div class="self-end">
-                    <button type="submit" class="btn-primary text-xs px-5 py-2 font-bold shadow-xs">Apply Year Filter</button>
-                </div>
-            </form>
-        </div>
 
         <!-- AWARDS & RANKINGS CARDS -->
         <div class="grid lg:grid-cols-2 gap-5 mb-6">
@@ -157,6 +147,7 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     report: { type: Object, default: () => ({}) },
     filters: { type: Object, default: () => ({}) },
+    academicYearOptions: { type: Array, default: () => [] },
 });
 
 const year = ref(props.filters.academic_year || '');

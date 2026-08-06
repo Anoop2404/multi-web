@@ -39,6 +39,7 @@ trait BuildsSchoolFestEventContext
             'event' => $event->only([
                 'id', 'title', 'status', 'event_type', 'event_start', 'event_end',
                 'venue', 'results_published', 'level_round', 'registration_open', 'registration_close',
+                'food_payee_type', 'food_host_school_id',
             ]),
             'program' => $meta['slug'],
             'programMeta' => $meta,

@@ -160,11 +160,18 @@
                             <option value="group">Group</option>
                             <option value="team">Team</option>
                         </select>
+                        <div>
+                            <input v-model.number="itemForm.qualify_count" type="number" min="1" class="field" placeholder="Qualifiers to State (default 2)">
+                            <p class="text-xs text-gray-400 mt-1">How many from each Sahodaya advance — leave blank for the usual top-2. Use 1 for items like English One Act Play.</p>
+                        </div>
                         <button class="btn-primary sm:col-span-2">Add state item</button>
                     </form>
                     <ul v-if="program.items?.length" class="divide-y border rounded-lg text-sm">
                         <li v-for="item in program.items" :key="item.id" class="py-2 px-3 flex justify-between gap-2">
-                            <span>{{ item.title }}<span v-if="item.fee_amount != null" class="text-gray-400"> · ₹{{ item.fee_amount }}</span></span>
+                            <span>
+                                {{ item.title }}<span v-if="item.fee_amount != null" class="text-gray-400"> · ₹{{ item.fee_amount }}</span>
+                                <span class="text-gray-400"> · qualifies {{ item.qualify_count ?? 2 }}</span>
+                            </span>
                             <button type="button" @click="removeItem(item.id)" class="text-red-600 text-xs">Remove</button>
                         </li>
                     </ul>
@@ -207,6 +214,14 @@
                             Re-sync missing clusters
                         </button>
                     </form>
+                </div>
+                <div class="card">
+                    <p class="text-xs text-gray-500 uppercase">Outside Sahodayas</p>
+                    <p class="text-xs text-gray-500 mt-1 mb-3">Sahodayas that aren't platform tenants — code-gated intake.</p>
+                    <Link :href="`/admin/state-programs/${program.id}/external-sahodayas`"
+                          class="block text-center w-full px-4 py-2 border border-indigo-200 text-indigo-700 rounded-lg text-sm hover:bg-indigo-50">
+                        Manage outside Sahodayas
+                    </Link>
                 </div>
                 <Link href="/admin/state-programs" class="block text-sm text-indigo-600">← All state programs</Link>
             </div>
@@ -410,6 +425,7 @@ const itemForm = useForm({
     age_group: '',
     participant_type: 'individual',
     fee_amount: null,
+    qualify_count: null,
 });
 
 function save() {

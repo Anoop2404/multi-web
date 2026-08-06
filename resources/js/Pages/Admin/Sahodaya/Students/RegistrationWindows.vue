@@ -54,17 +54,12 @@
                 </FormGrid>
             </FormSection>
 
-            <FormSection title="Board Examination Results Data Entry Window"
-                         hint="When schools can submit or edit Class X &amp; Class XII Board Examination Results and Toppers for this academic year. (Leave blank for open entry)">
-                <FormGrid>
-                    <FormField label="Opens">
-                        <input v-model="form.board_open" type="datetime-local" class="field">
-                    </FormField>
-                    <FormField label="Closes">
-                        <input v-model="form.board_close" type="datetime-local" class="field">
-                    </FormField>
-                </FormGrid>
-            </FormSection>
+            <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 text-sm text-indigo-900 flex flex-wrap items-center justify-between gap-3">
+                <span>Board Examination Results data entry windows moved to the Board Results settings page.</span>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/settings`" class="btn-secondary text-xs font-bold shrink-0">
+                    Open Board Results settings →
+                </Link>
+            </div>
 
             <button type="submit" class="btn-primary" :disabled="form.processing">Save student windows</button>
         </form>
@@ -104,8 +99,6 @@ const form = useForm({
     add_close: props.window?.add_close_local ?? '',
     edit_open: props.window?.edit_open_local ?? '',
     edit_close: props.window?.edit_close_local ?? '',
-    board_open: props.window?.board_open_local ?? '',
-    board_close: props.window?.board_close_local ?? '',
 });
 
 function save() {

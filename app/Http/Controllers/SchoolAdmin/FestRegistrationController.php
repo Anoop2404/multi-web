@@ -225,8 +225,9 @@ class FestRegistrationController extends SchoolAdminController
         }
 
         $sahodayaId = $this->school->parent_id;
-        $hasRegions = \App\Models\Region::forTenant($sahodayaId)->active()->exists();
-        if (! $hasRegions) {
+        $regions = \App\Models\Region::forTenant($sahodayaId)->active()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']);
+        
+        if ($regions->isEmpty()) {
             return null;
         }
 
@@ -240,7 +241,8 @@ class FestRegistrationController extends SchoolAdminController
         return [
             'applies' => true,
             'region'  => $regionName,
-            'set_url' => "/school-admin/{$this->school->id}/registration",
+            'set_url' => "/school-admin/{$this->school->id}/registration/region",
+            'regions' => $regions,
         ];
     }
 
@@ -268,28 +270,29 @@ class FestRegistrationController extends SchoolAdminController
             });
         }
 
-        // Keep the response bounded for large schools, but make the initial pool useful
+        // Keep the response bounded for extremely large schools, but make the initial pool useful
         // for every class. A simple alphabetical limit can contain only the first few
         // classes, which incorrectly makes items for later classes look ineligible.
+        $limit = 1000;
         if (! $classId && blank($search)) {
             $classIds = Student::where('tenant_id', $this->school->id)
                 ->active()
                 ->whereNotNull('school_class_id')
                 ->distinct()
                 ->orderBy('school_class_id')
-                ->limit(150)
+                ->limit($limit)
                 ->pluck('school_class_id');
 
-            $perClass = max(1, intdiv(150, max(1, $classIds->count())));
+            $perClass = max(1, intdiv($limit, max(1, $classIds->count())));
             $studentRows = $classIds
                 ->flatMap(fn ($id) => (clone $studentQuery)
                     ->where('school_class_id', $id)
                     ->limit($perClass)
                     ->get())
-                ->take(150)
+                ->take($limit)
                 ->values();
         } else {
-            $studentRows = $studentQuery->limit(150)->get();
+            $studentRows = $studentQuery->limit($limit)->get();
         }
 
         $annotated = app(FestRegistrationEligibilityService::class)
@@ -831,6 +834,9 @@ class FestRegistrationController extends SchoolAdminController
             foreach ($messages as $key => $errors) {
                 if (in_array($key, ['student_ids', 'teacher_ids', 'standby_ids', 'registration'])) {
                     $mapped["items.{$item->id}"] = $errors;
+                } elseif (in_array($key, ['region', 'membership', 'partition'])) {
+                    $mapped["items.{$item->id}"] = $errors;
+                    $mapped[$key] = $errors;
                 } else {
                     $mapped[$key] = $errors;
                 }

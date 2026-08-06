@@ -24,16 +24,26 @@
         </PageHeader>
 
         <div v-if="schoolRegion?.applies" class="mb-5 max-w-2xl">
-            <div v-if="schoolRegion.region" class="notice-banner notice-banner--info text-sm">
-                <p>Your {{ programLabel }} region: <strong>{{ schoolRegion.region }}</strong>.
-                    <a :href="schoolRegion.set_url" class="link-brand font-semibold">Change →</a>
-                </p>
+            <div v-if="schoolRegion.region && !showChangeRegion" class="notice-banner notice-banner--info text-sm flex flex-wrap items-center gap-3 justify-between">
+                <p>Your {{ programLabel }} region: <strong>{{ schoolRegion.region }}</strong>.</p>
+                <button type="button" class="link-brand font-semibold text-xs shrink-0" @click="showChangeRegion = true">Change region →</button>
             </div>
             <div v-else class="notice-banner notice-banner--warning text-sm">
-                <p class="font-semibold">Select your {{ programLabel }} region</p>
-                <p class="mt-1">Your Sahodaya runs {{ programLabel }} by region. Choose your region in
-                    <a :href="schoolRegion.set_url" class="link-brand font-semibold">annual registration →</a>
-                    (or ask your Sahodaya to assign it).
+                <p class="font-semibold mb-2">{{ schoolRegion.region ? 'Change your' : 'Select your' }} {{ programLabel }} region</p>
+                <form @submit.prevent="submitRegion" class="flex flex-wrap items-center gap-3">
+                    <select v-model="regionForm.region_id" class="field !py-1.5 min-w-[15rem]" required>
+                        <option value="" disabled>Choose your region...</option>
+                        <option v-for="region in schoolRegion.regions" :key="region.id" :value="region.id">
+                            {{ region.name }}
+                        </option>
+                    </select>
+                    <button type="submit" class="btn-primary text-xs !py-1.5" :disabled="regionForm.processing">
+                        {{ regionForm.processing ? 'Saving…' : 'Save Region' }}
+                    </button>
+                    <button v-if="schoolRegion.region" type="button" class="btn-ghost text-xs !py-1.5" @click="showChangeRegion = false">Cancel</button>
+                </form>
+                <p v-if="!schoolRegion.region" class="text-xs text-amber-800 mt-2">
+                    Your Sahodaya runs {{ programLabel }} by region. You must select your region before you can register for events.
                 </p>
             </div>
         </div>
@@ -524,6 +534,22 @@ const props = defineProps({
 });
 
 const paymentDetails = computed(() => props.profile?.payment_details_text || '');
+
+const regionForm = useForm({
+    region_id: '',
+});
+
+const showChangeRegion = ref(false);
+
+function submitRegion() {
+    regionForm.post(props.schoolRegion.set_url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showChangeRegion.value = false;
+            router.reload();
+        }
+    });
+}
 
 const { programSlug, programLabel, programBase } = useSchoolProgramContext(props);
 const page = usePage();
@@ -1570,6 +1596,12 @@ function extractItemErrors(errors, itemId) {
     const messages = errors?.[key];
     if (Array.isArray(messages)) return messages.join(' ');
     if (typeof messages === 'string') return messages;
+    // Also surface top-level region/partition/membership errors
+    for (const fallbackKey of ['region', 'partition', 'membership', 'registration']) {
+        const fb = errors?.[fallbackKey];
+        if (Array.isArray(fb) && fb.length) return fb.join(' ');
+        if (typeof fb === 'string' && fb) return fb;
+    }
     return '';
 }
 
@@ -1652,6 +1684,12 @@ function submitBulkAssign() {
         onSuccess: () => {
             bulkAssignForm.reset();
             showBulkAssign.value = false;
+        },
+        onError: (errors) => {
+            const keys = Object.keys(errors);
+            if (keys.length) {
+                alert(errors[keys[0]]);
+            }
         },
     });
 }

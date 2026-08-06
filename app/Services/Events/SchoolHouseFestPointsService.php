@@ -32,13 +32,19 @@ class SchoolHouseFestPointsService
             ->with(['participant.student', 'participant.registration.item'])
             ->get();
 
+        // One query for every distinct event these marks belong to, instead of
+        // FestEvent::find() per mark — when $eventId is given (the common case),
+        // every mark shares the same event, so the old code re-queried the exact
+        // same row once per mark. See docs/N1_AND_REPORT_MEMORY_AUDIT_2026_08_03.md §7.
+        $events = FestEvent::whereIn('id', $marks->pluck('event_id')->unique()->values())->get()->keyBy('id');
+
         foreach ($marks as $mark) {
             $houseId = $mark->participant?->student?->school_house_id;
             if (! $houseId || ! array_key_exists($houseId, $totals)) {
                 continue;
             }
 
-            $event = FestEvent::find($mark->event_id);
+            $event = $events->get($mark->event_id);
             if (! $event) {
                 continue;
             }

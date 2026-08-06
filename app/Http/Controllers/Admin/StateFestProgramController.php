@@ -69,6 +69,8 @@ class StateFestProgramController extends Controller
             'defaultQualifierPolicy' => config('fest_conduct_presets.mcs_kalotsav.qualifier_policy', [
                 'regional' => ['positions' => [1]],
                 'district' => ['positions' => [1, 2]],
+                // Non-partitioned Sahodayas (the common case): manual General Rules #15 — top 2 always.
+                'standard' => ['positions' => [1, 2]],
                 'skip_item_flags' => ['mcs_only'],
             ]),
         ]);
@@ -217,6 +219,8 @@ class StateFestProgramController extends Controller
             'qualifier_policy.regional.positions.*' => 'integer|min:1|max:10',
             'qualifier_policy.district.positions' => 'nullable|array',
             'qualifier_policy.district.positions.*' => 'integer|min:1|max:10',
+            'qualifier_policy.standard.positions' => 'nullable|array',
+            'qualifier_policy.standard.positions.*' => 'integer|min:1|max:10',
             'qualifier_policy.skip_item_flags' => 'nullable|array',
             'qualifier_policy.skip_item_flags.*' => 'string|max:80',
             'state_domain'       => 'nullable|array',

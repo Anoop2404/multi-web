@@ -116,7 +116,19 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
         { label: 'Clash requests', href: `${eventBase}/clash-requests`, icon: 'alert-circle' },
         { label: 'Substitutions', href: `${eventBase}/substitution-requests`, icon: 'repeat' },
         { label: 'Fest day view', href: `${programBase}/fest-day/${eventId}`, icon: 'calendar' },
+        // Food ordering/billing lives under the flat /fest/{event}/... routes (same
+        // namespace as food coupons & catering), not under the program-prefixed
+        // /{program}/events/{id}/... routes used above.
+        { label: 'Food order', href: `/school-admin/${schoolId}/fest/${eventId}/food-order`, icon: 'clipboard' },
     );
+
+    // Only the school designated as the food payee for this event gets the billing
+    // management link — every other school just sees "Food order" above. If the
+    // Sahodaya is the payee (the default), no school gets a billing link at all; that's
+    // managed from the Sahodaya-admin side instead.
+    if (event?.food_payee_type === 'host_school' && String(event?.food_host_school_id) === String(schoolId)) {
+        workflowItems.push({ label: 'Food billing (host)', href: `/school-admin/${schoolId}/fest/${eventId}/food-host-billing`, icon: 'credit-card' });
+    }
 
     const groups = [
         {

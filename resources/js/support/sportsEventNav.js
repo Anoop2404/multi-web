@@ -103,6 +103,14 @@ export function sportsEventSidebarNav(base, caps) {
         });
     }
 
+    groups.push({
+        section: 'Food',
+        items: [
+            { label: 'Food menu', href: `${base}/food-menu`, icon: 'clipboard', permissions: FEST_CATERING },
+            { label: 'Food billing', href: `${base}/food-billing`, icon: 'credit-card', permissions: FEST_CATERING },
+        ],
+    });
+
     return groups;
 }
 

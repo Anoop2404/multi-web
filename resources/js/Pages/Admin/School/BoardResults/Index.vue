@@ -360,7 +360,7 @@
                                         <th class="p-3">CBSE Roll No</th>
                                         <th class="p-3">Marks Scored</th>
                                         <th class="p-3">%</th>
-                                        <th class="p-3">Photo (Optional)</th>
+                                        <th class="p-3">Marksheet PDF</th>
                                         <th class="p-3 text-right"></th>
                                     </tr>
                                 </thead>
@@ -385,7 +385,7 @@
                                         <td class="p-3"><input v-model="row.roll_no" type="text" placeholder="CBSE Roll No" class="field text-sm w-36" :disabled="!canEditActive"></td>
                                         <td class="p-3"><input v-model.number="row.marks_obtained" type="number" min="0" :max="rowTotalMarks(row) || undefined" placeholder="Marks" class="field text-sm w-28" :disabled="!canEditActive"></td>
                                         <td class="p-3 text-indigo-600 font-bold whitespace-nowrap">{{ rowPercentage(row) }}</td>
-                                        <td class="p-3"><input type="file" accept="image/*" class="text-xs w-40" :disabled="!canEditActive" @change="row.photo = $event.target.files[0]"></td>
+                                        <td class="p-3"><input type="file" accept=".pdf,image/*" class="text-xs w-48" :disabled="!canEditActive" @change="row.marksheet = $event.target.files[0]"></td>
                                         <td class="p-3 text-right">
                                             <button v-if="canEditActive && form.toppers.length > 1" type="button" class="text-red-500 hover:text-red-700 text-xs font-semibold" @click="removeRow(i)">Remove</button>
                                         </td>

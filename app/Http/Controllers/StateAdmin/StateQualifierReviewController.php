@@ -15,7 +15,12 @@ class StateQualifierReviewController extends Controller
 {
     public function index()
     {
+        // 'draft' intakes are external-Sahodaya submissions still being assembled by the
+        // coordinator (schools adding their own students, §2.1) — not visible to State until
+        // the coordinator finalizes and submits, same as a Sahodaya tenant reviewing before
+        // clicking "Submit qualifiers to State."
         $intakes = StateQualifierIntake::withCount('entries')
+            ->where('status', '!=', 'draft')
             ->orderByDesc('created_at')
             ->paginate(20);
 

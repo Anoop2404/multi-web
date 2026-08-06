@@ -66,6 +66,38 @@ class BoardResultAcademicYearService
             ->all();
     }
 
+    /**
+     * Return only the years that should be visible in the frontend dropdowns for reports
+     * and school data entry. A year is visible if data entry is explicitly enabled,
+     * OR if there are existing BoardResult submissions for that year.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function activeOrPopulatedYearOptions(string $sahodayaId): array
+    {
+        $allOptions = $this->entryYearOptions($sahodayaId);
+
+        $schoolIds = Tenant::query()
+            ->where('parent_id', $sahodayaId)
+            ->where('type', 'school')
+            ->pluck('id')
+            ->all();
+
+        $populatedYears = BoardResult::query()
+            ->whereIn('tenant_id', $schoolIds)
+            ->select('academic_year')
+            ->distinct()
+            ->pluck('academic_year')
+            ->toArray();
+
+        $filtered = array_filter($allOptions, function (array $opt) use ($populatedYears) {
+            // Keep if admin checked "Enable data entry" OR if there is data for this year
+            return $opt['board_entry_enabled'] === true || in_array($opt['label'], $populatedYears, true);
+        });
+
+        return array_values($filtered);
+    }
+
     public function resolveId(?string $label): ?int
     {
         if (! $label) {

@@ -5,11 +5,8 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Models\BoardResultMarksConfig;
 use App\Models\ExamStream;
 use App\Models\SahodayaRegistrationWindow;
-use App\Models\TopperCountConfig;
-use App\Models\TopperRankingSetting;
 use App\Services\BoardResults\BoardResultAcademicYearService;
 use App\Services\BoardResults\BoardResultMarksConfigService;
-use App\Services\BoardResults\TopperCountService;
 use App\Support\AcademicYear;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -50,14 +47,6 @@ class BoardResultSettingsController extends SahodayaAdminController
             ->where('academic_year', $academicYear)
             ->first();
 
-        $topperConfigs = TopperCountConfig::query()
-            ->where('sahodaya_id', $this->sahodaya->id)
-            ->where(function ($q) use ($academicYear) {
-                $q->where('academic_year', $academicYear)->orWhereNull('academic_year');
-            })
-            ->orderBy('class')
-            ->get();
-
         $marksConfigs = BoardResultMarksConfig::query()
             ->where('sahodaya_id', $this->sahodaya->id)
             ->where(function ($q) use ($academicYear) {
@@ -81,8 +70,6 @@ class BoardResultSettingsController extends SahodayaAdminController
             ]];
         });
 
-        $rankingSettings = TopperRankingSetting::forSahodaya($this->sahodaya->id);
-
         return $this->inertia('Sahodaya/BoardResults/Settings', [
             'academicYear' => $academicYear,
             'academicYearOptions' => $years->entryYearOptions($this->sahodaya->id),
@@ -92,12 +79,9 @@ class BoardResultSettingsController extends SahodayaAdminController
                 'ends_at' => $window?->board_entry_ends_at?->toDateString(),
             ],
             'streams' => $streams,
-            'topperConfigs' => $topperConfigs,
-            'defaultTopN' => TopperCountService::DEFAULT_TOP_N,
             'classXTotalMarks' => $classXConfig?->total_marks ?? BoardResultMarksConfig::DEFAULT_TOTAL_MARKS,
             'classXIsYearSpecific' => $classXYearRow !== null,
             'streamTotalMarks' => $streamTotalMarks,
-            'rankingSettings' => $rankingSettings->only(['use_common_ranking', 'no_rank']),
         ]);
     }
 
@@ -174,27 +158,6 @@ class BoardResultSettingsController extends SahodayaAdminController
             : 'Marks settings saved as the default for every academic year.');
     }
 
-    public function updateTopperCap(Request $request, TopperCountService $counts)
-    {
-        $data = $request->validate([
-            'academic_year' => 'required|string|max:10',
-            'apply_to_all_years' => 'nullable|boolean',
-            'class' => 'nullable|integer|in:10,12',
-            'scope' => 'nullable|string|in:overall,stream,subject',
-            'top_n' => 'required|integer|min:1|max:50',
-            'tie_mode' => 'nullable|string|in:include_group,hard_cap',
-            'rank_style' => 'nullable|string|in:competition,dense,sequential',
-            'stream_id' => 'nullable|integer',
-            'subject_id' => 'nullable|integer',
-        ]);
-
-        $data['academic_year'] = ($data['apply_to_all_years'] ?? false) ? null : $data['academic_year'];
-
-        $config = $counts->upsert($this->sahodaya->id, $data);
-
-        return back()->with('success', "Top-N set to {$config->top_n}.");
-    }
-
     /** Clones a prior year's explicit marks-config + topper-cap rows onto a new year in one step. */
     public function copyFromPreviousYear(Request $request, BoardResultMarksConfigService $marksConfig)
     {
@@ -213,34 +176,10 @@ class BoardResultSettingsController extends SahodayaAdminController
                 $copiedMarks++;
             });
 
-        $copiedCaps = 0;
-        TopperCountConfig::query()
-            ->where('sahodaya_id', $this->sahodaya->id)
-            ->where('academic_year', $data['from_year'])
-            ->get()
-            ->each(function (TopperCountConfig $row) use ($data, &$copiedCaps) {
-                TopperCountConfig::updateOrCreate(
-                    [
-                        'sahodaya_id' => $this->sahodaya->id,
-                        'academic_year' => $data['to_year'],
-                        'class' => $row->class,
-                        'scope' => $row->scope,
-                        'stream_id' => $row->stream_id,
-                        'subject_id' => $row->subject_id,
-                    ],
-                    [
-                        'top_n' => $row->top_n,
-                        'tie_mode' => $row->tie_mode,
-                        'rank_style' => $row->rank_style,
-                    ],
-                );
-                $copiedCaps++;
-            });
-
-        if ($copiedMarks === 0 && $copiedCaps === 0) {
+        if ($copiedMarks === 0) {
             return back()->with('success', "No year-specific settings found on {$data['from_year']} to copy — {$data['to_year']} will keep using this Sahodaya's global defaults.");
         }
 
-        return back()->with('success', "Copied {$copiedMarks} marks setting(s) and {$copiedCaps} topper cap setting(s) from {$data['from_year']} to {$data['to_year']}.");
+        return back()->with('success', "Copied {$copiedMarks} marks setting(s) from {$data['from_year']} to {$data['to_year']}.");
     }
 }

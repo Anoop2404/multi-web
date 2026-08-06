@@ -256,6 +256,23 @@
                             On-stage + off-stage + team ({{ breakdownSum }}) exceeds the total ({{ form.max_total_per_student }}).
                         </p>
                     </div>
+                    <div class="border-t border-slate-200 pt-3">
+                        <p class="form-label mb-1">Food payments payable to</p>
+                        <p class="section-desc mb-2">Most events collect food payments centrally to the Sahodaya. Pick a host school instead if it runs its own catering and should be paid directly.</p>
+                        <div class="flex gap-4 text-sm mb-2">
+                            <label class="flex items-center gap-2">
+                                <input type="radio" value="sahodaya" v-model="form.food_payee_type"> Sahodaya
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="radio" value="host_school" v-model="form.food_payee_type"> A host school
+                            </label>
+                        </div>
+                        <select v-if="form.food_payee_type === 'host_school'" v-model="form.food_host_school_id" class="field">
+                            <option value="">— Select school —</option>
+                            <option v-for="s in schoolOptions" :key="s.id" :value="s.id">{{ s.name }}</option>
+                        </select>
+                        <InputError :message="form.errors.food_host_school_id" class="mt-2" />
+                    </div>
                     <div class="flex justify-end gap-2 pt-2">
                         <button type="button" class="btn-secondary text-xs" @click="showCreateForm = false">Cancel</button>
                         <button type="submit" class="btn-primary text-xs" :disabled="form.processing || breakdownExceedsTotal">
@@ -440,6 +457,7 @@ const props = defineProps({
     eventsByLevel: { type: Object, default: null },
     seasonEvent: { type: Object, default: null },
     seasonRemittance: { type: Object, default: null },
+    schoolOptions: { type: Array, default: () => [] },
 });
 
 const showCreateForm = ref(false);
@@ -469,6 +487,8 @@ const form = useForm({
     max_onstage_per_student: null,
     max_offstage_per_student: null,
     max_group_per_student: null,
+    food_payee_type: 'sahodaya',
+    food_host_school_id: '',
 });
 
 const breakdownSum = computed(() => (

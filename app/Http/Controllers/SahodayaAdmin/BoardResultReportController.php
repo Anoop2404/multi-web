@@ -44,6 +44,7 @@ class BoardResultReportController extends SahodayaAdminController
             ->join('board_results as br', 'br.id', '=', 'toppers.board_result_id')
             ->whereIn('br.tenant_id', $schoolIds)
             ->where('toppers.entry_type', \App\Models\Topper::ENTRY_FULL_A1)
+            ->where('toppers.verification_status', 'verified')
             ->where('br.academic_year', $year)
             ->count();
 
@@ -56,7 +57,14 @@ class BoardResultReportController extends SahodayaAdminController
         $totalTopperCount = \App\Models\Topper::query()
             ->join('board_results as br', 'br.id', '=', 'toppers.board_result_id')
             ->whereIn('br.tenant_id', $schoolIds)
-            ->whereIn('toppers.entry_type', [\App\Models\Topper::ENTRY_OVERALL, \App\Models\Topper::ENTRY_SUBJECT])
+            ->where('toppers.entry_type', \App\Models\Topper::ENTRY_OVERALL)
+            ->where('br.academic_year', $year)
+            ->count();
+
+        $subjectMeritCount = \App\Models\Topper::query()
+            ->join('board_results as br', 'br.id', '=', 'toppers.board_result_id')
+            ->whereIn('br.tenant_id', $schoolIds)
+            ->where('toppers.entry_type', \App\Models\Topper::ENTRY_SUBJECT)
             ->where('br.academic_year', $year)
             ->count();
 
@@ -70,6 +78,7 @@ class BoardResultReportController extends SahodayaAdminController
             'full_a1' => $fullA1Count,
             'school_toppers' => $schoolTopperCount,
             'total_toppers' => $totalTopperCount,
+            'subject_merit' => $subjectMeritCount,
             'schools_submitted' => $schoolsSubmittedCount,
         ];
 
@@ -224,7 +233,7 @@ class BoardResultReportController extends SahodayaAdminController
         // {id, label} pairs for its <option :key="ay.id" :value="ay.label"> loop, not the
         // flat label strings AcademicYear::options() returns. Matches the same query
         // FestEventController already uses for the same shape (see its 'academicYearOptions').
-        $academicYearOptions = \App\Models\AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label']);
+        $academicYearOptions = app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->activeOrPopulatedYearOptions((string) $this->sahodaya->id);
 
         return $this->inertia('Sahodaya/BoardResults/SubjectMeritRegister', [
             'rows' => $rows,
@@ -248,7 +257,7 @@ class BoardResultReportController extends SahodayaAdminController
 
         $rows = $service->list($this->sahodaya->id, $year, $class, $stream);
 
-        $academicYearOptions = \App\Models\AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label']);
+        $academicYearOptions = app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->activeOrPopulatedYearOptions((string) $this->sahodaya->id);
 
         return $this->inertia('Sahodaya/BoardResults/FullA1Achievers', [
             'rows' => $rows,
@@ -277,7 +286,7 @@ class BoardResultReportController extends SahodayaAdminController
             ? $service->listAllToppers($this->sahodaya->id, $year, $class, $stream)
             : $service->list($this->sahodaya->id, $year, $class, $stream);
 
-        $academicYearOptions = \App\Models\AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label']);
+        $academicYearOptions = app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->activeOrPopulatedYearOptions((string) $this->sahodaya->id);
 
         return $this->inertia('Sahodaya/BoardResults/SchoolWiseToppers', [
             'rows' => $rows,
@@ -325,9 +334,12 @@ class BoardResultReportController extends SahodayaAdminController
         $year = $request->string('academic_year')->toString()
             ?: AcademicYear::forSahodaya($this->sahodaya->id);
 
+        $academicYearOptions = app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->activeOrPopulatedYearOptions((string) $this->sahodaya->id);
+
         return $this->inertia('Sahodaya/BoardResults/ExcellenceReport', [
             'report' => $service->report($this->sahodaya->id, $year),
             'filters' => ['academic_year' => $year],
+            'academicYearOptions' => $academicYearOptions,
         ]);
     }
 

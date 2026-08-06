@@ -34,10 +34,20 @@ class FestStateQualifierPayloadBuilder
                     continue;
                 }
 
+                // Per-item override (e.g. English One Act Play: qualify_count=1 caps it below
+                // the role's default [1,2] even though every other item on this event qualifies two).
+                $itemPositions = $item->qualify_count
+                    ? array_values(array_filter($positions, fn (int $p) => $p <= (int) $item->qualify_count))
+                    : $positions;
+
+                if ($itemPositions === []) {
+                    continue;
+                }
+
                 $marks = FestMark::where('event_id', $event->id)
                     ->where('item_id', $item->id)
                     ->whereNotNull('position')
-                    ->whereIn('position', $positions)
+                    ->whereIn('position', $itemPositions)
                     ->with(['participant.registration.participants.student'])
                     ->orderBy('position')
                     ->get();
@@ -64,7 +74,11 @@ class FestStateQualifierPayloadBuilder
                         'grade'                  => $mark->grade,
                         'points'                 => $mark->score ?? 0,
                         'partition_key'          => $this->partitions->partitionKey($event),
-                        'qualifier_type'         => $role === 'finale' ? 'district_winner' : 'regional_winner',
+                        'qualifier_type'         => match (true) {
+                            $role === 'finale' => 'district_winner',
+                            in_array($role, ['region', 'cluster'], true) => 'regional_winner',
+                            default => 'sahodaya_winner',
+                        },
                     ];
                 }
             }
@@ -109,7 +123,15 @@ class FestStateQualifierPayloadBuilder
         return [$sourceEvent];
     }
 
-    /** @return list<int> */
+    /**
+     * Manual, General Rules #15: "First and second position winners ... shall be selected ...
+     * only two participants/teams from a Sahodaya are eligible to register in the State level
+     * competition." Top 2, always — for a partitioned finale AND for a standard (non-partitioned)
+     * Sahodaya alike. Previously this fell through to a hardcoded [1,2,3] for the standard case,
+     * silently over-submitting 3rd-place finishers to State.
+     *
+     * @return list<int>
+     */
     private function positionsForRole(array $policy, string $role): array
     {
         if ($role === 'finale') {
@@ -120,7 +142,7 @@ class FestStateQualifierPayloadBuilder
             return $policy['regional']['positions'] ?? [1];
         }
 
-        return [1, 2, 3];
+        return $policy['standard']['positions'] ?? [1, 2];
     }
 
     private function shouldSkipItem(FestEventItem $item): bool

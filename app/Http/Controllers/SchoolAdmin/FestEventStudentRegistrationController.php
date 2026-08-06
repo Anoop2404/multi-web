@@ -39,7 +39,7 @@ class FestEventStudentRegistrationController extends SchoolAdminController
         $service = app(FestEventRegistrationService::class);
         $count = $service->registerStudents($event, $this->school, $data['student_ids']);
 
-        return back()->with('success', "Registered {$count} student(s) for the event.");
+        return back()->with('success', "Registered {$count} student(s) for the event. IMPORTANT: Please proceed to Step 2 (Item Registration) to assign these students to specific items.");
     }
 
     public function destroy(string $tenantId, FestEvent $event, string $program, int $student)

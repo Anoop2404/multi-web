@@ -17,9 +17,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class SubjectMeritRegisterService
 {
-    public function __construct(
-        private readonly RankStyleService $rankStyles,
-    ) {}
+    public function __construct() {}
 
     /**
      * @return list<array{
@@ -126,60 +124,12 @@ class SubjectMeritRegisterService
 
         $grouped = $items->groupBy(fn (array $row) => $row['subject_id'] ?? $row['subject']);
         $rankedList = [];
-        $counts = app(TopperCountService::class);
 
         foreach ($grouped as $subjectKey => $subjectItems) {
             $sorted = $subjectItems->sortByDesc(fn ($r) => (float) ($r['marks'] ?? 0))->values();
-            $currentRank = 1;
-            $prevMarks = null;
 
             foreach ($sorted as $idx => $row) {
-                $marks = (float) ($row['marks'] ?? 0);
-                if ($prevMarks !== null && $marks < $prevMarks) {
-                    $currentRank = $idx + 1;
-                }
-                $row['rank'] = $currentRank;
-                $prevMarks = $marks;
-                $sorted[$idx] = $row;
-            }
-
-            if ($class !== null) {
-                $subjectId = is_numeric($subjectKey) ? (int) $subjectKey : ($sorted->first()['subject_id'] ?? null);
-                $topN = $counts->resolveCap($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
-
-                if ($counts->isNoRankMode($sahodayaId)) {
-                    // No-rank mode: drop tie/rank-style handling, just take the top_n
-                    // rows ordered by percentage (marks) descending, with no rank number.
-                    $sorted = $sorted->sortByDesc(fn ($r) => (float) ($r['marks'] ?? 0))->values();
-                    $selected = array_map(function (array $row) {
-                        $row['rank'] = null;
-
-                        return $row;
-                    }, $sorted->take($topN)->all());
-                } else {
-                    $tieMode = $counts->resolveTieMode($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
-                    $rankStyle = $counts->resolveRankStyle($sahodayaId, $class, TopperCountConfig::SCOPE_SUBJECT, null, $subjectId);
-                    $sorted = collect($this->rankStyles->assign($sorted->all(), $rankStyle, fn (array $row) => $row['marks'] ?? null));
-
-                    $selected = [];
-                    foreach ($sorted as $row) {
-                        if ($tieMode === TopperCountConfig::TIE_HARD_CAP) {
-                            if (count($selected) >= $topN) {
-                                break;
-                            }
-                        } elseif ($row['rank'] > $topN) {
-                            // Rank-cutoff mode: include every row whose rank is within Top-N.
-                            break;
-                        }
-
-                        $selected[] = $row;
-                    }
-                }
-            } else {
-                $selected = $sorted->all();
-            }
-
-            foreach ($selected as $row) {
+                $row['rank'] = $idx + 1;
                 $rankedList[] = $row;
             }
         }

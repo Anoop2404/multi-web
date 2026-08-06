@@ -168,6 +168,10 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
     if (caps.foodCoupons) {
         adminItems.push({ label: 'Food coupons', href: `${base}/food-coupons`, icon: 'hash', permissions: FEST_CATERING });
     }
+    adminItems.push(
+        { label: 'Food menu', href: `${base}/food-menu`, icon: 'clipboard', permissions: FEST_CATERING },
+        { label: 'Food billing', href: `${base}/food-billing`, icon: 'credit-card', permissions: FEST_CATERING },
+    );
 
     groups.push({ section: 'Administration', items: adminItems });
 

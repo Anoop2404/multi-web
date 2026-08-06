@@ -76,6 +76,7 @@ class FullA1AchieversReportService
             ->whereIn('br.tenant_id', $schoolIds)
             ->where('br.academic_year', $academicYear)
             ->where('br.status', '!=', BoardResult::STATUS_REJECTED)
+            ->where('t.verification_status', 'verified')
             ->select([
                 't.id',
                 't.board_result_id',

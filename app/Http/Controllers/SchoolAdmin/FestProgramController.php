@@ -25,8 +25,12 @@ class FestProgramController extends SchoolAdminController
             ->orderByDesc('event_start')
             ->get();
 
+        // Only 'sahodaya' events are real, conductable rounds a school can roll up into.
+        // A same-program 'state' event is a locked, read-only placeholder (FestEvent::isEditableBySahodaya()
+        // is false for it) — including it here let a school get silently parented to a dead end
+        // whenever it happened to sort more recently than the real 'sahodaya' event (fixed 2026-07-31).
         $parentEvents = FestEvent::where('tenant_id', $sahodayaId)
-            ->whereIn('level_round', ['sahodaya', 'state'])
+            ->where('level_round', 'sahodaya')
             ->where(function ($q) {
                 $q->where(function ($sports) {
                     $sports->where('event_type', 'sports')
@@ -70,7 +74,7 @@ class FestProgramController extends SchoolAdminController
         } else {
             $data['parent_event_id'] = FestEvent::where('tenant_id', $sahodayaId)
                 ->where('event_type', $data['event_type'])
-                ->whereIn('level_round', ['sahodaya', 'state'])
+                ->where('level_round', 'sahodaya')
                 ->when(
                     ($data['event_type'] ?? null) === 'sports',
                     fn ($q) => $q->whereIn('status', ['published', 'registration_open', 'ongoing']),

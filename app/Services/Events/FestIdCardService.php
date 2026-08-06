@@ -741,12 +741,42 @@ class FestIdCardService
         return $p->student?->photoUrl() ?? $p->teacher?->photoUrl();
     }
 
+    /**
+     * Cached, downscaled base64 data URI for a participant's photo, for bulk ID card
+     * PDFs (pdfAllItems()/pdfAllHeads() can embed every participant across an entire
+     * event in one PDF). Uses photoBase64DataUri() (downscales + never hands DomPDF a
+     * bare filesystem path) instead of the plain photoDataUri(), which read
+     * full-resolution bytes (up to ~2MB per photo) uncached on every single PDF
+     * generation. Caching per student (keyed on updated_at) means only the first
+     * report/PDF that touches a given student's photo pays the decode/downscale cost.
+     * See docs/N1_AND_REPORT_MEMORY_AUDIT_2026_08_03.md §2.
+     */
     private function portraitDataUri(FestParticipant $p): ?string
     {
         if ($p->student) {
-            return TenantStorage::photoDataUri(
-                $p->student->relationLoaded('tenant') ? $p->student->tenant : Tenant::find($p->student->tenant_id),
-                $p->student->photo,
+            $photo = $p->student->photo;
+            if (! $photo) {
+                return null;
+            }
+
+            // photoBase64DataUri() deliberately refuses to fetch remote http(s) URLs
+            // (unlike the plain photoDataUri() this replaces) — preserve the old
+            // pass-through behavior for the rare student whose `photo` column already
+            // holds a full external URL rather than a relative storage path.
+            if (str_starts_with($photo, 'http://') || str_starts_with($photo, 'https://')) {
+                return $photo;
+            }
+
+            $cacheKey = 'student-photo-thumb:'.$p->student->id.':'.($p->student->updated_at?->timestamp ?? 0);
+
+            return \Illuminate\Support\Facades\Cache::remember(
+                $cacheKey,
+                now()->addDays(30),
+                function () use ($p) {
+                    $tenant = $p->student->relationLoaded('tenant') ? $p->student->tenant : Tenant::find($p->student->tenant_id);
+
+                    return TenantStorage::photoBase64DataUri($tenant, $p->student->photo);
+                },
             );
         }
 

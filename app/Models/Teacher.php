@@ -162,14 +162,39 @@ class Teacher extends Model
         ], absolute: false);
     }
 
+    /**
+     * Cached, downscaled base64 data URI for this teacher's photo — used by ID card
+     * PDF generation (FestIdCardService, TrainingIdCardService), which can embed
+     * hundreds/thousands of these in a single bulk PDF. Uses photoBase64DataUri()
+     * (downscales + never hands the renderer a bare filesystem path) instead of the
+     * plain photoDataUri(), and caches per teacher (keyed on updated_at) so repeat PDF
+     * generations don't re-decode the same full-resolution photo from scratch. See
+     * docs/N1_AND_REPORT_MEMORY_AUDIT_2026_08_03.md §2.
+     */
     public function photoDataUri(): ?string
     {
         if (! $this->photo || ! $this->tenant_id) {
             return null;
         }
 
-        $tenant = $this->relationLoaded('tenant') ? $this->tenant : Tenant::find($this->tenant_id);
+        // photoBase64DataUri() deliberately refuses to fetch remote http(s) URLs
+        // (unlike the plain photoDataUri() this replaces) — preserve the old
+        // pass-through behavior for the rare teacher whose `photo` column already
+        // holds a full external URL rather than a relative storage path.
+        if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
+            return $this->photo;
+        }
 
-        return TenantStorage::photoDataUri($tenant, $this->photo);
+        $cacheKey = 'teacher-photo-thumb:'.$this->id.':'.($this->updated_at?->timestamp ?? 0);
+
+        return \Illuminate\Support\Facades\Cache::remember(
+            $cacheKey,
+            now()->addDays(30),
+            function () {
+                $tenant = $this->relationLoaded('tenant') ? $this->tenant : Tenant::find($this->tenant_id);
+
+                return TenantStorage::photoBase64DataUri($tenant, $this->photo);
+            },
+        );
     }
 }

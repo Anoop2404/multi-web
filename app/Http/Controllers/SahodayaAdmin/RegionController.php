@@ -190,6 +190,10 @@ class RegionController extends SahodayaAdminController
                 ],
             );
             $saved++;
+            
+            // Auto-sync the school into its region's partition on active events
+            app(\App\Services\Events\FestRegionPartitionService::class)
+                ->syncSchoolAcrossHubs($this->sahodaya->id, $row['school_id']);
         }
 
         $audit->log('region.schools_assigned', "Assigned {$saved} school(s) to regions", properties: [

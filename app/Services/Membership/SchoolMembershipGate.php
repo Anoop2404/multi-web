@@ -61,7 +61,9 @@ class SchoolMembershipGate
     {
         $reason = $this->blockReason($school);
         if ($reason !== null) {
-            abort(422, $reason);
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'membership' => $reason,
+            ]);
         }
     }
 }

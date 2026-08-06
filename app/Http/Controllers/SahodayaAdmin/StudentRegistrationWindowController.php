@@ -26,8 +26,6 @@ class StudentRegistrationWindowController extends SahodayaAdminController
                 'add_close_local'  => $window->add_close?->format('Y-m-d\TH:i'),
                 'edit_open_local'  => $window->edit_open?->format('Y-m-d\TH:i'),
                 'edit_close_local' => $window->edit_close?->format('Y-m-d\TH:i'),
-                'board_open_local' => $window->board_entry_starts_at?->format('Y-m-d\TH:i'),
-                'board_close_local'=> $window->board_entry_ends_at?->format('Y-m-d\TH:i'),
             ] : null,
             'emergencyLock' => (bool) SahodayaProfile::where('tenant_id', $this->sahodaya->id)->value('student_edit_lock_enabled'),
         ]);
@@ -41,14 +39,16 @@ class StudentRegistrationWindowController extends SahodayaAdminController
             'add_close'     => 'nullable|date|after_or_equal:add_open',
             'edit_open'     => 'nullable|date',
             'edit_close'    => 'nullable|date|after_or_equal:edit_open',
-            'board_open'    => 'nullable|date',
-            'board_close'   => 'nullable|date|after_or_equal:board_open',
         ]);
 
         $existing = SahodayaRegistrationWindow::where('sahodaya_id', $this->sahodaya->id)
             ->where('academic_year', $data['academic_year'])
             ->first();
 
+        // Board-entry window (dates + enable/disable) now lives entirely on the Board Results
+        // settings page (BoardResultSettingsController::updateEntryWindow) — this endpoint no
+        // longer touches board_entry_starts_at/board_entry_ends_at/board_entry_enabled at all,
+        // so saving student add/edit windows here can never clobber that setting.
         SahodayaRegistrationWindow::updateOrCreate(
             ['sahodaya_id' => $this->sahodaya->id, 'academic_year' => $data['academic_year']],
             [
@@ -57,8 +57,6 @@ class StudentRegistrationWindowController extends SahodayaAdminController
                 'add_close'              => $data['add_close'],
                 'edit_open'              => $data['edit_open'],
                 'edit_close'             => $data['edit_close'],
-                'board_entry_starts_at'  => $data['board_open'] ?? null,
-                'board_entry_ends_at'    => $data['board_close'] ?? null,
                 'registration_starts_at' => $existing?->registration_starts_at,
                 'registration_ends_at'   => $existing?->registration_ends_at,
             ],

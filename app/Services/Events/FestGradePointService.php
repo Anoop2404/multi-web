@@ -27,6 +27,10 @@ class FestGradePointService
             return $this->mcsPointsForMark($mark, $isGroup);
         }
 
+        if ($event->scoring_preset === 'confed_kalotsav') {
+            return $this->confedPointsForMark($mark, $isGroup);
+        }
+
         if ($event->event_type === 'sports' && $mark->position) {
             return app(FestRankPointService::class)->pointsForRank($event, (int) $mark->position, $isGroup);
         }
@@ -55,6 +59,10 @@ class FestGradePointService
     {
         if ($event->scoring_preset === 'mcs_kalotsav') {
             return $this->resolveMcsGradeFromScore($score);
+        }
+
+        if ($event->scoring_preset === 'confed_kalotsav') {
+            return $this->resolveConfedGradeFromScore($score);
         }
 
         $configs = FestGradeConfig::where('event_id', $event->id)
@@ -90,6 +98,33 @@ class FestGradePointService
     public function resolveMcsGradeFromScore(float $score): ?string
     {
         $grades = config('fest_mcs_scoring.grades', []);
+        $matched = null;
+
+        foreach ($grades as $key => $band) {
+            if ($score >= (float) ($band['min'] ?? 0)) {
+                $matched = $band['label'] ?? $key;
+            }
+        }
+
+        return $matched;
+    }
+
+    /** Official Confederation State Kalolsavam Manual table — see config/fest_confed_kalotsav_scoring.php. */
+    private function confedPointsForMark(FestMark $mark, bool $isGroup): int
+    {
+        $table = $isGroup
+            ? config('fest_confed_kalotsav_scoring.group_points', [])
+            : config('fest_confed_kalotsav_scoring.individual_points', []);
+
+        $grade = $this->normalizeMcsGrade($mark->grade); // same A/B/C-only normalization the manual uses
+        $pos = (string) ($mark->position ?? '');
+
+        return (int) ($table[$grade][$pos] ?? 0);
+    }
+
+    public function resolveConfedGradeFromScore(float $score): ?string
+    {
+        $grades = config('fest_confed_kalotsav_scoring.grades', []);
         $matched = null;
 
         foreach ($grades as $key => $band) {

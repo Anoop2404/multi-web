@@ -23,6 +23,82 @@ use Illuminate\Validation\ValidationException;
 
 class BoardResultController extends SchoolAdminController
 {
+    public function reports(Request $request)
+    {
+        $class = $request->filled('class') ? $request->integer('class') : null;
+        $academicYear = $request->string('academic_year')->toString() ?: null;
+        $yearService = app(BoardResultAcademicYearService::class);
+        $academicYearOptions = $yearService->activeOrPopulatedYearOptions((string) $this->school->parent_id);
+
+        if (!$academicYear) {
+            $configuredOpenYear = collect($academicYearOptions)
+                ->first(fn (array $year) => $year['entry_configured'] && $year['entry_status'] === 'open');
+            $openYear = $configuredOpenYear ?? collect($academicYearOptions)->firstWhere('entry_status', 'open');
+            $academicYear = $openYear['label'] ?? ((date('Y') - 1).'-'.substr((string) date('Y'), 2));
+        }
+
+        $results = BoardResult::where('tenant_id', $this->school->id)
+            ->where('academic_year', $academicYear)
+            ->with(['toppers.subjectMarks', 'toppers.examStream'])
+            ->get();
+
+        $activeResult = $class ? $results->firstWhere('class', $class) : $results->first();
+
+        return $this->inertia('School/BoardResults/Reports', [
+            'results' => $results,
+            'academicYearOptions' => $academicYearOptions,
+            'selectedClass' => $class ?? ($activeResult ? $activeResult->class : 10),
+            'selectedAcademicYear' => $academicYear,
+            'activeResult' => $activeResult,
+            'school' => $this->school,
+        ]);
+    }
+
+    public function summaryPdf(Request $request)
+    {
+        $class = $request->integer('class') ?: 10;
+        $academicYear = $request->string('academic_year')->toString() ?: date('Y').'-'.substr(date('Y') + 1, 2);
+
+        $result = BoardResult::where('tenant_id', $this->school->id)
+            ->where('academic_year', $academicYear)
+            ->where('class', $class)
+            ->firstOrFail();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('board-results.pdf.school-summary', [
+            'result'        => $result,
+            'academicYear'  => $academicYear,
+            'selectedClass' => $class,
+            'school'        => $this->school,
+            'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->school),
+            'generatedAt'   => now()->format('d M Y · h:i A'),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download("school-summary-class-{$class}-{$academicYear}.pdf");
+    }
+
+    public function toppersPdf(Request $request)
+    {
+        $class = $request->integer('class') ?: 10;
+        $academicYear = $request->string('academic_year')->toString() ?: date('Y').'-'.substr(date('Y') + 1, 2);
+
+        $result = BoardResult::where('tenant_id', $this->school->id)
+            ->where('academic_year', $academicYear)
+            ->where('class', $class)
+            ->with(['toppers.subjectMarks', 'toppers.examStream'])
+            ->firstOrFail();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('board-results.pdf.school-toppers', [
+            'result'        => $result,
+            'academicYear'  => $academicYear,
+            'selectedClass' => $class,
+            'school'        => $this->school,
+            'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->school),
+            'generatedAt'   => now()->format('d M Y · h:i A'),
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download("school-toppers-class-{$class}-{$academicYear}.pdf");
+    }
+
     public function index(Request $request)
     {
         $class = $request->filled('class') ? $request->integer('class') : null;
@@ -52,7 +128,7 @@ class BoardResultController extends SchoolAdminController
 
         return $this->inertia('School/BoardResults/Index', array_merge([
             'results' => $results,
-            'academicYearOptions' => $yearService->entryYearOptions((string) $this->school->parent_id),
+            'academicYearOptions' => $yearService->activeOrPopulatedYearOptions((string) $this->school->parent_id),
             'statuses' => [
                 BoardResult::STATUS_DRAFT,
                 BoardResult::STATUS_SUBMITTED,
@@ -283,7 +359,7 @@ class BoardResultController extends SchoolAdminController
             'toppers.*.gender' => 'nullable|string|in:male,female,other',
             'toppers.*.admission_no' => 'nullable|string|max:64',
             'toppers.*.marks_obtained' => 'nullable|numeric|min:0',
-            'toppers.*.photo' => 'nullable|image|max:4096',
+            'toppers.*.marksheet' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:4096',
         ]);
 
         $rows = collect($data['toppers'] ?? [])
@@ -430,11 +506,13 @@ class BoardResultController extends SchoolAdminController
                 $totalMarks = $resolved[$i]['total_marks'];
                 $percentage = $totalMarks > 0 ? round(($marksObtained / $totalMarks) * 100, 2) : 0;
 
-                $photoPath = null;
-                if ($request->hasFile("toppers.{$i}.photo")) {
-                    $photoPath = $request->file("toppers.{$i}.photo")->store(
+                $marksheetPath = null;
+                $marksheetDisk = null;
+                if ($request->hasFile("toppers.{$i}.marksheet")) {
+                    $marksheetDisk = TenantStorage::uploadDisk();
+                    $marksheetPath = $request->file("toppers.{$i}.marksheet")->store(
                         'board-results/'.$this->school->id.'/'.$boardResult->id,
-                        TenantStorage::uploadDisk()
+                        $marksheetDisk
                     );
                 }
 
@@ -454,7 +532,8 @@ class BoardResultController extends SchoolAdminController
                         'total_marks' => $totalMarks,
                         'marks_obtained' => $marksObtained,
                         'percentage' => $percentage,
-                        'photo' => $photoPath ?? $matched->photo,
+                        'marksheet_path' => $marksheetPath ?? $matched->marksheet_path,
+                        'marksheet_disk' => $marksheetDisk ?? $matched->marksheet_disk,
                     ]);
                     $updated++;
                 } else {
@@ -471,7 +550,8 @@ class BoardResultController extends SchoolAdminController
                         'total_marks' => $totalMarks,
                         'marks_obtained' => $marksObtained,
                         'percentage' => $percentage,
-                        'photo' => $photoPath,
+                        'marksheet_path' => $marksheetPath,
+                        'marksheet_disk' => $marksheetDisk,
                     ]);
                     $created++;
                 }
@@ -633,7 +713,7 @@ class BoardResultController extends SchoolAdminController
         $class = $request->filled('class') ? (int) $request->input('class') : 12;
         $academicYear = $request->string('academic_year')->trim()->toString();
         $yearService = app(BoardResultAcademicYearService::class);
-        $academicYearOptions = $yearService->entryYearOptions((string) $this->school->parent_id);
+        $academicYearOptions = $yearService->activeOrPopulatedYearOptions((string) $this->school->parent_id);
         if ($academicYear === '') {
             $configuredOpenYear = collect($academicYearOptions)
                 ->first(fn (array $year) => $year['entry_configured'] && $year['entry_status'] === 'open');
@@ -686,7 +766,7 @@ class BoardResultController extends SchoolAdminController
 
         $academicYear = $request->string('academic_year')->trim()->toString();
         $yearService = app(BoardResultAcademicYearService::class);
-        $academicYearOptions = $yearService->entryYearOptions((string) $this->school->parent_id);
+        $academicYearOptions = $yearService->activeOrPopulatedYearOptions((string) $this->school->parent_id);
         if ($academicYear === '') {
             $configuredOpenYear = collect($academicYearOptions)
                 ->first(fn (array $year) => $year['entry_configured'] && $year['entry_status'] === 'open');

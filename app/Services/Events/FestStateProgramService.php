@@ -92,10 +92,16 @@ class FestStateProgramService
         $fee = app(FestEventFeeResolver::class)->resolveForProgram($program, $levelRound);
         $feeModel = $fee['fee_model'] ?? 'none';
 
+        // Disambiguate title: publish() can create both a 'sahodaya' event (the real, conducted
+        // round) and a 'state' event (locked qualifier placeholder, see FestEvent::isEditableBySahodaya())
+        // for the same program — without this they'd be two events with the identical title, indistinguishable
+        // in any dropdown/list that (mistakenly, see 2026-07-31 fixes) still shows both. Fixed 2026-07-31.
+        $title = $levelRound === 'state' ? "{$program->title} — State Qualifiers" : $program->title;
+
         $event = FestEvent::create([
             'tenant_id'          => $sahodaya->id,
             'academic_year_id'   => $academicYearId,
-            'title'              => $program->title,
+            'title'              => $title,
             'event_type'         => $program->event_type,
             'conductor_level'    => 'state',
             'conduct_levels'     => FestConductLevels::normalize(
@@ -113,6 +119,13 @@ class FestStateProgramService
             'fee_amount'         => null,
             'status'             => 'draft',
             'description'        => $program->description,
+            // Official Confederation State Kalolsavam Manual points table (§6 of the rollout plan) —
+            // on by default so a Sahodaya conducting this program doesn't have to remember to set it.
+            // Kalolsavam only: sports already scores via FestRankPointService's athletics table.
+            'scoring_preset'     => $program->event_type === 'kalolsavam' ? 'confed_kalotsav' : null,
+            'appeal_fee_amount'  => $program->event_type === 'kalolsavam'
+                ? config('fest_confed_kalotsav_scoring.appeal_fee')
+                : null,
         ]);
 
         app(FestParticipationPolicyService::class)->copyFromStateProgram($event, $program);
@@ -161,6 +174,12 @@ class FestStateProgramService
                     'conductor_level'       => $parent->conductor_level,
                     'fee_type'              => $schoolFeeModel === 'none' ? 'none' : 'per_item',
                     'fee_amount'            => null,
+                    // Inherit the parent's points table/appeal fee so school rounds score by the
+                    // same manual — otherwise a school round scored differently from its own
+                    // Sahodaya round would make promoted positions inconsistent with the points
+                    // that got them there.
+                    'scoring_preset'        => $parent->scoring_preset,
+                    'appeal_fee_amount'     => $parent->appeal_fee_amount,
                 ]
             );
 

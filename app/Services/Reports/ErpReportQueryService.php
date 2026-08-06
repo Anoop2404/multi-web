@@ -189,13 +189,21 @@ class ErpReportQueryService
             ->orderBy('min_students')
             ->get();
 
+        // One grouped query for every school's active-student count instead of a
+        // per-payment count() — see docs/N1_AND_REPORT_MEMORY_AUDIT_2026_08_03.md §6.
+        $activeStudentCounts = Student::whereIn('tenant_id', $schoolIds)
+            ->where('status', 'active')
+            ->selectRaw('tenant_id, count(*) as aggregate')
+            ->groupBy('tenant_id')
+            ->pluck('aggregate', 'tenant_id');
+
         return MembershipPayment::whereIn('school_id', $schoolIds)
             ->where('academic_year', $year)
             ->where('status', 'verified')
             ->with('school:id,name')
             ->get()
-            ->map(function (MembershipPayment $p) use ($slabs) {
-                $studentCount = Student::where('tenant_id', $p->school_id)->where('status', 'active')->count();
+            ->map(function (MembershipPayment $p) use ($slabs, $activeStudentCounts) {
+                $studentCount = (int) ($activeStudentCounts[$p->school_id] ?? 0);
                 $slab = $slabs->first(fn (MembershipFeeSlab $s) => $studentCount >= $s->min_students
                     && ($s->max_students === null || $studentCount <= $s->max_students));
                 $base = $slab ? (float) $slab->amount : (float) $p->amount;
@@ -216,25 +224,36 @@ class ErpReportQueryService
 
     private function waiverRegister(string $sahodayaId): Collection
     {
+        // Eager-load the polymorphic `feeable` relation so schoolIdForReceipt()'s
+        // loadMissing() is a no-op instead of one query per receipt, resolve the
+        // school ID exactly once per receipt (previously computed twice — once to
+        // filter, once to map), and batch the Tenant name lookup into a single
+        // whereIn() instead of one Tenant::find() per row. See
+        // docs/N1_AND_REPORT_MEMORY_AUDIT_2026_08_03.md §3.
         $schoolIds = $this->schoolIds($sahodayaId);
+        $receiptService = app(\App\Services\Fees\ProgramFeeReceiptService::class);
 
-        return FeeReceipt::query()
+        $withSchoolId = FeeReceipt::query()
             ->where('status', 'approved')
             ->where('waiver_amount', '>', 0)
+            ->with('feeable')
             ->orderByDesc('updated_at')
             ->get()
-            ->filter(function (FeeReceipt $r) use ($schoolIds) {
-                $schoolId = app(\App\Services\Fees\ProgramFeeReceiptService::class)->schoolIdForReceipt($r);
+            ->map(fn (FeeReceipt $r) => ['receipt' => $r, 'school_id' => $receiptService->schoolIdForReceipt($r)])
+            ->filter(fn (array $row) => $row['school_id'] && $schoolIds->contains($row['school_id']));
 
-                return $schoolId && $schoolIds->contains($schoolId);
-            })
-            ->map(fn (FeeReceipt $r) => [
-                'receipt_number' => $r->receipt_number,
-                'school'         => Tenant::find(app(\App\Services\Fees\ProgramFeeReceiptService::class)->schoolIdForReceipt($r))?->name,
-                'amount'         => (float) $r->amount,
-                'waiver_amount'  => (float) $r->waiver_amount,
-                'waiver_reason'  => $r->waiver_reason,
-                'waived_at'      => $r->updated_at?->format('j M Y'),
+        $schools = Tenant::whereIn('id', $withSchoolId->pluck('school_id')->unique()->values())
+            ->get(['id', 'name'])
+            ->keyBy('id');
+
+        return $withSchoolId
+            ->map(fn (array $row) => [
+                'receipt_number' => $row['receipt']->receipt_number,
+                'school'         => $schools->get($row['school_id'])?->name,
+                'amount'         => (float) $row['receipt']->amount,
+                'waiver_amount'  => (float) $row['receipt']->waiver_amount,
+                'waiver_reason'  => $row['receipt']->waiver_reason,
+                'waived_at'      => $row['receipt']->updated_at?->format('j M Y'),
             ])
             ->values();
     }
@@ -246,15 +265,20 @@ class ErpReportQueryService
         $from = $filters['from'] ?? now()->subDays(30)->toDateString();
         $to = $filters['to'] ?? now()->toDateString();
 
+        // Eager-load `feeable` so schoolIdForReceipt()'s loadMissing() is a no-op
+        // instead of one query per receipt in the loop below. See
+        // docs/N1_AND_REPORT_MEMORY_AUDIT_2026_08_03.md §4.
         $receipts = FeeReceipt::query()
             ->where('status', 'approved')
             ->whereBetween('payment_date', [$from, $to])
+            ->with('feeable')
             ->get();
 
         $byDate = [];
+        $receiptService = app(\App\Services\Fees\ProgramFeeReceiptService::class);
 
         foreach ($receipts as $receipt) {
-            $schoolId = app(\App\Services\Fees\ProgramFeeReceiptService::class)->schoolIdForReceipt($receipt);
+            $schoolId = $receiptService->schoolIdForReceipt($receipt);
             if (! $schoolId || ! $schoolIds->contains($schoolId)) {
                 continue;
             }
@@ -287,10 +311,16 @@ class ErpReportQueryService
 
         $schools = Tenant::where('parent_id', $sahodayaId)->where('type', 'school')->where('membership_status', 'approved')->get();
 
-        return $schools->map(function (Tenant $school) use ($requiredTypes, $sahodayaId) {
-            $docs = SchoolDocument::where('school_id', $school->id)
-                ->whereHas('documentType', fn ($q) => $q->where('sahodaya_id', $sahodayaId))
-                ->get();
+        // One query for every school's documents instead of one query per school —
+        // see docs/N1_AND_REPORT_MEMORY_AUDIT_2026_08_03.md §5.
+        $docsBySchool = SchoolDocument::whereIn('school_id', $schools->pluck('id'))
+            ->whereHas('documentType', fn ($q) => $q->where('sahodaya_id', $sahodayaId))
+            ->with('documentType')
+            ->get()
+            ->groupBy('school_id');
+
+        return $schools->map(function (Tenant $school) use ($requiredTypes, $docsBySchool) {
+            $docs = $docsBySchool->get($school->id, collect());
 
             $approvedRequired = $docs->filter(fn (SchoolDocument $d) => $d->status === 'approved'
                 && $d->documentType?->is_required)->count();

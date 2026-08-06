@@ -58,6 +58,7 @@ class SahodayaTopperController extends SahodayaAdminController
                 ->join('board_results as br', 'br.id', '=', 'toppers.board_result_id')
                 ->whereIn('br.tenant_id', $schoolIds)
                 ->where('toppers.entry_type', \App\Models\Topper::ENTRY_FULL_A1)
+                ->where('toppers.verification_status', 'verified')
                 ->where('br.academic_year', $year)
                 ->count(),
             'school_toppers' => \App\Models\BoardResult::query()
@@ -68,7 +69,13 @@ class SahodayaTopperController extends SahodayaAdminController
             'total_toppers' => \App\Models\Topper::query()
                 ->join('board_results as br', 'br.id', '=', 'toppers.board_result_id')
                 ->whereIn('br.tenant_id', $schoolIds)
-                ->whereIn('toppers.entry_type', [\App\Models\Topper::ENTRY_OVERALL, \App\Models\Topper::ENTRY_SUBJECT])
+                ->where('toppers.entry_type', \App\Models\Topper::ENTRY_OVERALL)
+                ->where('br.academic_year', $year)
+                ->count(),
+            'subject_merit' => \App\Models\Topper::query()
+                ->join('board_results as br', 'br.id', '=', 'toppers.board_result_id')
+                ->whereIn('br.tenant_id', $schoolIds)
+                ->where('toppers.entry_type', \App\Models\Topper::ENTRY_SUBJECT)
                 ->where('br.academic_year', $year)
                 ->count(),
             'schools_submitted' => \App\Models\BoardResult::query()
@@ -84,7 +91,7 @@ class SahodayaTopperController extends SahodayaAdminController
             'selectedStreamLabel' => $selectedStreamLabel,
             'selectedSubjectId' => $selectedSubjectId,
             'filters' => ['academic_year' => $year, 'stream' => $selectedStream],
-            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
+            'academicYearOptions' => app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->activeOrPopulatedYearOptions((string) $this->sahodaya->id),
             'streamOptions' => $streams,
             'subjectOptions' => $subjects,
             'rows' => $streamRows,
@@ -117,7 +124,7 @@ class SahodayaTopperController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/BoardResults/TopperReportsMenu', [
             'filters' => ['academic_year' => $year],
-            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
+            'academicYearOptions' => app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->activeOrPopulatedYearOptions((string) $this->sahodaya->id),
         ]);
     }
 
@@ -176,7 +183,7 @@ class SahodayaTopperController extends SahodayaAdminController
             'selectedStream' => $selectedStream,
             'selectedStreamLabel' => $selectedStreamLabel,
             'filters' => ['academic_year' => $year, 'stream' => $selectedStream],
-            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
+            'academicYearOptions' => app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->activeOrPopulatedYearOptions((string) $this->sahodaya->id),
             'streamOptions' => $streams,
             'overall' => $overallRows,
             'byStream' => $byStream,
@@ -198,7 +205,7 @@ class SahodayaTopperController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/BoardResults/TopperResultsSubjectWise', [
             'filters' => ['academic_year' => $year],
-            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
+            'academicYearOptions' => app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->activeOrPopulatedYearOptions((string) $this->sahodaya->id),
             'subjectLeaders' => $subjectLeaders,
             'noRank' => app(TopperCountService::class)->isNoRankMode($this->sahodaya->id),
         ]);
@@ -232,7 +239,7 @@ class SahodayaTopperController extends SahodayaAdminController
             'selectedStream' => $selectedStream,
             'selectedStreamLabel' => $selectedStreamLabel,
             'filters' => ['academic_year' => $year, 'threshold' => rtrim(rtrim(number_format($threshold, 2), '0'), '.'), 'stream' => $selectedStream],
-            'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
+            'academicYearOptions' => app(\App\Services\BoardResults\BoardResultAcademicYearService::class)->activeOrPopulatedYearOptions((string) $this->sahodaya->id),
             'streamOptions' => $streams,
             'achieversOverall' => $achieversOverall,
             'achieversByStream' => $achieversByStream,

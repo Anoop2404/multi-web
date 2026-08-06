@@ -66,15 +66,27 @@ class McqCertificateService
         abort_unless($exam->results_published, 422, 'Publish results before generating certificates.');
 
         $count = 0;
+
+        // Pre-fetch which registrations already have a certificate in one query,
+        // instead of a McqCertificate::where(...)->exists() call per registration in
+        // the loop below — issue() itself already runs the equivalent check via
+        // first() right before creating, so the per-registration exists() here was a
+        // second, redundant query on top of that. See
+        // docs/N1_AND_REPORT_MEMORY_AUDIT_2026_08_03.md §8.
+        $existingRegistrationIds = McqCertificate::whereHas(
+            'registration',
+            fn ($q) => $q->where('exam_id', $exam->id),
+        )->pluck('registration_id')->flip();
+
         McqRegistration::where('exam_id', $exam->id)
             ->where('status', 'submitted')
             ->whereNotIn('attendance_status', McqRegistration::BLOCKING_ATTENDANCE_STATUSES)
             ->whereHas('mark')
             ->with(['exam', 'mark', 'student', 'teacher', 'school'])
-            ->chunkById(100, function ($regs) use (&$count) {
+            ->chunkById(100, function ($regs) use (&$count, $existingRegistrationIds) {
                 foreach ($regs as $registration) {
                     try {
-                        $before = McqCertificate::where('registration_id', $registration->id)->exists();
+                        $before = $existingRegistrationIds->has($registration->id);
                         $this->issue($registration);
                         if (! $before) {
                             $count++;

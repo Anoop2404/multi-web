@@ -36,9 +36,11 @@ class KalotsavProgramController extends SahodayaAdminController
                 'linked'              => filled($e->parent_event_id),
             ]);
 
+        // 'state' events are locked, read-only qualifier placeholders (see FestEvent::isEditableBySahodaya())
+        // — never a real round to link a school's event under. Excluded 2026-07-31.
         $parentEvents = FestEvent::forTenant($this->sahodaya->id)
             ->ofType('kalolsavam')
-            ->whereIn('level_round', ['sahodaya', 'state'])
+            ->where('level_round', 'sahodaya')
             ->whereIn('status', ['published', 'registration_open', 'ongoing', 'completed'])
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'level_round']);

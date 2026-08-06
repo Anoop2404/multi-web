@@ -60,15 +60,24 @@ class FestEventRegistrationService
         abort_if($student->tenant_id !== $school->id, 403);
         abort_if($school->parent_id !== $event->tenant_id, 403);
         $this->assertSchoolMembershipApproved($school);
-        abort_if($school->fest_registration_closed, 422, 'Fest registration is closed for your school.');
-        abort_if(! $this->isEventRegistrationOpen($event), 422, 'Event registration is closed.');
+        
+        if ($school->fest_registration_closed) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['registration' => 'Fest registration is closed for your school.']);
+        }
+        if (! $this->isEventRegistrationOpen($event)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['registration' => 'Event registration is closed.']);
+        }
 
         if ($event->event_type === 'sports') {
-            abort_if(! $student->dob, 422, 'Date of birth is required before sports event registration.');
+            if (! $student->dob) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['registration' => 'Date of birth is required before sports event registration.']);
+            }
 
             $verifyGate = app(\App\Services\Students\StudentVerificationGate::class);
             $verifyReason = $verifyGate->ineligibilityReason($student, $event);
-            abort_if($verifyReason !== null, 422, $verifyReason);
+            if ($verifyReason !== null) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['registration' => $verifyReason]);
+            }
         }
 
         $existing = FestLevelRegistration::where('event_id', $event->id)
