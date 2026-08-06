@@ -80,7 +80,7 @@ class FestRegistrationRouterService
         // assigned region. The on-stage/group split below belongs to the Kalotsav
         // region + common-finale topology and made most English Fest items resolve
         // to a non-existent finale item.
-        if ($hub->event_type === 'english_fest') {
+        if (in_array($hub->event_type, ['sports', 'english_fest', 'science_fest', 'kids_fest', 'teacher_fest'], true)) {
             return 'region';
         }
 

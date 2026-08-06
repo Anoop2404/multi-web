@@ -51,7 +51,7 @@
             Showing {{ visibleRows.length }} of {{ rows.length }} students
         </p>
 
-        <div class="overflow-x-auto max-h-[700px] min-h-[350px] overflow-y-auto bg-white">
+        <div class="overflow-x-auto min-h-[350px] bg-white">
             <table class="data-table w-full text-sm">
                 <thead class="sticky top-0 bg-slate-50 z-[1]">
                     <tr>
@@ -68,7 +68,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="row in visibleRows" :key="row.id" class="hover:bg-slate-50/80">
+                    <tr v-for="row in paginatedRows" :key="row.id" class="hover:bg-slate-50/80">
                         <td>
                             <input v-if="!row.registered && row.hasDob && (row.isVerified || !requireVerified)" type="checkbox"
                                    :checked="isSelected(row.id)"
@@ -78,9 +78,10 @@
                         </td>
                         <td class="font-medium">
                             <span class="font-mono text-xs text-indigo-800 mr-1.5">
-                                {{ row.school_number || row.reg_no || '—' }}<span v-if="row.admission_number" class="font-normal text-slate-400">&nbsp;({{ row.admission_number }})</span>
+                                {{ row.school_number || row.reg_no || '—' }}
                             </span>
-                            {{ row.displayName || row.name }}
+                            <span class="font-semibold text-slate-900">{{ row.name }}</span>
+                            <span v-if="row.admission_number" class="text-slate-500 font-normal text-xs ml-1.5">({{ row.admission_number }})</span>
                             <span v-if="row.registered && row.event_reg_number"
                                   class="ml-1.5 text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
                                 Fest ID {{ row.event_reg_number }}
@@ -115,6 +116,26 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div v-if="visibleRows.length > pageSize" class="px-4 py-2.5 bg-slate-50 border-t border-indigo-50 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <span class="text-slate-600 font-medium">
+                Showing <strong>{{ pageStart + 1 }}–{{ Math.min(pageEnd, visibleRows.length) }}</strong> of <strong>{{ visibleRows.length }}</strong> students
+            </span>
+            <div class="flex items-center gap-1.5">
+                <button type="button" class="px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 font-semibold disabled:opacity-40 shadow-sm transition"
+                        :disabled="currentPage === 1" @click="currentPage--">
+                    ← Previous
+                </button>
+                <span class="px-2 text-slate-600 font-semibold">
+                    Page {{ currentPage }} of {{ totalPages }}
+                </span>
+                <button type="button" class="px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 font-semibold disabled:opacity-40 shadow-sm transition"
+                        :disabled="currentPage >= totalPages" @click="currentPage++">
+                    Next →
+                </button>
+            </div>
         </div>
 
         <div v-if="registeredCount" class="px-4 py-3 text-xs border-t border-indigo-50 bg-rose-50/50 flex flex-col gap-1.5">
@@ -320,6 +341,18 @@ const hasActiveFilters = computed(() =>
     || !!ageFilter.value
     || showUnregisteredOnly.value,
 );
+
+const currentPage = ref(1);
+const pageSize = ref(30);
+
+watch([search, classFilter, ageFilter, showUnregisteredOnly], () => {
+    currentPage.value = 1;
+});
+
+const pageStart = computed(() => (currentPage.value - 1) * pageSize.value);
+const pageEnd = computed(() => currentPage.value * pageSize.value);
+const paginatedRows = computed(() => visibleRows.value.slice(pageStart.value, pageEnd.value));
+const totalPages = computed(() => Math.ceil(visibleRows.value.length / pageSize.value) || 1);
 
 function clearFilters() {
     search.value = '';

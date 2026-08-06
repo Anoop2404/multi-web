@@ -217,21 +217,32 @@ class ProgramHubDataService
                     ->whereIn('status', ['published', 'registration_open'])
                     ->where('registration_close', '>=', now())
                     ->orderBy('registration_close')
-                    ->get(['id', 'title', 'event_type', 'parent_event_id', 'conduct_mode', 'registration_close'])
+                    ->get(['id', 'title', 'event_type', 'parent_event_id', 'conduct_mode', 'cluster_label', 'registration_close'])
                     ->pipe(fn ($events) => app(FestSchoolPartitionService::class)->filterVisibleToSchool($events, $school->id))
                     ->take(5)
-                    ->map(fn ($e) => [
-                        'type'  => 'fest',
-                        'title' => $e->title,
-                        'date'  => $e->registration_close?->toDateString(),
-                        'url'   => '/school-admin/'.$school->id.'/'.ProgramRouteMap::prefixFromSlug(
-                            match ($e->event_type) {
-                                'kalolsavam' => 'kalotsav',
-                                'sports' => 'sports-meet',
-                                default => str_replace('_', '-', $e->event_type),
+                    ->map(function ($e) use ($school) {
+                        $displayTitle = $e->title;
+                        if ($e->parent_event_id) {
+                            $parentTitle = FestEvent::where('id', $e->parent_event_id)->value('title');
+                            if ($parentTitle) {
+                                $label = $e->cluster_label ?: \Illuminate\Support\Str::after($e->title, '— ');
+                                $displayTitle = "{$parentTitle} ({$label})";
                             }
-                        ).'/events/'.$e->id.'/registration',
-                    ])
+                        }
+
+                        return [
+                            'type'  => 'fest',
+                            'title' => $displayTitle,
+                            'date'  => $e->registration_close?->toDateString(),
+                            'url'   => '/school-admin/'.$school->id.'/'.ProgramRouteMap::prefixFromSlug(
+                                match ($e->event_type) {
+                                    'kalolsavam' => 'kalotsav',
+                                    'sports' => 'sports-meet',
+                                    default => str_replace('_', '-', $e->event_type),
+                                }
+                            ).'/events/'.$e->id.'/registration',
+                        ];
+                    })
             )
             ->sortBy('date')
             ->take(5)

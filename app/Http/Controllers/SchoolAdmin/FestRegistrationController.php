@@ -266,7 +266,9 @@ class FestRegistrationController extends SchoolAdminController
             $term = strtolower(trim((string) $search));
             $studentQuery->where(function ($q) use ($term) {
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
-                  ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"]);
+                  ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"])
+                  ->orWhereRaw('LOWER(admission_number) LIKE ?', ["%{$term}%"])
+                  ->orWhereRaw('LOWER(roll_number) LIKE ?', ["%{$term}%"]);
             });
         }
 

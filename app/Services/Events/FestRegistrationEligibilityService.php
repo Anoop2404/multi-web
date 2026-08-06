@@ -130,6 +130,8 @@ class FestRegistrationEligibilityService
                 'id' => $student->id,
                 'name' => $student->name,
                 'reg_no' => $student->reg_no,
+                'admission_number' => $student->admission_number,
+                'roll_number' => $student->roll_number,
                 'gender' => $student->gender,
                 'dob' => $student->dob?->toDateString() ?? $student->dob,
                 'academic_year_id' => $student->academic_year_id,
