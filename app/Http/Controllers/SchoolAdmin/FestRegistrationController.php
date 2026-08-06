@@ -21,6 +21,7 @@ use App\Services\Events\FestItemFeeResolver;
 use App\Services\Events\FestLevelRegistrationService;
 use App\Services\Events\FestPartitionService;
 use App\Services\Events\FestParticipationLimitService;
+use App\Services\Events\FestRegionPartitionService;
 use App\Services\Events\FestSchoolPartitionService;
 use App\Services\Events\FestRegistrationEligibilityService;
 use App\Services\Events\FestSchoolEventFeeService;
