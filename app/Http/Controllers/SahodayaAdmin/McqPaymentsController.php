@@ -126,7 +126,7 @@ class McqPaymentsController extends SahodayaAdminController
         abort_if($schoolFee->exam?->tenant_id !== $this->sahodaya->id, 403);
         abort_unless($schoolFee->feeReceipt?->file_path, 404);
 
-        return TenantStorage::response($schoolFee->feeReceipt->file_path);
+        return TenantStorage::downloadResponse($this->sahodaya, $schoolFee->feeReceipt->file_path);
     }
 
     /** @return array<string, mixed> */
