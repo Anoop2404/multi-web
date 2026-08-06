@@ -11,13 +11,30 @@ use Illuminate\Support\Collection;
  */
 class BoardResultMarksConfigService
 {
-    public function resolve(string $sahodayaId, int $class, ?int $streamId = null): int
+    /**
+     * When $academicYear is null (every pre-existing call site), only the global
+     * (academic_year IS NULL) row is eligible — unchanged from before the column existed.
+     * When a year is passed, a row explicit to that year is preferred, falling back to the
+     * global row if no year-specific override exists.
+     */
+    public function resolve(string $sahodayaId, int $class, ?int $streamId = null, ?string $academicYear = null): int
     {
-        return BoardResultMarksConfig::query()
+        $query = BoardResultMarksConfig::query()
             ->where('sahodaya_id', $sahodayaId)
             ->where('class', $class)
-            ->where('stream_id', $streamId)
-            ->value('total_marks') ?? BoardResultMarksConfig::DEFAULT_TOTAL_MARKS;
+            ->where('stream_id', $streamId);
+
+        if ($academicYear !== null) {
+            $query->where(function ($q) use ($academicYear) {
+                $q->where('academic_year', $academicYear)->orWhereNull('academic_year');
+            });
+        } else {
+            $query->whereNull('academic_year');
+        }
+
+        $config = $query->orderByRaw('academic_year is null')->first();
+
+        return $config?->total_marks ?? BoardResultMarksConfig::DEFAULT_TOTAL_MARKS;
     }
 
     /** @return Collection<int, BoardResultMarksConfig> */
@@ -26,10 +43,10 @@ class BoardResultMarksConfigService
         return BoardResultMarksConfig::query()->where('sahodaya_id', $sahodayaId)->get();
     }
 
-    public function upsert(string $sahodayaId, int $class, ?int $streamId, int $totalMarks): BoardResultMarksConfig
+    public function upsert(string $sahodayaId, int $class, ?int $streamId, int $totalMarks, ?string $academicYear = null): BoardResultMarksConfig
     {
         return BoardResultMarksConfig::updateOrCreate(
-            ['sahodaya_id' => $sahodayaId, 'class' => $class, 'stream_id' => $streamId],
+            ['sahodaya_id' => $sahodayaId, 'class' => $class, 'stream_id' => $streamId, 'academic_year' => $academicYear],
             ['total_marks' => $totalMarks],
         );
     }

@@ -76,16 +76,52 @@ class TopperCountService
         string $scope = TopperCountConfig::SCOPE_OVERALL,
         ?int $streamId = null,
         ?int $subjectId = null,
+        ?string $academicYear = null,
     ): int
     {
         [$scope, $streamId, $subjectId] = $this->effectiveScope($sahodayaId, $scope, $streamId, $subjectId);
 
+        $query = $this->scopedConfigQuery($sahodayaId, $class, $scope, $streamId, $subjectId, $academicYear);
+
+        $config = $query
+            ->orderByRaw('academic_year is null') // prefer year-specific override
+            ->orderByRaw('class is null') // prefer class-specific
+            ->orderByRaw('stream_id is null')
+            ->orderByRaw('subject_id is null')
+            ->first();
+
+        return max(1, (int) ($config?->top_n ?? self::DEFAULT_TOP_N));
+    }
+
+    /**
+     * Shared "which config row applies" query used by resolveCap/resolveTieMode/resolveRankStyle.
+     * When $academicYear is null (the default, matching every pre-existing call site), only the
+     * global (academic_year IS NULL) row is eligible — behavior is unchanged from before the
+     * academic_year column existed. When a year is passed, a row explicit to that year is
+     * preferred, falling back to the global row if no year-specific override exists.
+     */
+    private function scopedConfigQuery(
+        string $sahodayaId,
+        int $class,
+        string $scope,
+        ?int $streamId,
+        ?int $subjectId,
+        ?string $academicYear,
+    ) {
         $query = TopperCountConfig::query()
             ->where('sahodaya_id', $sahodayaId)
             ->where('scope', $scope)
             ->where(function ($q) use ($class) {
                 $q->where('class', $class)->orWhereNull('class');
             });
+
+        if ($academicYear !== null) {
+            $query->where(function ($q) use ($academicYear) {
+                $q->where('academic_year', $academicYear)->orWhereNull('academic_year');
+            });
+        } else {
+            $query->whereNull('academic_year');
+        }
 
         if ($scope === TopperCountConfig::SCOPE_STREAM && $streamId) {
             $query->where(function ($q) use ($streamId) {
@@ -97,13 +133,7 @@ class TopperCountService
             });
         }
 
-        $config = $query
-            ->orderByRaw('class is null') // prefer class-specific
-            ->orderByRaw('stream_id is null')
-            ->orderByRaw('subject_id is null')
-            ->first();
-
-        return max(1, (int) ($config?->top_n ?? self::DEFAULT_TOP_N));
+        return $query;
     }
 
     public function assertCanAdd(BoardResult $boardResult, string $sahodayaId, ?Topper $updating = null): void
@@ -130,6 +160,9 @@ class TopperCountService
     {
         $keys = [
             'sahodaya_id' => $sahodayaId,
+            // Omitted/null academic_year keeps writing the global row, exactly as before this
+            // column existed — callers must pass it explicitly to create/edit a per-year override.
+            'academic_year' => $data['academic_year'] ?? null,
             'class' => $data['class'] ?? null,
             'scope' => $data['scope'] ?? TopperCountConfig::SCOPE_OVERALL,
             'stream_id' => $data['stream_id'] ?? null,
@@ -164,28 +197,13 @@ class TopperCountService
         string $scope = TopperCountConfig::SCOPE_OVERALL,
         ?int $streamId = null,
         ?int $subjectId = null,
+        ?string $academicYear = null,
     ): string
     {
         [$scope, $streamId, $subjectId] = $this->effectiveScope($sahodayaId, $scope, $streamId, $subjectId);
 
-        $query = TopperCountConfig::query()
-            ->where('sahodaya_id', $sahodayaId)
-            ->where('scope', $scope)
-            ->where(function ($q) use ($class) {
-                $q->where('class', $class)->orWhereNull('class');
-            });
-
-        if ($scope === TopperCountConfig::SCOPE_STREAM && $streamId) {
-            $query->where(function ($q) use ($streamId) {
-                $q->where('stream_id', $streamId)->orWhereNull('stream_id');
-            });
-        } elseif ($scope === TopperCountConfig::SCOPE_SUBJECT && $subjectId) {
-            $query->where(function ($q) use ($subjectId) {
-                $q->where('subject_id', $subjectId)->orWhereNull('subject_id');
-            });
-        }
-
-        $config = $query
+        $config = $this->scopedConfigQuery($sahodayaId, $class, $scope, $streamId, $subjectId, $academicYear)
+            ->orderByRaw('academic_year is null')
             ->orderByRaw('class is null')
             ->orderByRaw('stream_id is null')
             ->orderByRaw('subject_id is null')
@@ -201,28 +219,13 @@ class TopperCountService
         string $scope = TopperCountConfig::SCOPE_OVERALL,
         ?int $streamId = null,
         ?int $subjectId = null,
+        ?string $academicYear = null,
     ): string
     {
         [$scope, $streamId, $subjectId] = $this->effectiveScope($sahodayaId, $scope, $streamId, $subjectId);
 
-        $query = TopperCountConfig::query()
-            ->where('sahodaya_id', $sahodayaId)
-            ->where('scope', $scope)
-            ->where(function ($q) use ($class) {
-                $q->where('class', $class)->orWhereNull('class');
-            });
-
-        if ($scope === TopperCountConfig::SCOPE_STREAM && $streamId) {
-            $query->where(function ($q) use ($streamId) {
-                $q->where('stream_id', $streamId)->orWhereNull('stream_id');
-            });
-        } elseif ($scope === TopperCountConfig::SCOPE_SUBJECT && $subjectId) {
-            $query->where(function ($q) use ($subjectId) {
-                $q->where('subject_id', $subjectId)->orWhereNull('subject_id');
-            });
-        }
-
-        $config = $query
+        $config = $this->scopedConfigQuery($sahodayaId, $class, $scope, $streamId, $subjectId, $academicYear)
+            ->orderByRaw('academic_year is null')
             ->orderByRaw('class is null')
             ->orderByRaw('stream_id is null')
             ->orderByRaw('subject_id is null')

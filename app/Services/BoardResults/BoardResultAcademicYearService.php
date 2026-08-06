@@ -30,13 +30,15 @@ class BoardResultAcademicYearService
             ->where('sahodaya_id', $sahodayaId)
             ->where(function ($query) {
                 $query->whereNotNull('board_entry_starts_at')
-                    ->orWhereNotNull('board_entry_ends_at');
+                    ->orWhereNotNull('board_entry_ends_at')
+                    ->orWhereNotNull('board_entry_enabled');
             })
             ->get([
                 'academic_year',
                 'academic_year_id',
                 'board_entry_starts_at',
                 'board_entry_ends_at',
+                'board_entry_enabled',
             ])
             ->keyBy('academic_year');
 
@@ -56,6 +58,7 @@ class BoardResultAcademicYearService
                     'status' => $record?->status,
                     'entry_status' => $entryStatus,
                     'entry_configured' => $window !== null,
+                    'board_entry_enabled' => $window?->board_entry_enabled,
                     'board_entry_starts_at' => $window?->board_entry_starts_at?->toDateString(),
                     'board_entry_ends_at' => $window?->board_entry_ends_at?->toDateString(),
                 ];
@@ -85,6 +88,21 @@ class BoardResultAcademicYearService
         $window = SahodayaRegistrationWindow::query()
             ->where('academic_year', $resolvedLabel)
             ->first();
+
+        // board_entry_enabled is only non-null once an admin has actually saved the new
+        // Board Results settings toggle for this year (see migration
+        // 2026_09_13_000003_add_board_entry_enabled_to_sahodaya_registration_windows).
+        // While it's null, behavior is exactly what it was before that toggle existed.
+        if ($window?->board_entry_enabled === false) {
+            throw ValidationException::withMessages([
+                'academic_year' => "Board result data entry is disabled for academic year {$resolvedLabel} by your Sahodaya admin.",
+            ]);
+        }
+
+        if ($window?->board_entry_enabled === true) {
+            $this->assertWithinWindow($resolvedLabel, $window);
+            return;
+        }
 
         $hasExplicitBoardWindow = $window
             && ($window->board_entry_starts_at || $window->board_entry_ends_at);
@@ -123,6 +141,10 @@ class BoardResultAcademicYearService
         ?AcademicYearRecord $record,
         ?SahodayaRegistrationWindow $window,
     ): string {
+        if ($window?->board_entry_enabled === false) {
+            return 'disabled';
+        }
+
         if ($window && ($window->board_entry_starts_at || $window->board_entry_ends_at)) {
             $now = now();
             if ($window->board_entry_starts_at && $now->lt($window->board_entry_starts_at->copy()->startOfDay())) {
@@ -160,7 +182,12 @@ class BoardResultAcademicYearService
     public function isResultWindowOpen(BoardResult $result): bool
     {
         $window = $this->windowForResult($result);
-        if ($window && ($window->board_entry_starts_at || $window->board_entry_ends_at)) {
+
+        if ($window?->board_entry_enabled === false) {
+            return false;
+        }
+
+        if ($window?->board_entry_enabled === true || ($window && ($window->board_entry_starts_at || $window->board_entry_ends_at))) {
             $now = now();
 
             return ! ($window->board_entry_starts_at && $now->lt($window->board_entry_starts_at->copy()->startOfDay()))
@@ -178,6 +205,10 @@ class BoardResultAcademicYearService
     {
         $window = $this->windowForResult($result);
         $now = now();
+
+        if ($window?->board_entry_enabled === false) {
+            return "Board result data entry is disabled for academic year {$result->academic_year} by your Sahodaya admin.";
+        }
 
         if ($window?->board_entry_starts_at && $now->lt($window->board_entry_starts_at->copy()->startOfDay())) {
             return 'Board result editing opens on '.$window->board_entry_starts_at->format('d M Y').'.';

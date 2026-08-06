@@ -27,6 +27,7 @@ class TopperCountConfig extends Model
 
     protected $fillable = [
         'sahodaya_id',
+        'academic_year',
         'class',
         'scope',
         'stream_id',

@@ -19,6 +19,7 @@ class BoardResultMarksConfig extends Model
 
     protected $fillable = [
         'sahodaya_id',
+        'academic_year',
         'class',
         'stream_id',
         'total_marks',

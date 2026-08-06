@@ -10,7 +10,10 @@
                     <button type="button" @click="setView('rank')" class="px-3 py-1.5" :class="!noRank ? 'bg-[#0f3d7a] text-white' : 'bg-white text-slate-600'">Rank</button>
                     <button type="button" @click="setView('percentage')" class="px-3 py-1.5" :class="noRank ? 'bg-[#0f3d7a] text-white' : 'bg-white text-slate-600'">Percentage</button>
                 </div>
-                <a :href="pdfHref" class="btn-primary text-xs flex items-center gap-1.5 font-bold print:hidden">
+                <button type="button" @click="showPdfPreview = true" class="btn-secondary text-xs flex items-center gap-1.5 font-bold print:hidden">
+                    <span>👁</span> Preview PDF
+                </button>
+                <a :href="pdfDownloadUrl" class="btn-primary text-xs flex items-center gap-1.5 font-bold print:hidden">
                     <span>📥</span> Download PDF Report
                 </a>
                 <button type="button" @click="printReport" class="btn-secondary text-sm font-bold flex items-center gap-1.5 print:hidden">
@@ -118,6 +121,13 @@
                 {{ flatRows.length ? 'No rows match your search.' : (selectedClass === 10 ? 'No eligible Class X toppers yet — schools must submit their board results with toppers first.' : 'No eligible Class XII toppers yet — schools must submit their board results with stream + toppers first.') }}
             </p>
         </div>
+
+        <PdfPreviewModal
+            :show="showPdfPreview"
+            :pdf-url="pdfPreviewUrl"
+            :title="`${pageTitle} — PDF Preview`"
+            @close="showPdfPreview = false"
+        />
     </SahodayaAdminLayout>
 </template>
 
@@ -126,6 +136,7 @@ import { Link, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import PdfPreviewModal from '@/Components/ui/PdfPreviewModal.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -175,10 +186,13 @@ function printReport() {
     window.print();
 }
 
-const pdfHref = computed(() => {
+const pdfPreviewUrl = computed(() => {
     const view = props.noRank ? 'percentage' : 'rank';
     return `/sahodaya-admin/${props.sahodaya.id}/board-results/reports/toppers/pdf?academic_year=${encodeURIComponent(props.filters.academic_year || '')}&view=${view}`;
 });
+// The PDF route streams inline (preview) by default — download=1 forces an actual attachment.
+const pdfDownloadUrl = computed(() => `${pdfPreviewUrl.value}&download=1`);
+const showPdfPreview = ref(false);
 
 // Preview the other mode for this one request — see TopperCountService::setNoRankOverride.
 // Doesn't touch the persisted sahodaya-wide no_rank setting on the Toppers settings hub.

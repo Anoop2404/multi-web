@@ -124,29 +124,16 @@
             </section>
         </div>
 
-        <section class="card mt-6">
-            <h2 class="font-semibold text-[#0f3d7a] mb-1">Marks settings — "out of" totals</h2>
-            <p class="text-xs text-slate-500 mb-4">
-                Locked per class/stream — schools can no longer type a different Total Marks value. Every topper's percentage is computed from this.
-            </p>
-            <form class="space-y-4" @submit.prevent="saveMarksConfig">
-                <div class="max-w-xs">
-                    <label class="text-xs font-semibold text-slate-700">Class X — out of</label>
-                    <input v-model.number="marksForm.class_x_total_marks" type="number" min="1" required class="form-input mt-1">
-                </div>
-
-                <div v-if="streams.length">
-                    <p class="text-xs font-semibold text-slate-700 mb-2">Class XII — out of, per stream</p>
-                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        <div v-for="s in streams" :key="s.id" class="border border-slate-200 rounded-lg p-3">
-                            <label class="text-xs text-slate-500">{{ s.label }}</label>
-                            <input v-model.number="marksForm.streams[s.id]" type="number" min="1" required class="form-input mt-1 text-sm">
-                        </div>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-primary text-sm">Save marks settings</button>
-            </form>
+        <section class="card mt-6 flex flex-wrap items-center justify-between gap-3 bg-amber-50/60 border-amber-100">
+            <div>
+                <h2 class="font-semibold text-[#0f3d7a] mb-1">Marks settings &amp; topper caps have moved</h2>
+                <p class="text-xs text-slate-600">
+                    "Out of" totals and Top-N/tie-break/rank-style settings are now per-academic-year, on the Board Results Settings page.
+                </p>
+            </div>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/settings`" class="btn-primary text-sm shrink-0">
+                Open Board Results Settings →
+            </Link>
         </section>
 
         <section class="card mt-6">
@@ -220,25 +207,6 @@ const apiSum = computed(() =>
 
 function saveApi() {
     router.put(`${base.value}/api-config`, { ...apiForm }, { preserveScroll: true });
-}
-
-// ── Marks Settings ("out of" totals, locked for schools) ────────────────
-const marksForm = reactive({
-    class_x_total_marks: props.classXTotalMarks ?? 500,
-    streams: {},
-});
-for (const s of props.streams ?? []) {
-    marksForm.streams[s.id] = props.streamTotalMarks?.[s.id] ?? 500;
-}
-
-function saveMarksConfig() {
-    router.put(`${base.value}/marks-config`, {
-        class_x_total_marks: marksForm.class_x_total_marks,
-        streams: Object.entries(marksForm.streams).map(([stream_id, total_marks]) => ({
-            stream_id: Number(stream_id),
-            total_marks,
-        })),
-    }, { preserveScroll: true });
 }
 
 // ── Board Subjects Master Form ───────────────────────────────────────────
