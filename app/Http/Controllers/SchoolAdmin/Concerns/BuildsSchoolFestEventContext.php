@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin\Concerns;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Services\Events\FestHeadItemNavigationService;
@@ -90,11 +91,16 @@ trait BuildsSchoolFestEventContext
             ->whereIn('status', FestRegistration::ACTIVE_STATUSES)
             ->count();
 
+        $eventIds = $event->reportableEventIds();
+
         return [
             'registrations' => $registrations,
             'fees_due' => (float) ($feeRow?->total_due ?? $schedule['amount'] ?? 0),
             'fee_status' => $feeRow?->status ?? 'none',
-            'items_enabled' => $event->items()->where('is_enabled', true)->count(),
+            'items_enabled' => \App\Models\FestEventItem::query()
+                ->whereIn('event_id', $eventIds)
+                ->where('is_enabled', true)
+                ->count(),
         ];
     }
 }

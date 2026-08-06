@@ -1,23 +1,26 @@
 <template>
     <nav class="flex flex-wrap gap-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/80 mb-5 overflow-x-auto shadow-inner"
          aria-label="School event registration steps">
-        <button v-for="step in steps" :key="step.key"
-                type="button"
-                :class="currentStep === step.key
-                    ? 'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold bg-slate-900 text-white shadow-sm transition whitespace-nowrap'
-                    : 'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/70 transition whitespace-nowrap'"
-                @click="onStepClick(step)">
+        <component
+            v-for="step in steps" :key="step.key"
+            :is="hasListener ? 'button' : 'a'"
+            :type="hasListener ? 'button' : undefined"
+            :href="hasListener ? undefined : step.href"
+            :class="currentStep === step.key
+                ? 'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold bg-slate-900 text-white shadow-sm transition whitespace-nowrap'
+                : 'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/70 transition whitespace-nowrap cursor-pointer'"
+            @click="hasListener ? onStepClick(step) : undefined">
             <span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold"
                   :class="currentStep === step.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'">
                 {{ step.num }}
             </span>
             <span>{{ step.label }}</span>
-        </button>
+        </component>
     </nav>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, getCurrentInstance } from 'vue';
 import { schoolEventBase } from '@/support/eventHeadNav.js';
 
 const props = defineProps({
@@ -29,6 +32,11 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['select-step']);
+
+// If a parent component listens to select-step, use emit (in-page tab switching).
+// Otherwise navigate via href (standalone overview page).
+const instance = getCurrentInstance();
+const hasListener = computed(() => !!(instance?.vnode?.props?.['onSelect-step']));
 
 const eventBase = computed(() => schoolEventBase(props.schoolId, props.programPrefix, props.eventId));
 
