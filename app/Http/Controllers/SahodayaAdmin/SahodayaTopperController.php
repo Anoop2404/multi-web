@@ -21,10 +21,9 @@ class SahodayaTopperController extends SahodayaAdminController
 {
     /**
      * Settings hub: Top-N / tie-mode config + recompute, plus links out to the three
-     * standalone report pages below. Deliberately doesn't compute any topper lists itself
-     * so it stays fast regardless of how many schools/toppers exist.
+     * standalone report pages below.
      */
-    public function index(Request $request)
+    public function index(Request $request, SahodayaTopperSelectionService $selection)
     {
         $year = $request->string('academic_year')->toString()
             ?: AcademicYear::forSahodaya($this->sahodaya->id);
@@ -36,19 +35,60 @@ class SahodayaTopperController extends SahodayaAdminController
         $selectedStream = $class === 12
             ? $this->resolveSelectedStreamCode($request, $streams)
             : null;
+        $selectedStreamLabel = $selectedStream ? ($streams[$selectedStream] ?? null) : null;
         $selectedSubjectId = $this->resolveSelectedSubjectId($request, $subjects);
 
         [$overallConfig, $streamConfigs, $subjectConfigs] = $this->loadConfigs($streams, $subjects, $class);
         $rankingSettings = TopperRankingSetting::forSahodaya($this->sahodaya->id);
 
+        $overallRows = $class === 10 ? $selection->overallForClassX($this->sahodaya->id, $year) : [];
+        $byStream = $class === 12 ? $selection->byStreamForClassXII($this->sahodaya->id, $year) : [];
+        $streamRows = $class === 12 && $selectedStreamLabel
+            ? ($byStream[$selectedStreamLabel] ?? [])
+            : $overallRows;
+
+        $schoolIds = \App\Models\Tenant::query()
+            ->where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->pluck('id')
+            ->all();
+
+        $counts = [
+            'full_a1' => \App\Models\Topper::query()
+                ->join('board_results as br', 'br.id', '=', 'toppers.board_result_id')
+                ->whereIn('br.tenant_id', $schoolIds)
+                ->where('toppers.entry_type', \App\Models\Topper::ENTRY_FULL_A1)
+                ->where('br.academic_year', $year)
+                ->count(),
+            'school_toppers' => \App\Models\BoardResult::query()
+                ->whereIn('tenant_id', $schoolIds)
+                ->where('academic_year', $year)
+                ->whereHas('toppers')
+                ->count(),
+            'total_toppers' => \App\Models\Topper::query()
+                ->join('board_results as br', 'br.id', '=', 'toppers.board_result_id')
+                ->whereIn('br.tenant_id', $schoolIds)
+                ->whereIn('toppers.entry_type', [\App\Models\Topper::ENTRY_OVERALL, \App\Models\Topper::ENTRY_SUBJECT])
+                ->where('br.academic_year', $year)
+                ->count(),
+            'schools_submitted' => \App\Models\BoardResult::query()
+                ->whereIn('tenant_id', $schoolIds)
+                ->where('academic_year', $year)
+                ->whereIn('status', [\App\Models\BoardResult::STATUS_SUBMITTED, \App\Models\BoardResult::STATUS_VERIFIED, \App\Models\BoardResult::STATUS_APPROVED, \App\Models\BoardResult::STATUS_PUBLISHED])
+                ->count(),
+        ];
+
         return $this->inertia('Sahodaya/BoardResults/Toppers', [
             'selectedClass' => $class,
             'selectedStream' => $selectedStream,
+            'selectedStreamLabel' => $selectedStreamLabel,
             'selectedSubjectId' => $selectedSubjectId,
-            'filters' => ['academic_year' => $year],
+            'filters' => ['academic_year' => $year, 'stream' => $selectedStream],
             'academicYearOptions' => AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label', 'status']),
             'streamOptions' => $streams,
             'subjectOptions' => $subjects,
+            'rows' => $streamRows,
+            'counts' => $counts,
             'settings' => [
                 'overall' => [
                     'top_n' => $overallConfig?->top_n ?? TopperCountService::DEFAULT_TOP_N,
@@ -58,9 +98,6 @@ class SahodayaTopperController extends SahodayaAdminController
                 'streams' => $streamConfigs,
                 'subjects' => $subjectConfigs,
             ],
-            // Sahodaya-wide toggles: use_common_ranking makes every stream/subject resolve
-            // its Top-N/tie-mode/rank-style from the single "overall" config above; no_rank
-            // drops rank numbers everywhere and just orders reports by percentage.
             'rankingSettings' => [
                 'use_common_ranking' => (bool) $rankingSettings->use_common_ranking,
                 'no_rank' => (bool) $rankingSettings->no_rank,

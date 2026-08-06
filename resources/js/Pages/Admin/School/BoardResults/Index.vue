@@ -121,6 +121,17 @@
                 </form>
             </div>
 
+            <!-- LOCKED ACADEMIC YEAR NOTICE -->
+            <div v-if="selectedAcademicYear && !isEntryWindowOpen" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-center gap-3 text-amber-900 print:hidden">
+                <span class="text-2xl">🔒</span>
+                <div>
+                    <h4 class="font-extrabold text-sm">Data Entry Closed for {{ selectedAcademicYear }}</h4>
+                    <p class="text-xs text-amber-800 mt-0.5">
+                        Board result submission and modifications are only permitted during the active academic year entry window set by Sahodaya Admin. Historical data is read-only.
+                    </p>
+                </div>
+            </div>
+
             <!-- MAIN WORKSPACE CARD -->
             <div v-if="selectedAcademicYear" class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden divide-y divide-gray-100">
                 <!-- Workspace Title Bar -->
@@ -594,8 +605,17 @@ function closeProofPreview() {
     proofPreview.value = null;
 }
 
-// ── Step 2: combined summary + toppers form ──────────────────────────────
+const activeYearOption = computed(() => {
+    return (props.academicYearOptions || []).find(ay => ay.label === props.selectedAcademicYear);
+});
+
+const isEntryWindowOpen = computed(() => {
+    if (!activeYearOption.value) return true;
+    return activeYearOption.value.entry_status === 'open';
+});
+
 const canEditActive = computed(() => {
+    if (!isEntryWindowOpen.value) return false;
     if (!props.activeResult) return true;
     // Prefer the server-provided context value which uses the model's isEditable()
     // (handles draft, rejected, AND recently-submitted results within the window).
