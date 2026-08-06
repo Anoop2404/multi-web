@@ -791,25 +791,36 @@ class FestReportService
         $orgName = e($sahodaya->name ?? 'SAHODAYA');
         $eventTitle = e($this->event->title);
         $generated = e(now()->format('d M Y, h:i A'));
+        // Mirrors the "sep"/item span in the preview's .event-context-bar
+        // (see fest.reports.attendance-sheet blade, lines ~274-280) so the
+        // event/item line matches what the on-screen preview shows.
         $itemLine = $singleItemName
-            ? '<div style="font-size:8px; font-weight:700; color:#475569; margin-top:2px; text-transform:uppercase;">'.e($singleItemName).'</div>'
+            ? ' <span style="color:#94a3b8; padding:0 4px;">&bull;</span> <span>'.e($singleItemName).'</span>'
             : '';
 
         $logoImg = $logo
             ? '<img src="'.e($logo).'" style="width:34px;height:34px;object-fit:contain;margin-right:10px;">'
             : '';
 
+        // Kept in sync by hand with partials/pdf-branding-header.blade.php +
+        // the .event-context-bar block in fest.reports.attendance-sheet —
+        // Chromium renders this template in isolation from the page's own
+        // stylesheet/partials, so it can't simply @include them.
         $header = <<<HTML
-            <div style="width:100%; font-family:Arial,sans-serif; padding:0 38px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid #0f172a; padding-bottom:7px;">
-                <div style="display:flex; align-items:center;">
-                    {$logoImg}
-                    <div>
-                        <div style="font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase;">{$orgName}</div>
-                        <div style="font-size:9px; font-weight:600; color:#334155; margin-top:3px;">{$eventTitle}</div>
-                        {$itemLine}
+            <div style="width:100%; font-family:Arial,sans-serif; padding:0 38px; box-sizing:border-box; border-bottom:2px solid #0f172a; padding-bottom:6px;">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <div style="display:flex; align-items:center;">
+                        {$logoImg}
+                        <div>
+                            <div style="font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase; letter-spacing:0.3px;">{$orgName}</div>
+                            <div style="font-size:8px; font-weight:600; color:#475569; margin-top:2px;">CBSE Sahodaya Inter-School Competitions &amp; Events</div>
+                        </div>
                     </div>
+                    <div style="background:#0f172a; color:#fff; padding:4px 10px; border-radius:4px; font-size:8px; font-weight:bold; letter-spacing:0.4px; white-space:nowrap;">ATTENDANCE SHEET</div>
                 </div>
-                <div style="background:#0f172a; color:#fff; padding:4px 10px; border-radius:4px; font-size:8px; font-weight:bold; letter-spacing:0.4px;">ATTENDANCE SHEET</div>
+                <div style="font-size:8px; color:#334155; margin-top:3px;">
+                    <span style="font-weight:bold; color:#0f172a;">{$eventTitle}</span>{$itemLine}
+                </div>
             </div>
             HTML;
 
