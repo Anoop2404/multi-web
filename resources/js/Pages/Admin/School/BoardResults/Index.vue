@@ -208,35 +208,98 @@
                         </div>
                     </div>
 
-                    <!-- SECTION 2: Proof Uploads -->
-                    <div>
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">2</span>
-                            <h3 class="font-bold text-gray-800 text-sm">Proof Document (PDF / DOC / Image)</h3>
+                    <!-- SECTION 2: Proof Upload & Verification Status -->
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center">2</span>
+                                <h3 class="font-bold text-gray-800 text-sm">CBSE Tabulation Sheet / Proof Document</h3>
+                            </div>
+                            <span v-if="activeResult?.status" class="text-xs px-2.5 py-0.5 rounded-full font-extrabold capitalize border" :class="statusClass(activeResult.status)">
+                                Status: {{ activeResult.status }}
+                            </span>
                         </div>
 
+                        <!-- Rejection Warning Banner if Rejected -->
+                        <div v-if="activeResult?.status === 'rejected' && activeResult.rejection_reason" class="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-800 flex items-start gap-3 shadow-xs">
+                            <span class="text-lg leading-none">⚠️</span>
+                            <div>
+                                <p class="font-bold text-red-900">Submission Rejected by Sahodaya Admin</p>
+                                <p class="mt-1 font-medium text-red-700">Reason: {{ activeResult.rejection_reason }}</p>
+                                <p class="mt-1.5 text-[11px] text-red-600 font-semibold">Please attach an updated tabulation sheet or corrected proof PDF below and resubmit.</p>
+                            </div>
+                        </div>
+
+                        <!-- Drag & Drop Upload Zone -->
                         <div class="grid sm:grid-cols-2 gap-4">
                             <div>
-                                <label class="form-label mb-1">CBSE Tabulation Sheet / Proof Document (Required for verification)</label>
-                                <div v-if="activeResult?.result_pdf_path" class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 mb-2 flex items-center justify-between shadow-xs">
-                                    <div class="flex items-center gap-2 text-xs font-semibold text-emerald-800 min-w-0">
-                                        <span>✓ Proof Attached</span>
-                                        <button type="button" class="underline text-indigo-600 hover:text-indigo-800 font-normal truncate text-left" @click="openProofPreview(activeResult)">
-                                            {{ activeProofLabel }}
+                                <label class="form-label mb-1 text-xs font-bold text-slate-700">Official CBSE Tabulation Sheet (Required)</label>
+
+                                <!-- File Preview Box if proof exists -->
+                                <div v-if="activeResult?.result_pdf_path || form.result_pdf" class="rounded-xl border border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 mb-3 shadow-sm">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div class="flex items-center gap-3 min-w-0">
+                                            <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-xs">
+                                                📄
+                                            </div>
+                                            <div class="min-w-0">
+                                                <p class="text-xs font-bold text-emerald-950 truncate">
+                                                    {{ form.result_pdf?.name || activeProofLabel }}
+                                                </p>
+                                                <p class="text-[11px] text-emerald-700 font-medium flex items-center gap-2 mt-0.5">
+                                                    <span>{{ form.result_pdf ? `${(form.result_pdf.size / (1024*1024)).toFixed(2)} MB (New file)` : activeProofTypeLabel }}</span>
+                                                    <span v-if="activeResult?.uploads?.length" class="bg-emerald-200 text-emerald-900 text-[10px] px-1.5 py-0.2 rounded font-extrabold">
+                                                        v{{ activeResult.uploads[0].version }}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <button v-if="activeResult?.result_pdf_path" type="button" class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition shadow-xs shrink-0" @click="openProofPreview(activeResult)">
+                                            👁 Preview PDF
                                         </button>
                                     </div>
-                                    <span class="text-[11px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-medium whitespace-nowrap">
-                                        {{ activeProofTypeLabel }}
-                                    </span>
                                 </div>
-                                <input type="file" accept="application/pdf,.doc,.docx,.xls,.xlsx,image/png,image/jpeg,image/jpg,image/webp" class="field text-sm bg-white" :disabled="!canEditActive" @change="form.result_pdf = $event.target.files[0]">
-                                <p class="text-[11px] text-gray-400 mt-1">Accepts PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, WEBP files up to 20MB.</p>
+
+                                <!-- Drag and Drop Box -->
+                                <div
+                                    class="border-2 border-dashed rounded-2xl p-5 text-center transition cursor-pointer"
+                                    :class="[
+                                        dragOver ? 'border-indigo-500 bg-indigo-50/80 scale-[0.99]' : 'border-indigo-200 bg-indigo-50/20 hover:bg-indigo-50/50 hover:border-indigo-400',
+                                        !canEditActive ? 'opacity-60 cursor-not-allowed' : ''
+                                    ]"
+                                    @dragover.prevent="dragOver = true"
+                                    @dragleave.prevent="dragOver = false"
+                                    @drop.prevent="handleDrop"
+                                    @click="triggerFileInput"
+                                >
+                                    <input ref="fileInputRef" type="file" accept="application/pdf,.doc,.docx,.xls,.xlsx,image/png,image/jpeg,image/jpg,image/webp" class="hidden" :disabled="!canEditActive" @change="onProofFileSelected">
+                                    <div class="w-10 h-10 mx-auto rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg mb-2 shadow-xs">
+                                        📥
+                                    </div>
+                                    <p class="text-xs font-bold text-slate-800">
+                                        {{ form.result_pdf ? 'Click or drag to replace proof document' : 'Click to select or drag & drop CBSE Tabulation Sheet' }}
+                                    </p>
+                                    <p class="text-[11px] text-slate-500 mt-1 font-medium">
+                                        Supports PDF, DOCX, XLSX, JPG, PNG up to 20MB
+                                    </p>
+                                </div>
                             </div>
+
                             <div>
-                                <label class="form-label mb-1">Additional Attachments (Word/Excel/Images)</label>
-                                <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,image/png,image/jpeg,image/jpg,image/webp" class="field text-sm bg-white" :disabled="!canEditActive"
-                                       @change="form.attachments = Array.from($event.target.files || [])">
-                                <p class="text-[11px] text-gray-400 mt-1">Optional additional sheets or summary docs.</p>
+                                <label class="form-label mb-1 text-xs font-bold text-slate-700">Additional Attachments (Optional)</label>
+                                <div class="border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-2xl p-5 text-center bg-slate-50/50 hover:bg-slate-50 transition cursor-pointer" @click="triggerExtraFiles">
+                                    <input ref="extraFilesRef" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,image/png,image/jpeg,image/jpg,image/webp" class="hidden" :disabled="!canEditActive" @change="form.attachments = Array.from($event.target.files || [])">
+                                    <div class="w-10 h-10 mx-auto rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-lg mb-2 shadow-xs">
+                                        📎
+                                    </div>
+                                    <p class="text-xs font-bold text-slate-800">
+                                        {{ form.attachments?.length ? `${form.attachments.length} additional file(s) selected` : 'Attach extra summary or breakdown sheets' }}
+                                    </p>
+                                    <p class="text-[11px] text-slate-500 mt-1 font-medium">
+                                        Optional supporting Excel or Word documents
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -470,6 +533,36 @@ const activeProofTypeLabel = computed(() => proofTypeLabelFor(props.activeResult
 const searchYear = ref(props.selectedAcademicYear ?? '');
 const searchClass = ref(props.selectedClass ? String(props.selectedClass) : '10');
 const searchStream = ref('science');
+
+const dragOver = ref(false);
+const fileInputRef = ref(null);
+const extraFilesRef = ref(null);
+
+function triggerFileInput() {
+    if (!canEditActive.value) return;
+    fileInputRef.value?.click();
+}
+
+function triggerExtraFiles() {
+    if (!canEditActive.value) return;
+    extraFilesRef.value?.click();
+}
+
+function onProofFileSelected(e) {
+    const file = e.target.files?.[0];
+    if (file) {
+        form.result_pdf = file;
+    }
+}
+
+function handleDrop(e) {
+    dragOver.value = false;
+    if (!canEditActive.value) return;
+    const file = e.dataTransfer?.files?.[0];
+    if (file) {
+        form.result_pdf = file;
+    }
+}
 
 function search() {
     router.get(`/school-admin/${props.school.id}/board-results`, {

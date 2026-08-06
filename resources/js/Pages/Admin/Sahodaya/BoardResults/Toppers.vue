@@ -14,6 +14,7 @@
             </template>
         </PageHeader>
 
+        <BoardResultsVerificationSubNav :sahodayaId="sahodaya.id" active="toppers" :currentClass="selectedClass" />
         <BoardResultsReportSubNav :sahodayaId="sahodaya.id" active="toppers" />
 
         <div class="flex flex-wrap items-center gap-3 mb-4">
@@ -229,6 +230,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
+import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
 
 const props = defineProps({
     sahodaya: Object,

@@ -6,6 +6,7 @@ use App\Models\Subject;
 use App\Services\BoardResults\AcademicExcellenceReportService;
 use App\Services\BoardResults\FullA1AchieversReportService;
 use App\Services\BoardResults\SahodayaTopperSelectionService;
+use App\Services\BoardResults\SchoolWiseToppersReportService;
 use App\Services\BoardResults\SubjectMeritRegisterService;
 use App\Services\BoardResults\TopperCountService;
 use App\Support\AcademicYear;
@@ -127,6 +128,13 @@ class BoardResultReportController extends SahodayaAdminController
                     'excelUrl' => "{$base}/reports/RPT-BRD-005/export?academic_year={$yearQ}&class=12&format=xlsx",
                 ],
                 [
+                    'key' => 'school-wise-toppers',
+                    'title' => 'School-Wise Toppers Register',
+                    'description' => "Each member school's own #1 topper, side by side — not the pooled Sahodaya-wide Top-N, so every school is represented (or flagged as not yet submitted).",
+                    'href' => "{$base}/board-results/reports/school-wise-toppers?academic_year={$yearQ}&class=10",
+                    'pdfUrl' => "{$base}/board-results/reports/school-wise-toppers/pdf?academic_year={$yearQ}&class=10",
+                ],
+                [
                     'key' => 'full-a1-achievers',
                     'title' => 'Full A1 Achievers — Class X & XII',
                     'description' => 'Students who scored A1 (91-100) in every subject entered, all streams.',
@@ -213,6 +221,63 @@ class BoardResultReportController extends SahodayaAdminController
             'streamOptions' => ['Science', 'Commerce', 'Humanities'],
             'academicYearOptions' => $academicYearOptions,
         ]);
+    }
+
+    /** "Each school has a topper" register — see SchoolWiseToppersReportService docblock. */
+    public function schoolWiseToppers(Request $request, SchoolWiseToppersReportService $service)
+    {
+        $year = $request->string('academic_year')->toString()
+            ?: AcademicYear::forSahodaya($this->sahodaya->id);
+        $class = $request->integer('class') ?: 10;
+        $stream = $request->filled('stream') ? $request->string('stream')->toString() : null;
+        $mode = $request->string('mode')->toString() ?: 'one_per_school';
+        abort_unless(in_array($class, [10, 12], true), 404);
+
+        $rows = $mode === 'all'
+            ? $service->listAllToppers($this->sahodaya->id, $year, $class, $stream)
+            : $service->list($this->sahodaya->id, $year, $class, $stream);
+
+        $academicYearOptions = \App\Models\AcademicYearRecord::orderByDesc('start_date')->get(['id', 'label']);
+
+        return $this->inertia('Sahodaya/BoardResults/SchoolWiseToppers', [
+            'rows' => $rows,
+            'filters' => [
+                'academic_year' => $year,
+                'class' => $class,
+                'stream' => $stream,
+                'mode' => $mode,
+            ],
+            'classOptions' => [10, 12],
+            'streamOptions' => ['Science', 'Commerce', 'Humanities'],
+            'academicYearOptions' => $academicYearOptions,
+        ]);
+    }
+
+    public function schoolWiseToppersPdf(Request $request, SchoolWiseToppersReportService $service)
+    {
+        $year = $request->string('academic_year')->toString()
+            ?: AcademicYear::forSahodaya($this->sahodaya->id);
+        $class = $request->integer('class') ?: 10;
+        abort_unless(in_array($class, [10, 12], true), 404);
+
+        $rows = $service->list($this->sahodaya->id, $year, $class);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('board-results.pdf.school-wise-toppers', [
+            'rows'          => $rows,
+            'academicYear'  => $year,
+            'selectedClass' => $class,
+            'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
+            'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'generatedAt'   => now()->format('d M Y · h:i A'),
+        ])->setPaper('a4', 'portrait');
+
+        $filename = "school-wise-toppers-class-{$class}-{$year}.pdf";
+
+        if ($request->boolean('download')) {
+            return $pdf->download($filename);
+        }
+
+        return $pdf->stream($filename);
     }
 
     public function excellence(Request $request, AcademicExcellenceReportService $service)

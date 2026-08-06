@@ -9,6 +9,8 @@
             </template>
         </PageHeader>
 
+        <BoardResultsVerificationSubNav :sahodayaId="sahodaya.id" active="overall" :currentClass="selectedClass" />
+
         <p v-if="selectedClass" class="text-sm -mt-2 mb-4">
             <Link :href="`/sahodaya-admin/${sahodaya.id}/board-results/verification?class=${selectedClass === 12 ? 10 : 12}&status=${filters.status}`" class="text-indigo-600 hover:underline font-medium">
                 Switch to {{ selectedClass === 12 ? 'Class X' : 'Class XII' }} →
@@ -259,6 +261,7 @@ import { Link, router } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
+import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
 
 const props = defineProps({
     sahodaya: Object,

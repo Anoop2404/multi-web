@@ -68,6 +68,7 @@
             </div>
         </div>
 
+        <BoardResultsVerificationSubNav :sahodayaId="sahodaya.id" active="full-a1" :currentClass="selectedClass" />
         <BoardResultsReportSubNav :sahodayaId="sahodaya.id" active="full-a1" />
 
         <!-- FILTER CONTROLS -->
@@ -269,6 +270,7 @@ import PdfPreviewModal from '@/Components/ui/PdfPreviewModal.vue';
 import SubjectMarksPreviewModal from '@/Components/BoardResults/SubjectMarksPreviewModal.vue';
 import StudentHistoryModal from '@/Components/BoardResults/StudentHistoryModal.vue';
 import BoardResultsReportSubNav from '@/Components/BoardResults/BoardResultsReportSubNav.vue';
+import BoardResultsVerificationSubNav from '@/Components/BoardResults/BoardResultsVerificationSubNav.vue';
 import { Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
