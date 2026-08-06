@@ -73,6 +73,8 @@ class BoardResultReportController extends SahodayaAdminController
             'schools_submitted' => $schoolsSubmittedCount,
         ];
 
+        $availableYears = AcademicYear::options();
+
         return $this->inertia('Sahodaya/BoardResults/Reports', [
             'filters' => [
                 'academic_year' => $year,
