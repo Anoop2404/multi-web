@@ -6,13 +6,15 @@ use App\Models\FestEvent;
 use App\Models\FestFoodMenuItem;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestFoodMenuSyncService;
+use App\Services\Events\FestPartitionService;
 use App\Support\FestPageActivity;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class FestFoodMenuController extends SahodayaAdminController
 {
-    public function index(string $tenantId, FestEvent $event)
+    public function index(string $tenantId, FestEvent $event, FestPartitionService $partitions)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
@@ -24,14 +26,35 @@ class FestFoodMenuController extends SahodayaAdminController
             ->get();
 
         return $this->inertia('Sahodaya/Events/FoodMenu', $this->withEventActivity($event, FestPageActivity::FOOD_MENU, [
-            'event' => $event->only('id', 'title', 'event_start', 'event_end', 'food_payee_type', 'food_host_school_id', 'conducting_school_id'),
+            'event' => $event->only('id', 'title', 'event_start', 'event_end', 'food_payee_type', 'food_host_school_id', 'conducting_school_id', 'require_payment_for_coupons'),
             'menuItems' => $items,
             'mealTypes' => $this->mealTypeOptions(),
             'schoolOptions' => Tenant::where('parent_id', $this->sahodaya->id)
                 ->where('type', 'school')
                 ->orderBy('name')
                 ->get(['id', 'name']),
+            'isPartitionedHub' => $partitions->isPartitionedHub($event),
         ]));
+    }
+
+    /**
+     * Copy this hub's menu items + payee settings onto every region partition child —
+     * additive/idempotent (FestFoodMenuSyncService never overwrites a region's own
+     * customizations). For hubs that add/edit menu items after regions already exist;
+     * spawn-time copying (FestPartitionService::spawnPartition()) covers new regions.
+     */
+    public function syncToRegions(string $tenantId, FestEvent $event, FestFoodMenuSyncService $sync, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->parent_event_id, 422, 'Sync the menu from the hub event, not a partition.');
+
+        $updated = $sync->copyMenuToAllPartitions($event);
+
+        $audit->festEvent($event, FestPageActivity::FOOD_MENU, 'fest.food_menu.synced_to_regions', 'Food menu applied to region partitions', [
+            'regions_updated' => count($updated),
+        ]);
+
+        return back()->with('success', count($updated).' region partition(s) updated with this menu.');
     }
 
     /** Which school (if any) food payments for this event are payable to. */
@@ -46,11 +69,13 @@ class FestFoodMenuController extends SahodayaAdminController
                 'nullable',
                 Rule::exists('tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
             ],
+            'require_payment_for_coupons' => ['nullable', 'boolean'],
         ]);
 
         $event->update([
             'food_payee_type' => $data['food_payee_type'],
             'food_host_school_id' => $data['food_payee_type'] === 'host_school' ? $data['food_host_school_id'] : null,
+            'require_payment_for_coupons' => $data['require_payment_for_coupons'] ?? $event->require_payment_for_coupons ?? false,
         ]);
 
         $audit->festEvent($event, FestPageActivity::FOOD_MENU, 'fest.food_menu.payee_updated', 'Food payment payee updated', [

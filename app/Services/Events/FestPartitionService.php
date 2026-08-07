@@ -2,7 +2,10 @@
 
 namespace App\Services\Events;
 
+use App\Models\FestCateringOrder;
 use App\Models\FestEvent;
+use App\Models\FestFoodBill;
+use App\Models\FestFoodCoupon;
 use App\Models\Tenant;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -207,6 +210,7 @@ class FestPartitionService
             'cluster_label' => $data['cluster_label'] ?? $data['title'] ?? ucfirst($key),
             'partition_key' => $key,
             'partition_role'=> $data['partition_role'] ?? 'region',
+            'region_id'     => $data['region_id'] ?? null,
             'venue'         => $data['venue'] ?? $hub->venue,
             'event_start'   => $data['event_start'] ?? $hub->event_start,
             'event_end'     => $data['event_end'] ?? $hub->event_end,
@@ -227,6 +231,18 @@ class FestPartitionService
         if ($hub->items()->exists()) {
             app(FestItemSyncService::class)->copyItemsToPartition($hub, $child, $data['partition_role'] ?? 'region');
         }
+
+        // Food menu replication only applies to region partitions — see
+        // docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.8 (Gap I).
+        if (($data['partition_role'] ?? 'region') === 'region' && $hub->foodMenuItems()->exists()) {
+            app(FestFoodMenuSyncService::class)->copyMenuToPartition($hub, $child);
+        }
+
+        // A region/cluster added after the hub already has fees configured should start
+        // with that configuration, not blank — see
+        // FestSchoolEventFeeService::propagateFeeSettingsToChildren(). No-op until the hub
+        // is actually conduct_mode = 'partitioned'.
+        app(FestSchoolEventFeeService::class)->propagateFeeSettingsToChildren($hub->fresh());
 
         return $child;
     }
@@ -283,6 +299,80 @@ class FestPartitionService
         return $this->spawnPartition($umbrella, array_merge($data, [
             'partition_role' => $data['partition_role'] ?? 'cluster',
         ]));
+    }
+
+    /**
+     * Hub-level food summary across all region partitions — same idea as combinedScoreboard(),
+     * but for food billing/catering/coupons, none of which aggregate across partitions on
+     * their own (each FestFoodBill/FestCateringOrder/FestFoodCoupon row is scoped to its own
+     * partition's event_id, with no hub-wide view). Without this, an admin had to open every
+     * region's own Food Menu/Billing page and add the numbers up by hand.
+     *
+     * See docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.9 (Gap J).
+     *
+     * @return array{
+     *     billing: array{total: float, paid: float, balance: float},
+     *     catering_head_count: int,
+     *     coupons: array{issued: int, redeemed: int},
+     *     by_region: list<array{region: string, total: float, paid: float, balance: float, head_count: int}>,
+     * }
+     */
+    public function combinedFoodSummary(FestEvent $hub): array
+    {
+        $regionPartitions = $this->partitions($hub)->filter(
+            fn (FestEvent $p) => $this->partitionRole($p) === 'region'
+        );
+
+        $billingTotal = 0.0;
+        $billingPaid = 0.0;
+        $cateringHeadCount = 0;
+        $couponsIssued = 0;
+        $couponsRedeemed = 0;
+        $byRegion = [];
+
+        foreach ($regionPartitions as $partition) {
+            $bills = FestFoodBill::where('event_id', $partition->id)
+                ->where('status', '!=', FestFoodBill::STATUS_CANCELLED)
+                ->get(['amount_total', 'amount_paid']);
+
+            $regionTotal = (float) $bills->sum('amount_total');
+            $regionPaid = (float) $bills->sum('amount_paid');
+
+            $regionHeadCount = (int) FestCateringOrder::where('event_id', $partition->id)
+                ->where('status', 'confirmed')
+                ->sum('head_count');
+
+            $issued = FestFoodCoupon::where('event_id', $partition->id)->count();
+            $redeemed = FestFoodCoupon::where('event_id', $partition->id)->where('status', 'redeemed')->count();
+
+            $billingTotal += $regionTotal;
+            $billingPaid += $regionPaid;
+            $cateringHeadCount += $regionHeadCount;
+            $couponsIssued += $issued;
+            $couponsRedeemed += $redeemed;
+
+            $byRegion[] = [
+                'region'     => $partition->cluster_label ?? $partition->title,
+                'total'      => round($regionTotal, 2),
+                'paid'       => round($regionPaid, 2),
+                'balance'    => round($regionTotal - $regionPaid, 2),
+                'head_count' => $regionHeadCount,
+            ];
+        }
+
+        return [
+            'billing' => [
+                'total'   => round($billingTotal, 2),
+                'paid'    => round($billingPaid, 2),
+                'balance' => round($billingTotal - $billingPaid, 2),
+            ],
+            'catering_head_count' => $cateringHeadCount,
+            'coupons' => [
+                'issued'   => $couponsIssued,
+                'redeemed' => $couponsRedeemed,
+            ],
+            'by_region' => $byRegion,
+        ];
     }
 
     /** @param array<string, int> $totals */

@@ -18,7 +18,53 @@
             {{ payeeNote }}
         </div>
 
-        <div class="grid grid-cols-3 gap-3 mb-4 max-w-lg">
+        <!-- Region-partitioned hub: bills live on each region's own event, this page's
+             own totals are empty by construction — show the cross-region rollup instead. -->
+        <div v-if="isPartitionedHub" class="rounded-xl border border-gray-200 bg-white p-4 mb-4">
+            <h3 class="font-bold text-sm mb-3">Combined across all regions</h3>
+            <div class="grid grid-cols-3 gap-3 max-w-lg mb-3">
+                <div class="card text-center">
+                    <p class="text-xl font-bold">₹{{ regionFoodSummary.billing.total.toFixed(2) }}</p>
+                    <p class="text-xs text-gray-500">Total billed</p>
+                </div>
+                <div class="card text-center">
+                    <p class="text-xl font-bold text-green-700">₹{{ regionFoodSummary.billing.paid.toFixed(2) }}</p>
+                    <p class="text-xs text-gray-500">Paid</p>
+                </div>
+                <div class="card text-center">
+                    <p class="text-xl font-bold" :class="regionFoodSummary.billing.balance > 0 ? 'text-amber-700' : 'text-gray-700'">₹{{ regionFoodSummary.billing.balance.toFixed(2) }}</p>
+                    <p class="text-xs text-gray-500">Balance due</p>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mb-3">
+                Catering headcount: {{ regionFoodSummary.catering_head_count }} ·
+                Coupons issued: {{ regionFoodSummary.coupons.issued }} ·
+                Redeemed: {{ regionFoodSummary.coupons.redeemed }}
+            </p>
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-left">
+                    <tr>
+                        <th class="p-2">Region</th>
+                        <th class="p-2">Total</th>
+                        <th class="p-2">Paid</th>
+                        <th class="p-2">Balance</th>
+                        <th class="p-2">Headcount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="r in regionFoodSummary.by_region" :key="r.region" class="border-t">
+                        <td class="p-2">{{ r.region }}</td>
+                        <td class="p-2">₹{{ r.total.toFixed(2) }}</td>
+                        <td class="p-2">₹{{ r.paid.toFixed(2) }}</td>
+                        <td class="p-2">₹{{ r.balance.toFixed(2) }}</td>
+                        <td class="p-2">{{ r.head_count }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="text-xs text-gray-400 mt-3">To manage an individual region's bills, open that region's own event page.</p>
+        </div>
+
+        <div v-else class="grid grid-cols-3 gap-3 mb-4 max-w-lg">
             <div class="card text-center">
                 <p class="text-xl font-bold">₹{{ summary.total.toFixed(2) }}</p>
                 <p class="text-xs text-gray-500">Total billed</p>
@@ -34,7 +80,7 @@
         </div>
 
         <!-- Open a bill for a school (e.g. before they've ordered, or a walk-in) -->
-        <form @submit.prevent="openBill" class="flex flex-wrap items-end gap-3 mb-6">
+        <form v-if="!isPartitionedHub" @submit.prevent="openBill" class="flex flex-wrap items-end gap-3 mb-6">
             <FormField label="Open/find bill for school" :error="openForm.errors.school_id">
                 <template #default="{ id }">
                     <select :id="id" v-model="openForm.school_id" class="field text-sm">
@@ -46,6 +92,7 @@
             <button type="submit" class="btn-secondary text-sm" :disabled="openForm.processing || !openForm.school_id">Open</button>
         </form>
 
+        <template v-if="!isPartitionedHub">
         <div class="flex flex-wrap gap-3 items-center mb-4">
             <input v-model="search" type="search" class="field flex-1 min-w-[12rem] max-w-sm text-sm"
                    placeholder="Search by school…" autocomplete="off">
@@ -96,6 +143,7 @@
                 </tbody>
             </table>
         </div>
+        </template>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>
@@ -114,6 +162,8 @@ const props = defineProps({
     summary: { type: Object, default: () => ({ total: 0, paid: 0, balance: 0 }) },
     schoolOptions: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
+    isPartitionedHub: { type: Boolean, default: false },
+    regionFoodSummary: { type: Object, default: null },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;

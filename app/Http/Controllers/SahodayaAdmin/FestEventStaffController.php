@@ -171,6 +171,18 @@ class FestEventStaffController extends SahodayaAdminController
         if ($user) {
             if ($data['duty'] === 'marks' && ! $user->hasRole('mark_entry_coordinator')) {
                 $user->assignRole('mark_entry_coordinator');
+            } elseif ($data['duty'] === 'region_admin') {
+                // Region coordinators must NOT receive the unscoped 'fest_ops' role — that grants
+                // full access to every event in the Sahodaya, defeating the point of "region" scoping.
+                // Access for this duty is enforced separately via EnsureSahodayaAdmin's region_admin
+                // branch, keyed off FestEventStaff.region_id for this exact (event, region) pair.
+                if (! $user->hasRole('region_admin')) {
+                    $user->assignRole('region_admin');
+                }
+                // Grant the write permissions this duty needs immediately, rather than waiting on
+                // the periodic `permissions:sync-staff` command — mark entry, ID cards, registrations,
+                // finance, food billing (see TenantUserCatalog::defaultPermissionsForRole()).
+                $user->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('region_admin'));
             } elseif ($data['duty'] !== 'marks' && ! $user->hasRole('fest_ops')) {
                 $user->assignRole('fest_ops');
             }

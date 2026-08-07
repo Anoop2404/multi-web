@@ -410,7 +410,10 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        $q = trim($request->query('q', ''));
+        // Cast: $request->query() returns whatever the client sends for this key, including an
+        // array (e.g. ?q[]=x), which would fatally TypeError trim(). This is a public,
+        // unauthenticated endpoint, so it must not trust the type of client input.
+        $q = trim((string) $request->query('q', ''));
 
         $results = collect();
         if (strlen($q) >= 1) {

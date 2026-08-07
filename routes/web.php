@@ -1060,6 +1060,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/leaderboard', [\App\Http\Controllers\SahodayaAdmin\FestLeaderboardHubController::class, 'index'])->name('leaderboard.index');
             Route::get('/{event}/food-coupons', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'index'])->name('food-coupons.index');
             Route::post('/{event}/food-coupons/issue', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'issueFromCatering'])->name('food-coupons.issue');
+            Route::post('/{event}/food-coupons/issue-from-bill', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'issueFromBill'])->name('food-coupons.issue-from-bill');
             Route::post('/{event}/food-coupons/{coupon}/redeem', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'redeem'])->name('food-coupons.redeem');
             Route::get('/{event}/food-coupons/print', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'print'])->name('food-coupons.print');
             Route::get('/{event}/food-menu', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'index'])->name('food-menu.index');
@@ -1067,6 +1068,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::put('/{event}/food-menu/{menuItem}', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'update'])->name('food-menu.update');
             Route::delete('/{event}/food-menu/{menuItem}', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'destroy'])->name('food-menu.destroy');
             Route::put('/{event}/food-menu-payee', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'updatePayee'])->name('food-menu.payee.update');
+            Route::post('/{event}/food-menu/sync-to-regions', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'syncToRegions'])->name('food-menu.sync-to-regions');
             Route::get('/{event}/food-billing', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'index'])->name('food-billing.index');
             Route::post('/{event}/food-billing', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'store'])->name('food-billing.store');
             Route::get('/{event}/food-billing/export', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'exportCsv'])->name('food-billing.export');

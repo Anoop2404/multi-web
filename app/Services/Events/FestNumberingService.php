@@ -35,27 +35,37 @@ class FestNumberingService
 
     public function nextEventRegNumber(FestEvent $event): string
     {
-        $settings = $this->settings($event);
-        $prefix = (string) ($settings['event_reg_prefix'] ?? '');
-        $start = (int) ($settings['event_reg_start'] ?? 1);
+        // Locked and transactional for the same reason as nextChestNumber() below: this is
+        // called both from live registration (already inside a FestEvent-locked transaction,
+        // where re-acquiring the lock here is a safe no-op) and from admin bulk-assign paths
+        // (FestLevelRegistrationService::backfillEvent()) that previously had no lock of their
+        // own, allowing them to race with a concurrent registration and hand out duplicate
+        // event registration numbers.
+        return DB::transaction(function () use ($event) {
+            FestEvent::where('id', $event->id)->lockForUpdate()->first();
 
-        $fromLevelRegs = FestLevelRegistration::where('event_id', $event->id)
-            ->pluck('registration_number')
-            ->map(fn (?string $num) => $this->parseSequence($num, $prefix));
+            $settings = $this->settings($event);
+            $prefix = (string) ($settings['event_reg_prefix'] ?? '');
+            $start = (int) ($settings['event_reg_start'] ?? 1);
 
-        $fromParticipants = FestParticipant::where('event_id', $event->id)
-            ->whereNotNull('level_registration_number')
-            ->pluck('level_registration_number')
-            ->map(fn (?string $num) => $this->parseSequence($num, $prefix));
+            $fromLevelRegs = FestLevelRegistration::where('event_id', $event->id)
+                ->pluck('registration_number')
+                ->map(fn (?string $num) => $this->parseSequence($num, $prefix));
 
-        $maxSeq = $fromLevelRegs->merge($fromParticipants)->max();
-        $next = max($start, ($maxSeq ?? 0) + 1);
+            $fromParticipants = FestParticipant::where('event_id', $event->id)
+                ->whereNotNull('level_registration_number')
+                ->pluck('level_registration_number')
+                ->map(fn (?string $num) => $this->parseSequence($num, $prefix));
 
-        if ($prefix === '') {
-            return (string) $next;
-        }
+            $maxSeq = $fromLevelRegs->merge($fromParticipants)->max();
+            $next = max($start, ($maxSeq ?? 0) + 1);
 
-        return $prefix.sprintf('%04d', $next);
+            if ($prefix === '') {
+                return (string) $next;
+            }
+
+            return $prefix.sprintf('%04d', $next);
+        });
     }
 
     public function chestHeadScope(FestEvent $event, FestEventItem $item): int
@@ -204,19 +214,27 @@ class FestNumberingService
 
     public function nextItemRegistrationNumber(FestEvent $event, FestEventItem $item): string
     {
-        $start = (int) ($item->item_reg_id_start ?? 1);
+        // See the comment on nextEventRegNumber() above — same fix, same reason: this used to
+        // read MAX(item_registration_number) with no lock, which was only race-safe when called
+        // from live registration (locked by the caller). assignMissingItemRegNumbers() (the
+        // admin "assign missing IDs" button) called it with no lock at all.
+        return DB::transaction(function () use ($event, $item) {
+            FestEvent::where('id', $event->id)->lockForUpdate()->first();
 
-        $maxSeq = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
-            ->where('item_id', $item->id))
-            ->whereNotNull('item_registration_number')
-            ->pluck('item_registration_number')
-            ->map(fn (?string $num) => $this->parseSequence($num, ''))
-            ->max();
+            $start = (int) ($item->item_reg_id_start ?? 1);
 
-        $next = max($start, ($maxSeq ?? 0) + 1);
+            $maxSeq = FestParticipant::whereHas('registration', fn ($q) => $q
+                ->where('event_id', $event->id)
+                ->where('item_id', $item->id))
+                ->whereNotNull('item_registration_number')
+                ->pluck('item_registration_number')
+                ->map(fn (?string $num) => $this->parseSequence($num, ''))
+                ->max();
 
-        return (string) $next;
+            $next = max($start, ($maxSeq ?? 0) + 1);
+
+            return (string) $next;
+        });
     }
 
     public function shouldAutoAssignChestOnCreate(FestEvent $event, FestEventItem $item): bool

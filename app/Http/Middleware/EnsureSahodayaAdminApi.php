@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\FestEvent;
 use App\Models\FestEventStaff;
 use App\Support\TenantUserCatalog;
 use Closure;
@@ -49,27 +50,70 @@ class EnsureSahodayaAdminApi
             }
         }
 
-        if ($user->hasRole('event_admin') && ! $user->hasRole('sahodaya_admin')) {
-            $allowedEventIds = FestEventStaff::query()
-                ->where('user_id', $user->id)
-                ->where('duty', 'event_admin')
-                ->pluck('event_id')
-                ->map(fn ($id) => (int) $id)
-                ->values()
-                ->all();
+        $hasEventAdmin = $user->hasRole('event_admin') && ! $user->hasRole('sahodaya_admin');
+        $hasRegionAdmin = $user->hasRole('region_admin') && ! $user->hasRole('sahodaya_admin');
+
+        if ($hasEventAdmin || $hasRegionAdmin) {
+            $allowedEventIds = [];
+            $allowedRegionScopes = [];
+
+            if ($hasEventAdmin) {
+                $allowedEventIds = FestEventStaff::query()
+                    ->where('user_id', $user->id)
+                    ->where('duty', 'event_admin')
+                    ->pluck('event_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all();
+            }
+
+            if ($hasRegionAdmin) {
+                $allowedRegionScopes = FestEventStaff::query()
+                    ->where('user_id', $user->id)
+                    ->where('duty', 'region_admin')
+                    ->get(['event_id', 'region_id'])
+                    ->map(fn ($row) => [
+                        'event_id'  => (int) $row->event_id,
+                        'region_id' => $row->region_id !== null ? (int) $row->region_id : null,
+                    ])
+                    ->values()
+                    ->all();
+            }
 
             $raw = $request->route('event');
             $requestedEventId = is_object($raw) ? ($raw->id ?? null) : (is_numeric($raw) ? (int) $raw : null);
+            $requestedEventId = $requestedEventId !== null ? (int) $requestedEventId : null;
 
-            if ($requestedEventId !== null && ! in_array((int) $requestedEventId, $allowedEventIds, true)) {
-                return response()->json(['message' => 'You are not assigned to this event.'], 403);
-            }
+            if ($requestedEventId !== null) {
+                $allowed = in_array($requestedEventId, $allowedEventIds, true);
 
-            if ($requestedEventId === null && ! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
-                return response()->json(['message' => 'Event admins can only modify their assigned events.'], 403);
+                if (! $allowed && $allowedRegionScopes !== []) {
+                    $requestedEvent = FestEvent::query()
+                        ->select(['id', 'parent_event_id', 'region_id'])
+                        ->find($requestedEventId);
+
+                    $allowed = $requestedEvent && collect($allowedRegionScopes)->contains(function (array $scope) use ($requestedEvent) {
+                        if ($scope['event_id'] === (int) $requestedEvent->id) {
+                            return true;
+                        }
+
+                        return $requestedEvent->parent_event_id
+                            && $scope['event_id'] === (int) $requestedEvent->parent_event_id
+                            && $scope['region_id'] !== null
+                            && $requestedEvent->region_id !== null
+                            && $scope['region_id'] === (int) $requestedEvent->region_id;
+                    });
+                }
+
+                if (! $allowed) {
+                    return response()->json(['message' => 'You are not assigned to this event.'], 403);
+                }
+            } elseif (! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
+                return response()->json(['message' => 'Event/region admins can only modify their assigned events.'], 403);
             }
 
             $request->attributes->set('eventAdminEventIds', $allowedEventIds);
+            $request->attributes->set('regionAdminScopes', $allowedRegionScopes);
         }
 
         return $next($request);

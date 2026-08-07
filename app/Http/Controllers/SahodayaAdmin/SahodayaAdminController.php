@@ -44,6 +44,43 @@ abstract class SahodayaAdminController extends Controller
         }
     }
 
+    /**
+     * Narrow a school-id list down to the current user's region(s), for controllers that
+     * aren't reached through an /events/{event} route (so EnsureSahodayaAdmin's per-event
+     * region_admin gate never runs) but still show school-level financial/operational data.
+     * A no-op (returns $schoolIds unchanged) for sahodaya_admin and any non-region-scoped
+     * staff — 'regionAdminScopes' is only ever set on the request when the current user
+     * actually holds the region_admin role without a broader admin role.
+     *
+     * See docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.4, Phase 3.
+     *
+     * @param  list<string>  $schoolIds
+     * @return list<string>
+     */
+    protected function regionScopedSchoolIds(array $schoolIds): array
+    {
+        $scopes = request()->attributes->get('regionAdminScopes');
+        if (empty($scopes)) {
+            return $schoolIds;
+        }
+
+        $regionIds = collect($scopes)->pluck('region_id')->filter()->unique()->values()->all();
+        if ($regionIds === []) {
+            // Assigned the region_admin duty but no region picked yet — fail closed, not open.
+            return [];
+        }
+
+        $year = \App\Support\AcademicYear::forSahodaya($this->sahodaya->id);
+
+        $regionSchoolIds = \App\Models\SchoolRegionAssignment::forTenant($this->sahodaya->id)
+            ->forYear($year)
+            ->whereIn('region_id', $regionIds)
+            ->pluck('school_id')
+            ->all();
+
+        return array_values(array_intersect($schoolIds, $regionSchoolIds));
+    }
+
     protected function inertia(string $component, array $props = [])
     {
         $props = $this->withFestNavContext($props);

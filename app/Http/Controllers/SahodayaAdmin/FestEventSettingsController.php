@@ -582,6 +582,14 @@ class FestEventSettingsController extends SahodayaAdminController
                 ]);
         }
 
+        // If this is a partitioned hub, cascade the fee configuration just saved (schedule,
+        // per-item overrides, per-head overrides, and — for sports — the composite fee
+        // columns) down onto every region/cluster child. See propagateFeeSettingsToChildren()
+        // for why this is needed: resolveSchedule() already redirects a child's schedule
+        // LOOKUP to the hub, but registrations actually price against each child's own
+        // FestEventItem/FestItemHead rows, which that read-side redirect never touches.
+        app(FestSchoolEventFeeService::class)->propagateFeeSettingsToChildren($event->fresh());
+
         app(PlatformAuditLogger::class)->festEvent(
             $event,
             FestPageActivity::settingsTab('fees'),

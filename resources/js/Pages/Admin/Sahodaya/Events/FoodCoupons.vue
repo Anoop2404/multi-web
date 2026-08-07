@@ -8,6 +8,9 @@
             <button @click="issueCoupons" class="btn-primary ml-auto">
                 Issue from confirmed catering
             </button>
+            <button @click="issueFromBill" class="btn-primary">
+                Issue from food billing
+            </button>
             <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-coupons/print`" target="_blank"
                class="px-4 py-2 border rounded-lg text-sm font-semibold">Print issued PDF</a>
         </div>
@@ -76,6 +79,9 @@ const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 
 function issueCoupons() {
     router.post(`${base}/food-coupons/issue`, {}, { preserveScroll: true });
+}
+function issueFromBill() {
+    router.post(`${base}/food-coupons/issue-from-bill`, {}, { preserveScroll: true });
 }
 function redeem(id) {
     router.post(`${base}/food-coupons/${id}/redeem`, {}, { preserveScroll: true });

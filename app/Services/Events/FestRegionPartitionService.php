@@ -194,11 +194,15 @@ class FestRegionPartitionService
                     'partition_key'  => $key,
                     'cluster_label'  => $region->name,
                     'partition_role' => 'region',
+                    'region_id'      => $region->id,
                 ]);
                 $created++;
             } else {
                 if (! str_contains($partition->title, $hub->title)) {
                     $partition->update(['title' => $expectedTitle]);
+                }
+                if ($partition->region_id !== $region->id) {
+                    $partition->update(['region_id' => $region->id]);
                 }
             }
 
@@ -206,8 +210,15 @@ class FestRegionPartitionService
             // catalogue import and older English Fest children that only received
             // off-stage individual items.
             app(FestItemSyncService::class)->copyItemsToPartition($hub, $partition, 'region');
+            app(FestFoodMenuSyncService::class)->copyMenuToPartition($hub, $partition);
             $this->inheritRegistrationLifecycle($hub, $partition);
         }
+
+        // Newly created regions (and any repaired above) need the hub's already-configured
+        // fee schedule, item-level overrides, and head overrides too — otherwise a region
+        // synced after fees were set on the hub starts out with none of them on its own
+        // rows (see FestSchoolEventFeeService::propagateFeeSettingsToChildren()).
+        app(FestSchoolEventFeeService::class)->propagateFeeSettingsToChildren($hub->fresh());
 
         $year = AcademicYear::forSahodaya($hub->tenant_id);
         $assignments = SchoolRegionAssignment::forTenant($hub->tenant_id)

@@ -9,6 +9,16 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * @deprecated Retired 06 Aug 2026 (docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.3, Phase 2).
+ * This was never registered on any route or middleware alias — confirmed dead code before this
+ * plan. Region-admin scoping is now handled by EnsureSahodayaAdmin's region_admin branch, keyed
+ * off FestEventStaff.region_id (per event, per region) rather than UserRegionAssignment
+ * (tenant-wide, never populated by any UI). Not deleted outright because files in the tracked
+ * workspace can't be removed by the tooling that made this change — safe to `git rm` this file
+ * and app/Models/UserRegionAssignment.php, and drop the user_region_assignments table via the
+ * migration in database/migrations/tenant/2026_09_14_000002_drop_user_region_assignments_table.php.
+ */
 class RegionScope
 {
     use RedirectsUnauthenticated;

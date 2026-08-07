@@ -172,8 +172,17 @@ class FestRegistrationCreateService
                     $groupId = $group->id;
                 }
 
+                // One query for the whole roster instead of one per student — performerIds and
+                // standbyIds are already deduped and disjoint (see array_diff/array_unique above),
+                // so the requested-id count and the matched-row count are directly comparable.
+                // Whole method still runs inside the outer DB::transaction, so this aborting still
+                // rolls back the registration/group rows created above exactly as the old
+                // per-student abort_if() did — same all-or-nothing behavior, fewer queries.
+                $rosterIds = array_merge($performerIds, $standbyIds);
+                $validRosterCount = Student::whereIn('id', $rosterIds)->where('tenant_id', $school->id)->count();
+                abort_if($validRosterCount !== count($rosterIds), 403);
+
                 foreach ($performerIds as $studentId) {
-                    abort_if(Student::where('id', $studentId)->where('tenant_id', $school->id)->doesntExist(), 403);
                     FestParticipant::create([
                         'registration_id'  => $registration->id,
                         'group_id'         => $groupId,
@@ -184,7 +193,6 @@ class FestRegistrationCreateService
                 }
 
                 foreach ($standbyIds as $studentId) {
-                    abort_if(Student::where('id', $studentId)->where('tenant_id', $school->id)->doesntExist(), 403);
                     FestParticipant::create([
                         'registration_id'  => $registration->id,
                         'group_id'         => $groupId,

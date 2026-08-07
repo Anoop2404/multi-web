@@ -6,6 +6,9 @@
 
         <div class="flex flex-wrap gap-2 mb-4">
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-billing`" class="text-sm text-indigo-600">Food Billing →</Link>
+            <button v-if="isPartitionedHub" @click="syncToRegions" class="btn-secondary text-sm ml-auto">
+                Apply menu to all regions
+            </button>
         </div>
 
         <!-- Payee settings -->
@@ -30,6 +33,10 @@
                         This event's conducting school is set — you can pick the same one here if that's who should be paid.
                     </p>
                 </div>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" v-model="payeeForm.require_payment_for_coupons">
+                    Only issue food coupons for settled (fully paid) bills
+                </label>
                 <button type="submit" class="btn-secondary text-sm" :disabled="payeeForm.processing">Save</button>
             </form>
         </div>
@@ -160,13 +167,19 @@ const props = defineProps({
     mealTypes: { type: Object, default: () => ({}) },
     schoolOptions: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
+    isPartitionedHub: { type: Boolean, default: false },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 
+function syncToRegions() {
+    router.post(`${base}/food-menu/sync-to-regions`, {}, { preserveScroll: true });
+}
+
 const payeeForm = useForm({
     food_payee_type: props.event.food_payee_type || 'sahodaya',
     food_host_school_id: props.event.food_host_school_id || '',
+    require_payment_for_coupons: props.event.require_payment_for_coupons || false,
 });
 function savePayee() {
     payeeForm.put(`${base}/food-menu-payee`, { preserveScroll: true });

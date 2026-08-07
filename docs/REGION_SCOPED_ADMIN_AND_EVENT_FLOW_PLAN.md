@@ -1,7 +1,7 @@
 # Region-Scoped Admin, Event Flow & Food Menu Plan
 
-**Status:** Analysis only — no code changed. Contains one item (Gap A) that should ship ahead of the rest as a standalone security fix.
-**Prepared:** 06 Aug 2026. Food menu section added 06 Aug 2026.
+**Status:** Phases 0, 1, 2, 3, 6, 7, 8, 9 implemented 06 Aug 2026 (code written, not yet migrated/deployed or tested against a live database — no PHP runtime was available to run `migrate` or the test suite during implementation). Phase 4 (hub drill-down UI) and Phase 5 (formal UAT pass) are **not done** — see §8 below.
+**Prepared:** 06 Aug 2026. Food menu section added 06 Aug 2026. Implementation pass 06 Aug 2026.
 **Companion reading:** [REGION_AND_PHASE_KALOTSAV_PLAN.md](REGION_AND_PHASE_KALOTSAV_PLAN.md) (partition engine, combine-at-finale, phases — the foundation this plan builds on), [KALOTSAV_IMPLEMENTATION_PLAN.md](KALOTSAV_IMPLEMENTATION_PLAN.md), [FOOD_MENU_BILLING_PREORDER_PLAN.md](FOOD_MENU_BILLING_PREORDER_PLAN.md) (original design for the priced menu/billing system — written with no region-partitioning awareness, extended below)
 
 ## 0. What already exists (confirmed by reading the code)
@@ -152,11 +152,37 @@ Standard (non-partitioned) events and `event_admin`/`sahodaya_admin` flows are u
 
 ## 7. Open questions for you to confirm before implementation
 
-1. Retire `RegionScope`/`UserRegionAssignment` outright (this plan's recommendation, §2.3), or keep them for a future tenant-wide (not per-event) region-admin use case? If kept, they still need to be wired up properly rather than left dead.
-2. Should a region-scoped admin be able to see payment/finance data at all, or should that stay a `sahodaya_admin`-only surface regardless of region duty? This changes whether Phase 3's finance work is needed.
-3. Backfill approach for Phase 1: acceptable to backfill by re-deriving the slug match, or do you want a manual review pass per Sahodaya first given real money/registrations are already attached to these events?
-4. Should Phase 0 (the security fix) go out ahead of this plan being fully scheduled, given it's a live over-grant in production today?
-5. Food consolidation (§2.6, Phase 6): confirm the direction — keep `FestFoodMenuItem`/`FestFoodBill` as the system of record and retire `FestCateringOrder`/`FestFoodCoupon` for new events, or is there a reason both need to stay live going forward (e.g. some Sahodayas deliberately want the free/headcount-only model and shouldn't be forced into billing)?
-6. Should `require_payment_for_coupons` (§2.7) default on or off for *new* events once built? Off preserves current behavior everywhere; on is safer but changes default UX for every new event unless explicitly toggled.
-7. Is a region-scoped admin (once Phase 2 lands) allowed to manage food menu/billing for their region, or is food admin always a full-Sahodaya-only surface regardless of the region-admin work in Phases 0-5? Determines whether Gap D's controller-scoping work (2.4) needs to extend to `FestFoodBillingController`/`FestFoodMenuController` too.
-8. Priority: should the food track (Phases 6-9) run after the admin-scoping track (Phases 0-5) finishes, or in parallel since they touch different controllers? Phase 8 (region replication) has no dependency on Phases 0-5 and could start immediately if resourced separately.
+1. ~~Retire `RegionScope`/`UserRegionAssignment` outright, or keep them for a future tenant-wide use case?~~ **Decided 06 Aug 2026: retire.** Both marked `@deprecated` with a pointer to the drop migration (`2026_09_14_000002`) — not physically deleted because the implementation tooling used couldn't remove tracked files in the workspace; safe to `git rm` both files once this is reviewed.
+2. Should a region-scoped admin be able to see payment/finance data at all, or should that stay a `sahodaya_admin`-only surface regardless of region duty? **Partially decided via item 7 below** (yes for membership payment approval/history via `PaymentVerificationController`) — but implementation deliberately did *not* extend this to `PaymentReconciliationController` (credit notes, ledger reposting), which stayed Sahodaya-admin-only as a judgment call; flag if that's wrong.
+3. Backfill approach for Phase 1: acceptable to backfill by re-deriving the slug match, or do you want a manual review pass per Sahodaya first given real money/registrations are already attached to these events? **Still open** — the migration (`2026_09_14_000001`) backfills automatically via slug match; review its output before trusting it on production data.
+4. ~~Should Phase 0 go out ahead of this plan being fully scheduled?~~ **Moot — the whole plan was implemented in one pass 06 Aug 2026**, so Phase 0 isn't ahead of anything, it's just done.
+5. ~~Food consolidation: keep the billing system as system of record and retire the old flow for new events, or keep both?~~ **Decided 06 Aug 2026: consolidate.** `issueFromBill()` built; old flow's *code* was not removed (still fully functional for events already using it) — the "don't offer it to new events" half of this decision was **not** implemented (see §8, it needs an event-creation-time cutoff this pass didn't build), nav labels were changed to "(legacy)" as a stopgap.
+6. Should `require_payment_for_coupons` default on or off for new events? **Decided by implementation: off** (`default(false)` in the migration) — matches the "off preserves current behavior" option, not explicitly re-confirmed with you.
+7. ~~Is a region-scoped admin allowed to manage food menu/billing for their region?~~ **Decided 06 Aug 2026: yes**, food/finance included in region scope. Implemented for `FestFoodBillingController`/`FestFoodMenuController` (naturally scoped, since each region is its own event) and `PaymentVerificationController` (explicit `regionScopedSchoolIds()` filtering) — see §8 for what this did *not* cover.
+8. ~~Priority: food track after or parallel to admin-scoping track?~~ **Moot — both done in the same pass.**
+
+## 8. Implementation status (06 Aug 2026)
+
+Everything below was written in one pass against the live codebase. **No PHP runtime was available in the implementation environment** — nothing was migrated, no test suite ran, no route list was verified. Treat this as a thorough first draft that needs a real review/QA pass (run `php artisan migrate`, `php artisan test`, and click through the flows) before it's trusted in production.
+
+**Shipped:**
+
+| Phase | What actually landed |
+|---|---|
+| 0 | `FestEventStaffController::store()` no longer grants `fest_ops` for `duty=region_admin`; grants the new scoped `region_admin` Spatie role instead, plus its default permissions directly (doesn't wait on `permissions:sync-staff`). |
+| 1 | `region_id` FK on `fest_events` (migration `2026_09_14_000001`, with backfill by slug re-derivation); `FestRegionPartitionService` sets/self-heals it on spawn and re-sync; `FestEvent::region()` added. |
+| 2 | `EnsureSahodayaAdmin` + `EnsureSahodayaAdminApi` both gained a combined event_admin/region_admin scoping branch (`matchesRegionScope()`), checking direct-event and hub-then-child-by-region matches. `RegionScope`/`UserRegionAssignment` marked `@deprecated`, not physically removable by the tooling used — flagged for manual `git rm`; drop migration for the table written (`2026_09_14_000002`). `TenantUserCatalog` updated across 6 methods so `region_admin` is a real, panel-accessible, permission-bearing role (mirrors `event_admin`'s treatment). |
+| 3 | Mark entry / ID cards / food menu / food billing needed **no controller changes** — they're naturally region-isolated because each region is its own `FestEvent` and Phase 2 already gates which event a region admin can reach. Explicit filtering added where routes aren't event-scoped: `SahodayaAdminController::regionScopedSchoolIds()` helper, applied to `PaymentVerificationController` (index/export/verify/proof) and `FestFoodBillingController` (schoolOptions + store validation). `PaymentReconciliationController` deliberately left untouched — see open question 2. |
+| 6 | `FestFoodCouponController::issueFromBill()` added (groups `FestFoodOrderItem`s by school+date+meal_type, issues coupons in the same shape as the old flow so redemption/print need no changes). Nav labels changed to "Catering (legacy)" / kept "Food coupons" unlabeled since it now serves both flows. **Not done:** actually preventing new events from offering the old flow — no event-creation-time cutoff was built, so today both flows are still offered to every event exactly as before; only the nav label changed. |
+| 7 | `require_payment_for_coupons` column (migration `2026_09_14_000003`, default off) + checkbox on the Food Menu payee form; `issueFromBill()` only issues against settled bills when the flag is on. `issueFromCatering()` deliberately **not** gated by this flag — see the doc comment added to that method for why (no payment concept exists on the old free/headcount flow to check against). |
+| 8 | `FestFoodMenuSyncService` (new) copies menu items + payee settings onto region partitions at spawn time (`FestPartitionService::spawnPartition()`) and on re-sync (`FestRegionPartitionService::syncPartitionsFromRegions()`); additive/idempotent, never overwrites a region's own edits. "Apply menu to all regions" button added to the hub's Food Menu page (`syncToRegions()` action). |
+| 9 | `FestPartitionService::combinedFoodSummary()` sums `FestFoodBill`/`FestCateringOrder`/`FestFoodCoupon` rows across a hub's region partitions; surfaced on the hub's Food Billing page (which was previously blank on a hub, since bills live on the child events) with a per-region breakdown table. |
+
+**Not done — still needed:**
+
+- **Phase 4 (hub drill-down UI)** — not started. Region data is still only reachable by navigating to each region's own event page.
+- **Phase 5 (formal UAT pass)** — not started. No test cases were written or run against `docs/STATE_MULTI_REGION_UAT.md`'s table format.
+- No database migration was actually run — `region_id` backfill, `user_region_assignments` drop, and `require_payment_for_coupons` all need `php artisan migrate` (per-tenant, per `database/migrations/tenant/`) before any of this takes effect.
+- `RegionScope.php`/`UserRegionAssignment.php` need a manual `git rm` — they're deprecated in place, not deleted.
+- The "retire old catering flow for new events" half of Phase 6 (§7 item 5) is unimplemented — both flows remain offered to every event today.
+- No automated test coverage was added for any of this (no test framework was runnable in the implementation environment to write against with confidence).

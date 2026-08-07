@@ -56,7 +56,7 @@ class FestAttendanceImportService
                     ->first();
             } elseif ($regNoIdx !== false && ! empty($row[$regNoIdx])) {
                 $participant = $lookup->resolveForEvent($event, [
-                    'reg_no'     => trim($row[$regNoIdx]),
+                    'reg_no'     => trim($row[$regNoIdx] ?? ''),
                     'item_id'    => $itemIdx !== false ? ($row[$itemIdx] ?: null) : null,
                     'item_title' => $itemTitleIdx !== false ? ($row[$itemTitleIdx] ?: null) : null,
                 ]);

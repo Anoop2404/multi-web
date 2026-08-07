@@ -24,7 +24,9 @@ class MembershipReportsController extends SahodayaAdminController
     {
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
         $tab = $request->query('tab', 'schools');
-        $search = trim($request->query('search', ''));
+        // Cast to string: $request->query() can return an array (?search[]=x), which would
+        // fatally TypeError trim().
+        $search = trim((string) $request->query('search', ''));
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
         $schoolIds = Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id');

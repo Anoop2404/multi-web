@@ -22,7 +22,7 @@ class PaymentVerificationController extends SahodayaAdminController
     public function index(Request $request)
     {
         $filters = $this->paymentListFilters($request);
-        $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
+        $schoolIds = $this->regionScopedSchoolIds(TenancyDatabase::schoolIdsFor($this->sahodaya->id));
         $year = AcademicYear::forSahodaya($this->sahodaya->id);
 
         $base = MembershipPayment::whereIn('school_id', $schoolIds)
@@ -76,7 +76,7 @@ class PaymentVerificationController extends SahodayaAdminController
     public function export(Request $request): StreamedResponse
     {
         $filters = $this->paymentListFilters($request);
-        $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
+        $schoolIds = $this->regionScopedSchoolIds(TenancyDatabase::schoolIdsFor($this->sahodaya->id));
 
         if ($filters['status'] === 'payment-due') {
             $year = AcademicYear::forSahodaya($this->sahodaya->id);
@@ -120,6 +120,7 @@ class PaymentVerificationController extends SahodayaAdminController
     public function verify(Request $request, string $tenantId, MembershipPayment $payment, MembershipNotifier $notifier, PlatformAuditLogger $audit)
     {
         abort_if($payment->school->parent_id !== $this->sahodaya->id, 403);
+        abort_if($this->regionScopedSchoolIds([$payment->school_id]) === [], 403, 'This school is outside your assigned region.');
         abort_unless($payment->status === 'submitted', 403);
 
         $data = $request->validate([
@@ -158,7 +159,7 @@ class PaymentVerificationController extends SahodayaAdminController
 
     public function proof(string $tenantId, string $paymentId, MembershipPaymentProofService $proofs)
     {
-        $schoolIds = TenancyDatabase::schoolIdsFor($this->sahodaya->id);
+        $schoolIds = $this->regionScopedSchoolIds(TenancyDatabase::schoolIdsFor($this->sahodaya->id));
 
         $payment = MembershipPayment::query()
             ->whereIn('school_id', $schoolIds)

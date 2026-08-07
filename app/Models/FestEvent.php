@@ -30,7 +30,7 @@ class FestEvent extends Model
         'tenant_id', 'academic_year_id', 'title', 'event_type', 'conductor_level',
         'conduct_levels', 'level_round', 'state_program_id', 'conducting_school_id',
         'is_cascaded', 'parent_event_id',         'cluster_key', 'cluster_label', 'cloned_from_event_id',
-        'conduct_mode', 'combine_regions_at_finale', 'partition_role', 'partition_key', 'aggregation_config', 'scoring_preset',
+        'conduct_mode', 'combine_regions_at_finale', 'partition_role', 'partition_key', 'region_id', 'aggregation_config', 'scoring_preset',
         'registration_open', 'registration_close', 'event_start', 'event_end', 'sports_age_cutoff_date', 'venue',
         'fee_type', 'fee_amount', 'fee_settings', 'numbering_settings', 'status', 'nav_hidden', 'results_published', 'description',
         'scoring_locked', 'appeals_open', 'chest_reveal_mode', 'require_judge_scores_before_publish',
@@ -50,7 +50,7 @@ class FestEvent extends Model
         'schedule_mode', 'competition_time',
         'notification_settings',
         'strict_item_payment_gating',
-        'food_payee_type', 'food_host_school_id',
+        'food_payee_type', 'food_host_school_id', 'require_payment_for_coupons',
     ];
 
     protected $attributes = [
@@ -74,6 +74,7 @@ class FestEvent extends Model
         'is_team_heading' => 'boolean',
         'strict_item_payment_gating' => 'boolean',
         'combine_regions_at_finale' => 'boolean',
+        'require_payment_for_coupons' => 'boolean',
         'conduct_levels' => 'array',
         'aggregation_config' => 'array',
         'notification_settings' => 'array',
@@ -197,6 +198,11 @@ class FestEvent extends Model
         return $this->hasMany(FestRegistration::class, 'event_id');
     }
 
+    public function foodMenuItems(): HasMany
+    {
+        return $this->hasMany(FestFoodMenuItem::class, 'event_id');
+    }
+
     public function results(): HasMany
     {
         return $this->hasMany(FestResult::class, 'event_id');
@@ -231,6 +237,16 @@ class FestEvent extends Model
     public function foodHostSchool(): BelongsTo
     {
         return $this->belongsToCentralTenant('food_host_school_id');
+    }
+
+    /**
+     * The membership Region this event is a partition of, when it's a region-sourced
+     * partition child (partition_role === 'region'). Null for hubs, non-region
+     * partitions (finale/cluster/digi_fest), and standard events.
+     */
+    public function region(): BelongsTo
+    {
+        return $this->belongsTo(Region::class, 'region_id');
     }
 
     public function scopeForTenant($q, string $tenantId)

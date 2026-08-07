@@ -191,6 +191,103 @@ class FestSchoolEventFeeService
         return $schedule;
     }
 
+    /**
+     * Push a partitioned hub's fee configuration down onto every one of its partition
+     * children (region/cluster/finale/sports_discipline).
+     *
+     * resolveSchedule() above already redirects a child's schedule LOOKUP up to the hub, so
+     * class-group/age-group/participant-type rates and the other schedule-level settings in
+     * fee_settings were already applying correctly. But that redirect never touches three
+     * other things schools' registrations actually reference on the CHILD's own rows: the
+     * child's own fee_settings column (left stale/empty), each region's own copy of
+     * FestEventItem (item-level fee_amount overrides — see FestItemSyncService::
+     * copyItemsToPartition(), every partition gets its own item rows), and each region's own
+     * FestItemHead rows. An admin setting a per-item or per-head fee override — or saving fee
+     * settings at all — on the hub therefore had no effect on any region a school actually
+     * registers and pays under. This makes a hub-level save apply everywhere, matching what
+     * admins expect from "Sahodaya applies settings across the parent event."
+     *
+     * Also recalculates (and persists) every already-registered school's FestSchoolEventFee
+     * on each child immediately — see the loop at the bottom — so this applies retroactively
+     * to schools that registered before the fee change, not just new registrations going
+     * forward. If a school was already fully paid and the new fee is higher, recalculate()'s
+     * existing demoteSiblingApprovals() safety net demotes their approved registrations back
+     * to 'submitted' until the difference is settled, exactly as it would for any other
+     * post-approval fee increase.
+     *
+     * No-op for anything that isn't a partitioned hub, or has no children yet. Deliberately
+     * one-directional (hub → children): editing fee settings on a CHILD event already takes
+     * effect for that child directly (it owns its own FestEventItem/FestItemHead rows), so
+     * there is nothing to redirect the other way.
+     */
+    public function propagateFeeSettingsToChildren(FestEvent $hub): void
+    {
+        if (($hub->conduct_mode ?? 'standard') !== 'partitioned') {
+            return;
+        }
+
+        $children = FestEvent::where('parent_event_id', $hub->id)->get();
+        if ($children->isEmpty()) {
+            return;
+        }
+
+        $hubItems = FestEventItem::where('event_id', $hub->id)->get(['id', 'fee_amount']);
+        $hubHeads = FestItemHead::where('event_id', $hub->id)->get();
+
+        $sportsColumns = [
+            'school_registration_fee', 'student_registration_fee', 'team_registration_fee',
+            'default_item_fee', 'extra_item_fee', 'included_items_per_student', 'included_teams',
+            'verification_policy', 'approval_policy', 'max_participants', 'max_teams',
+        ];
+
+        foreach ($children as $child) {
+            $child->update(['fee_settings' => $hub->fee_settings]);
+
+            if ($hub->event_type === 'sports') {
+                $child->update(array_intersect_key($hub->getAttributes(), array_flip($sportsColumns)));
+            }
+
+            foreach ($hubItems as $hubItem) {
+                FestEventItem::where('event_id', $child->id)
+                    ->where('inherited_from_item_id', $hubItem->id)
+                    ->update(['fee_amount' => $hubItem->fee_amount]);
+            }
+
+            foreach ($hubHeads as $hubHead) {
+                // Partition children don't link heads back to the hub's head row (no
+                // inherited_from_head_id column), so match by name — the same way titles
+                // are matched for region partitions elsewhere in this topology.
+                FestItemHead::where('event_id', $child->id)
+                    ->where('name', $hubHead->name)
+                    ->update([
+                        'default_item_fee' => $hubHead->default_item_fee,
+                        'extra_item_fee' => $hubHead->extra_item_fee,
+                        'school_registration_fee' => $hubHead->school_registration_fee,
+                        'student_registration_fee' => $hubHead->student_registration_fee,
+                        'team_registration_fee' => $hubHead->team_registration_fee,
+                        'included_items_per_student' => $hubHead->included_items_per_student,
+                        'included_teams' => $hubHead->included_teams,
+                        'verification_policy' => $hubHead->verification_policy,
+                        'approval_policy' => $hubHead->approval_policy,
+                        'max_participants' => $hubHead->max_participants,
+                        'max_teams' => $hubHead->max_teams,
+                    ]);
+            }
+
+            // Schools that already registered under this region shouldn't have to wait for
+            // their next payment-page visit to see the corrected amount — recalculate() is
+            // cheap, idempotent, and already has the "demote approved-but-now-underpaid
+            // registrations back to submitted" safety net built in (see
+            // demoteSiblingApprovals()), so it's safe to run eagerly here rather than leaving
+            // stale total_due sitting on every already-registered school's fee record.
+            FestRegistration::whereIn('event_id', $child->reportableEventIds())
+                ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
+                ->distinct()
+                ->pluck('school_id')
+                ->each(fn (string $schoolId) => $this->recalculate($child, $schoolId));
+        }
+    }
+
     /** Which fee configuration source is active for this event. */
     public function feeConfigSource(FestEvent $event): string
     {

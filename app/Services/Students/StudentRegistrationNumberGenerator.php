@@ -27,8 +27,12 @@ class StudentRegistrationNumberGenerator
             // Serialize allocation across the whole Sahodaya by locking the profile row.
             SahodayaProfile::where('tenant_id', $school->parent_id)->lockForUpdate()->first();
 
+            // Scoped to this year's base prefix (e.g. "STU/26/") instead of pulling every
+            // reg_no ever assigned across the whole Sahodaya's history — the unscoped version
+            // rescanned the full multi-year, multi-school history on every single call, making
+            // bulk import/backfill of N students effectively O(N x total-ever-students).
             $max = Student::whereIn('tenant_id', $schoolIds)
-                ->whereNotNull('reg_no')
+                ->where('reg_no', 'like', $base.'%')
                 ->pluck('reg_no')
                 ->map(fn (?string $value) => $this->parseSequenceForBase($value, $base))
                 ->max() ?? 0;

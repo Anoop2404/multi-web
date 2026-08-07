@@ -9,6 +9,7 @@ use App\Models\FestFoodOrderItem;
 use App\Models\FestFoodPayment;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestPartitionService;
 use App\Services\Exports\CsvExportDispatcher;
 use App\Support\FestPageActivity;
 use App\Support\TenantBranding;
@@ -18,7 +19,7 @@ use Illuminate\Validation\Rule;
 
 class FestFoodBillingController extends SahodayaAdminController
 {
-    public function index(string $tenantId, FestEvent $event)
+    public function index(string $tenantId, FestEvent $event, FestPartitionService $partitions)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
@@ -33,9 +34,17 @@ class FestFoodBillingController extends SahodayaAdminController
             ? Tenant::where('id', $event->food_host_school_id)->value('name')
             : null;
 
+        // On a partitioned hub, bills live on each region's own child event — this event's
+        // own row is empty by construction, so surface a cross-region rollup instead of
+        // an empty page. See docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.9 (Gap J).
+        $isPartitionedHub = $partitions->isPartitionedHub($event);
+        $regionFoodSummary = $isPartitionedHub ? $partitions->combinedFoodSummary($event) : null;
+
         return $this->inertia('Sahodaya/Events/FoodBilling', $this->withEventActivity($event, FestPageActivity::FOOD_BILLING, [
             'event' => $event->only('id', 'title', 'food_payee_type', 'food_host_school_id'),
             'hostSchoolName' => $hostSchoolName,
+            'isPartitionedHub' => $isPartitionedHub,
+            'regionFoodSummary' => $regionFoodSummary,
             'bills' => $bills->map(fn (FestFoodBill $b) => [
                 'id' => $b->id,
                 'school_id' => $b->school_id,
@@ -53,8 +62,9 @@ class FestFoodBillingController extends SahodayaAdminController
                 'paid' => (float) $bills->sum('amount_paid'),
                 'balance' => (float) $bills->sum(fn (FestFoodBill $b) => $b->balanceDue()),
             ],
-            'schoolOptions' => Tenant::where('parent_id', $this->sahodaya->id)
-                ->where('type', 'school')
+            'schoolOptions' => Tenant::whereIn('id', $this->regionScopedSchoolIds(
+                Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->pluck('id')->all()
+            ))
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]));
@@ -71,6 +81,8 @@ class FestFoodBillingController extends SahodayaAdminController
                 Rule::exists('tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
             ],
         ]);
+
+        abort_if($this->regionScopedSchoolIds([$data['school_id']]) === [], 403, 'This school is outside your assigned region.');
 
         $bill = FestFoodBill::firstOrCreateForSchool($event, $data['school_id']);
 

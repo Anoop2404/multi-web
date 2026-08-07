@@ -18,7 +18,9 @@ trait BuildsMembershipExports
     protected function schoolListFilters(Request $request): array
     {
         return [
-            'search'    => trim($request->query('search', '')),
+            // Cast to string: query('search') can return an array (?search[]=x), which would
+            // fatally TypeError trim().
+            'search'    => trim((string) $request->query('search', '')),
             'date_from' => $request->query('date_from'),
             'date_to'   => $request->query('date_to'),
             'sort'      => $request->query('sort', 'name'),
@@ -32,7 +34,7 @@ trait BuildsMembershipExports
         $status = $request->query('status', 'submitted');
 
         return [
-            'search'    => trim($request->query('search', '')),
+            'search'    => trim((string) $request->query('search', '')),
             'date_from' => $request->query('date_from'),
             'date_to'   => $request->query('date_to'),
             'status'    => in_array($status, ['submitted', 'verified', 'rejected', 'all', 'payment-due'], true) ? $status : 'submitted',

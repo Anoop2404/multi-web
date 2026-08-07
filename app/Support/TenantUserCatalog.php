@@ -25,6 +25,7 @@ class TenantUserCatalog
             'fest_ops',
             'school_principal',
             'event_admin',
+            'region_admin',
         ];
     }
 
@@ -140,6 +141,7 @@ class TenantUserCatalog
             'group_admin'              => 'Class / group admin',
             'house_admin'              => 'House admin (intra-school)',
             'event_admin'              => 'Event admin (full control, assigned events only)',
+            'region_admin'             => 'Region admin (assigned event, one region only)',
         ];
     }
 
@@ -168,6 +170,7 @@ class TenantUserCatalog
             'fest_ops'                 => 'One operational duty (registration desk, stage, food, etc.) for a single event you assign — narrow, task-based access.',
             'school_principal'         => 'Full school-admin access, can create/manage other school users.',
             'event_admin'              => 'Full sahodaya-admin control (items, fees, registrations, results, settings) but locked to only the events you tick below.',
+            'region_admin'             => 'Mark entry, ID cards, registrations, finance, and food billing — locked to one region within one event. Assign via that event\'s Event Staff page, not here.',
         ];
     }
 
@@ -182,7 +185,7 @@ class TenantUserCatalog
         return [
             'General'            => ['sahodaya_staff', 'school_principal'],
             'Registration & finance' => ['registration_coordinator', 'sahodaya_finance', 'certificate_collector', 'data_entry'],
-            'Event roles'        => ['event_coordinator', 'fest_ops', 'event_admin', 'judge'],
+            'Event roles'        => ['event_coordinator', 'fest_ops', 'event_admin', 'region_admin', 'judge'],
             'Exams & training'   => ['training_admin', 'mark_entry_admin', 'mark_entry_coordinator', 'exam_controller', 'exam_staff'],
         ];
     }
@@ -295,6 +298,7 @@ class TenantUserCatalog
             'event_coordinator',
             'mark_entry_admin',
             'event_admin',
+            'region_admin',
             'training_admin',
         ];
     }
@@ -345,6 +349,14 @@ class TenantUserCatalog
                 'fest.view', 'fest.manage', 'fest.marks', 'fest.registrations',
                 'fest.results', 'fest.finance', 'fest.settings', 'fest.catering',
                 'fest.schedule', 'fest.certificates',
+            ],
+            // Region admin is deliberately narrower than event_admin: mark entry, ID cards,
+            // registrations, finance, and food billing — no schedule/settings/certificates.
+            // 'fest.manage' is required because id-cards/food-menu/food-billing paths don't
+            // have a dedicated permission and fall through to it in writePermissionForPath().
+            'region_admin'             => [
+                'fest.view', 'fest.manage', 'fest.marks', 'fest.registrations',
+                'fest.finance', 'fest.catering',
             ],
             default                    => [],
         };

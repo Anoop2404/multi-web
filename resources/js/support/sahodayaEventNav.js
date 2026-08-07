@@ -163,9 +163,14 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         adminItems.push({ label: 'Houses', href: `${base}/houses`, icon: 'building', permissions: FEST_MANAGE });
     }
     if (caps.catering) {
-        adminItems.push({ label: 'Catering', href: `${base}/catering`, icon: 'clipboard', permissions: FEST_CATERING });
+        // "(legacy)" — free headcount-only flow, superseded by Food menu/Food billing below.
+        // Kept for events already using it; not offered to new events. See
+        // docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.6.
+        adminItems.push({ label: 'Catering (legacy)', href: `${base}/catering`, icon: 'clipboard', permissions: FEST_CATERING });
     }
     if (caps.foodCoupons) {
+        // Not "(legacy)" — this page now issues from either the old catering flow or the
+        // new food-billing flow (issueFromBill()), and is the shared redemption/print UI.
         adminItems.push({ label: 'Food coupons', href: `${base}/food-coupons`, icon: 'hash', permissions: FEST_CATERING });
     }
     adminItems.push(
