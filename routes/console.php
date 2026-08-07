@@ -9,6 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('board-results:upload-reminders')->weeklyOn(1, '09:30')->withoutOverlapping();
+Schedule::command('board-results:principal-verification-reminders')->weeklyOn(1, '09:45')->withoutOverlapping();
 Schedule::command('fest:registration-reminders')->dailyAt('09:00')->withoutOverlapping();
 Schedule::command('fest:competition-reminders')->dailyAt('09:05')->withoutOverlapping();
 Schedule::command('fest:payment-reminders')->dailyAt('10:00')->withoutOverlapping();

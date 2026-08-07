@@ -460,13 +460,18 @@ class FestEventOpsController extends Controller
         abort_if($event->tenant_id !== $tenantId, 403);
         $this->authorizeDuty($request, $event->id, 'attendance');
 
+        // Region/season hub: registrations and attendance actually live under child
+        // events — filtering by event_id alone would silently show nothing when this
+        // duty is assigned at the hub. Mirrors SahodayaAdmin\FestAttendanceController.
+        $eventIds = $event->reportableEventIds();
+
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $eventIds)
             ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->with(['registration.item', 'student', 'teacher'])
             ->get();
 
-        $attendance = FestAttendance::where('event_id', $event->id)
+        $attendance = FestAttendance::whereIn('event_id', $eventIds)
             ->get()
             ->keyBy(fn ($a) => $a->item_id.'-'.$a->participant_id);
 
@@ -494,6 +499,15 @@ class FestEventOpsController extends Controller
             'participant_id' => 'required|exists:fest_participants,id',
             'status'         => 'required|in:present,absent',
         ]);
+
+        // Cross-scope validation: verify the participant belongs to this event (or one
+        // of its region/child events) and item — same check as
+        // SahodayaAdmin\FestAttendanceController::store(), needed here now that reads
+        // above are region-aware too (a hub-scoped duty should not be able to mark
+        // attendance for a participant under an unrelated event).
+        $participant = FestParticipant::with('registration')->findOrFail($data['participant_id']);
+        abort_if(! in_array($participant->registration->event_id, $event->reportableEventIds(), true), 422, 'Participant does not belong to this event.');
+        abort_if($participant->registration->item_id !== (int) $data['item_id'], 422, 'Participant does not belong to this item.');
 
         FestAttendance::updateOrCreate(
             ['item_id' => $data['item_id'], 'participant_id' => $data['participant_id']],
@@ -603,7 +617,7 @@ class FestEventOpsController extends Controller
             $headContext['selectedItemId'],
         );
 
-        $attendance = FestAttendance::where('event_id', $event->id)
+        $attendance = FestAttendance::whereIn('event_id', $event->reportableEventIds())
             ->get()
             ->mapWithKeys(fn (FestAttendance $row) => [
                 "{$row->item_id}-{$row->participant_id}" => ['status' => $row->status],

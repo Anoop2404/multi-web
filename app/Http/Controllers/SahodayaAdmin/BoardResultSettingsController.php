@@ -78,6 +78,10 @@ class BoardResultSettingsController extends SahodayaAdminController
                 'starts_at' => $window?->board_entry_starts_at?->toDateString(),
                 'ends_at' => $window?->board_entry_ends_at?->toDateString(),
             ],
+            // Principal Verification go-live gating — plan §13 Phase 5. Null = not yet
+            // opted in (direct submission stays allowed for this year unless a school
+            // already started the new workflow, per the package-presence gate in code).
+            'certificationRequired' => $window?->certification_required,
             'streams' => $streams,
             'classXTotalMarks' => $classXConfig?->total_marks ?? BoardResultMarksConfig::DEFAULT_TOTAL_MARKS,
             'classXIsYearSpecific' => $classXYearRow !== null,
@@ -132,6 +136,45 @@ class BoardResultSettingsController extends SahodayaAdminController
         return back()->with('success', $data['enabled']
             ? 'Board result data entry window saved and enabled for '.$data['academic_year'].'.'
             : 'Board result data entry disabled for '.$data['academic_year'].'.');
+    }
+
+    /**
+     * Go-live toggle for mandatory Principal Verification — plan §13 Phase 5. Recommended
+     * to enable only after Principal/Vice Principal accounts have been verified for the
+     * school population, per the plan's rollout guidance.
+     */
+    public function updateCertificationRequired(Request $request)
+    {
+        $data = $request->validate([
+            'academic_year' => 'required|string|max:10',
+            'required' => 'required|boolean',
+        ]);
+
+        $existing = SahodayaRegistrationWindow::query()
+            ->where('sahodaya_id', $this->sahodaya->id)
+            ->where('academic_year', $data['academic_year'])
+            ->first();
+
+        SahodayaRegistrationWindow::updateOrCreate(
+            ['sahodaya_id' => $this->sahodaya->id, 'academic_year' => $data['academic_year']],
+            [
+                'academic_year_id' => AcademicYear::recordIdForLabel($data['academic_year']),
+                'certification_required' => $data['required'],
+                'board_entry_enabled' => $existing?->board_entry_enabled,
+                'board_entry_starts_at' => $existing?->board_entry_starts_at,
+                'board_entry_ends_at' => $existing?->board_entry_ends_at,
+                'add_open' => $existing?->add_open,
+                'add_close' => $existing?->add_close,
+                'edit_open' => $existing?->edit_open,
+                'edit_close' => $existing?->edit_close,
+                'registration_starts_at' => $existing?->registration_starts_at,
+                'registration_ends_at' => $existing?->registration_ends_at,
+            ],
+        );
+
+        return back()->with('success', $data['required']
+            ? 'Principal Verification is now mandatory for '.$data['academic_year'].'.'
+            : 'Principal Verification is no longer mandatory for '.$data['academic_year'].'.');
     }
 
     public function updateMarksConfig(Request $request, BoardResultMarksConfigService $marksConfig)

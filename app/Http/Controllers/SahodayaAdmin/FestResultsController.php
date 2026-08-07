@@ -198,14 +198,33 @@ class FestResultsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        // Verifies (across every region/finale child too, not just the hub itself — see
+        // EventLifecycleGate::assertAllParticipantsMarked() and FestJudgeGateService::
+        // assertCanPublish()) that marking is actually complete before a hub-level publish
+        // is allowed to proceed. Phase 3 audit item 1.
         EventLifecycleGate::allowPublishResults($event);
 
-        EventContext::for($event)->recalculateSchoolPoints();
+        // A partitioned hub's marks (and therefore its FestResult school-points rows)
+        // live on its region/finale children, never the hub's own event_id — recalculating
+        // only $event left every child's FestResult stale as of this publish. Recompute
+        // each reportable event (a no-op loop of one for a non-hub event).
+        foreach (\App\Models\FestEvent::whereIn('id', $event->reportableEventIds())->get() as $scopeEvent) {
+            EventContext::for($scopeEvent)->recalculateSchoolPoints();
+        }
 
         $event->update([
             'results_published' => true,
             'status'            => 'completed',
         ]);
+
+        // Cascade to region AND finale/cluster children — a hub-level "Publish Results"
+        // represents the whole fest being final, so finale (which the region-only default
+        // deliberately excludes for registration/lock fields) needs to move with it too.
+        // See FestRegionPartitionService::cascadeLifecycleToChildren()'s $includeFinale doc.
+        app(\App\Services\Events\FestRegionPartitionService::class)->cascadeLifecycleToChildren($event, [
+            'results_published' => true,
+            'status'            => 'completed',
+        ], includeFinale: true);
 
         app(\App\Services\Events\FestCertificateService::class)->generateForEvent($event);
         app(\App\Services\Events\FestCertificateService::class)->generateParticipationForEvent($event);

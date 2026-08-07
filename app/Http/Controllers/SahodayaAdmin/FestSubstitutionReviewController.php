@@ -14,7 +14,12 @@ class FestSubstitutionReviewController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $requests = FestSubstitutionRequest::where('event_id', $event->id)
+        // Same hub-aggregation gap as FestClashReviewController — substitution requests are
+        // stored against the school's actual region/finale child event (see
+        // FestSubstitutionRequestController, which already reads via reportableEventIds()),
+        // so a hub admin reviewing from the hub page needs every region's requests here too
+        // (Phase 9 audit).
+        $requests = FestSubstitutionRequest::whereIn('event_id', $event->reportableEventIds())
             ->with([
                 'school:id,name',
                 'registration.item',
@@ -34,7 +39,7 @@ class FestSubstitutionReviewController extends SahodayaAdminController
     public function approve(Request $request, string $tenantId, FestEvent $event, FestSubstitutionRequest $substitutionRequest)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($substitutionRequest->event_id !== $event->id, 403);
+        abort_unless(in_array($substitutionRequest->event_id, $event->reportableEventIds(), true), 403);
         abort_unless($substitutionRequest->status === 'pending', 422);
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);
@@ -69,7 +74,7 @@ class FestSubstitutionReviewController extends SahodayaAdminController
     public function reject(Request $request, string $tenantId, FestEvent $event, FestSubstitutionRequest $substitutionRequest)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($substitutionRequest->event_id !== $event->id, 403);
+        abort_unless(in_array($substitutionRequest->event_id, $event->reportableEventIds(), true), 403);
         abort_unless($substitutionRequest->status === 'pending', 422);
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);

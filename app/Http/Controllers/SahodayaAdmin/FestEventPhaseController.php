@@ -81,7 +81,7 @@ class FestEventPhaseController extends SahodayaAdminController
         abort_if($phase->event_id !== $event->id, 403);
 
         $name = $phase->name;
-        $service->deletePhase($phase);
+        $service->deletePhase($phase, $request->boolean('force'));
 
         $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.phase.deleted', "Deleted phase {$name}", [
             'phase_id' => $phase->id,
@@ -95,7 +95,11 @@ class FestEventPhaseController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'phase_id' => 'nullable|integer|exists:fest_event_phases,id',
+            // Scoped to THIS event — previously any phase id anywhere (including another
+            // event's) passed the bare exists() check; FestEventPhaseService::
+            // assignItemsToPhase() re-checks this too (defense in depth), but the request
+            // should fail validation before it even reaches the service. Phase 5 audit item 2.
+            'phase_id' => ['nullable', 'integer', \Illuminate\Validation\Rule::exists('fest_event_phases', 'id')->where('event_id', $event->id)],
             'item_ids' => 'required|array',
             'item_ids.*' => 'integer|exists:fest_event_items,id',
         ]);

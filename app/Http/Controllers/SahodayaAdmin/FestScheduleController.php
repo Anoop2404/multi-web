@@ -158,6 +158,9 @@ class FestScheduleController extends SahodayaAdminController
 
         $event->update(['schedule_published' => true]);
 
+        app(\App\Services\Events\FestRegionPartitionService::class)
+            ->cascadeLifecycleToChildren($event, ['schedule_published' => true]);
+
         $audit->festEvent($event, FestPageActivity::SCHEDULE, 'fest.schedule.published', 'Schedule published to public portal');
 
         app(\App\Services\Events\FestEventNotifier::class)->schedulePublished($event);
@@ -170,6 +173,9 @@ class FestScheduleController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $event->update(['schedule_published' => false]);
+
+        app(\App\Services\Events\FestRegionPartitionService::class)
+            ->cascadeLifecycleToChildren($event, ['schedule_published' => false]);
 
         $audit->festEvent($event, FestPageActivity::SCHEDULE, 'fest.schedule.unpublished', 'Schedule hidden from public portal');
 

@@ -19,40 +19,48 @@ class FestJudgeGateService
             return;
         }
 
-        $items = FestEventItem::where('event_id', $event->id)->pluck('id');
-        $assignments = FestJudgeAssignment::where('event_id', $event->id)->get()->groupBy('item_id');
-
         $pending = [];
 
-        foreach ($items as $itemId) {
-            $judges = $assignments->get($itemId, collect());
-            if ($judges->isEmpty()) {
-                continue;
-            }
+        // A partitioned hub's items/judge assignments/scores all live on its region/
+        // finale children, keyed by each child's own event_id — filtering by the hub's
+        // id alone (the previous behavior) found zero items and silently passed this
+        // gate even with unscored judge assignments outstanding on every region. Walk
+        // every event in the hub's reportable family (itself, for a non-hub event) and
+        // check each one under its own id.
+        foreach (FestEvent::whereIn('id', $event->reportableEventIds())->get() as $scopeEvent) {
+            $items = FestEventItem::where('event_id', $scopeEvent->id)->pluck('id');
+            $assignments = FestJudgeAssignment::where('event_id', $scopeEvent->id)->get()->groupBy('item_id');
 
-            $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q
-                ->where('event_id', $event->id)
-                ->where('item_id', $itemId)
-                ->where('status', 'approved'))
-                ->pluck('id');
+            foreach ($items as $itemId) {
+                $judges = $assignments->get($itemId, collect());
+                if ($judges->isEmpty()) {
+                    continue;
+                }
 
-            if ($participantIds->isEmpty()) {
-                continue;
-            }
+                $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q
+                    ->where('event_id', $scopeEvent->id)
+                    ->where('item_id', $itemId)
+                    ->where('status', 'approved'))
+                    ->pluck('id');
 
-            $requiredScores = $participantIds->count() * $judges->count();
-            $entered = FestJudgeScore::where('event_id', $event->id)
-                ->where('item_id', $itemId)
-                ->whereIn('participant_id', $participantIds)
-                ->whereIn('judge_user_id', $judges->pluck('user_id'))
-                ->where(function ($q) {
-                    $q->whereNotNull('score')->orWhereNotNull('grade');
-                })
-                ->count();
+                if ($participantIds->isEmpty()) {
+                    continue;
+                }
 
-            if ($entered < $requiredScores) {
-                $item = FestEventItem::find($itemId);
-                $pending[] = $item?->title ?? "Item #{$itemId}";
+                $requiredScores = $participantIds->count() * $judges->count();
+                $entered = FestJudgeScore::where('event_id', $scopeEvent->id)
+                    ->where('item_id', $itemId)
+                    ->whereIn('participant_id', $participantIds)
+                    ->whereIn('judge_user_id', $judges->pluck('user_id'))
+                    ->where(function ($q) {
+                        $q->whereNotNull('score')->orWhereNotNull('grade');
+                    })
+                    ->count();
+
+                if ($entered < $requiredScores) {
+                    $item = FestEventItem::find($itemId);
+                    $pending[] = $item?->title ?? "Item #{$itemId}";
+                }
             }
         }
 

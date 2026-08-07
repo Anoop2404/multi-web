@@ -492,6 +492,13 @@ class FestEventController extends SahodayaAdminController
 
         $event->update($data);
 
+        // Cascade whichever lifecycle fields this save actually touched (registration
+        // window, status, results_published) down onto every region child — see
+        // FestRegionPartitionService::cascadeLifecycleToChildren(). No-op unless this
+        // event is a partitioned hub.
+        app(\App\Services\Events\FestRegionPartitionService::class)
+            ->cascadeLifecycleToChildren($event, $data);
+
         if (in_array($newStatus, ['published', 'registration_open'], true)) {
             app(\App\Services\Events\FestRegionPartitionService::class)
                 ->autoSyncIfApplicable($event->fresh());
@@ -966,7 +973,13 @@ class FestEventController extends SahodayaAdminController
         abort_if($item->event_id !== $event->id, 403);
         abort_if($item->isStateCatalog(), 422, 'State catalog items cannot be removed here.');
         $title = $item->title;
+        $itemId = $item->id;
         $item->delete();
+
+        // Deleting a hub item previously left its already-copied region/finale/cluster
+        // children in place with no way to reach them from here anymore — see
+        // FestItemSyncService::removeItemFromPartitions() (Phase 6 audit).
+        app(\App\Services\Events\FestItemSyncService::class)->removeItemFromPartitions($itemId);
 
         $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.item.deleted', "Item removed: {$title}");
 
@@ -1219,6 +1232,9 @@ class FestEventController extends SahodayaAdminController
         } else {
             $event->update(['status' => $newStatus]);
         }
+
+        app(\App\Services\Events\FestRegionPartitionService::class)
+            ->cascadeLifecycleToChildren($event, ['status' => $event->status]);
 
         if ($event->event_type === 'sports' && $event->isSportsSeasonEvent()) {
             app(\App\Services\Events\FestSportsEventSyncService::class)->syncSeason($event->fresh());

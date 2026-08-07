@@ -6,6 +6,7 @@ use App\Models\FestClashRequest;
 use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestSchedule;
+use App\Services\Events\FestRegistrationRouterService;
 use App\Support\SchoolFestProgram;
 use App\Support\ProgramRouteMap;
 use Illuminate\Http\Request;
@@ -16,6 +17,13 @@ class FestClashRequestController extends SchoolAdminController
     {
         $meta = SchoolFestProgram::meta($program);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        // A school hitting this page against the hub id directly (instead of its assigned
+        // region/finale child) would read/write FestClashRequest rows keyed to the wrong
+        // event_id — inconsistent with the participant/schedule data on the same page, which
+        // already reads via reportableEventIds(). Same sibling-region gap class as Phase 1's
+        // food-ordering fix (Phase 9 audit).
+        app(FestRegistrationRouterService::class)->assertSchoolCanAccess($event, $this->school->id);
 
         $requests = FestClashRequest::where('event_id', $event->id)
             ->where('school_id', $this->school->id)
@@ -63,6 +71,7 @@ class FestClashRequestController extends SchoolAdminController
     {
         $meta = SchoolFestProgram::meta($program);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        app(FestRegistrationRouterService::class)->assertSchoolCanAccess($event, $this->school->id);
 
         $data = $request->validate([
             'participant_id'       => 'required|exists:fest_participants,id',

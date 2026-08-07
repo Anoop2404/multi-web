@@ -71,17 +71,24 @@ class FestRegistrationBulkService
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->when($itemId, fn ($q) => $q->whereIn('item_id', $event->reportableItemIds([$itemId])));
 
+        // Bulk actions can be invoked (e.g. via Portal duty routes) with $event resolved to
+        // a region CHILD, not just the Sahodaya-admin hub — recalculate() always persists
+        // the fee record under the HUB's event_id (see FestSchoolEventFeeService::
+        // feeOwnerEvent()), so the lock below must target that same id or it silently locks
+        // a row that never exists for a partitioned child.
+        $feeOwnerEventId = $feeService->feeOwnerEvent($event)->id;
+
         foreach ($query->with('participants')->get() as $registration) {
             // Only the DB-mutating snapshot/update/credit critical section is locked and
             // transactional — notifier/audit calls happen after commit, outside the lock, so a
             // slow mail/notification dispatch never holds the row lock open. See
             // docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4.
-            DB::transaction(function () use ($event, $registration, $feeService, $reason) {
+            DB::transaction(function () use ($event, $registration, $feeService, $reason, $feeOwnerEventId) {
                 // Lock the school's aggregate fee record (if one exists yet) for the duration
                 // of the before/after snapshot below, so two reject/cancel actions racing on
                 // the same school can't both read the same "before" state and either compute
                 // a wrong delta or double-issue a credit.
-                FestSchoolEventFee::where('event_id', $event->id)
+                FestSchoolEventFee::where('event_id', $feeOwnerEventId)
                     ->where('school_id', $registration->school_id)
                     ->whereNull('head_id')
                     ->lockForUpdate()

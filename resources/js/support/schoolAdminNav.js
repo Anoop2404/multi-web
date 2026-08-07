@@ -379,6 +379,7 @@ export function schoolAdminNav(schoolId, options = {}) {
             { label: 'Class XII Results', href: `${base}/board-results?class=12`, icon: 'bar-chart', matchQuery: { class: '12' } },
             { label: 'Subject-Wise Toppers', href: `${base}/board-results/subject-toppers`, icon: 'award' },
             { label: 'Full A1 Achievers', href: `${base}/board-results/full-a1-achievers`, icon: 'star' },
+            { label: 'Principal Verification', href: `${base}/board-results/principal-verification`, icon: 'shield' },
         ],
     });
 

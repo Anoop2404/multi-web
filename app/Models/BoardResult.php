@@ -105,6 +105,19 @@ class BoardResult extends Model
         return $this->hasMany(BoardResultRanking::class);
     }
 
+    public function certificationPackages(): HasMany
+    {
+        return $this->hasMany(BoardResultCertificationPackage::class)->orderByDesc('version');
+    }
+
+    /** The current (highest-version, non-superseded) certification package, if any. */
+    public function activeCertificationPackage(): ?BoardResultCertificationPackage
+    {
+        return $this->certificationPackages()
+            ->where('status', '!=', BoardResultCertificationPackage::STATUS_SUPERSEDED)
+            ->first();
+    }
+
     public function academicYearRecord(): BelongsTo
     {
         return $this->belongsTo(AcademicYearRecord::class, 'academic_year_id');
@@ -142,6 +155,14 @@ class BoardResult extends Model
             return false;
         }
 
+        // Once a certification package has been submitted to Sahodaya (or beyond), the
+        // underlying result/topper data is locked even if BoardResult.status itself hasn't
+        // caught up yet — see BoardResultCertificationPackage / the Principal Verification plan.
+        $activePackage = $this->activeCertificationPackage();
+        if ($activePackage && $activePackage->isSubmittedToSahodaya()) {
+            return false;
+        }
+
         return app(\App\Services\BoardResults\BoardResultAcademicYearService::class)
             ->isResultWindowOpen($this);
     }
@@ -162,6 +183,10 @@ class BoardResult extends Model
         }
         if ($this->status === self::STATUS_SUBMITTED && $this->reviewed_by_user_id !== null) {
             return 'Sahodaya has started reviewing this result. Wait for rejection or approval.';
+        }
+        $activePackage = $this->activeCertificationPackage();
+        if ($activePackage && $activePackage->isSubmittedToSahodaya()) {
+            return 'The certified package has been submitted to Sahodaya and is locked. Ask Sahodaya to return it for correction if changes are needed.';
         }
         return app(\App\Services\BoardResults\BoardResultAcademicYearService::class)
             ->resultWindowLockReason($this);

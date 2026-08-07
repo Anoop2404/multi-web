@@ -12,7 +12,11 @@ class FestClashReviewController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $requests = FestClashRequest::where('event_id', $event->id)
+        // Clash requests are always stored against the school's actual assigned
+        // region/finale child event (see FestClashRequestController, Phase 9 audit) — a hub
+        // admin reviewing from the hub page needs every region's requests aggregated here,
+        // same as FestRegistrationReviewController's reportableEventIds() fix in Phase 1.
+        $requests = FestClashRequest::whereIn('event_id', $event->reportableEventIds())
             ->with([
                 'school:id,name',
                 'participant.student',
@@ -31,7 +35,7 @@ class FestClashReviewController extends SahodayaAdminController
     public function approve(Request $request, string $tenantId, FestEvent $event, FestClashRequest $clashRequest)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($clashRequest->event_id !== $event->id, 403);
+        abort_unless(in_array($clashRequest->event_id, $event->reportableEventIds(), true), 403);
         abort_unless($clashRequest->status === 'pending', 422);
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);
@@ -49,7 +53,7 @@ class FestClashReviewController extends SahodayaAdminController
     public function reject(Request $request, string $tenantId, FestEvent $event, FestClashRequest $clashRequest)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($clashRequest->event_id !== $event->id, 403);
+        abort_unless(in_array($clashRequest->event_id, $event->reportableEventIds(), true), 403);
         abort_unless($clashRequest->status === 'pending', 422);
 
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);

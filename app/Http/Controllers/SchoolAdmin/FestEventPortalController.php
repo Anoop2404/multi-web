@@ -10,6 +10,7 @@ use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Services\Events\EventContext;
 use App\Services\Events\FestCertificateService;
+use App\Services\Events\FestRegistrationRouterService;
 use App\Services\Events\FestSchoolPartitionService;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
@@ -37,6 +38,11 @@ class FestEventPortalController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
+        // Legacy catering had zero partition awareness — a school could view/submit meal
+        // requests directly against the hub, or against a sibling region's child event, the
+        // same gap food ordering had before Phase 1 (Phase 8 audit).
+        app(FestRegistrationRouterService::class)->assertSchoolCanAccess($event, $this->school->id);
+
         $orders = FestCateringOrder::where('event_id', $event->id)
             ->where('school_id', $this->school->id)
             ->orderByDesc('meal_date')
@@ -51,6 +57,7 @@ class FestEventPortalController extends SchoolAdminController
     public function storeCatering(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        app(FestRegistrationRouterService::class)->assertSchoolCanAccess($event, $this->school->id);
 
         $data = $request->validate([
             'meal_date'  => 'required|date',

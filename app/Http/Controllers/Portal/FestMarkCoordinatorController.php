@@ -84,7 +84,11 @@ class FestMarkCoordinatorController extends Controller
             $headContext['selectedItemId'],
         );
 
-        $attendance = FestAttendance::where('event_id', $event->id)
+        // Region/season hub: registrations/attendance live under child events — mirror
+        // SahodayaAdmin\FestAttendanceController's reportableEventIds() expansion so a
+        // hub-scoped coordinator sees attendance regardless of which specific child
+        // event a participant's registration actually landed on.
+        $attendance = FestAttendance::whereIn('event_id', $event->reportableEventIds())
             ->get()
             ->mapWithKeys(fn (FestAttendance $row) => [
                 "{$row->item_id}-{$row->participant_id}" => ['status' => $row->status],
@@ -114,6 +118,13 @@ class FestMarkCoordinatorController extends Controller
             'participant_id' => 'required|exists:fest_participants,id',
             'status'         => 'required|in:present,absent',
         ]);
+
+        // Cross-scope validation — see FestEventOpsController::storeAttendance() for why:
+        // reads above now span the event's whole reportable family, so writes need the
+        // same guard against an unrelated participant/item being posted here.
+        $participant = FestParticipant::with('registration')->findOrFail($data['participant_id']);
+        abort_if(! in_array($participant->registration->event_id, $event->reportableEventIds(), true), 422, 'Participant does not belong to this event.');
+        abort_if($participant->registration->item_id !== (int) $data['item_id'], 422, 'Participant does not belong to this item.');
 
         FestAttendance::updateOrCreate(
             ['item_id' => $data['item_id'], 'participant_id' => $data['participant_id']],

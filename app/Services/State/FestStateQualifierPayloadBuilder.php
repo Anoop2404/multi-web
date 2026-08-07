@@ -95,8 +95,29 @@ class FestStateQualifierPayloadBuilder
 
     public function enqueue(FestStateProgram $program, FestEvent $sourceEvent, string $sourceTenantId, ?int $submittedBy = null): FestStateSubmissionOutbox
     {
+        // Every applicable source event (the event itself, or — for a partitioned hub —
+        // every region/finale child, since that's where results actually live) must have
+        // published results before qualifiers can go to State. Without this, an admin
+        // could submit qualifiers computed from marks that were never finalized/published,
+        // and — for a hub — a region that hasn't finished yet would silently contribute
+        // nothing rather than blocking the submission.
+        foreach ($this->sourceEvents($sourceEvent) as $event) {
+            abort_unless(
+                $event->results_published,
+                422,
+                "Results for \"{$event->title}\" must be published before submitting qualifiers to State."
+            );
+        }
+
         $payload = $this->build($program, $sourceEvent, $sourceTenantId);
-        $hash = hash('sha256', json_encode($payload));
+
+        // Hash only the actual qualifier content (never submitted_at, a generation
+        // timestamp baked into the payload) — otherwise the hash, and therefore the
+        // idempotency key below, differs on every call even when the underlying
+        // qualifiers are byte-for-byte identical, so firstOrCreate() never finds the
+        // existing row and a duplicate outbox submission is created on every re-click
+        // or retry. See docs — Phase 3 audit, item 6.
+        $hash = hash('sha256', json_encode($payload['entries']));
         $idempotencyKey = "qualifiers:{$program->id}:{$sourceEvent->id}:{$hash}";
 
         return FestStateSubmissionOutbox::firstOrCreate(

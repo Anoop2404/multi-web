@@ -1014,7 +1014,11 @@ class FestRegistrationController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $feeService = app(FestSchoolEventFeeService::class);
-        $query = FestSchoolEventFee::where('event_id', $event->id)
+        // The fee record for a partitioned region child is always persisted under the
+        // HUB's event_id (see FestSchoolEventFeeService::feeOwnerEvent()) — without this,
+        // a school viewing their own region event (the normal way they reach it) got a
+        // 404 trying to download a receipt they'd already paid and had approved.
+        $query = FestSchoolEventFee::where('event_id', $feeService->feeOwnerEvent($event)->id)
             ->where('school_id', $this->school->id)
             ->with('feeReceipt');
 

@@ -14,6 +14,10 @@ use Illuminate\Support\Str;
 
 class FestQualificationService
 {
+  public function __construct(
+    private FestPartitionService $partitions,
+  ) {}
+
   /** @return array{promoted: int, skipped: int} */
   public function promoteWinners(FestEvent $fromEvent, FestEvent $toEvent): array
   {
@@ -23,64 +27,76 @@ class FestQualificationService
     $skipped = 0;
     $handledRegistrations = [];
 
-    $items = FestEventItem::where('event_id', $fromEvent->id)->get();
+    // A partitioned hub's items and marks live on its region/finale children (see
+    // FestItemSyncService::copyItemsToPartition()), never on the hub's own event_id —
+    // without this expansion, promoting straight "from" a partitioned hub found zero
+    // items and silently promoted nobody. Mirrors the same expansion
+    // FestStateQualifierPayloadBuilder::sourceEvents() already uses for the separate
+    // state-submission flow.
+    $sourceEvents = $this->partitions->isPartitionedHub($fromEvent)
+      ? $this->partitions->partitions($fromEvent)->all()
+      : [$fromEvent];
 
-    foreach ($items as $item) {
-      $limit = max(1, (int) ($item->qualify_count ?? 3));
-      $mode = $item->tiebreak_mode ?: 'none';
+    foreach ($sourceEvents as $sourceEvent) {
+      $items = FestEventItem::where('event_id', $sourceEvent->id)->get();
 
-      $allMarks = FestMark::where('event_id', $fromEvent->id)
-        ->where('item_id', $item->id)
-        ->whereNotNull('position')
-        ->with(['participant.registration.participants', 'participant.registration.groups'])
-        ->orderBy('position')
-        ->orderBy('id')
-        ->get();
+      foreach ($items as $item) {
+        $limit = max(1, (int) ($item->qualify_count ?? 3));
+        $mode = $item->tiebreak_mode ?: 'none';
 
-      $marks = $this->selectMarksForPromotion($allMarks, $limit, $mode, $fromEvent, $item, $toEvent);
+        $allMarks = FestMark::where('event_id', $sourceEvent->id)
+          ->where('item_id', $item->id)
+          ->whereNotNull('position')
+          ->with(['participant.registration.participants', 'participant.registration.groups'])
+          ->orderBy('position')
+          ->orderBy('id')
+          ->get();
 
-      $targetItem = $this->matchingItem($toEvent, $item);
+        $marks = $this->selectMarksForPromotion($allMarks, $limit, $mode, $sourceEvent, $item, $toEvent);
 
-      foreach ($marks as $mark) {
-        $participant = $mark->participant;
-        if (! $participant) {
-          $skipped++;
+        $targetItem = $this->matchingItem($toEvent, $item);
 
-          continue;
+        foreach ($marks as $mark) {
+          $participant = $mark->participant;
+          if (! $participant) {
+            $skipped++;
+
+            continue;
+          }
+
+          $participant->loadMissing('registration');
+          $sourceReg = $participant->registration;
+
+          if ($sourceReg && isset($handledRegistrations[$sourceReg->id])) {
+            continue;
+          }
+
+          $qual = FestQualification::firstOrCreate(
+            [
+              'event_id'       => $sourceEvent->id,
+              'item_id'        => $item->id,
+              'participant_id' => $participant->id,
+            ],
+            [
+              'next_level_event_id' => $toEvent->id,
+              'promoted_at'         => now(),
+            ]
+          );
+
+          if (! $qual->wasRecentlyCreated) {
+            $skipped++;
+
+            continue;
+          }
+
+          if ($targetItem && $sourceReg) {
+            $sourceReg->loadMissing('groups', 'participants');
+            $this->ensurePromotedRegistration($toEvent, $targetItem, $sourceReg);
+            $handledRegistrations[$sourceReg->id] = true;
+          }
+
+          $promoted++;
         }
-
-        $participant->loadMissing('registration');
-        $sourceReg = $participant->registration;
-
-        if ($sourceReg && isset($handledRegistrations[$sourceReg->id])) {
-          continue;
-        }
-
-        $qual = FestQualification::firstOrCreate(
-          [
-            'event_id'       => $fromEvent->id,
-            'item_id'        => $item->id,
-            'participant_id' => $participant->id,
-          ],
-          [
-            'next_level_event_id' => $toEvent->id,
-            'promoted_at'         => now(),
-          ]
-        );
-
-        if (! $qual->wasRecentlyCreated) {
-          $skipped++;
-
-          continue;
-        }
-
-        if ($targetItem && $sourceReg) {
-          $sourceReg->loadMissing('groups', 'participants');
-          $this->ensurePromotedRegistration($toEvent, $targetItem, $sourceReg);
-          $handledRegistrations[$sourceReg->id] = true;
-        }
-
-        $promoted++;
       }
     }
 

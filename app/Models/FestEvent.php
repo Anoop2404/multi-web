@@ -51,6 +51,7 @@ class FestEvent extends Model
         'notification_settings',
         'strict_item_payment_gating',
         'food_payee_type', 'food_host_school_id', 'require_payment_for_coupons',
+        'phase_mode_enabled',
     ];
 
     protected $attributes = [
@@ -75,6 +76,7 @@ class FestEvent extends Model
         'strict_item_payment_gating' => 'boolean',
         'combine_regions_at_finale' => 'boolean',
         'require_payment_for_coupons' => 'boolean',
+        'phase_mode_enabled' => 'boolean',
         'conduct_levels' => 'array',
         'aggregation_config' => 'array',
         'notification_settings' => 'array',

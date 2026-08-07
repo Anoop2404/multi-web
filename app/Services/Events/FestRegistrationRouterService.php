@@ -24,6 +24,19 @@ class FestRegistrationRouterService
         }
 
         if ($hub->id !== $event->id && $event->parent_event_id === $hub->id) {
+            // Previously accepted ANY child of the hub verbatim here, with no check that
+            // it's THIS school's own assigned partition — a request naming a sibling
+            // region's child event id would register straight into that region unchecked
+            // (see Phase 1 audit — "Reject direct hub and sibling-region ... requests").
+            // Finale is exempt: it's the shared common round every assigned school routes
+            // into regardless of which region they belong to, same as the fresh-resolve
+            // path below.
+            if ($this->partitions->partitionRole($event) !== 'finale') {
+                $partitionKey = $this->schoolPartitions->requireAssignment($hub, $schoolId);
+                $eventKey = $event->partition_key ?? $event->cluster_key;
+                abort_unless($eventKey === $partitionKey, 403, 'This event belongs to a different region.');
+            }
+
             return $event;
         }
 
@@ -41,6 +54,40 @@ class FestRegistrationRouterService
         abort_if(! $region, 422, 'Assigned region partition is not configured.');
 
         return $region;
+    }
+
+    /**
+     * Assert that $schoolId may operate against $event directly — registration, food
+     * ordering, roster/attendance viewing, payment, etc. For a partitioned hub's family
+     * this means $event must be the school's own assigned region partition (or the
+     * shared finale); never the hub itself, never a sibling region's child. No-op for
+     * anything that isn't a partitioned hub (the vast majority of events), so this is
+     * safe to add to any school-facing controller without changing behavior for
+     * standard, non-regional events.
+     *
+     * This is the "one canonical regional event-context resolver" called for in the
+     * Phase 1 plan — before this, registration had its own (partial) check inside
+     * resolveTargetEvent() above, while food ordering (FestFoodOrderController) and
+     * others had none at all.
+     */
+    public function assertSchoolCanAccess(FestEvent $event, string $schoolId): void
+    {
+        $hub = $this->resolveHub($event);
+
+        if ($this->partitions->conductMode($hub) !== 'partitioned') {
+            return;
+        }
+
+        abort_if($event->id === $hub->id, 422, 'Use your assigned region event, not the hub.');
+
+        if ($this->partitions->partitionRole($event) === 'finale') {
+            return;
+        }
+
+        $assignedKey = $this->schoolPartitions->requireAssignment($hub, $schoolId);
+        $eventKey = $event->partition_key ?? $event->cluster_key;
+
+        abort_unless($eventKey === $assignedKey, 403, 'This event belongs to a different region.');
     }
 
     public function resolveHub(FestEvent $event): FestEvent

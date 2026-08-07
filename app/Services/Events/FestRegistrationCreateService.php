@@ -242,7 +242,9 @@ class FestRegistrationCreateService
         ?string $teamName = null,
         ?array $teamContacts = null,
     ): FestRegistration {
-        abort_if($registration->event_id !== $event->id, 403);
+        // Defense-in-depth, same reasoning as FestRegistrationService::cancel(): a
+        // partitioned hub's registrations live on the school's region child, not the hub.
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
         abort_if($registration->item_id !== $item->id, 403, 'Cannot change which item a registration belongs to — cancel and re-register instead.');
         abort_if($registration->school_id !== $school->id, 403);
         abort_if($school->parent_id !== $event->tenant_id, 403);

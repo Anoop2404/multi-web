@@ -7,6 +7,7 @@ use App\Models\FestFoodBill;
 use App\Models\FestFoodMenuItem;
 use App\Models\FestFoodOrderItem;
 use App\Models\Tenant;
+use App\Services\Events\FestRegistrationRouterService;
 use Illuminate\Http\Request;
 
 class FestFoodOrderController extends SchoolAdminController
@@ -14,6 +15,12 @@ class FestFoodOrderController extends SchoolAdminController
     private function assertAccess(FestEvent $event): void
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        // Regions: a school may only order food against its OWN assigned region/finale
+        // partition — not the hub directly, and not a sibling region's child event. Food
+        // ordering previously had zero partition awareness (see Phase 1 audit — "Reject
+        // direct hub and sibling-region ... food ... requests").
+        app(FestRegistrationRouterService::class)->assertSchoolCanAccess($event, $this->school->id);
     }
 
     public function show(string $tenantId, FestEvent $event)

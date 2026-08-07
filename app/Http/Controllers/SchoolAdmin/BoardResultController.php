@@ -324,7 +324,26 @@ class BoardResultController extends SchoolAdminController
         });
 
         $fresh = $boardResult->fresh();
+
+        try {
+            app(\App\Services\BoardResults\BoardResultCertificationService::class)
+                ->invalidateForDataChange($fresh, $request->user(), 'Result summary or toppers updated by the school.');
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['result' => [$e->getMessage()]]);
+        }
+
         if ($request->boolean('submit_for_review')) {
+            $activePackage = $fresh->activeCertificationPackage();
+            if ($activePackage && $activePackage->status !== \App\Models\BoardResultCertificationPackage::STATUS_DRAFT) {
+                throw ValidationException::withMessages([
+                    'result' => 'This result is already going through Principal Verification. Use that workflow to certify and submit it.',
+                ]);
+            }
+            if (app(BoardResultAcademicYearService::class)->isCertificationRequired($fresh)) {
+                throw ValidationException::withMessages([
+                    'result' => 'Your Sahodaya requires Principal Verification for this academic year. Use "Send for Leadership Review" instead of direct submission.',
+                ]);
+            }
             if (! $fresh->hasResultPdf()) {
                 throw ValidationException::withMessages([
                     'result_pdf' => 'Upload the proof document before submitting for verification.',
@@ -613,6 +632,23 @@ class BoardResultController extends SchoolAdminController
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
         abort_unless($boardResult->isEditable(), 422, 'This result cannot be submitted in its current state.');
         app(BoardResultAcademicYearService::class)->assertResultEditable($boardResult);
+
+        // Principal Verification (docs/BOARD_RESULTS_PRINCIPAL_VERIFICATION_PLAN.md) is the
+        // required path once a school has started it for this result — direct submission is
+        // only still allowed for schools/years that haven't begun using the new workflow yet,
+        // so this doesn't retroactively break results already mid-flight under the old process.
+        $activePackage = $boardResult->activeCertificationPackage();
+        if ($activePackage && $activePackage->status !== \App\Models\BoardResultCertificationPackage::STATUS_DRAFT) {
+            throw ValidationException::withMessages([
+                'result' => 'This result is already going through Principal Verification. Use that workflow to certify and submit it — direct submission is disabled once verification has started.',
+            ]);
+        }
+
+        if (app(BoardResultAcademicYearService::class)->isCertificationRequired($boardResult)) {
+            throw ValidationException::withMessages([
+                'result' => 'Your Sahodaya requires Principal Verification for this academic year. Use "Send for Leadership Review" instead of direct submission.',
+            ]);
+        }
 
         if (! $boardResult->hasResultPdf()) {
             throw ValidationException::withMessages([
@@ -906,7 +942,7 @@ class BoardResultController extends SchoolAdminController
             $submittedRollNos[$rollNo] = true;
         }
 
-        return DB::transaction(function () use ($data, $boardResult, $isClass12, $normalizedSubjectMarks) {
+        $response = DB::transaction(function () use ($data, $boardResult, $isClass12, $normalizedSubjectMarks) {
             BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
 
             $existing = Topper::where('board_result_id', $boardResult->id)
@@ -973,6 +1009,10 @@ class BoardResultController extends SchoolAdminController
 
             return back()->with('success', implode(', ', $parts).' as Full A1 Achievers.');
         });
+
+        $this->invalidateCertificationIfNeeded($boardResult, $request, 'Full A1 Achievers updated by the school.');
+
+        return $response;
     }
 
     public function toppers(string $tenantId, BoardResult $boardResult)
@@ -1027,6 +1067,22 @@ class BoardResultController extends SchoolAdminController
      * @param  array<string, string>  $streamOptions  stream_key => label
      * @return array{classX: int, byStream: array<string, int>}
      */
+    /**
+     * Corrections to a result's toppers must invalidate any in-progress certification
+     * package (superseding signed reports and bumping the package version) — see
+     * BoardResultCertificationService::invalidateForDataChange() and plan §7. This is a
+     * no-op for the common case where no certification package exists yet.
+     */
+    private function invalidateCertificationIfNeeded(BoardResult $boardResult, Request $request, string $reason): void
+    {
+        try {
+            app(\App\Services\BoardResults\BoardResultCertificationService::class)
+                ->invalidateForDataChange($boardResult->fresh(), $request->user(), $reason);
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['result' => [$e->getMessage()]]);
+        }
+    }
+
     private function marksConfigFor(int $class, array $streamOptions, string $sahodayaId): array
     {
         $marksConfig = app(BoardResultMarksConfigService::class);
@@ -1058,6 +1114,7 @@ class BoardResultController extends SchoolAdminController
         ) {
             $topper->delete();
             app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
+            $this->invalidateCertificationIfNeeded($boardResult, $request, 'Subject topper entry removed by the school.');
 
             return back()->with('success', 'Subject topper entry removed.');
         }
@@ -1090,6 +1147,8 @@ class BoardResultController extends SchoolAdminController
             $this->school->id,
             'topper',
         );
+
+        $this->invalidateCertificationIfNeeded($boardResult, $request, 'Topper updated by the school.');
 
         return back()->with('success', 'Topper updated.');
     }
@@ -1124,6 +1183,8 @@ class BoardResultController extends SchoolAdminController
             $boardResult,
             ['count' => $created],
         );
+
+        $this->invalidateCertificationIfNeeded($boardResult, $request, 'Toppers added in bulk by the school.');
 
         return back()->with('success', $created.' topper(s) added.');
     }
@@ -1167,6 +1228,8 @@ class BoardResultController extends SchoolAdminController
             ['name' => $topper->name, 'percentage' => $topper->percentage],
         );
 
+        $this->invalidateCertificationIfNeeded($boardResult, $request, 'Topper added by the school.');
+
         return back()->with('success', 'Topper added.');
     }
 
@@ -1195,7 +1258,7 @@ class BoardResultController extends SchoolAdminController
         $subject = $data['subject'];
         $sahodayaId = (string) $this->school->parent_id;
 
-        return DB::transaction(function () use ($data, $boardResult, $sahodayaId, $subject) {
+        $response = DB::transaction(function () use ($data, $boardResult, $sahodayaId, $subject) {
             BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->first();
 
             $nextRank = (int) (Topper::where('board_result_id', $boardResult->id)->max('rank') ?? 0) + 1;
@@ -1291,6 +1354,10 @@ class BoardResultController extends SchoolAdminController
 
             return back()->with('success', implode(', ', $parts)." for {$subject}.");
         });
+
+        $this->invalidateCertificationIfNeeded($boardResult, $request, "Subject-wise toppers for {$subject} updated by the school.");
+
+        return $response;
     }
 
     /** @return array<string, mixed> */
@@ -1392,7 +1459,7 @@ class BoardResultController extends SchoolAdminController
         return $data;
     }
 
-    public function destroyTopper(string $tenantId, BoardResult $boardResult, Topper $topper)
+    public function destroyTopper(Request $request, string $tenantId, BoardResult $boardResult, Topper $topper)
     {
         abort_if($boardResult->tenant_id !== $this->school->id, 403);
         abort_if($topper->board_result_id !== $boardResult->id, 403);
@@ -1413,6 +1480,8 @@ class BoardResultController extends SchoolAdminController
             $this->recomputeOverallRanks($boardResult);
         }
         app(SubjectStatsNormalizer::class)->rebuild($boardResult->fresh(['toppers']));
+
+        $this->invalidateCertificationIfNeeded($boardResult, $request, 'Topper removed by the school.');
 
         return back()->with('success', 'Topper removed.');
     }

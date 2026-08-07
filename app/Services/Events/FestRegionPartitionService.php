@@ -163,6 +163,65 @@ class FestRegionPartitionService
     }
 
     /**
+     * Push hub-level lifecycle fields down onto every REGION partition child by default
+     * (never finale/cluster — those run on their own later timeline by design, same
+     * scoping as combinedFoodSummary() elsewhere in this topology) — unless the caller
+     * opts into $includeFinale (see its own doc below) for the one case where finale
+     * should move with the hub too.
+     *
+     * inheritRegistrationLifecycle() above is one-shot and conditional — it only fires
+     * once, at spawn/first-registration time, and only writes a field if the child's own
+     * value is still null. That leaves every hub lifecycle change made AFTER regions
+     * already exist (reschedule the registration window, lock registration, publish
+     * results/schedule, mark the event completed) with zero effect on any child — each
+     * region had to be updated by hand. This is the live cascade: call it every time an
+     * admin actually changes one of these fields on the hub, and it unconditionally
+     * overwrites the matching field on every region child — the same push-on-save pattern
+     * already shipped for fee configuration (see FestSchoolEventFeeService::
+     * propagateFeeSettingsToChildren()).
+     *
+     * Deliberately only the subset of fields the caller actually changed (not a wholesale
+     * copy of every lifecycle column) — a region that a region-admin has independently
+     * pushed further along (e.g. their own mark entry already underway) shouldn't have
+     * unrelated fields clobbered by a hub save that only touched, say, the registration
+     * window.
+     *
+     * @param  array<string, mixed>  $fields  subset of: registration_open, registration_close,
+     *   registration_locked, status, scoring_locked, results_published, schedule_published
+     * @param  bool  $includeFinale  Also cascade to finale/cluster children, not just region —
+     *   opt-in, since registration windows/locks genuinely run on a separate later timeline
+     *   for finale by design. Results publication is the one case where finale SHOULD move
+     *   with the hub: a hub-level "Publish Results" represents the whole fest being final,
+     *   and a finale child left unpublished would show incomplete/stale results on its own
+     *   public page. See Phase 3 audit item 2.
+     */
+    public function cascadeLifecycleToChildren(FestEvent $hub, array $fields, bool $includeFinale = false): void
+    {
+        if (($hub->conduct_mode ?? 'standard') !== 'partitioned' || empty($fields)) {
+            return;
+        }
+
+        $allowed = [
+            'registration_open', 'registration_close', 'registration_locked',
+            'status', 'scoring_locked', 'results_published', 'schedule_published',
+        ];
+        $fields = array_intersect_key($fields, array_flip($allowed));
+
+        if (empty($fields)) {
+            return;
+        }
+
+        FestEvent::where('parent_event_id', $hub->id)
+            ->when(
+                $includeFinale,
+                fn ($q) => $q->whereIn('partition_role', ['region', 'finale', 'cluster']),
+                fn ($q) => $q->where('partition_role', 'region'),
+            )
+            ->get()
+            ->each(fn (FestEvent $child) => $child->update($fields));
+    }
+
+    /**
      * Ensure a partition child event exists per membership region and (re)assign every
      * school to its region's partition. Returns a summary for the admin.
      *

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\BoardResult;
+use App\Models\BoardResultCertificationPackage;
 use App\Models\Tenant;
 use App\Models\Topper;
 use App\Models\TopperCountConfig;
 use App\Services\Audit\DataChangeLogger;
+use App\Services\BoardResults\BoardResultCertificationService;
 use App\Services\BoardResults\BoardResultNotifier;
 use App\Services\BoardResults\BoardResultPublishPipeline;
 use App\Services\BoardResults\TopperCountService;
@@ -145,9 +147,22 @@ class BoardResultVerificationController extends SahodayaAdminController
         return back()->with('success', "Top-N set to {$config->top_n}.");
     }
 
-    public function verify(Request $request, BoardResult $boardResult)
+    public function verify(Request $request, string $tenantId, BoardResult $boardResult)
     {
         $this->assertInScope($boardResult);
+
+        // A school that has started Principal Verification for this result must fully
+        // complete it (every individual report + the consolidated report signed and
+        // submitted) before Sahodaya can verify — plan §9. Results that never went
+        // through the new workflow (no package at all) are unaffected.
+        $package = $boardResult->activeCertificationPackage();
+        if ($package) {
+            abort_unless(
+                $package->status === BoardResultCertificationPackage::STATUS_SUBMITTED_TO_SAHODAYA,
+                422,
+                'This result has not completed school certification (Principal Verification) yet.'
+            );
+        }
 
         DB::transaction(function () use ($request, $boardResult) {
             $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
@@ -171,12 +186,30 @@ class BoardResultVerificationController extends SahodayaAdminController
             );
         });
 
+        if ($package) {
+            app(BoardResultCertificationService::class)->sahodayaVerify($package, $request->user());
+            try {
+                app(\App\Services\BoardResults\BoardResultCertificationNotifier::class)->sahodayaVerified($package->fresh());
+            } catch (\Throwable) {
+                // Notifications must never block workflow transitions.
+            }
+        }
+
         return back()->with('success', 'Board result marked verified.');
     }
 
-    public function approve(Request $request, BoardResult $boardResult)
+    public function approve(Request $request, string $tenantId, BoardResult $boardResult)
     {
         $this->assertInScope($boardResult);
+
+        $package = $boardResult->activeCertificationPackage();
+        if ($package) {
+            abort_unless(
+                $package->status === BoardResultCertificationPackage::STATUS_SAHODAYA_VERIFIED,
+                422,
+                'Verify the certified package before approving it.'
+            );
+        }
 
         DB::transaction(function () use ($request, $boardResult) {
             $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
@@ -210,16 +243,42 @@ class BoardResultVerificationController extends SahodayaAdminController
             }
         });
 
+        if ($package) {
+            app(BoardResultCertificationService::class)->sahodayaApprove($package, $request->user());
+            try {
+                app(\App\Services\BoardResults\BoardResultCertificationNotifier::class)->sahodayaApproved($package->fresh());
+            } catch (\Throwable) {
+                // Notifications must never block workflow transitions.
+            }
+        }
+
         return back()->with('success', 'Board result approved.');
     }
 
-    public function reject(Request $request, BoardResult $boardResult)
+    public function reject(Request $request, string $tenantId, BoardResult $boardResult)
     {
         $this->assertInScope($boardResult);
 
         $data = $request->validate([
             'rejection_reason' => 'required|string|max:2000',
         ]);
+
+        $package = $boardResult->activeCertificationPackage();
+        if ($package && in_array($package->status, [
+            BoardResultCertificationPackage::STATUS_SUBMITTED_TO_SAHODAYA,
+            BoardResultCertificationPackage::STATUS_SAHODAYA_VERIFIED,
+            BoardResultCertificationPackage::STATUS_APPROVED,
+        ], true)) {
+            // sahodayaReturn() mutates $package in place (old version -> superseded, with
+            // return_reason set) before returning the newly spawned draft version, so
+            // $package itself (not the return value) is what the notifier should read.
+            app(BoardResultCertificationService::class)->sahodayaReturn($package, $request->user(), $data['rejection_reason']);
+            try {
+                app(\App\Services\BoardResults\BoardResultCertificationNotifier::class)->sahodayaReturned($package);
+            } catch (\Throwable) {
+                // Notifications must never block workflow transitions.
+            }
+        }
 
         DB::transaction(function () use ($request, $boardResult, $data) {
             $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
@@ -276,9 +335,18 @@ class BoardResultVerificationController extends SahodayaAdminController
         return back()->with('success', 'Board result rejected and school notified.');
     }
 
-    public function publish(Request $request, BoardResult $boardResult, BoardResultPublishPipeline $pipeline)
+    public function publish(Request $request, string $tenantId, BoardResult $boardResult, BoardResultPublishPipeline $pipeline)
     {
         $this->assertInScope($boardResult);
+
+        $package = $boardResult->activeCertificationPackage();
+        if ($package) {
+            abort_unless(
+                $package->status === BoardResultCertificationPackage::STATUS_APPROVED,
+                422,
+                'Approve the certified package before publishing it.'
+            );
+        }
 
         // First: validate and save the status update in a short locked transaction.
         $academicYear = DB::transaction(function () use ($request, $boardResult) {
@@ -331,6 +399,18 @@ class BoardResultVerificationController extends SahodayaAdminController
                 'sahodaya_id' => $this->sahodaya->id,
                 'academic_year' => $academicYear,
             ]);
+        }
+
+        if ($package) {
+            try {
+                app(BoardResultCertificationService::class)->sahodayaPublish($package, $request->user());
+                app(\App\Services\BoardResults\BoardResultCertificationNotifier::class)->sahodayaPublished($package->fresh());
+            } catch (\Throwable $e) {
+                logger()->error('Failed to sync certification package status after publish: '.$e->getMessage(), [
+                    'board_result_id' => $boardResult->id,
+                    'package_id' => $package->id,
+                ]);
+            }
         }
 
         return back()->with('success', 'Board result published.');
@@ -482,6 +562,15 @@ class BoardResultVerificationController extends SahodayaAdminController
     {
         $this->assertInScope($boardResult);
 
+        $package = $boardResult->activeCertificationPackage();
+        if ($package) {
+            abort_unless(
+                $package->status === BoardResultCertificationPackage::STATUS_SUBMITTED_TO_SAHODAYA,
+                422,
+                'This result has not completed school certification (Principal Verification) yet.'
+            );
+        }
+
         DB::transaction(function () use ($request, $boardResult) {
             $locked = BoardResult::query()->whereKey($boardResult->id)->lockForUpdate()->firstOrFail();
 
@@ -501,6 +590,10 @@ class BoardResultVerificationController extends SahodayaAdminController
                 'verified_by'          => auth()->user()?->name ?? 'Sahodaya Admin',
             ]);
         });
+
+        if ($package) {
+            app(BoardResultCertificationService::class)->sahodayaVerify($package, $request->user());
+        }
 
         return back()->with('success', 'Board result and all student achievers marked as verified.');
     }

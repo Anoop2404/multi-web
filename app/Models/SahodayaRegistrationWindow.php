@@ -13,7 +13,7 @@ class SahodayaRegistrationWindow extends Model
         'sahodaya_id', 'academic_year', 'academic_year_id',
         'registration_starts_at', 'registration_ends_at',
         'add_open', 'add_close', 'edit_open', 'edit_close',
-        'board_entry_starts_at', 'board_entry_ends_at', 'board_entry_enabled', 'default_total_marks',
+        'board_entry_starts_at', 'board_entry_ends_at', 'board_entry_enabled', 'certification_required', 'default_total_marks',
     ];
 
     protected $casts = [
@@ -22,6 +22,7 @@ class SahodayaRegistrationWindow extends Model
         'board_entry_starts_at'  => 'date',
         'board_entry_ends_at'    => 'date',
         'board_entry_enabled'    => 'boolean',
+        'certification_required' => 'boolean',
         'default_total_marks'    => 'integer',
         'add_open'               => 'datetime',
         'add_close'              => 'datetime',

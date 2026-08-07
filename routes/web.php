@@ -420,6 +420,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/fest/{event}/food-host-billing/{bill}/items', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'addItem'])->name('food-host-billing.items.store');
     Route::delete('/fest/{event}/food-host-billing/{bill}/items/{orderItem}', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'removeItem'])->name('food-host-billing.items.destroy');
     Route::post('/fest/{event}/food-host-billing/{bill}/payments', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'recordPayment'])->name('food-host-billing.payments.store');
+    Route::delete('/fest/{event}/food-host-billing/{bill}/payments/{payment}', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'voidPayment'])->name('food-host-billing.payments.void');
     Route::post('/fest/{event}/food-host-billing/{bill}/settle', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'settle'])->name('food-host-billing.settle');
     Route::post('/fest/{event}/food-host-billing/{bill}/reopen', [\App\Http\Controllers\SchoolAdmin\FestFoodHostBillingController::class, 'reopen'])->name('food-host-billing.reopen');
 
@@ -574,6 +575,26 @@ Route::prefix('school-admin/{tenantId}')
     Route::delete('/board-results/{boardResult}/toppers/{topper}', [BoardResultController::class, 'destroyTopper'])->name('board-results.toppers.destroy');
     Route::post('/board-results/{boardResult}/toppers/{topper}/marksheet', [BoardResultController::class, 'uploadTopperMarksheet'])->name('board-results.toppers.upload-marksheet');
     Route::delete('/board-results/{boardResult}/toppers/{topper}/marksheet', [BoardResultController::class, 'deleteTopperMarksheet'])->name('board-results.toppers.delete-marksheet');
+
+    // Board Results — Principal Verification (docs/BOARD_RESULTS_PRINCIPAL_VERIFICATION_PLAN.md)
+    Route::prefix('board-results')->name('board-results.')->group(function () {
+        Route::get('/principal-verification', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'dashboard'])->name('principal-verification.dashboard');
+        Route::get('/{boardResult}/principal-verification', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'show'])->name('principal-verification.show');
+        Route::post('/{boardResult}/request-leadership-review', [\App\Http\Controllers\SchoolAdmin\BoardResultLeadershipReviewController::class, 'requestReview'])->name('request-leadership-review');
+
+        Route::post('/{boardResult}/certification/reports/{report}/generate', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'generateReport'])->name('certification.reports.generate');
+        Route::get('/{boardResult}/certification/reports/{report}/pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadReportPdf'])->name('certification.reports.pdf');
+        Route::get('/{boardResult}/certification/reports/{report}/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadSignedReportPdf'])->name('certification.reports.signed-pdf.download');
+        Route::post('/{boardResult}/certification/reports/{report}/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'uploadSignedReport'])->name('certification.reports.signed-pdf.upload');
+        Route::post('/{boardResult}/certification/reports/{report}/accept', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'acceptReport'])->name('certification.reports.accept');
+        Route::post('/{boardResult}/certification/reports/{report}/return', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'returnReport'])->name('certification.reports.return');
+
+        Route::post('/{boardResult}/certification/consolidated/generate', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'generateConsolidated'])->name('certification.consolidated.generate');
+        Route::get('/{boardResult}/certification/consolidated/pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadConsolidatedPdf'])->name('certification.consolidated.pdf');
+        Route::get('/{boardResult}/certification/consolidated/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'downloadSignedConsolidatedPdf'])->name('certification.consolidated.signed-pdf.download');
+        Route::post('/{boardResult}/certification/consolidated/signed-pdf', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'uploadSignedConsolidated'])->name('certification.consolidated.signed-pdf.upload');
+        Route::post('/{boardResult}/certification/submit', [\App\Http\Controllers\SchoolAdmin\BoardResultCertificationController::class, 'submit'])->name('certification.submit');
+    });
 
     // Alumni
     Route::get('/alumni',                         [AlumniController::class, 'index'])->name('alumni.index');
@@ -898,6 +919,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/verification/a1', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyA1'])->name('verification.a1');
             Route::get('/settings', [\App\Http\Controllers\SahodayaAdmin\BoardResultSettingsController::class, 'index'])->name('settings');
             Route::put('/settings/entry-window', [\App\Http\Controllers\SahodayaAdmin\BoardResultSettingsController::class, 'updateEntryWindow'])->name('settings.entry-window');
+            Route::put('/settings/certification-required', [\App\Http\Controllers\SahodayaAdmin\BoardResultSettingsController::class, 'updateCertificationRequired'])->name('settings.certification-required');
             Route::put('/settings/marks-config', [\App\Http\Controllers\SahodayaAdmin\BoardResultSettingsController::class, 'updateMarksConfig'])->name('settings.marks-config');
             Route::post('/settings/copy-previous-year', [\App\Http\Controllers\SahodayaAdmin\BoardResultSettingsController::class, 'copyFromPreviousYear'])->name('settings.copy-previous-year');
             Route::get('/masters', [\App\Http\Controllers\SahodayaAdmin\BoardResultMastersController::class, 'index'])->name('masters');
@@ -937,6 +959,15 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{boardResult}/toppers/verify-all-toppers', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyAllToppers'])->name('toppers.verify-all-toppers');
             Route::post('/{boardResult}/toppers/{topper}/verify-marksheet', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'verifyTopperMarksheet'])->name('toppers.verify-marksheet');
             Route::post('/{boardResult}/toppers/{topper}/reject-marksheet', [\App\Http\Controllers\SahodayaAdmin\BoardResultVerificationController::class, 'rejectTopperMarksheet'])->name('toppers.reject-marksheet');
+
+            // School-Certified Result Packages (docs/BOARD_RESULTS_PRINCIPAL_VERIFICATION_PLAN.md §4, §10, §12)
+            Route::prefix('certifications')->name('certifications.')->group(function () {
+                Route::get('/', [\App\Http\Controllers\SahodayaAdmin\BoardResultCertificationController::class, 'index'])->name('index');
+                Route::get('/report', [\App\Http\Controllers\SahodayaAdmin\BoardResultCertificationController::class, 'statusReport'])->name('report');
+                Route::get('/{package}', [\App\Http\Controllers\SahodayaAdmin\BoardResultCertificationController::class, 'show'])->name('show');
+                Route::get('/{package}/reports/{report}/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultCertificationController::class, 'downloadReportPdf'])->name('reports.pdf');
+                Route::get('/{package}/consolidated/pdf', [\App\Http\Controllers\SahodayaAdmin\BoardResultCertificationController::class, 'downloadConsolidatedPdf'])->name('consolidated.pdf');
+            });
         });
         Route::get('/membership/reports/export/schools', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportSchools'])->name('membership.reports.export.schools');
         Route::get('/membership/reports/export/approved-unpaid', [\App\Http\Controllers\SahodayaAdmin\MembershipReportsController::class, 'exportApprovedUnpaid'])->name('membership.reports.export.approved-unpaid');
@@ -1077,8 +1108,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/food-billing/{bill}/items', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'addItem'])->name('food-billing.items.store');
             Route::delete('/{event}/food-billing/{bill}/items/{orderItem}', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'removeItem'])->name('food-billing.items.destroy');
             Route::post('/{event}/food-billing/{bill}/payments', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'recordPayment'])->name('food-billing.payments.store');
+            Route::delete('/{event}/food-billing/{bill}/payments/{payment}', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'voidPayment'])->name('food-billing.payments.void');
             Route::post('/{event}/food-billing/{bill}/settle', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'settle'])->name('food-billing.settle');
             Route::post('/{event}/food-billing/{bill}/reopen', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'reopen'])->name('food-billing.reopen');
+            Route::post('/{event}/food-billing/{bill}/cancel', [\App\Http\Controllers\SahodayaAdmin\FestFoodBillingController::class, 'cancel'])->name('food-billing.cancel');
             Route::get('/{event}/athletic-records', [\App\Http\Controllers\SahodayaAdmin\FestAthleticRecordController::class, 'index'])->name('athletic-records.index');
             Route::post('/{event}/athletic-records', [\App\Http\Controllers\SahodayaAdmin\FestAthleticRecordController::class, 'store'])->name('athletic-records.store');
             Route::delete('/{event}/athletic-records/{record}', [\App\Http\Controllers\SahodayaAdmin\FestAthleticRecordController::class, 'destroy'])->name('athletic-records.destroy');

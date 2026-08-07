@@ -174,13 +174,17 @@ class FestFoodBillingController extends SahodayaAdminController
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $payment = $bill->payments()->create([
-            ...$data,
-            'receipt_number' => FestFoodPayment::generateReceiptNumber($bill),
-            'received_by_user_id' => $request->user()->id,
-            'received_at' => now(),
-        ]);
-        $bill->recalculate();
+        // recordForBill() enforces (under a row lock, so it's race-safe): the bill isn't
+        // already settled/cancelled, and the amount doesn't exceed the outstanding
+        // balance — see FestFoodPayment::recordForBill()'s docblock (Phase 4 audit items
+        // 1, 2, 5). Previously neither check existed at all.
+        $payment = FestFoodPayment::recordForBill(
+            $bill,
+            (float) $data['amount'],
+            $data['payment_mode'],
+            $data['notes'] ?? null,
+            $request->user()->id,
+        );
 
         $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.payment_recorded', "Payment of ₹{$data['amount']} recorded ({$payment->receipt_number})", [
             'bill_id' => $bill->id,
@@ -190,10 +194,28 @@ class FestFoodBillingController extends SahodayaAdminController
         return back()->with('success', "Payment recorded ({$payment->receipt_number}).");
     }
 
+    public function voidPayment(string $tenantId, FestEvent $event, FestFoodBill $bill, FestFoodPayment $payment, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($bill->event_id !== $event->id, 404);
+        abort_if($payment->bill_id !== $bill->id, 404);
+
+        $receiptNumber = $payment->receipt_number;
+        $amount = (float) $payment->amount;
+        $payment->voidPayment();
+
+        $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.payment_voided', "Payment of ₹{$amount} voided ({$receiptNumber})", [
+            'bill_id' => $bill->id,
+        ]);
+
+        return back()->with('success', "Payment {$receiptNumber} voided.");
+    }
+
     public function settle(Request $request, string $tenantId, FestEvent $event, FestFoodBill $bill, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($bill->event_id !== $event->id, 404);
+        abort_if($bill->balanceDue() > 0.0, 422, 'This bill has an outstanding balance of ₹'.number_format($bill->balanceDue(), 2).' — record the remaining payment before settling.');
 
         $bill->update([
             'status' => FestFoodBill::STATUS_SETTLED,
@@ -223,6 +245,28 @@ class FestFoodBillingController extends SahodayaAdminController
     }
 
     /**
+     * Cancel a bill entirely (e.g. the school withdrew from the event before ordering was
+     * finalized). Distinct from reopen()'s settled→open transition — this is a terminal
+     * state, same as FestRegistration's withdrawn. See Phase 4 audit item 6: STATUS_CANCELLED
+     * existed as a constant and was defensively checked elsewhere, but nothing ever set it.
+     */
+    public function cancel(Request $request, string $tenantId, FestEvent $event, FestFoodBill $bill, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($bill->event_id !== $event->id, 404);
+        abort_if($bill->status === FestFoodBill::STATUS_CANCELLED, 422, 'Bill is already cancelled.');
+        abort_if($bill->amount_paid > 0, 422, 'This bill has payments recorded — void the payment(s) first so the refund is explicit, then cancel.');
+
+        $bill->update(['status' => FestFoodBill::STATUS_CANCELLED]);
+
+        $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.cancelled', 'Bill cancelled', [
+            'bill_id' => $bill->id,
+        ]);
+
+        return back()->with('success', 'Bill cancelled.');
+    }
+
+    /**
      * Printable bill receipt. Uses manual model resolution rather than implicit route-model
      * binding — see BoardResultVerificationController::downloadPdf() for why: file/PDF
      * download routes in this app have been found to unreliably receive the resolved model
@@ -248,13 +292,23 @@ class FestFoodBillingController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $bills = FestFoodBill::forTenant($this->sahodaya->id)->where('event_id', $event->id)->get();
+        // On a partitioned hub, bills live on each region's own child event — exporting
+        // strictly by $event->id previously produced an empty CSV with no indication why,
+        // even though the index page already surfaces a cross-region rollup for the same
+        // hub (see index() above, Gap J). Matches every other reportableEventIds() fix in
+        // this project (Phase 7 audit).
+        $eventIds = $event->reportableEventIds();
+        $bills = FestFoodBill::forTenant($this->sahodaya->id)->whereIn('event_id', $eventIds)->get();
         $schools = Tenant::whereIn('id', $bills->pluck('school_id')->unique())->pluck('name', 'id');
+        $regionLabels = count($eventIds) > 1
+            ? FestEvent::whereIn('id', $eventIds)->pluck('cluster_label', 'id')
+            : collect();
 
         // CsvExportDispatcher casts any non-array row to array before calling $mapRow, which
         // mangles Eloquent models (private/protected props, not attributes) — so build plain
         // arrays here first, same convention as PaymentHistoryController::export.
         $rows = $bills->map(fn (FestFoodBill $b) => [
+            'region' => $regionLabels[$b->event_id] ?? '',
             'school' => $schools[$b->school_id] ?? $b->school_id,
             'status' => $b->status,
             'payee' => $b->payee_type === 'host_school' ? 'Host school' : 'Sahodaya',
@@ -270,8 +324,9 @@ class FestFoodBillingController extends SahodayaAdminController
             'fest_food_billing',
             $filename,
             $rows,
-            ['School', 'Status', 'Payee', 'Total', 'Paid', 'Balance due'],
+            ['Region', 'School', 'Status', 'Payee', 'Total', 'Paid', 'Balance due'],
             fn (array $r) => [
+                $r['region'],
                 $r['school'],
                 $r['status'],
                 $r['payee'],

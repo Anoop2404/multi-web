@@ -332,6 +332,11 @@ class FestEventSettingsController extends SahodayaAdminController
         $event->update($data);
         $this->applyStudentVerificationMode($event, $verificationMode);
 
+        // Cascade scoring_locked/schedule_published/registration_locked down onto every
+        // region child — see FestRegionPartitionService::cascadeLifecycleToChildren().
+        app(\App\Services\Events\FestRegionPartitionService::class)
+            ->cascadeLifecycleToChildren($event, $data);
+
         app(PlatformAuditLogger::class)->festEvent(
             $event,
             FestPageActivity::settingsTab('locks'),
@@ -629,6 +634,13 @@ class FestEventSettingsController extends SahodayaAdminController
                 ? (float) $data['fee_amount']
                 : null,
         ]);
+
+        // This quick single-item edit previously bypassed the hub->children fee cascade
+        // entirely — only the "Fee settings" tab's bulk save triggered
+        // propagateFeeSettingsToChildren(). Editing one item's fee here on the hub left
+        // already-spawned region/finale children (and already-registered schools within
+        // them) silently out of sync (Phase 6 audit). No-ops for non-hub events.
+        app(\App\Services\Events\FestSchoolEventFeeService::class)->propagateFeeSettingsToChildren($event->fresh());
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,
@@ -1271,6 +1283,14 @@ class FestEventSettingsController extends SahodayaAdminController
         }
 
         $item->update($data);
+
+        // Registration windows are legitimately region-specific and are NOT cascaded — a
+        // region can run its own registration window independent of siblings. fee_amount is
+        // the one field on this form that IS supposed to follow the hub->children cascade
+        // (Phase 6 audit), so re-run it when this endpoint touched fee_amount on a hub event.
+        if (array_key_exists('fee_amount', $data)) {
+            app(\App\Services\Events\FestSchoolEventFeeService::class)->propagateFeeSettingsToChildren($event->fresh());
+        }
 
         return back()->with('success', 'Item registration window saved.');
     }

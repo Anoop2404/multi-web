@@ -15,7 +15,11 @@ class FestRegistrationService
 {
     public function cancel(FestRegistration $registration, FestEvent $event, bool $notify = true): void
     {
-        abort_if($registration->event_id !== $event->id, 422);
+        // Registrations for a partitioned hub are created against the school's assigned
+        // region child, not the hub — a strict id match 403'd this for every such
+        // registration when called with the hub (see the identical fix in
+        // FestRegistrationReviewController for individual approve/reject/substitute).
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 422);
         abort_if(in_array($registration->status, ['withdrawn', 'rejected'], true), 422, 'Registration is already closed.');
         abort_if(
             app(FestSchoolEventFeeService::class)->hasApprovedPaymentForRegistration($event, $registration),
@@ -26,12 +30,16 @@ class FestRegistrationService
         $registration->loadMissing('item', 'participants');
         $headId = $registration->item?->head_id;
         $studentIds = $registration->participants->pluck('student_id')->filter()->unique();
+        $feeOwnerEventId = app(FestSchoolEventFeeService::class)->feeOwnerEvent($event)->id;
 
-        DB::transaction(function () use ($event, $registration, $studentIds) {
+        DB::transaction(function () use ($event, $registration, $studentIds, $feeOwnerEventId) {
             // Lock the school's aggregate fee record for the duration of the status flip +
             // recalculate, so a concurrent cancel/reject on the same school can't interleave.
-            // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4.
-            FestSchoolEventFee::where('event_id', $event->id)
+            // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4. Must lock under the fee
+            // OWNER event (the hub, for a partitioned child) — recalculate() always persists
+            // the record there, so locking by $event->id directly locked a row that never
+            // existed for a region child, silently defeating the lock.
+            FestSchoolEventFee::where('event_id', $feeOwnerEventId)
                 ->where('school_id', $registration->school_id)
                 ->whereNull('head_id')
                 ->lockForUpdate()
@@ -99,7 +107,8 @@ class FestRegistrationService
      */
     public function cancelWithRefund(FestRegistration $registration, FestEvent $event, string $reason, bool $notify = true): void
     {
-        abort_if($registration->event_id !== $event->id, 422);
+        // See cancel() above for why this can't be a strict id match.
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 422);
         abort_unless(trim($reason) !== '', 422, 'A reason is required to cancel a paid, approved registration.');
         abort_unless($this->canAdminCancelWithRefund($registration, $event), 422,
             'This registration cannot be cancelled with refund — it is already closed, results are published, or it was never paid.');
@@ -109,6 +118,7 @@ class FestRegistrationService
         $registration->loadMissing('item', 'participants');
         $headId = $registration->item?->head_id;
         $participantIds = $registration->participants->pluck('id');
+        $feeOwnerEventId = $feeService->feeOwnerEvent($event)->id;
 
         // Lock the school's aggregate fee record for the duration of the snapshot/update/
         // credit critical section, so a concurrent cancel/reject on the same school can't
@@ -116,8 +126,9 @@ class FestRegistrationService
         // stay outside, after commit. See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §13.4.
         $studentIds = $registration->participants->pluck('student_id')->filter()->unique();
 
-        $creditAmount = DB::transaction(function () use ($event, $registration, $feeService, $reason, $participantIds, $studentIds) {
-            FestSchoolEventFee::where('event_id', $event->id)
+        $creditAmount = DB::transaction(function () use ($event, $registration, $feeService, $reason, $participantIds, $studentIds, $feeOwnerEventId) {
+            // Locked under the fee OWNER event — see cancel() above for why.
+            FestSchoolEventFee::where('event_id', $feeOwnerEventId)
                 ->where('school_id', $registration->school_id)
                 ->whereNull('head_id')
                 ->lockForUpdate()

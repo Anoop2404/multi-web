@@ -105,7 +105,10 @@ class FestPortalController extends Controller
             ])
             ->all();
 
-        $marks = FestMark::where('event_id', $event->id)
+        // A partitioned hub's marks live on its region/finale children, not the hub's own
+        // event_id — without this expansion, a partitioned hub's public results page
+        // showed zero item results even after results_published was cascaded true.
+        $marks = FestMark::whereIn('event_id', $event->reportableEventIds())
             ->whereIn('position', [1, 2, 3])
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('item_id')
@@ -177,10 +180,10 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        abort_if($item->event_id !== $event->id, 404);
+        abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
         abort_unless($event->results_published, 404);
 
-        $marks = FestMark::where('event_id', $event->id)
+        $marks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
             ->with(['participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('position')
@@ -209,8 +212,8 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        abort_if($item->event_id !== $event->id, 404);
-        abort_if($mark->event_id !== $event->id || $mark->item_id !== $item->id, 404);
+        abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
+        abort_if($mark->event_id !== $item->event_id || $mark->item_id !== $item->id, 404);
         abort_unless($event->results_published, 404);
         abort_if(! in_array((int) $mark->position, [1, 2, 3], true), 404);
 
@@ -226,10 +229,10 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        abort_if($item->event_id !== $event->id, 404);
+        abort_unless(in_array($item->event_id, $event->reportableEventIds(), true), 404);
         abort_unless($event->results_published, 404);
 
-        $marks = FestMark::where('event_id', $event->id)
+        $marks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
             ->with(['participant.student', 'participant.teacher', 'participant.registration.school'])
             ->orderBy('position')
@@ -288,7 +291,7 @@ class FestPortalController extends Controller
             $scoreboardTitle = $category ? ($categoryLabels[$category] ?? strtoupper($category)) : 'Overall';
         }
 
-        $latestWinners = FestMark::where('event_id', $event->id)
+        $latestWinners = FestMark::whereIn('event_id', $event->reportableEventIds())
             ->whereIn('position', [1, 2, 3])
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->latest('updated_at')
@@ -356,7 +359,7 @@ class FestPortalController extends Controller
             'url'   => route('tenant.fest.scoreboard', ['event' => $event->id, 'category' => $key]),
         ])->all();
 
-        $nowSlot = FestSchedule::where('event_id', $event->id)
+        $nowSlot = FestSchedule::whereIn('event_id', $event->reportableEventIds())
             ->whereNotNull('scheduled_at')
             ->where('scheduled_at', '<=', now())
             ->orderByDesc('scheduled_at')
@@ -467,7 +470,7 @@ class FestPortalController extends Controller
     /** @return list<array<string, mixed>> */
     private function mapScheduleRows(FestEvent $event, ?int $itemId = null): array
     {
-        $query = FestSchedule::where('event_id', $event->id)
+        $query = FestSchedule::whereIn('event_id', $event->reportableEventIds())
             ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.item', 'participant.registration.event']);
 
         if ($itemId) {

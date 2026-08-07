@@ -23,13 +23,42 @@ use Illuminate\Validation\Rule;
  */
 class FestFoodHostBillingController extends SchoolAdminController
 {
+    /**
+     * Gate access to the FEATURE (can this school reach the food-host billing pages at
+     * all for this event) — either as the event's CURRENT designated host, or as a
+     * FORMER host with at least one bill still snapshotted to them (see
+     * FestFoodBill::firstOrCreateForSchool()'s payee-snapshot doc). Individual bill
+     * actions below additionally check the bill's OWN snapshot via assertBillBelongsToHost()
+     * — this method alone is not sufficient to authorize access to a specific bill, since
+     * the event's current host_school_id can change after bills already exist (Phase 4
+     * audit item 4: the old version gated purely on the event's CURRENT host, which meant
+     * a newly-designated host could see billing they were never actually payee for, while
+     * changing the host silently locked the real original host out of their own history).
+     */
     private function assertIsHost(FestEvent $event): void
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $isCurrentHost = $event->food_payee_type === 'host_school' && $event->food_host_school_id === $this->school->id;
+        $wasFormerHost = FestFoodBill::where('event_id', $event->id)
+            ->where('payee_type', 'host_school')
+            ->where('host_school_id', $this->school->id)
+            ->exists();
+
+        abort_unless($isCurrentHost || $wasFormerHost, 403, 'Your school is not the designated food payee for this event.');
+    }
+
+    /**
+     * Per-bill authorization: the bill must actually be snapshotted to THIS school as
+     * payee — never derived from the event's current food_host_school_id, which may have
+     * moved on since this bill was created. See assertIsHost()'s docblock above.
+     */
+    private function assertBillBelongsToHost(FestFoodBill $bill): void
+    {
         abort_unless(
-            $event->food_payee_type === 'host_school' && $event->food_host_school_id === $this->school->id,
+            $bill->payee_type === 'host_school' && $bill->host_school_id === $this->school->id,
             403,
-            'Your school is not the designated food payee for this event.'
+            'This bill is not payable to your school.'
         );
     }
 
@@ -37,7 +66,13 @@ class FestFoodHostBillingController extends SchoolAdminController
     {
         $this->assertIsHost($event);
 
+        // Scoped to bills actually snapshotted to THIS school as host — not every bill on
+        // the event (see assertIsHost()'s docblock; the previous version showed all bills
+        // regardless of payee, including 'sahodaya'-payee ones this school has no business
+        // seeing).
         $bills = FestFoodBill::where('event_id', $event->id)
+            ->where('payee_type', 'host_school')
+            ->where('host_school_id', $this->school->id)
             ->withCount('orderItems')
             ->orderByDesc('updated_at')
             ->get();
@@ -67,6 +102,7 @@ class FestFoodHostBillingController extends SchoolAdminController
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
+        $this->assertBillBelongsToHost($bill);
 
         $bill->load(['orderItems', 'payments']);
         $school = Tenant::find($bill->school_id);
@@ -93,6 +129,7 @@ class FestFoodHostBillingController extends SchoolAdminController
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
+        $this->assertBillBelongsToHost($bill);
         abort_if($bill->status !== FestFoodBill::STATUS_OPEN, 422, 'This bill is settled/cancelled and no longer editable.');
 
         $data = $request->validate([
@@ -117,6 +154,7 @@ class FestFoodHostBillingController extends SchoolAdminController
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
+        $this->assertBillBelongsToHost($bill);
         abort_if($orderItem->bill_id !== $bill->id, 404);
         abort_if($bill->status !== FestFoodBill::STATUS_OPEN, 422, 'This bill is settled/cancelled and no longer editable.');
 
@@ -130,6 +168,7 @@ class FestFoodHostBillingController extends SchoolAdminController
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
+        $this->assertBillBelongsToHost($bill);
 
         $data = $request->validate([
             'amount' => 'required|numeric|min:0.01|max:9999999.99',
@@ -137,13 +176,16 @@ class FestFoodHostBillingController extends SchoolAdminController
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $payment = $bill->payments()->create([
-            ...$data,
-            'receipt_number' => FestFoodPayment::generateReceiptNumber($bill),
-            'received_by_user_id' => $request->user()->id,
-            'received_at' => now(),
-        ]);
-        $bill->recalculate();
+        // See FestFoodPayment::recordForBill() — atomically enforces the bill isn't
+        // settled/cancelled and the amount doesn't exceed the outstanding balance
+        // (Phase 4 audit items 1, 2, 5).
+        $payment = FestFoodPayment::recordForBill(
+            $bill,
+            (float) $data['amount'],
+            $data['payment_mode'],
+            $data['notes'] ?? null,
+            $request->user()->id,
+        );
 
         return back()->with('success', "Payment recorded ({$payment->receipt_number}).");
     }
@@ -152,6 +194,8 @@ class FestFoodHostBillingController extends SchoolAdminController
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
+        $this->assertBillBelongsToHost($bill);
+        abort_if($bill->balanceDue() > 0.0, 422, 'This bill has an outstanding balance of ₹'.number_format($bill->balanceDue(), 2).' — record the remaining payment before settling.');
 
         $bill->update([
             'status' => FestFoodBill::STATUS_SETTLED,
@@ -162,10 +206,24 @@ class FestFoodHostBillingController extends SchoolAdminController
         return back()->with('success', 'Bill settled.');
     }
 
+    public function voidPayment(string $tenantId, FestEvent $event, FestFoodBill $bill, FestFoodPayment $payment)
+    {
+        $this->assertIsHost($event);
+        abort_if($bill->event_id !== $event->id, 404);
+        $this->assertBillBelongsToHost($bill);
+        abort_if($payment->bill_id !== $bill->id, 404);
+
+        $receiptNumber = $payment->receipt_number;
+        $payment->voidPayment();
+
+        return back()->with('success', "Payment {$receiptNumber} voided.");
+    }
+
     public function reopen(string $tenantId, FestEvent $event, FestFoodBill $bill)
     {
         $this->assertIsHost($event);
         abort_if($bill->event_id !== $event->id, 404);
+        $this->assertBillBelongsToHost($bill);
 
         $bill->update(['status' => FestFoodBill::STATUS_OPEN, 'settled_at' => null, 'settled_by_user_id' => null]);
 
@@ -182,6 +240,7 @@ class FestFoodHostBillingController extends SchoolAdminController
         $this->assertIsHost($event);
         $bill = FestFoodBill::findOrFail($bill);
         abort_if($bill->event_id !== $event->id, 404);
+        $this->assertBillBelongsToHost($bill);
 
         $bill->load(['orderItems', 'payments', 'school', 'hostSchool']);
         $sahodaya = Tenant::find($event->tenant_id);
@@ -198,7 +257,10 @@ class FestFoodHostBillingController extends SchoolAdminController
     {
         $this->assertIsHost($event);
 
-        $bills = FestFoodBill::where('event_id', $event->id)->get();
+        $bills = FestFoodBill::where('event_id', $event->id)
+            ->where('payee_type', 'host_school')
+            ->where('host_school_id', $this->school->id)
+            ->get();
         $schools = Tenant::whereIn('id', $bills->pluck('school_id')->unique())->pluck('name', 'id');
 
         $rows = $bills->map(fn (FestFoodBill $b) => [

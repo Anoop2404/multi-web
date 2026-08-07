@@ -61,6 +61,30 @@
             </button>
         </section>
 
+        <!-- SECTION 1b: PRINCIPAL VERIFICATION -->
+        <section class="card space-y-4 border-2 border-emerald-100 bg-gradient-to-br from-emerald-50/30 to-white mb-6">
+            <div class="border-b border-emerald-100 pb-3">
+                <h2 class="text-base font-bold text-gray-900 flex items-center gap-2"><span>🛡️</span> Principal Verification — {{ selectedYear }}</h2>
+                <p class="text-xs text-gray-500 mt-0.5">
+                    When required, schools must certify results through Principal/Vice Principal sign-off before they can be submitted to Sahodaya.
+                    Recommended: enable only after Principal/Vice Principal accounts are set up for your member schools.
+                </p>
+            </div>
+
+            <label class="flex items-center gap-2.5 bg-white rounded-xl border border-gray-200 p-3.5 cursor-pointer">
+                <input type="checkbox" v-model="certificationForm.required" class="rounded border-gray-300 text-emerald-600 w-4 h-4">
+                <span class="text-sm font-bold text-gray-800">Require Principal Verification for {{ selectedYear }}</span>
+            </label>
+            <p class="text-xs text-gray-500">
+                Schools that haven't started certification for a result can still submit it directly until this is enabled. Once a school starts
+                Principal Verification for a result, direct submission is always blocked for that result regardless of this setting.
+            </p>
+
+            <button type="button" class="btn-primary text-sm" :disabled="certificationForm.processing" @click="saveCertificationRequired">
+                Save
+            </button>
+        </section>
+
         <!-- SECTION 2: MARKS SETTINGS -->
         <section class="card space-y-4 mb-6">
             <div class="border-b border-gray-100 pb-3">
@@ -137,6 +161,7 @@ const props = defineProps({
     academicYear: String,
     academicYearOptions: { type: Array, default: () => [] },
     entryWindow: { type: Object, default: () => ({}) },
+    certificationRequired: { type: Boolean, default: null },
     streams: { type: Array, default: () => [] },
     classXTotalMarks: { type: Number, default: 500 },
     classXIsYearSpecific: { type: Boolean, default: false },
@@ -180,6 +205,23 @@ function saveEntryWindow() {
     }, {
         preserveScroll: true,
         onFinish: () => { entryForm.processing = false; },
+    });
+}
+
+// ── Principal Verification (certification) ─────────────────────────────────
+const certificationForm = reactive({
+    required: props.certificationRequired ?? false,
+    processing: false,
+});
+
+function saveCertificationRequired() {
+    certificationForm.processing = true;
+    router.put(`${base.value}/settings/certification-required`, {
+        academic_year: selectedYear.value,
+        required: certificationForm.required,
+    }, {
+        preserveScroll: true,
+        onFinish: () => { certificationForm.processing = false; },
     });
 }
 

@@ -14,11 +14,34 @@ class FestEventPhase extends Model
         'code',
         'sort_order',
         'is_default',
+        'starts_at',
+        'ends_at',
+        'registration_open',
+        'registration_close',
+        'registration_locked',
+        'food_cutoff_at',
+        'status',
+        'scoring_locked',
+        'schedule_published',
+        'results_published',
+        'appeals_open',
+        'appeal_deadline_at',
     ];
 
     protected $casts = [
         'sort_order' => 'integer',
         'is_default' => 'boolean',
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
+        'registration_open' => 'datetime',
+        'registration_close' => 'datetime',
+        'registration_locked' => 'boolean',
+        'food_cutoff_at' => 'datetime',
+        'scoring_locked' => 'boolean',
+        'schedule_published' => 'boolean',
+        'results_published' => 'boolean',
+        'appeals_open' => 'boolean',
+        'appeal_deadline_at' => 'datetime',
     ];
 
     public function event(): BelongsTo

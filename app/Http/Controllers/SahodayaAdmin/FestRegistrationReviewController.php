@@ -268,7 +268,14 @@ class FestRegistrationReviewController extends SahodayaAdminController
     public function approve(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($registration->event_id !== $event->id, 403);
+        // Registrations for a partitioned hub are actually created against the school's
+        // assigned REGION child event (see FestRegistrationCreateService), not the hub
+        // itself — a strict $registration->event_id !== $event->id check 403'd every
+        // individual approve/reject/cancel/substitute action against a child-event
+        // registration, even though the review page (list()) already lists them via
+        // reportableEventIds(). Bulk actions (FestRegistrationBulkService) already used
+        // reportableEventIds() correctly; this brings the individual actions in line.
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
 
         EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
 
@@ -301,7 +308,14 @@ class FestRegistrationReviewController extends SahodayaAdminController
     public function reject(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($registration->event_id !== $event->id, 403);
+        // Registrations for a partitioned hub are actually created against the school's
+        // assigned REGION child event (see FestRegistrationCreateService), not the hub
+        // itself — a strict $registration->event_id !== $event->id check 403'd every
+        // individual approve/reject/cancel/substitute action against a child-event
+        // registration, even though the review page (list()) already lists them via
+        // reportableEventIds(). Bulk actions (FestRegistrationBulkService) already used
+        // reportableEventIds() correctly; this brings the individual actions in line.
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
 
         EventLifecycleGate::allowRegistrationReview($event, $request->boolean('override_lifecycle'));
 
@@ -357,7 +371,14 @@ class FestRegistrationReviewController extends SahodayaAdminController
     public function cancel(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($registration->event_id !== $event->id, 403);
+        // Registrations for a partitioned hub are actually created against the school's
+        // assigned REGION child event (see FestRegistrationCreateService), not the hub
+        // itself — a strict $registration->event_id !== $event->id check 403'd every
+        // individual approve/reject/cancel/substitute action against a child-event
+        // registration, even though the review page (list()) already lists them via
+        // reportableEventIds(). Bulk actions (FestRegistrationBulkService) already used
+        // reportableEventIds() correctly; this brings the individual actions in line.
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
 
         abort_unless(
             app(FestRegistrationService::class)->canAdminCancel($registration, $event),
@@ -380,7 +401,14 @@ class FestRegistrationReviewController extends SahodayaAdminController
     public function cancelWithRefund(Request $request, string $tenantId, FestEvent $event, FestRegistration $registration)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($registration->event_id !== $event->id, 403);
+        // Registrations for a partitioned hub are actually created against the school's
+        // assigned REGION child event (see FestRegistrationCreateService), not the hub
+        // itself — a strict $registration->event_id !== $event->id check 403'd every
+        // individual approve/reject/cancel/substitute action against a child-event
+        // registration, even though the review page (list()) already lists them via
+        // reportableEventIds(). Bulk actions (FestRegistrationBulkService) already used
+        // reportableEventIds() correctly; this brings the individual actions in line.
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
 
         $data = $request->validate([
             'reason' => 'required|string|max:500',
@@ -400,7 +428,14 @@ class FestRegistrationReviewController extends SahodayaAdminController
     public function substitute(string $tenantId, FestEvent $event, FestRegistration $registration, FestParticipant $performer, FestParticipant $standby)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($registration->event_id !== $event->id, 403);
+        // Registrations for a partitioned hub are actually created against the school's
+        // assigned REGION child event (see FestRegistrationCreateService), not the hub
+        // itself — a strict $registration->event_id !== $event->id check 403'd every
+        // individual approve/reject/cancel/substitute action against a child-event
+        // registration, even though the review page (list()) already lists them via
+        // reportableEventIds(). Bulk actions (FestRegistrationBulkService) already used
+        // reportableEventIds() correctly; this brings the individual actions in line.
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
         abort_if($performer->registration_id !== $registration->id || $standby->registration_id !== $registration->id, 403);
 
         app(FestRegistrationService::class)->substitutePerformer($performer, $standby);

@@ -143,15 +143,23 @@ class EventLifecycleGate
 
     private static function assertAllParticipantsMarked(FestEvent $event): void
     {
+        // A partitioned hub's registrations/marks live on its region/finale children
+        // (see FestRegistrationCreateService/FestRegistrationRouterService), never the
+        // hub's own event_id — filtering by the hub id alone found zero participants and
+        // silently passed this gate (Phase 3 audit item 1: "prevent hub result
+        // publication until every applicable child is fully marked"). reportableEventIds()
+        // is a no-op ([$event->id]) for anything that isn't a partitioned hub.
+        $eventIds = $event->reportableEventIds();
+
         $participantCount = FestParticipant::whereHas('registration', fn ($q) => $q
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $eventIds)
             ->where('status', 'approved'))
             ->where(function ($q) {
                 $q->where('participant_role', 'performer')->orWhereNull('participant_role');
             })
             ->count();
 
-        $markedCount = FestMark::where('event_id', $event->id)
+        $markedCount = FestMark::whereIn('event_id', $eventIds)
             ->where(function ($q) {
                 $q->whereNotNull('grade')->orWhereNotNull('score')->orWhereNotNull('position');
             })

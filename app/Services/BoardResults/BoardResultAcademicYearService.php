@@ -270,4 +270,15 @@ class BoardResultAcademicYearService
             ->where('academic_year', $result->academic_year)
             ->first();
     }
+
+    /**
+     * Whether Principal Verification is mandatory for this result's Sahodaya + academic
+     * year — plan §13 Phase 5 go-live gating. Defaults to false (not required) unless a
+     * Sahodaya admin has explicitly opted the year in via Board Results Settings, so
+     * historical/unmigrated years are never unexpectedly blocked.
+     */
+    public function isCertificationRequired(BoardResult $result): bool
+    {
+        return $this->windowForResult($result)?->certification_required === true;
+    }
 }

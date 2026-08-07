@@ -381,6 +381,48 @@ class NotificationTemplatesSeeder extends Seeder
                 'body_template' => 'Your Class {{class}} ({{examination_type}}) result for {{academic_year}} is now published. Pass %: {{pass_percent}}.',
             ],
 
+            // --- Principal Verification / certification packages (docs/BOARD_RESULTS_PRINCIPAL_VERIFICATION_PLAN.md §11) ---
+            [
+                'slug'          => 'board_result_certification.review_requested',
+                'title'         => 'Principal Verification requested',
+                'body_template' => 'Class {{class}} ({{examination_type}}) result for {{academic_year}} at {{school_name}} is ready for your review and signature (package v{{version}}).',
+            ],
+            [
+                'slug'          => 'board_result_certification.report_returned',
+                'title'         => 'Certification report returned for correction',
+                'body_template' => 'The {{report_label}} report for Class {{class}} ({{academic_year}}) was returned: {{reason}}',
+            ],
+            [
+                'slug'          => 'board_result_certification.reminder',
+                'title'         => 'Principal Verification pending',
+                'body_template' => 'Class {{class}} ({{examination_type}}) result for {{academic_year}} at {{school_name}} is still awaiting signature before the deadline.',
+            ],
+            [
+                'slug'          => 'board_result_certification.submitted',
+                'title'         => 'Certified result package submitted',
+                'body_template' => '{{school_name}} submitted a fully signed Class {{class}} ({{examination_type}}) result package for {{academic_year}} (v{{version}}).',
+            ],
+            [
+                'slug'          => 'board_result_certification.sahodaya_returned',
+                'title'         => 'Certified package returned by Sahodaya',
+                'body_template' => 'Your certified Class {{class}} ({{examination_type}}) package for {{academic_year}} was returned: {{reason}}',
+            ],
+            [
+                'slug'          => 'board_result_certification.sahodaya_verified',
+                'title'         => 'Certified package verified',
+                'body_template' => 'Your certified Class {{class}} ({{examination_type}}) package for {{academic_year}} has been verified by Sahodaya.',
+            ],
+            [
+                'slug'          => 'board_result_certification.sahodaya_approved',
+                'title'         => 'Certified package approved',
+                'body_template' => 'Your certified Class {{class}} ({{examination_type}}) package for {{academic_year}} has been approved by Sahodaya.',
+            ],
+            [
+                'slug'          => 'board_result_certification.sahodaya_published',
+                'title'         => 'Certified package published',
+                'body_template' => 'Your certified Class {{class}} ({{examination_type}}) package for {{academic_year}} is now published.',
+            ],
+
             // --- Full HTML transactional emails (membership, fee receipts, auth) ---
             // These render inside branded Blade layouts (logo, buttons, tables) rather
             // than the plain-text notification wrapper; only the title/paragraph wording

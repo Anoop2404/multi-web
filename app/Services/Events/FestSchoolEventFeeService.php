@@ -39,6 +39,33 @@ class FestSchoolEventFeeService
         return ($schedule['fee_model'] ?? 'none') !== 'none';
     }
 
+    /**
+     * The event whose FestSchoolEventFee rows actually hold a school's fee/payment state
+     * for $event: the partitioned hub, if $event is one of its region/finale children —
+     * otherwise $event itself, unchanged. recalculate() (below) always persists a
+     * partitioned child's fee record under the HUB's event_id, mirroring resolveSchedule()'s
+     * own redirect for fee configuration. Every read that queries FestSchoolEventFee
+     * directly by event_id (isPaid(), hasApprovedPaymentForRegistration(),
+     * currentFeeRecordFor(), itemPaymentAllocation()) MUST go through this first, or it
+     * silently queries a row that only ever exists under the hub's id, and gets nothing
+     * back — even for a school that has fully paid. This was one of the concrete Phase 2
+     * gaps: several of these reads had no such redirect while resolveSchedule()/
+     * recalculate() already did, so passing a child event (which is what schools and some
+     * portal/admin surfaces actually operate against day to day) silently reported "unpaid"
+     * or "no fee record" regardless of the real, hub-owned state.
+     */
+    public function feeOwnerEvent(FestEvent $event): FestEvent
+    {
+        if ($event->parent_event_id) {
+            $hub = FestEvent::find($event->parent_event_id);
+            if ($hub && ($hub->conduct_mode ?? 'standard') === 'partitioned') {
+                return $hub;
+            }
+        }
+
+        return $event;
+    }
+
     /** @return array<string, mixed> */
     public function resolveSchedule(FestEvent $event): array
     {
@@ -1013,7 +1040,7 @@ class FestSchoolEventFeeService
             return true;
         }
 
-        $fee = FestSchoolEventFee::where('event_id', $event->id)
+        $fee = FestSchoolEventFee::where('event_id', $this->feeOwnerEvent($event)->id)
             ->where('school_id', $schoolId)
             ->first();
 
@@ -1074,7 +1101,7 @@ class FestSchoolEventFeeService
         $registration->loadMissing('item');
         $headId = $registration->item?->head_id;
 
-        $query = FestSchoolEventFee::where('event_id', $event->id)
+        $query = FestSchoolEventFee::where('event_id', $this->feeOwnerEvent($event)->id)
             ->where('school_id', $registration->school_id);
 
         if ($headId && $this->usesPerHeadBilling($event)) {
@@ -1101,7 +1128,7 @@ class FestSchoolEventFeeService
      */
     public function currentFeeRecordFor(FestEvent $event, string $schoolId): ?FestSchoolEventFee
     {
-        return FestSchoolEventFee::where('event_id', $event->id)
+        return FestSchoolEventFee::where('event_id', $this->feeOwnerEvent($event)->id)
             ->where('school_id', $schoolId)
             ->whereNull('head_id')
             ->first();
@@ -1313,7 +1340,7 @@ class FestSchoolEventFeeService
             return [];
         }
 
-        $fee = FestSchoolEventFee::where('event_id', $event->id)
+        $fee = FestSchoolEventFee::where('event_id', $this->feeOwnerEvent($event)->id)
             ->where('school_id', $schoolId)
             ->whereNull('head_id')
             ->first();
