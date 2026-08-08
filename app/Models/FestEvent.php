@@ -342,15 +342,19 @@ class FestEvent extends Model
      */
     public function reportableEventIds(): array
     {
-        $ids = [$this->id];
+        $ids = [(int) $this->id];
+
+        if ($this->parent_event_id) {
+            $ids[] = (int) $this->parent_event_id;
+        }
 
         if ($this->isSportsSeasonEvent()
             || ($this->parent_event_id === null && ($this->conduct_mode ?? 'standard') === 'partitioned')
         ) {
-            $ids = array_merge($ids, self::where('parent_event_id', $this->id)->pluck('id')->all());
+            $ids = array_merge($ids, self::where('parent_event_id', $this->id)->pluck('id')->map(fn ($id) => (int) $id)->all());
         }
 
-        return $ids;
+        return array_values(array_unique($ids));
     }
 
     /**
