@@ -3,7 +3,7 @@
     <tr v-if="layout === 'sports'" :id="rowId" class="group hover:bg-slate-50/80 transition-colors">
         <td class="px-3 py-2.5 align-middle">
             <div class="flex flex-wrap items-center gap-1.5">
-                <p class="font-medium text-slate-900 text-sm leading-snug">{{ item.title }}</p>
+                <p class="font-medium text-slate-900 text-sm leading-snug">{{ displayTitle }}</p>
                 <span v-if="statusLabel"
                       class="inline-flex shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border"
                       :class="statusClass">
@@ -93,7 +93,7 @@
     <tr v-else :id="rowId" class="hover:bg-gray-50/40">
         <td class="px-3 py-2">
             <div class="flex flex-wrap items-center gap-1.5">
-                <p class="font-medium text-gray-900 text-sm">{{ item.title }}</p>
+                <p class="font-medium text-gray-900 text-sm">{{ displayTitle }}</p>
                 <span v-if="statusLabel"
                       class="inline-flex shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border"
                       :class="statusClass">
@@ -175,7 +175,7 @@
     <FestStudentPickerModal
         v-if="!isTeacherFest"
         v-model="pickerOpen"
-        :title="`${item.title} — pick ${performerLabel}`"
+        :title="`${displayTitle} — pick ${performerLabel}`"
         :subtitle="pickerSubtitle"
         :entries="rosterEntries"
         v-model:selected-ids="pickerModel"
@@ -200,7 +200,7 @@
     <FestStudentPickerModal
         v-if="!isTeacherFest && showStandbyPicker"
         v-model="standbyPickerOpen"
-        :title="`${item.title} — pick standbys`"
+        :title="`${displayTitle} — pick standbys`"
         subtitle="Optional substitutes — max 2"
         :entries="standbyEntries"
         v-model:selected-ids="standbyModel"
@@ -212,7 +212,7 @@
     <FestStudentPickerModal
         v-else-if="isTeacherFest"
         v-model="pickerOpen"
-        :title="`${item.title} — pick teachers`"
+        :title="`${displayTitle} — pick teachers`"
         :subtitle="pickerSubtitle"
         :entries="teacherEntries"
         v-model:selected-ids="pickerModel"
@@ -272,6 +272,11 @@ const showStandbyPicker = computed(() => {
     if (props.item.max_subs != null && props.item.max_subs > 0) return true;
     if (props.item.standbys != null && props.item.standbys > 0) return true;
     return isGroup.value;
+});
+
+const displayTitle = computed(() => {
+    const raw = props.item?.clean_title || props.item?.title || '';
+    return String(raw).replace(/_/g, ' ');
 });
 
 const isGroup = computed(() => ['group', 'team'].includes(props.item.participant_type));
