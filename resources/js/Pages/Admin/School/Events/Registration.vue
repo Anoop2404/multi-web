@@ -966,14 +966,41 @@ function formatMoney(value) {
 }
 
 function registrationsForItem(eventId, itemId) {
-    return (props.registrations ?? []).filter((reg) => {
-        const directMatch = Number(reg.event_id) === Number(eventId)
-            && Number(reg.item_id) === Number(itemId);
-        const partitionMatch = Number(reg.event?.parent_event_id) === Number(eventId)
-            && Number(reg.item?.inherited_from_item_id) === Number(itemId);
+    const numEventId = Number(eventId);
+    const numItemId = Number(itemId);
 
-        return (directMatch || partitionMatch)
-            && !['withdrawn', 'rejected'].includes(reg.status);
+    let targetItem = null;
+    for (const ev of (props.events ?? [])) {
+        const found = (ev.items ?? []).find(i => Number(i.id) === numItemId);
+        if (found) { targetItem = found; break; }
+    }
+    const targetInheritedId = targetItem?.inherited_from_item_id ? Number(targetItem.inherited_from_item_id) : null;
+
+    return (props.registrations ?? []).filter((reg) => {
+        if (['withdrawn', 'rejected'].includes(reg.status)) {
+            return false;
+        }
+
+        const regItemId = Number(reg.item_id);
+        const regInheritedId = reg.item?.inherited_from_item_id ? Number(reg.item.inherited_from_item_id) : null;
+
+        const itemMatch = regItemId === numItemId
+            || (targetInheritedId !== null && regItemId === targetInheritedId)
+            || (regInheritedId !== null && regInheritedId === numItemId)
+            || (targetInheritedId !== null && regInheritedId !== null && regInheritedId === targetInheritedId);
+
+        if (!itemMatch) {
+            return false;
+        }
+
+        const regEventId = Number(reg.event_id);
+        const regParentEventId = reg.event?.parent_event_id ? Number(reg.event.parent_event_id) : null;
+
+        const eventMatch = regEventId === numEventId
+            || regParentEventId === numEventId
+            || (props.event?.parent_event_id && regEventId === Number(props.event.parent_event_id));
+
+        return eventMatch;
     });
 }
 
@@ -1776,7 +1803,12 @@ const incompleteSquads = computed(() => {
     if (!props.registrations || !props.events) return [];
     const list = [];
     for (const reg of props.registrations) {
-        const item = props.events.flatMap(ev => ev.items ?? []).find(it => Number(it.id) === Number(reg.item_id));
+        const regItemId = Number(reg.item_id);
+        const item = props.events.flatMap(ev => ev.items ?? []).find(it => {
+            const id = Number(it.id);
+            const inhId = it.inherited_from_item_id ? Number(it.inherited_from_item_id) : null;
+            return id === regItemId || (inhId !== null && inhId === regItemId);
+        });
         if (!item) continue;
         const isGroup = ['group', 'team'].includes(item.participant_type);
         if (!isGroup) continue;
