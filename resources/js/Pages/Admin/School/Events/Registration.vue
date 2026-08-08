@@ -1314,13 +1314,9 @@ function standbyCount(reg) {
 
 function canWithdraw(reg) {
     if (['withdrawn', 'rejected'].includes(reg.status)) return false;
-    const event = props.events.find(e => e.id === reg.event_id);
+    const event = props.events.find(e => Number(e.id) === Number(reg.event_id) || Number(e.parent_event_id) === Number(reg.event_id)) ?? props.events[0];
     if (!event) return reg.status === 'submitted';
     if (event.results_published || ['completed', 'cancelled'].includes(event.status)) return false;
-    // Mirrors the server-side rule (FestRegistrationService::canSchoolCancel): once the
-    // school has an approved/paid fee for this event, cancellation is blocked to avoid
-    // an out-of-sync fee ledger. Without this check the Cancel link was always shown and
-    // always failed with a 422 once payment was approved.
     const fee = event.school_fee;
     if (fee && (fee.status === 'approved' || Number(fee.amount_paid ?? 0) > 0)) return false;
     return event.status === 'registration_open' || reg.status === 'submitted';
@@ -1333,7 +1329,7 @@ function withdraw(id) {
 
 function canEdit(reg) {
     if (['withdrawn', 'rejected'].includes(reg.status)) return false;
-    const event = props.events.find(e => e.id === reg.event_id);
+    const event = props.events.find(e => Number(e.id) === Number(reg.event_id) || Number(e.parent_event_id) === Number(reg.event_id)) ?? props.events[0];
     if (!event) return reg.status === 'submitted';
     if (event.schedule_published || event.results_published || ['completed', 'cancelled'].includes(event.status)) return false;
     return event.status === 'registration_open' || reg.status === 'submitted';
