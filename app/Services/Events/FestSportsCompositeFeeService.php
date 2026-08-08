@@ -121,9 +121,10 @@ class FestSportsCompositeFeeService
                     }
                 }
 
+                $itemTitle = str_replace('_', ' ', $registration->item->title ?? 'Item');
                 $lines[] = [
                     'line_type' => $waived ? 'item_fee_waived' : 'item_fee',
-                    'label' => ($registration->item->title ?? 'Item').($waived ? ' (free quota)' : ''),
+                    'label' => $itemTitle.($waived ? ' (free quota)' : ''),
                     'quantity' => 1,
                     'unit_amount' => $amount,
                     'amount' => $amount,
@@ -146,34 +147,40 @@ class FestSportsCompositeFeeService
                 continue;
             }
 
+            $performersCount = $registration->participants
+                ->filter(fn ($p) => $p->participant_role !== 'standby' && $p->student_id)
+                ->count();
+
+            if ($performersCount === 0) {
+                continue;
+            }
+
             $eligible = (bool) ($registration->item->quota_eligible ?? false);
             $waived = $eligible && $teamQuotaUsed < $teamQuota;
             $itemOverride = $registration->item->fee_amount !== null ? (float) $registration->item->fee_amount : null;
+            $itemTitle = str_replace('_', ' ', $registration->item->title ?? 'Team item');
 
             if ($waived) {
                 $teamQuotaUsed++;
                 $amount = 0.0;
-                $itemLineLabel = ($registration->item->title ?? 'Team item').' — team fee (free quota)';
+                $itemLineLabel = $itemTitle.' — team fee (free quota)';
                 $quantity = 1;
                 $unitAmount = 0.0;
             } elseif ($itemOverride !== null) {
                 $amount = $itemOverride;
-                $itemLineLabel = ($registration->item->title ?? 'Team item').' — team fee (override)';
+                $itemLineLabel = $itemTitle.' — team fee (override)';
                 $quantity = 1;
                 $unitAmount = $itemOverride;
             } else {
                 if ($teamRegRate == 0) {
-                    $performersCount = $registration->participants
-                        ->filter(fn ($p) => $p->participant_role !== 'standby' && $p->student_id)
-                        ->count();
                     $itemFee = (float) ($defaultItemFee ?? $studentRegRate);
                     $amount = $itemFee * $performersCount;
-                    $itemLineLabel = ($registration->item->title ?? 'Team item')." ({$performersCount} × ₹".number_format($itemFee, 0).')';
+                    $itemLineLabel = $itemTitle." ({$performersCount} × ₹".number_format($itemFee, 0).')';
                     $quantity = $performersCount;
                     $unitAmount = $itemFee;
                 } else {
                     $amount = $teamRegRate;
-                    $itemLineLabel = ($registration->item->title ?? 'Team item').' — team fee';
+                    $itemLineLabel = $itemTitle.' — team fee';
                     $quantity = 1;
                     $unitAmount = $teamRegRate;
                 }
@@ -407,34 +414,40 @@ class FestSportsCompositeFeeService
                 continue;
             }
 
+            $performersCount = $registration->participants
+                ->filter(fn ($p) => $p->participant_role !== 'standby' && $p->student_id)
+                ->count();
+
+            if ($performersCount === 0) {
+                continue;
+            }
+
             $eligible = (bool) ($registration->item->quota_eligible ?? false);
             $waived = $eligible && $teamQuotaUsed < $teamQuota;
             $itemOverride = $registration->item->fee_amount !== null ? (float) $registration->item->fee_amount : null;
+            $itemTitle = str_replace('_', ' ', $registration->item->title ?? 'Team item');
 
             if ($waived) {
                 $teamQuotaUsed++;
                 $amount = 0.0;
-                $label = ($registration->item->title ?? 'Team item').' — team fee (free quota)';
+                $label = $itemTitle.' — team fee (free quota)';
                 $quantity = 1;
                 $unitAmount = 0.0;
             } elseif ($itemOverride !== null) {
                 $amount = $itemOverride;
-                $label = ($registration->item->title ?? 'Team item').' — team fee (override)';
+                $label = $itemTitle.' — team fee (override)';
                 $quantity = 1;
                 $unitAmount = $itemOverride;
             } else {
                 if ($teamRegRate == 0) {
-                    $performersCount = $registration->participants
-                        ->filter(fn ($p) => $p->participant_role !== 'standby' && $p->student_id)
-                        ->count();
                     $itemFee = (float) ($head->default_item_fee ?? $studentRegRate);
                     $amount = $itemFee * $performersCount;
-                    $label = ($registration->item->title ?? 'Team item')." ({$performersCount} × ₹".number_format($itemFee, 0).')';
+                    $label = $itemTitle." ({$performersCount} × ₹".number_format($itemFee, 0).')';
                     $quantity = $performersCount;
                     $unitAmount = $itemFee;
                 } else {
                     $amount = $teamRegRate;
-                    $label = ($registration->item->title ?? 'Team item').' — team fee';
+                    $label = $itemTitle.' — team fee';
                     $quantity = 1;
                     $unitAmount = $teamRegRate;
                 }
