@@ -51,7 +51,7 @@ class FestSportsCompositeFeeService
         $extraItemFee = $fees['extra_item_fee'] ?? null;
         $eventTitle = $event->title ?: 'Sport event';
 
-        $registrations = FestRegistration::where('event_id', $event->id)
+        $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             // A withdrawn/disabled/deleted item should never keep billing a school —
@@ -341,7 +341,7 @@ class FestSportsCompositeFeeService
         $individualQuota = max(0, (int) ($head->included_items_per_student ?? 0));
         $teamQuota = max(0, (int) ($head->included_teams ?? 0));
 
-        $registrations = FestRegistration::where('event_id', $head->event_id)
+        $registrations = FestRegistration::whereIn('event_id', $event ? $event->reportableEventIds() : [$head->event_id])
             ->where('school_id', $schoolId)
             ->whereIn('status', ['submitted', 'approved', 'pending_approval'])
             ->whereHas('item', fn ($q) => $q->where('head_id', $head->id)->where('is_enabled', true))
