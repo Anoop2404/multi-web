@@ -32,6 +32,14 @@ class FestReportController extends SahodayaAdminController
                 'headSummary'     => [],
             ];
 
+        $regions = \App\Models\Region::forTenant($tenantId)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code'])
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'code' => $r->code])
+            ->values()
+            ->all();
+
         return array_merge([
             'event'          => $event->only([
                 'id', 'title', 'event_type', 'status', 'event_start', 'event_end',
@@ -42,6 +50,7 @@ class FestReportController extends SahodayaAdminController
             'interactiveNav' => FestReportCatalog::interactivePages($tenantId, $event->id, $event->event_type),
             'currentPhase'   => EventLifecycleGate::currentReportPhase($event),
             'allowedPhases'  => EventLifecycleGate::allowedReportPhases($event),
+            'regions'        => $regions,
         ], $headContext, $extra);
     }
 
@@ -408,7 +417,17 @@ class FestReportController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $schoolId = $request->input('school_id');
-        $data = $register->build($event, $schoolId ?: null);
+        $regionId = $request->integer('region_id') ?: null;
+
+        $schoolIds = null;
+        if ($regionId && !$schoolId) {
+            $schoolIds = \App\Models\SchoolRegionAssignment::forTenant($this->sahodaya->id)
+                ->where('region_id', $regionId)
+                ->pluck('school_id')
+                ->all();
+        }
+
+        $data = $register->build($event, $schoolId ?: null, null, 50, null, null, $schoolIds);
 
         return $this->inertia('Sahodaya/Events/Reports/RegistrationRegister', $this->reportProps($tenantId, $event, [
             'rows'            => $data['rows'],
@@ -416,6 +435,7 @@ class FestReportController extends SahodayaAdminController
             'totals'          => $data['totals'],
             'schools'         => $register->schools($event),
             'filterSchoolId'  => $schoolId,
+            'filterRegionId'  => $regionId,
             'feesUrl'         => "/sahodaya-admin/{$tenantId}/events/{$event->id}/fees",
             'activityLogs'    => $this->pageActivityLogs($event, FestPageActivity::REPORTS),
         ]));

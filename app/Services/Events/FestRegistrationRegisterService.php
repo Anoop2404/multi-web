@@ -41,6 +41,7 @@ class FestRegistrationRegisterService
         int $perPage = 50,
         ?string $headId = null,
         ?string $itemId = null,
+        ?array $schoolIds = null,
     ): array {
         $schedule = $this->feeService->resolveSchedule($event);
         $feeRequired = $this->feeService->feeRequired($event);
@@ -53,6 +54,7 @@ class FestRegistrationRegisterService
         // fee row per school once whereIn() starts returning more than one row per school.
         $schoolFees = FestSchoolEventFee::whereIn('event_id', $eventIds)
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->when($schoolIds !== null, fn ($q) => $q->whereIn('school_id', $schoolIds))
             ->with('feeReceipt')
             ->get()
             ->groupBy('school_id')
@@ -68,6 +70,7 @@ class FestRegistrationRegisterService
 
         $registrations = FestRegistration::whereIn('event_id', $eventIds)
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->when($schoolIds !== null, fn ($q) => $q->whereIn('school_id', $schoolIds))
             ->whereNotIn('status', ['withdrawn', 'rejected'])
             // head_id/item_id come from the on-screen head/item filter dropdown. Filtering
             // here (not client-side) is required now that 'rows' can be a paginated slice —

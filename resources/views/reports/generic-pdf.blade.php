@@ -9,7 +9,7 @@
         html, body {
             font-family: DejaVu Sans, Arial, sans-serif;
             color: #1a2236;
-            font-size: 9px;
+            font-size: 11px;
             margin: 0; padding: 0;
             background: #fff;
         }
@@ -42,7 +42,7 @@
             text-align: left;
         }
         .org-name {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 700;
             color: #ffffff;
             letter-spacing: 0.3px;
@@ -50,8 +50,8 @@
             display: block;
         }
         .org-sub {
-            font-size: 7px;
-            color: rgba(255,255,255,0.5);
+            font-size: 9px;
+            color: rgba(255,255,255,0.7);
             text-transform: uppercase;
             letter-spacing: 1.2px;
             margin-top: 3px;
@@ -77,21 +77,21 @@
         }
         .info-cell:last-child { border-right: none; }
         .info-lbl {
-            font-size: 6.5px;
+            font-size: 8px;
             text-transform: uppercase;
             letter-spacing: 0.9px;
-            color: rgba(255,255,255,0.4);
+            color: rgba(255,255,255,0.6);
             display: block;
             margin-bottom: 2px;
         }
         .info-val {
-            font-size: 9px;
+            font-size: 11px;
             font-weight: 700;
             color: #ffffff;
             display: block;
         }
         .info-val-lg {
-            font-size: 9.5px;
+            font-size: 11.5px;
             font-weight: 700;
             color: #7eb3ff;
             display: block;
@@ -114,10 +114,10 @@
         }
         table.report-table thead tr { background: #0b2558; }
         table.report-table th {
-            color: #c8d9f5;
+            color: #ffffff;
             text-align: left;
             padding: 8px 10px;
-            font-size: 8px;
+            font-size: 10.5px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             font-weight: 700;
@@ -129,8 +129,8 @@
             border-bottom: 1px solid #e8edf5;
             border-right: 1px solid #eef1f8;
             vertical-align: middle;
-            font-size: 9px;
-            line-height: 1.35;
+            font-size: 10.5px;
+            line-height: 1.4;
         }
         table.report-table td:last-child { border-right: none; }
         table.report-table tbody tr:nth-child(odd)  td { background: #fff; }

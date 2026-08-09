@@ -30,8 +30,14 @@
                           :is-sports="event.event_type === 'sports'"
                           @apply="applyFilter">
             <template #extra>
+                <FormField v-if="regions?.length" label="Region" class-extra="mb-0 min-w-[10rem]">
+                    <select v-model="regionFilter" class="field text-sm" @change="applyFilter">
+                        <option value="">All regions</option>
+                        <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
+                    </select>
+                </FormField>
                 <FormField label="School" class-extra="mb-0 min-w-[12rem]">
-                    <select v-model="schoolFilter" class="field text-sm">
+                    <select v-model="schoolFilter" class="field text-sm" @change="applyFilter">
                         <option value="">All schools</option>
                         <option v-for="(name, id) in schools" :key="id" :value="id">{{ name }}</option>
                     </select>
@@ -40,6 +46,12 @@
         </ReportHeadFilter>
 
         <div v-else class="card !p-4 mb-4 flex flex-wrap gap-3 items-end">
+            <FormField v-if="regions?.length" label="Region" class-extra="mb-0">
+                <select v-model="regionFilter" class="field text-sm w-48" @change="applyFilter">
+                    <option value="">All regions</option>
+                    <option v-for="r in regions" :key="r.id" :value="r.id">{{ r.name }}</option>
+                </select>
+            </FormField>
             <FormField label="School" class-extra="mb-0">
                 <select v-model="schoolFilter" class="field text-sm w-56" @change="applyFilter">
                     <option value="">All schools</option>
@@ -149,6 +161,7 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, rows: Array, schoolSummaries: Array, totals: Object,
     schools: Object, filterSchoolId: { type: String, default: '' },
+    filterRegionId: { type: [Number, String], default: '' },
     feesUrl: String, activityLogs: { type: Array, default: () => [] },
 });
 
@@ -156,10 +169,12 @@ const page = usePage();
 const headItemGroups = computed(() => page.props.headItemGroups ?? []);
 const headsForFilter = computed(() => page.props.headsForFilter ?? []);
 const hasItemHeads = computed(() => page.props.hasItemHeads ?? false);
+const regions = computed(() => page.props.regions ?? []);
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/registration-register`;
 const params = new URLSearchParams(window.location.search);
 const schoolFilter = ref(props.filterSchoolId || params.get('school_id') || '');
+const regionFilter = ref(props.filterRegionId || params.get('region_id') || '');
 const headFilter = ref(params.get('head_id') ?? '');
 const itemFilter = ref(params.get('item_id') ?? '');
 
@@ -177,6 +192,7 @@ const displayRows = computed(() => {
 const exportUrl = computed(() => {
     const q = new URLSearchParams();
     if (schoolFilter.value) q.set('school_id', schoolFilter.value);
+    if (regionFilter.value) q.set('region_id', regionFilter.value);
     if (headFilter.value) q.set('head_id', headFilter.value);
     if (itemFilter.value) q.set('item_id', itemFilter.value);
     const qs = q.toString();
@@ -186,6 +202,7 @@ const exportUrl = computed(() => {
 function applyFilter() {
     router.get(base, {
         school_id: schoolFilter.value || undefined,
+        region_id: regionFilter.value || undefined,
         head_id: headFilter.value || undefined,
         item_id: itemFilter.value || undefined,
     }, { preserveScroll: true, preserveState: true });

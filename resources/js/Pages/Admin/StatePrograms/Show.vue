@@ -122,10 +122,11 @@
                                 <option value="">Custom</option>
                                 <option v-for="(preset, key) in participationPresets" :key="key" :value="key">{{ preset.label }}</option>
                             </select>
-                            <div v-if="!form.level_policies[lvl].preset_key" class="grid sm:grid-cols-3 gap-2">
+                            <div v-if="!form.level_policies[lvl].preset_key" class="grid sm:grid-cols-4 gap-2">
                                 <input v-model.number="form.level_policies[lvl].max_onstage_per_student" type="number" min="0" class="field" placeholder="On-stage/student">
                                 <input v-model.number="form.level_policies[lvl].max_offstage_per_student" type="number" min="0" class="field" placeholder="Off-stage/student">
                                 <input v-model.number="form.level_policies[lvl].max_group_per_student" type="number" min="0" class="field" placeholder="Group/student">
+                                <input v-model.number="form.level_policies[lvl].max_total_per_student" type="number" min="0" class="field" placeholder="Total/student">
                             </div>
                         </div>
                     </div>
@@ -300,6 +301,7 @@ function buildLevelPolicies(program, conductLevels) {
             max_onstage_per_student: existing.max_onstage_per_student ?? '',
             max_offstage_per_student: existing.max_offstage_per_student ?? '',
             max_group_per_student: existing.max_group_per_student ?? '',
+            max_total_per_student: existing.max_total_per_student ?? '',
         };
     }
     return policies;
@@ -414,6 +416,7 @@ watch(() => form.conduct_levels, (levels) => {
                 max_onstage_per_student: '',
                 max_offstage_per_student: '',
                 max_group_per_student: '',
+                max_total_per_student: '',
             };
         }
     }

@@ -65,7 +65,11 @@ class FestStateQualifierPayloadBuilder
                         'source_registration_id' => (string) $registration->id,
                         'source_participant_id'  => (string) $participant->id,
                         'school_id'              => $registration->school_id,
-                        'item_id'                => $item->id,
+                        // The canonical State catalog item UUID (FestStateProgramItem.id), not this
+                        // Sahodaya's own tenant-local FestEventItem.id — that integer is only unique
+                        // within this one tenant database and means nothing at State level. State's
+                        // item_id columns store the catalog UUID; item_code is the human-readable tie.
+                        'item_id'                => $item->state_program_item_id,
                         'item_code'              => $item->item_code,
                         'item_name'              => $item->title,
                         'student_name'           => $student?->name ?? $participant->display_name ?? 'Participant',
@@ -168,6 +172,14 @@ class FestStateQualifierPayloadBuilder
 
     private function shouldSkipItem(FestEventItem $item): bool
     {
+        // A Sahodaya/school's own custom item (owner_level != 'state', no state_program_item_id
+        // back-reference) has no meaning at State level and must never qualify there by accident —
+        // it only ends up in this event's item list because it's conducted alongside the real
+        // state-catalog items, not because it's part of the state program.
+        if (! $item->state_program_item_id) {
+            return true;
+        }
+
         $criteria = $item->criteria_json ?? [];
 
         return ($criteria['mcs_only'] ?? false) === true

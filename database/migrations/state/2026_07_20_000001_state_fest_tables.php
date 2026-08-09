@@ -37,7 +37,10 @@ return new class extends Migration
             $table->string('source_participant_id')->nullable();
             $table->string('school_id');
             $table->string('school_name')->nullable();
-            $table->unsignedBigInteger('item_id')->nullable();
+            // FestStateProgramItem.id (central catalog UUID) — NOT a tenant-local FestEventItem
+            // integer id, which means nothing outside the Sahodaya database it came from. See
+            // FestStateQualifierPayloadBuilder, which sends item->state_program_item_id.
+            $table->uuid('item_id')->nullable();
             $table->string('item_code', 64)->nullable();
             $table->string('item_name')->nullable();
             $table->string('student_name');
@@ -76,7 +79,7 @@ return new class extends Migration
             $table->unsignedBigInteger('qualifier_entry_id')->nullable();
             $table->string('school_id');
             $table->string('school_name')->nullable();
-            $table->unsignedBigInteger('item_id')->nullable();
+            $table->uuid('item_id')->nullable();
             $table->string('item_code', 64)->nullable();
             $table->string('status', 20)->default('draft');
             $table->json('meta')->nullable();

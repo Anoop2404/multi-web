@@ -212,6 +212,7 @@ class StateFestProgramController extends Controller
             'level_policies.*.max_onstage_per_student' => 'nullable|integer|min:0',
             'level_policies.*.max_offstage_per_student' => 'nullable|integer|min:0',
             'level_policies.*.max_group_per_student' => 'nullable|integer|min:0',
+            'level_policies.*.max_total_per_student' => 'nullable|integer|min:0',
             'state_domain_id'    => 'nullable|uuid|exists:state_domains,id',
             'state_flow_mode'    => 'nullable|in:state_domain_event,read_only_aggregation',
             'qualifier_policy'   => 'nullable|array',
@@ -258,6 +259,7 @@ class StateFestProgramController extends Controller
                         'max_onstage_per_student' => $row['max_onstage_per_student'] ?? null,
                         'max_offstage_per_student' => $row['max_offstage_per_student'] ?? null,
                         'max_group_per_student' => $row['max_group_per_student'] ?? null,
+                        'max_total_per_student' => $row['max_total_per_student'] ?? null,
                     ], fn ($v) => $v !== null && $v !== '');
                 }
             }

@@ -97,16 +97,7 @@ class FestGradePointService
 
     public function resolveMcsGradeFromScore(float $score): ?string
     {
-        $grades = config('fest_mcs_scoring.grades', []);
-        $matched = null;
-
-        foreach ($grades as $key => $band) {
-            if ($score >= (float) ($band['min'] ?? 0)) {
-                $matched = $band['label'] ?? $key;
-            }
-        }
-
-        return $matched;
+        return $this->highestMatchingBand(config('fest_mcs_scoring.grades', []), $score);
     }
 
     /** Official Confederation State Kalolsavam Manual table — see config/fest_confed_kalotsav_scoring.php. */
@@ -124,16 +115,32 @@ class FestGradePointService
 
     public function resolveConfedGradeFromScore(float $score): ?string
     {
-        $grades = config('fest_confed_kalotsav_scoring.grades', []);
-        $matched = null;
+        return $this->highestMatchingBand(config('fest_confed_kalotsav_scoring.grades', []), $score);
+    }
 
-        foreach ($grades as $key => $band) {
+    /**
+     * Returns the label of the highest-threshold band the score clears — e.g. for
+     * A(min70)/B(min60)/C(min50) and a score of 75, that's A, not C.
+     *
+     * Both callers previously iterated without sorting or breaking, so a later (lower-
+     * threshold) band always overwrote an earlier match — every score ≥ the lowest band's
+     * minimum resolved to that lowest grade. A score of 85 was graded C. Fixed by sorting
+     * bands high-to-low and returning on first match, so config array order can't matter.
+     *
+     * @param  array<string, array{min?: float|int, label?: string}>  $bands
+     */
+    private function highestMatchingBand(array $bands, float $score): ?string
+    {
+        $sorted = $bands;
+        uasort($sorted, fn ($a, $b) => ($b['min'] ?? 0) <=> ($a['min'] ?? 0));
+
+        foreach ($sorted as $key => $band) {
             if ($score >= (float) ($band['min'] ?? 0)) {
-                $matched = $band['label'] ?? $key;
+                return $band['label'] ?? $key;
             }
         }
 
-        return $matched;
+        return null;
     }
 
     private function normalizeGrade(?string $grade): string

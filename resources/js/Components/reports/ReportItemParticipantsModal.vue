@@ -18,29 +18,29 @@
                     No participants registered for this item yet.
                 </p>
                 <div v-else class="overflow-x-auto">
-                    <table class="data-table">
+                    <table class="data-table text-sm">
                         <thead>
-                            <tr>
-                                <th class="pl-4">Participant</th>
-                                <th>Fest ID</th>
-                                <th>Item reg</th>
-                                <th>Chest</th>
-                                <th>Status</th>
+                            <tr class="text-xs uppercase font-bold tracking-wider text-slate-700 bg-slate-50">
+                                <th class="pl-4 py-3">Participant</th>
+                                <th class="py-3">Fest ID</th>
+                                <th class="py-3">Item reg</th>
+                                <th class="py-3">Chest</th>
+                                <th class="py-3">Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(p, idx) in participants" :key="p.student_id ?? idx">
-                                <td class="pl-4">
+                            <tr v-for="(p, idx) in participants" :key="p.student_id ?? idx" class="text-sm">
+                                <td class="pl-4 py-3">
                                     <ReportStudentCell :name="p.name"
                                                        :reg-no="p.reg_no"
                                                        :class-label="p.class"
                                                        :photo-url="p.photo_url" />
                                 </td>
-                                <td class="font-mono text-xs">{{ p.fest_id ?? '—' }}</td>
-                                <td class="font-mono text-xs">{{ p.item_reg ?? '—' }}</td>
-                                <td class="font-mono text-xs">{{ p.chest_no ?? '—' }}</td>
+                                <td class="font-mono text-sm font-medium text-slate-800">{{ p.fest_id ?? '—' }}</td>
+                                <td class="font-mono text-sm text-slate-700">{{ p.item_reg ?? '—' }}</td>
+                                <td class="font-mono text-sm font-bold text-indigo-900">{{ p.chest_no ?? '—' }}</td>
                                 <td>
-                                    <span class="status-pill text-xs capitalize"
+                                    <span class="status-pill text-xs font-bold capitalize"
                                           :class="p.status === 'approved' ? 'status-pill--published' : 'status-pill--open'">
                                         {{ p.status ?? '—' }}
                                     </span>
