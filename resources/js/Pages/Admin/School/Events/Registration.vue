@@ -1594,19 +1594,21 @@ function itemStatusMeta(event, item) {
     }
 
     const participantNoun = isSports.value ? 'participant' : 'student';
+    const limitLabel = max === 1 ? 'Max 1 entry per school' : `Max ${max} entries per school`;
+    const rosterLabel = `${eligible} ${participantNoun}${eligible === 1 ? '' : 's'} eligible`;
 
     if (status === 'partial') {
         return {
             label: `Registered (${regs}/${max})`,
             badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-            hint: `${regs} of ${max} entries registered · ${eligible} ${participantNoun}${eligible === 1 ? '' : 's'} eligible for more entries`,
+            hint: `${regs} of ${max} entries registered · ${rosterLabel}`,
         };
     }
 
     return {
         label: 'Open',
         badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-        hint: `${eligible} ${participantNoun}${eligible === 1 ? '' : 's'} can register`,
+        hint: `${limitLabel} · ${rosterLabel}`,
     };
 }
 
