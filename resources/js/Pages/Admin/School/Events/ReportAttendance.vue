@@ -24,7 +24,6 @@
                     <tr>
                         <th class="pl-5">Student</th>
                         <th>Fest ID</th>
-                        <th>Chest</th>
                         <th>Items</th>
                     </tr>
                 </thead>
@@ -37,7 +36,6 @@
                                                :photo-url="row.photo_url" />
                         </td>
                         <td class="font-mono text-xs">{{ row.fest_id ?? '—' }}</td>
-                        <td class="font-mono text-xs">{{ row.chest_no ?? '—' }}</td>
                         <td class="text-xs">
                             <p v-for="(item, idx) in row.items" :key="idx" class="py-0.5">
                                 <span class="font-medium text-slate-800">{{ item.item }}</span>
@@ -47,7 +45,7 @@
                         </td>
                     </tr>
                     <tr v-if="!rows?.length">
-                        <td colspan="4" class="p-6 text-center text-slate-400">
+                        <td colspan="3" class="p-6 text-center text-slate-400">
                             No students match the selected filters.
                         </td>
                     </tr>

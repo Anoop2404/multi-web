@@ -777,6 +777,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
 
         // Regions (Kalotsav) — State → Sahodaya → Region → School
         Route::get('/regions', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'index'])->name('regions.index');
+        Route::get('/regions/report', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'report'])->name('regions.report');
+        Route::get('/regions/report/export', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'exportReport'])->name('regions.report.export');
         Route::post('/regions', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'store'])->name('regions.store');
         Route::post('/regions/assign', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'assign'])->name('regions.assign');
         Route::put('/regions/{region}', [\App\Http\Controllers\SahodayaAdmin\RegionController::class, 'update'])->name('regions.update');

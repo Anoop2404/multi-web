@@ -16,7 +16,6 @@
             <p class="font-semibold text-[#0f3d7a] mb-1">Your fest IDs</p>
             <p class="text-slate-700">
                 Each student gets one <strong>Fest ID</strong> for this event (shown below). That same ID applies to every item they register for.
-                <strong>Chest numbers</strong> are per item and appear after Sahodaya approval.
                 Event fees are one total per school — upload proof under Payments once all items are registered.
             </p>
         </div>
@@ -58,14 +57,13 @@
                         <th class="p-3">Item</th>
                         <th class="p-3">Item reg</th>
                         <th class="p-3">Status</th>
-                        <th class="p-3">Chest</th>
                         <th class="p-3">Item fee</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template v-for="(row, idx) in rows.data" :key="row.participant_id">
                         <tr v-if="shouldShowHeadDivider(row, rows.data[idx - 1])" class="bg-slate-50">
-                            <td colspan="8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            <td colspan="7" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 {{ row.head_name ?? 'Other items' }}
                             </td>
                         </tr>
@@ -82,12 +80,11 @@
                                 {{ row.registration_status }}
                                 <span v-if="row.participant_role === 'standby'" class="text-slate-500"> · standby</span>
                             </td>
-                            <td class="p-3 font-mono text-xs">{{ row.chest_no }}</td>
                             <td class="p-3 text-xs">{{ row.item_fee != null ? `₹${row.item_fee}` : '—' }}</td>
                         </tr>
                     </template>
                     <tr v-if="!rows.data.length">
-                        <td colspan="8" class="p-8 text-center text-gray-400">No registrations match the selected filters.</td>
+                        <td colspan="7" class="p-8 text-center text-gray-400">No registrations match the selected filters.</td>
                     </tr>
                 </tbody>
             </table>

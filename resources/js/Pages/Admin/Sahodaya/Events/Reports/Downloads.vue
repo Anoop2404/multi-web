@@ -7,45 +7,159 @@
 
             <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" :active="phase" />
 
-            <div v-if="exports.length" class="mb-6">
-                <ReportToolbar v-model:query="searchQuery"
-                               v-model:category="activeCategory"
-                               :categories="categoryOptions"
-                               placeholder="Search downloads…" />
-                <p class="text-xs text-slate-500 mt-3">{{ filteredCount }} export{{ filteredCount === 1 ? '' : 's' }} in this pack</p>
-            </div>
+            <!-- =============================================================
+                 PARTITIONED PARENT: inline region sections + combined
+                 ============================================================= -->
+            <template v-if="isPartitionedParent && regionChildrenWithExports.length">
 
-            <EmptyState v-if="!exports.length"
-                        title="No exports in this pack"
-                        :description="`No ${phaseMeta?.label?.toLowerCase() ?? phase} exports are available for this event yet.`"
-                        icon="📥" />
-
-            <EmptyState v-else-if="!filteredGroups.length"
-                        title="No matching exports"
-                        description="Try a different search term or clear filters."
-                        icon="🔍" />
-
-            <template v-else>
-                <section v-for="[catKey, items] in filteredGroups" :key="catKey" class="mb-8">
-                    <h3 class="section-title mb-3 flex items-center gap-2">
-                        <span aria-hidden="true">{{ categoryMeta[catKey]?.icon }}</span>
-                        {{ reportCategoryLabel(catKey, event.event_type === 'sports') }}
-                        <span class="text-xs font-normal text-slate-400">({{ items.length }})</span>
-                    </h3>
-                    <div class="space-y-3">
-                        <ReportExportCard v-for="exp in items" :key="exp.id"
-                                          :exp="exp"
-                                          :reports-base="reportsBase"
-                                          :param-values="params[exp.id]"
-                                          :schools="schools"
-                                          :items="itemsList"
-                                          :heads="heads"
-                                          :stages="stages"
-                                          :class-groups="classGroups"
-                                          :is-sports="event.event_type === 'sports'"
-                                          @update:param="({ key, value }) => params[exp.id][key] = value" />
+                <!-- Per-region export sections -->
+                <section
+                    v-for="child in regionChildrenWithExports"
+                    :key="child.id"
+                    class="mb-12"
+                >
+                    <div class="flex items-center gap-3 mb-4 pb-3 border-b border-slate-200">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-xs font-bold shrink-0"
+                              style="background: #0d9488;">
+                            {{ child.region_code || '◎' }}
+                        </span>
+                        <div>
+                            <h3 class="section-title mb-0">{{ child.region_name }}</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Region-scoped downloads</p>
+                        </div>
                     </div>
+
+                    <template v-if="child.exports?.length">
+                        <section v-for="[catKey, items] in groupedChildExports(child.exports)" :key="catKey" class="mb-8">
+                            <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                <span aria-hidden="true">{{ categoryMeta[catKey]?.icon }}</span>
+                                {{ reportCategoryLabel(catKey, event.event_type === 'sports') }}
+                                <span class="text-xs font-normal text-slate-400">({{ items.length }})</span>
+                            </h4>
+                            <div class="space-y-3">
+                                <ReportExportCard
+                                    v-for="exp in items"
+                                    :key="exp.id"
+                                    :exp="exp"
+                                    :reports-base="child.reportsBase"
+                                    :param-values="childParams[child.id]?.[exp.id] ?? {}"
+                                    :schools="schools"
+                                    :items="itemsList"
+                                    :heads="heads"
+                                    :stages="stages"
+                                    :class-groups="classGroups"
+                                    :is-sports="event.event_type === 'sports'"
+                                    @update:param="({ key, value }) => setChildParam(child.id, exp.id, key, value)"
+                                />
+                            </div>
+                        </section>
+                    </template>
+                    <EmptyState v-else
+                                title="No exports in this pack"
+                                :description="`No ${phaseMeta?.label?.toLowerCase() ?? phase} exports are available for this region yet.`"
+                                icon="📥" />
                 </section>
+
+                <!-- Combined (all regions) exports section -->
+                <section class="mb-10">
+                    <div class="flex items-center gap-3 mb-4 pb-3 border-b border-slate-200">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-xs font-bold shrink-0"
+                              style="background: #475569;">
+                            ALL
+                        </span>
+                        <div>
+                            <h3 class="section-title mb-0">Combined — All Regions</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Merged downloads across every region</p>
+                        </div>
+                    </div>
+
+                    <div v-if="exports.length" class="mb-6">
+                        <ReportToolbar v-model:query="searchQuery"
+                                       v-model:category="activeCategory"
+                                       :categories="categoryOptions"
+                                       placeholder="Search combined downloads…" />
+                        <p class="text-xs text-slate-500 mt-3">{{ filteredCount }} export{{ filteredCount === 1 ? '' : 's' }} in this pack</p>
+                    </div>
+
+                    <EmptyState v-if="!exports.length"
+                                title="No exports in this pack"
+                                :description="`No ${phaseMeta?.label?.toLowerCase() ?? phase} exports are available for this event yet.`"
+                                icon="📥" />
+
+                    <EmptyState v-else-if="!filteredGroups.length"
+                                title="No matching exports"
+                                description="Try a different search term or clear filters."
+                                icon="🔍" />
+
+                    <template v-else>
+                        <section v-for="[catKey, items] in filteredGroups" :key="catKey" class="mb-8">
+                            <h4 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                <span aria-hidden="true">{{ categoryMeta[catKey]?.icon }}</span>
+                                {{ reportCategoryLabel(catKey, event.event_type === 'sports') }}
+                                <span class="text-xs font-normal text-slate-400">({{ items.length }})</span>
+                            </h4>
+                            <div class="space-y-3">
+                                <ReportExportCard v-for="exp in items" :key="exp.id"
+                                                  :exp="exp"
+                                                  :reports-base="reportsBase"
+                                                  :param-values="params[exp.id]"
+                                                  :schools="schools"
+                                                  :items="itemsList"
+                                                  :heads="heads"
+                                                  :stages="stages"
+                                                  :class-groups="classGroups"
+                                                  :is-sports="event.event_type === 'sports'"
+                                                  @update:param="({ key, value }) => params[exp.id][key] = value" />
+                            </div>
+                        </section>
+                    </template>
+                </section>
+            </template>
+
+            <!-- =============================================================
+                 STANDARD (non-partitioned) event — original layout
+                 ============================================================= -->
+            <template v-else>
+                <div v-if="exports.length" class="mb-6">
+                    <ReportToolbar v-model:query="searchQuery"
+                                   v-model:category="activeCategory"
+                                   :categories="categoryOptions"
+                                   placeholder="Search downloads…" />
+                    <p class="text-xs text-slate-500 mt-3">{{ filteredCount }} export{{ filteredCount === 1 ? '' : 's' }} in this pack</p>
+                </div>
+
+                <EmptyState v-if="!exports.length"
+                            title="No exports in this pack"
+                            :description="`No ${phaseMeta?.label?.toLowerCase() ?? phase} exports are available for this event yet.`"
+                            icon="📥" />
+
+                <EmptyState v-else-if="!filteredGroups.length"
+                            title="No matching exports"
+                            description="Try a different search term or clear filters."
+                            icon="🔍" />
+
+                <template v-else>
+                    <section v-for="[catKey, items] in filteredGroups" :key="catKey" class="mb-8">
+                        <h3 class="section-title mb-3 flex items-center gap-2">
+                            <span aria-hidden="true">{{ categoryMeta[catKey]?.icon }}</span>
+                            {{ reportCategoryLabel(catKey, event.event_type === 'sports') }}
+                            <span class="text-xs font-normal text-slate-400">({{ items.length }})</span>
+                        </h3>
+                        <div class="space-y-3">
+                            <ReportExportCard v-for="exp in items" :key="exp.id"
+                                              :exp="exp"
+                                              :reports-base="reportsBase"
+                                              :param-values="params[exp.id]"
+                                              :schools="schools"
+                                              :items="itemsList"
+                                              :heads="heads"
+                                              :stages="stages"
+                                              :class-groups="classGroups"
+                                              :is-sports="event.event_type === 'sports'"
+                                              @update:param="({ key, value }) => params[exp.id][key] = value" />
+                        </div>
+                    </section>
+                </template>
             </template>
 
             <EventPageActivityLog :logs="activityLogs" />
@@ -74,6 +188,9 @@ const props = defineProps({
     event: Object, phase: String, exports: Array,
     schools: Array, items: Array, heads: Array, stages: Array, classGroups: Object,
     activityLogs: { type: Array, default: () => [] },
+    isPartitionedParent: { type: Boolean, default: false },
+    regionChildren: { type: Array, default: () => [] },
+    regionChildrenWithExports: { type: Array, default: () => [] },
 });
 
 const categoryMeta = REPORT_CATEGORIES;
@@ -110,9 +227,34 @@ const filteredCount = computed(() =>
     filteredGroups.value.reduce((n, [, arr]) => n + arr.length, 0),
 );
 
+/** Group a child's export list by category — no filtering applied (keep all exports). */
+function groupedChildExports(childExports) {
+    const grouped = groupExportsByCategory(childExports ?? []);
+    return REPORT_CATEGORY_ORDER
+        .filter((k) => grouped[k]?.length)
+        .map((catKey) => [catKey, grouped[catKey]]);
+}
+
+// Params state for combined exports
 const params = reactive({});
 for (const exp of props.exports ?? []) {
     params[exp.id] = {};
     for (const p of exp.params ?? []) params[exp.id][p] = '';
+}
+
+// Params state for per-region child exports: childParams[childId][exportId][paramKey]
+const childParams = reactive({});
+for (const child of props.regionChildrenWithExports ?? []) {
+    childParams[child.id] = {};
+    for (const exp of child.exports ?? []) {
+        childParams[child.id][exp.id] = {};
+        for (const p of exp.params ?? []) childParams[child.id][exp.id][p] = '';
+    }
+}
+
+function setChildParam(childId, expId, key, value) {
+    if (!childParams[childId]) childParams[childId] = {};
+    if (!childParams[childId][expId]) childParams[childId][expId] = {};
+    childParams[childId][expId][key] = value;
 }
 </script>

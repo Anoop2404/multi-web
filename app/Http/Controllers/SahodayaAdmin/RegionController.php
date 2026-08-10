@@ -204,6 +204,108 @@ class RegionController extends SahodayaAdminController
         return back()->with('success', "{$saved} school region assignment(s) saved.");
     }
 
+    /**
+     * Sahodaya-level region assignment report — NOT tied to any FestEvent. Requested
+     * directly: "a report which is not related to events, a report for sahodaya which
+     * has regions, to get region assigned schools and schools which don't have regions."
+     * RegionController::index() already lists every school with its region_id (or null)
+     * for the assignment UI; this reshapes the same underlying data (active-year
+     * SchoolRegionAssignment) into a report: schools grouped by region, plus a distinct
+     * "no region assigned" bucket, with counts — the assignment UI doesn't group or
+     * count, and isn't meant to be exported/printed the way a report is.
+     */
+    public function report()
+    {
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
+
+        [$regions, $unassigned, $totals] = $this->regionReportData($year);
+
+        return $this->inertia('Sahodaya/Regions/Report', [
+            'regions'      => $regions,
+            'unassigned'   => $unassigned,
+            'totals'       => $totals,
+            'academicYear' => $year,
+        ]);
+    }
+
+    public function exportReport()
+    {
+        $year = AcademicYear::forSahodaya($this->sahodaya->id);
+        [$regions, $unassigned] = $this->regionReportData($year);
+
+        $sahodayaSlug = Str::slug($this->sahodaya->name);
+        $filename = "{$sahodayaSlug}-region-assignment-{$year}.csv";
+
+        return response()->streamDownload(function () use ($regions, $unassigned) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Region', 'Region code', 'School', 'School prefix']);
+
+            foreach ($regions as $region) {
+                foreach ($region['schools'] as $school) {
+                    fputcsv($out, [$region['name'], $region['code'], $school['name'], $school['school_prefix']]);
+                }
+            }
+            foreach ($unassigned as $school) {
+                fputcsv($out, ['— No region assigned —', '', $school['name'], $school['school_prefix']]);
+            }
+
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>, 2: array<string, int>}
+     */
+    private function regionReportData(string $year): array
+    {
+        $schools = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name', 'school_prefix']);
+
+        $assignments = SchoolRegionAssignment::forTenant($this->sahodaya->id)
+            ->forYear($year)
+            ->pluck('region_id', 'school_id');
+
+        $allRegions = Region::forTenant($this->sahodaya->id)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $schoolsByRegion = [];
+        $unassigned = [];
+
+        foreach ($schools as $school) {
+            $regionId = $assignments[$school->id] ?? null;
+            $row = ['id' => $school->id, 'name' => $school->name, 'school_prefix' => $school->school_prefix];
+
+            if ($regionId === null) {
+                $unassigned[] = $row;
+            } else {
+                $schoolsByRegion[$regionId][] = $row;
+            }
+        }
+
+        $regions = $allRegions->map(fn (Region $region) => [
+            'id'      => $region->id,
+            'name'    => $region->name,
+            'code'    => $region->code,
+            'is_active' => $region->is_active,
+            'schools' => $schoolsByRegion[$region->id] ?? [],
+            'count'   => count($schoolsByRegion[$region->id] ?? []),
+        ])->values()->all();
+
+        $totals = [
+            'schools'          => $schools->count(),
+            'regions'          => $allRegions->count(),
+            'assigned'         => $schools->count() - count($unassigned),
+            'unassigned'       => count($unassigned),
+        ];
+
+        return [$regions, $unassigned, $totals];
+    }
+
     private function uniqueCode(?string $code, string $name, ?int $ignoreId = null): string
     {
         $base = Str::slug($code ?: $name) ?: 'region';

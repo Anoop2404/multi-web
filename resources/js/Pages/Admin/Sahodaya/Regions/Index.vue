@@ -11,6 +11,7 @@
                 :description="`Group member schools into regions for Kalotsav (State → Sahodaya → Region → School). Academic year ${academicYear}.`"
             >
                 <template #actions>
+                    <Link :href="`${base}/report`" class="btn-secondary text-sm">View report</Link>
                     <button type="button" class="btn-primary text-sm" @click="showAdd = !showAdd">+ Add region</button>
                 </template>
             </PageHeader>
@@ -173,7 +174,7 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 
 const props = defineProps({

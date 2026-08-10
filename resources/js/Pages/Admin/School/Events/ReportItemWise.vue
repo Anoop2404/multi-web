@@ -40,7 +40,6 @@
                         <th>Admission No</th>
                         <th>Fest ID</th>
                         <th>Item reg</th>
-                        <th>Chest</th>
                         <th>Grade</th>
                         <th>Position</th>
                         <th>Score</th>
@@ -52,12 +51,11 @@
                         <td class="font-mono text-xs">{{ p.student?.admission_number ?? p.teacher?.reg_no }}</td>
                         <td class="font-mono text-xs">{{ p.level_registration_number ?? '—' }}</td>
                         <td class="font-mono text-xs">{{ p.item_registration_number ?? '—' }}</td>
-                        <td class="font-mono text-xs">{{ p.chest_no ?? '—' }}</td>
                         <td>{{ p.mark?.grade ?? '—' }}</td>
                         <td>{{ p.mark?.position ?? '—' }}</td>
                         <td>{{ p.mark?.score ?? '—' }}</td>
                     </tr>
-                    <tr v-if="!participants.length"><td colspan="8" class="p-6 text-center text-slate-400">No participants</td></tr>
+                    <tr v-if="!participants.length"><td colspan="7" class="p-6 text-center text-slate-400">No participants</td></tr>
                 </tbody>
             </table>
         </div>

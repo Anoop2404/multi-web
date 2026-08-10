@@ -53,7 +53,6 @@
                         <th>Head</th>
                         <th>Item</th>
                         <th>Fest ID</th>
-                        <th>Chest</th>
                         <th>Position</th>
                         <th>Grade</th>
                         <th>Score</th>
@@ -70,13 +69,12 @@
                         <td class="text-sm">{{ row.head_name ?? '—' }}</td>
                         <td class="text-sm">{{ row.item }}</td>
                         <td class="font-mono text-xs">{{ row.fest_id ?? '—' }}</td>
-                        <td class="font-mono text-xs">{{ row.chest_no ?? '—' }}</td>
                         <td>{{ row.position ?? '—' }}</td>
                         <td>{{ row.grade ?? '—' }}</td>
                         <td>{{ row.score ?? '—' }}</td>
                     </tr>
                     <tr v-if="!displayRows.length">
-                        <td colspan="8" class="p-6 text-center text-slate-400">No results for the selected filters.</td>
+                        <td colspan="7" class="p-6 text-center text-slate-400">No results for the selected filters.</td>
                     </tr>
                 </tbody>
             </table>

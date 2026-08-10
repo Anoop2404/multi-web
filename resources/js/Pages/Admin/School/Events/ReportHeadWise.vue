@@ -94,14 +94,13 @@
                             <th>Item</th>
                             <th>Fest ID</th>
                             <th>Item reg</th>
-                            <th>Chest</th>
                             <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
                         <template v-for="(row, idx) in displayRows" :key="`${row.head_id}-${row.item_id}-${idx}`">
                             <tr v-if="shouldShowHeadDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                                <td colspan="7" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                <td colspan="6" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                     {{ row.head_name ?? 'Other items' }}
                                 </td>
                             </tr>
@@ -116,12 +115,11 @@
                                 <td>{{ row.item }}</td>
                                 <td class="font-mono text-xs">{{ row.fest_id ?? '—' }}</td>
                                 <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
-                                <td class="font-mono text-xs">{{ row.chest_no ?? '—' }}</td>
                                 <td class="capitalize text-xs">{{ row.status ?? '—' }}</td>
                             </tr>
                         </template>
                         <tr v-if="!displayRows.length && summary.length">
-                            <td colspan="7" class="p-6 text-center text-slate-400">No participants for the selected filters.</td>
+                            <td colspan="6" class="p-6 text-center text-slate-400">No participants for the selected filters.</td>
                         </tr>
                     </tbody>
                 </table>

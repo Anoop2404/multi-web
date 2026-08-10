@@ -198,6 +198,99 @@ class FestReportCatalog
         return $pages;
     }
 
+    /**
+     * Interactive/export ids whose builders read $event->reportableEventIds()/
+     * reportableItemIds() in a way that, run directly on a region-partition child event,
+     * pulls in the hub's own uncopied item/registration rows alongside the child's own —
+     * not full cross-region combination, but not correctly isolated either. Confirmed by
+     * a manual audit (see docs/REGION_PHASE_EVENT_REPORTING_REMEDIATION_PLAN.md Phase 1
+     * completion notes): Item Counts, Head-wise Participants, Discipline Registration,
+     * Mark Entry Status, Schedule/Clashes, and Assignment Completeness. Only these ids
+     * get rerouted through the parent hub + region_id by regionScopedRows() below; every
+     * other report keeps linking to the child event's own id/URL (its existing, working
+     * behavior) rather than blanket-rerouting everything, which would regress reports
+     * that don't understand region_id into showing fully combined data unlabeled.
+     *
+     * @var list<string>
+     */
+    public const REGION_ID_AWARE_IDS = [
+        'item-counts', 'item-list',
+        'head-wise-participants',
+        'discipline-registration',
+        'mark-entry-status', 'mark-entered-summary',
+        'schedule-clashes', 'clashes', 'clashes-school',
+        'assignment-completeness',
+        // Payment/fee report — same reportableEventIds() resolution issue, found when
+        // auditing the six above.
+        'fee-collection', 'fees', 'fee-breakdown', 'fee-pending-schools',
+        // Attendance — same issue (FestReportController::attendance() route lives on
+        // FestEventOpsController / a dedicated attendance controller, not this file; its
+        // own reportAwareTargetEvent()-equivalent fix is applied there — see
+        // FestAttendanceController).
+        'attendance', 'attendance-sheet', 'attendance-sheet-school',
+    ];
+
+    /**
+     * Build a region child's interactive-page or export rows: mostly the child event's
+     * own routes (unchanged, existing behavior), except for REGION_ID_AWARE_IDS, which
+     * are rerouted to the parent hub's own route with an explicit region_id instead —
+     * see REGION_ID_AWARE_IDS' docblock for why.
+     *
+     * @param  list<array<string, mixed>>  $childRows  Rows already built with the child event's own id (e.g. interactivePages($tenantId, $child->id, ...)).
+     * @param  list<array<string, mixed>>  $hubRowsWithRegionParam  The same catalog built with the hub's id, already passed through withRegionParam().
+     * @return list<array<string, mixed>>
+     */
+    public static function regionScopedRows(array $childRows, array $hubRowsWithRegionParam): array
+    {
+        $hubById = collect($hubRowsWithRegionParam)->keyBy('id');
+
+        return array_map(function (array $row) use ($hubById) {
+            if (in_array($row['id'], self::REGION_ID_AWARE_IDS, true) && $hubById->has($row['id'])) {
+                return $hubById->get($row['id']);
+            }
+
+            return $row;
+        }, $childRows);
+    }
+
+    /**
+     * Append region_id=X to every href/previewHref in a list of catalog rows —
+     * used to point a region section's tiles at the parent hub's own routes with an
+     * explicit region filter, instead of building the tiles from the child event's own
+     * id. Region-admin fix for the "region tiles link to /events/{childId}/..." bug:
+     * several report builders (item counts, head-wise participants, discipline
+     * registration, mark-entry status, schedule clashes, assignment completeness) read
+     * FestEvent::reportableEventIds()/reportableItemIds() off whichever $event the route
+     * is bound to — accessed via the child's own id, that pulls in the *hub's* original
+     * (uncopied) item/registration rows alongside the child's, which is a different but
+     * related correctness bug to the parent-hub containment issue Phase 1 fixed. Routing
+     * through the hub with an explicit region_id (the same pattern already used for
+     * Registration Register and Overall Ranking) sidesteps it entirely rather than
+     * chasing each report's own event-id resolution individually.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    public static function withRegionParam(array $rows, int $regionId): array
+    {
+        $append = function (string $href) use ($regionId): string {
+            $sep = str_contains($href, '?') ? '&' : '?';
+
+            return "{$href}{$sep}region_id={$regionId}";
+        };
+
+        return array_map(function (array $row) use ($append) {
+            if (isset($row['href'])) {
+                $row['href'] = $append($row['href']);
+            }
+            if (isset($row['previewHref'])) {
+                $row['previewHref'] = $append($row['previewHref']);
+            }
+
+            return $row;
+        }, $rows);
+    }
+
     /** Interactive preview page id for a bulk export type, if one exists. */
     public static function previewPageForExport(string $exportId): ?string
     {

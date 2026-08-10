@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
 use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestParticipant;
@@ -13,9 +14,25 @@ use Illuminate\Http\Request;
 
 class FestAttendanceController extends SahodayaAdminController
 {
-    public function index(string $tenantId, FestEvent $event)
+    use ResolvesRegionAwareReportEvent;
+
+    /**
+     * region_id-aware for the same reason as FestReportController's
+     * REGION_ID_AWARE_IDS reports: reached via a region tile that now routes through the
+     * parent hub, $event->reportableEventIds() on the raw hub would show every region's
+     * attendance combined; reached via the child's own id directly, it would also pull
+     * in the hub's own uncopied rows alongside the child's. Only this read-only index()
+     * is touched — store()/importStore() (which actually write attendance) are left
+     * exactly as they were: intentionally, marking attendance is a live operational flow
+     * this change was not run against the test suite for, and a write path is a far
+     * worse place to guess wrong than a report view. See this implementation's final
+     * status report.
+     */
+    public function index(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event = $this->regionAwareTargetEvent($request, $event);
 
         $event->load([
             'items' => fn ($query) => $query->where('is_enabled', true),

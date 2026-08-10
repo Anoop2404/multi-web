@@ -14,11 +14,13 @@ use App\Support\FestReportCatalog;
 use App\Support\FestEventMeta;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
+use App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
 use Illuminate\Http\Request;
 
 class FestReportController extends SahodayaAdminController
 {
     use BuildsItemHeadReportContext;
+    use ResolvesRegionAwareReportEvent;
     /** @return array<string, mixed> */
     protected function reportProps(string $tenantId, FestEvent $event, array $extra = []): array
     {
@@ -41,17 +43,61 @@ class FestReportController extends SahodayaAdminController
             ->values()
             ->all();
 
+        // Detect whether this is a partitioned parent with region children so that Hub
+        // and Downloads can render per-region navigation cards.
+        //
+        // Most tiles still link to the child event's own id/URL — that's each region
+        // child's own report, and it's already correctly isolated to that child. The
+        // exception is FestReportCatalog::REGION_ID_AWARE_IDS (item counts, head-wise
+        // participants, discipline registration, mark-entry status, schedule/clashes,
+        // assignment completeness): those builders resolve data via
+        // $event->reportableEventIds()/reportableItemIds(), which, run directly on the
+        // child, pulls in the hub's own uncopied item/registration rows alongside the
+        // child's own. For just those ids, regionScopedRows() reroutes the tile through
+        // the parent hub with an explicit region_id instead (same pattern already used
+        // for Registration Register / Overall Ranking), which those six controller
+        // methods now understand. See FestReportCatalog::REGION_ID_AWARE_IDS docblock.
+        $regionChildren = $event->childrenForRoles(['region'])
+            ->load('region:id,name,code')
+            ->sortBy('sort_order')
+            ->map(function (FestEvent $child) use ($tenantId, $event) {
+                $childPages = FestReportCatalog::interactivePages($tenantId, $child->id, $event->event_type);
+                $hubPagesForThisRegion = FestReportCatalog::withRegionParam(
+                    FestReportCatalog::interactivePages($tenantId, $event->id, $event->event_type),
+                    $child->region_id,
+                );
+
+                return [
+                    'id'             => $child->id,
+                    'title'          => $child->title,
+                    'region_id'      => $child->region_id,
+                    'region_name'    => $child->region?->name ?? $child->title,
+                    'region_code'    => $child->region?->code,
+                    'reportsBase'    => "/sahodaya-admin/{$tenantId}/events/{$child->id}/reports",
+                    'downloadsBase'  => "/sahodaya-admin/{$tenantId}/events/{$child->id}/reports/downloads",
+                    'interactivePages' => FestReportCatalog::regionScopedRows($childPages, $hubPagesForThisRegion),
+                    'exportBase'     => "/sahodaya-admin/{$tenantId}/events/{$child->id}/reports/export",
+                ];
+            })
+            ->values()
+            ->all();
+
+        $isPartitionedParent = $event->parent_event_id === null
+            && count($regionChildren) > 0;
+
         return array_merge([
-            'event'          => $event->only([
+            'event'               => $event->only([
                 'id', 'title', 'event_type', 'status', 'event_start', 'event_end',
                 'registration_open', 'registration_close', 'venue', 'results_published',
                 'schedule_published', 'level_round',
             ]),
-            'eventMeta'      => FestEventMeta::reportSnapshot($event, $base, "{$base}/settings"),
-            'interactiveNav' => FestReportCatalog::interactivePages($tenantId, $event->id, $event->event_type),
-            'currentPhase'   => EventLifecycleGate::currentReportPhase($event),
-            'allowedPhases'  => EventLifecycleGate::allowedReportPhases($event),
-            'regions'        => $regions,
+            'eventMeta'           => FestEventMeta::reportSnapshot($event, $base, "{$base}/settings"),
+            'interactiveNav'      => FestReportCatalog::interactivePages($tenantId, $event->id, $event->event_type),
+            'currentPhase'        => EventLifecycleGate::currentReportPhase($event),
+            'allowedPhases'       => EventLifecycleGate::allowedReportPhases($event),
+            'regions'             => $regions,
+            'isPartitionedParent' => $isPartitionedParent,
+            'regionChildren'      => $regionChildren,
         ], $headContext, $extra);
     }
 
@@ -124,20 +170,44 @@ class FestReportController extends SahodayaAdminController
                 && in_array($exp['phase'] ?? 'before', $allowedPhases, true)
         ));
 
+        // For partitioned parent events: compute the same filtered export catalog for
+        // each region child — mostly the child event's own export routes, except
+        // FestReportCatalog::REGION_ID_AWARE_IDS, rerouted through the hub + region_id.
+        // Same reasoning as reportProps()'s $regionChildren above.
+        // Downloads.vue uses this to render per-region export sections inline on the page.
+        $regionChildrenWithExports = array_map(function (array $child) use ($tenantId, $event, $phase, $allowedPhases) {
+            $childExports = FestReportCatalog::regionScopedRows(
+                FestReportCatalog::exportsWithPreview($tenantId, $child['id']),
+                FestReportCatalog::withRegionParam(
+                    FestReportCatalog::exportsWithPreview($tenantId, $event->id),
+                    $child['region_id'],
+                ),
+            );
+
+            $childExports = array_values(array_filter(
+                $childExports,
+                fn ($exp) => ($exp['phase'] ?? 'before') === $phase
+                    && in_array($exp['phase'] ?? 'before', $allowedPhases, true)
+            ));
+
+            return array_merge($child, ['exports' => $childExports]);
+        }, $this->reportProps($tenantId, $event)['regionChildren'] ?? []);
+
         return $this->inertia('Sahodaya/Events/Reports/Downloads', $this->reportProps($tenantId, $event, [
-            'phase'        => $phase,
-            'exports'      => $exports,
-            'schools'      => $service->schools(),
-            'items'        => $service->items()->map->only(['id', 'title', 'class_group']),
-            'heads'        => $event->event_type === 'sports'
+            'phase'                    => $phase,
+            'exports'                  => $exports,
+            'regionChildrenWithExports' => $regionChildrenWithExports,
+            'schools'                  => $service->schools(),
+            'items'                    => $service->items()->map->only(['id', 'title', 'class_group']),
+            'heads'                    => $event->event_type === 'sports'
                 ? ($event->isSportsSeasonEvent()
                     ? FestEvent::where('parent_event_id', $event->id)->ofType('sports')->orderBy('sort_order')->orderBy('title')->get(['id', 'title'])->map(fn ($e) => ['id' => $e->id, 'name' => $e->title])->values()
                     : collect([['id' => $event->id, 'name' => $event->title]]))
                 : \App\Models\FestItemHead::forTenant($this->sahodaya->id)->forEvent($event->id)->orderBy('sort_order')->get(['id', 'name']),
-            'stages'       => $service->scheduleStages()->map(fn ($s) => ['id' => $s->id, 'name' => $s->name]),
-            'classGroups'  => FestReportService::classGroups($event),
-            'currentPhase' => $currentPhase,
-            'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::reportsPhase($phase)),
+            'stages'                   => $service->scheduleStages()->map(fn ($s) => ['id' => $s->id, 'name' => $s->name]),
+            'classGroups'              => FestReportService::classGroups($event),
+            'currentPhase'             => $currentPhase,
+            'activityLogs'             => $this->pageActivityLogs($event, FestPageActivity::reportsPhase($phase)),
         ]));
     }
 
@@ -251,11 +321,11 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
-    public function markEntryStatus(string $tenantId, FestEvent $event)
+    public function markEntryStatus(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($event);
+        $service = new FestReportService($this->regionAwareTargetEvent($request, $event));
         $data = $service->markEntryStatusSummary();
 
         return $this->inertia('Sahodaya/Events/Reports/MarkEntryStatus', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
@@ -269,7 +339,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $service = new FestReportService($event);
+        $service = new FestReportService($this->regionAwareTargetEvent($request, $event));
         $schoolId = $request->input('school_id');
         $clashes = $service->scheduleClashRows($schoolId);
 
@@ -311,11 +381,11 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
-    public function itemCounts(string $tenantId, FestEvent $event)
+    public function itemCounts(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
         $rows = $analytics->itemRegistrationRows();
 
         return $this->inertia('Sahodaya/Events/Reports/ItemCounts', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
@@ -326,11 +396,11 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
-    public function disciplineRegistration(string $tenantId, FestEvent $event)
+    public function disciplineRegistration(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
 
         return $this->inertia('Sahodaya/Events/Reports/DisciplineRegistration', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'   => $analytics->disciplineRegistrationRows(),
@@ -346,7 +416,7 @@ class FestReportController extends SahodayaAdminController
             app(\App\Services\Events\FestItemHeadService::class)->syncEventHeads($event);
         }
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
         $headId = $request->input('head_id') !== null && $request->input('head_id') !== ''
             ? ($request->input('head_id') === 'other' ? 0 : $request->integer('head_id'))
             : null;
@@ -413,12 +483,16 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
-    public function feeCollection(string $tenantId, FestEvent $event)
+    public function feeCollection(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        // Payment/fee report — same reportableEventIds() resolution issue as the six
+        // report builders in FestReportCatalog::REGION_ID_AWARE_IDS, found when auditing
+        // those; feeCollectionRows()/feeCollectionByHeadRows() have the same shape.
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
         $rows = $analytics->feeCollectionRows();
+        $regionId = $request->integer('region_id') ?: null;
 
         return $this->inertia('Sahodaya/Events/Reports/FeeCollection', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'   => $rows,
@@ -429,11 +503,33 @@ class FestReportController extends SahodayaAdminController
                 'collected'=> round(collect($rows)->where('status', 'approved')->sum('total_due'), 2),
                 'pending'  => collect($rows)->whereIn('status', ['pending', 'proof_uploaded'])->count(),
             ],
-            'xlsUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/fee-pending-schools",
+            'xlsUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/fee-pending-schools".($regionId ? "?region_id={$regionId}" : ''),
             'feesUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/fees",
         ])));
     }
 
+    /**
+     * Resolves the FestEvent a region-aware report should actually read from, for the
+     * six report builders in FestReportCatalog::REGION_ID_AWARE_IDS (and feeCollection —
+     * added when the same issue was found in fee/payment reports). Two paths:
+     *
+     *   1. $event is already a region-partition child (parent_event_id set) — reached
+     *      either via its own direct URL, or because ResolveRegionScopedReportEvent
+     *      already substituted a region-locked admin's own child in. Isolate it so its
+     *      own reportableEventIds() call doesn't also pull in the hub's rows.
+     *   2. $event is the hub and ?region_id= was supplied (from a Hub.vue region tile,
+     *      built via FestReportCatalog::regionScopedRows()) — resolve that region's
+     *      child, then isolate it the same way.
+     *   3. Neither — $event is used as-is (the existing Combined/no-region-filter path,
+     *      unchanged).
+     *
+     * "Isolate" means returning a detached, unsaved clone with parent_event_id nulled
+     * out in memory only, so FestEvent::reportableEventIds()/reportableItemIds() (used
+     * throughout FestReportService/FestEventReportAnalyticsService) resolve to just that
+     * child's own event_id instead of [child, hub] — the hub's own uncopied item/
+     * registration rows were otherwise being pulled in alongside the child's own data.
+     * Never persisted; nothing calls ->save() on the result.
+     */
     public function registrationRegister(Request $request, string $tenantId, FestEvent $event, FestRegistrationRegisterService $register, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -534,25 +630,25 @@ class FestReportController extends SahodayaAdminController
         return ['schoolId' => $schoolId, 'schoolIds' => $schoolIds, 'regionId' => $regionId];
     }
 
-    public function assignmentCompleteness(string $tenantId, FestEvent $event)
+    public function assignmentCompleteness(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $analytics = new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event));
         $rows = $analytics->assignmentCompletenessRows();
 
         return $this->inertia('Sahodaya/Events/Reports/AssignmentCompleteness', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'rows'    => $rows,
             'totals'  => $analytics->assignmentCompletenessTotals($rows),
-            'xlsUrl'  => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/assignment-completeness/export",
+            'xlsUrl'  => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/assignment-completeness/export".($request->integer('region_id') ? '?region_id='.$request->integer('region_id') : ''),
         ])));
     }
 
-    public function exportAssignmentCompleteness(string $tenantId, FestEvent $event)
+    public function exportAssignmentCompleteness(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        return (new \App\Services\Events\FestEventReportAnalyticsService($event))->exportAssignmentCompleteness();
+        return (new \App\Services\Events\FestEventReportAnalyticsService($this->regionAwareTargetEvent($request, $event)))->exportAssignmentCompleteness();
     }
 
     public function numberingRegister(string $tenantId, FestEvent $event)
@@ -690,7 +786,17 @@ class FestReportController extends SahodayaAdminController
             'export_type' => $exportType,
         ]);
 
-        return (new FestReportService($event))->export($exportType, $request);
+        // FestReportCatalog::REGION_ID_AWARE_IDS exports (item-list, discipline-
+        // registration, head-wise-participants, mark-entry-status/mark-entered-summary,
+        // clashes/clashes-school, assignment-completeness) resolve their data off
+        // whatever event FestReportService is constructed with — reroute through the
+        // same isolation used by the interactive pages above, so the export a region
+        // tile links to matches what the interactive page for that region showed.
+        $targetEvent = in_array($exportType, FestReportCatalog::REGION_ID_AWARE_IDS, true)
+            ? $this->regionAwareTargetEvent($request, $event)
+            : $event;
+
+        return (new FestReportService($targetEvent))->export($exportType, $request);
     }
 
     /**

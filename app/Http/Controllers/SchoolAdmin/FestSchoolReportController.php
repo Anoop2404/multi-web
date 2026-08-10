@@ -463,7 +463,7 @@ class FestSchoolReportController extends SchoolAdminController
 
         return response()->streamDownload(function () use ($event, $eventIds, $itemId, $item) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Item', 'Participant', 'Admission No', 'Class', 'Fest ID', 'Item reg', 'Chest', 'Grade', 'Position', 'Score']);
+            fputcsv($out, ['Item', 'Participant', 'Admission No', 'Class', 'Fest ID', 'Item reg', 'Grade', 'Position', 'Score']);
             $participants = FestParticipant::whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $eventIds)
                 ->where('school_id', $this->school->id)
@@ -479,7 +479,6 @@ class FestSchoolReportController extends SchoolAdminController
                     $p->student?->schoolClass?->name,
                     $p->level_registration_number,
                     $p->item_registration_number,
-                    $p->chest_no,
                     $p->mark?->grade,
                     $p->mark?->position,
                     $p->mark?->score,
@@ -515,7 +514,6 @@ class FestSchoolReportController extends SchoolAdminController
                 'class'       => $p->student?->schoolClass?->name,
                 'fest_id'     => $p->level_registration_number,
                 'item_reg'    => $p->item_registration_number,
-                'chest_no'    => $p->chest_no,
                 'grade'       => $p->mark?->grade,
                 'position'    => $p->mark?->position,
                 'score'       => $p->mark?->score,
