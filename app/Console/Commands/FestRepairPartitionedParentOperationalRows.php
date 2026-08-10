@@ -139,11 +139,22 @@ class FestRepairPartitionedParentOperationalRows extends Command
                 continue;
             }
 
-            $this->line("  MOVE registration #{$registration->id} (school {$registration->school_id}) -> event #{$child->id} ({$child->title})");
+            $childItem = \App\Models\FestEventItem::where('event_id', $child->id)
+                ->where(function ($q) use ($registration) {
+                    $q->where('inherited_from_item_id', $registration->item_id)
+                      ->orWhere('id', $registration->item_id);
+                })->first();
+
+            $targetItemId = $childItem?->id ?? $registration->item_id;
+
+            $this->line("  MOVE registration #{$registration->id} (school {$registration->school_id}) -> event #{$child->id} ({$child->title}), item #{$targetItemId}");
 
             if ($apply) {
-                DB::transaction(function () use ($registration, $child) {
-                    $registration->update(['event_id' => $child->id]);
+                DB::transaction(function () use ($registration, $child, $targetItemId) {
+                    $registration->update([
+                        'event_id' => $child->id,
+                        'item_id'  => $targetItemId,
+                    ]);
                 });
             }
 

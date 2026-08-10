@@ -583,10 +583,11 @@ class FestRegistrationController extends SchoolAdminController
         $item->setRelation('event', $event);
 
         return [
-            'id'                => $item->id,
-            'title'             => $item->title,
-            'item_code'         => $item->item_code,
-            'stage_type'        => $item->stage_type,
+            'id'                     => $item->id,
+            'title'                  => $item->title,
+            'item_code'              => $item->item_code,
+            'inherited_from_item_id' => $item->inherited_from_item_id,
+            'stage_type'             => $item->stage_type,
             'participant_type'  => $item->participant_type,
             'gender'            => $item->gender,
             'age_group'         => $item->age_group,
