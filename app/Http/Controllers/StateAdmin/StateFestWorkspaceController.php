@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\State\StateFestEvent;
 use App\Models\State\StateFestRegistration;
 use App\Models\State\StateQualifierEntry;
+use App\Services\State\StateConductService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -53,5 +54,20 @@ class StateFestWorkspaceController extends Controller
             'approvedQualifiers' => $approvedQualifiers,
             'registrations'      => $registrations,
         ]);
+    }
+
+    /**
+     * WP-08 (master plan §29.13) — assign sequential chest numbers (101+) to every
+     * approved registration's participants that doesn't have one yet. Was built as
+     * StateConductService::assignChestNumbers() but never wired to a route until now;
+     * safe to call repeatedly — already-numbered participants are left untouched.
+     */
+    public function assignChestNumbers(StateFestEvent $event, StateConductService $service)
+    {
+        $count = $service->assignChestNumbers($event);
+
+        return back()->with('success', $count > 0
+            ? "Assigned chest numbers to {$count} participant(s)."
+            : 'No unnumbered participants found — everyone already has a chest number.');
     }
 }

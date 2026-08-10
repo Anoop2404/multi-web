@@ -39,7 +39,7 @@ class FestEventRegistrationService
 
     public function studentIsRegistered(FestEvent $event, int $studentId): bool
     {
-        return FestLevelRegistration::where('event_id', $event->id)
+        return FestLevelRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('student_id', $studentId)
             ->where('status', 'active')
             ->exists();
@@ -48,7 +48,7 @@ class FestEventRegistrationService
     /** @return list<int> */
     public function registeredStudentIds(FestEvent $event, string $schoolId): array
     {
-        return FestLevelRegistration::where('event_id', $event->id)
+        return FestLevelRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->where('status', 'active')
             ->pluck('student_id')
@@ -189,12 +189,13 @@ class FestEventRegistrationService
             ->pluck('id');
 
         return FestLevelRegistration::query()
-            ->where('event_id', $event->id)
+            ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'active')
             ->whereIn('student_id', $studentIds)
             ->with('student:id,name,reg_no')
             ->orderBy('registration_number')
             ->get()
+            ->unique('student_id')
             ->map(fn (FestLevelRegistration $r) => [
                 'id' => $r->id,
                 'student_id' => $r->student_id,
@@ -203,13 +204,14 @@ class FestEventRegistrationService
                 'registration_number' => $r->registration_number,
                 'registered_at' => $r->registered_at?->toIso8601String(),
             ])
+            ->values()
             ->all();
     }
 
     /** @return list<array<string, mixed>> */
     public function studentItemRegistrations(FestEvent $event, int $studentId): array
     {
-        return FestRegistration::where('event_id', $event->id)
+        return FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->whereIn('status', ['submitted', 'approved'])
             ->whereHas('participants', fn ($q) => $q->where('student_id', $studentId))
             ->with(['item:id,title,head_id', 'participants' => fn ($q) => $q->where('student_id', $studentId)])

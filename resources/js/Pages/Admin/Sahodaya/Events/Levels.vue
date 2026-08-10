@@ -220,8 +220,12 @@
                                     <span>🏛️</span> State Qualification Outbox
                                 </h5>
                                 <p class="text-[11px] text-amber-800/90 leading-relaxed">
-                                    Submit regional/district winners to the Central State Competition portal.
+                                    Submit regional/district winners to the Central State Competition portal. If a committee has certified a
+                                    nomination batch below, that curated list is used instead of raw results.
                                 </p>
+                                <Link :href="`${base}/state-nomination`" class="btn-secondary text-xs justify-center !py-2 w-full !bg-white hover:!bg-amber-100 !border-amber-300 !text-amber-900 block text-center">
+                                    Review &amp; Nominate for State
+                                </Link>
                                 <button type="button" @click="submitStateQualifiers" class="btn-secondary text-xs justify-center !py-2 w-full !bg-white hover:!bg-amber-100 !border-amber-300 !text-amber-900">
                                     Submit Qualifiers to State
                                 </button>

@@ -5,6 +5,7 @@ namespace App\Services\State;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
+use App\Models\FestStateNominationBatch;
 use App\Models\FestStateProgram;
 use App\Models\FestStateSubmissionOutbox;
 use App\Services\Events\FestPartitionService;
@@ -18,6 +19,74 @@ class FestStateQualifierPayloadBuilder
 
     /** @return array<string, mixed> */
     public function build(FestStateProgram $program, FestEvent $sourceEvent, string $sourceTenantId): array
+    {
+        $entries = $this->entriesFromCertifiedNomination($program, $sourceEvent)
+            ?? $this->entriesFromDirectMarks($program, $sourceEvent);
+
+        return [
+            'state_program_id' => $program->id,
+            'source_tenant_id' => $sourceTenantId,
+            'source_event_id'  => $sourceEvent->id,
+            'submitted_at'     => now()->toIso8601String(),
+            'entries'          => $entries,
+        ];
+    }
+
+    /**
+     * WP-04 (§27.4): once a Sahodaya's committee has run the maker/checker nomination
+     * workflow and certified a batch for this hub event, that curated selection is the
+     * source of truth — it may include manual overrides (skip a higher scorer, promote a
+     * reserve) that the raw marks alone can't express. Returns null (meaning "no certified
+     * batch exists yet") so callers fall back to reading marks directly, which keeps
+     * today's direct-registration path working for every Sahodaya that hasn't adopted the
+     * nomination workspace yet.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    private function entriesFromCertifiedNomination(FestStateProgram $program, FestEvent $sourceEvent): ?array
+    {
+        $batch = FestStateNominationBatch::query()
+            ->where('state_program_id', $program->id)
+            ->where('hub_event_id', $sourceEvent->id)
+            ->where('status', 'certified')
+            ->first();
+
+        if (! $batch) {
+            return null;
+        }
+
+        $entries = [];
+
+        foreach ($batch->primarySelections()->orderBy('priority_order')->get() as $selection) {
+            if (! $selection->item_id) {
+                // A certified batch should never contain a primary selection without its
+                // catalog item_id backfilled, but skip defensively rather than send State
+                // a qualifier entry with no item to attach it to.
+                continue;
+            }
+
+            $entries[] = [
+                'source_registration_id' => (string) ($selection->registration_id ?? ''),
+                'source_participant_id'  => (string) ($selection->participant_id ?? ''),
+                'school_id'              => $selection->school_id,
+                'item_id'                => $selection->item_id,
+                'item_code'              => $selection->item_code,
+                'item_name'              => $selection->item_title,
+                'student_name'           => $selection->student_name ?? 'Participant',
+                'class_name'             => $selection->class_name,
+                'position'               => $selection->source_position,
+                'grade'                  => $selection->grade,
+                'points'                 => $selection->score ?? 0,
+                'partition_key'          => $selection->partition_key,
+                'qualifier_type'         => 'state_nominated',
+            ];
+        }
+
+        return $entries;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function entriesFromDirectMarks(FestStateProgram $program, FestEvent $sourceEvent): array
     {
         $events = $this->sourceEvents($sourceEvent);
         $entries = [];
@@ -88,13 +157,7 @@ class FestStateQualifierPayloadBuilder
             }
         }
 
-        return [
-            'state_program_id' => $program->id,
-            'source_tenant_id' => $sourceTenantId,
-            'source_event_id'  => $sourceEvent->id,
-            'submitted_at'     => now()->toIso8601String(),
-            'entries'          => $entries,
-        ];
+        return $entries;
     }
 
     public function enqueue(FestStateProgram $program, FestEvent $sourceEvent, string $sourceTenantId, ?int $submittedBy = null): FestStateSubmissionOutbox

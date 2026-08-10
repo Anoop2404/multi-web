@@ -348,10 +348,29 @@ class FestEvent extends Model
             $ids[] = (int) $this->parent_event_id;
         }
 
-        if ($this->isSportsSeasonEvent()
-            || ($this->parent_event_id === null && ($this->conduct_mode ?? 'standard') === 'partitioned')
-        ) {
-            $ids = array_merge($ids, self::where('parent_event_id', $this->id)->pluck('id')->map(fn ($id) => (int) $id)->all());
+        if ($this->root_event_id) {
+            $ids[] = (int) $this->root_event_id;
+        }
+
+        $childIds = self::where('parent_event_id', $this->id)->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (! empty($childIds)) {
+            $ids = array_merge($ids, $childIds);
+            $grandChildIds = self::whereIn('parent_event_id', $childIds)->pluck('id')->map(fn ($id) => (int) $id)->all();
+            if (! empty($grandChildIds)) {
+                $ids = array_merge($ids, $grandChildIds);
+            }
+        }
+
+        $parentOrRoot = $this->root_event_id ?: $this->parent_event_id;
+        if ($parentOrRoot) {
+            $siblingIds = self::where('parent_event_id', $parentOrRoot)
+                ->orWhere('root_event_id', $parentOrRoot)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            if (! empty($siblingIds)) {
+                $ids = array_merge($ids, $siblingIds);
+            }
         }
 
         return array_values(array_unique($ids));

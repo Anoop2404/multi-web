@@ -975,6 +975,7 @@ function registrationsForItem(eventId, itemId) {
         if (found) { targetItem = found; break; }
     }
     const targetInheritedId = targetItem?.inherited_from_item_id ? Number(targetItem.inherited_from_item_id) : null;
+    const targetItemCode = targetItem?.item_code ? String(targetItem.item_code).trim().toLowerCase() : null;
 
     return (props.registrations ?? []).filter((reg) => {
         if (['withdrawn', 'rejected'].includes(reg.status)) {
@@ -983,11 +984,13 @@ function registrationsForItem(eventId, itemId) {
 
         const regItemId = Number(reg.item_id);
         const regInheritedId = reg.item?.inherited_from_item_id ? Number(reg.item.inherited_from_item_id) : null;
+        const regItemCode = reg.item?.item_code ? String(reg.item.item_code).trim().toLowerCase() : null;
 
         const itemMatch = regItemId === numItemId
             || (targetInheritedId !== null && regItemId === targetInheritedId)
             || (regInheritedId !== null && regInheritedId === numItemId)
-            || (targetInheritedId !== null && regInheritedId !== null && regInheritedId === targetInheritedId);
+            || (targetInheritedId !== null && regInheritedId !== null && regInheritedId === targetInheritedId)
+            || (targetItemCode !== null && regItemCode !== null && targetItemCode === regItemCode);
 
         if (!itemMatch) {
             return false;
@@ -995,10 +998,19 @@ function registrationsForItem(eventId, itemId) {
 
         const regEventId = Number(reg.event_id);
         const regParentEventId = reg.event?.parent_event_id ? Number(reg.event.parent_event_id) : null;
+        const regRootEventId = reg.event?.root_event_id ? Number(reg.event.root_event_id) : null;
+
+        const targetEvent = (props.events ?? []).find(e => Number(e.id) === numEventId) || props.event;
+        const targetParentId = targetEvent?.parent_event_id ? Number(targetEvent.parent_event_id) : null;
+        const targetRootId = targetEvent?.root_event_id ? Number(targetEvent.root_event_id) : null;
 
         const eventMatch = regEventId === numEventId
-            || regParentEventId === numEventId
-            || (props.event?.parent_event_id && regEventId === Number(props.event.parent_event_id));
+            || (targetParentId !== null && regEventId === targetParentId)
+            || (targetRootId !== null && regEventId === targetRootId)
+            || (regParentEventId !== null && regParentEventId === numEventId)
+            || (regRootEventId !== null && regRootEventId === numEventId)
+            || (targetParentId !== null && regParentEventId !== null && targetParentId === regParentEventId)
+            || (targetRootId !== null && regRootEventId !== null && targetRootId === regRootEventId);
 
         return eventMatch;
     });

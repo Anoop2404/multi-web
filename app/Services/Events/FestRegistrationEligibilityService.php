@@ -110,7 +110,7 @@ class FestRegistrationEligibilityService
         if ($schoolId) {
             $studentIds = $students->pluck('id');
             $eventRegByStudent = FestLevelRegistration::query()
-                ->where('event_id', $event->id)
+                ->whereIn('event_id', $event->reportableEventIds())
                 ->where('status', 'active')
                 ->whereIn('student_id', $studentIds)
                 ->pluck('registration_number', 'student_id')

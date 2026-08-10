@@ -156,7 +156,7 @@ class FestRegistrationController extends SchoolAdminController
                 : collect();
 
             $eventRegMap = \App\Models\FestLevelRegistration::query()
-                ->whereIn('event_id', $events->pluck('id'))
+                ->whereIn('event_id', $registrationEventIds)
                 ->where('status', 'active')
                 ->whereIn('student_id', $studentRows->pluck('id'))
                 ->get()
@@ -164,12 +164,18 @@ class FestRegistrationController extends SchoolAdminController
                 ->map(fn ($regs) => $regs->pluck('registration_number', 'student_id')->all());
 
             $studentsByEvent = $events->mapWithKeys(function (FestEvent $event) use ($baseStudents, $eventRegMap) {
-                $regMap = $eventRegMap->get($event->id) ?? [];
-                $eventStudents = $baseStudents->map(function ($s) use ($regMap) {
-                    $regNo = $regMap[$s['id']] ?? null;
+                $reportableIds = $event->reportableEventIds();
+                $eventStudents = $baseStudents->map(function ($s) use ($eventRegMap, $reportableIds) {
+                    $regNo = null;
+                    foreach ($reportableIds as $eid) {
+                        if (isset($eventRegMap[$eid][$s['id']])) {
+                            $regNo = $eventRegMap[$eid][$s['id']];
+                            break;
+                        }
+                    }
                     return array_merge($s, [
-                        'event_registered' => $regNo !== null,
-                        'event_registration_number' => $regNo,
+                        'event_registered' => $regNo !== null || ($s['event_registered'] ?? false),
+                        'event_registration_number' => $regNo ?: ($s['event_registration_number'] ?? null),
                     ]);
                 });
                 return [$event->id => $eventStudents];
@@ -501,19 +507,11 @@ class FestRegistrationController extends SchoolAdminController
 
     private function registrationEventIdsForSchoolView($events)
     {
-        $partitionService = app(\App\Services\Events\FestPartitionService::class);
-
         return collect($events)
-            ->flatMap(function (FestEvent $event) use ($partitionService) {
-                $ids = [$event->id];
-                if ($partitionService->isPartitionedHub($event)) {
-                    $ids = array_merge($ids, $partitionService->partitions($event)->pluck('id')->all());
-                }
-
-                return $ids;
-            })
+            ->flatMap(fn (FestEvent $event) => $event->reportableEventIds())
             ->unique()
-            ->values();
+            ->values()
+            ->all();
     }
 
     /**

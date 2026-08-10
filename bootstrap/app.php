@@ -16,6 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
+        then: function () {
+            // Additive dedicated-domain group — see routes/state.php for why this is
+            // safe to register unconditionally (inert until STATE_APP_DOMAIN is set).
+            require __DIR__.'/../routes/state.php';
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // On central /sahodaya-admin/{tenantId} routes, tenancy must start AFTER the session

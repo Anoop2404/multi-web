@@ -118,6 +118,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::get('/fest', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'index'])->name('fest.index');
             Route::post('/fest', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'store'])->name('fest.store');
             Route::get('/fest/{event}', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'show'])->name('fest.show');
+            Route::post('/fest/{event}/assign-chest-numbers', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'assignChestNumbers'])->name('fest.assign-chest-numbers');
         });
 
         Route::get('/sports', [\App\Http\Controllers\Admin\SportsResultsController::class, 'index'])->name('sports.index');
@@ -1010,6 +1011,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/phases/{phase}', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'destroy'])->name('phases.destroy');
             Route::post('/{event}/phases/assign-items', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'assignItems'])->name('phases.assign-items');
             Route::post('/{event}/submit-state-qualifiers', [\App\Http\Controllers\SahodayaAdmin\StateQualifierSubmissionController::class, 'store'])->name('submit-state-qualifiers');
+            // WP-04 manual State nomination workspace (master plan §27) — additive; a
+            // Sahodaya only sees these if its event has a state_program_id at all, and
+            // submit-state-qualifiers above still works with zero certified nominations.
+            Route::get('/{event}/state-nomination', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'index'])->name('state-nomination.index');
+            Route::post('/{event}/state-nomination/select', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'select'])->name('state-nomination.select');
+            Route::delete('/{event}/state-nomination/selections/{selection}', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'unselect'])->name('state-nomination.unselect');
+            Route::post('/{event}/state-nomination/certify', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'certify'])->name('state-nomination.certify');
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');
             Route::post('/{event}/promote-discipline-events', [FestEventController::class, 'promoteDisciplineEvents'])->name('promote-discipline-events');
